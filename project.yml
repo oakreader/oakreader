@@ -1,0 +1,54 @@
+name: OakReader
+options:
+  bundleIdPrefix: com.oakreader
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "16.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+  generateEmptyDirectories: true
+
+packages:
+  OakReaderAI:
+    path: Packages/OakReaderAI
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    ENABLE_STRICT_OBJC_MSGSEND: YES
+
+targets:
+  OakReader:
+    type: application
+    platform: macOS
+    sources:
+      - path: OakReader
+        excludes:
+          - "**/Info.plist"
+          - "**/*.entitlements"
+    dependencies:
+      - package: OakReaderAI
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.oakreader.OakReader
+        PRODUCT_NAME: OakReader
+        INFOPLIST_FILE: OakReader/App/Info.plist
+        CODE_SIGN_ENTITLEMENTS: OakReader/OakReader.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        COMBINE_HIDPI_IMAGES: YES
+        ENABLE_HARDENED_RUNTIME: YES
+        CODE_SIGN_IDENTITY: "-"
+        SWIFT_STRICT_CONCURRENCY: minimal
+
+  oakreader-chat:
+    type: tool
+    platform: macOS
+    sources:
+      - path: CLI
+    dependencies:
+      - package: OakReaderAI
+    settings:
+      base:
+        PRODUCT_NAME: oakreader-chat
+        SWIFT_STRICT_CONCURRENCY: minimal
