@@ -1,0 +1,148 @@
+import Foundation
+
+public struct GoogleProvider: LLMProviderService {
+    private let apiKey: String
+    private let baseURL = "https://generativelanguage.googleapis.com/v1beta/models/"
+
+    public init(apiKey: String) {
+        self.apiKey = apiKey
+    }
+
+    public func sendMessage(
+        messages: [LLMMessage],
+        model: String,
+        systemPrompt: String?,
+        maxTokens: Int
+    ) -> AsyncThrowingStream<StreamChunk, Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    let url = URL(string: "\(baseURL)\(model):streamGenerateContent?alt=sse&key=\(apiKey)")!
+                    var request = URLRequest(url: url)
+                    request.httpMethod = "POST"
+                    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+                    let body = buildRequestBody(
+                        messages: messages, systemPrompt: systemPrompt,
+                        maxTokens: maxTokens
+                    )
+                    request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+                    let (bytes, response) = try await URLSession.shared.bytes(for: request)
+                    guard let httpResponse = response as? HTTPURLResponse else {
+                        continuation.finish(throwing: LLMProviderError.networkError("Invalid response"))
+                        return
+                    }
+                    guard httpResponse.statusCode == 200 else {
+                        var errorBody = ""
+                        for try await line in bytes.lines { errorBody += line }
+                        continuation.finish(throwing: LLMProviderError.invalidResponse(httpResponse.statusCode))
+                        return
+                    }
+
+                    try await parseSSEStream(bytes: bytes, continuation: continuation)
+                } catch is CancellationError {
+                    continuation.finish(throwing: LLMProviderError.cancelled)
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    private func buildRequestBody(
+        messages: [LLMMessage],
+        systemPrompt: String?,
+        maxTokens: Int
+    ) -> [String: Any] {
+        var body: [String: Any] = [
+            "generationConfig": [
+                "maxOutputTokens": maxTokens,
+            ] as [String: Any]
+        ]
+
+        // System instruction
+        if let system = systemPrompt {
+            body["systemInstruction"] = [
+                "parts": [["text": system]]
+            ] as [String: Any]
+        }
+
+        // Convert messages to Gemini format
+        var contents: [[String: Any]] = []
+        for msg in messages where msg.role != .system {
+            let role = msg.role == .user ? "user" : "model"
+
+            var parts: [[String: Any]] = []
+            for part in msg.content {
+                switch part {
+                case .text(let text):
+                    parts.append(["text": text])
+                case .imageBase64(let data, let mediaType):
+                    parts.append([
+                        "inlineData": [
+                            "mimeType": mediaType,
+                            "data": data,
+                        ] as [String: Any]
+                    ])
+                }
+            }
+
+            contents.append(["role": role, "parts": parts])
+        }
+
+        body["contents"] = contents
+        return body
+    }
+
+    private func parseSSEStream(
+        bytes: URLSession.AsyncBytes,
+        continuation: AsyncThrowingStream<StreamChunk, Error>.Continuation
+    ) async throws {
+        for try await line in bytes.lines {
+            guard !Task.isCancelled else {
+                continuation.finish(throwing: LLMProviderError.cancelled)
+                return
+            }
+
+            guard line.hasPrefix("data: ") else { continue }
+            let jsonStr = String(line.dropFirst(6))
+
+            guard let data = jsonStr.data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            else { continue }
+
+            // Check for error
+            if let error = json["error"] as? [String: Any],
+               let message = error["message"] as? String
+            {
+                continuation.finish(throwing: LLMProviderError.streamError(message))
+                return
+            }
+
+            // Extract text from candidates
+            if let candidates = json["candidates"] as? [[String: Any]],
+               let candidate = candidates.first,
+               let content = candidate["content"] as? [String: Any],
+               let parts = content["parts"] as? [[String: Any]]
+            {
+                for part in parts {
+                    if let text = part["text"] as? String {
+                        continuation.yield(.delta(text))
+                    }
+                }
+
+                // Check finish reason
+                if let finishReason = candidate["finishReason"] as? String,
+                   finishReason == "STOP"
+                {
+                    continuation.yield(.finished(stopReason: finishReason))
+                    continuation.finish()
+                    return
+                }
+            }
+        }
+        continuation.finish()
+    }
+}
