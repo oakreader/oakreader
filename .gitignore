@@ -1,0 +1,55 @@
+# Xcode
+xcuserdata/
+*.xcscmblueprint
+*.xccheckout
+*.xcworkspace/xcuserdata/
+
+# Build
+build/
+.build/
+DerivedData/
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Swift Package Manager
+.swiftpm/
+Packages/
+Package.resolved
+
+# CocoaPods (if ever used)
+Pods/
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+# OS files
+.DS_Store
+*.swp
+*~
+._*
+Thumbs.db
+
+# Claude Code
+.claude/
+
+# IDE
+*.idea/
+*.vscode/
+
+# Archives
+*.xcarchive
+
+# Provisioning
+*.mobileprovision
+*.provisionprofile
+
+# Keys and secrets
+*.pem
+*.p12
+*.key
+*.env
+*.env.*
