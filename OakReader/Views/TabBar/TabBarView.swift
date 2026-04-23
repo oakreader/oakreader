@@ -53,6 +53,20 @@ struct TabBarView: View {
             }
 
             Spacer(minLength: 0)
+
+            // Settings button — right end, aligned with SideNav column
+            Button {
+                appState.showSettings = true
+            } label: {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 14))
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(appState.showSettings ? Color.accentColor : Color(nsColor: .labelColor))
+            .help("Settings")
+            .frame(width: ZoteroStyle.Size.sidenavWidth)
         }
         .padding(.leading, isFullScreen ? fullScreenPadding : trafficLightPadding)
         .padding(.top, 4)
@@ -86,13 +100,13 @@ struct TabBarView: View {
     private var pinnedTabShape: some View {
         if appState.isLibraryActive {
             RoundedRectangle(cornerRadius: ZoteroStyle.Radius.standard)
-                .fill(Color.primary.opacity(0.10))
+                .fill(ZoteroStyle.Colors.activeTabBackground)
                 .padding(.vertical, 6)
         } else if isPinnedHovering {
             RoundedRectangle(cornerRadius: ZoteroStyle.Radius.standard)
-                .fill(Color.primary.opacity(0.07))
+                .fill(Color.primary.opacity(0.08))
                 .padding(.vertical, 6)
         }
-        // Inactive + not hovering: transparent
+        // Inactive + not hovering: transparent (gray tab bar shows through)
     }
 }

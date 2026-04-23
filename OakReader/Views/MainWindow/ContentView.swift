@@ -17,65 +17,76 @@ struct ContentView: View {
     @State private var sidebarWidth: CGFloat = 200  // idealWidth
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Inline toolbar (below tab bar)
-            OakReaderToolbarView(viewModel: viewModel)
-            Divider()
-
-            // Search bar (below toolbar, like Zotero)
-            if viewModel.state.isSearchBarVisible {
-                SearchBarView(viewModel: viewModel)
+        HStack(spacing: 0) {
+            // Main content column (toolbar + content)
+            VStack(spacing: 0) {
+                // Inline toolbar (below tab bar)
+                OakReaderToolbarView(viewModel: viewModel)
                 Divider()
+
+                // Search bar (below toolbar, like Zotero)
+                if viewModel.state.isSearchBarVisible {
+                    SearchBarView(viewModel: viewModel)
+                    Divider()
+                }
+
+                HStack(spacing: 0) {
+                    // Left sidebar — draggable divider
+                    if viewModel.state.isSidebarVisible {
+                        SidebarView(viewModel: viewModel)
+                            .frame(width: sidebarWidth)
+                            .background(Color(nsColor: .controlBackgroundColor))
+
+                        panelDivider { delta in
+                            sidebarWidth = min(max(sidebarWidth + delta, 140), 380)
+                        }
+                    }
+
+                    // Main content area
+                    ZStack {
+                        if viewModel.hasDocument {
+                            mainContentView
+                        } else {
+                            emptyStateView
+                        }
+
+                        // Loading overlay
+                        if viewModel.state.isLoading {
+                            ProgressOverlay(message: "Processing...")
+                        }
+                    }
+                    .frame(minWidth: 300)
+                    .frame(maxWidth: .infinity)
+
+                    // Right panel — draggable divider
+                    if viewModel.state.rightPanelMode != nil {
+                        panelDivider { delta in
+                            rightPanelWidth = min(max(rightPanelWidth - delta, 320), 720)
+                        }
+
+                        RightPanelContentView(viewModel: viewModel)
+                            .frame(width: rightPanelWidth)
+                            .background(Color(nsColor: .controlBackgroundColor))
+                    }
+                }
             }
+            .background(ZoteroStyle.Colors.contentBackground)
+            .clipShape(
+                UnevenRoundedRectangle(
+                    topLeadingRadius: 0,
+                    bottomLeadingRadius: 0,
+                    bottomTrailingRadius: 0,
+                    topTrailingRadius: 8
+                )
+            )
 
-            HStack(spacing: 0) {
-                // Left sidebar — draggable divider
-                if viewModel.state.isSidebarVisible {
-                    SidebarView(viewModel: viewModel)
-                        .frame(width: sidebarWidth)
-                        .background(Color(nsColor: .controlBackgroundColor))
-
-                    panelDivider { delta in
-                        sidebarWidth = min(max(sidebarWidth + delta, 140), 380)
-                    }
-                }
-
-                // Main content area
-                ZStack {
-                    if viewModel.hasDocument {
-                        mainContentView
-                    } else {
-                        emptyStateView
-                    }
-
-                    // Loading overlay
-                    if viewModel.state.isLoading {
-                        ProgressOverlay(message: "Processing...")
-                    }
-                }
-                .frame(minWidth: 300)
-                .frame(maxWidth: .infinity)
-
-                // Right panel — draggable divider
-                if viewModel.state.rightPanelMode != nil {
-                    panelDivider { delta in
-                        rightPanelWidth = min(max(rightPanelWidth - delta, 320), 720)
-                    }
-
-                    RightPanelContentView(viewModel: viewModel)
-                        .frame(width: rightPanelWidth)
-                        .background(Color(nsColor: .controlBackgroundColor))
-                }
-
-                // Side navigation strip — always visible
-                Divider()
-                SideNavView(rightPanelMode: Binding(
-                    get: { viewModel.state.rightPanelMode },
-                    set: { viewModel.state.rightPanelMode = $0 }
-                ))
-            }
+            // Side navigation strip — spans full height (toolbar + content)
+            SideNavView(rightPanelMode: Binding(
+                get: { viewModel.state.rightPanelMode },
+                set: { viewModel.state.rightPanelMode = $0 }
+            ))
         }
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(ZoteroStyle.Colors.tabBarBackground)
         .alert("Error", isPresented: Binding(
             get: { viewModel.state.showError },
             set: { viewModel.state.showError = $0 }

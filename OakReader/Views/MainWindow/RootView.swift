@@ -20,5 +20,11 @@ struct RootView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .ignoresSafeArea(.container, edges: .top)
+        .sheet(isPresented: Binding(
+            get: { appState.showSettings },
+            set: { appState.showSettings = $0 }
+        )) {
+            SettingsView()
+        }
     }
 }

@@ -1,7 +1,6 @@
 import Foundation
 import PDFKit
 import AppKit
-import SwiftData
 
 // MARK: - Document Tab
 
@@ -11,25 +10,19 @@ final class DocumentTab: Identifiable {
     let document: OakReaderDocument
     let viewModel: DocumentViewModel
     var title: String
-    /// Security-scoped URL kept alive for bookmark-based file access
-    private var securityScopedURL: URL?
+    /// Storage key for this document's managed directory (nil for unsaved/blank documents).
+    let storageKey: String?
 
     var isDirty: Bool {
         document.hasUnautosavedChanges || document.isDocumentEdited
     }
 
-    init(document: OakReaderDocument, securityScopedURL: URL? = nil) {
+    init(document: OakReaderDocument, storageKey: String? = nil) {
         self.id = UUID()
         self.document = document
         self.viewModel = document.documentViewModel
         self.title = document.fileURL?.lastPathComponent ?? "Untitled"
-        self.securityScopedURL = securityScopedURL
-    }
-
-    /// Release security-scoped resource when tab is done
-    func releaseSecurityScope() {
-        securityScopedURL?.stopAccessingSecurityScopedResource()
-        securityScopedURL = nil
+        self.storageKey = storageKey
     }
 }
 
@@ -39,11 +32,13 @@ final class DocumentTab: Identifiable {
 final class AppState {
     let libraryStore: LibraryStore
     let coverService = LibraryCoverService()
+    let importService: ImportService
 
     var openTabs: [DocumentTab] = []
     var activeTabID: UUID?
     var window: NSWindow?
     var selectedLibraryItemIDs: Set<UUID> = []
+    var showSettings: Bool = false
 
     private var autosaveTimer: Timer?
 
@@ -62,53 +57,101 @@ final class AppState {
     }
 
     init() {
-        self.libraryStore = LibraryStore()
+        let database: CatalogDatabase
+        do {
+            database = try CatalogDatabase()
+        } catch {
+            fatalError("[AppState] Failed to initialize database: \(error)")
+        }
+        self.libraryStore = LibraryStore(database: database)
+        self.importService = ImportService(store: libraryStore, coverService: coverService)
         startAutosaveTimer()
     }
 
     // MARK: - Tab Operations
 
-    /// Open a document from a URL.
-    /// - Parameters:
-    ///   - url: File URL (may be security-scoped)
-    ///   - securityScoped: If true, the URL's security scope is kept alive for the tab's lifetime
-    func openDocument(url: URL, securityScoped: Bool = false) {
-        // Check if already open
+    /// Open a document from a URL. If the PDF is not already in managed storage, it will be imported first.
+    func openDocument(url: URL) {
+        // Check if already open by URL
         if let existing = openTabs.first(where: { $0.document.fileURL == url }) {
-            // Release the extra security scope since we don't need it
-            if securityScoped { url.stopAccessingSecurityScopedResource() }
+            switchToTab(existing.id)
+            return
+        }
+
+        // Import into managed storage (or find existing)
+        let item = importService.importPDF(from: url)
+        let pdfURL = item?.fileURL ?? url
+        let storageKey = item?.storageKey
+
+        // Check if the managed URL is already open
+        if let item, let existing = openTabs.first(where: { $0.document.fileURL == item.fileURL }) {
             switchToTab(existing.id)
             return
         }
 
         let doc = OakReaderDocument()
         do {
-            NSLog("[Open] Reading PDF from: \(url.path)")
-            try doc.read(from: url, ofType: "com.adobe.pdf")
-            doc.fileURL = url
-            NSLog("[Open] Successfully read PDF: \(url.lastPathComponent)")
+            NSLog("[Open] Reading PDF from: \(pdfURL.path)")
+            try doc.read(from: pdfURL, ofType: "com.adobe.pdf")
+            doc.fileURL = pdfURL
+            NSLog("[Open] Successfully read PDF: \(pdfURL.lastPathComponent)")
         } catch {
-            NSLog("[Open] FAILED to read PDF: \(url.lastPathComponent) — \(error)")
-            if securityScoped { url.stopAccessingSecurityScopedResource() }
+            NSLog("[Open] FAILED to read PDF: \(pdfURL.lastPathComponent) — \(error)")
             NSAlert(error: error).runModal()
             return
         }
 
         NSDocumentController.shared.noteNewRecentDocumentURL(url)
 
-        // Add to library & generate cover
-        if let item = libraryStore.addItem(from: url) {
+        if let item {
             libraryStore.markOpened(item)
-            if item.coverImageData == nil {
-                Task {
-                    if let data = await coverService.generateCover(for: url) {
-                        await MainActor.run { libraryStore.updateCover(item, imageData: data) }
-                    }
-                }
-            }
         }
 
-        let tab = DocumentTab(document: doc, securityScopedURL: securityScoped ? url : nil)
+        let tab = DocumentTab(document: doc, storageKey: storageKey)
+        // Use original filename (not "document.pdf" from managed storage)
+        tab.title = item?.fileName ?? url.lastPathComponent
+        NSDocumentController.shared.addDocument(doc)
+        openTabs.append(tab)
+        activeTabID = tab.id
+        updateWindowTitle()
+    }
+
+    /// Open a library item directly (already imported).
+    func openLibraryItem(_ item: PDFLibraryItem) {
+        let pdfURL = item.fileURL
+
+        // Check if already open
+        if let existing = openTabs.first(where: { $0.document.fileURL == pdfURL }) {
+            switchToTab(existing.id)
+            return
+        }
+
+        guard FileManager.default.fileExists(atPath: pdfURL.path) else {
+            let alert = NSAlert()
+            alert.messageText = "Cannot Open PDF"
+            alert.informativeText = "The file \"\(item.title)\" could not be found in managed storage."
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
+            return
+        }
+
+        let doc = OakReaderDocument()
+        do {
+            try doc.read(from: pdfURL, ofType: "com.adobe.pdf")
+            doc.fileURL = pdfURL
+        } catch {
+            NSLog("[Open] FAILED to read PDF: \(item.title) — \(error)")
+            NSAlert(error: error).runModal()
+            return
+        }
+
+        NSDocumentController.shared.noteNewRecentDocumentURL(pdfURL)
+        libraryStore.markOpened(item)
+
+        let tab = DocumentTab(document: doc, storageKey: item.storageKey)
+        // Use original filename from library item
+        tab.title = item.fileName
         NSDocumentController.shared.addDocument(doc)
         openTabs.append(tab)
         activeTabID = tab.id
@@ -155,7 +198,6 @@ final class AppState {
             }
         }
 
-        tab.releaseSecurityScope()
         tab.document.close()
         openTabs.remove(at: index)
 
@@ -205,8 +247,6 @@ final class AppState {
     // MARK: - Window
 
     func updateWindowTitle() {
-        // Title is hidden in the title bar; document name is shown in tabs.
-        // Keep a short title for Window menu / Mission Control.
         window?.title = ""
     }
 
