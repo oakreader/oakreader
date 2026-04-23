@@ -24,12 +24,6 @@ struct AIChatView: View {
 
             inputBar
         }
-        .sheet(isPresented: Binding(
-            get: { chatVM.showSettings },
-            set: { chatVM.showSettings = $0 }
-        )) {
-            AISettingsView()
-        }
     }
 
     // MARK: - Header
@@ -37,7 +31,7 @@ struct AIChatView: View {
     private var header: some View {
         HStack(spacing: 8) {
             Text("AI Chat")
-                .font(.headline)
+                .font(.system(size: 15, weight: .semibold))
 
             Spacer()
 
@@ -49,13 +43,6 @@ struct AIChatView: View {
             }
             .buttonStyle(.plain)
             .help("New Chat")
-
-            Button(action: { chatVM.showSettings = true }) {
-                Image(systemName: "gearshape")
-                    .font(.system(size: 16))
-            }
-            .buttonStyle(.plain)
-            .help("AI Settings")
         }
         .padding(.horizontal, ZoteroStyle.Spacing.sm)
         .padding(.vertical, ZoteroStyle.Spacing.sm)
@@ -67,13 +54,13 @@ struct AIChatView: View {
         VStack(spacing: 12) {
             Spacer()
             Image(systemName: "bubble.left.and.text.bubble.right")
-                .font(.system(size: 36))
+                .font(.system(size: 40))
                 .foregroundStyle(.tertiary)
             Text("Ask about this PDF")
-                .font(.headline)
+                .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.secondary)
             Text("Ask questions, get summaries, or find information in your document.")
-                .font(.caption)
+                .font(.system(size: 13))
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, ZoteroStyle.Spacing.lg)
@@ -121,36 +108,43 @@ struct AIChatView: View {
 
     // MARK: - Input Bar
 
+    @State private var inputContentHeight: CGFloat = 36
+    private let inputFocusRef = ChatInputTextView.FocusRef()
+
     private var inputHasText: Bool {
         !chatVM.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private var inputBar: some View {
         VStack(spacing: 0) {
-            // Attachment chips inside the card
+            // Attachment chips
             if !chatVM.pendingAttachments.isEmpty {
                 AttachmentPreviewStrip(
                     attachments: chatVM.pendingAttachments,
                     onRemove: { chatVM.removePendingAttachment($0) }
                 )
-                .padding(.top, 10)
-                .padding(.horizontal, 8)
+                .padding(.top, 6)
+                .padding(.horizontal, 10)
             }
 
-            // Multi-line text field with placeholder
-            TextField("Ask about this PDF...", text: Binding(
-                get: { chatVM.inputText },
-                set: { chatVM.inputText = $0 }
-            ), axis: .vertical)
-            .font(.body)
-            .textFieldStyle(.plain)
-            .lineLimit(3...6)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
+            // Text input — sized exactly to content
+            ChatInputTextView(
+                text: Binding(
+                    get: { chatVM.inputText },
+                    set: { chatVM.inputText = $0 }
+                ),
+                placeholder: "Ask about this PDF...",
+                onSend: { if inputHasText { chatVM.send() } },
+                contentHeight: $inputContentHeight,
+                focusRef: inputFocusRef
+            )
+            .frame(height: inputContentHeight)
+            .padding(.horizontal, 10)
+            .padding(.top, 8)
+            .padding(.bottom, 4)
 
-            // Bottom row: attachment button + send/stop button
-            HStack(spacing: 8) {
-                // Attachment menu button
+            // Bottom row: attachment + send
+            HStack(spacing: 6) {
                 Menu {
                     Button(action: {}) {
                         Label("Attach Page Snapshot", systemImage: "doc.viewfinder")
@@ -160,9 +154,9 @@ struct AIChatView: View {
                     }
                 } label: {
                     Image(systemName: "plus")
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(.secondary)
-                        .frame(width: 28, height: 28)
+                        .frame(width: 24, height: 24)
                         .background(Circle().fill(Color.primary.opacity(0.06)))
                 }
                 .buttonStyle(.plain)
@@ -170,30 +164,36 @@ struct AIChatView: View {
 
                 Spacer()
 
-                // Send / Stop button
                 if chatVM.isStreaming {
                     Button(action: { chatVM.stopStreaming() }) {
-                        Image(systemName: "stop.circle.fill")
-                            .font(.system(size: 24))
-                            .foregroundStyle(.red)
+                        ZStack {
+                            Circle()
+                                .fill(Color.primary)
+                                .frame(width: 24, height: 24)
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(Color(nsColor: .windowBackgroundColor))
+                                .frame(width: 10, height: 10)
+                        }
                     }
                     .buttonStyle(.plain)
                     .help("Stop generating")
                 } else {
                     Button(action: { chatVM.send() }) {
                         Image(systemName: "arrow.up.circle.fill")
-                            .font(.system(size: 24))
+                            .font(.system(size: 22))
                             .foregroundStyle(inputHasText ? Color.accentColor : Color.gray.opacity(0.5))
                     }
                     .buttonStyle(.plain)
                     .disabled(!inputHasText)
-                    .help("Send message (⌘↩)")
-                    .keyboardShortcut(.return, modifiers: .command)
+                    .help("Send message (↩)")
                 }
             }
             .padding(.horizontal, 10)
-            .padding(.bottom, 10)
-            .padding(.top, 4)
+            .padding(.bottom, 6)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 16))
+        .onTapGesture {
+            inputFocusRef.focus()
         }
         .background(
             RoundedRectangle(cornerRadius: 16)
