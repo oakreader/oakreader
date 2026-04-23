@@ -2,25 +2,47 @@ import SwiftUI
 
 enum ZoteroStyle {
     // MARK: - Colors
+    // Inspired by Dia browser's design system — uses opacity-based tints
+    // for better light/dark mode adaptability.
 
     enum Colors {
-        static let tabBarBackground = Color(hex: "F2F2F2")
-        static let sidebarBackground = Color(hex: "F2F2F2")
-        static let activeTabBackground = Color(nsColor: .controlBackgroundColor)
-        static let hoverBackground = Color.black.opacity(0.05)
-        static let activeBackground = Color.black.opacity(0.10)
-        static let divider = Color(hex: "DADADA")
+        // Backgrounds (Dia gray scale: #F8F8F8 → #F2F2F2 → #EDEDED)
+        static let tabBarBackground = Color(hex: "F5F5F5")
+        static let sidebarBackground = Color(hex: "F5F5F5")
+        static let activeTabBackground = Color(nsColor: .textBackgroundColor)  // white — merges with content
+        static let contentBackground = Color(nsColor: .textBackgroundColor)
+
+        // Interactive states
+        static let hoverBackground = Color.primary.opacity(0.06)
+        static let activeBackground = Color.primary.opacity(0.10)
+        static let selectedBackground = Color.accentColor.opacity(0.12)
+
+        // Borders & dividers
+        static let divider = Color.primary.opacity(0.08)
+        static let border = Color.primary.opacity(0.10)
+        static let borderSubtle = Color.primary.opacity(0.05)
+
+        // Text
+        static let textPrimary = Color.primary.opacity(1.0)
+        static let textSecondary = Color.primary.opacity(0.60)
+        static let textTertiary = Color.primary.opacity(0.35)
+        static let textQuaternary = Color.primary.opacity(0.20)
+
+        // Buttons (Dia-style)
+        static let buttonBackground = Color.primary.opacity(0.07)
+        static let buttonBackgroundHover = Color.primary.opacity(0.12)
+        static let buttonForeground = Color.primary.opacity(0.80)
     }
 
     // MARK: - Sizes
 
     enum Size {
         static let buttonStandard: CGFloat = 28
-        static let toolbarHeight: CGFloat = 44
-        static let tabHeight: CGFloat = 38
-        static let tabBarHeight: CGFloat = 42  // topPad(4) + tabHeight(38)
+        static let toolbarHeight: CGFloat = 40
+        static let tabHeight: CGFloat = 36
+        static let tabBarHeight: CGFloat = 40
         static let closeButton: CGFloat = 18
-        static let sidenavWidth: CGFloat = 37
+        static let sidenavWidth: CGFloat = 38
         static let rightPanelWidth: CGFloat = 520
         static let sidebarMin: CGFloat = 200
         static let sidebarMax: CGFloat = 320
@@ -55,7 +77,7 @@ enum ZoteroStyle {
 
     enum Radius {
         static let standard: CGFloat = 8
-        static let small: CGFloat = 3
+        static let small: CGFloat = 4
         static let concave: CGFloat = 10
     }
 

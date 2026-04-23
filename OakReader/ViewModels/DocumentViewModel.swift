@@ -62,9 +62,21 @@ class DocumentViewModel {
     private var _chat: ChatViewModel?
     var chat: ChatViewModel {
         if let vm = _chat { return vm }
-        let vm = ChatViewModel(parent: self)
+        // Derive document storage path from file URL if it's in managed storage
+        let storagePath = documentStoragePath
+        let vm = ChatViewModel(parent: self, documentStoragePath: storagePath)
         _chat = vm
         return vm
+    }
+
+    /// Returns the document's managed storage directory if the file is in ~/OakReader/storage/.
+    private var documentStoragePath: URL? {
+        guard let fileURL = document?.fileURL else { return nil }
+        let storageDirPath = CatalogDatabase.storageDirectory.path
+        let filePath = fileURL.path
+        guard filePath.hasPrefix(storageDirPath) else { return nil }
+        // Path is .../storage/{key}/document.pdf → parent is the document directory
+        return fileURL.deletingLastPathComponent()
     }
 
     // MARK: - Computed Properties
@@ -108,7 +120,7 @@ class DocumentViewModel {
             if state.rightPanelMode != nil {
                 state.rightPanelMode = nil
             } else {
-                state.rightPanelMode = .inspector
+                state.rightPanelMode = .aiChat
             }
         case .zoomIn:
             viewer.zoomIn()

@@ -5,6 +5,7 @@ struct SideNavView: View {
 
     var body: some View {
         VStack(spacing: 2) {
+            // Panel mode icons — right below settings button in tab bar
             ForEach(RightPanelMode.allCases) { mode in
                 Button {
                     if rightPanelMode == mode {
@@ -14,17 +15,18 @@ struct SideNavView: View {
                     }
                 } label: {
                     Image(systemName: mode.systemImage)
-                        .font(.system(size: 12))
-                        .frame(width: 24, height: 24)
+                        .font(.system(size: 14))
+                        .frame(width: 28, height: 28)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(rightPanelMode == mode ? Color.accentColor : Color(nsColor: .labelColor))
                 .help(mode.label)
             }
+
             Spacer()
         }
-        .padding(.top, ZoteroStyle.Spacing.xs)
+        .padding(.top, 6)
         .frame(width: ZoteroStyle.Size.sidenavWidth)
         .background(ZoteroStyle.Colors.sidebarBackground)
     }
