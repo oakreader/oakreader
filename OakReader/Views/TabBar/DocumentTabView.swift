@@ -1,67 +1,77 @@
 import SwiftUI
 
-/// Chrome-style tab shape: subtle tapered sides, smooth rounded top corners,
-/// and elegant concave bottom curves using cubic beziers for S-curve transitions.
-struct ChromeTabShape: Shape {
+/// Browser-style tab shape: straight vertical sides, rounded top corners,
+/// and concave (inverse) arcs at the bottom corners where the tab meets the bar.
+///
+///      ╭──────────────╮
+///      │              │
+///  ────╯              ╰────
+///
+/// The concave arcs extend `cr` points beyond each side of the tab body.
+struct BrowserTabShape: Shape {
     let topRadius: CGFloat
     let concaveRadius: CGFloat
-    let taper: CGFloat
 
-    init(topRadius: CGFloat = ZoteroStyle.Radius.standard,
-         concaveRadius: CGFloat = ZoteroStyle.Radius.concave,
-         taper: CGFloat = 2) {
+    init(topRadius: CGFloat = 10,
+         concaveRadius: CGFloat = 10) {
         self.topRadius = topRadius
         self.concaveRadius = concaveRadius
-        self.taper = taper
     }
 
     func path(in rect: CGRect) -> Path {
         let w = rect.width
         let h = rect.height
-        let tr = topRadius
+        let r = topRadius
         let cr = concaveRadius
-
-        let left = cr
-        let right = w - cr
 
         var path = Path()
 
-        // Bottom-left start
+        // Start at bottom-left outside
         path.move(to: CGPoint(x: 0, y: h))
 
-        // Left concave S-curve
-        path.addCurve(
-            to: CGPoint(x: left, y: h - cr),
-            control1: CGPoint(x: left * 0.72, y: h),
-            control2: CGPoint(x: left, y: h - cr * 0.28)
+        // Left concave arc (╯): bows outward, from bottom bar up to tab edge
+        path.addArc(
+            center: CGPoint(x: 0, y: h - cr),
+            radius: cr,
+            startAngle: .degrees(90),
+            endAngle: .degrees(0),
+            clockwise: true
         )
 
-        // Up the left side with subtle inward taper
-        path.addLine(to: CGPoint(x: left + taper, y: tr))
+        // Straight up the left side
+        path.addLine(to: CGPoint(x: cr, y: r))
 
         // Top-left rounded corner
-        path.addQuadCurve(
-            to: CGPoint(x: left + taper + tr, y: 0),
-            control: CGPoint(x: left + taper, y: 0)
+        path.addArc(
+            center: CGPoint(x: cr + r, y: r),
+            radius: r,
+            startAngle: .degrees(180),
+            endAngle: .degrees(270),
+            clockwise: false
         )
 
         // Across the top
-        path.addLine(to: CGPoint(x: right - taper - tr, y: 0))
+        path.addLine(to: CGPoint(x: w - cr - r, y: 0))
 
         // Top-right rounded corner
-        path.addQuadCurve(
-            to: CGPoint(x: right - taper, y: tr),
-            control: CGPoint(x: right - taper, y: 0)
+        path.addArc(
+            center: CGPoint(x: w - cr - r, y: r),
+            radius: r,
+            startAngle: .degrees(270),
+            endAngle: .degrees(0),
+            clockwise: false
         )
 
-        // Down the right side
-        path.addLine(to: CGPoint(x: right, y: h - cr))
+        // Straight down the right side
+        path.addLine(to: CGPoint(x: w - cr, y: h - cr))
 
-        // Right concave S-curve
-        path.addCurve(
-            to: CGPoint(x: w, y: h),
-            control1: CGPoint(x: right, y: h - cr * 0.28),
-            control2: CGPoint(x: right + cr * 0.28, y: h)
+        // Right concave arc (╰): bows outward, from tab edge down to bottom bar
+        path.addArc(
+            center: CGPoint(x: w, y: h - cr),
+            radius: cr,
+            startAngle: .degrees(180),
+            endAngle: .degrees(90),
+            clockwise: true
         )
 
         // Bottom edge back to start
@@ -80,7 +90,7 @@ struct DocumentTabView: View {
     @State private var isHovering = false
     @State private var isCloseHovering = false
 
-    private let cr: CGFloat = ZoteroStyle.Radius.concave
+    private let cr: CGFloat = 10  // concave radius
 
     var body: some View {
         HStack(spacing: 6) {
@@ -120,7 +130,6 @@ struct DocumentTabView: View {
             .onHover { isCloseHovering = $0 }
             .opacity(isActive || isHovering ? 1 : 0)
         }
-        // Always use same padding (include concave space) so width never changes
         .padding(.leading, 12 + cr)
         .padding(.trailing, 12 + cr)
         .frame(height: ZoteroStyle.Size.tabHeight)
@@ -131,20 +140,19 @@ struct DocumentTabView: View {
         .contentShape(Rectangle())
         .onTapGesture { onSelect() }
         .onHover { isHovering = $0 }
-        .zIndex(isActive ? 1 : 0)
     }
 
     @ViewBuilder
     private var tabShape: some View {
         if isActive {
-            ChromeTabShape()
-                .fill(Color(nsColor: .controlBackgroundColor))
+            BrowserTabShape(concaveRadius: cr)
+                .fill(ZoteroStyle.Colors.activeTabBackground)
         } else if isHovering {
             RoundedRectangle(cornerRadius: ZoteroStyle.Radius.standard)
-                .fill(Color.primary.opacity(0.07))
+                .fill(Color.primary.opacity(0.08))
                 .padding(.horizontal, cr)
                 .padding(.vertical, 5)
         }
-        // Inactive + not hovering: no background
+        // Inactive + not hovering: transparent
     }
 }
