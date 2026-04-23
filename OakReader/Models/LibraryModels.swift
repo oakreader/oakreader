@@ -1,155 +1,253 @@
 import Foundation
-import SwiftData
-import SwiftUI
+import GRDB
 
-// MARK: - Library Item
+// MARK: - GRDB Records (internal, map directly to DB columns)
 
-@Model
-final class PDFLibraryItem {
-    @Attribute(.unique) var id: UUID
+struct DocumentRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable {
+    static let databaseTableName = "documents"
 
-    // File reference — store bookmark data for security-scoped access
-    var fileBookmarkData: Data?
+    var id: String
+    var userId: String
+    var storageKey: String
+    var originalFileName: String
+    var title: String
+    var author: String
+    var pageCount: Int
+    var fileSize: Int64
+    var isFavorite: Bool
+    var dateLastOpened: String?
+    var syncStatus: String
+    var createdAt: String
+    var updatedAt: String
+
+    enum CodingKeys: String, CodingKey, ColumnExpression {
+        case id
+        case userId = "user_id"
+        case storageKey = "storage_key"
+        case originalFileName = "original_file_name"
+        case title, author
+        case pageCount = "page_count"
+        case fileSize = "file_size"
+        case isFavorite = "is_favorite"
+        case dateLastOpened = "date_last_opened"
+        case syncStatus = "sync_status"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+}
+
+struct CollectionRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable {
+    static let databaseTableName = "collections"
+
+    var id: String
+    var userId: String
+    var name: String
+    var icon: String
+    var sortOrder: Int
+    var parentId: String?
+    var createdAt: String
+    var updatedAt: String
+
+    enum CodingKeys: String, CodingKey, ColumnExpression {
+        case id
+        case userId = "user_id"
+        case name, icon
+        case sortOrder = "sort_order"
+        case parentId = "parent_id"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+}
+
+struct TagRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable {
+    static let databaseTableName = "tags"
+
+    var id: String
+    var userId: String
+    var name: String
+    var colorHex: String
+    var position: Int
+    var createdAt: String
+    var updatedAt: String
+
+    enum CodingKeys: String, CodingKey, ColumnExpression {
+        case id
+        case userId = "user_id"
+        case name
+        case colorHex = "color_hex"
+        case position
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+}
+
+struct DocumentCollectionRecord: Codable, FetchableRecord, PersistableRecord, Hashable {
+    static let databaseTableName = "document_collections"
+
+    var documentId: String
+    var collectionId: String
+    var createdAt: String
+
+    enum CodingKeys: String, CodingKey, ColumnExpression {
+        case documentId = "document_id"
+        case collectionId = "collection_id"
+        case createdAt = "created_at"
+    }
+}
+
+struct DocumentTagRecord: Codable, FetchableRecord, PersistableRecord, Hashable {
+    static let databaseTableName = "document_tags"
+
+    var documentId: String
+    var tagId: String
+    var createdAt: String
+
+    enum CodingKeys: String, CodingKey, ColumnExpression {
+        case documentId = "document_id"
+        case tagId = "tag_id"
+        case createdAt = "created_at"
+    }
+}
+
+struct ChatSessionRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable {
+    static let databaseTableName = "chat_sessions"
+
+    var id: String
+    var userId: String
+    var documentId: String
+    var title: String
+    var messageCount: Int
+    var createdAt: String
+    var updatedAt: String
+
+    enum CodingKeys: String, CodingKey, ColumnExpression {
+        case id
+        case userId = "user_id"
+        case documentId = "document_id"
+        case title
+        case messageCount = "message_count"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+}
+
+// MARK: - View-Facing Types (backward-compatible names)
+
+/// Library item displayed in the table and detail panel.
+/// Composed from DocumentRecord + related tags/collections + cover image.
+struct PDFLibraryItem: Identifiable, Hashable {
+    let id: UUID
+    let storageKey: String
     var fileName: String
-    var filePath: String?  // Fallback when bookmark creation fails (e.g. debug builds)
-
-    // Metadata
     var title: String
     var author: String
     var dateAdded: Date
     var dateLastOpened: Date?
     var pageCount: Int
     var fileSize: Int64
-
-    // Organization
     var isFavorite: Bool
-    @Relationship(inverse: \PDFCollection.items)
-    var collections: [PDFCollection]
-    var tags: [PDFTag]
+    var syncStatus: SyncStatus
 
-    // Cover
+    // Populated by the store from relationships / filesystem
+    var tags: [PDFTag]
+    var collections: [PDFCollection]
     var coverImageData: Data?
 
-    // Future: cloud sync
-    var syncStatus: SyncStatus
-    var remoteIdentifier: String?
-
-    init(
-        fileName: String,
-        title: String = "",
-        author: String = "",
-        pageCount: Int = 0,
-        fileSize: Int64 = 0
-    ) {
-        self.id = UUID()
-        self.fileName = fileName
-        self.title = title.isEmpty ? fileName : title
-        self.author = author
-        self.dateAdded = Date()
-        self.pageCount = pageCount
-        self.fileSize = fileSize
-        self.isFavorite = false
-        self.collections = []
-        self.tags = []
-        self.syncStatus = .local
+    /// PDF file URL within managed storage.
+    /// Falls back to legacy "document.pdf" for items imported before the rename.
+    var fileURL: URL {
+        let url = CatalogDatabase.documentPDFURL(storageKey: storageKey, fileName: fileName)
+        if FileManager.default.fileExists(atPath: url.path) {
+            return url
+        }
+        // Fallback for legacy imports
+        return CatalogDatabase.documentPDFURL(storageKey: storageKey)
     }
 
-    // MARK: - Security-Scoped Bookmark
-
-    func resolveFileURL() -> URL? {
-        // Try security-scoped bookmark first
-        if let bookmarkData = fileBookmarkData {
-            var isStale = false
-            do {
-                let url = try URL(
-                    resolvingBookmarkData: bookmarkData,
-                    options: .withSecurityScope,
-                    relativeTo: nil,
-                    bookmarkDataIsStale: &isStale
-                )
-                if isStale {
-                    self.fileBookmarkData = try? url.bookmarkData(
-                        options: .withSecurityScope,
-                        includingResourceValuesForKeys: nil,
-                        relativeTo: nil
-                    )
-                }
-                return url
-            } catch {
-                NSLog("[Library] bookmark resolve failed for \(title): \(error)")
-            }
-        }
-
-        // Fallback: use stored file path
-        if let filePath, FileManager.default.fileExists(atPath: filePath) {
-            return URL(fileURLWithPath: filePath)
-        }
-
-        NSLog("[Library] resolveFileURL: no bookmark or path for \(title)")
-        return nil
+    /// Document directory within managed storage.
+    var documentDirectory: URL {
+        CatalogDatabase.documentDirectory(storageKey: storageKey)
     }
 
-    func setFileURL(_ url: URL) {
-        // Always store the path as fallback
-        self.filePath = url.path
-        self.fileName = url.lastPathComponent
+    static func == (lhs: PDFLibraryItem, rhs: PDFLibraryItem) -> Bool {
+        lhs.id == rhs.id
+    }
 
-        // Try to create security-scoped bookmark
-        do {
-            self.fileBookmarkData = try url.bookmarkData(
-                options: .withSecurityScope,
-                includingResourceValuesForKeys: nil,
-                relativeTo: nil
-            )
-        } catch {
-            NSLog("[Library] bookmark creation failed for \(url.lastPathComponent): \(error). Using path fallback.")
-            self.fileBookmarkData = nil
-        }
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+
+    // MARK: - Record conversion
+
+    init(record: DocumentRecord, tags: [PDFTag] = [], collections: [PDFCollection] = [], coverImageData: Data? = nil) {
+        self.id = UUID(uuidString: record.id) ?? UUID()
+        self.storageKey = record.storageKey
+        self.fileName = record.originalFileName
+        self.title = record.title
+        self.author = record.author
+        self.dateAdded = Date(iso8601String: record.createdAt) ?? Date()
+        self.dateLastOpened = record.dateLastOpened.flatMap { Date(iso8601String: $0) }
+        self.pageCount = record.pageCount
+        self.fileSize = record.fileSize
+        self.isFavorite = record.isFavorite
+        self.syncStatus = SyncStatus(rawValue: record.syncStatus) ?? .local
+        self.tags = tags
+        self.collections = collections
+        self.coverImageData = coverImageData
     }
 }
 
-// MARK: - Collection
-
-@Model
-final class PDFCollection {
-    @Attribute(.unique) var id: UUID
+/// Collection displayed in the sidebar.
+struct PDFCollection: Identifiable, Hashable {
+    let id: UUID
     var name: String
     var icon: String
     var sortOrder: Int
-    var items: [PDFLibraryItem]
+    var parentId: UUID?
 
-    // Subcollection support
-    var parent: PDFCollection?
-    @Relationship(deleteRule: .cascade, inverse: \PDFCollection.parent)
+    // Populated by the store
     var subcollections: [PDFCollection]
+    /// Number of documents in this collection (populated by the store).
+    var itemCount: Int
 
-    init(name: String, icon: String = "folder", sortOrder: Int = 0) {
-        self.id = UUID()
-        self.name = name
-        self.icon = icon
-        self.sortOrder = sortOrder
-        self.items = []
-        self.subcollections = []
+    static func == (lhs: PDFCollection, rhs: PDFCollection) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+
+    init(record: CollectionRecord, subcollections: [PDFCollection] = [], itemCount: Int = 0) {
+        self.id = UUID(uuidString: record.id) ?? UUID()
+        self.name = record.name
+        self.icon = record.icon
+        self.sortOrder = record.sortOrder
+        self.parentId = record.parentId.flatMap { UUID(uuidString: $0) }
+        self.subcollections = subcollections
+        self.itemCount = itemCount
     }
 }
 
-// MARK: - Tag
-
-@Model
-final class PDFTag {
-    @Attribute(.unique) var id: UUID
+/// Tag displayed as colored swatches in the table.
+struct PDFTag: Identifiable, Hashable {
+    let id: UUID
     var name: String
     var colorHex: String
     var position: Int
-    @Relationship(inverse: \PDFLibraryItem.tags)
-    var items: [PDFLibraryItem]
 
-    init(name: String, colorHex: String, position: Int = 0) {
-        self.id = UUID()
+    init(record: TagRecord) {
+        self.id = UUID(uuidString: record.id) ?? UUID()
+        self.name = record.name
+        self.colorHex = record.colorHex
+        self.position = record.position
+    }
+
+    init(id: UUID = UUID(), name: String, colorHex: String, position: Int = 0) {
+        self.id = id
         self.name = name
         self.colorHex = colorHex
         self.position = position
-        self.items = []
     }
 }
 
@@ -210,3 +308,8 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         }
     }
 }
+
+// MARK: - Local user ID
+
+/// Default user ID for Phase 1 (local-only). Will become a real user ID in Phase 2 (sync).
+let localUserId = "local"
