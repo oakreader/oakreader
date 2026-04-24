@@ -8,16 +8,16 @@ struct SearchBarView: View {
     @FocusState private var isSearchFieldFocused: Bool
 
     var body: some View {
-        HStack(spacing: ZoteroStyle.Spacing.xs) {
+        HStack(spacing: OakStyle.Spacing.xs) {
             // Search field
             HStack(spacing: 5) {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: ZoteroStyle.Font.icon))
+                    .font(.system(size: OakStyle.Font.icon))
                     .foregroundStyle(.secondary)
 
                 TextField("Find in document...", text: $searchText)
                     .textFieldStyle(.plain)
-                    .font(.system(size: ZoteroStyle.Font.body))
+                    .font(.system(size: OakStyle.Font.body))
                     .focused($isSearchFieldFocused)
                     .onSubmit {
                         performSearch()
@@ -29,7 +29,7 @@ struct SearchBarView: View {
                         viewModel.viewer.clearSearch()
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: ZoteroStyle.Font.iconSmall))
+                            .font(.system(size: OakStyle.Font.iconSmall))
                             .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
@@ -38,18 +38,18 @@ struct SearchBarView: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .background(Color(nsColor: .controlBackgroundColor))
-            .cornerRadius(ZoteroStyle.Radius.standard)
+            .cornerRadius(OakStyle.Radius.standard)
             .frame(maxWidth: 260)
 
             // Result count
             if viewModel.viewer.hasSearchResults {
                 Text(viewModel.viewer.searchResultLabel)
-                    .font(.system(size: ZoteroStyle.Font.caption))
+                    .font(.system(size: OakStyle.Font.caption))
                     .foregroundStyle(.secondary)
                     .fixedSize()
             } else if !searchText.isEmpty && !viewModel.viewer.isSearching {
                 Text("No results")
-                    .font(.system(size: ZoteroStyle.Font.caption))
+                    .font(.system(size: OakStyle.Font.caption))
                     .foregroundStyle(.secondary)
                     .fixedSize()
             }
@@ -65,7 +65,7 @@ struct SearchBarView: View {
                     viewModel.viewer.previousSearchResult()
                 } label: {
                     Image(systemName: "chevron.up")
-                        .font(.system(size: ZoteroStyle.Font.iconSmall))
+                        .font(.system(size: OakStyle.Font.iconSmall))
                 }
                 .buttonStyle(.borderless)
 
@@ -73,7 +73,7 @@ struct SearchBarView: View {
                     viewModel.viewer.nextSearchResult()
                 } label: {
                     Image(systemName: "chevron.down")
-                        .font(.system(size: ZoteroStyle.Font.iconSmall))
+                        .font(.system(size: OakStyle.Font.iconSmall))
                 }
                 .buttonStyle(.borderless)
             }
@@ -86,12 +86,12 @@ struct SearchBarView: View {
                 viewModel.viewer.clearSearch()
             } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: ZoteroStyle.Font.iconSmall))
+                    .font(.system(size: OakStyle.Font.iconSmall))
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
         }
-        .padding(.horizontal, ZoteroStyle.Spacing.xs)
+        .padding(.horizontal, OakStyle.Spacing.xs)
         .padding(.vertical, 4)
         .background(Color(nsColor: .windowBackgroundColor))
         .onAppear {

@@ -15,8 +15,8 @@ struct SideNavView: View {
                     }
                 } label: {
                     Image(systemName: mode.systemImage)
-                        .font(.system(size: 14))
-                        .frame(width: 28, height: 28)
+                        .font(.system(size: OakStyle.Font.icon))
+                        .frame(width: OakStyle.Size.buttonStandard, height: OakStyle.Size.buttonStandard)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -27,7 +27,7 @@ struct SideNavView: View {
             Spacer()
         }
         .padding(.top, 6)
-        .frame(width: ZoteroStyle.Size.sidenavWidth)
-        .background(ZoteroStyle.Colors.sidebarBackground)
+        .frame(width: OakStyle.Size.sidenavWidth)
+        .background(OakStyle.Colors.sidebarBackground)
     }
 }

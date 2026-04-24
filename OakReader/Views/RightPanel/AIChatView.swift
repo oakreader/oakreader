@@ -47,13 +47,13 @@ struct AIChatView: View {
 
             Button(action: { chatVM.newSession() }) {
                 Image(systemName: "plus.bubble")
-                    .font(.system(size: ZoteroStyle.Font.icon))
+                    .font(.system(size: OakStyle.Font.icon))
             }
             .buttonStyle(.plain)
             .help("New Chat")
         }
-        .padding(.horizontal, ZoteroStyle.Spacing.sm)
-        .padding(.vertical, ZoteroStyle.Spacing.sm)
+        .padding(.horizontal, OakStyle.Spacing.sm)
+        .padding(.vertical, OakStyle.Spacing.sm)
     }
 
     // MARK: - Empty State
@@ -71,7 +71,7 @@ struct AIChatView: View {
                 .font(.system(size: 13))
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, ZoteroStyle.Spacing.lg)
+                .padding(.horizontal, OakStyle.Spacing.lg)
 
             if chatVM.selectedSkill != nil {
                 Text("Skill: \(chatVM.selectedSkill!.name)")
@@ -103,7 +103,7 @@ struct AIChatView: View {
                             .id(turn.id)
                     }
                 }
-                .padding(ZoteroStyle.Spacing.sm)
+                .padding(OakStyle.Spacing.sm)
                 .background(
                     GeometryReader { inner in
                         Color.clear
@@ -222,9 +222,9 @@ struct AIChatView: View {
                     }
                 } label: {
                     Image(systemName: "plus")
-                        .font(.system(size: ZoteroStyle.Font.icon, weight: .medium))
+                        .font(.system(size: OakStyle.Font.icon, weight: .medium))
                         .foregroundStyle(.secondary)
-                        .frame(width: ZoteroStyle.Size.buttonStandard, height: ZoteroStyle.Size.buttonStandard)
+                        .frame(width: OakStyle.Size.buttonStandard, height: OakStyle.Size.buttonStandard)
                         .background(Circle().fill(Color.primary.opacity(0.06)))
                 }
                 .buttonStyle(.plain)
@@ -237,7 +237,7 @@ struct AIChatView: View {
                         ZStack {
                             Circle()
                                 .fill(Color.primary)
-                                .frame(width: ZoteroStyle.Size.buttonStandard, height: ZoteroStyle.Size.buttonStandard)
+                                .frame(width: OakStyle.Size.buttonStandard, height: OakStyle.Size.buttonStandard)
                             RoundedRectangle(cornerRadius: 3)
                                 .fill(Color(nsColor: .windowBackgroundColor))
                                 .frame(width: 12, height: 12)
@@ -250,9 +250,9 @@ struct AIChatView: View {
                         ZStack {
                             Circle()
                                 .fill(inputHasText ? Color.primary : Color.gray.opacity(0.3))
-                                .frame(width: ZoteroStyle.Size.buttonStandard, height: ZoteroStyle.Size.buttonStandard)
+                                .frame(width: OakStyle.Size.buttonStandard, height: OakStyle.Size.buttonStandard)
                             Image(systemName: "arrow.up")
-                                .font(.system(size: ZoteroStyle.Font.icon, weight: .bold))
+                                .font(.system(size: OakStyle.Font.icon, weight: .bold))
                                 .foregroundStyle(Color(nsColor: .windowBackgroundColor))
                         }
                     }
@@ -276,8 +276,8 @@ struct AIChatView: View {
             RoundedRectangle(cornerRadius: 16)
                 .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
         )
-        .padding(.horizontal, ZoteroStyle.Spacing.sm)
-        .padding(.vertical, ZoteroStyle.Spacing.xs)
+        .padding(.horizontal, OakStyle.Spacing.sm)
+        .padding(.vertical, OakStyle.Spacing.xs)
     }
 
     // MARK: - Error Banner
@@ -296,8 +296,8 @@ struct AIChatView: View {
                 .font(.caption)
                 .buttonStyle(.plain)
         }
-        .padding(.horizontal, ZoteroStyle.Spacing.sm)
-        .padding(.vertical, ZoteroStyle.Spacing.xxs)
+        .padding(.horizontal, OakStyle.Spacing.sm)
+        .padding(.vertical, OakStyle.Spacing.xxs)
         .background(Color.yellow.opacity(0.1))
     }
 }

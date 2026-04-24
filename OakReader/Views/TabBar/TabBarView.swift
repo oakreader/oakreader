@@ -20,15 +20,15 @@ struct TabBarView: View {
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: pinnedTabIcon)
-                        .font(.system(size: ZoteroStyle.Font.icon))
+                        .font(.system(size: OakStyle.Font.icon))
                     Text(pinnedTabTitle)
-                        .font(.system(size: ZoteroStyle.Font.body, weight: .regular))
+                        .font(.system(size: OakStyle.Font.body, weight: .regular))
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }
                 .padding(.horizontal, 16)
-                .frame(height: ZoteroStyle.Size.tabHeight)
-                .frame(maxWidth: ZoteroStyle.Size.tabMax, alignment: .leading)
+                .frame(height: OakStyle.Size.tabHeight)
+                .frame(maxWidth: OakStyle.Size.tabMax, alignment: .leading)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -59,19 +59,19 @@ struct TabBarView: View {
                 appState.showSettings = true
             } label: {
                 Image(systemName: "gearshape")
-                    .font(.system(size: 14))
-                    .frame(width: 28, height: 28)
+                    .font(.system(size: OakStyle.Font.icon))
+                    .frame(width: OakStyle.Size.buttonStandard, height: OakStyle.Size.buttonStandard)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .foregroundStyle(appState.showSettings ? Color.accentColor : Color(nsColor: .labelColor))
             .help("Settings")
-            .frame(width: ZoteroStyle.Size.sidenavWidth)
+            .frame(width: OakStyle.Size.sidenavWidth)
         }
         .padding(.leading, isFullScreen ? fullScreenPadding : trafficLightPadding)
         .padding(.top, 4)
-        .frame(height: ZoteroStyle.Size.tabBarHeight)
-        .background(ZoteroStyle.Colors.tabBarBackground)
+        .frame(height: OakStyle.Size.tabBarHeight)
+        .background(OakStyle.Colors.tabBarBackground)
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEnterFullScreenNotification)) { _ in
             isFullScreen = true
         }
@@ -99,11 +99,11 @@ struct TabBarView: View {
     @ViewBuilder
     private var pinnedTabShape: some View {
         if appState.isLibraryActive {
-            RoundedRectangle(cornerRadius: ZoteroStyle.Radius.standard)
-                .fill(ZoteroStyle.Colors.activeTabBackground)
+            RoundedRectangle(cornerRadius: OakStyle.Radius.standard)
+                .fill(OakStyle.Colors.activeTabBackground)
                 .padding(.vertical, 6)
         } else if isPinnedHovering {
-            RoundedRectangle(cornerRadius: ZoteroStyle.Radius.standard)
+            RoundedRectangle(cornerRadius: OakStyle.Radius.standard)
                 .fill(Color.primary.opacity(0.08))
                 .padding(.vertical, 6)
         }

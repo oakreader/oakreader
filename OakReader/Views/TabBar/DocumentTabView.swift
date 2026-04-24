@@ -103,7 +103,7 @@ struct DocumentTabView: View {
 
             // Title
             Text(tab.title)
-                .font(.system(size: ZoteroStyle.Font.body, weight: .regular))
+                .font(.system(size: OakStyle.Font.body, weight: .regular))
                 .lineLimit(1)
                 .truncationMode(.middle)
 
@@ -117,11 +117,11 @@ struct DocumentTabView: View {
                     .font(.system(size: 9, weight: .semibold))
                     .foregroundStyle(isCloseHovering ? Color(nsColor: .labelColor) : .secondary)
                     .frame(
-                        width: ZoteroStyle.Size.closeButton,
-                        height: ZoteroStyle.Size.closeButton
+                        width: OakStyle.Size.closeButton,
+                        height: OakStyle.Size.closeButton
                     )
                     .background(
-                        RoundedRectangle(cornerRadius: ZoteroStyle.Radius.small)
+                        RoundedRectangle(cornerRadius: OakStyle.Radius.small)
                             .fill(isCloseHovering ? Color.primary.opacity(0.1) : Color.clear)
                     )
                     .contentShape(Rectangle())
@@ -132,9 +132,9 @@ struct DocumentTabView: View {
         }
         .padding(.leading, 12 + cr)
         .padding(.trailing, 12 + cr)
-        .frame(height: ZoteroStyle.Size.tabHeight)
-        .frame(minWidth: ZoteroStyle.Size.tabMin + cr * 2,
-               maxWidth: ZoteroStyle.Size.tabMax + cr * 2)
+        .frame(height: OakStyle.Size.tabHeight)
+        .frame(minWidth: OakStyle.Size.tabMin + cr * 2,
+               maxWidth: OakStyle.Size.tabMax + cr * 2)
         .foregroundStyle(isActive ? Color(nsColor: .labelColor) : Color(nsColor: .secondaryLabelColor))
         .background(tabShape)
         .contentShape(Rectangle())
@@ -146,9 +146,9 @@ struct DocumentTabView: View {
     private var tabShape: some View {
         if isActive {
             BrowserTabShape(concaveRadius: cr)
-                .fill(ZoteroStyle.Colors.activeTabBackground)
+                .fill(OakStyle.Colors.activeTabBackground)
         } else if isHovering {
-            RoundedRectangle(cornerRadius: ZoteroStyle.Radius.standard)
+            RoundedRectangle(cornerRadius: OakStyle.Radius.standard)
                 .fill(Color.primary.opacity(0.08))
                 .padding(.horizontal, cr)
                 .padding(.vertical, 5)

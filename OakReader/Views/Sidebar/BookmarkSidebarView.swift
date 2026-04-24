@@ -30,7 +30,7 @@ struct BookmarkSidebarView: View {
                 }
             }
         }
-        .background(ZoteroStyle.Colors.sidebarBackground)
+        .background(OakStyle.Colors.sidebarBackground)
         .onAppear { loadOutline() }
     }
 
@@ -85,9 +85,9 @@ private struct OutlineTreeRow: View {
                 // Disclosure triangle
                 if !item.children.isEmpty {
                     Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 8, weight: .bold))
+                        .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(.secondary)
-                        .frame(width: 14, height: 14)
+                        .frame(width: 16, height: 16)
                         .contentShape(Rectangle())
                         .onTapGesture { isExpanded.toggle() }
                 } else {

@@ -563,7 +563,7 @@ class AreaSelectionPopupPanel: NSPanel {
     }
 
     private func addAreaAnnotation(color: NSColor) {
-        // Create a square (rectangle) annotation with colored border, no fill — like Zotero
+        // Create a square (rectangle) annotation with colored border, no fill — like OakReader
         let annotation = PDFAnnotation.rectangle(
             bounds: pdfRect,
             color: color,
@@ -649,7 +649,7 @@ class AreaSelectionPopupPanel: NSPanel {
     }
 }
 
-// MARK: - Color Dot (Zotero-style round swatch for area popup)
+// MARK: - Color Dot (OakReader-style round swatch for area popup)
 
 private class AreaColorDotView: NSView {
     private let color: NSColor
@@ -716,7 +716,7 @@ private class AreaColorDotView: NSView {
     }
 }
 
-// MARK: - Popup Action Button for Area Popup (icon + label, Zotero-style)
+// MARK: - Popup Action Button for Area Popup (icon + label, OakReader-style)
 
 private class AreaPopupActionButton: NSButton {
     private let onClick: () -> Void

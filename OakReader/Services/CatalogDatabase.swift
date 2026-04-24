@@ -123,7 +123,7 @@ final class CatalogDatabase {
 
     // MARK: - Storage Key Generation
 
-    /// Generate an 8-character random alphanumeric key (Zotero-style).
+    /// Generate an 8-character random alphanumeric key.
     static func generateStorageKey() -> String {
         let chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
         return String((0..<8).map { _ in chars.randomElement()! })

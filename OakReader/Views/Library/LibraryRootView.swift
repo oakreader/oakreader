@@ -31,7 +31,7 @@ private struct TopLeftBorderFill: Shape {
     }
 }
 
-// Zotero-style 3-pane: sidebar #f2f2f2, table white, detail #f2f2f2
+// 3-pane layout: sidebar, table, detail panel
 struct LibraryRootView: View {
     @Bindable var appState: AppState
 
@@ -42,7 +42,7 @@ struct LibraryRootView: View {
             // Left pane: Sidebar (no right divider)
             LibrarySidebarView(appState: appState)
                 .frame(width: 280)
-                .background(ZoteroStyle.Colors.sidebarBackground)
+                .background(OakStyle.Colors.sidebarBackground)
 
             // Middle + Right in HSplitView
             HSplitView {
@@ -55,13 +55,13 @@ struct LibraryRootView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color(nsColor: .controlBackgroundColor))
                 .clipShape(UnevenRoundedRectangle(
-                    topLeadingRadius: ZoteroStyle.Radius.standard,
+                    topLeadingRadius: OakStyle.Radius.standard,
                     bottomLeadingRadius: 0,
                     bottomTrailingRadius: 0,
                     topTrailingRadius: 0
                 ))
                 .overlay(
-                    TopLeftBorderFill(radius: ZoteroStyle.Radius.standard, thickness: 1)
+                    TopLeftBorderFill(radius: OakStyle.Radius.standard, thickness: 1)
                         .fill(Color(nsColor: .separatorColor))
                 )
 

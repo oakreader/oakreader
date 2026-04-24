@@ -28,9 +28,9 @@ struct LibrarySidebarView: View {
                     importFolderAsCollection()
                 } label: {
                     Image(systemName: "folder.badge.plus")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: OakStyle.Font.icon, weight: .medium))
                         .foregroundStyle(.secondary)
-                        .frame(width: 20, height: 20)
+                        .frame(width: OakStyle.Size.buttonStandard, height: OakStyle.Size.buttonStandard)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -39,9 +39,9 @@ struct LibrarySidebarView: View {
                     showNewCollection = true
                 } label: {
                     Image(systemName: "plus")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: OakStyle.Font.icon, weight: .medium))
                         .foregroundStyle(.secondary)
-                        .frame(width: 20, height: 20)
+                        .frame(width: OakStyle.Size.buttonStandard, height: OakStyle.Size.buttonStandard)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -80,7 +80,7 @@ struct LibrarySidebarView: View {
 
             TagSelectorView(store: store)
         }
-        .background(ZoteroStyle.Colors.sidebarBackground)
+        .background(OakStyle.Colors.sidebarBackground)
         .sheet(isPresented: $showNewCollection) {
             CollectionEditorSheet(store: store, collection: nil)
         }
@@ -127,7 +127,7 @@ struct LibrarySidebarView: View {
         } label: {
             HStack(spacing: 7) {
                 Image(systemName: icon)
-                    .font(.system(size: 14))
+                    .font(.system(size: OakStyle.Font.icon))
                     .foregroundStyle(isSelected ? .white : .primary)
                     .frame(width: 18)
 
@@ -206,7 +206,7 @@ private struct CollectionRowView: View {
                     }
 
                     Image(systemName: collection.icon)
-                        .font(.system(size: 14))
+                        .font(.system(size: OakStyle.Font.icon))
                         .foregroundStyle(isSelected ? .white : .primary)
                         .frame(width: 18)
                         .padding(.trailing, 6)

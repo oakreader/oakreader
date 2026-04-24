@@ -13,8 +13,8 @@ struct SkillPickerBar: View {
                     skillChip(skill)
                 }
             }
-            .padding(.horizontal, ZoteroStyle.Spacing.sm)
-            .padding(.vertical, ZoteroStyle.Spacing.xs)
+            .padding(.horizontal, OakStyle.Spacing.sm)
+            .padding(.vertical, OakStyle.Spacing.xs)
         }
     }
 
@@ -30,9 +30,9 @@ struct SkillPickerBar: View {
         }) {
             HStack(spacing: 5) {
                 Image(systemName: skill.icon)
-                    .font(.system(size: 12))
+                    .font(.system(size: OakStyle.Font.body))
                 Text(skill.name)
-                    .font(.system(size: 13))
+                    .font(.system(size: OakStyle.Font.body))
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)

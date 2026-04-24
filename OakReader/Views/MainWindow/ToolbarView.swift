@@ -17,8 +17,8 @@ struct OakReaderToolbarView: View {
             Spacer(minLength: 4)
             rightSection
         }
-        .padding(.horizontal, ZoteroStyle.Spacing.xs)
-        .frame(height: ZoteroStyle.Size.toolbarHeight)
+        .padding(.horizontal, OakStyle.Spacing.xs)
+        .frame(height: OakStyle.Size.toolbarHeight)
         .background(Color(nsColor: .windowBackgroundColor))
         .onAppear { syncPageText() }
         .onChange(of: viewModel.state.currentPageIndex) { _, _ in
@@ -29,8 +29,8 @@ struct OakReaderToolbarView: View {
     // MARK: - Left Section
 
     private var leftSection: some View {
-        HStack(spacing: ZoteroStyle.Spacing.xs) {
-            ZoteroToolButton(
+        HStack(spacing: OakStyle.Spacing.xs) {
+            OakToolButton(
                 systemImage: "sidebar.leading",
                 isSelected: viewModel.state.isSidebarVisible,
                 tooltip: "Toggle Sidebar"
@@ -41,7 +41,7 @@ struct OakReaderToolbarView: View {
             separator
 
             // Zoom
-            ZoteroToolButton(
+            OakToolButton(
                 systemImage: "minus.magnifyingglass",
                 tooltip: "Zoom Out"
             ) {
@@ -49,17 +49,17 @@ struct OakReaderToolbarView: View {
             }
 
             Text(viewModel.viewer.zoomPercentage)
-                .font(.system(size: ZoteroStyle.Font.body).monospacedDigit())
+                .font(.system(size: OakStyle.Font.body).monospacedDigit())
                 .frame(width: 40)
 
-            ZoteroToolButton(
+            OakToolButton(
                 systemImage: "plus.magnifyingglass",
                 tooltip: "Zoom In"
             ) {
                 viewModel.viewer.zoomIn()
             }
 
-            ZoteroToolButton(
+            OakToolButton(
                 systemImage: "arrow.up.left.and.arrow.down.right",
                 tooltip: "Zoom to Fit"
             ) {
@@ -69,7 +69,7 @@ struct OakReaderToolbarView: View {
             separator
 
             // Page navigation
-            ZoteroToolButton(
+            OakToolButton(
                 systemImage: "chevron.up",
                 tooltip: "Previous Page"
             ) {
@@ -81,7 +81,7 @@ struct OakReaderToolbarView: View {
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 38)
                     .multilineTextAlignment(.center)
-                    .font(.system(size: ZoteroStyle.Font.body))
+                    .font(.system(size: OakStyle.Font.body))
                     .onSubmit {
                         if let page = Int(goToPageText) {
                             viewModel.viewer.goToPage(page - 1)
@@ -89,11 +89,11 @@ struct OakReaderToolbarView: View {
                         syncPageText()
                     }
                 Text("/ \(viewModel.pageCount)")
-                    .font(.system(size: ZoteroStyle.Font.body).monospacedDigit())
+                    .font(.system(size: OakStyle.Font.body).monospacedDigit())
                     .foregroundStyle(.secondary)
             }
 
-            ZoteroToolButton(
+            OakToolButton(
                 systemImage: "chevron.down",
                 tooltip: "Next Page"
             ) {
@@ -105,13 +105,13 @@ struct OakReaderToolbarView: View {
     // MARK: - Center Section
 
     private var centerSection: some View {
-        HStack(spacing: ZoteroStyle.Spacing.xs) {
+        HStack(spacing: OakStyle.Spacing.xs) {
             ForEach(annotationTools) { tool in
                 annotationButton(for: tool)
             }
 
             // Area (snapshot)
-            ZoteroToolButton(
+            OakToolButton(
                 systemImage: "rectangle.dashed",
                 isSelected: viewModel.state.editorMode == .snapshot,
                 tooltip: "Area"
@@ -124,7 +124,7 @@ struct OakReaderToolbarView: View {
             }
 
             // Ink
-            ZoteroToolButton(
+            OakToolButton(
                 systemImage: AnnotationTool.freehand.systemImage,
                 isSelected: viewModel.state.editorMode == .annotate && (viewModel.annotation.currentTool == .freehand || viewModel.annotation.currentTool == .eraser),
                 tooltip: "Ink"
@@ -147,8 +147,8 @@ struct OakReaderToolbarView: View {
     // MARK: - Right Section
 
     private var rightSection: some View {
-        HStack(spacing: ZoteroStyle.Spacing.xs) {
-            ZoteroToolButton(
+        HStack(spacing: OakStyle.Spacing.xs) {
+            OakToolButton(
                 systemImage: "magnifyingglass",
                 isSelected: viewModel.state.isSearchBarVisible,
                 tooltip: "Find in Document"
@@ -166,12 +166,12 @@ struct OakReaderToolbarView: View {
     private var separator: some View {
         Divider()
             .frame(height: 18)
-            .padding(.horizontal, ZoteroStyle.Spacing.xxs)
+            .padding(.horizontal, OakStyle.Spacing.xxs)
     }
 
     private func annotationButton(for tool: AnnotationTool) -> some View {
         let isActive = viewModel.state.editorMode == .annotate && viewModel.annotation.currentTool == tool
-        return ZoteroToolButton(
+        return OakToolButton(
             systemImage: tool.systemImage,
             isSelected: isActive,
             tooltip: tool.label

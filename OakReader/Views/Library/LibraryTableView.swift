@@ -1,7 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-// Zotero-style items table: white bg, 13px font, colored tag squares inline
+// Items table: white bg, 13px font, colored tag squares inline
 struct LibraryTableView: View {
     let appState: AppState
     @Binding var selection: Set<UUID>
@@ -21,7 +21,7 @@ struct LibraryTableView: View {
                             .foregroundStyle(Color.primary.opacity(0.4))
                             .font(.system(size: 14))
 
-                        // Zotero tag swatches: overlapping colored squares
+                        // Tag swatches: overlapping colored squares
                         if !item.tags.isEmpty {
                             HStack(spacing: -3) {
                                 ForEach(item.tags.prefix(3), id: \.id) { tag in

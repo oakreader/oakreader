@@ -1,7 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-// Zotero-style toolbar: height 41px, sidepane bg, 28x28 buttons, 5px radius
+// Library toolbar: height 41px, 28x28 buttons, 5px radius
 struct LibraryTableToolbar: View {
     let appState: AppState
 
@@ -11,10 +11,10 @@ struct LibraryTableToolbar: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            // Search field — Zotero style: height 28, radius 5
+            // Search field
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 12))
+                    .font(.system(size: OakStyle.Font.caption))
                     .foregroundStyle(Color.primary.opacity(0.55))
                 TextField("Search PDFs", text: $searchText)
                     .font(.system(size: 13))
@@ -27,7 +27,7 @@ struct LibraryTableToolbar: View {
                         searchText = ""
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 12))
+                            .font(.system(size: OakStyle.Font.caption))
                             .foregroundStyle(Color.primary.opacity(0.25))
                     }
                     .buttonStyle(.plain)
@@ -40,7 +40,7 @@ struct LibraryTableToolbar: View {
 
             Spacer()
 
-            // Sort menu — Zotero: 28x28, radius 5
+            // Sort menu
             Menu {
                 ForEach(LibrarySortOrder.allCases) { sort in
                     Button {
@@ -61,9 +61,9 @@ struct LibraryTableToolbar: View {
                 }
             } label: {
                 Image(systemName: "arrow.up.arrow.down")
-                    .font(.system(size: 13))
+                    .font(.system(size: OakStyle.Font.icon))
                     .foregroundStyle(Color.primary.opacity(0.55))
-                    .frame(width: 28, height: 28)
+                    .frame(width: OakStyle.Size.buttonStandard, height: OakStyle.Size.buttonStandard)
                     .background(
                         RoundedRectangle(cornerRadius: 5)
                             .fill(Color.clear)
@@ -73,14 +73,14 @@ struct LibraryTableToolbar: View {
             .fixedSize()
             .help("Sort Library")
 
-            // Add button — Zotero: 28x28, radius 5
+            // Add button
             Button {
                 importPDFs()
             } label: {
                 Image(systemName: "plus")
-                    .font(.system(size: 13))
+                    .font(.system(size: OakStyle.Font.icon))
                     .foregroundStyle(Color.primary.opacity(0.55))
-                    .frame(width: 28, height: 28)
+                    .frame(width: OakStyle.Size.buttonStandard, height: OakStyle.Size.buttonStandard)
             }
             .buttonStyle(.borderless)
             .help("Add PDFs to Library")

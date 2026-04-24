@@ -251,7 +251,7 @@ struct PDFTag: Identifiable, Hashable {
     }
 }
 
-// MARK: - Tag Colors (Zotero palette)
+// MARK: - Tag Colors
 
 enum TagColor: String, CaseIterable, Identifiable {
     case red, orange, gray, green, teal, blue, indigo, purple, plum

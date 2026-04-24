@@ -536,7 +536,7 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
 }
 
 
-// MARK: - Text Selection Popup Panel (Zotero-style)
+// MARK: - Text Selection Popup Panel (OakReader-style)
 
 private class TextSelectionPopupPanel: NSPanel {
     private let viewModel: DocumentViewModel
@@ -780,7 +780,7 @@ private class TextSelectionPopupPanel: NSPanel {
     }
 
     /// Dismiss the popup. If autoHighlightOnDismiss is true (user clicked outside),
-    /// automatically apply highlight in the current color — Zotero-style behavior.
+    /// automatically apply highlight in the current color — OakReader-style behavior.
     func dismiss() {
         if let observer = scrollObserver {
             NotificationCenter.default.removeObserver(observer)
@@ -803,7 +803,7 @@ private class TextSelectionPopupPanel: NSPanel {
     }
 }
 
-// MARK: - Color Dot (Zotero-style round swatch)
+// MARK: - Color Dot (OakReader-style round swatch)
 
 private class ColorDotView: NSView {
     private let color: NSColor
@@ -870,7 +870,7 @@ private class ColorDotView: NSView {
     }
 }
 
-// MARK: - Popup Action Button (icon + label, Zotero-style)
+// MARK: - Popup Action Button (icon + label, OakReader-style)
 
 private class PopupActionButton: NSButton {
     private let onClick: () -> Void

@@ -21,7 +21,7 @@ struct AnnotationColorDropdown: View {
                 Image(systemName: "chevron.down")
                     .font(.system(size: 7, weight: .semibold))
             }
-            .frame(height: ZoteroStyle.Size.buttonStandard)
+            .frame(height: OakStyle.Size.buttonStandard)
             .padding(.horizontal, 4)
             .contentShape(Rectangle())
         }
@@ -36,7 +36,7 @@ struct AnnotationColorDropdown: View {
         VStack(alignment: .leading, spacing: 10) {
             // Color swatches
             HStack(spacing: 6) {
-                ForEach(ZoteroStyle.AnnotationColors.allColors, id: \.name) { entry in
+                ForEach(OakStyle.AnnotationColors.allColors, id: \.name) { entry in
                     colorSwatch(entry.color, nsColor: entry.nsColor, name: entry.name)
                 }
             }
@@ -109,13 +109,13 @@ struct AnnotationColorDropdown: View {
     private func sliderRow(label: String, value: Binding<CGFloat>, range: ClosedRange<CGFloat>, step: CGFloat, format: String) -> some View {
         HStack {
             Text(label)
-                .font(.system(size: ZoteroStyle.Font.caption))
+                .font(.system(size: OakStyle.Font.caption))
                 .foregroundStyle(.secondary)
             Spacer()
             Slider(value: value, in: range, step: step)
                 .frame(width: 120)
             Text(String(format: format, value.wrappedValue))
-                .font(.system(size: ZoteroStyle.Font.caption))
+                .font(.system(size: OakStyle.Font.caption))
                 .monospacedDigit()
                 .frame(width: 30)
         }
@@ -133,13 +133,13 @@ struct AnnotationColorDropdown: View {
         } label: {
             HStack {
                 Image(systemName: "eraser.line.dashed")
-                    .font(.system(size: ZoteroStyle.Font.icon))
+                    .font(.system(size: OakStyle.Font.icon))
                 Text("Eraser")
-                    .font(.system(size: ZoteroStyle.Font.caption))
+                    .font(.system(size: OakStyle.Font.caption))
                 Spacer()
                 if viewModel.annotation.currentTool == .eraser {
                     Image(systemName: "checkmark")
-                        .font(.system(size: ZoteroStyle.Font.caption))
+                        .font(.system(size: OakStyle.Font.caption))
                         .foregroundStyle(Color.accentColor)
                 }
             }

@@ -1,6 +1,6 @@
 import SwiftUI
 
-// Zotero-style detail panel: #f2f2f2 sidepane bg, collapsible sections with colored icons,
+// Detail panel: collapsible sections with colored icons,
 // grid metadata layout with 8px column gap, 2px row gap, secondary labels at 55% opacity
 struct LibraryDetailPanel: View {
     let item: PDFLibraryItem
@@ -40,7 +40,7 @@ struct LibraryDetailPanel: View {
         .background(Color(hex: "F2F2F2"))
     }
 
-    // MARK: - Section wrapper (Zotero collapsible section style)
+    // MARK: - Section wrapper (OakReader collapsible section style)
 
     @ViewBuilder
     private func sectionView<Content: View>(
@@ -50,7 +50,7 @@ struct LibraryDetailPanel: View {
         @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            // Section header — Zotero: icon + semibold title, secondary color
+            // Section header — OakReader: icon + semibold title, secondary color
             HStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.system(size: 13))
@@ -100,14 +100,14 @@ struct LibraryDetailPanel: View {
                 Spacer()
             }
 
-            // Title — Zotero: semibold, line-height 1.333
+            // Title — OakReader: semibold, line-height 1.333
             Text(item.title)
                 .font(.system(size: 14, weight: .semibold))
                 .lineLimit(3)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
 
-            // Author — Zotero: secondary color
+            // Author — OakReader: secondary color
             if !item.author.isEmpty {
                 Text(item.author)
                     .font(.system(size: 13))
@@ -119,7 +119,7 @@ struct LibraryDetailPanel: View {
         .padding(8)
     }
 
-    // MARK: - Info Grid (Zotero: CSS Grid, max-content 1fr, gap 8px col / 2px row)
+    // MARK: - Info Grid (OakReader: CSS Grid, max-content 1fr, gap 8px col / 2px row)
 
     @ViewBuilder
     private var infoGrid: some View {
