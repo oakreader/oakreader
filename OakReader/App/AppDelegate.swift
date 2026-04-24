@@ -14,9 +14,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Clear stale document restoration state to prevent
-        // "not a valid PDF" errors after app updates/rebuilds
-        NSDocumentController.shared.documents.forEach { $0.invalidateRestorableState() }
+        // Run one-time migration from old SwiftData storage
+        let migration = MigrationService(store: appState.libraryStore, coverService: appState.coverService)
+        migration.migrateIfNeeded()
+
         createMainWindow()
     }
 
@@ -72,14 +73,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.minSize = NSSize(width: 800, height: 500)
         window.title = ""
 
+        window.makeKeyAndOrderFront(nil)
+
         // Restore saved frame if available, otherwise use the computed large frame
         if !window.setFrameUsingName("OakReaderMainWindow") {
-            // No saved frame — use the initial 85% × 90% size
-            window.center()
+            // No saved frame — set explicit frame and center
+            window.setFrame(NSRect(
+                x: screenFrame.origin.x + (screenFrame.width - windowWidth) / 2,
+                y: screenFrame.origin.y + (screenFrame.height - windowHeight) / 2,
+                width: windowWidth,
+                height: windowHeight
+            ), display: true)
         }
         window.setFrameAutosaveName("OakReaderMainWindow")
-
-        window.makeKeyAndOrderFront(nil)
 
         self.mainWindow = window
         appState.window = window

@@ -1,11 +1,10 @@
 import Foundation
-import SwiftData
+import GRDB
 import PDFKit
 
 @Observable
 final class LibraryStore {
-    let modelContainer: ModelContainer
-    private let modelContext: ModelContext
+    let database: CatalogDatabase
 
     // Search & filter state
     var searchText: String = ""
@@ -18,32 +17,15 @@ final class LibraryStore {
     // Observation trigger — bump this to force computed properties to re-evaluate
     private(set) var revision: Int = 0
 
-    init() {
-        let schema = Schema([PDFLibraryItem.self, PDFCollection.self, PDFTag.self, ChatSessionMeta.self])
-        let config = ModelConfiguration(
-            "OakReaderLibrary",
-            schema: schema,
-            cloudKitDatabase: .automatic
-        )
-        do {
-            modelContainer = try ModelContainer(for: schema, configurations: [config])
-        } catch {
-            // Fallback without CloudKit if entitlements aren't set up
-            let localConfig = ModelConfiguration("OakReaderLibrary", schema: schema)
-            modelContainer = try! ModelContainer(for: schema, configurations: [localConfig])
-        }
-        modelContext = ModelContext(modelContainer)
-        modelContext.autosaveEnabled = true
+    init(database: CatalogDatabase) {
+        self.database = database
     }
 
     // MARK: - Library Items
 
     var items: [PDFLibraryItem] {
-        _ = revision  // tracked by Observation — triggers re-fetch on mutation
-        let descriptor = FetchDescriptor<PDFLibraryItem>(
-            sortBy: [sortDescriptor]
-        )
-        return (try? modelContext.fetch(descriptor)) ?? []
+        _ = revision
+        return (try? fetchAllItems()) ?? []
     }
 
     var filteredItems: [PDFLibraryItem] {
@@ -74,7 +56,7 @@ final class LibraryStore {
             }
         }
 
-        // Apply search
+        // Apply search (FTS5 or fallback)
         if !searchText.isEmpty {
             let query = searchText.lowercased()
             results = results.filter {
@@ -84,165 +66,315 @@ final class LibraryStore {
             }
         }
 
+        // Sort
+        results.sort { a, b in
+            let cmp: Bool
+            switch currentSort {
+            case .dateAdded:  cmp = a.dateAdded < b.dateAdded
+            case .dateOpened: cmp = (a.dateLastOpened ?? .distantPast) < (b.dateLastOpened ?? .distantPast)
+            case .title:      cmp = a.title.localizedCaseInsensitiveCompare(b.title) == .orderedAscending
+            case .author:     cmp = a.author.localizedCaseInsensitiveCompare(b.author) == .orderedAscending
+            case .fileSize:   cmp = a.fileSize < b.fileSize
+            }
+            return sortAscending ? cmp : !cmp
+        }
+
         return results
     }
 
-    private var sortDescriptor: SortDescriptor<PDFLibraryItem> {
-        switch currentSort {
-        case .dateAdded:
-            return SortDescriptor(\.dateAdded, order: sortAscending ? .forward : .reverse)
-        case .dateOpened:
-            return SortDescriptor(\.dateLastOpened, order: sortAscending ? .forward : .reverse)
-        case .title:
-            return SortDescriptor(\.title, order: sortAscending ? .forward : .reverse)
-        case .author:
-            return SortDescriptor(\.author, order: sortAscending ? .forward : .reverse)
-        case .fileSize:
-            return SortDescriptor(\.fileSize, order: sortAscending ? .forward : .reverse)
+    // MARK: - Fetch
+
+    private func fetchAllItems() throws -> [PDFLibraryItem] {
+        try database.dbQueue.read { db in
+            let documents = try DocumentRecord.fetchAll(db)
+            let allDocTags = try DocumentTagRecord.fetchAll(db)
+            let allTags = try TagRecord.order(TagRecord.CodingKeys.position).fetchAll(db)
+            let allDocCollections = try DocumentCollectionRecord.fetchAll(db)
+            let allCollections = try CollectionRecord.order(CollectionRecord.CodingKeys.sortOrder).fetchAll(db)
+
+            // Build lookup maps
+            let tagMap = Dictionary(uniqueKeysWithValues: allTags.map { ($0.id, PDFTag(record: $0)) })
+            let collMap = Dictionary(uniqueKeysWithValues: allCollections.map { ($0.id, PDFCollection(record: $0)) })
+
+            var docTagsMap: [String: [PDFTag]] = [:]
+            for dt in allDocTags {
+                if let tag = tagMap[dt.tagId] {
+                    docTagsMap[dt.documentId, default: []].append(tag)
+                }
+            }
+
+            var docCollectionsMap: [String: [PDFCollection]] = [:]
+            for dc in allDocCollections {
+                if let coll = collMap[dc.collectionId] {
+                    docCollectionsMap[dc.documentId, default: []].append(coll)
+                }
+            }
+
+            return documents.map { doc in
+                let tags = docTagsMap[doc.id] ?? []
+                let collections = docCollectionsMap[doc.id] ?? []
+                let coverData = Self.loadCoverData(storageKey: doc.storageKey)
+                return PDFLibraryItem(record: doc, tags: tags, collections: collections, coverImageData: coverData)
+            }
         }
     }
 
     // MARK: - CRUD
 
     @discardableResult
-    func addItem(from url: URL) -> PDFLibraryItem? {
-        // Check if already in library
-        if let existing = findItem(for: url) {
-            existing.dateLastOpened = Date()
-            return existing
-        }
-
-        let item = PDFLibraryItem(fileName: url.lastPathComponent)
-        item.setFileURL(url)
-
-        // Read PDF metadata
-        if let pdfDoc = PDFDocument(url: url) {
-            item.pageCount = pdfDoc.pageCount
-            if let title = pdfDoc.documentAttributes?[PDFDocumentAttribute.titleAttribute] as? String, !title.isEmpty {
-                item.title = title
+    func insertDocument(_ record: DocumentRecord) -> PDFLibraryItem? {
+        do {
+            var rec = record
+            try database.dbQueue.write { db in
+                try rec.insert(db)
             }
-            if let author = pdfDoc.documentAttributes?[PDFDocumentAttribute.authorAttribute] as? String {
-                item.author = author
-            }
+            revision += 1
+            let coverData = Self.loadCoverData(storageKey: rec.storageKey)
+            return PDFLibraryItem(record: rec, coverImageData: coverData)
+        } catch {
+            NSLog("[LibraryStore] insertDocument failed: \(error)")
+            return nil
         }
+    }
 
-        // File size
-        if let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
-           let size = attrs[.size] as? Int64 {
-            item.fileSize = size
-        }
+    func findItem(byStorageKey key: String) -> PDFLibraryItem? {
+        items.first { $0.storageKey == key }
+    }
 
-        modelContext.insert(item)
-        try? modelContext.save()
-        revision += 1
-        return item
+    func findItem(byFileName fileName: String) -> PDFLibraryItem? {
+        items.first { $0.fileName == fileName }
     }
 
     func removeItem(_ item: PDFLibraryItem) {
-        modelContext.delete(item)
-        try? modelContext.save()
-        revision += 1
-    }
-
-    func findItem(for url: URL) -> PDFLibraryItem? {
-        let fileName = url.lastPathComponent
-        let descriptor = FetchDescriptor<PDFLibraryItem>(
-            predicate: #Predicate { $0.fileName == fileName }
-        )
-        return try? modelContext.fetch(descriptor).first
+        do {
+            try database.dbQueue.write { db in
+                try db.execute(sql: "DELETE FROM documents WHERE id = ?", arguments: [item.id.uuidString])
+            }
+            // Remove storage directory
+            let dir = CatalogDatabase.documentDirectory(storageKey: item.storageKey)
+            try? FileManager.default.removeItem(at: dir)
+            revision += 1
+        } catch {
+            NSLog("[LibraryStore] removeItem failed: \(error)")
+        }
     }
 
     func toggleFavorite(_ item: PDFLibraryItem) {
-        item.isFavorite.toggle()
-        try? modelContext.save()
-        revision += 1
+        let newValue = !item.isFavorite
+        let now = Date().iso8601String
+        do {
+            try database.dbQueue.write { db in
+                try db.execute(
+                    sql: "UPDATE documents SET is_favorite = ?, updated_at = ? WHERE id = ?",
+                    arguments: [newValue, now, item.id.uuidString]
+                )
+            }
+            revision += 1
+        } catch {
+            NSLog("[LibraryStore] toggleFavorite failed: \(error)")
+        }
     }
 
     func markOpened(_ item: PDFLibraryItem) {
-        item.dateLastOpened = Date()
-        try? modelContext.save()
-        revision += 1
+        let now = Date().iso8601String
+        do {
+            try database.dbQueue.write { db in
+                try db.execute(
+                    sql: "UPDATE documents SET date_last_opened = ?, updated_at = ? WHERE id = ?",
+                    arguments: [now, now, item.id.uuidString]
+                )
+            }
+            revision += 1
+        } catch {
+            NSLog("[LibraryStore] markOpened failed: \(error)")
+        }
     }
 
     func updateCover(_ item: PDFLibraryItem, imageData: Data) {
-        item.coverImageData = imageData
-        try? modelContext.save()
-        revision += 1
+        let coverURL = CatalogDatabase.documentCoverURL(storageKey: item.storageKey)
+        do {
+            try imageData.write(to: coverURL, options: .atomic)
+            revision += 1
+        } catch {
+            NSLog("[LibraryStore] updateCover failed: \(error)")
+        }
     }
 
     // MARK: - Collections
 
     var collections: [PDFCollection] {
-        _ = revision  // tracked by Observation
-        let descriptor = FetchDescriptor<PDFCollection>(
-            sortBy: [SortDescriptor(\.sortOrder)]
-        )
-        return (try? modelContext.fetch(descriptor)) ?? []
+        _ = revision
+        return (try? fetchAllCollections()) ?? []
     }
 
-    /// Root collections (no parent) — for sidebar tree display
     var rootCollections: [PDFCollection] {
-        collections.filter { $0.parent == nil }
+        collections.filter { $0.parentId == nil }
+    }
+
+    private func fetchAllCollections() throws -> [PDFCollection] {
+        try database.dbQueue.read { db in
+            let records = try CollectionRecord.order(CollectionRecord.CodingKeys.sortOrder).fetchAll(db)
+            // Count items per collection
+            let countRows = try Row.fetchAll(db, sql: """
+                SELECT collection_id, COUNT(*) as cnt FROM document_collections GROUP BY collection_id
+            """)
+            var itemCounts: [String: Int] = [:]
+            for row in countRows {
+                itemCounts[row["collection_id"]] = row["cnt"]
+            }
+            return buildCollectionTree(from: records, itemCounts: itemCounts)
+        }
+    }
+
+    private func buildCollectionTree(from records: [CollectionRecord], itemCounts: [String: Int]) -> [PDFCollection] {
+        var childrenMap: [String?: [CollectionRecord]] = [:]
+        for r in records {
+            childrenMap[r.parentId, default: []].append(r)
+        }
+
+        func build(parentId: String?) -> [PDFCollection] {
+            (childrenMap[parentId] ?? []).map { record in
+                let subs = build(parentId: record.id)
+                return PDFCollection(record: record, subcollections: subs, itemCount: itemCounts[record.id] ?? 0)
+            }
+        }
+
+        return records.map { record in
+            let subs = build(parentId: record.id)
+            return PDFCollection(record: record, subcollections: subs, itemCount: itemCounts[record.id] ?? 0)
+        }
     }
 
     @discardableResult
     func createCollection(name: String, icon: String = "folder") -> PDFCollection {
-        let collection = PDFCollection(name: name, icon: icon, sortOrder: collections.count)
-        modelContext.insert(collection)
-        try? modelContext.save()
-        revision += 1
-        return collection
+        let now = Date().iso8601String
+        let record = CollectionRecord(
+            id: UUID().uuidString,
+            userId: localUserId,
+            name: name,
+            icon: icon,
+            sortOrder: collections.count,
+            parentId: nil,
+            createdAt: now,
+            updatedAt: now
+        )
+        do {
+            try database.dbQueue.write { db in
+                var r = record
+                try r.insert(db)
+            }
+            revision += 1
+        } catch {
+            NSLog("[LibraryStore] createCollection failed: \(error)")
+        }
+        return PDFCollection(record: record)
     }
 
     @discardableResult
     func createSubcollection(name: String, icon: String = "folder", parent: PDFCollection) -> PDFCollection {
-        let collection = PDFCollection(name: name, icon: icon, sortOrder: parent.subcollections.count)
-        collection.parent = parent
-        modelContext.insert(collection)
-        try? modelContext.save()
-        revision += 1
-        return collection
+        let now = Date().iso8601String
+        let record = CollectionRecord(
+            id: UUID().uuidString,
+            userId: localUserId,
+            name: name,
+            icon: icon,
+            sortOrder: parent.subcollections.count,
+            parentId: parent.id.uuidString,
+            createdAt: now,
+            updatedAt: now
+        )
+        do {
+            try database.dbQueue.write { db in
+                var r = record
+                try r.insert(db)
+            }
+            revision += 1
+        } catch {
+            NSLog("[LibraryStore] createSubcollection failed: \(error)")
+        }
+        return PDFCollection(record: record)
     }
 
     func moveCollection(_ collection: PDFCollection, toParent newParent: PDFCollection?) {
-        collection.parent = newParent
-        try? modelContext.save()
-        revision += 1
+        let now = Date().iso8601String
+        do {
+            try database.dbQueue.write { db in
+                try db.execute(
+                    sql: "UPDATE collections SET parent_id = ?, updated_at = ? WHERE id = ?",
+                    arguments: [newParent?.id.uuidString, now, collection.id.uuidString]
+                )
+            }
+            revision += 1
+        } catch {
+            NSLog("[LibraryStore] moveCollection failed: \(error)")
+        }
     }
 
     func deleteCollection(_ collection: PDFCollection) {
-        modelContext.delete(collection)
-        if selectedCollection?.id == collection.id {
-            selectedCollection = nil
+        do {
+            try database.dbQueue.write { db in
+                try db.execute(sql: "DELETE FROM collections WHERE id = ?", arguments: [collection.id.uuidString])
+            }
+            if selectedCollection?.id == collection.id {
+                selectedCollection = nil
+            }
+            revision += 1
+        } catch {
+            NSLog("[LibraryStore] deleteCollection failed: \(error)")
         }
-        try? modelContext.save()
-        revision += 1
     }
 
     func renameCollection(_ collection: PDFCollection, to name: String) {
-        collection.name = name
-        try? modelContext.save()
-        revision += 1
+        let now = Date().iso8601String
+        do {
+            try database.dbQueue.write { db in
+                try db.execute(
+                    sql: "UPDATE collections SET name = ?, updated_at = ? WHERE id = ?",
+                    arguments: [name, now, collection.id.uuidString]
+                )
+            }
+            revision += 1
+        } catch {
+            NSLog("[LibraryStore] renameCollection failed: \(error)")
+        }
     }
 
     func addItem(_ item: PDFLibraryItem, to collection: PDFCollection) {
-        if !collection.items.contains(where: { $0.id == item.id }) {
-            collection.items.append(item)
-            try? modelContext.save()
+        // Check if already in collection
+        if item.collections.contains(where: { $0.id == collection.id }) { return }
+        let now = Date().iso8601String
+        let junction = DocumentCollectionRecord(
+            documentId: item.id.uuidString,
+            collectionId: collection.id.uuidString,
+            createdAt: now
+        )
+        do {
+            try database.dbQueue.write { db in
+                try junction.insert(db)
+            }
             revision += 1
+        } catch {
+            NSLog("[LibraryStore] addItem to collection failed: \(error)")
         }
     }
 
     func removeItem(_ item: PDFLibraryItem, from collection: PDFCollection) {
-        collection.items.removeAll { $0.id == item.id }
-        try? modelContext.save()
-        revision += 1
+        do {
+            try database.dbQueue.write { db in
+                try db.execute(
+                    sql: "DELETE FROM document_collections WHERE document_id = ? AND collection_id = ?",
+                    arguments: [item.id.uuidString, collection.id.uuidString]
+                )
+            }
+            revision += 1
+        } catch {
+            NSLog("[LibraryStore] removeItem from collection failed: \(error)")
+        }
     }
 
     /// Import all PDFs from a folder, creating a collection named after the folder.
-    /// Returns the number of PDFs imported.
     @discardableResult
-    func importFolder(_ folderURL: URL) -> Int {
+    func importFolder(_ folderURL: URL, importService: ImportService) -> Int {
         let folderName = folderURL.lastPathComponent
         let collection = createCollection(name: folderName, icon: "folder.fill")
 
@@ -256,7 +388,7 @@ final class LibraryStore {
         var count = 0
         for case let fileURL as URL in enumerator {
             guard fileURL.pathExtension.lowercased() == "pdf" else { continue }
-            if let item = addItem(from: fileURL) {
+            if let item = importService.importPDF(from: fileURL) {
                 addItem(item, to: collection)
                 count += 1
             }
@@ -269,52 +401,119 @@ final class LibraryStore {
     // MARK: - Tags
 
     var tags: [PDFTag] {
-        _ = revision  // tracked by Observation
-        let descriptor = FetchDescriptor<PDFTag>(
-            sortBy: [SortDescriptor(\.position)]
-        )
-        return (try? modelContext.fetch(descriptor)) ?? []
+        _ = revision
+        return (try? fetchAllTags()) ?? []
+    }
+
+    private func fetchAllTags() throws -> [PDFTag] {
+        try database.dbQueue.read { db in
+            let records = try TagRecord.order(TagRecord.CodingKeys.position).fetchAll(db)
+            return records.map { PDFTag(record: $0) }
+        }
     }
 
     @discardableResult
     func createTag(name: String, color: TagColor) -> PDFTag {
-        let tag = PDFTag(name: name, colorHex: color.hex, position: tags.count)
-        modelContext.insert(tag)
-        try? modelContext.save()
-        revision += 1
-        return tag
+        let now = Date().iso8601String
+        let record = TagRecord(
+            id: UUID().uuidString,
+            userId: localUserId,
+            name: name,
+            colorHex: color.hex,
+            position: tags.count,
+            createdAt: now,
+            updatedAt: now
+        )
+        do {
+            try database.dbQueue.write { db in
+                var r = record
+                try r.insert(db)
+            }
+            revision += 1
+        } catch {
+            NSLog("[LibraryStore] createTag failed: \(error)")
+        }
+        return PDFTag(record: record)
     }
 
     func deleteTag(_ tag: PDFTag) {
         selectedTags.remove(tag.id)
-        modelContext.delete(tag)
-        try? modelContext.save()
-        revision += 1
+        do {
+            try database.dbQueue.write { db in
+                try db.execute(sql: "DELETE FROM tags WHERE id = ?", arguments: [tag.id.uuidString])
+            }
+            revision += 1
+        } catch {
+            NSLog("[LibraryStore] deleteTag failed: \(error)")
+        }
     }
 
     func renameTag(_ tag: PDFTag, to name: String) {
-        tag.name = name
-        try? modelContext.save()
-        revision += 1
+        let now = Date().iso8601String
+        do {
+            try database.dbQueue.write { db in
+                try db.execute(
+                    sql: "UPDATE tags SET name = ?, updated_at = ? WHERE id = ?",
+                    arguments: [name, now, tag.id.uuidString]
+                )
+            }
+            revision += 1
+        } catch {
+            NSLog("[LibraryStore] renameTag failed: \(error)")
+        }
     }
 
     func updateTagColor(_ tag: PDFTag, to color: TagColor) {
-        tag.colorHex = color.hex
-        try? modelContext.save()
-        revision += 1
+        let now = Date().iso8601String
+        do {
+            try database.dbQueue.write { db in
+                try db.execute(
+                    sql: "UPDATE tags SET color_hex = ?, updated_at = ? WHERE id = ?",
+                    arguments: [color.hex, now, tag.id.uuidString]
+                )
+            }
+            revision += 1
+        } catch {
+            NSLog("[LibraryStore] updateTagColor failed: \(error)")
+        }
     }
 
     func addTag(_ tag: PDFTag, to item: PDFLibraryItem) {
-        if !item.tags.contains(where: { $0.id == tag.id }) {
-            item.tags.append(tag)
-            try? modelContext.save()
+        if item.tags.contains(where: { $0.id == tag.id }) { return }
+        let now = Date().iso8601String
+        let junction = DocumentTagRecord(
+            documentId: item.id.uuidString,
+            tagId: tag.id.uuidString,
+            createdAt: now
+        )
+        do {
+            try database.dbQueue.write { db in
+                try junction.insert(db)
+            }
             revision += 1
+        } catch {
+            NSLog("[LibraryStore] addTag failed: \(error)")
         }
     }
 
     func removeTag(_ tag: PDFTag, from item: PDFLibraryItem) {
-        item.tags.removeAll { $0.id == tag.id }
-        try? modelContext.save()
-        revision += 1
+        do {
+            try database.dbQueue.write { db in
+                try db.execute(
+                    sql: "DELETE FROM document_tags WHERE document_id = ? AND tag_id = ?",
+                    arguments: [item.id.uuidString, tag.id.uuidString]
+                )
+            }
+            revision += 1
+        } catch {
+            NSLog("[LibraryStore] removeTag failed: \(error)")
+        }
+    }
+
+    // MARK: - Cover helpers
+
+    private static func loadCoverData(storageKey: String) -> Data? {
+        let url = CatalogDatabase.documentCoverURL(storageKey: storageKey)
+        return try? Data(contentsOf: url)
     }
 }

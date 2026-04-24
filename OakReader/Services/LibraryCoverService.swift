@@ -15,11 +15,4 @@ actor LibraryCoverService {
             NSBitmapImageRep(data: $0)?.representation(using: .jpeg, properties: [.compressionFactor: 0.8])
         }
     }
-
-    func generateCover(for item: PDFLibraryItem) async -> Data? {
-        guard let url = item.resolveFileURL() else { return nil }
-        let accessing = url.startAccessingSecurityScopedResource()
-        defer { if accessing { url.stopAccessingSecurityScopedResource() } }
-        return await generateCover(for: url)
-    }
 }

@@ -23,15 +23,7 @@ class PDFDocumentController: NSDocumentController {
         return try super.typeForContents(of: url)
     }
 
-    // Disable macOS automatic document restoration on relaunch.
-    // The app uses a custom tab architecture — restoring stale document
-    // state causes "not a valid PDF" errors after rebuilds/updates.
-    override func reopenDocument(for urlOrNil: URL?, withContentsOf contentsURL: URL, display displayDocument: Bool, completionHandler: @escaping (NSDocument?, Bool, (any Error)?) -> Void) {
-        // Silently skip — don't restore documents from previous session
-        completionHandler(nil, false, nil)
-    }
-
-    // Route document opening through AppState to create tabs instead of windows
+    // Route document opening through AppState to import and create tabs
     override func openDocument(withContentsOf url: URL, display displayDocument: Bool, completionHandler: @escaping (NSDocument?, Bool, (any Error)?) -> Void) {
         if let appState {
             // Check if already open

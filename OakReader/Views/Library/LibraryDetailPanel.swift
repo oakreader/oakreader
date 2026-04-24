@@ -230,7 +230,7 @@ struct LibraryDetailPanel: View {
     private var actionsSection: some View {
         VStack(spacing: 6) {
             Button {
-                openItem()
+                appState.openLibraryItem(item)
             } label: {
                 Label("Open", systemImage: "doc.viewfinder")
                     .font(.system(size: 14))
@@ -240,9 +240,7 @@ struct LibraryDetailPanel: View {
             .controlSize(.regular)
 
             Button {
-                if let url = item.resolveFileURL() {
-                    NSWorkspace.shared.activateFileViewerSelecting([url])
-                }
+                NSWorkspace.shared.activateFileViewerSelecting([item.fileURL])
             } label: {
                 Label("Reveal in Finder", systemImage: "folder")
                     .font(.system(size: 13))
@@ -262,20 +260,5 @@ struct LibraryDetailPanel: View {
             .controlSize(.small)
         }
         .padding(.horizontal, 8)
-    }
-
-    private func openItem() {
-        guard let url = item.resolveFileURL() else {
-            let alert = NSAlert()
-            alert.messageText = "Cannot Open PDF"
-            alert.informativeText = "The file \"\(item.title)\" could not be found. It may have been moved or deleted."
-            alert.alertStyle = .warning
-            alert.addButton(withTitle: "OK")
-            alert.runModal()
-            return
-        }
-        _ = url.startAccessingSecurityScopedResource()
-        // Security scope is managed by the tab — don't stop it here
-        appState.openDocument(url: url, securityScoped: true)
     }
 }
