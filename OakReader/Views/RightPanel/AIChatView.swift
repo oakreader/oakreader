@@ -47,7 +47,7 @@ struct AIChatView: View {
 
             Button(action: { chatVM.newSession() }) {
                 Image(systemName: "plus.bubble")
-                    .font(.system(size: 16))
+                    .font(.system(size: ZoteroStyle.Font.icon))
             }
             .buttonStyle(.plain)
             .help("New Chat")
@@ -222,9 +222,9 @@ struct AIChatView: View {
                     }
                 } label: {
                     Image(systemName: "plus")
-                        .font(.system(size: 15, weight: .medium))
+                        .font(.system(size: ZoteroStyle.Font.icon, weight: .medium))
                         .foregroundStyle(.secondary)
-                        .frame(width: 30, height: 30)
+                        .frame(width: ZoteroStyle.Size.buttonStandard, height: ZoteroStyle.Size.buttonStandard)
                         .background(Circle().fill(Color.primary.opacity(0.06)))
                 }
                 .buttonStyle(.plain)
@@ -237,7 +237,7 @@ struct AIChatView: View {
                         ZStack {
                             Circle()
                                 .fill(Color.primary)
-                                .frame(width: 30, height: 30)
+                                .frame(width: ZoteroStyle.Size.buttonStandard, height: ZoteroStyle.Size.buttonStandard)
                             RoundedRectangle(cornerRadius: 3)
                                 .fill(Color(nsColor: .windowBackgroundColor))
                                 .frame(width: 12, height: 12)
@@ -250,9 +250,9 @@ struct AIChatView: View {
                         ZStack {
                             Circle()
                                 .fill(inputHasText ? Color.primary : Color.gray.opacity(0.3))
-                                .frame(width: 30, height: 30)
+                                .frame(width: ZoteroStyle.Size.buttonStandard, height: ZoteroStyle.Size.buttonStandard)
                             Image(systemName: "arrow.up")
-                                .font(.system(size: 14, weight: .bold))
+                                .font(.system(size: ZoteroStyle.Font.icon, weight: .bold))
                                 .foregroundStyle(Color(nsColor: .windowBackgroundColor))
                         }
                     }
