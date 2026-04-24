@@ -159,9 +159,7 @@ struct LibraryTableView: View {
             Divider()
 
             Button("Reveal in Finder") {
-                if let url = item.resolveFileURL() {
-                    NSWorkspace.shared.activateFileViewerSelecting([url])
-                }
+                NSWorkspace.shared.activateFileViewerSelecting([item.fileURL])
             }
 
             Divider()
@@ -193,18 +191,7 @@ struct LibraryTableView: View {
     }
 
     private func openItem(_ item: PDFLibraryItem) {
-        guard let url = item.resolveFileURL() else {
-            let alert = NSAlert()
-            alert.messageText = "Cannot Open PDF"
-            alert.informativeText = "The file \"\(item.title)\" could not be found. It may have been moved or deleted."
-            alert.alertStyle = .warning
-            alert.addButton(withTitle: "OK")
-            alert.runModal()
-            return
-        }
-        _ = url.startAccessingSecurityScopedResource()
-        // Security scope is managed by the tab — don't stop it here
-        appState.openDocument(url: url, securityScoped: true)
+        appState.openLibraryItem(item)
     }
 
     private func importPDFs() {
@@ -215,16 +202,9 @@ struct LibraryTableView: View {
         panel.begin { response in
             guard response == .OK else { return }
             for url in panel.urls {
-                if let item = store.addItem(from: url) {
+                if let item = appState.importService.importPDF(from: url) {
                     if let collection = store.selectedCollection {
                         store.addItem(item, to: collection)
-                    }
-                    if item.coverImageData == nil {
-                        Task {
-                            if let data = await appState.coverService.generateCover(for: url) {
-                                await MainActor.run { store.updateCover(item, imageData: data) }
-                            }
-                        }
                     }
                 }
             }
@@ -236,16 +216,9 @@ struct LibraryTableView: View {
             provider.loadItem(forTypeIdentifier: UTType.pdf.identifier, options: nil) { data, _ in
                 guard let url = data as? URL else { return }
                 DispatchQueue.main.async {
-                    if let item = store.addItem(from: url) {
+                    if let item = appState.importService.importPDF(from: url) {
                         if let collection = store.selectedCollection {
                             store.addItem(item, to: collection)
-                        }
-                        if item.coverImageData == nil {
-                            Task {
-                                if let data = await appState.coverService.generateCover(for: url) {
-                                    await MainActor.run { store.updateCover(item, imageData: data) }
-                                }
-                            }
                         }
                     }
                 }

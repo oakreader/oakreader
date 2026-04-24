@@ -111,7 +111,7 @@ struct LibrarySidebarView: View {
         panel.prompt = "Import"
 
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        let count = store.importFolder(url)
+        let count = store.importFolder(url, importService: appState.importService)
         NSLog("[Library] Imported \(count) PDFs from folder: \(url.lastPathComponent)")
     }
 
@@ -218,7 +218,7 @@ private struct CollectionRowView: View {
 
                     Spacer()
 
-                    let count = collection.items.count
+                    let count = collection.itemCount
                     if count > 0 {
                         Text("\(count)")
                             .font(.system(size: 11, weight: .medium))
@@ -244,7 +244,7 @@ private struct CollectionRowView: View {
                     newSubcollectionParent = collection
                 }
                 Divider()
-                if collection.parent != nil {
+                if collection.parentId != nil {
                     Button("Move to Root") {
                         store.moveCollection(collection, toParent: nil)
                     }

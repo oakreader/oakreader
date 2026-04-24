@@ -98,17 +98,9 @@ struct LibraryTableToolbar: View {
         panel.begin { response in
             guard response == .OK else { return }
             for url in panel.urls {
-                if let item = store.addItem(from: url) {
-                    // If a collection is selected, add the item to it
+                if let item = appState.importService.importPDF(from: url) {
                     if let collection = store.selectedCollection {
                         store.addItem(item, to: collection)
-                    }
-                    if item.coverImageData == nil {
-                        Task {
-                            if let data = await appState.coverService.generateCover(for: url) {
-                                await MainActor.run { store.updateCover(item, imageData: data) }
-                            }
-                        }
                     }
                 }
             }

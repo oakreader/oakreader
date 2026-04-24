@@ -49,16 +49,9 @@ struct LibraryToolbarContent: ToolbarContent {
         panel.begin { response in
             guard response == .OK else { return }
             for url in panel.urls {
-                if let item = store.addItem(from: url) {
+                if let item = appState.importService.importPDF(from: url) {
                     if let collection = store.selectedCollection {
                         store.addItem(item, to: collection)
-                    }
-                    if item.coverImageData == nil {
-                        Task {
-                            if let data = await appState.coverService.generateCover(for: url) {
-                                await MainActor.run { store.updateCover(item, imageData: data) }
-                            }
-                        }
                     }
                 }
             }
