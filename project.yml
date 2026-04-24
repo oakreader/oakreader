@@ -2,7 +2,7 @@ name: OakReader
 options:
   bundleIdPrefix: com.oakreader
   deploymentTarget:
-    macOS: "14.0"
+    macOS: "15.0"
   xcodeVersion: "16.0"
   createIntermediateGroups: true
   groupSortPosition: top
@@ -11,11 +11,17 @@ options:
 packages:
   OakReaderAI:
     path: Packages/OakReaderAI
+  Textual:
+    url: https://github.com/gonzalezreal/textual
+    from: "0.1.0"
+  GRDB:
+    url: https://github.com/groue/GRDB.swift
+    from: "7.0.0"
 
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    MACOSX_DEPLOYMENT_TARGET: "15.0"
     ENABLE_STRICT_OBJC_MSGSEND: YES
 
 targets:
@@ -29,6 +35,9 @@ targets:
           - "**/*.entitlements"
     dependencies:
       - package: OakReaderAI
+      - package: Textual
+      - package: GRDB
+        product: GRDB
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.oakreader.OakReader
