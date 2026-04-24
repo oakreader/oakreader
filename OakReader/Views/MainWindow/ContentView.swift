@@ -13,7 +13,7 @@ struct ContentView: View {
     // MARK: - Notification Observer
 
     @State private var actionObserver: Any?
-    @State private var rightPanelWidth: CGFloat = ZoteroStyle.Size.rightPanelWidth
+    @State private var rightPanelWidth: CGFloat = OakStyle.Size.rightPanelWidth
     @State private var sidebarWidth: CGFloat = 200  // idealWidth
 
     var body: some View {
@@ -24,7 +24,7 @@ struct ContentView: View {
                 OakReaderToolbarView(viewModel: viewModel)
                 Divider()
 
-                // Search bar (below toolbar, like Zotero)
+                // Search bar (below toolbar)
                 if viewModel.state.isSearchBarVisible {
                     SearchBarView(viewModel: viewModel)
                     Divider()
@@ -70,7 +70,7 @@ struct ContentView: View {
                     }
                 }
             }
-            .background(ZoteroStyle.Colors.contentBackground)
+            .background(OakStyle.Colors.contentBackground)
             .clipShape(
                 UnevenRoundedRectangle(
                     topLeadingRadius: 0,
@@ -86,7 +86,7 @@ struct ContentView: View {
                 set: { viewModel.state.rightPanelMode = $0 }
             ))
         }
-        .background(ZoteroStyle.Colors.tabBarBackground)
+        .background(OakStyle.Colors.tabBarBackground)
         .alert("Error", isPresented: Binding(
             get: { viewModel.state.showError },
             set: { viewModel.state.showError = $0 }

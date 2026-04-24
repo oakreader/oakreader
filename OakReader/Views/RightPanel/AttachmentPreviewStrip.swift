@@ -12,8 +12,8 @@ struct AttachmentPreviewStrip: View {
                     attachmentCard(attachment)
                 }
             }
-            .padding(.horizontal, ZoteroStyle.Spacing.sm)
-            .padding(.vertical, ZoteroStyle.Spacing.xxs)
+            .padding(.horizontal, OakStyle.Spacing.sm)
+            .padding(.vertical, OakStyle.Spacing.xxs)
         }
     }
 

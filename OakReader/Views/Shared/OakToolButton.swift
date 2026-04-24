@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 
-struct ZoteroToolButton: View {
+struct OakToolButton: View {
     let systemImage: String
     var isSelected: Bool = false
     var tooltip: String = ""
@@ -12,14 +12,14 @@ struct ZoteroToolButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 15))
+                .font(.system(size: OakStyle.Font.icon))
                 .frame(width: 28, height: 28)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .foregroundStyle(isSelected ? Color.accentColor : Color(nsColor: .labelColor))
         .background(
-            RoundedRectangle(cornerRadius: ZoteroStyle.Radius.standard)
+            RoundedRectangle(cornerRadius: OakStyle.Radius.standard)
                 .fill(backgroundColor)
         )
         .onHover { isHovering = $0 }
@@ -30,9 +30,9 @@ struct ZoteroToolButton: View {
 
     private var backgroundColor: Color {
         if isSelected {
-            return ZoteroStyle.Colors.activeBackground
+            return OakStyle.Colors.activeBackground
         } else if isHovering {
-            return ZoteroStyle.Colors.hoverBackground
+            return OakStyle.Colors.hoverBackground
         }
         return .clear
     }
@@ -108,7 +108,7 @@ private class TooltipNSView: NSView {
         panel.ignoresMouseEvents = true
 
         let label = NSTextField(labelWithString: tip)
-        label.font = NSFont.systemFont(ofSize: ZoteroStyle.Font.caption)
+        label.font = NSFont.systemFont(ofSize: OakStyle.Font.caption)
         label.textColor = .white
         label.alignment = .center
         label.sizeToFit()

@@ -11,8 +11,8 @@ struct InspectorPanelView: View {
                     .font(.headline)
                 Spacer()
             }
-            .padding(.horizontal, ZoteroStyle.Spacing.sm)
-            .padding(.vertical, ZoteroStyle.Spacing.xs)
+            .padding(.horizontal, OakStyle.Spacing.sm)
+            .padding(.vertical, OakStyle.Spacing.xs)
 
             Divider()
 

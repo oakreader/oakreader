@@ -1,6 +1,6 @@
 import SwiftUI
 
-// Zotero-style tag: colored square (not circle), 12px swatch, semibold when colored
+// OakReader-style tag: colored square (not circle), 12px swatch, semibold when colored
 struct TagChip: View {
     let name: String
     let colorHex: String
@@ -11,7 +11,7 @@ struct TagChip: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            // Zotero uses colored squares for tag swatches
+            // OakReader uses colored squares for tag swatches
             RoundedRectangle(cornerRadius: 2)
                 .fill(Color(hex: colorHex))
                 .frame(width: 10, height: 10)

@@ -1,6 +1,6 @@
 import SwiftUI
 
-// Zotero-style tag manager: 9-color swatch picker with exact Zotero palette
+// OakReader-style tag manager: 9-color swatch picker with exact OakReader palette
 struct TagManagerSheet: View {
     let store: LibraryStore
 
@@ -29,7 +29,7 @@ struct TagManagerSheet: View {
                 .disabled(newTagName.trimmingCharacters(in: .whitespaces).isEmpty)
             }
 
-            // Color picker — Zotero's 9 colors as squares
+            // Color picker — OakReader's 9 colors as squares
             HStack(spacing: 6) {
                 ForEach(TagColor.allCases) { color in
                     Button {

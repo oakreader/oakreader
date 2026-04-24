@@ -1,6 +1,6 @@
 import SwiftUI
 
-// Zotero-style tag selector: colored dots with names, wrapping layout
+// Tag selector: colored dots with names, wrapping layout
 struct TagSelectorView: View {
     let store: LibraryStore
 
@@ -17,7 +17,7 @@ struct TagSelectorView: View {
                     gearButton
                 }
             } else {
-                // Tag dots in a wrapping flow — like Zotero bottom bar
+                // Tag dots in a wrapping flow
                 FlowLayout(spacing: 4) {
                     ForEach(store.tags, id: \.id) { tag in
                         tagDot(tag)

@@ -1,9 +1,8 @@
 import SwiftUI
 
-enum ZoteroStyle {
+enum OakStyle {
     // MARK: - Colors
-    // Inspired by Dia browser's design system — uses opacity-based tints
-    // for better light/dark mode adaptability.
+    // Uses opacity-based tints for better light/dark mode adaptability.
 
     enum Colors {
         // Backgrounds (Dia gray scale: #F8F8F8 → #F2F2F2 → #EDEDED)
@@ -81,7 +80,7 @@ enum ZoteroStyle {
         static let concave: CGFloat = 10
     }
 
-    // MARK: - Annotation Colors (Zotero palette)
+    // MARK: - Annotation Colors
 
     enum AnnotationColors {
         static let yellow = Color(hex: "ffd400")

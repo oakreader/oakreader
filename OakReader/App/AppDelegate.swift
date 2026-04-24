@@ -114,7 +114,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func centerTrafficLights() {
         guard let window = mainWindow else { return }
-        let tabBarHeight: CGFloat = 38.0 // ZoteroStyle.Size.tabBarHeight
+        let tabBarHeight: CGFloat = 38.0 // OakStyle.Size.tabBarHeight
 
         for buttonType: NSWindow.ButtonType in [.closeButton, .miniaturizeButton, .zoomButton] {
             guard let button = window.standardWindowButton(buttonType) else { continue }

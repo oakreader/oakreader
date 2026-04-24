@@ -8,7 +8,7 @@ struct SidebarView: View {
             // Icon-only mode picker
             HStack(spacing: 2) {
                 ForEach(SidebarMode.allCases) { mode in
-                    ZoteroToolButton(
+                    OakToolButton(
                         systemImage: mode.systemImage,
                         isSelected: viewModel.state.sidebarMode == mode,
                         tooltip: mode.label
@@ -18,8 +18,8 @@ struct SidebarView: View {
                 }
                 Spacer()
             }
-            .padding(.horizontal, ZoteroStyle.Spacing.xs)
-            .padding(.vertical, ZoteroStyle.Spacing.xs)
+            .padding(.horizontal, OakStyle.Spacing.xs)
+            .padding(.vertical, OakStyle.Spacing.xs)
 
             Divider()
 
