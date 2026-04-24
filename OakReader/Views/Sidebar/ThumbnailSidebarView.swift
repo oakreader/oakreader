@@ -90,14 +90,14 @@ private struct ThumbnailItemView: View {
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 4)
-                .background(isSelected ? Color(red: 0.14, green: 0.45, blue: 0.58) : Color.gray.opacity(0.45))
+                .background(isSelected ? Color.accentColor : Color.gray.opacity(0.45))
         }
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .overlay(
             RoundedRectangle(cornerRadius: 6)
                 .strokeBorder(
-                    isSelected ? Color(red: 0.14, green: 0.45, blue: 0.58) : Color.black.opacity(0.08),
+                    isSelected ? Color.accentColor : Color.black.opacity(0.08),
                     lineWidth: isSelected ? borderWidth : 1
                 )
         )
