@@ -6,6 +6,7 @@ struct ChatInputTextView: NSViewRepresentable {
     @Binding var text: String
     var placeholder: String = "Ask about this PDF..."
     var onSend: () -> Void
+    var onPasteImage: ((Data) -> Void)?
     @Binding var contentHeight: CGFloat
 
     /// Shared reference so the parent SwiftUI view can trigger focus.
@@ -33,6 +34,7 @@ struct ChatInputTextView: NSViewRepresentable {
         let textView = ChatNSTextView()
         textView.delegate = context.coordinator
         textView.onSend = onSend
+        textView.onPasteImage = onPasteImage
         textView.isRichText = false
         textView.allowsUndo = true
         textView.font = .systemFont(ofSize: 14)
@@ -74,6 +76,7 @@ struct ChatInputTextView: NSViewRepresentable {
         }
 
         textView.onSend = onSend
+        textView.onPasteImage = onPasteImage
         focusRef.textView = textView
     }
 
@@ -140,6 +143,7 @@ struct ChatInputTextView: NSViewRepresentable {
 
 final class ChatNSTextView: NSTextView {
     var onSend: (() -> Void)?
+    var onPasteImage: ((Data) -> Void)?
 
     override var acceptsFirstResponder: Bool { true }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
@@ -160,5 +164,39 @@ final class ChatNSTextView: NSTextView {
         }
 
         super.keyDown(with: event)
+    }
+
+    override func paste(_ sender: Any?) {
+        guard let handler = onPasteImage else {
+            super.paste(sender)
+            return
+        }
+
+        let pb = NSPasteboard.general
+        let types = pb.types ?? []
+
+        // Any image on the pasteboard — screenshots, SnipPaste, Preview, etc.
+        let hasImage = types.contains(.tiff) || types.contains(.png)
+        if hasImage,
+           let image = NSImage(pasteboard: pb),
+           let png = image.pngData() {
+            handler(png)
+            return
+        }
+
+        // Image file URL pasted (e.g. from Finder)
+        if types.contains(.fileURL),
+           let urlString = pb.string(forType: .fileURL),
+           let url = URL(string: urlString) {
+            let ext = url.pathExtension.lowercased()
+            if ["png", "jpg", "jpeg", "gif", "bmp", "tiff", "webp"].contains(ext),
+               let image = NSImage(contentsOf: url),
+               let png = image.pngData() {
+                handler(png)
+                return
+            }
+        }
+
+        super.paste(sender)
     }
 }

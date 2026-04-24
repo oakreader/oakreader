@@ -9,8 +9,6 @@ struct AIChatView: View {
             // Header
             header
 
-            Divider()
-
             if chatVM.turns.isEmpty {
                 emptyState
             } else {
@@ -23,6 +21,16 @@ struct AIChatView: View {
             }
 
             inputBar
+        }
+        .onAppear {
+            // Auto-focus the chat input when the AI chat panel opens.
+            // Delayed so the NSTextView is attached to its NSWindow before
+            // we call makeFirstResponder (otherwise textView.window is nil
+            // and the call silently no-ops, leaving keystrokes to hit the
+            // toolbar responder chain — e.g. triggering the search field).
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                inputFocusRef.focus()
+            }
         }
     }
 
@@ -80,6 +88,12 @@ struct AIChatView: View {
 
     // MARK: - Message List
 
+    @State private var scrollOffset: CGFloat = 0
+    @State private var scrollContentHeight: CGFloat = 0
+    @State private var scrollViewHeight: CGFloat = 0
+    @State private var scrollBarOpacity: Double = 0
+    @State private var fadeTask: Task<Void, Never>?
+
     private var messageList: some View {
         ScrollViewReader { proxy in
             ScrollView {
@@ -90,6 +104,49 @@ struct AIChatView: View {
                     }
                 }
                 .padding(ZoteroStyle.Spacing.sm)
+                .background(
+                    GeometryReader { inner in
+                        Color.clear
+                            .preference(
+                                key: ScrollMetricsKey.self,
+                                value: ScrollMetrics(
+                                    offset: -inner.frame(in: .named("chatScroll")).minY,
+                                    contentHeight: inner.size.height
+                                )
+                            )
+                    }
+                )
+            }
+            .coordinateSpace(name: "chatScroll")
+            .scrollIndicators(.hidden)
+            .scrollContentBackground(.hidden)
+            .overlay(alignment: .trailing) {
+                GeometryReader { geo in
+                    let viewH = geo.size.height
+                    let ratio = scrollContentHeight > viewH
+                        ? viewH / scrollContentHeight : 1
+                    let thumbH = max(ratio * viewH, 28)
+                    let maxTravel = viewH - thumbH
+                    let scrollable = scrollContentHeight - viewH
+                    let progress = scrollable > 0
+                        ? min(max(scrollOffset / scrollable, 0), 1) : 0
+                    let thumbY = progress * maxTravel
+
+                    Capsule()
+                        .fill(Color.primary.opacity(0.18))
+                        .frame(width: 3, height: thumbH)
+                        .offset(y: thumbY)
+                        .padding(.trailing, 1.5)
+                        .opacity(ratio < 1 ? scrollBarOpacity : 0)
+                        .animation(.easeOut(duration: 0.15), value: scrollBarOpacity)
+                        .onAppear { scrollViewHeight = viewH }
+                        .onChange(of: geo.size.height) { _, h in scrollViewHeight = h }
+                }
+            }
+            .onPreferenceChange(ScrollMetricsKey.self) { metrics in
+                scrollOffset = metrics.offset
+                scrollContentHeight = metrics.contentHeight
+                showScrollBar()
             }
             .onChange(of: chatVM.turns.count) { _, _ in
                 if let last = chatVM.turns.last {
@@ -103,6 +160,16 @@ struct AIChatView: View {
                     proxy.scrollTo(last.id, anchor: .bottom)
                 }
             }
+        }
+    }
+
+    private func showScrollBar() {
+        scrollBarOpacity = 1
+        fadeTask?.cancel()
+        fadeTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.2))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.6)) { scrollBarOpacity = 0 }
         }
     }
 
@@ -135,6 +202,7 @@ struct AIChatView: View {
                 ),
                 placeholder: "Ask about this PDF...",
                 onSend: { if inputHasText { chatVM.send() } },
+                onPasteImage: { data in chatVM.addClipboardImage(data) },
                 contentHeight: $inputContentHeight,
                 focusRef: inputFocusRef
             )
@@ -154,9 +222,9 @@ struct AIChatView: View {
                     }
                 } label: {
                     Image(systemName: "plus")
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(.secondary)
-                        .frame(width: 24, height: 24)
+                        .frame(width: 30, height: 30)
                         .background(Circle().fill(Color.primary.opacity(0.06)))
                 }
                 .buttonStyle(.plain)
@@ -169,19 +237,24 @@ struct AIChatView: View {
                         ZStack {
                             Circle()
                                 .fill(Color.primary)
-                                .frame(width: 24, height: 24)
-                            RoundedRectangle(cornerRadius: 2)
+                                .frame(width: 30, height: 30)
+                            RoundedRectangle(cornerRadius: 3)
                                 .fill(Color(nsColor: .windowBackgroundColor))
-                                .frame(width: 10, height: 10)
+                                .frame(width: 12, height: 12)
                         }
                     }
                     .buttonStyle(.plain)
                     .help("Stop generating")
                 } else {
                     Button(action: { chatVM.send() }) {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(.system(size: 22))
-                            .foregroundStyle(inputHasText ? Color.accentColor : Color.gray.opacity(0.5))
+                        ZStack {
+                            Circle()
+                                .fill(inputHasText ? Color.primary : Color.gray.opacity(0.3))
+                                .frame(width: 30, height: 30)
+                            Image(systemName: "arrow.up")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(Color(nsColor: .windowBackgroundColor))
+                        }
                     }
                     .buttonStyle(.plain)
                     .disabled(!inputHasText)
@@ -226,5 +299,19 @@ struct AIChatView: View {
         .padding(.horizontal, ZoteroStyle.Spacing.sm)
         .padding(.vertical, ZoteroStyle.Spacing.xxs)
         .background(Color.yellow.opacity(0.1))
+    }
+}
+
+// MARK: - Scroll metrics preference key
+
+private struct ScrollMetrics: Equatable {
+    var offset: CGFloat = 0
+    var contentHeight: CGFloat = 0
+}
+
+private struct ScrollMetricsKey: PreferenceKey {
+    static let defaultValue = ScrollMetrics()
+    static func reduce(value: inout ScrollMetrics, nextValue: () -> ScrollMetrics) {
+        value = nextValue()
     }
 }

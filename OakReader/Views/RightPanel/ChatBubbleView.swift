@@ -1,5 +1,6 @@
 import SwiftUI
 import OakReaderAI
+import Textual
 
 struct ChatBubbleView: View {
     let turn: ChatTurn
@@ -17,7 +18,7 @@ struct ChatBubbleView: View {
                     // Skill badge
                     if let skill = turn.skill {
                         Text(skill)
-                            .font(.caption2)
+                            .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
@@ -26,21 +27,14 @@ struct ChatBubbleView: View {
 
                     // Inline attachments for user messages
                     if turn.role == .user && !turn.attachments.isEmpty {
-                        ForEach(turn.attachments) { attachment in
-                            attachmentView(attachment)
-                        }
+                        FannedAttachmentStack(attachments: turn.attachments)
                     }
 
                     // Message content
-                    Group {
-                        if turn.role == .assistant {
-                            markdownContent
-                        } else {
-                            Text(turn.content)
-                        }
-                    }
-                    .font(.body)
-                    .textSelection(.enabled)
+                    StructuredText(markdown: turn.content, syntaxExtensions: [.math])
+                        .textual.headingStyle(ChatHeadingStyle())
+                        .textual.textSelection(.enabled)
+                        .font(.system(size: 14))
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
                     .background(
@@ -72,17 +66,15 @@ struct ChatBubbleView: View {
                         }
                     }
 
-                    // Hover actions
-                    if isHovered && !turn.isStreaming && turn.role == .assistant {
-                        HStack(spacing: 8) {
-                            Button(action: copyContent) {
-                                Image(systemName: "doc.on.doc")
-                                    .font(.caption)
-                            }
-                            .buttonStyle(.plain)
-                            .help("Copy")
+                    // Copy button — always visible after response is done
+                    if !turn.isStreaming && turn.role == .assistant {
+                        Button(action: copyContent) {
+                            Image(systemName: "doc.on.doc")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
                         }
-                        .transition(.opacity)
+                        .buttonStyle(.plain)
+                        .help("Copy")
                     }
                 }
 
@@ -90,38 +82,6 @@ struct ChatBubbleView: View {
             }
             .onHover { isHovered = $0 }
             .animation(.easeInOut(duration: 0.15), value: isHovered)
-        )
-    }
-
-    // MARK: - Markdown content
-
-    @ViewBuilder
-    private var markdownContent: some View {
-        if let attributed = try? AttributedString(markdown: turn.content, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
-            Text(attributed)
-        } else {
-            Text(turn.content)
-        }
-    }
-
-    // MARK: - Attachment view
-
-    @ViewBuilder
-    private func attachmentView(_ attachment: ChatAttachment) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: attachment.type == .textSelection ? "text.quote" : "photo")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text(attachment.label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(Color(nsColor: .controlBackgroundColor))
         )
     }
 
@@ -137,5 +97,22 @@ struct ChatBubbleView: View {
     private func copyContent() {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(turn.content, forType: .string)
+    }
+}
+
+// MARK: - Compact heading style for chat bubbles
+
+private struct ChatHeadingStyle: StructuredText.HeadingStyle {
+    private static let fontScales: [CGFloat] = [1.3, 1.15, 1.05, 1.0, 0.9, 0.85]
+
+    func makeBody(configuration: Configuration) -> some View {
+        let level = min(configuration.headingLevel, 6)
+        let scale = Self.fontScales[level - 1]
+
+        configuration.label
+            .textual.fontScale(scale)
+            .textual.lineSpacing(.fontScaled(0.1))
+            .textual.blockSpacing(.fontScaled(top: 0.6, bottom: 0.3))
+            .fontWeight(.semibold)
     }
 }
