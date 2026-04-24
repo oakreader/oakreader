@@ -27,7 +27,7 @@ struct SidebarView: View {
             switch viewModel.state.sidebarMode {
             case .thumbnails:
                 ThumbnailSidebarView(viewModel: viewModel)
-            case .bookmarks:
+            case .outline:
                 BookmarkSidebarView(viewModel: viewModel)
             case .annotations:
                 AnnotationListView(viewModel: viewModel)

@@ -158,20 +158,6 @@ struct OakReaderToolbarView: View {
                     viewModel.viewer.clearSearch()
                 }
             }
-
-            separator
-
-            ZoteroToolButton(
-                systemImage: "sidebar.trailing",
-                isSelected: viewModel.state.rightPanelMode != nil,
-                tooltip: "Toggle Right Panel"
-            ) {
-                if viewModel.state.rightPanelMode != nil {
-                    viewModel.state.rightPanelMode = nil
-                } else {
-                    viewModel.state.rightPanelMode = .inspector
-                }
-            }
         }
     }
 

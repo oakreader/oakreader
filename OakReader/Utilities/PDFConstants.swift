@@ -27,7 +27,7 @@ enum EditorMode: String, CaseIterable, Identifiable {
 
 enum SidebarMode: String, CaseIterable, Identifiable {
     case thumbnails
-    case bookmarks
+    case outline
     case annotations
 
     var id: String { rawValue }
@@ -35,7 +35,7 @@ enum SidebarMode: String, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .thumbnails: return "Thumbnails"
-        case .bookmarks: return "Outline"
+        case .outline: return "Outline"
         case .annotations: return "Annotations"
         }
     }
@@ -43,7 +43,7 @@ enum SidebarMode: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .thumbnails: return "rectangle.split.3x3"
-        case .bookmarks: return "list.bullet.indent"
+        case .outline: return "list.bullet.indent"
         case .annotations: return "text.bubble"
         }
     }
