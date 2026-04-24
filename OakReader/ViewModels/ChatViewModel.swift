@@ -21,12 +21,17 @@ class ChatViewModel {
 
     // MARK: - Private
 
-    private let engine = ChatEngine()
+    private let engine: ChatEngine
     private let contextProvider = PDFContextProvider()
     private var streamTask: Task<Void, Never>?
 
-    init(parent: DocumentViewModel) {
+    init(parent: DocumentViewModel, documentStoragePath: URL? = nil) {
         self.parent = parent
+        if let path = documentStoragePath {
+            self.engine = ChatEngine(documentStoragePath: path)
+        } else {
+            self.engine = ChatEngine()
+        }
     }
 
     // MARK: - Configuration
@@ -163,6 +168,15 @@ class ChatViewModel {
             label: "Page \(pageIndex + 1), region capture",
             imageData: imageData,
             pageIndex: pageIndex
+        )
+        pendingAttachments.append(attachment)
+    }
+
+    func addClipboardImage(_ imageData: Data) {
+        let attachment = ChatAttachment(
+            type: .imageCapture,
+            label: "Pasted image",
+            imageData: imageData
         )
         pendingAttachments.append(attachment)
     }

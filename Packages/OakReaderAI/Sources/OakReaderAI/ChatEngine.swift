@@ -29,9 +29,17 @@ public struct PDFContextSnapshot: Sendable {
 /// Actor that coordinates message flow: builds prompts, routes to provider, persists turns.
 public actor ChatEngine {
     private let router = ProviderRouter()
-    private let store = ChatSessionStore()
+    private let store: ChatSessionStore
 
-    public init() {}
+    /// Initialize with a per-document storage path for session files.
+    public init(documentStoragePath: URL) {
+        self.store = ChatSessionStore(documentStoragePath: documentStoragePath)
+    }
+
+    /// Initialize with default centralized storage (fallback).
+    public init() {
+        self.store = ChatSessionStore()
+    }
 
     // MARK: - Send message
 

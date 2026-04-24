@@ -1,14 +1,26 @@
 import Foundation
 
 /// Persists chat turns as JSONL files (one JSON object per line).
+/// When initialized with a document storage path, sessions are stored per-document
+/// in `{documentStoragePath}/sessions/`. Otherwise falls back to a centralized directory.
 public actor ChatSessionStore {
     private let baseDirectory: URL
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
+    /// Initialize with a per-document storage path.
+    /// Sessions will be stored in `{documentStoragePath}/sessions/`.
+    public init(documentStoragePath: URL) {
+        self.baseDirectory = documentStoragePath.appendingPathComponent("sessions", isDirectory: true)
+        try? FileManager.default.createDirectory(at: baseDirectory, withIntermediateDirectories: true)
+    }
+
+    /// Initialize with the default centralized directory (fallback).
     public init() {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        self.baseDirectory = appSupport.appendingPathComponent("OakReader/ChatSessions", isDirectory: true)
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        self.baseDirectory = home
+            .appendingPathComponent("OakReader", isDirectory: true)
+            .appendingPathComponent("chat_sessions", isDirectory: true)
         try? FileManager.default.createDirectory(at: baseDirectory, withIntermediateDirectories: true)
     }
 
@@ -66,6 +78,9 @@ public actor ChatSessionStore {
     public func deleteSession(_ sessionId: UUID) {
         let url = fileURL(for: sessionId)
         try? FileManager.default.removeItem(at: url)
+        // Also remove attachments directory if it exists
+        let attachmentsDir = baseDirectory.appendingPathComponent("\(sessionId.uuidString)_attachments")
+        try? FileManager.default.removeItem(at: attachmentsDir)
     }
 
     // MARK: - Internal

@@ -44,6 +44,10 @@ public struct ChatAttachment: Identifiable, Codable, Sendable {
     public let type: AttachmentType
     public let label: String
     public let textContent: String?
+    /// Relative file path for image attachments (stored on disk, not inline).
+    /// Path is relative to the session's attachments directory.
+    public let filePath: String?
+    /// Inline image data — used only for in-memory/pending attachments, not persisted in JSONL.
     public let imageData: Data?
     public let pageIndex: Int?
 
@@ -57,6 +61,7 @@ public struct ChatAttachment: Identifiable, Codable, Sendable {
         type: AttachmentType,
         label: String,
         textContent: String? = nil,
+        filePath: String? = nil,
         imageData: Data? = nil,
         pageIndex: Int? = nil
     ) {
@@ -64,6 +69,7 @@ public struct ChatAttachment: Identifiable, Codable, Sendable {
         self.type = type
         self.label = label
         self.textContent = textContent
+        self.filePath = filePath
         self.imageData = imageData
         self.pageIndex = pageIndex
     }
