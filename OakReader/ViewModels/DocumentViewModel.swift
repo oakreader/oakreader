@@ -129,7 +129,8 @@ class DocumentViewModel {
         case .displayTwoUpContinuous:
             viewer.setDisplayMode(.twoUpContinuous)
         case .find:
-            state.isSearchBarVisible = true
+            state.sidebarMode = .search
+            state.isSidebarVisible = true
         case .accessibilityCheck:
             Task { @MainActor in
                 await accessibility.runCheck()

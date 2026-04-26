@@ -29,6 +29,8 @@ struct SidebarView: View {
                 BookmarkSidebarView(viewModel: viewModel)
             case .annotations:
                 AnnotationListView(viewModel: viewModel)
+            case .search:
+                SearchSidebarView(viewModel: viewModel)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

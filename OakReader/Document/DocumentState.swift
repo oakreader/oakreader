@@ -14,7 +14,6 @@ class DocumentState {
     var editorMode: EditorMode = .viewer
     var sidebarMode: SidebarMode = .thumbnails
     var isSidebarVisible: Bool = true
-    var isSearchBarVisible: Bool = false
     var rightPanelMode: RightPanelMode? = nil
     var isLoading: Bool = false
     var errorMessage: String?
