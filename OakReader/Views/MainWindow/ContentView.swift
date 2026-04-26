@@ -37,36 +37,34 @@ struct ContentView: View {
                     OakReaderToolbarView(viewModel: viewModel)
                     Divider()
 
-                    HStack(spacing: 0) {
-                        // Main content area
-                        ZStack {
-                            if viewModel.hasDocument {
-                                mainContentView
-                            } else {
-                                emptyStateView
-                            }
-
-                            // Loading overlay
-                            if viewModel.state.isLoading {
-                                ProgressOverlay(message: "Processing...")
-                            }
+                    // Main content area
+                    ZStack {
+                        if viewModel.hasDocument {
+                            mainContentView
+                        } else {
+                            emptyStateView
                         }
-                        .frame(minWidth: 300)
-                        .frame(maxWidth: .infinity)
 
-                        // Right panel — draggable divider
-                        if viewModel.state.rightPanelMode != nil {
-                            panelDivider { delta in
-                                rightPanelWidth = min(max(rightPanelWidth - delta, 320), 720)
-                            }
-
-                            RightPanelContentView(viewModel: viewModel)
-                                .frame(width: rightPanelWidth)
-                                .background(Color(nsColor: .controlBackgroundColor))
+                        // Loading overlay
+                        if viewModel.state.isLoading {
+                            ProgressOverlay(message: "Processing...")
                         }
                     }
+                    .frame(minWidth: 300)
+                    .frame(maxWidth: .infinity)
                 }
                 .background(OakStyle.Colors.contentBackground)
+
+                // Right panel — draggable divider (full height under tab bar)
+                if viewModel.state.rightPanelMode != nil {
+                    panelDivider { delta in
+                        rightPanelWidth = min(max(rightPanelWidth - delta, 320), 720)
+                    }
+
+                    RightPanelContentView(viewModel: viewModel)
+                        .frame(width: rightPanelWidth)
+                        .background(Color(nsColor: .controlBackgroundColor))
+                }
             }
             .clipShape(
                 UnevenRoundedRectangle(

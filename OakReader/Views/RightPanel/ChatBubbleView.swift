@@ -18,7 +18,7 @@ struct ChatBubbleView: View {
                     // Skill badge
                     if let skill = turn.skill {
                         Text(skill)
-                            .font(.system(size: 12))
+                            .font(.system(size: 13))
                             .foregroundStyle(.secondary)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
@@ -60,7 +60,7 @@ struct ChatBubbleView: View {
                     if !turn.isStreaming && turn.role == .assistant {
                         Button(action: copyContent) {
                             Image(systemName: "doc.on.doc")
-                                .font(.system(size: 12))
+                                .font(.system(size: 13))
                                 .foregroundStyle(.secondary)
                         }
                         .buttonStyle(.plain)
@@ -70,6 +70,7 @@ struct ChatBubbleView: View {
 
                 if turn.role == .assistant { Spacer(minLength: 40) }
             }
+            .clipped()
             .onHover { isHovered = $0 }
             .animation(.easeInOut(duration: 0.15), value: isHovered)
         )
@@ -80,7 +81,7 @@ struct ChatBubbleView: View {
         let base = StructuredText(markdown: turn.content, syntaxExtensions: [.math])
             .textual.headingStyle(ChatHeadingStyle())
             .textual.textSelection(.enabled)
-            .font(.system(size: 14))
+            .font(.system(size: 15))
 
         if turn.role == .assistant {
             base
@@ -100,14 +101,14 @@ struct ChatBubbleView: View {
                     RoundedRectangle(cornerRadius: 12)
                         .fill(bubbleColor)
                 )
-                .foregroundStyle(.white)
+                .foregroundStyle(Color(nsColor: .labelColor))
         }
     }
 
     private var bubbleColor: Color {
         switch turn.role {
         case .user:
-            return Color.accentColor
+            return Color.accentColor.opacity(0.15)
         case .assistant, .system:
             return Color(nsColor: .controlBackgroundColor)
         }

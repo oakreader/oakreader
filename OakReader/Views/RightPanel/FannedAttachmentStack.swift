@@ -99,7 +99,7 @@ struct FannedAttachmentStack: View {
             }
         }
         .padding(6)
-        .frame(width: cardWidth, alignment: .leading)
+        .frame(maxWidth: cardWidth, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: cornerRadius)
                 .fill(Color(nsColor: .controlBackgroundColor))

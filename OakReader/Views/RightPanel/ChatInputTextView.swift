@@ -37,7 +37,7 @@ struct ChatInputTextView: NSViewRepresentable {
         textView.onPasteImage = onPasteImage
         textView.isRichText = false
         textView.allowsUndo = true
-        textView.font = .systemFont(ofSize: 14)
+        textView.font = .systemFont(ofSize: 15)
         textView.textColor = .labelColor
         textView.drawsBackground = false
         textView.isVerticallyResizable = true

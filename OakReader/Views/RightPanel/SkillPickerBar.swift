@@ -30,9 +30,9 @@ struct SkillPickerBar: View {
         }) {
             HStack(spacing: 5) {
                 Image(systemName: skill.icon)
-                    .font(.system(size: OakStyle.Font.body))
+                    .font(.system(size: 14))
                 Text(skill.name)
-                    .font(.system(size: OakStyle.Font.body))
+                    .font(.system(size: 14))
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
