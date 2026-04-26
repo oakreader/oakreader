@@ -9,8 +9,6 @@ enum OakReaderError: LocalizedError {
     case incorrectPassword
     case encryptionFailed(String)
     case pageOutOfRange(index: Int, count: Int)
-    case ocrFailed(page: Int, underlying: Error?)
-    case ocrNotAvailable
     case conversionFailed(format: String, underlying: Error?)
     case compressionFailed(underlying: Error?)
     case comparisonFailed(String)
@@ -46,10 +44,6 @@ enum OakReaderError: LocalizedError {
             return "Encryption failed: \(reason)"
         case .pageOutOfRange(let index, let count):
             return "Page \(index + 1) is out of range. Document has \(count) pages."
-        case .ocrFailed(let page, let underlying):
-            return "OCR failed on page \(page + 1): \(underlying?.localizedDescription ?? "unknown error")"
-        case .ocrNotAvailable:
-            return "OCR is not available on this system."
         case .conversionFailed(let format, let underlying):
             return "Conversion to \(format) failed: \(underlying?.localizedDescription ?? "unknown error")"
         case .compressionFailed(let underlying):

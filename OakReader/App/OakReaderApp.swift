@@ -8,7 +8,6 @@ enum DocumentAction: String {
     case zoomIn, zoomOut, zoomToFit
     case displaySingle, displaySingleContinuous, displayTwoUp, displayTwoUpContinuous
     case find
-    case runOCR
     case accessibilityCheck
     case rotateRight, rotateLeft
     case exportImages

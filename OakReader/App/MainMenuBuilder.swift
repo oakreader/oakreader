@@ -67,16 +67,6 @@ enum MainMenuBuilder {
     private static func buildFileMenu(target: AppDelegate) -> NSMenuItem {
         let fileMenu = NSMenu(title: "File")
 
-        let newItem = NSMenuItem(title: "New Blank PDF", action: #selector(AppDelegate.newBlankDocument(_:)), keyEquivalent: "n")
-        newItem.target = target
-        fileMenu.addItem(newItem)
-
-        let createFromImagesItem = NSMenuItem(title: "New from Images...", action: #selector(AppDelegate.createFromImages(_:)), keyEquivalent: "")
-        createFromImagesItem.target = target
-        fileMenu.addItem(createFromImagesItem)
-
-        fileMenu.addItem(.separator())
-
         let openItem = NSMenuItem(title: "Open...", action: #selector(AppDelegate.openDocument(_:)), keyEquivalent: "o")
         openItem.target = target
         fileMenu.addItem(openItem)
@@ -202,8 +192,6 @@ enum MainMenuBuilder {
 
     private static func buildToolsMenu(target: AppDelegate) -> NSMenuItem {
         let toolsMenu = NSMenu(title: "Tools")
-        toolsMenu.addItem(actionMenuItem("Run OCR", action: .runOCR, key: "r", modifiers: [.command, .shift], target: target))
-        toolsMenu.addItem(.separator())
         toolsMenu.addItem(actionMenuItem("Rotate Clockwise", action: .rotateRight, key: "]", modifiers: [.command], target: target))
         toolsMenu.addItem(actionMenuItem("Rotate Counter-Clockwise", action: .rotateLeft, key: "[", modifiers: [.command], target: target))
         toolsMenu.addItem(.separator())

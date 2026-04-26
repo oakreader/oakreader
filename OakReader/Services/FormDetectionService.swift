@@ -7,7 +7,7 @@ struct FormDetectionService {
 
     func detectFormFields(on page: PDFPage) async -> [FormFieldModel] {
         guard let pageIndex = page.document?.index(for: page) else { return [] }
-        guard let cgImage = page.renderToCGImage(dpi: PDFDefaults.ocrDPI) else { return [] }
+        guard let cgImage = page.renderToCGImage(dpi: 300) else { return [] }
 
         let pageRect = page.bounds(for: .mediaBox)
 

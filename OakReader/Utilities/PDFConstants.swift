@@ -170,7 +170,6 @@ struct PDFDefaults {
     static let defaultPageSize = CGSize(width: pageWidth, height: pageHeight)
     static let defaultMargin: CGFloat = 36 // 0.5 inch
     static let thumbnailSize = CGSize(width: 110, height: 142)
-    static let ocrDPI: CGFloat = 300
     static let highlightColor = NSColor.yellow.withAlphaComponent(0.5)
     static let watermarkOpacity: CGFloat = 0.3
     static let watermarkFontSize: CGFloat = 72

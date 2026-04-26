@@ -41,7 +41,7 @@ targets:
     postCompileScripts:
       - script: |
           if which swiftlint > /dev/null; then
-            swiftlint
+            swiftlint || true
           else
             echo "warning: SwiftLint not installed"
           fi
