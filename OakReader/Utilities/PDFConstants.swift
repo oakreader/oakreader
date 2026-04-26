@@ -125,7 +125,7 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .inspector: return "Inspector"
+        case .inspector: return "Info"
         case .aiChat: return "AI Chat"
         }
     }

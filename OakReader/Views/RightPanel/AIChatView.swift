@@ -1,5 +1,5 @@
 import SwiftUI
-// import OakReaderAI // TODO: re-enable when module is available
+import OakReaderAI
 
 struct AIChatView: View {
     let chatVM: ChatViewModel
@@ -280,6 +280,54 @@ struct AIChatView: View {
         )
         .padding(.horizontal, OakStyle.Spacing.sm)
         .padding(.vertical, OakStyle.Spacing.xs)
+    }
+
+    // MARK: - Model Switcher
+
+    private var currentModelName: String {
+        let config = chatVM.config
+        return config.modelInfo?.name ?? config.model
+    }
+
+    private var modelSwitcher: some View {
+        let prefs = Preferences.shared
+        let provider = prefs.aiProvider
+        let currentModel = chatVM.config.model
+
+        return Menu {
+            ForEach(provider.models) { model in
+                Button(action: {
+                    prefs.aiModel = model.id
+                }) {
+                    HStack {
+                        Text(model.name)
+                        if model.id == currentModel {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 3) {
+                Text(currentModelName)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                Capsule().fill(Color.primary.opacity(0.06))
+            )
+            .overlay(
+                Capsule().strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5)
+            )
+        }
+        .buttonStyle(.plain)
+        .help("Switch model")
     }
 
     // MARK: - Error Banner
