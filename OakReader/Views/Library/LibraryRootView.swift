@@ -40,9 +40,11 @@ struct LibraryRootView: View {
     var body: some View {
         HStack(spacing: 0) {
             // Left pane: Sidebar (no right divider)
-            LibrarySidebarView(appState: appState)
-                .frame(width: 280)
-                .background(OakStyle.Colors.sidebarBackground)
+            if appState.isLibrarySidebarVisible {
+                LibrarySidebarView(appState: appState)
+                    .frame(width: 280)
+                    .background(OakStyle.Colors.sidebarBackground)
+            }
 
             // Middle + Right in HSplitView
             HSplitView {
