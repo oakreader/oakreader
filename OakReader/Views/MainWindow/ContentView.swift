@@ -18,65 +18,68 @@ struct ContentView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            // Main content column (toolbar + content)
-            VStack(spacing: 0) {
-                // Inline toolbar (below tab bar)
-                OakReaderToolbarView(viewModel: viewModel)
-                Divider()
+            // Sidebar + Content wrapped together for unified corner radius
+            HStack(spacing: 0) {
+                // Left sidebar — full height
+                if viewModel.state.isSidebarVisible {
+                    SidebarView(viewModel: viewModel)
+                        .frame(width: sidebarWidth)
+                        .background(Color(nsColor: .controlBackgroundColor))
 
-                // Search bar (below toolbar)
-                if viewModel.state.isSearchBarVisible {
-                    SearchBarView(viewModel: viewModel)
+                    panelDivider { delta in
+                        sidebarWidth = min(max(sidebarWidth + delta, 140), 380)
+                    }
+                }
+
+                // Main content column (toolbar + content)
+                VStack(spacing: 0) {
+                    // Inline toolbar (below tab bar)
+                    OakReaderToolbarView(viewModel: viewModel)
                     Divider()
-                }
 
-                HStack(spacing: 0) {
-                    // Left sidebar — draggable divider
-                    if viewModel.state.isSidebarVisible {
-                        SidebarView(viewModel: viewModel)
-                            .frame(width: sidebarWidth)
-                            .background(Color(nsColor: .controlBackgroundColor))
-
-                        panelDivider { delta in
-                            sidebarWidth = min(max(sidebarWidth + delta, 140), 380)
-                        }
+                    // Search bar (below toolbar)
+                    if viewModel.state.isSearchBarVisible {
+                        SearchBarView(viewModel: viewModel)
+                        Divider()
                     }
 
-                    // Main content area
-                    ZStack {
-                        if viewModel.hasDocument {
-                            mainContentView
-                        } else {
-                            emptyStateView
-                        }
+                    HStack(spacing: 0) {
+                        // Main content area
+                        ZStack {
+                            if viewModel.hasDocument {
+                                mainContentView
+                            } else {
+                                emptyStateView
+                            }
 
-                        // Loading overlay
-                        if viewModel.state.isLoading {
-                            ProgressOverlay(message: "Processing...")
+                            // Loading overlay
+                            if viewModel.state.isLoading {
+                                ProgressOverlay(message: "Processing...")
+                            }
                         }
-                    }
-                    .frame(minWidth: 300)
-                    .frame(maxWidth: .infinity)
+                        .frame(minWidth: 300)
+                        .frame(maxWidth: .infinity)
 
-                    // Right panel — draggable divider
-                    if viewModel.state.rightPanelMode != nil {
-                        panelDivider { delta in
-                            rightPanelWidth = min(max(rightPanelWidth - delta, 320), 720)
+                        // Right panel — draggable divider
+                        if viewModel.state.rightPanelMode != nil {
+                            panelDivider { delta in
+                                rightPanelWidth = min(max(rightPanelWidth - delta, 320), 720)
+                            }
+
+                            RightPanelContentView(viewModel: viewModel)
+                                .frame(width: rightPanelWidth)
+                                .background(Color(nsColor: .controlBackgroundColor))
                         }
-
-                        RightPanelContentView(viewModel: viewModel)
-                            .frame(width: rightPanelWidth)
-                            .background(Color(nsColor: .controlBackgroundColor))
                     }
                 }
+                .background(OakStyle.Colors.contentBackground)
             }
-            .background(OakStyle.Colors.contentBackground)
             .clipShape(
                 UnevenRoundedRectangle(
-                    topLeadingRadius: 0,
+                    topLeadingRadius: 2,
                     bottomLeadingRadius: 0,
                     bottomTrailingRadius: 0,
-                    topTrailingRadius: 8
+                    topTrailingRadius: 2
                 )
             )
 
@@ -114,7 +117,7 @@ struct ContentView: View {
 
     /// 1px visible line with a wider invisible hit zone (11px) for easy dragging.
     private func panelDivider(onDrag: @escaping (CGFloat) -> Void) -> some View {
-        Color.clear
+        Color.white
             .frame(width: 11)
             .overlay(
                 Rectangle()

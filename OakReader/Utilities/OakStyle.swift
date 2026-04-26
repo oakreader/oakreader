@@ -38,7 +38,7 @@ enum OakStyle {
     enum Size {
         static let buttonStandard: CGFloat = 28
         static let toolbarHeight: CGFloat = 40
-        static let tabHeight: CGFloat = 36
+        static let tabHeight: CGFloat = 40
         static let tabBarHeight: CGFloat = 40
         static let closeButton: CGFloat = 18
         static let sidenavWidth: CGFloat = 38
@@ -46,7 +46,7 @@ enum OakStyle {
         static let sidebarMin: CGFloat = 200
         static let sidebarMax: CGFloat = 320
         static let tabMin: CGFloat = 100
-        static let tabMax: CGFloat = 200
+        static let tabMax: CGFloat = 180
     }
 
     // MARK: - Typography
@@ -57,7 +57,7 @@ enum OakStyle {
         /// Secondary text for labels, search results, popover controls
         static let caption: CGFloat = 12
         /// Toolbar and tab bar icon size
-        static let icon: CGFloat = 14
+        static let icon: CGFloat = 16
         /// Small icon size (close buttons, chevrons in search)
         static let iconSmall: CGFloat = 11
     }

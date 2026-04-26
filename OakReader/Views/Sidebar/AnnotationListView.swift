@@ -62,6 +62,7 @@ struct AnnotationListView: View {
             }
             .padding(8)
         }
+        .background(.white)
         .onAppear { loadAnnotations() }
     }
 

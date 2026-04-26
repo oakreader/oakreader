@@ -30,16 +30,6 @@ struct OakReaderToolbarView: View {
 
     private var leftSection: some View {
         HStack(spacing: OakStyle.Spacing.xs) {
-            OakToolButton(
-                systemImage: "sidebar.leading",
-                isSelected: viewModel.state.isSidebarVisible,
-                tooltip: "Toggle Sidebar"
-            ) {
-                viewModel.state.isSidebarVisible.toggle()
-            }
-
-            separator
-
             // Zoom
             OakToolButton(
                 systemImage: "minus.magnifyingglass",

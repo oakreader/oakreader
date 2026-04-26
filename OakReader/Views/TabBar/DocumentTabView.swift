@@ -11,11 +11,17 @@ import SwiftUI
 struct BrowserTabShape: Shape {
     let topRadius: CGFloat
     let concaveRadius: CGFloat
+    let showLeftConcave: Bool
+    let showRightConcave: Bool
 
-    init(topRadius: CGFloat = 10,
-         concaveRadius: CGFloat = 10) {
+    init(topRadius: CGFloat = 8,
+         concaveRadius: CGFloat = 10,
+         showLeftConcave: Bool = true,
+         showRightConcave: Bool = true) {
         self.topRadius = topRadius
         self.concaveRadius = concaveRadius
+        self.showLeftConcave = showLeftConcave
+        self.showRightConcave = showRightConcave
     }
 
     func path(in rect: CGRect) -> Path {
@@ -26,56 +32,86 @@ struct BrowserTabShape: Shape {
 
         var path = Path()
 
-        // Start at bottom-left outside
-        path.move(to: CGPoint(x: 0, y: h))
+        if showLeftConcave {
+            // Start at bottom-left outside
+            path.move(to: CGPoint(x: 0, y: h))
 
-        // Left concave arc (╯): bows outward, from bottom bar up to tab edge
-        path.addArc(
-            center: CGPoint(x: 0, y: h - cr),
-            radius: cr,
-            startAngle: .degrees(90),
-            endAngle: .degrees(0),
-            clockwise: true
-        )
+            // Left concave arc (╯)
+            path.addArc(
+                center: CGPoint(x: 0, y: h - cr),
+                radius: cr,
+                startAngle: .degrees(90),
+                endAngle: .degrees(0),
+                clockwise: true
+            )
 
-        // Straight up the left side
-        path.addLine(to: CGPoint(x: cr, y: r))
+            // Straight up the left side
+            path.addLine(to: CGPoint(x: cr, y: r))
 
-        // Top-left rounded corner
-        path.addArc(
-            center: CGPoint(x: cr + r, y: r),
-            radius: r,
-            startAngle: .degrees(180),
-            endAngle: .degrees(270),
-            clockwise: false
-        )
+            // Top-left rounded corner
+            path.addArc(
+                center: CGPoint(x: cr + r, y: r),
+                radius: r,
+                startAngle: .degrees(180),
+                endAngle: .degrees(270),
+                clockwise: false
+            )
+        } else {
+            // Start at bottom-left, straight up
+            path.move(to: CGPoint(x: cr, y: h))
+            path.addLine(to: CGPoint(x: cr, y: r))
+
+            // Top-left rounded corner
+            path.addArc(
+                center: CGPoint(x: cr + r, y: r),
+                radius: r,
+                startAngle: .degrees(180),
+                endAngle: .degrees(270),
+                clockwise: false
+            )
+        }
 
         // Across the top
         path.addLine(to: CGPoint(x: w - cr - r, y: 0))
 
-        // Top-right rounded corner
-        path.addArc(
-            center: CGPoint(x: w - cr - r, y: r),
-            radius: r,
-            startAngle: .degrees(270),
-            endAngle: .degrees(0),
-            clockwise: false
-        )
+        if showRightConcave {
+            // Top-right rounded corner
+            path.addArc(
+                center: CGPoint(x: w - cr - r, y: r),
+                radius: r,
+                startAngle: .degrees(270),
+                endAngle: .degrees(0),
+                clockwise: false
+            )
 
-        // Straight down the right side
-        path.addLine(to: CGPoint(x: w - cr, y: h - cr))
+            // Straight down the right side
+            path.addLine(to: CGPoint(x: w - cr, y: h - cr))
 
-        // Right concave arc (╰): bows outward, from tab edge down to bottom bar
-        path.addArc(
-            center: CGPoint(x: w, y: h - cr),
-            radius: cr,
-            startAngle: .degrees(180),
-            endAngle: .degrees(90),
-            clockwise: true
-        )
+            // Right concave arc (╰)
+            path.addArc(
+                center: CGPoint(x: w, y: h - cr),
+                radius: cr,
+                startAngle: .degrees(180),
+                endAngle: .degrees(90),
+                clockwise: true
+            )
 
-        // Bottom edge back to start
-        path.addLine(to: CGPoint(x: 0, y: h))
+            // Bottom edge back to start
+            path.addLine(to: CGPoint(x: 0, y: h))
+        } else {
+            // Top-right rounded corner
+            path.addArc(
+                center: CGPoint(x: w - cr - r, y: r),
+                radius: r,
+                startAngle: .degrees(270),
+                endAngle: .degrees(0),
+                clockwise: false
+            )
+
+            // Straight down the right side
+            path.addLine(to: CGPoint(x: w - cr, y: h))
+            path.addLine(to: CGPoint(x: cr, y: h))
+        }
 
         return path
     }
@@ -84,6 +120,7 @@ struct BrowserTabShape: Shape {
 struct DocumentTabView: View {
     let tab: DocumentTab
     let isActive: Bool
+    let isFirst: Bool
     let onSelect: () -> Void
     let onClose: () -> Void
 
@@ -130,13 +167,16 @@ struct DocumentTabView: View {
             .onHover { isCloseHovering = $0 }
             .opacity(isActive || isHovering ? 1 : 0)
         }
-        .padding(.leading, 12 + cr)
-        .padding(.trailing, 12 + cr)
+        .padding(.leading, 10 + cr)
+        .padding(.trailing, 10 + cr)
         .frame(height: OakStyle.Size.tabHeight)
         .frame(minWidth: OakStyle.Size.tabMin + cr * 2,
                maxWidth: OakStyle.Size.tabMax + cr * 2)
         .foregroundStyle(isActive ? Color(nsColor: .labelColor) : Color(nsColor: .secondaryLabelColor))
         .background(tabShape)
+        .padding(.leading, isFirst ? 0 : -cr + 3)
+        .padding(.trailing, -cr + 3)
+        .zIndex(isActive ? 2 : isHovering ? 1 : 0)
         .contentShape(Rectangle())
         .onTapGesture { onSelect() }
         .onHover { isHovering = $0 }
@@ -147,6 +187,7 @@ struct DocumentTabView: View {
         if isActive {
             BrowserTabShape(concaveRadius: cr)
                 .fill(OakStyle.Colors.activeTabBackground)
+                .padding(.top, 6)
         } else if isHovering {
             RoundedRectangle(cornerRadius: OakStyle.Radius.standard)
                 .fill(Color.primary.opacity(0.08))
