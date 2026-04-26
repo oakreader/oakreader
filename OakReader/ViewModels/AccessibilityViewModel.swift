@@ -63,13 +63,13 @@ class AccessibilityViewModel {
         for pageIndex in 0..<doc.pageCount {
             guard let page = doc.page(at: pageIndex) else { continue }
 
-            // Check if page has text (scanned image without OCR)
+            // Check if page has text (scanned image)
             if !page.hasText {
                 detectedIssues.append(AccessibilityIssue(
                     severity: .error,
                     message: "Page \(pageIndex + 1) has no text content (may be a scanned image)",
                     pageIndex: pageIndex,
-                    suggestion: "Run OCR on this page to make text accessible to screen readers"
+                    suggestion: "This page may be a scanned image without selectable text"
                 ))
             }
 
@@ -282,7 +282,7 @@ class AccessibilityViewModel {
             parent?.markDocumentEdited()
 
         case let msg where msg.contains("no text content"):
-            // Suggest OCR - navigate to the page
+            // Navigate to the page
             if let pageIndex = issue.pageIndex {
                 parent?.viewer.goToPage(pageIndex)
             }

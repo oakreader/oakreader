@@ -13,7 +13,6 @@ final class Preferences {
         static let showSidebar = "showSidebar"
         static let sidebarMode = "sidebarMode"
         static let autoSave = "autoSave"
-        static let ocrLanguage = "ocrLanguage"
         static let compressionQuality = "compressionQuality"
         static let recentSignatures = "recentSignatures"
         static let defaultAnnotationColor = "defaultAnnotationColor"
@@ -40,7 +39,6 @@ final class Preferences {
             Keys.showSidebar: true,
             Keys.sidebarMode: SidebarMode.thumbnails.rawValue,
             Keys.autoSave: true,
-            Keys.ocrLanguage: "en",
             Keys.compressionQuality: CompressionQuality.medium.rawValue,
             Keys.defaultFontName: PDFDefaults.defaultFontName,
             Keys.defaultFontSize: PDFDefaults.defaultFontSize,
@@ -73,11 +71,6 @@ final class Preferences {
     var autoSave: Bool {
         get { defaults.bool(forKey: Keys.autoSave) }
         set { defaults.set(newValue, forKey: Keys.autoSave) }
-    }
-
-    var ocrLanguage: String {
-        get { defaults.string(forKey: Keys.ocrLanguage) ?? "en" }
-        set { defaults.set(newValue, forKey: Keys.ocrLanguage) }
     }
 
     var compressionQuality: CompressionQuality {

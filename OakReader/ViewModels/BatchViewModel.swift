@@ -1,7 +1,6 @@
 import Foundation
 import PDFKit
 import AppKit
-import Vision
 
 @Observable
 class BatchViewModel {
@@ -17,7 +16,6 @@ class BatchViewModel {
     var compressionQuality: CompressionQuality = .medium
     var watermarkConfig: WatermarkConfig = WatermarkConfig()
     var headerFooterConfig: HeaderFooterConfig = HeaderFooterConfig()
-    var ocrLanguage: String = Preferences.shared.ocrLanguage
     var password: String = ""
     var redactPattern: String = ""
 
@@ -142,9 +140,6 @@ class BatchViewModel {
         case .compress:
             try await compressDocument(doc, to: outputURL, jobIndex: jobIndex)
 
-        case .ocr:
-            try await ocrDocument(doc, to: outputURL, jobIndex: jobIndex)
-
         case .watermark:
             try await watermarkDocument(doc, to: outputURL, jobIndex: jobIndex)
 
@@ -193,53 +188,6 @@ class BatchViewModel {
                     try data.write(to: outputURL)
                 }
             }
-        }
-    }
-
-    // MARK: - OCR
-
-    private func ocrDocument(_ doc: PDFDocument, to outputURL: URL, jobIndex: Int) async throws {
-        let language = ocrLanguage
-
-        for i in 0..<doc.pageCount {
-            guard let page = doc.page(at: i) else { continue }
-
-            if !page.hasText {
-                guard let cgImage = page.renderToCGImage(dpi: PDFDefaults.ocrDPI) else { continue }
-
-                let request = VNRecognizeTextRequest()
-                request.recognitionLevel = .accurate
-                request.usesLanguageCorrection = true
-                request.recognitionLanguages = [language]
-
-                let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
-                try handler.perform([request])
-
-                if let observations = request.results {
-                    let text = observations.compactMap { $0.topCandidates(1).first?.string }.joined(separator: "\n")
-                    if !text.isEmpty {
-                        let pageRect = page.bounds(for: .mediaBox)
-                        let annotation = PDFAnnotation(bounds: pageRect, forType: .freeText, withProperties: nil)
-                        annotation.contents = text
-                        annotation.font = NSFont(name: "Helvetica", size: 1)
-                        annotation.fontColor = .clear
-                        annotation.color = .clear
-                        let border = PDFBorder()
-                        border.lineWidth = 0
-                        annotation.border = border
-                        page.addAnnotation(annotation)
-                    }
-                }
-            }
-
-            await MainActor.run { [weak self] in
-                let pageProgress = Double(i + 1) / Double(doc.pageCount)
-                self?.jobs[jobIndex].status = .processing(progress: pageProgress)
-            }
-        }
-
-        guard doc.write(to: outputURL) else {
-            throw OakReaderError.fileWriteFailed(outputURL, underlying: nil)
         }
     }
 

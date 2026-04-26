@@ -12,7 +12,7 @@ struct BatchProcessingWindow: View {
     @State private var compressionQuality: CompressionQuality = .medium
     @State private var watermarkConfig = WatermarkConfig()
     @State private var headerFooterConfig = HeaderFooterConfig()
-    @State private var ocrLanguage = "en"
+
     @State private var password = ""
     @State private var redactPattern = ""
 
@@ -133,21 +133,6 @@ struct BatchProcessingWindow: View {
                     }
                 }
                 .pickerStyle(.radioGroup)
-            }
-
-        case .ocr:
-            VStack(alignment: .leading, spacing: 8) {
-                Text("OCR Language")
-                    .font(.caption)
-                    .fontWeight(.medium)
-                Picker("Language", selection: $ocrLanguage) {
-                    Text("English").tag("en")
-                    Text("French").tag("fr")
-                    Text("German").tag("de")
-                    Text("Spanish").tag("es")
-                    Text("Chinese (Simplified)").tag("zh-Hans")
-                    Text("Japanese").tag("ja")
-                }
             }
 
         case .passwordProtect:

@@ -131,10 +131,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - File Actions
 
-    @objc func newBlankDocument(_ sender: Any?) {
-        appState.openBlankDocument()
-    }
-
     @objc func openDocument(_ sender: Any?) {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.pdf]
@@ -196,36 +192,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
             try? text.write(to: url, atomically: true, encoding: .utf8)
-        }
-    }
-
-    @objc func createFromImages(_ sender: Any?) {
-        let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = true
-        panel.allowedContentTypes = [.jpeg, .png, .tiff, .bmp, .heic]
-        panel.message = "Select images to combine into a PDF"
-        panel.begin { [weak self] response in
-            guard let self, response == .OK, !panel.urls.isEmpty else { return }
-
-            let doc = OakReaderDocument()
-            let newPDF = PDFDocument()
-
-            for url in panel.urls {
-                guard let image = NSImage(contentsOf: url),
-                      let page = image.toPDFPage() else { continue }
-                newPDF.insert(page, at: newPDF.pageCount)
-            }
-
-            guard newPDF.pageCount > 0 else { return }
-
-            doc.pdfDocument = newPDF
-            doc.documentViewModel = DocumentViewModel(document: doc)
-            NSDocumentController.shared.addDocument(doc)
-
-            let tab = DocumentTab(document: doc)
-            self.appState.openTabs.append(tab)
-            self.appState.activeTabID = tab.id
-            self.appState.updateWindowTitle()
         }
     }
 

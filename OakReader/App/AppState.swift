@@ -39,6 +39,7 @@ final class AppState {
     var window: NSWindow?
     var selectedLibraryItemIDs: Set<UUID> = []
     var showSettings: Bool = false
+    var isLibrarySidebarVisible: Bool = true
 
     private var autosaveTimer: Timer?
 
@@ -153,22 +154,6 @@ final class AppState {
         // Use original filename from library item
         tab.title = item.fileName
         NSDocumentController.shared.addDocument(doc)
-        openTabs.append(tab)
-        activeTabID = tab.id
-        updateWindowTitle()
-    }
-
-    func openBlankDocument() {
-        let doc = OakReaderDocument()
-        let newPDF = PDFDocument()
-        let blankPage = PDFPage.blankPage()
-        newPDF.insert(blankPage, at: 0)
-        doc.pdfDocument = newPDF
-        doc.documentViewModel = DocumentViewModel(document: doc)
-
-        NSDocumentController.shared.addDocument(doc)
-
-        let tab = DocumentTab(document: doc)
         openTabs.append(tab)
         activeTabID = tab.id
         updateWindowTitle()

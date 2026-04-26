@@ -4,7 +4,6 @@ import AppKit
 
 actor BatchProcessingService {
 
-    private let ocrService = OCRService()
     private let compressionService = CompressionService()
     private let watermarkService = WatermarkService()
     private let headerFooterService = HeaderFooterService()
@@ -59,16 +58,6 @@ actor BatchProcessingService {
         let baseName = fileURL.deletingPathExtension().lastPathComponent
 
         switch operation {
-        case .ocr:
-            let language = options["language"] as? String ?? "en"
-            let allPages = IndexSet(0..<document.pageCount)
-            try await ocrService.ocrDocument(document, pages: allPages, progressHandler: progressHandler)
-            let outputURL = outputDir.appendingPathComponent("\(baseName)_ocr.pdf")
-            guard document.write(to: outputURL) else {
-                throw OakReaderError.fileWriteFailed(outputURL, underlying: nil)
-            }
-            return outputURL
-
         case .compress:
             let qualityRaw = options["quality"] as? String ?? CompressionQuality.medium.rawValue
             let quality = CompressionQuality(rawValue: qualityRaw) ?? .medium

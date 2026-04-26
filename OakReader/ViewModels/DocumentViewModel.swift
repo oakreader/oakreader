@@ -27,14 +27,6 @@ class DocumentViewModel {
         return vm
     }
 
-    private var _ocr: OCRViewModel?
-    var ocr: OCRViewModel {
-        if let vm = _ocr { return vm }
-        let vm = OCRViewModel(parent: self)
-        _ocr = vm
-        return vm
-    }
-
     private var _accessibility: AccessibilityViewModel?
     var accessibility: AccessibilityViewModel {
         if let vm = _accessibility { return vm }
@@ -138,10 +130,6 @@ class DocumentViewModel {
             viewer.setDisplayMode(.twoUpContinuous)
         case .find:
             state.isSearchBarVisible = true
-        case .runOCR:
-            Task { @MainActor in
-                await ocr.runOCROnAllPages()
-            }
         case .accessibilityCheck:
             Task { @MainActor in
                 await accessibility.runCheck()

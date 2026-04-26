@@ -1,7 +1,6 @@
 import Foundation
 
 enum BatchOperationType: String, CaseIterable, Identifiable {
-    case ocr
     case compress
     case watermark
     case headerFooter
@@ -16,7 +15,6 @@ enum BatchOperationType: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .ocr: return "Run OCR"
         case .compress: return "Compress"
         case .watermark: return "Add Watermark"
         case .headerFooter: return "Add Headers/Footers"
@@ -31,7 +29,6 @@ enum BatchOperationType: String, CaseIterable, Identifiable {
 
     var systemImage: String {
         switch self {
-        case .ocr: return "text.viewfinder"
         case .compress: return "arrow.down.right.and.arrow.up.left"
         case .watermark: return "drop.triangle"
         case .headerFooter: return "textformat.abc"

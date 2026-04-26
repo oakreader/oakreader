@@ -90,7 +90,7 @@ struct AccessibilityService {
                 severity: .error,
                 message: "Page \(index + 1) has no extractable text.",
                 pageIndex: index,
-                suggestion: "Run OCR on this page to make its content accessible to screen readers."
+                suggestion: "This page may be a scanned image without selectable text."
             ))
         }
 
