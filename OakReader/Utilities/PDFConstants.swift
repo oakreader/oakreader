@@ -53,10 +53,6 @@ enum AnnotationTool: String, CaseIterable, Identifiable {
     case none
     case highlight
     case underline
-    case stickyNote
-    case freeText
-    case freehand
-    case eraser
 
     var id: String { rawValue }
 
@@ -65,10 +61,6 @@ enum AnnotationTool: String, CaseIterable, Identifiable {
         case .none: return "Select"
         case .highlight: return "Highlight"
         case .underline: return "Underline"
-        case .stickyNote: return "Note"
-        case .freeText: return "Text"
-        case .freehand: return "Ink"
-        case .eraser: return "Eraser"
         }
     }
 
@@ -77,10 +69,6 @@ enum AnnotationTool: String, CaseIterable, Identifiable {
         case .none: return "cursor.rays"
         case .highlight: return "highlighter"
         case .underline: return "underline"
-        case .stickyNote: return "note.text"
-        case .freeText: return "textformat"
-        case .freehand: return "pencil.tip"
-        case .eraser: return "eraser.line.dashed"
         }
     }
 }

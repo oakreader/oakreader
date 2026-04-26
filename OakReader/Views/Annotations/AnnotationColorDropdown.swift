@@ -43,67 +43,24 @@ struct AnnotationColorDropdown: View {
 
             Divider()
 
-            // Size slider — context-dependent
+            // Line width slider
             sizeControls
-
-            // Eraser toggle when ink tool is active
-            if viewModel.annotation.currentTool == .freehand || viewModel.annotation.currentTool == .eraser {
-                Divider()
-                eraserControls
-            }
         }
         .padding(12)
         .frame(width: 260)
     }
 
-    @ViewBuilder
     private var sizeControls: some View {
-        let tool = viewModel.annotation.currentTool
-        if tool == .eraser {
-            sliderRow(
-                label: "Eraser Size",
-                value: Binding(
-                    get: { viewModel.annotation.eraserSize },
-                    set: { viewModel.annotation.eraserSize = $0 }
-                ),
-                range: 8...64,
-                step: 4,
-                format: "%.0f"
-            )
-        } else if tool == .freehand {
-            sliderRow(
-                label: "Ink Width",
-                value: Binding(
-                    get: { viewModel.annotation.lineWidth },
-                    set: { viewModel.annotation.lineWidth = $0 }
-                ),
-                range: 0.5...8,
-                step: 0.5,
-                format: "%.1f"
-            )
-        } else if tool == .freeText {
-            sliderRow(
-                label: "Font Size",
-                value: Binding(
-                    get: { viewModel.annotation.fontSize },
-                    set: { viewModel.annotation.fontSize = $0 }
-                ),
-                range: 8...72,
-                step: 1,
-                format: "%.0f"
-            )
-        } else {
-            sliderRow(
-                label: "Line Width",
-                value: Binding(
-                    get: { viewModel.annotation.lineWidth },
-                    set: { viewModel.annotation.lineWidth = $0 }
-                ),
-                range: 0.5...8,
-                step: 0.5,
-                format: "%.1f"
-            )
-        }
+        sliderRow(
+            label: "Line Width",
+            value: Binding(
+                get: { viewModel.annotation.lineWidth },
+                set: { viewModel.annotation.lineWidth = $0 }
+            ),
+            range: 0.5...8,
+            step: 0.5,
+            format: "%.1f"
+        )
     }
 
     private func sliderRow(label: String, value: Binding<CGFloat>, range: ClosedRange<CGFloat>, step: CGFloat, format: String) -> some View {
@@ -119,33 +76,6 @@ struct AnnotationColorDropdown: View {
                 .monospacedDigit()
                 .frame(width: 30)
         }
-    }
-
-    @ViewBuilder
-    private var eraserControls: some View {
-        Button {
-            if viewModel.annotation.currentTool == .eraser {
-                viewModel.annotation.currentTool = .freehand
-            } else {
-                viewModel.annotation.currentTool = .eraser
-                viewModel.setEditorMode(.annotate)
-            }
-        } label: {
-            HStack {
-                Image(systemName: "eraser.line.dashed")
-                    .font(.system(size: OakStyle.Font.icon))
-                Text("Eraser")
-                    .font(.system(size: OakStyle.Font.caption))
-                Spacer()
-                if viewModel.annotation.currentTool == .eraser {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: OakStyle.Font.caption))
-                        .foregroundStyle(Color.accentColor)
-                }
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
     }
 
     private func colorSwatch(_ color: Color, nsColor: NSColor, name: String) -> some View {

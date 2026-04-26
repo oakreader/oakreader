@@ -7,8 +7,6 @@ struct AnnotationPropertyPanel: View {
     @State private var color: NSColor = .systemRed
     @State private var lineWidth: CGFloat = 1.5
     @State private var opacity: CGFloat = 1.0
-    @State private var fontName: String = PDFDefaults.defaultFontName
-    @State private var fontSize: CGFloat = PDFDefaults.defaultFontSize
     @State private var contents: String = ""
 
     var body: some View {
@@ -56,25 +54,6 @@ struct AnnotationPropertyPanel: View {
                         }
                 }
 
-                // Font settings (for free text)
-                if annotation.type == PDFAnnotationSubtype.freeText.rawValue {
-                    Divider()
-
-                    Text("Font")
-                        .font(.caption)
-                        .fontWeight(.medium)
-
-                    FontPickerButton(fontName: $fontName, fontSize: $fontSize)
-                        .onChange(of: fontName) { _, newName in
-                            annotation.font = NSFont(name: newName, size: fontSize)
-                            viewModel.markDocumentEdited()
-                        }
-                        .onChange(of: fontSize) { _, newSize in
-                            annotation.font = NSFont(name: fontName, size: newSize)
-                            viewModel.markDocumentEdited()
-                        }
-                }
-
                 // Contents
                 Divider()
 
@@ -115,8 +94,6 @@ struct AnnotationPropertyPanel: View {
         color = annotation.color
         lineWidth = annotation.border?.lineWidth ?? 1.5
         opacity = annotation.color.alphaComponent
-        fontName = annotation.font?.fontName ?? PDFDefaults.defaultFontName
-        fontSize = annotation.font?.pointSize ?? PDFDefaults.defaultFontSize
         contents = annotation.contents ?? ""
     }
 

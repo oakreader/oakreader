@@ -13,11 +13,6 @@ class AnnotationViewModel {
     var fillColor: NSColor? = nil
     var lineWidth: CGFloat = PDFDefaults.annotationDefaultLineWidth
     var opacity: CGFloat = 1.0
-    var fontName: String = PDFDefaults.defaultFontName
-    var fontSize: CGFloat = PDFDefaults.defaultFontSize
-    var fontColor: NSColor = .black
-    var eraserSize: CGFloat = 16.0
-
     // MARK: - Annotations List
 
     var annotationModels: [AnnotationModel] = []
@@ -91,63 +86,6 @@ class AnnotationViewModel {
             page.addAnnotation(annotation)
             let _ = doc.index(for: page)
         }
-        parent?.markDocumentEdited()
-        refreshAnnotationModels()
-    }
-
-    // MARK: - Sticky Note
-
-    func addStickyNote(at point: CGPoint, on pageIndex: Int, contents: String = "") {
-        guard let doc = pdfDocument,
-              let page = doc.page(at: pageIndex) else { return }
-
-        let effectiveColor = strokeColor.withAlphaComponent(opacity)
-        let annotation = PDFAnnotation.stickyNote(at: point, color: effectiveColor, contents: contents)
-        page.addAnnotation(annotation)
-
-        parent?.markDocumentEdited()
-        refreshAnnotationModels()
-    }
-
-    // MARK: - Free Text
-
-    func addFreeText(at point: CGPoint, on pageIndex: Int, text: String = "Text") {
-        guard let doc = pdfDocument,
-              let page = doc.page(at: pageIndex) else { return }
-
-        let font = NSFont(name: fontName, size: fontSize) ?? NSFont.systemFont(ofSize: fontSize)
-        let attrs: [NSAttributedString.Key: Any] = [.font: font]
-        let textSize = (text as NSString).size(withAttributes: attrs)
-        let padding: CGFloat = 4
-
-        let bounds = CGRect(
-            x: point.x,
-            y: point.y - textSize.height - padding,
-            width: max(textSize.width + padding * 2, 100),
-            height: max(textSize.height + padding * 2, 24)
-        )
-
-        let annotation = PDFAnnotation.freeText(bounds: bounds, text: text, font: font, color: fontColor)
-        if opacity < 1.0 {
-            annotation.setValue(opacity, forAnnotationKey: PDFAnnotationKey(rawValue: "/CA"))
-        }
-        page.addAnnotation(annotation)
-
-        parent?.markDocumentEdited()
-        refreshAnnotationModels()
-    }
-
-    // MARK: - Freehand / Ink
-
-    func addFreehandStroke(_ points: [[CGPoint]], on pageIndex: Int) {
-        guard let doc = pdfDocument,
-              let page = doc.page(at: pageIndex),
-              !points.isEmpty else { return }
-
-        let effectiveColor = strokeColor.withAlphaComponent(opacity)
-        let annotation = PDFAnnotation.ink(paths: points, color: effectiveColor, lineWidth: lineWidth)
-        page.addAnnotation(annotation)
-
         parent?.markDocumentEdited()
         refreshAnnotationModels()
     }

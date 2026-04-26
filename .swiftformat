@@ -1,0 +1,14 @@
+--swiftversion 5.9
+--indent 4
+--self remove
+--stripunusedargs closure-only
+--maxwidth 120
+--wraparguments before-first
+--wrapcollections before-first
+--wrapparameters before-first
+--disable redundantReturn
+--disable blankLinesBetweenScopes
+--commas inline
+--ifdef no-indent
+--importgrouping alpha
+--exclude DerivedData,.build,build,*.pbxproj,Packages

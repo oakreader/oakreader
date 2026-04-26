@@ -8,8 +8,6 @@ struct AISettingsView: View {
     @State private var testResult: String?
     @State private var isTesting: Bool = false
 
-    @Environment(\.dismiss) private var dismiss
-
     private var selectedModelInfo: ModelInfo? {
         provider.models.first { $0.id == model }
     }
@@ -21,76 +19,74 @@ struct AISettingsView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text("AI Settings")
-                    .font(.headline)
-                Spacer()
-                Button("Done") { save(); dismiss() }
-                    .keyboardShortcut(.defaultAction)
-            }
-            .padding()
-
-            Divider()
-
-            Form {
-                // Provider
-                Section("Provider") {
-                    Picker("Provider", selection: $provider) {
-                        ForEach(AIProvider.allCases) { p in
-                            Text(p.displayName).tag(p)
-                        }
-                    }
-                    .onChange(of: provider) { _, newValue in
-                        model = newValue.defaultModel
-                        loadAPIKey()
-                    }
-
-                    Picker("Model", selection: $model) {
-                        ForEach(provider.models) { m in
-                            Text(m.name).tag(m.id)
-                        }
-                    }
-                }
-
-                // Model info
-                if let info = selectedModelInfo {
-                    Section("Model Info") {
-                        LabeledContent("Context Window", value: formatTokens(info.contextWindow))
-                        LabeledContent("Max Output", value: formatTokens(info.maxTokens))
-                        LabeledContent("Vision", value: info.supportsVision ? "Yes" : "No")
-                        LabeledContent("Reasoning", value: info.reasoning ? "Yes" : "No")
-                    }
-                }
-
-                // API Key
-                Section("API Key") {
-                    SecureField("API Key for \(provider.displayName)", text: $apiKey)
-                        .textFieldStyle(.roundedBorder)
-
-                    HStack {
-                        Button("Test Connection") { testConnection() }
-                            .disabled(apiKey.isEmpty || isTesting)
-
-                        if isTesting {
-                            ProgressView()
-                                .controlSize(.small)
-                        }
-
-                        if let result = testResult {
-                            Text(result)
-                                .font(.caption)
-                                .foregroundStyle(result.contains("Success") ? .green : .red)
-                        }
-                    }
-                }
-            }
-            .formStyle(.grouped)
-            .padding()
+        Form {
+            providerSection
+            modelInfoSection
+            apiKeySection
         }
-        .frame(width: 520, height: 560)
+        .formStyle(.grouped)
         .onAppear { loadAPIKey() }
+        .onDisappear { save() }
     }
+
+    // MARK: - Sections
+
+    private var providerSection: some View {
+        Section("Provider") {
+            Picker("Provider", selection: $provider) {
+                ForEach(AIProvider.allCases) { p in
+                    Text(p.displayName).tag(p)
+                }
+            }
+            .onChange(of: provider) { _, newValue in
+                model = newValue.defaultModel
+                loadAPIKey()
+            }
+
+            Picker("Model", selection: $model) {
+                ForEach(provider.models) { m in
+                    Text(m.name).tag(m.id)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var modelInfoSection: some View {
+        if let info = selectedModelInfo {
+            Section("Model Info") {
+                LabeledContent("Context Window", value: formatTokens(info.contextWindow))
+                LabeledContent("Max Output", value: formatTokens(info.maxTokens))
+                LabeledContent("Vision", value: info.supportsVision ? "Yes" : "No")
+                LabeledContent("Reasoning", value: info.reasoning ? "Yes" : "No")
+            }
+        }
+    }
+
+    private var apiKeySection: some View {
+        Section("API Key") {
+            SecureField("API Key for \(provider.displayName)", text: $apiKey)
+                .textFieldStyle(.roundedBorder)
+
+            HStack {
+                Button("Test Connection") { testConnection() }
+                    .disabled(apiKey.isEmpty || isTesting)
+
+                if isTesting {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+
+                if let result = testResult {
+                    Text(result)
+                        .font(.caption)
+                        .foregroundStyle(result.contains("Success") ? .green : .red)
+                }
+            }
+        }
+    }
+
+    // MARK: - Helpers
 
     private func formatTokens(_ count: Int) -> String {
         if count >= 1_000_000 { return "\(count / 1_000_000)M" }
