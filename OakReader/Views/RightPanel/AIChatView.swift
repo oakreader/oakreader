@@ -39,7 +39,7 @@ struct AIChatView: View {
     private var header: some View {
         HStack(spacing: 8) {
             Text("AI Chat")
-                .font(.system(size: 15, weight: .semibold))
+                .font(.system(size: 16, weight: .semibold))
 
             Spacer()
 
@@ -68,7 +68,7 @@ struct AIChatView: View {
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.secondary)
             Text("Ask questions, get summaries, or find information in your document.")
-                .font(.system(size: 13))
+                .font(.system(size: 14))
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, OakStyle.Spacing.lg)
@@ -229,6 +229,8 @@ struct AIChatView: View {
                 }
                 .buttonStyle(.plain)
                 .help("Add attachment")
+
+                modelSwitcher
 
                 Spacer()
 
