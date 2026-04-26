@@ -6,7 +6,7 @@ struct ThumbnailSidebarView: View {
 
     @State private var draggedPageIndex: Int?
 
-    private let padding: CGFloat = 12
+    private let padding: CGFloat = 8
 
     var body: some View {
         GeometryReader { geo in

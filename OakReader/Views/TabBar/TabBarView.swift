@@ -14,6 +14,24 @@ struct TabBarView: View {
 
     var body: some View {
         HStack(spacing: 0) {
+            // Sidebar toggle
+            Button {
+                if let viewModel = appState.activeTab?.viewModel {
+                    viewModel.state.isSidebarVisible.toggle()
+                } else {
+                    appState.isLibrarySidebarVisible.toggle()
+                }
+            } label: {
+                Image(systemName: "sidebar.leading")
+                    .font(.system(size: 16, weight: .regular))
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(sidebarToggleActive ? Color.accentColor : Color(nsColor: .labelColor))
+            .help("Toggle Sidebar")
+            .padding(.trailing, 4)
+
             // Pinned collection tab (always visible)
             Button {
                 appState.switchToLibrary()
@@ -35,15 +53,16 @@ struct TabBarView: View {
             .foregroundStyle(appState.isLibraryActive ? Color(nsColor: .labelColor) : Color(nsColor: .secondaryLabelColor))
             .background(pinnedTabShape)
             .onHover { isPinnedHovering = $0 }
-            .padding(.trailing, 2)
+            .padding(.trailing, 8)
 
             if !appState.openTabs.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 0) {
-                        ForEach(appState.openTabs) { tab in
+                        ForEach(Array(appState.openTabs.enumerated()), id: \.element.id) { index, tab in
                             DocumentTabView(
                                 tab: tab,
                                 isActive: tab.id == appState.activeTabID,
+                                isFirst: index == 0,
                                 onSelect: { appState.switchToTab(tab.id) },
                                 onClose: { appState.closeTab(tab.id) }
                             )
@@ -69,7 +88,6 @@ struct TabBarView: View {
             .frame(width: OakStyle.Size.sidenavWidth)
         }
         .padding(.leading, isFullScreen ? fullScreenPadding : trafficLightPadding)
-        .padding(.top, 4)
         .frame(height: OakStyle.Size.tabBarHeight)
         .background(OakStyle.Colors.tabBarBackground)
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEnterFullScreenNotification)) { _ in
@@ -78,6 +96,15 @@ struct TabBarView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didExitFullScreenNotification)) { _ in
             isFullScreen = false
         }
+    }
+
+    // MARK: - Sidebar Toggle
+
+    private var sidebarToggleActive: Bool {
+        if let viewModel = appState.activeTab?.viewModel {
+            return viewModel.state.isSidebarVisible
+        }
+        return appState.isLibrarySidebarVisible
     }
 
     // MARK: - Pinned Tab Content

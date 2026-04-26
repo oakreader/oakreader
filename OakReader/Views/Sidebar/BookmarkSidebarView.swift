@@ -30,7 +30,7 @@ struct BookmarkSidebarView: View {
                 }
             }
         }
-        .background(OakStyle.Colors.sidebarBackground)
+        .background(.white)
         .onAppear { loadOutline() }
     }
 

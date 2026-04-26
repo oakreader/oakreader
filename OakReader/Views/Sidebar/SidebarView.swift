@@ -21,8 +21,6 @@ struct SidebarView: View {
             .padding(.horizontal, OakStyle.Spacing.xs)
             .padding(.vertical, OakStyle.Spacing.xs)
 
-            Divider()
-
             // Content
             switch viewModel.state.sidebarMode {
             case .thumbnails:
