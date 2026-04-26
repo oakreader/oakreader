@@ -14,8 +14,7 @@ struct OakReaderToolbarView: View {
             leftSection
             Spacer(minLength: 4)
             centerSection
-            Spacer(minLength: 4)
-            rightSection
+            Spacer()
         }
         .padding(.horizontal, OakStyle.Spacing.xs)
         .frame(height: OakStyle.Size.toolbarHeight)
@@ -116,23 +115,6 @@ struct OakReaderToolbarView: View {
             separator
 
             AnnotationColorDropdown(viewModel: viewModel)
-        }
-    }
-
-    // MARK: - Right Section
-
-    private var rightSection: some View {
-        HStack(spacing: OakStyle.Spacing.xs) {
-            OakToolButton(
-                systemImage: "magnifyingglass",
-                isSelected: viewModel.state.isSearchBarVisible,
-                tooltip: "Find in Document"
-            ) {
-                viewModel.state.isSearchBarVisible.toggle()
-                if !viewModel.state.isSearchBarVisible {
-                    viewModel.viewer.clearSearch()
-                }
-            }
         }
     }
 

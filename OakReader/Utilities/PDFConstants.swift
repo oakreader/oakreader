@@ -29,6 +29,7 @@ enum SidebarMode: String, CaseIterable, Identifiable {
     case thumbnails
     case outline
     case annotations
+    case search
 
     var id: String { rawValue }
 
@@ -37,6 +38,7 @@ enum SidebarMode: String, CaseIterable, Identifiable {
         case .thumbnails: return "Thumbnails"
         case .outline: return "Outline"
         case .annotations: return "Annotations"
+        case .search: return "Search"
         }
     }
 
@@ -45,6 +47,7 @@ enum SidebarMode: String, CaseIterable, Identifiable {
         case .thumbnails: return "rectangle.split.3x3"
         case .outline: return "list.bullet.indent"
         case .annotations: return "text.bubble"
+        case .search: return "magnifyingglass"
         }
     }
 }

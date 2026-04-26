@@ -14,7 +14,7 @@ struct ContentView: View {
 
     @State private var actionObserver: Any?
     @State private var rightPanelWidth: CGFloat = OakStyle.Size.rightPanelWidth
-    @State private var sidebarWidth: CGFloat = 200  // idealWidth
+    @State private var sidebarWidth: CGFloat = 240  // idealWidth
 
     var body: some View {
         HStack(spacing: 0) {
@@ -36,12 +36,6 @@ struct ContentView: View {
                     // Inline toolbar (below tab bar)
                     OakReaderToolbarView(viewModel: viewModel)
                     Divider()
-
-                    // Search bar (below toolbar)
-                    if viewModel.state.isSearchBarVisible {
-                        SearchBarView(viewModel: viewModel)
-                        Divider()
-                    }
 
                     HStack(spacing: 0) {
                         // Main content area
