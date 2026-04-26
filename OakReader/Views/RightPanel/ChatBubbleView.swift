@@ -31,17 +31,7 @@ struct ChatBubbleView: View {
                     }
 
                     // Message content
-                    StructuredText(markdown: turn.content, syntaxExtensions: [.math])
-                        .textual.headingStyle(ChatHeadingStyle())
-                        .textual.textSelection(.enabled)
-                        .font(.system(size: 14))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(bubbleColor)
-                    )
-                    .foregroundStyle(turn.role == .user ? .white : Color(nsColor: .labelColor))
+                    messageBubble
 
                     // Streaming indicator
                     if turn.isStreaming {
@@ -83,6 +73,35 @@ struct ChatBubbleView: View {
             .onHover { isHovered = $0 }
             .animation(.easeInOut(duration: 0.15), value: isHovered)
         )
+    }
+
+    @ViewBuilder
+    private var messageBubble: some View {
+        let base = StructuredText(markdown: turn.content, syntaxExtensions: [.math])
+            .textual.headingStyle(ChatHeadingStyle())
+            .textual.textSelection(.enabled)
+            .font(.system(size: 14))
+
+        if turn.role == .assistant {
+            base
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(bubbleColor)
+                )
+                .foregroundStyle(Color(nsColor: .labelColor))
+        } else {
+            base
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(bubbleColor)
+                )
+                .foregroundStyle(.white)
+        }
     }
 
     private var bubbleColor: Color {
