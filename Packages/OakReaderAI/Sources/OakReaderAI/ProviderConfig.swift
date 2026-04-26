@@ -48,9 +48,7 @@ public enum AIProvider: String, Codable, CaseIterable, Sendable, Identifiable {
                 ModelInfo(id: "claude-opus-4-6", name: "Claude Opus 4.6", provider: .anthropic, contextWindow: 200_000, maxTokens: 128_000, reasoning: true, supportsVision: true),
                 ModelInfo(id: "claude-sonnet-4-5-20250929", name: "Claude Sonnet 4.5", provider: .anthropic, contextWindow: 200_000, maxTokens: 16_000, reasoning: false, supportsVision: true),
                 ModelInfo(id: "claude-opus-4-5-20251101", name: "Claude Opus 4.5", provider: .anthropic, contextWindow: 200_000, maxTokens: 128_000, reasoning: true, supportsVision: true),
-                ModelInfo(id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4", provider: .anthropic, contextWindow: 200_000, maxTokens: 16_000, reasoning: false, supportsVision: true),
-                ModelInfo(id: "claude-opus-4-20250514", name: "Claude Opus 4", provider: .anthropic, contextWindow: 200_000, maxTokens: 128_000, reasoning: true, supportsVision: true),
-                ModelInfo(id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5", provider: .anthropic, contextWindow: 200_000, maxTokens: 8_192, reasoning: false, supportsVision: true),
+
             ]
         case .google:
             return [
