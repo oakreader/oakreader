@@ -11,74 +11,17 @@ struct LibrarySidebarView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // MARK: - My Library section
-            sectionHeader("MY LIBRARY")
-
-            filterRow(label: "All PDFs", icon: "books.vertical", filter: .all)
-            filterRow(label: "Recently Added", icon: "clock", filter: .recentlyAdded)
-            filterRow(label: "Favorites", icon: "star", filter: .favorites)
+            myLibrarySection
 
             Spacer().frame(height: 18)
 
-            // MARK: - Collections section
-            HStack {
-                sectionHeader("COLLECTIONS")
-                Spacer()
-                Button {
-                    importFolderAsCollection()
-                } label: {
-                    Image(systemName: "folder.badge.plus")
-                        .font(.system(size: OakStyle.Font.icon, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .frame(width: OakStyle.Size.buttonStandard, height: OakStyle.Size.buttonStandard)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .help("Import Folder as Collection")
-                Button {
-                    showNewCollection = true
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: OakStyle.Font.icon, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .frame(width: OakStyle.Size.buttonStandard, height: OakStyle.Size.buttonStandard)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .help("New Collection")
-                .padding(.trailing, 14)
-            }
-            .contextMenu {
-                Button("New Collection") {
-                    showNewCollection = true
-                }
-                Button("Import Folder as Collection...") {
-                    importFolderAsCollection()
-                }
-            }
+            collectionsHeader
 
-            ScrollView {
-                VStack(spacing: 1) {
-                    ForEach(store.rootCollections.sorted(by: { $0.sortOrder < $1.sortOrder })) { collection in
-                        CollectionRowView(
-                            collection: collection,
-                            depth: 0,
-                            store: store,
-                            appState: appState,
-                            expandedCollections: $expandedCollections,
-                            newSubcollectionParent: $newSubcollectionParent
-                        )
-                    }
-                }
-            }
+            collectionsScrollView
 
             Spacer()
 
-            // MARK: - Tags section
-            Divider()
-                .padding(.horizontal, 14)
-
-            TagSelectorView(store: store)
+            tagsSection
         }
         .background(OakStyle.Colors.sidebarBackground)
         .sheet(isPresented: $showNewCollection) {
@@ -148,6 +91,84 @@ struct LibrarySidebarView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Subviews
+
+private extension LibrarySidebarView {
+    var myLibrarySection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            sectionHeader("MY LIBRARY")
+
+            filterRow(label: "All PDFs", icon: "books.vertical", filter: .all)
+            filterRow(label: "Recently Added", icon: "clock", filter: .recentlyAdded)
+            filterRow(label: "Favorites", icon: "star", filter: .favorites)
+        }
+    }
+
+    var collectionsHeader: some View {
+        HStack {
+            sectionHeader("COLLECTIONS")
+            Spacer()
+            Button {
+                importFolderAsCollection()
+            } label: {
+                Image(systemName: "folder.badge.plus")
+                    .font(.system(size: OakStyle.Font.icon, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .frame(width: OakStyle.Size.buttonStandard, height: OakStyle.Size.buttonStandard)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Import Folder as Collection")
+            Button {
+                showNewCollection = true
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: OakStyle.Font.icon, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .frame(width: OakStyle.Size.buttonStandard, height: OakStyle.Size.buttonStandard)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("New Collection")
+            .padding(.trailing, 14)
+        }
+        .contextMenu {
+            Button("New Collection") {
+                showNewCollection = true
+            }
+            Button("Import Folder as Collection...") {
+                importFolderAsCollection()
+            }
+        }
+    }
+
+    var collectionsScrollView: some View {
+        ScrollView {
+            VStack(spacing: 1) {
+                ForEach(store.rootCollections.sorted(by: { $0.sortOrder < $1.sortOrder })) { collection in
+                    CollectionRowView(
+                        collection: collection,
+                        depth: 0,
+                        store: store,
+                        appState: appState,
+                        expandedCollections: $expandedCollections,
+                        newSubcollectionParent: $newSubcollectionParent
+                    )
+                }
+            }
+        }
+    }
+
+    var tagsSection: some View {
+        VStack(spacing: 0) {
+            Divider()
+                .padding(.horizontal, 14)
+
+            TagSelectorView(store: store)
+        }
     }
 }
 

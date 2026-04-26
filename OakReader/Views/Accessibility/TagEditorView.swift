@@ -11,110 +11,18 @@ struct TagEditorView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Toolbar
-            HStack {
-                Text("Structure Tags")
-                    .font(.headline)
-
-                Spacer()
-
-                Button {
-                    showAddTag = true
-                } label: {
-                    Label("Add Tag", systemImage: "plus")
-                }
-                .buttonStyle(.bordered)
-
-                Button {
-                    removeSelectedTag()
-                } label: {
-                    Label("Remove", systemImage: "minus")
-                }
-                .buttonStyle(.bordered)
-                .disabled(selectedNodeID == nil)
-
-                Button {
-                    loadTagTree()
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                }
-                .buttonStyle(.bordered)
-            }
-            .padding(8)
+            toolbar
 
             Divider()
 
             if tagTree.isEmpty {
-                VStack(spacing: 12) {
-                    Image(systemName: "text.badge.plus")
-                        .font(.largeTitle)
-                        .foregroundStyle(.secondary)
-                    Text("No Structure Tags")
-                        .font(.headline)
-                        .foregroundStyle(.secondary)
-                    Text("Add structure tags to make this document accessible.")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                        .multilineTextAlignment(.center)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding()
+                emptyState
             } else {
-                List {
-                    OutlineGroup(tagTree, children: \.childrenOptional) { node in
-                        TagNodeRow(
-                            node: node,
-                            isSelected: node.id == selectedNodeID,
-                            onSelect: { selectedNodeID = node.id },
-                            onChangeType: { newType in
-                                updateTagType(nodeID: node.id, newType: newType)
-                            }
-                        )
-                    }
-                }
-                .listStyle(.bordered)
+                tagList
             }
 
-            // Selected tag properties
             if let nodeID = selectedNodeID, let node = findNode(id: nodeID) {
-                Divider()
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Tag Properties")
-                        .font(.caption)
-                        .fontWeight(.medium)
-
-                    LabeledContent("Type") {
-                        Picker("", selection: Binding(
-                            get: { node.tagType },
-                            set: { updateTagType(nodeID: nodeID, newType: $0) }
-                        )) {
-                            ForEach(PDFTagType.allCases) { type in
-                                Text(type.label).tag(type)
-                            }
-                        }
-                        .frame(width: 150)
-                    }
-
-                    if node.tagType == .figure {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Alternative Text")
-                                .font(.caption)
-                            TextField("Alt text for image", text: Binding(
-                                get: { node.alternativeText ?? "" },
-                                set: { updateAltText(nodeID: nodeID, text: $0) }
-                            ))
-                            .textFieldStyle(.roundedBorder)
-                        }
-                    }
-
-                    if let pageIndex = node.pageIndex {
-                        Text("Page: \(pageIndex + 1)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .padding(8)
+                propertiesPanel(node: node, nodeID: nodeID)
             }
         }
         .onAppear { loadTagTree() }
@@ -211,6 +119,118 @@ struct TagEditorView: View {
                 return
             }
             updateNode(id: id, in: &nodes[i].children, transform: transform)
+        }
+    }
+}
+
+// MARK: - Subviews
+
+private extension TagEditorView {
+    var toolbar: some View {
+        HStack {
+            Text("Structure Tags")
+                .font(.headline)
+
+            Spacer()
+
+            Button {
+                showAddTag = true
+            } label: {
+                Label("Add Tag", systemImage: "plus")
+            }
+            .buttonStyle(.bordered)
+
+            Button {
+                removeSelectedTag()
+            } label: {
+                Label("Remove", systemImage: "minus")
+            }
+            .buttonStyle(.bordered)
+            .disabled(selectedNodeID == nil)
+
+            Button {
+                loadTagTree()
+            } label: {
+                Image(systemName: "arrow.clockwise")
+            }
+            .buttonStyle(.bordered)
+        }
+        .padding(8)
+    }
+
+    var emptyState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "text.badge.plus")
+                .font(.largeTitle)
+                .foregroundStyle(.secondary)
+            Text("No Structure Tags")
+                .font(.headline)
+                .foregroundStyle(.secondary)
+            Text("Add structure tags to make this document accessible.")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding()
+    }
+
+    var tagList: some View {
+        List {
+            OutlineGroup(tagTree, children: \.childrenOptional) { node in
+                TagNodeRow(
+                    node: node,
+                    isSelected: node.id == selectedNodeID,
+                    onSelect: { selectedNodeID = node.id },
+                    onChangeType: { newType in
+                        updateTagType(nodeID: node.id, newType: newType)
+                    }
+                )
+            }
+        }
+        .listStyle(.bordered)
+    }
+
+    func propertiesPanel(node: AccessibilityTagNode, nodeID: UUID) -> some View {
+        VStack(spacing: 0) {
+            Divider()
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Tag Properties")
+                    .font(.caption)
+                    .fontWeight(.medium)
+
+                LabeledContent("Type") {
+                    Picker("", selection: Binding(
+                        get: { node.tagType },
+                        set: { updateTagType(nodeID: nodeID, newType: $0) }
+                    )) {
+                        ForEach(PDFTagType.allCases) { type in
+                            Text(type.label).tag(type)
+                        }
+                    }
+                    .frame(width: 150)
+                }
+
+                if node.tagType == .figure {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Alternative Text")
+                            .font(.caption)
+                        TextField("Alt text for image", text: Binding(
+                            get: { node.alternativeText ?? "" },
+                            set: { updateAltText(nodeID: nodeID, text: $0) }
+                        ))
+                        .textFieldStyle(.roundedBorder)
+                    }
+                }
+
+                if let pageIndex = node.pageIndex {
+                    Text("Page: \(pageIndex + 1)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(8)
         }
     }
 }

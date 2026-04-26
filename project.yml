@@ -38,6 +38,14 @@ targets:
       - package: Textual
       - package: GRDB
         product: GRDB
+    postCompileScripts:
+      - script: |
+          if which swiftlint > /dev/null; then
+            swiftlint
+          else
+            echo "warning: SwiftLint not installed"
+          fi
+        name: "SwiftLint"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.oakreader.OakReader

@@ -12,110 +12,12 @@ struct ImportSheet: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            Text("Create PDF from Images")
-                .font(.title3)
-                .fontWeight(.semibold)
-
-            Text("Add images to create a new PDF document. Drag to reorder.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            header
 
             if imageURLs.isEmpty {
-                DropZoneView(
-                    supportedTypes: [.image],
-                    label: "Drop images here",
-                    icon: "photo.on.rectangle"
-                ) { urls in
-                    imageURLs.append(contentsOf: urls)
-                }
-                .frame(height: 200)
+                dropZone
             } else {
-                VStack(spacing: 0) {
-                    ScrollView {
-                        LazyVStack(spacing: 4) {
-                            ForEach(Array(imageURLs.enumerated()), id: \.offset) { index, url in
-                                HStack {
-                                    if let image = NSImage(contentsOf: url) {
-                                        Image(nsImage: image)
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fit)
-                                            .frame(width: 40, height: 40)
-                                            .background(Color.white)
-                                            .cornerRadius(4)
-                                    }
-
-                                    VStack(alignment: .leading) {
-                                        Text(url.lastPathComponent)
-                                            .font(.caption)
-                                            .lineLimit(1)
-
-                                        if let image = NSImage(contentsOf: url) {
-                                            Text("\(Int(image.size.width)) x \(Int(image.size.height))")
-                                                .font(.caption2)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                    }
-
-                                    Spacer()
-
-                                    // Reorder buttons
-                                    VStack(spacing: 2) {
-                                        Button {
-                                            if index > 0 {
-                                                imageURLs.swapAt(index, index - 1)
-                                            }
-                                        } label: {
-                                            Image(systemName: "chevron.up")
-                                                .font(.caption2)
-                                        }
-                                        .buttonStyle(.plain)
-                                        .disabled(index == 0)
-
-                                        Button {
-                                            if index < imageURLs.count - 1 {
-                                                imageURLs.swapAt(index, index + 1)
-                                            }
-                                        } label: {
-                                            Image(systemName: "chevron.down")
-                                                .font(.caption2)
-                                        }
-                                        .buttonStyle(.plain)
-                                        .disabled(index == imageURLs.count - 1)
-                                    }
-
-                                    Button {
-                                        imageURLs.remove(at: index)
-                                    } label: {
-                                        Image(systemName: "xmark.circle")
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                            }
-                        }
-                    }
-                    .frame(height: 200)
-                    .border(Color.secondary.opacity(0.2))
-
-                    HStack {
-                        Button {
-                            addMoreImages()
-                        } label: {
-                            Label("Add More", systemImage: "plus")
-                        }
-                        .buttonStyle(.borderless)
-                        .font(.caption)
-
-                        Spacer()
-
-                        Text("\(imageURLs.count) images")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(8)
-                }
+                imageList
             }
 
             if let error = errorMessage {
@@ -126,21 +28,7 @@ struct ImportSheet: View {
 
             Divider()
 
-            HStack {
-                Button("Cancel") {
-                    dismiss()
-                }
-                .keyboardShortcut(.cancelAction)
-
-                Spacer()
-
-                Button("Create PDF") {
-                    createPDF()
-                }
-                .keyboardShortcut(.defaultAction)
-                .buttonStyle(.borderedProminent)
-                .disabled(imageURLs.isEmpty || isCreating)
-            }
+            actionButtons
         }
         .padding()
         .frame(width: 480, height: 450)
@@ -196,6 +84,144 @@ struct ImportSheet: View {
         } else {
             errorMessage = "Failed to save PDF."
             isCreating = false
+        }
+    }
+}
+
+// MARK: - Subviews
+
+private extension ImportSheet {
+    var header: some View {
+        VStack(spacing: 8) {
+            Text("Create PDF from Images")
+                .font(.title3)
+                .fontWeight(.semibold)
+
+            Text("Add images to create a new PDF document. Drag to reorder.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    var dropZone: some View {
+        DropZoneView(
+            supportedTypes: [.image],
+            label: "Drop images here",
+            icon: "photo.on.rectangle"
+        ) { urls in
+            imageURLs.append(contentsOf: urls)
+        }
+        .frame(height: 200)
+    }
+
+    var imageList: some View {
+        VStack(spacing: 0) {
+            ScrollView {
+                LazyVStack(spacing: 4) {
+                    ForEach(Array(imageURLs.enumerated()), id: \.offset) { index, url in
+                        imageRow(index: index, url: url)
+                    }
+                }
+            }
+            .frame(height: 200)
+            .border(Color.secondary.opacity(0.2))
+
+            HStack {
+                Button {
+                    addMoreImages()
+                } label: {
+                    Label("Add More", systemImage: "plus")
+                }
+                .buttonStyle(.borderless)
+                .font(.caption)
+
+                Spacer()
+
+                Text("\(imageURLs.count) images")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(8)
+        }
+    }
+
+    func imageRow(index: Int, url: URL) -> some View {
+        HStack {
+            if let image = NSImage(contentsOf: url) {
+                Image(nsImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 40, height: 40)
+                    .background(Color.white)
+                    .cornerRadius(4)
+            }
+
+            VStack(alignment: .leading) {
+                Text(url.lastPathComponent)
+                    .font(.caption)
+                    .lineLimit(1)
+
+                if let image = NSImage(contentsOf: url) {
+                    Text("\(Int(image.size.width)) x \(Int(image.size.height))")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer()
+
+            // Reorder buttons
+            VStack(spacing: 2) {
+                Button {
+                    if index > 0 {
+                        imageURLs.swapAt(index, index - 1)
+                    }
+                } label: {
+                    Image(systemName: "chevron.up")
+                        .font(.caption2)
+                }
+                .buttonStyle(.plain)
+                .disabled(index == 0)
+
+                Button {
+                    if index < imageURLs.count - 1 {
+                        imageURLs.swapAt(index, index + 1)
+                    }
+                } label: {
+                    Image(systemName: "chevron.down")
+                        .font(.caption2)
+                }
+                .buttonStyle(.plain)
+                .disabled(index == imageURLs.count - 1)
+            }
+
+            Button {
+                imageURLs.remove(at: index)
+            } label: {
+                Image(systemName: "xmark.circle")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+    }
+
+    var actionButtons: some View {
+        HStack {
+            Button("Cancel") {
+                dismiss()
+            }
+            .keyboardShortcut(.cancelAction)
+
+            Spacer()
+
+            Button("Create PDF") {
+                createPDF()
+            }
+            .keyboardShortcut(.defaultAction)
+            .buttonStyle(.borderedProminent)
+            .disabled(imageURLs.isEmpty || isCreating)
         }
     }
 }

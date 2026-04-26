@@ -6,7 +6,7 @@ struct OakReaderToolbarView: View {
     @State private var goToPageText = ""
 
     private let annotationTools: [AnnotationTool] = [
-        .highlight, .underline, .stickyNote, .freeText
+        .highlight, .underline
     ]
 
     var body: some View {
@@ -120,21 +120,6 @@ struct OakReaderToolbarView: View {
                     viewModel.setEditorMode(.viewer)
                 } else {
                     viewModel.setEditorMode(.snapshot)
-                }
-            }
-
-            // Ink
-            OakToolButton(
-                systemImage: AnnotationTool.freehand.systemImage,
-                isSelected: viewModel.state.editorMode == .annotate && (viewModel.annotation.currentTool == .freehand || viewModel.annotation.currentTool == .eraser),
-                tooltip: "Ink"
-            ) {
-                if viewModel.state.editorMode == .annotate && (viewModel.annotation.currentTool == .freehand || viewModel.annotation.currentTool == .eraser) {
-                    viewModel.annotation.currentTool = .none
-                    viewModel.setEditorMode(.viewer)
-                } else {
-                    viewModel.annotation.currentTool = .freehand
-                    viewModel.setEditorMode(.annotate)
                 }
             }
 

@@ -10,121 +10,18 @@ struct AccessibilityCheckerView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            HStack {
-                Text("Accessibility Check")
-                    .font(.title3)
-                    .fontWeight(.semibold)
-
-                Spacer()
-
-                Button("Done") {
-                    dismiss()
-                }
-                .keyboardShortcut(.cancelAction)
-            }
-            .padding()
+            header
 
             Divider()
 
             if !hasChecked {
-                // Pre-check state
-                VStack(spacing: 16) {
-                    Image(systemName: "accessibility")
-                        .font(.system(size: 50))
-                        .foregroundStyle(Color.accentColor)
-
-                    Text("Check Document Accessibility")
-                        .font(.headline)
-
-                    Text("Run an accessibility check to identify potential issues that may affect users with disabilities.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: 350)
-
-                    Button("Run Check") {
-                        runCheck()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                preCheckState
             } else if isChecking {
-                VStack(spacing: 12) {
-                    ProgressView()
-                        .controlSize(.large)
-                    Text("Checking document accessibility...")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                checkingState
             } else if issues.isEmpty {
-                VStack(spacing: 12) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 50))
-                        .foregroundStyle(.green)
-
-                    Text("No Issues Found")
-                        .font(.headline)
-
-                    Text("The document passed all accessibility checks.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    Button("Run Again") {
-                        runCheck()
-                    }
-                    .buttonStyle(.bordered)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                successState
             } else {
-                // Results
-                VStack(spacing: 0) {
-                    // Summary bar
-                    HStack(spacing: 16) {
-                        issueSummary(
-                            severity: .error,
-                            count: issues.filter { $0.severity == .error }.count,
-                            color: .red
-                        )
-                        issueSummary(
-                            severity: .warning,
-                            count: issues.filter { $0.severity == .warning }.count,
-                            color: .orange
-                        )
-                        issueSummary(
-                            severity: .info,
-                            count: issues.filter { $0.severity == .info }.count,
-                            color: .blue
-                        )
-
-                        Spacer()
-
-                        Button("Re-check") {
-                            runCheck()
-                        }
-                        .buttonStyle(.bordered)
-                    }
-                    .padding(8)
-                    .background(Color(nsColor: .controlBackgroundColor))
-
-                    Divider()
-
-                    // Issue list
-                    List {
-                        ForEach(issues) { issue in
-                            IssueRow(issue: issue)
-                                .contentShape(Rectangle())
-                                .onTapGesture {
-                                    if let pageIndex = issue.pageIndex {
-                                        viewModel.viewer.goToPage(pageIndex)
-                                    }
-                                }
-                        }
-                    }
-                    .listStyle(.bordered)
-                }
+                resultsState
             }
         }
         .frame(width: 550, height: 500)
@@ -143,7 +40,145 @@ struct AccessibilityCheckerView: View {
         }
     }
 
-    private func issueSummary(severity: AccessibilityIssue.Severity, count: Int, color: Color) -> some View {
+    private func iconForSeverity(_ severity: AccessibilityIssue.Severity) -> String {
+        switch severity {
+        case .error: return "xmark.circle.fill"
+        case .warning: return "exclamationmark.triangle.fill"
+        case .info: return "info.circle.fill"
+        }
+    }
+}
+
+// MARK: - Subviews
+
+private extension AccessibilityCheckerView {
+    var header: some View {
+        HStack {
+            Text("Accessibility Check")
+                .font(.title3)
+                .fontWeight(.semibold)
+
+            Spacer()
+
+            Button("Done") {
+                dismiss()
+            }
+            .keyboardShortcut(.cancelAction)
+        }
+        .padding()
+    }
+
+    var preCheckState: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "accessibility")
+                .font(.system(size: 50))
+                .foregroundStyle(Color.accentColor)
+
+            Text("Check Document Accessibility")
+                .font(.headline)
+
+            Text("Run an accessibility check to identify potential issues that may affect users with disabilities.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 350)
+
+            Button("Run Check") {
+                runCheck()
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    var checkingState: some View {
+        VStack(spacing: 12) {
+            ProgressView()
+                .controlSize(.large)
+            Text("Checking document accessibility...")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    var successState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 50))
+                .foregroundStyle(.green)
+
+            Text("No Issues Found")
+                .font(.headline)
+
+            Text("The document passed all accessibility checks.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Button("Run Again") {
+                runCheck()
+            }
+            .buttonStyle(.bordered)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    var resultsState: some View {
+        VStack(spacing: 0) {
+            summaryBar
+
+            Divider()
+
+            issueList
+        }
+    }
+
+    var summaryBar: some View {
+        HStack(spacing: 16) {
+            issueSummary(
+                severity: .error,
+                count: issues.filter { $0.severity == .error }.count,
+                color: .red
+            )
+            issueSummary(
+                severity: .warning,
+                count: issues.filter { $0.severity == .warning }.count,
+                color: .orange
+            )
+            issueSummary(
+                severity: .info,
+                count: issues.filter { $0.severity == .info }.count,
+                color: .blue
+            )
+
+            Spacer()
+
+            Button("Re-check") {
+                runCheck()
+            }
+            .buttonStyle(.bordered)
+        }
+        .padding(8)
+        .background(Color(nsColor: .controlBackgroundColor))
+    }
+
+    var issueList: some View {
+        List {
+            ForEach(issues) { issue in
+                IssueRow(issue: issue)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        if let pageIndex = issue.pageIndex {
+                            viewModel.viewer.goToPage(pageIndex)
+                        }
+                    }
+            }
+        }
+        .listStyle(.bordered)
+    }
+
+    func issueSummary(severity: AccessibilityIssue.Severity, count: Int, color: Color) -> some View {
         HStack(spacing: 4) {
             Image(systemName: iconForSeverity(severity))
                 .foregroundStyle(color)
@@ -154,14 +189,6 @@ struct AccessibilityCheckerView: View {
             Text(severity.label)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-        }
-    }
-
-    private func iconForSeverity(_ severity: AccessibilityIssue.Severity) -> String {
-        switch severity {
-        case .error: return "xmark.circle.fill"
-        case .warning: return "exclamationmark.triangle.fill"
-        case .info: return "info.circle.fill"
         }
     }
 }

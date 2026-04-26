@@ -1,0 +1,34 @@
+disabled_rules:
+  - todo
+  - trailing_comma
+  - nesting
+  - type_body_length
+  - file_length
+  - function_body_length
+  - cyclomatic_complexity
+
+opt_in_rules:
+  - closure_spacing
+  - modifier_order
+  - empty_count
+  - multiline_parameters_brackets
+  - multiline_arguments_brackets
+
+excluded:
+  - DerivedData
+  - .build
+  - build
+  - Packages
+
+identifier_name:
+  min_length: 1
+  excluded:
+    - id
+    - _
+
+line_length:
+  warning: 150
+  error: 200
+
+type_name:
+  min_length: 2

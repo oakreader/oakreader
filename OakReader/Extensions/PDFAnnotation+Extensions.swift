@@ -20,50 +20,12 @@ extension PDFAnnotation {
         return annotation
     }
 
-    static func stickyNote(at point: CGPoint, color: NSColor = .yellow, contents: String = "") -> PDFAnnotation {
-        let bounds = CGRect(x: point.x, y: point.y, width: 24, height: 24)
-        let annotation = PDFAnnotation(bounds: bounds, forType: .text, withProperties: nil)
-        annotation.color = color
-        annotation.contents = contents
-        annotation.iconType = .note
-        return annotation
-    }
-
     static func freeText(bounds: CGRect, text: String, font: NSFont? = nil, color: NSColor = .black) -> PDFAnnotation {
         let annotation = PDFAnnotation(bounds: bounds, forType: .freeText, withProperties: nil)
         annotation.contents = text
         annotation.font = font ?? NSFont(name: PDFDefaults.defaultFontName, size: PDFDefaults.defaultFontSize)
         annotation.fontColor = color
         annotation.color = .clear
-        return annotation
-    }
-
-    static func ink(paths: [[CGPoint]], color: NSColor = .red, lineWidth: CGFloat = 2.0) -> PDFAnnotation {
-        var overallBounds = CGRect.null
-        let bezierPaths: [NSBezierPath] = paths.map { points in
-            let path = NSBezierPath()
-            guard let first = points.first else { return path }
-            path.move(to: first)
-            for point in points.dropFirst() {
-                path.line(to: point)
-            }
-            overallBounds = overallBounds.union(path.bounds)
-            return path
-        }
-
-        if overallBounds.isNull {
-            overallBounds = .zero
-        }
-        overallBounds = overallBounds.insetBy(dx: -lineWidth * 2, dy: -lineWidth * 2)
-
-        let annotation = PDFAnnotation(bounds: overallBounds, forType: .ink, withProperties: nil)
-        annotation.color = color
-        for path in bezierPaths {
-            annotation.add(path)
-        }
-        let border = PDFBorder()
-        border.lineWidth = lineWidth
-        annotation.border = border
         return annotation
     }
 
