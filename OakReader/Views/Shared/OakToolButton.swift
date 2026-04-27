@@ -23,6 +23,7 @@ struct OakToolButton: View {
                 .fill(backgroundColor)
         )
         .onHover { isHovering = $0 }
+        .accessibilityLabel(tooltip)
         .background(
             TooltipTrigger(tooltip: tooltip)
         )
@@ -40,7 +41,7 @@ struct OakToolButton: View {
 
 // MARK: - NSView-based tooltip (renders in its own window, never clipped)
 
-private struct TooltipTrigger: NSViewRepresentable {
+struct TooltipTrigger: NSViewRepresentable {
     let tooltip: String
 
     func makeNSView(context: Context) -> TooltipNSView {
@@ -54,7 +55,7 @@ private struct TooltipTrigger: NSViewRepresentable {
     }
 }
 
-private class TooltipNSView: NSView {
+class TooltipNSView: NSView {
     private var tooltipWindow: NSPanel?
     private var showTimer: Timer?
     private var trackingArea: NSTrackingArea?

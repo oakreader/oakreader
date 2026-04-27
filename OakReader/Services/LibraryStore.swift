@@ -32,8 +32,7 @@ final class LibraryStore {
         _ = revision
         return (try? database.dbQueue.read { db in
             try Int.fetchOne(db, sql: """
-                SELECT COUNT(*) FROM documents
-                WHERE id NOT IN (SELECT document_id FROM document_collections)
+                SELECT COUNT(*) FROM documents WHERE is_in_inbox = 1
             """) ?? 0
         }) ?? 0
     }
@@ -44,7 +43,7 @@ final class LibraryStore {
         // Apply filter
         switch currentFilter {
         case .inbox:
-            results = results.filter { $0.collections.isEmpty }
+            results = results.filter { $0.isInInbox }
         case .all:
             break
         case .recentlyAdded:
@@ -57,9 +56,7 @@ final class LibraryStore {
         case .webSnapshots:
             results = results.filter { $0.documentType == .webSnapshot }
         case .videos:
-            results = results.filter { $0.documentType == .youtubeVideo }
-        case .podcasts:
-            results = results.filter { $0.documentType == .podcast }
+            results = results.filter { $0.documentType == .embed }
         }
 
         // Apply collection filter
@@ -152,7 +149,7 @@ final class LibraryStore {
             let coverData = Self.loadCoverData(storageKey: rec.storageKey)
             return PDFLibraryItem(record: rec, coverImageData: coverData)
         } catch {
-            NSLog("[LibraryStore] insertDocument failed: \(error)")
+            Log.error(Log.store, "insertDocument failed: \(error)")
             return nil
         }
     }
@@ -175,7 +172,7 @@ final class LibraryStore {
             try? FileManager.default.removeItem(at: dir)
             revision += 1
         } catch {
-            NSLog("[LibraryStore] removeItem failed: \(error)")
+            Log.error(Log.store, "removeItem failed: \(error)")
         }
     }
 
@@ -191,7 +188,7 @@ final class LibraryStore {
             }
             revision += 1
         } catch {
-            NSLog("[LibraryStore] toggleFavorite failed: \(error)")
+            Log.error(Log.store, "toggleFavorite failed: \(error)")
         }
     }
 
@@ -206,7 +203,7 @@ final class LibraryStore {
             }
             revision += 1
         } catch {
-            NSLog("[LibraryStore] markOpened failed: \(error)")
+            Log.error(Log.store, "markOpened failed: \(error)")
         }
     }
 
@@ -216,7 +213,7 @@ final class LibraryStore {
             try imageData.write(to: coverURL, options: .atomic)
             revision += 1
         } catch {
-            NSLog("[LibraryStore] updateCover failed: \(error)")
+            Log.error(Log.store, "updateCover failed: \(error)")
         }
     }
 
@@ -285,7 +282,7 @@ final class LibraryStore {
             }
             revision += 1
         } catch {
-            NSLog("[LibraryStore] createCollection failed: \(error)")
+            Log.error(Log.store, "createCollection failed: \(error)")
         }
         return PDFCollection(record: record)
     }
@@ -310,7 +307,7 @@ final class LibraryStore {
             }
             revision += 1
         } catch {
-            NSLog("[LibraryStore] createSubcollection failed: \(error)")
+            Log.error(Log.store, "createSubcollection failed: \(error)")
         }
         return PDFCollection(record: record)
     }
@@ -326,7 +323,7 @@ final class LibraryStore {
             }
             revision += 1
         } catch {
-            NSLog("[LibraryStore] moveCollection failed: \(error)")
+            Log.error(Log.store, "moveCollection failed: \(error)")
         }
     }
 
@@ -340,7 +337,7 @@ final class LibraryStore {
             }
             revision += 1
         } catch {
-            NSLog("[LibraryStore] deleteCollection failed: \(error)")
+            Log.error(Log.store, "deleteCollection failed: \(error)")
         }
     }
 
@@ -355,7 +352,7 @@ final class LibraryStore {
             }
             revision += 1
         } catch {
-            NSLog("[LibraryStore] renameCollection failed: \(error)")
+            Log.error(Log.store, "renameCollection failed: \(error)")
         }
     }
 
@@ -371,10 +368,15 @@ final class LibraryStore {
         do {
             try database.dbQueue.write { db in
                 try junction.insert(db)
+                // Archive from inbox when organized into a collection
+                try db.execute(
+                    sql: "UPDATE documents SET is_in_inbox = 0, updated_at = ? WHERE id = ?",
+                    arguments: [now, item.id.uuidString]
+                )
             }
             revision += 1
         } catch {
-            NSLog("[LibraryStore] addItem to collection failed: \(error)")
+            Log.error(Log.store, "addItem to collection failed: \(error)")
         }
     }
 
@@ -388,7 +390,7 @@ final class LibraryStore {
             }
             revision += 1
         } catch {
-            NSLog("[LibraryStore] removeItem from collection failed: \(error)")
+            Log.error(Log.store, "removeItem from collection failed: \(error)")
         }
     }
 
@@ -460,7 +462,7 @@ final class LibraryStore {
             }
             revision += 1
         } catch {
-            NSLog("[LibraryStore] createTag failed: \(error)")
+            Log.error(Log.store, "createTag failed: \(error)")
         }
         return PDFTag(record: record)
     }
@@ -473,7 +475,7 @@ final class LibraryStore {
             }
             revision += 1
         } catch {
-            NSLog("[LibraryStore] deleteTag failed: \(error)")
+            Log.error(Log.store, "deleteTag failed: \(error)")
         }
     }
 
@@ -488,7 +490,7 @@ final class LibraryStore {
             }
             revision += 1
         } catch {
-            NSLog("[LibraryStore] renameTag failed: \(error)")
+            Log.error(Log.store, "renameTag failed: \(error)")
         }
     }
 
@@ -503,7 +505,7 @@ final class LibraryStore {
             }
             revision += 1
         } catch {
-            NSLog("[LibraryStore] updateTagColor failed: \(error)")
+            Log.error(Log.store, "updateTagColor failed: \(error)")
         }
     }
 
@@ -521,7 +523,7 @@ final class LibraryStore {
             }
             revision += 1
         } catch {
-            NSLog("[LibraryStore] addTag failed: \(error)")
+            Log.error(Log.store, "addTag failed: \(error)")
         }
     }
 
@@ -535,7 +537,7 @@ final class LibraryStore {
             }
             revision += 1
         } catch {
-            NSLog("[LibraryStore] removeTag failed: \(error)")
+            Log.error(Log.store, "removeTag failed: \(error)")
         }
     }
 

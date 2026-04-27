@@ -55,7 +55,7 @@ struct LibrarySidebarView: View {
 
         guard panel.runModal() == .OK, let url = panel.url else { return }
         let count = store.importFolder(url, importService: appState.importService)
-        NSLog("[Library] Imported \(count) PDFs from folder: \(url.lastPathComponent)")
+        Log.info(Log.ui, "Imported \(count) items from folder: \(url.lastPathComponent)")
     }
 
     // MARK: - Filter Row
@@ -91,6 +91,7 @@ struct LibrarySidebarView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .help(label)
     }
 }
 
@@ -150,6 +151,7 @@ private extension LibrarySidebarView {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .help(count > 0 ? "Inbox, \(count) items" : "Inbox")
     }
 
     var collectionsHeader: some View {

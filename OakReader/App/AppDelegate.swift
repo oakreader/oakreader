@@ -204,6 +204,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    // MARK: - Log Export
+
+    @objc func exportLogs(_ sender: Any?) {
+        let logURL = Log.logFileURL
+        guard FileManager.default.fileExists(atPath: logURL.path) else {
+            let alert = NSAlert()
+            alert.messageText = "No Logs Available"
+            alert.informativeText = "The log file has not been created yet."
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
+            return
+        }
+
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = logURL.lastPathComponent
+        panel.allowedContentTypes = [.plainText]
+        panel.begin { response in
+            guard response == .OK, let destURL = panel.url else { return }
+            try? FileManager.default.copyItem(at: logURL, to: destURL)
+        }
+    }
+
     // MARK: - Menu Action Dispatch
 
     @objc func menuAction(_ sender: NSMenuItem) {

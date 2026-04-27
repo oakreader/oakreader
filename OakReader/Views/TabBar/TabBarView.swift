@@ -30,6 +30,7 @@ struct TabBarView: View {
             .buttonStyle(.plain)
             .foregroundStyle(sidebarToggleActive ? Color.accentColor : Color(nsColor: .labelColor))
             .help("Toggle Sidebar")
+            .accessibilityLabel("Toggle Sidebar")
             .padding(.trailing, 4)
 
             // Pinned collection tab (always visible)
@@ -53,6 +54,7 @@ struct TabBarView: View {
             .foregroundStyle(appState.isLibraryActive ? Color(nsColor: .labelColor) : Color(nsColor: .secondaryLabelColor))
             .background(pinnedTabShape)
             .onHover { isPinnedHovering = $0 }
+            .help("Library: \(pinnedTabTitle)")
             .padding(.trailing, 8)
 
             if !appState.openTabs.isEmpty {
@@ -85,6 +87,7 @@ struct TabBarView: View {
             .buttonStyle(.plain)
             .foregroundStyle(appState.showSettings ? Color.accentColor : Color(nsColor: .labelColor))
             .help("Settings")
+            .accessibilityLabel("Settings")
             .frame(width: OakStyle.Size.sidenavWidth)
         }
         .padding(.leading, isFullScreen ? fullScreenPadding : trafficLightPadding)

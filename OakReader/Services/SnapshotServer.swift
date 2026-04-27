@@ -22,7 +22,7 @@ final class SnapshotServer {
         do {
             listener = try NWListener(using: params, on: NWEndpoint.Port(rawValue: port)!)
         } catch {
-            NSLog("[SnapshotServer] Failed to create listener: \(error)")
+            Log.error(Log.server, "Failed to create listener: \(error)")
             return
         }
 
@@ -33,9 +33,9 @@ final class SnapshotServer {
         listener?.stateUpdateHandler = { state in
             switch state {
             case .ready:
-                NSLog("[SnapshotServer] Listening on 127.0.0.1:\(self.port)")
+                Log.info(Log.server, "Listening on 127.0.0.1:\(self.port)")
             case .failed(let error):
-                NSLog("[SnapshotServer] Listener failed: \(error)")
+                Log.error(Log.server, "Listener failed: \(error)")
             default:
                 break
             }
@@ -47,7 +47,7 @@ final class SnapshotServer {
     func stop() {
         listener?.cancel()
         listener = nil
-        NSLog("[SnapshotServer] Stopped")
+        Log.info(Log.server, "Stopped")
     }
 
     // MARK: - Connection Handling
@@ -59,7 +59,7 @@ final class SnapshotServer {
         connection.receive(minimumIncompleteLength: 1, maximumLength: maxPayload + 65536) { [weak self] data, _, _, error in
             guard let self, let data else {
                 if let error {
-                    NSLog("[SnapshotServer] Receive error: \(error)")
+                    Log.error(Log.server, "Receive error: \(error)")
                 }
                 connection.cancel()
                 return
@@ -103,31 +103,72 @@ final class SnapshotServer {
             return
         }
 
-        // Only accept POST /snapshot
-        guard method == "POST", path == "/snapshot" else {
-            sendResponse(connection: connection, status: 404, body: #"{"status":"error","message":"Not found"}"#)
+        // GET /collections
+        if method == "GET", path == "/collections" {
+            handleGetCollections(connection: connection)
             return
         }
 
-        guard !bodyString.isEmpty, let bodyData = bodyString.data(using: .utf8) else {
-            sendResponse(connection: connection, status: 400, body: #"{"status":"error","message":"Empty body"}"#)
+        // POST /snapshot
+        if method == "POST", path == "/snapshot" {
+            guard !bodyString.isEmpty, let bodyData = bodyString.data(using: .utf8) else {
+                sendResponse(connection: connection, status: 400, body: #"{"status":"error","message":"Empty body"}"#)
+                return
+            }
+
+            do {
+                let payload = try JSONDecoder().decode(SnapshotPayload.self, from: bodyData)
+                handlePayload(payload) { result in
+                    switch result {
+                    case .success:
+                        self.sendResponse(connection: connection, status: 200, body: #"{"status":"ok"}"#)
+                    case .failure(let error):
+                        let msg = error.localizedDescription.replacingOccurrences(of: "\"", with: "'")
+                        self.sendResponse(connection: connection, status: 500, body: #"{"status":"error","message":"\#(msg)"}"#)
+                    }
+                }
+            } catch {
+                Log.error(Log.server, "JSON decode error: \(error)")
+                sendResponse(connection: connection, status: 400, body: #"{"status":"error","message":"Invalid JSON"}"#)
+            }
             return
         }
 
-        do {
-            let payload = try JSONDecoder().decode(SnapshotPayload.self, from: bodyData)
-            handlePayload(payload) { result in
-                switch result {
-                case .success:
-                    self.sendResponse(connection: connection, status: 200, body: #"{"status":"ok"}"#)
-                case .failure(let error):
-                    let msg = error.localizedDescription.replacingOccurrences(of: "\"", with: "'")
-                    self.sendResponse(connection: connection, status: 500, body: #"{"status":"error","message":"\#(msg)"}"#)
+        sendResponse(connection: connection, status: 404, body: #"{"status":"error","message":"Not found"}"#)
+    }
+
+    // MARK: - GET /collections
+
+    private func handleGetCollections(connection: NWConnection) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            let collections = self.importService.store.collections
+
+            // Flatten collections with parent info for the extension
+            var result: [[String: Any]] = []
+            func flatten(_ colls: [PDFCollection], parentId: String?) {
+                for c in colls {
+                    var entry: [String: Any] = [
+                        "id": c.id.uuidString,
+                        "name": c.name,
+                        "icon": c.icon,
+                    ]
+                    if let pid = parentId {
+                        entry["parentId"] = pid
+                    }
+                    result.append(entry)
+                    flatten(c.subcollections, parentId: c.id.uuidString)
                 }
             }
-        } catch {
-            NSLog("[SnapshotServer] JSON decode error: \(error)")
-            sendResponse(connection: connection, status: 400, body: #"{"status":"error","message":"Invalid JSON"}"#)
+            flatten(collections.filter { $0.parentId == nil }, parentId: nil)
+
+            // Serialize
+            if let jsonData = try? JSONSerialization.data(withJSONObject: result),
+               let jsonString = String(data: jsonData, encoding: .utf8) {
+                self.sendResponse(connection: connection, status: 200, body: jsonString)
+            } else {
+                self.sendResponse(connection: connection, status: 200, body: "[]")
+            }
         }
     }
 
@@ -137,10 +178,8 @@ final class SnapshotServer {
         switch payload.type {
         case "html":
             handleHTMLSnapshot(payload, completion: completion)
-        case "youtube":
-            handleYouTube(payload, completion: completion)
-        case "podcast":
-            handlePodcast(payload, completion: completion)
+        case "embed":
+            handleEmbed(payload, completion: completion)
         default:
             completion(.failure(OakReaderError.serverError("Unknown type: \(payload.type)")))
         }
@@ -170,7 +209,8 @@ final class SnapshotServer {
             guard let self else { return }
             let item = self.importService.importWebSnapshot(from: tempURL, originalPageURL: originalURL, title: payload.title)
             try? FileManager.default.removeItem(at: tempURL)
-            if item != nil {
+            if let item {
+                self.assignToCollection(item: item, collectionId: payload.collectionId)
                 completion(.success(()))
             } else {
                 completion(.failure(OakReaderError.serverError("Import failed")))
@@ -178,7 +218,7 @@ final class SnapshotServer {
         }
     }
 
-    private func handleYouTube(_ payload: SnapshotPayload, completion: @escaping (Result<Void, Error>) -> Void) {
+    private func handleEmbed(_ payload: SnapshotPayload, completion: @escaping (Result<Void, Error>) -> Void) {
         guard let sourceURL = URL(string: payload.url) else {
             completion(.failure(OakReaderError.serverError("Invalid URL")))
             return
@@ -191,16 +231,14 @@ final class SnapshotServer {
             duration: payload.duration,
             thumbnailURL: payload.thumbnailURL.flatMap { URL(string: $0) },
             publishedAt: nil,
-            description: payload.description,
-            feedURL: nil,
-            episodeTitle: nil
+            description: payload.description
         )
 
         // Download thumbnail if available
         downloadData(from: payload.thumbnailURL) { thumbnailData in
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
-                let item = self.importService.importYouTubeVideo(
+                let item = self.importService.importEmbed(
                     title: payload.title ?? "Untitled Video",
                     author: payload.author ?? "",
                     sourceURL: sourceURL,
@@ -209,54 +247,28 @@ final class SnapshotServer {
                     transcript: payload.transcript,
                     metadata: metadata
                 )
-                if item != nil {
+                if let item {
+                    self.assignToCollection(item: item, collectionId: payload.collectionId)
                     completion(.success(()))
                 } else {
-                    completion(.failure(OakReaderError.serverError("YouTube import failed")))
+                    completion(.failure(OakReaderError.serverError("Embed import failed")))
                 }
             }
         }
     }
 
-    private func handlePodcast(_ payload: SnapshotPayload, completion: @escaping (Result<Void, Error>) -> Void) {
-        guard let sourceURL = URL(string: payload.url) else {
-            completion(.failure(OakReaderError.serverError("Invalid URL")))
+    // MARK: - Collection Assignment
+
+    /// Assigns an imported item to a collection if a collectionId was provided.
+    /// Must be called on the main thread.
+    private func assignToCollection(item: PDFLibraryItem, collectionId: String?) {
+        guard let collectionId else { return }
+        let store = importService.store
+        guard let collection = store.collections.first(where: { $0.id.uuidString == collectionId }) else {
+            Log.error(Log.server, "Collection not found: \(collectionId)")
             return
         }
-
-        let metadata = MediaMetadata(
-            title: payload.episodeTitle ?? payload.title ?? "Untitled Episode",
-            author: payload.author ?? "",
-            sourceURL: sourceURL,
-            duration: payload.duration,
-            thumbnailURL: payload.thumbnailURL.flatMap { URL(string: $0) },
-            publishedAt: nil,
-            description: payload.description,
-            feedURL: payload.feedURL.flatMap { URL(string: $0) },
-            episodeTitle: payload.episodeTitle
-        )
-
-        // Download thumbnail if available
-        downloadData(from: payload.thumbnailURL) { thumbnailData in
-            DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
-                let item = self.importService.importPodcastEpisode(
-                    title: payload.episodeTitle ?? payload.title ?? "Untitled Episode",
-                    author: payload.author ?? "",
-                    sourceURL: sourceURL,
-                    duration: payload.duration,
-                    thumbnailData: thumbnailData,
-                    transcript: payload.transcript,
-                    audioData: nil,
-                    metadata: metadata
-                )
-                if item != nil {
-                    completion(.success(()))
-                } else {
-                    completion(.failure(OakReaderError.serverError("Podcast import failed")))
-                }
-            }
-        }
+        store.addItem(item, to: collection)
     }
 
     // MARK: - HTTP Response
@@ -277,7 +289,7 @@ final class SnapshotServer {
         headers += "Content-Type: application/json\r\n"
         headers += "Content-Length: \(bodyData.count)\r\n"
         headers += "Access-Control-Allow-Origin: *\r\n"
-        headers += "Access-Control-Allow-Methods: POST, OPTIONS\r\n"
+        headers += "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
         headers += "Access-Control-Allow-Headers: Content-Type\r\n"
         headers += "Connection: close\r\n"
         headers += "\r\n"
@@ -314,17 +326,15 @@ final class SnapshotServer {
 // MARK: - Payload
 
 struct SnapshotPayload: Codable {
-    let type: String            // "html" | "youtube" | "podcast"
+    let type: String            // "html" | "embed"
     let url: String
     let title: String?
     let author: String?
     let html: String?           // html only
-    let videoId: String?        // youtube only
+    let videoId: String?        // embed (YouTube) only
     let duration: Int?
     let thumbnailURL: String?
     let transcript: String?
-    let episodeTitle: String?   // podcast only
-    let feedURL: String?
-    let audioURL: String?
     let description: String?
+    let collectionId: String?   // optional — target collection, nil = inbox
 }

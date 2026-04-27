@@ -16,7 +16,7 @@ struct PDFContextProvider {
             return pdfSnapshot(from: viewModel, contextMode: contextMode)
         case .webSnapshot:
             return webSnapshotSnapshot(from: viewModel, contextMode: contextMode)
-        case .youtubeVideo, .podcast:
+        case .embed:
             return mediaSnapshot(from: viewModel, contextMode: contextMode)
         }
     }
@@ -75,7 +75,7 @@ struct PDFContextProvider {
         )
     }
 
-    // MARK: - Media (YouTube / Podcast)
+    // MARK: - Media (Embed)
 
     private func mediaSnapshot(
         from viewModel: DocumentViewModel,

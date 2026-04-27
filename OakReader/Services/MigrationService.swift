@@ -28,11 +28,11 @@ final class MigrationService {
 
         // Find old SwiftData SQLite file
         guard let oldDBURL = findOldDatabase() else {
-            NSLog("[Migration] No old SwiftData database found — skipping migration")
+            Log.info(Log.migration, "No old SwiftData database found — skipping migration")
             return 0
         }
 
-        NSLog("[Migration] Found old database at: \(oldDBURL.path)")
+        Log.info(Log.migration, "Found old database at: \(oldDBURL.path)")
         return migrateFromOldDB(at: oldDBURL)
     }
 
@@ -59,13 +59,13 @@ final class MigrationService {
         // to extract library items and their file paths/bookmark data.
         // This avoids depending on SwiftData for the migration.
         guard let db = OldSQLiteReader(path: dbURL.path) else {
-            NSLog("[Migration] Failed to open old database")
+            Log.error(Log.migration, "Failed to open old database")
             return 0
         }
         defer { db.close() }
 
         let items = db.fetchLibraryItems()
-        NSLog("[Migration] Found \(items.count) items to migrate")
+        Log.info(Log.migration, "Found \(items.count) items to migrate")
 
         var migrated = 0
         for item in items {
@@ -74,19 +74,19 @@ final class MigrationService {
             }
         }
 
-        NSLog("[Migration] Successfully migrated \(migrated)/\(items.count) items")
+        Log.info(Log.migration, "Successfully migrated \(migrated)/\(items.count) items")
         return migrated
     }
 
     private func migrateItem(_ item: OldLibraryItem) -> Bool {
         // Resolve the file URL from old data
         guard let sourceURL = resolveOldFileURL(item) else {
-            NSLog("[Migration] Cannot resolve URL for: \(item.title)")
+            Log.error(Log.migration, "Cannot resolve URL for: \(item.title)")
             return false
         }
 
         guard FileManager.default.fileExists(atPath: sourceURL.path) else {
-            NSLog("[Migration] File not found: \(sourceURL.path)")
+            Log.error(Log.migration, "File not found: \(sourceURL.path)")
             return false
         }
 
@@ -102,7 +102,7 @@ final class MigrationService {
             try FileManager.default.createDirectory(at: sessionsDir, withIntermediateDirectories: true)
             try FileManager.default.copyItem(at: sourceURL, to: destURL)
         } catch {
-            NSLog("[Migration] Failed to copy \(item.title): \(error)")
+            Log.error(Log.migration, "Failed to copy \(item.title): \(error)")
             try? FileManager.default.removeItem(at: docDir)
             return false
         }
@@ -129,7 +129,8 @@ final class MigrationService {
             createdAt: item.dateAdded.iso8601String,
             updatedAt: now,
             documentType: DocumentType.pdf.rawValue,
-            sourceURL: nil
+            sourceURL: nil,
+            isInInbox: false
         )
 
         store.insertDocument(record)

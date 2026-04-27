@@ -18,6 +18,7 @@ struct PDFLibraryItem: Identifiable, Hashable {
     var syncStatus: SyncStatus
     var documentType: DocumentType
     var sourceURL: URL?
+    var isInInbox: Bool
 
     // Populated by the store from relationships / filesystem
     var tags: [PDFTag]
@@ -27,7 +28,7 @@ struct PDFLibraryItem: Identifiable, Hashable {
     /// File URL within managed storage.
     /// For web snapshots, returns the HTML file path.
     /// For PDFs, falls back to legacy "document.pdf" for items imported before the rename.
-    /// For YouTube/podcast, returns the metadata.json path.
+    /// For embeds, returns the metadata.json path.
     var fileURL: URL {
         switch documentType {
         case .webSnapshot:
@@ -39,7 +40,7 @@ struct PDFLibraryItem: Identifiable, Hashable {
             }
             // Fallback for legacy imports
             return CatalogDatabase.documentPDFURL(storageKey: storageKey)
-        case .youtubeVideo, .podcast:
+        case .embed:
             return CatalogDatabase.documentMetadataURL(storageKey: storageKey)
         }
     }
@@ -73,6 +74,7 @@ struct PDFLibraryItem: Identifiable, Hashable {
         self.syncStatus = SyncStatus(rawValue: record.syncStatus) ?? .local
         self.documentType = DocumentType(rawValue: record.documentType) ?? .pdf
         self.sourceURL = record.sourceURL.flatMap { URL(string: $0) }
+        self.isInInbox = record.isInInbox
         self.tags = tags
         self.collections = collections
         self.coverImageData = coverImageData

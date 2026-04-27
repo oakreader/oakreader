@@ -9,6 +9,9 @@
     "zip": "wxt zip",
     "prepare": "wxt prepare"
   },
+  "dependencies": {
+    "single-file-core": "^1.5.84"
+  },
   "devDependencies": {
     "typescript": "^5.7.0",
     "wxt": "^0.20.0"

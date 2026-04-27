@@ -1,7 +1,7 @@
 import SwiftUI
 import WebKit
 
-/// Combined viewer for YouTube videos and podcast episodes.
+/// Viewer for embed documents (YouTube).
 struct MediaViewerView: View {
     let viewModel: DocumentViewModel
 
@@ -10,7 +10,7 @@ struct MediaViewerView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     // Player area
-                    playerSection(media: media)
+                    youtubeEmbed(media: media)
 
                     Divider()
 
@@ -38,16 +38,7 @@ struct MediaViewerView: View {
         }
     }
 
-    // MARK: - Player Section
-
-    @ViewBuilder
-    private func playerSection(media: MediaDocument) -> some View {
-        if viewModel.documentType == .youtubeVideo {
-            youtubeEmbed(media: media)
-        } else if let audioURL = media.audioURL {
-            podcastPlayer(media: media, audioURL: audioURL)
-        }
-    }
+    // MARK: - YouTube Embed
 
     @ViewBuilder
     private func youtubeEmbed(media: MediaDocument) -> some View {
@@ -57,33 +48,6 @@ struct MediaViewerView: View {
                 .aspectRatio(16/9, contentMode: .fit)
                 .frame(maxWidth: .infinity)
         }
-    }
-
-    @ViewBuilder
-    private func podcastPlayer(media: MediaDocument, audioURL: URL) -> some View {
-        VStack(spacing: 16) {
-            // Cover art
-            if let coverData = loadCoverData(from: media.storageDirectory),
-               let nsImage = NSImage(data: coverData) {
-                Image(nsImage: nsImage)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(maxWidth: 300, maxHeight: 300)
-                    .cornerRadius(12)
-                    .shadow(radius: 4)
-            } else {
-                Image(systemName: "headphones")
-                    .font(.system(size: 80))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 200, height: 200)
-            }
-
-            // Audio player controls
-            AudioPlayerView(audioURL: audioURL)
-                .frame(maxWidth: 500)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 24)
     }
 
     // MARK: - Metadata Section
@@ -166,11 +130,6 @@ struct MediaViewerView: View {
             return String(format: "%d:%02d:%02d", h, m, s)
         }
         return String(format: "%d:%02d", m, s)
-    }
-
-    private func loadCoverData(from storageDirectory: URL) -> Data? {
-        let coverURL = storageDirectory.appendingPathComponent("cover.webp")
-        return try? Data(contentsOf: coverURL)
     }
 }
 

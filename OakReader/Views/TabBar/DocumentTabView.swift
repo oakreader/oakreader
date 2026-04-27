@@ -166,6 +166,7 @@ struct DocumentTabView: View {
             .buttonStyle(.plain)
             .onHover { isCloseHovering = $0 }
             .opacity(isActive || isHovering ? 1 : 0)
+            .accessibilityLabel("Close \(tab.title)")
         }
         .padding(.leading, 10 + cr)
         .padding(.trailing, 10 + cr)
@@ -180,6 +181,10 @@ struct DocumentTabView: View {
         .contentShape(Rectangle())
         .onTapGesture { onSelect() }
         .onHover { isHovering = $0 }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Tab: \(tab.title)")
+        .accessibilityAddTraits(isActive ? .isSelected : [])
+        .accessibilityHint("Double-click to switch to this tab")
     }
 
     @ViewBuilder

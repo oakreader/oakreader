@@ -65,6 +65,8 @@ final class AppState {
     let coverService = LibraryCoverService()
     let importService: ImportService
 
+
+
     var openTabs: [DocumentTab] = []
     var activeTabID: UUID?
     var window: NSWindow?
@@ -129,12 +131,12 @@ final class AppState {
 
         let doc = OakReaderDocument()
         do {
-            NSLog("[Open] Reading PDF from: \(pdfURL.path)")
+            Log.info(Log.open, "Reading PDF from: \(pdfURL.path)")
             try doc.read(from: pdfURL, ofType: "com.adobe.pdf")
             doc.fileURL = pdfURL
-            NSLog("[Open] Successfully read PDF: \(pdfURL.lastPathComponent)")
+            Log.info(Log.open, "Successfully read PDF: \(pdfURL.lastPathComponent)")
         } catch {
-            NSLog("[Open] FAILED to read PDF: \(pdfURL.lastPathComponent) — \(error)")
+            Log.error(Log.open, "Failed to read PDF: \(pdfURL.lastPathComponent) — \(error)")
             NSAlert(error: error).runModal()
             return
         }
@@ -172,7 +174,7 @@ final class AppState {
                 libraryStore.markOpened(item)
             }
         } catch {
-            NSLog("[Open] FAILED to open HTML: \(url.lastPathComponent) — \(error)")
+            Log.error(Log.open, "Failed to open HTML: \(url.lastPathComponent) — \(error)")
             NSAlert(error: error).runModal()
         }
     }
@@ -184,7 +186,7 @@ final class AppState {
             openWebSnapshotItem(item)
         case .pdf:
             openPDFItem(item)
-        case .youtubeVideo, .podcast:
+        case .embed:
             openMediaItem(item)
         }
     }
@@ -213,7 +215,7 @@ final class AppState {
             try doc.read(from: pdfURL, ofType: "com.adobe.pdf")
             doc.fileURL = pdfURL
         } catch {
-            NSLog("[Open] FAILED to read PDF: \(item.title) — \(error)")
+            Log.error(Log.open, "Failed to read PDF: \(item.title) — \(error)")
             NSAlert(error: error).runModal()
             return
         }
@@ -232,7 +234,6 @@ final class AppState {
 
     private func openWebSnapshotItem(_ item: PDFLibraryItem) {
         let htmlURL = item.fileURL
-
         // Check if already open by storage key
         if let existing = openTabs.first(where: { $0.storageKey == item.storageKey }) {
             switchToTab(existing.id)
@@ -259,7 +260,7 @@ final class AppState {
             activeTabID = tab.id
             updateWindowTitle()
         } catch {
-            NSLog("[Open] FAILED to open web snapshot: \(item.title) — \(error)")
+            Log.error(Log.open, "Failed to open web snapshot: \(item.title) — \(error)")
             NSAlert(error: error).runModal()
         }
     }
@@ -294,7 +295,7 @@ final class AppState {
             activeTabID = tab.id
             updateWindowTitle()
         } catch {
-            NSLog("[Open] FAILED to open media item: \(item.title) — \(error)")
+            Log.error(Log.open, "Failed to open media item: \(item.title) — \(error)")
             NSAlert(error: error).runModal()
         }
     }

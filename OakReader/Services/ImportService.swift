@@ -46,7 +46,7 @@ final class ImportService {
             // Copy PDF to managed storage
             try FileManager.default.copyItem(at: sourceURL, to: destURL)
         } catch {
-            NSLog("[Import] Failed to copy PDF: \(error)")
+            Log.error(Log.importer, "Failed to copy PDF: \(error)")
             try? FileManager.default.removeItem(at: docDir)
             return nil
         }
@@ -90,7 +90,8 @@ final class ImportService {
             createdAt: now,
             updatedAt: now,
             documentType: DocumentType.pdf.rawValue,
-            sourceURL: nil
+            sourceURL: nil,
+            isInInbox: false
         )
 
         guard let item = store.insertDocument(record) else {
@@ -134,7 +135,7 @@ final class ImportService {
 
             try FileManager.default.copyItem(at: sourceURL, to: destURL)
         } catch {
-            NSLog("[Import] Failed to copy HTML snapshot: \(error)")
+            Log.error(Log.importer, "Failed to copy HTML snapshot: \(error)")
             try? FileManager.default.removeItem(at: docDir)
             return nil
         }
@@ -173,7 +174,8 @@ final class ImportService {
             createdAt: now,
             updatedAt: now,
             documentType: DocumentType.webSnapshot.rawValue,
-            sourceURL: originalPageURL?.absoluteString
+            sourceURL: originalPageURL?.absoluteString,
+            isInInbox: originalPageURL != nil
         )
 
         guard let item = store.insertDocument(record) else {
@@ -193,11 +195,11 @@ final class ImportService {
         return item
     }
 
-    // MARK: - YouTube Import
+    // MARK: - Embed Import
 
-    /// Import a YouTube video from Chrome extension payload.
+    /// Import an embed (YouTube) from Chrome extension payload.
     @discardableResult
-    func importYouTubeVideo(
+    func importEmbed(
         title: String,
         author: String,
         sourceURL: URL,
@@ -237,7 +239,7 @@ final class ImportService {
                 try thumbnailData.write(to: coverURL, options: .atomic)
             }
         } catch {
-            NSLog("[Import] Failed to import YouTube video: \(error)")
+            Log.error(Log.importer, "Failed to import embed: \(error)")
             try? FileManager.default.removeItem(at: docDir)
             return nil
         }
@@ -257,96 +259,9 @@ final class ImportService {
             syncStatus: SyncStatus.local.rawValue,
             createdAt: now,
             updatedAt: now,
-            documentType: DocumentType.youtubeVideo.rawValue,
-            sourceURL: sourceURL.absoluteString
-        )
-
-        guard let item = store.insertDocument(record) else {
-            try? FileManager.default.removeItem(at: docDir)
-            return nil
-        }
-
-        return item
-    }
-
-    // MARK: - Podcast Import
-
-    /// Import a podcast episode from Chrome extension payload.
-    @discardableResult
-    func importPodcastEpisode(
-        title: String,
-        author: String,
-        sourceURL: URL,
-        duration: Int?,
-        thumbnailData: Data?,
-        transcript: String?,
-        audioData: Data?,
-        metadata: MediaMetadata
-    ) -> PDFLibraryItem? {
-        // Duplicate detection by source URL
-        if let existing = store.items.first(where: { $0.sourceURL == sourceURL }) {
-            return existing
-        }
-
-        let docId = UUID()
-        let storageKey = CatalogDatabase.generateStorageKey()
-        let docDir = CatalogDatabase.documentDirectory(storageKey: storageKey)
-
-        do {
-            try FileManager.default.createDirectory(at: docDir, withIntermediateDirectories: true)
-            let sessionsDir = CatalogDatabase.documentSessionsDirectory(storageKey: storageKey)
-            try FileManager.default.createDirectory(at: sessionsDir, withIntermediateDirectories: true)
-
-            // Write metadata.json
-            let metadataURL = CatalogDatabase.documentMetadataURL(storageKey: storageKey)
-            let encoded = try JSONEncoder().encode(metadata)
-            try encoded.write(to: metadataURL, options: .atomic)
-
-            // Write transcript
-            if let transcript, !transcript.isEmpty {
-                let transcriptURL = CatalogDatabase.documentTranscriptURL(storageKey: storageKey)
-                try transcript.write(to: transcriptURL, atomically: true, encoding: .utf8)
-            }
-
-            // Write audio file
-            if let audioData {
-                let audioURL = CatalogDatabase.documentAudioURL(storageKey: storageKey)
-                try audioData.write(to: audioURL, options: .atomic)
-            }
-
-            // Write thumbnail as cover
-            if let thumbnailData {
-                let coverURL = CatalogDatabase.documentCoverURL(storageKey: storageKey)
-                try thumbnailData.write(to: coverURL, options: .atomic)
-            }
-        } catch {
-            NSLog("[Import] Failed to import podcast episode: \(error)")
-            try? FileManager.default.removeItem(at: docDir)
-            return nil
-        }
-
-        var fileSize: Int64 = 0
-        if let audioData {
-            fileSize = Int64(audioData.count)
-        }
-
-        let now = Date().iso8601String
-        let record = DocumentRecord(
-            id: docId.uuidString,
-            userId: localUserId,
-            storageKey: storageKey,
-            originalFileName: "metadata.json",
-            title: title,
-            author: author,
-            pageCount: duration ?? 0,
-            fileSize: fileSize,
-            isFavorite: false,
-            dateLastOpened: nil,
-            syncStatus: SyncStatus.local.rawValue,
-            createdAt: now,
-            updatedAt: now,
-            documentType: DocumentType.podcast.rawValue,
-            sourceURL: sourceURL.absoluteString
+            documentType: DocumentType.embed.rawValue,
+            sourceURL: sourceURL.absoluteString,
+            isInInbox: true
         )
 
         guard let item = store.insertDocument(record) else {

@@ -16,9 +16,11 @@ struct LibraryTableToolbar: View {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: OakStyle.Font.caption))
                     .foregroundStyle(Color.primary.opacity(0.55))
+                    .accessibilityHidden(true)
                 TextField("Search PDFs", text: $searchText)
                     .font(.system(size: 13))
                     .textFieldStyle(.plain)
+                    .accessibilityLabel("Search library")
                     .onChange(of: searchText) { _, newValue in
                         store.searchText = newValue
                     }
@@ -31,6 +33,7 @@ struct LibraryTableToolbar: View {
                             .foregroundStyle(Color.primary.opacity(0.25))
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Clear search")
                 }
             }
             .padding(.horizontal, 7)
@@ -72,6 +75,7 @@ struct LibraryTableToolbar: View {
             .menuStyle(.borderlessButton)
             .fixedSize()
             .help("Sort Library")
+            .accessibilityLabel("Sort Library")
 
             // Add button
             Button {
@@ -84,6 +88,7 @@ struct LibraryTableToolbar: View {
             }
             .buttonStyle(.borderless)
             .help("Add PDFs to Library")
+            .accessibilityLabel("Add PDFs to Library")
         }
         .padding(.horizontal, 8)
         .frame(height: 41)

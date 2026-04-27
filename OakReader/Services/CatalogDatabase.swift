@@ -125,6 +125,14 @@ final class CatalogDatabase {
             }
         }
 
+        migrator.registerMigration("v3-inbox-flag") { db in
+            try db.alter(table: "documents") { t in
+                t.add(column: "is_in_inbox", .integer).notNull().defaults(to: 0)
+            }
+            // Backfill: items imported from the Chrome extension have a source_url
+            try db.execute(sql: "UPDATE documents SET is_in_inbox = 1 WHERE source_url IS NOT NULL")
+        }
+
         return migrator
     }
 
@@ -158,19 +166,14 @@ final class CatalogDatabase {
         documentDirectory(storageKey: storageKey).appendingPathComponent("cover.webp")
     }
 
-    /// Metadata JSON URL for a media document (YouTube/podcast).
+    /// Metadata JSON URL for an embed document.
     static func documentMetadataURL(storageKey: String) -> URL {
         documentDirectory(storageKey: storageKey).appendingPathComponent("metadata.json")
     }
 
-    /// Transcript file URL for a media document.
+    /// Transcript file URL for an embed document.
     static func documentTranscriptURL(storageKey: String) -> URL {
         documentDirectory(storageKey: storageKey).appendingPathComponent("transcript.txt")
-    }
-
-    /// Audio file URL for a podcast episode.
-    static func documentAudioURL(storageKey: String) -> URL {
-        documentDirectory(storageKey: storageKey).appendingPathComponent("audio.m4a")
     }
 
     /// Sessions directory for a document.
