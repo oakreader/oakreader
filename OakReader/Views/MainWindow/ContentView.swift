@@ -146,8 +146,13 @@ struct ContentView: View {
                 }
             }
         case .webSnapshot:
-            WebArchiveViewerRepresentable(viewModel: viewModel)
-        case .youtubeVideo, .podcast:
+            ZStack {
+                WebArchiveViewerRepresentable(viewModel: viewModel)
+                if viewModel.state.editorMode == .snapshot {
+                    WebSnapshotOverlayView(viewModel: viewModel)
+                }
+            }
+        case .embed:
             MediaViewerView(viewModel: viewModel)
         }
     }
