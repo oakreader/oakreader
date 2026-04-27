@@ -133,6 +133,19 @@ final class CatalogDatabase {
             try db.execute(sql: "UPDATE documents SET is_in_inbox = 1 WHERE source_url IS NOT NULL")
         }
 
+        migrator.registerMigration("v4-notes") { db in
+            try db.create(table: "notes") { t in
+                t.column("id", .text).primaryKey()
+                t.column("user_id", .text).notNull()
+                t.column("document_id", .text).notNull().references("documents", onDelete: .cascade)
+                t.column("title", .text).notNull().defaults(to: "")
+                t.column("is_pinned", .integer).notNull().defaults(to: false)
+                t.column("created_at", .text).notNull()
+                t.column("updated_at", .text).notNull()
+            }
+            try db.create(index: "idx_notes_document_id", on: "notes", columns: ["document_id"])
+        }
+
         return migrator
     }
 
@@ -179,6 +192,16 @@ final class CatalogDatabase {
     /// Sessions directory for a document.
     static func documentSessionsDirectory(storageKey: String) -> URL {
         documentDirectory(storageKey: storageKey).appendingPathComponent("sessions", isDirectory: true)
+    }
+
+    /// Notes directory for a document.
+    static func documentNotesDirectory(storageKey: String) -> URL {
+        documentDirectory(storageKey: storageKey).appendingPathComponent("notes", isDirectory: true)
+    }
+
+    /// Notes attachments directory for a document.
+    static func documentNotesAttachmentsDirectory(storageKey: String) -> URL {
+        documentNotesDirectory(storageKey: storageKey).appendingPathComponent("attachments", isDirectory: true)
     }
 }
 

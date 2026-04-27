@@ -17,6 +17,9 @@ packages:
   GRDB:
     url: https://github.com/groue/GRDB.swift
     from: "7.0.0"
+  MarkdownEditor:
+    url: https://github.com/Pallepadehat/MarkdownEditor
+    from: "1.0.0"
 
 settings:
   base:
@@ -38,6 +41,7 @@ targets:
       - package: Textual
       - package: GRDB
         product: GRDB
+      - package: MarkdownEditor
     postCompileScripts:
       - script: |
           if which swiftlint > /dev/null; then

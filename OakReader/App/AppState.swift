@@ -148,6 +148,7 @@ final class AppState {
         }
 
         let tab = DocumentTab(document: doc, storageKey: storageKey)
+        tab.viewModel.database = libraryStore.database
         // Use original filename (not "document.pdf" from managed storage)
         tab.title = item?.fileName ?? url.lastPathComponent
         NSDocumentController.shared.addDocument(doc)
@@ -165,6 +166,7 @@ final class AppState {
         do {
             let snapshot = try WebSnapshotDocument(htmlURL: htmlURL, sourceURL: item?.sourceURL)
             let tab = DocumentTab(webSnapshot: snapshot, storageKey: storageKey)
+            tab.viewModel.database = libraryStore.database
             tab.title = item?.title ?? url.deletingPathExtension().lastPathComponent
             openTabs.append(tab)
             activeTabID = tab.id
@@ -224,6 +226,7 @@ final class AppState {
         libraryStore.markOpened(item)
 
         let tab = DocumentTab(document: doc, storageKey: item.storageKey)
+        tab.viewModel.database = libraryStore.database
         // Use original filename from library item
         tab.title = item.fileName
         NSDocumentController.shared.addDocument(doc)
@@ -255,6 +258,7 @@ final class AppState {
             libraryStore.markOpened(item)
 
             let tab = DocumentTab(webSnapshot: snapshot, storageKey: item.storageKey)
+            tab.viewModel.database = libraryStore.database
             tab.title = item.title
             openTabs.append(tab)
             activeTabID = tab.id
@@ -290,6 +294,7 @@ final class AppState {
             libraryStore.markOpened(item)
 
             let tab = DocumentTab(media: media, storageKey: item.storageKey)
+            tab.viewModel.database = libraryStore.database
             tab.title = item.title
             openTabs.append(tab)
             activeTabID = tab.id

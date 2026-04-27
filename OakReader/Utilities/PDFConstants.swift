@@ -112,6 +112,7 @@ enum FormFieldType: String, CaseIterable, Identifiable {
 
 enum RightPanelMode: String, CaseIterable, Identifiable {
     case aiChat
+    case notes
     case inspector
 
     var id: String { rawValue }
@@ -120,6 +121,7 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
         switch self {
         case .inspector: return "info.circle"
         case .aiChat: return "bubble.left.and.text.bubble.right"
+        case .notes: return "note.text"
         }
     }
 
@@ -127,6 +129,7 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
         switch self {
         case .inspector: return "Info"
         case .aiChat: return "AI Chat"
+        case .notes: return "Notes"
         }
     }
 }
