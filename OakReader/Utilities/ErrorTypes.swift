@@ -5,6 +5,9 @@ enum OakReaderError: LocalizedError {
     case fileReadFailed(URL, underlying: Error?)
     case fileWriteFailed(URL, underlying: Error?)
     case invalidPDF
+    case invalidHTML
+    case snapshotImportFailed(String)
+    case mediaImportFailed(String)
     case passwordRequired
     case incorrectPassword
     case encryptionFailed(String)
@@ -23,6 +26,7 @@ enum OakReaderError: LocalizedError {
     case importFailed(String)
     case watermarkFailed(String)
     case accessibilityError(String)
+    case serverError(String)
     case cancelled
     case unknown(String)
 
@@ -36,6 +40,12 @@ enum OakReaderError: LocalizedError {
             return "Failed to write \(url.lastPathComponent): \(underlying?.localizedDescription ?? "unknown error")"
         case .invalidPDF:
             return "The file is not a valid PDF document."
+        case .invalidHTML:
+            return "The file is not a valid HTML document."
+        case .snapshotImportFailed(let reason):
+            return "Web snapshot import failed: \(reason)"
+        case .mediaImportFailed(let reason):
+            return "Media import failed: \(reason)"
         case .passwordRequired:
             return "This document requires a password."
         case .incorrectPassword:
@@ -73,6 +83,8 @@ enum OakReaderError: LocalizedError {
             return "Watermark failed: \(reason)"
         case .accessibilityError(let reason):
             return "Accessibility error: \(reason)"
+        case .serverError(let reason):
+            return "Server error: \(reason)"
         case .cancelled:
             return "Operation was cancelled."
         case .unknown(let reason):

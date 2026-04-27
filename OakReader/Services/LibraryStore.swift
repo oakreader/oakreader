@@ -28,11 +28,23 @@ final class LibraryStore {
         return (try? fetchAllItems()) ?? []
     }
 
+    var inboxCount: Int {
+        _ = revision
+        return (try? database.dbQueue.read { db in
+            try Int.fetchOne(db, sql: """
+                SELECT COUNT(*) FROM documents
+                WHERE id NOT IN (SELECT document_id FROM document_collections)
+            """) ?? 0
+        }) ?? 0
+    }
+
     var filteredItems: [PDFLibraryItem] {
         var results = items
 
         // Apply filter
         switch currentFilter {
+        case .inbox:
+            results = results.filter { $0.collections.isEmpty }
         case .all:
             break
         case .recentlyAdded:
@@ -40,6 +52,14 @@ final class LibraryStore {
             results = results.filter { $0.dateAdded >= cutoff }
         case .favorites:
             results = results.filter { $0.isFavorite }
+        case .pdfs:
+            results = results.filter { $0.documentType == .pdf }
+        case .webSnapshots:
+            results = results.filter { $0.documentType == .webSnapshot }
+        case .videos:
+            results = results.filter { $0.documentType == .youtubeVideo }
+        case .podcasts:
+            results = results.filter { $0.documentType == .podcast }
         }
 
         // Apply collection filter
@@ -372,7 +392,7 @@ final class LibraryStore {
         }
     }
 
-    /// Import all PDFs from a folder, creating a collection named after the folder.
+    /// Import all PDFs and HTML files from a folder, creating a collection named after the folder.
     @discardableResult
     func importFolder(_ folderURL: URL, importService: ImportService) -> Int {
         let folderName = folderURL.lastPathComponent
@@ -385,10 +405,19 @@ final class LibraryStore {
             options: [.skipsHiddenFiles]
         ) else { return 0 }
 
+        let supportedExtensions: Set<String> = ["pdf", "html", "htm"]
         var count = 0
         for case let fileURL as URL in enumerator {
-            guard fileURL.pathExtension.lowercased() == "pdf" else { continue }
-            if let item = importService.importPDF(from: fileURL) {
+            let ext = fileURL.pathExtension.lowercased()
+            guard supportedExtensions.contains(ext) else { continue }
+
+            let item: PDFLibraryItem?
+            if ext == "html" || ext == "htm" {
+                item = importService.importWebSnapshot(from: fileURL)
+            } else {
+                item = importService.importPDF(from: fileURL)
+            }
+            if let item {
                 addItem(item, to: collection)
                 count += 1
             }

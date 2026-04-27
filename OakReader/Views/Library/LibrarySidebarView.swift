@@ -101,10 +101,55 @@ private extension LibrarySidebarView {
         VStack(alignment: .leading, spacing: 0) {
             sectionHeader("MY LIBRARY")
 
-            filterRow(label: "All PDFs", icon: "books.vertical", filter: .all)
+            inboxRow
+
+            filterRow(label: "All Items", icon: "books.vertical", filter: .all)
             filterRow(label: "Recently Added", icon: "clock", filter: .recentlyAdded)
             filterRow(label: "Favorites", icon: "star", filter: .favorites)
         }
+    }
+
+    var inboxRow: some View {
+        let isSelected = store.selectedCollection == nil && store.currentFilter == .inbox && appState.isLibraryActive
+        let count = store.inboxCount
+
+        return Button {
+            store.selectedCollection = nil
+            store.currentFilter = .inbox
+            appState.switchToLibrary()
+        } label: {
+            HStack(spacing: 7) {
+                Image(systemName: "tray.and.arrow.down")
+                    .font(.system(size: OakStyle.Font.icon))
+                    .foregroundStyle(isSelected ? .white : .primary)
+                    .frame(width: 18)
+
+                Text("Inbox")
+                    .font(.system(size: 13, weight: isSelected ? .medium : .regular))
+                    .foregroundStyle(isSelected ? .white : .primary)
+                    .lineLimit(1)
+
+                Spacer()
+
+                if count > 0 {
+                    Text("\(count)")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 1)
+                        .background(Capsule().fill(Color.accentColor))
+                }
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(isSelected ? Color.accentColor : Color.clear)
+                    .padding(.horizontal, 10)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     var collectionsHeader: some View {

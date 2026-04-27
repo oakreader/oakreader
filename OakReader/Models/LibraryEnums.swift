@@ -43,17 +43,27 @@ enum LibrarySortOrder: String, CaseIterable, Identifiable {
 }
 
 enum LibraryFilter: String, CaseIterable, Identifiable {
-    case all = "All PDFs"
+    case inbox = "Inbox"
+    case all = "All Items"
     case recentlyAdded = "Recently Added"
     case favorites = "Favorites"
+    case pdfs = "PDFs"
+    case webSnapshots = "Web Snapshots"
+    case videos = "Videos"
+    case podcasts = "Podcasts"
 
     var id: String { rawValue }
 
     var icon: String {
         switch self {
+        case .inbox: return "tray.and.arrow.down"
         case .all: return "books.vertical"
         case .recentlyAdded: return "clock"
         case .favorites: return "star"
+        case .pdfs: return "doc.fill"
+        case .webSnapshots: return "globe"
+        case .videos: return "play.rectangle.fill"
+        case .podcasts: return "headphones"
         }
     }
 }

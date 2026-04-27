@@ -62,7 +62,7 @@ targets:
     type: tool
     platform: macOS
     sources:
-      - path: CLI
+      - path: cli
     dependencies:
       - package: OakReaderAI
     settings:

@@ -7,6 +7,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let documentController = PDFDocumentController()
     let appState = AppState()
     private var mainWindow: NSWindow?
+    private var snapshotServer: SnapshotServer?
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         documentController.appState = appState
@@ -18,7 +19,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let migration = MigrationService(store: appState.libraryStore, coverService: appState.coverService)
         migration.migrateIfNeeded()
 
+        // Start the snapshot server for Chrome extension
+        snapshotServer = SnapshotServer(importService: appState.importService)
+        snapshotServer?.start()
+
         createMainWindow()
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        snapshotServer?.stop()
     }
 
     func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool {
@@ -133,7 +142,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func openDocument(_ sender: Any?) {
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.pdf]
+        panel.allowedContentTypes = [.pdf, .html]
         panel.allowsMultipleSelection = true
         panel.begin { [weak self] response in
             guard response == .OK else { return }
@@ -144,19 +153,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func saveDocument(_ sender: Any?) {
-        appState.activeTab?.document.save(sender)
+        appState.activeTab?.document?.save(sender)
     }
 
     @objc func saveDocumentAs(_ sender: Any?) {
-        appState.activeTab?.document.saveAs(sender)
+        appState.activeTab?.document?.saveAs(sender)
     }
 
     @objc func revertDocument(_ sender: Any?) {
-        appState.activeTab?.document.revertToSaved(sender)
+        appState.activeTab?.document?.revertToSaved(sender)
     }
 
     @objc func printDocument(_ sender: Any?) {
-        appState.activeTab?.document.printDocument(sender)
+        appState.activeTab?.document?.printDocument(sender)
     }
 
     @objc func closeTab(_ sender: Any?) {

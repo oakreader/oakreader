@@ -14,7 +14,6 @@ DerivedData/
 
 # Swift Package Manager
 .swiftpm/
-Packages/
 Package.resolved
 
 # CocoaPods (if ever used)
@@ -46,6 +45,11 @@ Thumbs.db
 # Provisioning
 *.mobileprovision
 *.provisionprofile
+
+# Chrome Extension
+chrome-extension/node_modules/
+chrome-extension/.output/
+chrome-extension/.wxt/
 
 # Keys and secrets
 *.pem
