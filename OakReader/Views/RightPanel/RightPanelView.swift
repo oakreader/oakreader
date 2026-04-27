@@ -12,6 +12,8 @@ struct RightPanelContentView: View {
                     InspectorPanelView(viewModel: viewModel)
                 case .aiChat:
                     AIChatView(chatVM: viewModel.chat)
+                case .notes:
+                    NotePanelView(notesVM: viewModel.notes)
                 }
             }
         }

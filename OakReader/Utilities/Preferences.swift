@@ -26,6 +26,15 @@ final class Preferences {
         // AI preferences
         static let aiProvider = "aiProvider"
         static let aiModel = "aiModel"
+        // Note editor preferences
+        static let noteEditorFontFamily = "noteEditorFontFamily"
+        static let noteEditorFontSize = "noteEditorFontSize"
+        static let noteEditorCodeFontFamily = "noteEditorCodeFontFamily"
+        static let noteEditorLineHeight = "noteEditorLineHeight"
+        static let noteEditorShowLineNumbers = "noteEditorShowLineNumbers"
+        static let noteEditorRenderMath = "noteEditorRenderMath"
+        static let noteEditorRenderImages = "noteEditorRenderImages"
+        static let noteEditorHideSyntax = "noteEditorHideSyntax"
     }
 
     private init() {
@@ -45,6 +54,14 @@ final class Preferences {
             Keys.showStatusBar: true,
             Keys.aiProvider: AIProvider.anthropic.rawValue,
             Keys.aiModel: "",
+            Keys.noteEditorFontFamily: "'Georgia', 'Times New Roman', 'Iowan Old Style', serif",
+            Keys.noteEditorFontSize: 17.0,
+            Keys.noteEditorCodeFontFamily: "'Iosevka Mono', 'SF Mono', Menlo, Monaco, monospace",
+            Keys.noteEditorLineHeight: 1.75,
+            Keys.noteEditorShowLineNumbers: false,
+            Keys.noteEditorRenderMath: true,
+            Keys.noteEditorRenderImages: true,
+            Keys.noteEditorHideSyntax: true,
         ])
     }
 
@@ -115,5 +132,47 @@ final class Preferences {
     var aiModel: String {
         get { defaults.string(forKey: Keys.aiModel) ?? "" }
         set { defaults.set(newValue, forKey: Keys.aiModel) }
+    }
+
+    // MARK: - Note Editor Preferences
+
+    var noteEditorFontFamily: String {
+        get { defaults.string(forKey: Keys.noteEditorFontFamily) ?? "'Georgia', 'Times New Roman', serif" }
+        set { defaults.set(newValue, forKey: Keys.noteEditorFontFamily) }
+    }
+
+    var noteEditorFontSize: CGFloat {
+        get { CGFloat(defaults.double(forKey: Keys.noteEditorFontSize)) }
+        set { defaults.set(Double(newValue), forKey: Keys.noteEditorFontSize) }
+    }
+
+    var noteEditorCodeFontFamily: String {
+        get { defaults.string(forKey: Keys.noteEditorCodeFontFamily) ?? "'Iosevka Mono', 'SF Mono', monospace" }
+        set { defaults.set(newValue, forKey: Keys.noteEditorCodeFontFamily) }
+    }
+
+    var noteEditorLineHeight: CGFloat {
+        get { CGFloat(defaults.double(forKey: Keys.noteEditorLineHeight)) }
+        set { defaults.set(Double(newValue), forKey: Keys.noteEditorLineHeight) }
+    }
+
+    var noteEditorShowLineNumbers: Bool {
+        get { defaults.bool(forKey: Keys.noteEditorShowLineNumbers) }
+        set { defaults.set(newValue, forKey: Keys.noteEditorShowLineNumbers) }
+    }
+
+    var noteEditorRenderMath: Bool {
+        get { defaults.bool(forKey: Keys.noteEditorRenderMath) }
+        set { defaults.set(newValue, forKey: Keys.noteEditorRenderMath) }
+    }
+
+    var noteEditorRenderImages: Bool {
+        get { defaults.bool(forKey: Keys.noteEditorRenderImages) }
+        set { defaults.set(newValue, forKey: Keys.noteEditorRenderImages) }
+    }
+
+    var noteEditorHideSyntax: Bool {
+        get { defaults.bool(forKey: Keys.noteEditorHideSyntax) }
+        set { defaults.set(newValue, forKey: Keys.noteEditorHideSyntax) }
     }
 }
