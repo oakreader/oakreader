@@ -28,7 +28,7 @@ enum MainMenuBuilder {
         NSApp.windowsMenu = windowMenu
 
         // Help menu
-        let (helpMenuItem, helpMenu) = buildHelpMenu()
+        let (helpMenuItem, helpMenu) = buildHelpMenu(target: target)
         mainMenu.addItem(helpMenuItem)
         NSApp.helpMenu = helpMenu
 
@@ -230,8 +230,13 @@ enum MainMenuBuilder {
 
     // MARK: - Help Menu
 
-    private static func buildHelpMenu() -> (NSMenuItem, NSMenu) {
+    private static func buildHelpMenu(target: AppDelegate) -> (NSMenuItem, NSMenu) {
         let helpMenu = NSMenu(title: "Help")
+
+        let exportLogsItem = NSMenuItem(title: "Export Logs...", action: #selector(AppDelegate.exportLogs(_:)), keyEquivalent: "")
+        exportLogsItem.target = target
+        helpMenu.addItem(exportLogsItem)
+
         let helpMenuItem = NSMenuItem(title: "Help", action: nil, keyEquivalent: "")
         helpMenuItem.submenu = helpMenu
         return (helpMenuItem, helpMenu)

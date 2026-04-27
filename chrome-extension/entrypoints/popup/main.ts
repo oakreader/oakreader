@@ -1,9 +1,10 @@
-const SERVER_URL = "http://localhost:23119/snapshot";
+const SERVER_BASE = "http://localhost:23119";
+const SNAPSHOT_URL = `${SERVER_BASE}/snapshot`;
+const COLLECTIONS_URL = `${SERVER_BASE}/collections`;
 
 const TYPE_LABELS: Record<string, string> = {
   html: "\uD83C\uDF10 Web Page",
-  youtube: "\u25B6\uFE0F YouTube Video",
-  podcast: "\uD83C\uDFA7 Podcast",
+  embed: "\u25B6\uFE0F Embed",
 };
 
 interface PageData {
@@ -11,6 +12,13 @@ interface PageData {
   url: string;
   title: string | null;
   [key: string]: unknown;
+}
+
+interface CollectionInfo {
+  id: string;
+  name: string;
+  icon: string;
+  parentId: string | null;
 }
 
 let pageData: PageData | null = null;
@@ -21,14 +29,34 @@ const titleEl = document.getElementById("pageTitle")!;
 const typeEl = document.getElementById("pageType")!;
 const saveBtn = document.getElementById("saveBtn") as HTMLButtonElement;
 const statusEl = document.getElementById("status")!;
+const collectionSelect = document.getElementById("collectionSelect") as HTMLSelectElement;
 
 function showError(msg: string) {
   loadingEl.style.display = "none";
   contentEl.style.display = "block";
   document.querySelector(".card")!.setAttribute("style", "display:none");
+  document.querySelector(".collection-picker")!.setAttribute("style", "display:none");
   saveBtn.style.display = "none";
   statusEl.textContent = msg;
   statusEl.className = "status error";
+}
+
+async function loadCollections() {
+  try {
+    const response = await fetch(COLLECTIONS_URL);
+    const collections: CollectionInfo[] = await response.json();
+
+    for (const coll of collections) {
+      const option = document.createElement("option");
+      option.value = coll.id;
+      // Indent subcollections
+      const prefix = coll.parentId ? "\u00A0\u00A0\u00A0\u00A0" : "";
+      option.textContent = prefix + coll.name;
+      collectionSelect.appendChild(option);
+    }
+  } catch {
+    // Server not running or no collections — keep just "Inbox"
+  }
 }
 
 async function init() {
@@ -43,6 +71,9 @@ async function init() {
       return;
     }
 
+    // Load collections in parallel with page data
+    const collectionsPromise = loadCollections();
+
     pageData = await chrome.tabs.sendMessage(tab.id, {
       action: "getPageData",
     });
@@ -51,6 +82,8 @@ async function init() {
       showError("Could not extract page data.");
       return;
     }
+
+    await collectionsPromise;
 
     loadingEl.style.display = "none";
     contentEl.style.display = "block";
@@ -69,17 +102,26 @@ saveBtn.addEventListener("click", async () => {
   statusEl.textContent = "";
   statusEl.className = "status";
 
+  const selectedCollectionId = collectionSelect.value || undefined;
+  const selectedOption = collectionSelect.options[collectionSelect.selectedIndex];
+  const collectionName = selectedOption?.value ? selectedOption.textContent?.trim() : "Inbox";
+
   try {
-    const response = await fetch(SERVER_URL, {
+    const body = {
+      ...pageData,
+      collectionId: selectedCollectionId,
+    };
+
+    const response = await fetch(SNAPSHOT_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(pageData),
+      body: JSON.stringify(body),
     });
 
     const result = await response.json();
 
     if (result.status === "ok") {
-      statusEl.textContent = "Saved! Added to Inbox.";
+      statusEl.textContent = `Saved to ${collectionName}.`;
       statusEl.className = "status success";
       saveBtn.textContent = "Saved";
     } else {

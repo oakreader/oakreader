@@ -21,6 +21,7 @@ struct DocumentRecord: Codable, FetchableRecord, MutablePersistableRecord, Hasha
     var updatedAt: String
     var documentType: String
     var sourceURL: String?
+    var isInInbox: Bool
 
     enum CodingKeys: String, CodingKey, ColumnExpression {
         case id
@@ -37,6 +38,7 @@ struct DocumentRecord: Codable, FetchableRecord, MutablePersistableRecord, Hasha
         case updatedAt = "updated_at"
         case documentType = "document_type"
         case sourceURL = "source_url"
+        case isInInbox = "is_in_inbox"
     }
 }
 

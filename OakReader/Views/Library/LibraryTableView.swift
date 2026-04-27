@@ -20,6 +20,7 @@ struct LibraryTableView: View {
                         Image(systemName: item.documentType.icon)
                             .foregroundStyle(Color.primary.opacity(0.4))
                             .font(.system(size: 14))
+                            .accessibilityLabel(item.documentType.label)
 
                         // Tag swatches: overlapping colored squares
                         if !item.tags.isEmpty {
@@ -28,6 +29,7 @@ struct LibraryTableView: View {
                                     RoundedRectangle(cornerRadius: 2)
                                         .fill(Color(hex: tag.colorHex))
                                         .frame(width: 11, height: 11)
+                                        .accessibilityLabel("Tag: \(tag.name)")
                                 }
                             }
                             .padding(.trailing, 2)
@@ -41,6 +43,7 @@ struct LibraryTableView: View {
                             Image(systemName: "star.fill")
                                 .foregroundStyle(Color(hex: "FAA700"))
                                 .font(.system(size: 11))
+                                .accessibilityLabel("Favorite")
                         }
                     }
                 }
@@ -97,24 +100,41 @@ struct LibraryTableView: View {
 
     private var emptyState: some View {
         VStack(spacing: 16) {
-            Image(systemName: "books.vertical")
-                .font(.system(size: 48))
-                .foregroundStyle(Color.primary.opacity(0.15))
+            if store.currentFilter == .inbox {
+                Image(systemName: "tray")
+                    .font(.system(size: 48))
+                    .foregroundStyle(Color.primary.opacity(0.15))
+                    .accessibilityHidden(true)
 
-            Text("Your Library is Empty")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Color.primary.opacity(0.55))
+                Text("Inbox is Empty")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Color.primary.opacity(0.55))
 
-            Text("Drag PDF files here or click + to add them.")
-                .font(.system(size: 13))
-                .foregroundStyle(Color.primary.opacity(0.25))
-                .multilineTextAlignment(.center)
+                Text("Items saved from the Chrome extension will appear here.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.primary.opacity(0.25))
+                    .multilineTextAlignment(.center)
+            } else {
+                Image(systemName: "books.vertical")
+                    .font(.system(size: 48))
+                    .foregroundStyle(Color.primary.opacity(0.15))
+                    .accessibilityHidden(true)
 
-            Button("Add PDFs...") {
-                importPDFs()
+                Text("Your Library is Empty")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Color.primary.opacity(0.55))
+
+                Text("Drag PDF files here or click + to add them.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.primary.opacity(0.25))
+                    .multilineTextAlignment(.center)
+
+                Button("Add PDFs...") {
+                    importPDFs()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.regular)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -157,6 +177,12 @@ struct LibraryTableView: View {
             }
 
             Divider()
+
+            if let sourceURL = item.sourceURL {
+                Button("View Online") {
+                    NSWorkspace.shared.open(sourceURL)
+                }
+            }
 
             Button("Reveal in Finder") {
                 NSWorkspace.shared.activateFileViewerSelecting([item.fileURL])

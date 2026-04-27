@@ -1,7 +1,7 @@
 import { defineContentScript } from "wxt/utils/define-content-script";
 
 interface PageData {
-  type: "html" | "youtube" | "podcast";
+  type: "html" | "embed";
   url: string;
   title: string | null;
   author?: string | null;
@@ -10,13 +10,21 @@ interface PageData {
   duration?: number | null;
   thumbnailURL?: string | null;
   transcript?: string | null;
-  episodeTitle?: string | null;
-  feedURL?: string | null;
-  audioURL?: string | null;
   description?: string | null;
 }
 
-function detectPageType(url: string): "html" | "youtube" | "podcast" {
+// Pending background fetch responses
+const pendingResponses = new Map<
+  number,
+  {
+    resolve: (value: unknown) => void;
+    reject: (reason: unknown) => void;
+    array?: number[];
+  }
+>();
+let fetchRequestId = 0;
+
+function detectPageType(url: string): "html" | "embed" {
   try {
     const u = new URL(url);
     if (
@@ -26,18 +34,7 @@ function detectPageType(url: string): "html" | "youtube" | "podcast" {
       u.pathname === "/watch" &&
       u.searchParams.has("v")
     ) {
-      return "youtube";
-    }
-    const podcastHosts = [
-      "podcasts.apple.com",
-      "open.spotify.com",
-      "podcasts.google.com",
-      "overcast.fm",
-      "pocketcasts.com",
-      "castbox.fm",
-    ];
-    if (podcastHosts.some((h) => u.hostname.includes(h))) {
-      return "podcast";
+      return "embed";
     }
   } catch {
     // ignore
@@ -45,13 +42,159 @@ function detectPageType(url: string): "html" | "youtube" | "podcast" {
   return "html";
 }
 
-function extractWebPage(): PageData {
-  return {
-    type: "html",
-    url: location.href,
-    title: document.title || location.href,
-    html: document.documentElement.outerHTML,
-  };
+// SingleFile fetch: try page-context fetch first, fall back to background
+async function contentFetch(
+  url: string,
+  options: Record<string, unknown> = {}
+) {
+  try {
+    const fetchOptions: RequestInit = {
+      cache: (options.cache as RequestCache) || "force-cache",
+      headers: options.headers as HeadersInit,
+      referrerPolicy:
+        (options.referrerPolicy as ReferrerPolicy) ||
+        "strict-origin-when-cross-origin",
+    };
+    const response = await fetch(url, fetchOptions);
+    if (
+      response.status === 401 ||
+      response.status === 403 ||
+      response.status === 404
+    ) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    return response;
+  } catch {
+    return backgroundFetch(url, options);
+  }
+}
+
+async function backgroundFetch(
+  url: string,
+  options: Record<string, unknown>
+): Promise<{
+  status: number;
+  headers: { get(name: string): string | null };
+  arrayBuffer(): Promise<ArrayBuffer>;
+}> {
+  fetchRequestId++;
+  const requestId = fetchRequestId;
+
+  const promise = new Promise<{
+    status: number;
+    headers: { get(name: string): string | null };
+    arrayBuffer(): Promise<ArrayBuffer>;
+  }>((resolve, reject) => {
+    pendingResponses.set(requestId, { resolve, reject });
+  });
+
+  await chrome.runtime.sendMessage({
+    method: "singlefile.fetch",
+    url,
+    requestId,
+    referrer: options.referrer,
+    headers: options.headers,
+  });
+
+  return promise;
+}
+
+function handleFetchResponse(message: {
+  requestId: number;
+  error?: string;
+  truncated?: boolean;
+  finished?: boolean;
+  array?: number[];
+  status?: number;
+  headers?: Record<string, string>;
+}) {
+  const pending = pendingResponses.get(message.requestId);
+  if (!pending) return;
+
+  if (message.error) {
+    pending.reject(new Error(message.error));
+    pendingResponses.delete(message.requestId);
+    return;
+  }
+
+  if (message.truncated) {
+    if (pending.array) {
+      pending.array = pending.array.concat(message.array || []);
+    } else {
+      pending.array = message.array || [];
+    }
+    if (!message.finished) return;
+    message.array = pending.array;
+  }
+
+  pending.resolve({
+    status: message.status || 0,
+    headers: {
+      get: (headerName: string) =>
+        message.headers?.[headerName] ?? null,
+    },
+    arrayBuffer: async () =>
+      new Uint8Array(message.array || []).buffer,
+  });
+  pendingResponses.delete(message.requestId);
+}
+
+async function extractWebPageWithSingleFile(): Promise<PageData> {
+  try {
+    // Dynamic import — Vite bundles single-file-core, loaded only when needed
+    const singlefile = await import("single-file-core/single-file.js");
+
+    singlefile.init({ fetch: contentFetch });
+
+    const pageData = await singlefile.getPageData({
+      removeFrames: true,
+      blockScripts: true,
+      blockVideos: true,
+      compressHTML: false,
+      loadDeferredImages: true,
+      loadDeferredImagesMaxIdleTime: 1500,
+      filenameTemplate: "{page-title}",
+      infobarContent: "",
+      includeInfobar: false,
+      removeHiddenElements: true,
+      removeUnusedStyles: true,
+      removeUnusedFonts: true,
+      removeSavedDate: true,
+      compressCSS: true,
+      loadDeferredImagesKeepZoomLevel: false,
+      loadDeferredImagesDispatchScrollEvent: false,
+      loadDeferredImagesBeforeFrames: false,
+      backgroundSave: false,
+      insertMetaCSP: true,
+      insertMetaNoIndex: false,
+      password: "",
+      woleetKey: "",
+      blockMixedContent: false,
+      saveOriginalURLs: false,
+      removeAlternativeFonts: true,
+      removeAlternativeMedias: true,
+      removeAlternativeImages: true,
+      groupDuplicateImages: true,
+      maxResourceSize: 10,
+      maxResourceSizeEnabled: false,
+      url: location.href,
+    }, { fetch: contentFetch });
+
+    return {
+      type: "html",
+      url: location.href,
+      title: document.title || location.href,
+      html: pageData.content as string,
+    };
+  } catch (error) {
+    console.warn("SingleFile capture failed, falling back to raw HTML:", error);
+    return {
+      type: "html",
+      url: location.href,
+      title: document.title || location.href,
+      html: document.documentElement.outerHTML,
+    };
+  }
 }
 
 function extractYouTube(): PageData {
@@ -110,7 +253,7 @@ function extractYouTube(): PageData {
   }
 
   return {
-    type: "youtube",
+    type: "embed",
     url: location.href,
     title,
     author,
@@ -121,71 +264,31 @@ function extractYouTube(): PageData {
   };
 }
 
-function extractPodcast(): PageData {
-  const title = document.title || location.href;
-
-  const author =
-    document.querySelector<HTMLMetaElement>('meta[name="author"]')?.content ??
-    document.querySelector<HTMLMetaElement>('meta[property="og:site_name"]')
-      ?.content ??
-    null;
-
-  const episodeTitle =
-    document.querySelector<HTMLMetaElement>('meta[property="og:title"]')
-      ?.content ?? title;
-
-  const thumbnailURL =
-    document.querySelector<HTMLMetaElement>('meta[property="og:image"]')
-      ?.content ?? null;
-
-  const description =
-    document.querySelector<HTMLMetaElement>('meta[property="og:description"]')
-      ?.content ??
-    document.querySelector<HTMLMetaElement>('meta[name="description"]')
-      ?.content ??
-    null;
-
-  let audioURL: string | null = null;
-  const audioEl = document.querySelector<HTMLSourceElement | HTMLAudioElement>(
-    "audio source, audio[src]"
-  );
-  if (audioEl) {
-    audioURL = audioEl.src || audioEl.getAttribute("src");
-  }
-
-  return {
-    type: "podcast",
-    url: location.href,
-    title,
-    author,
-    episodeTitle,
-    thumbnailURL,
-    description,
-    audioURL,
-  };
-}
-
 export default defineContentScript({
   matches: ["<all_urls>"],
   runAt: "document_idle",
 
   main() {
+    // Listen for background fetch responses (chunked)
+    chrome.runtime.onMessage.addListener((message) => {
+      if (message.method === "singlefile.fetchResponse") {
+        handleFetchResponse(message);
+      }
+    });
+
     chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
       if (request.action === "getPageData") {
         const pageType = detectPageType(location.href);
-        let data: PageData;
-        switch (pageType) {
-          case "youtube":
-            data = extractYouTube();
-            break;
-          case "podcast":
-            data = extractPodcast();
-            break;
-          default:
-            data = extractWebPage();
-            break;
+
+        if (pageType === "html") {
+          extractWebPageWithSingleFile().then(sendResponse);
+          return true;
         }
+
+        // embed (YouTube)
+        const data = extractYouTube();
         sendResponse(data);
+        return true;
       }
       return true;
     });

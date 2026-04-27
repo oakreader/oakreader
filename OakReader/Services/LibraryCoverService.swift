@@ -29,7 +29,7 @@ actor LibraryCoverService {
                     snapshotConfig.rect = NSRect(x: 0, y: 0, width: 1024, height: 768)
                     webView.takeSnapshot(with: snapshotConfig) { image, error in
                         guard let image else {
-                            NSLog("[CoverService] Web snapshot cover failed: \(error?.localizedDescription ?? "unknown")")
+                            Log.error(Log.cover, "Web snapshot cover failed: \(error?.localizedDescription ?? "unknown")")
                             continuation.resume(returning: nil)
                             return
                         }

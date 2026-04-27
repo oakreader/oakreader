@@ -77,7 +77,7 @@ class DocumentViewModel {
             let storageDirPath = CatalogDatabase.storageDirectory.path
             guard fileURL.path.hasPrefix(storageDirPath) else { return nil }
             return fileURL.deletingLastPathComponent()
-        case .youtubeVideo, .podcast:
+        case .embed:
             return mediaDocument?.storageDirectory
         }
     }
@@ -92,7 +92,7 @@ class DocumentViewModel {
         switch documentType {
         case .pdf: return pdfDocument?.pageCount ?? 0
         case .webSnapshot: return 1
-        case .youtubeVideo, .podcast: return 1
+        case .embed: return 1
         }
     }
 
@@ -100,7 +100,7 @@ class DocumentViewModel {
         switch documentType {
         case .pdf: return pdfDocument != nil
         case .webSnapshot: return webSnapshot != nil
-        case .youtubeVideo, .podcast: return mediaDocument != nil
+        case .embed: return mediaDocument != nil
         }
     }
 
@@ -110,7 +110,7 @@ class DocumentViewModel {
             return document?.fileURL?.lastPathComponent ?? "Untitled"
         case .webSnapshot:
             return webSnapshot?.htmlURL.deletingPathExtension().lastPathComponent ?? "Untitled"
-        case .youtubeVideo, .podcast:
+        case .embed:
             return mediaDocument?.metadata.title ?? "Untitled"
         }
     }
@@ -140,7 +140,7 @@ class DocumentViewModel {
 
     init(media: MediaDocument) {
         self.mediaDocument = media
-        self.documentType = media.audioURL != nil ? .podcast : .youtubeVideo
+        self.documentType = .embed
         self.state = DocumentState()
         state.isSidebarVisible = false
     }

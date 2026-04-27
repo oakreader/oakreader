@@ -78,6 +78,6 @@ struct TagSelectorView: View {
                 .frame(width: 20, height: 20)
         }
         .buttonStyle(.plain)
-        .help("Manage Tags")
+        .background(TooltipTrigger(tooltip: "Manage Tags"))
     }
 }
