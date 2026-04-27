@@ -16,21 +16,32 @@ struct PDFLibraryItem: Identifiable, Hashable {
     var fileSize: Int64
     var isFavorite: Bool
     var syncStatus: SyncStatus
+    var documentType: DocumentType
+    var sourceURL: URL?
 
     // Populated by the store from relationships / filesystem
     var tags: [PDFTag]
     var collections: [PDFCollection]
     var coverImageData: Data?
 
-    /// PDF file URL within managed storage.
-    /// Falls back to legacy "document.pdf" for items imported before the rename.
+    /// File URL within managed storage.
+    /// For web snapshots, returns the HTML file path.
+    /// For PDFs, falls back to legacy "document.pdf" for items imported before the rename.
+    /// For YouTube/podcast, returns the metadata.json path.
     var fileURL: URL {
-        let url = CatalogDatabase.documentPDFURL(storageKey: storageKey, fileName: fileName)
-        if FileManager.default.fileExists(atPath: url.path) {
-            return url
+        switch documentType {
+        case .webSnapshot:
+            return CatalogDatabase.documentHTMLURL(storageKey: storageKey, fileName: fileName)
+        case .pdf:
+            let url = CatalogDatabase.documentPDFURL(storageKey: storageKey, fileName: fileName)
+            if FileManager.default.fileExists(atPath: url.path) {
+                return url
+            }
+            // Fallback for legacy imports
+            return CatalogDatabase.documentPDFURL(storageKey: storageKey)
+        case .youtubeVideo, .podcast:
+            return CatalogDatabase.documentMetadataURL(storageKey: storageKey)
         }
-        // Fallback for legacy imports
-        return CatalogDatabase.documentPDFURL(storageKey: storageKey)
     }
 
     /// Document directory within managed storage.
@@ -60,6 +71,8 @@ struct PDFLibraryItem: Identifiable, Hashable {
         self.fileSize = record.fileSize
         self.isFavorite = record.isFavorite
         self.syncStatus = SyncStatus(rawValue: record.syncStatus) ?? .local
+        self.documentType = DocumentType(rawValue: record.documentType) ?? .pdf
+        self.sourceURL = record.sourceURL.flatMap { URL(string: $0) }
         self.tags = tags
         self.collections = collections
         self.coverImageData = coverImageData

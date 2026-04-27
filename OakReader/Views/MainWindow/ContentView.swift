@@ -136,12 +136,19 @@ struct ContentView: View {
 
     @ViewBuilder
     private var mainContentView: some View {
-        ZStack {
-            PDFViewerRepresentable(viewModel: viewModel)
+        switch viewModel.documentType {
+        case .pdf:
+            ZStack {
+                PDFViewerRepresentable(viewModel: viewModel)
 
-            if viewModel.state.editorMode == .snapshot {
-                SnapshotOverlayView(viewModel: viewModel)
+                if viewModel.state.editorMode == .snapshot {
+                    SnapshotOverlayView(viewModel: viewModel)
+                }
             }
+        case .webSnapshot:
+            WebArchiveViewerRepresentable(viewModel: viewModel)
+        case .youtubeVideo, .podcast:
+            MediaViewerView(viewModel: viewModel)
         }
     }
 
