@@ -6,6 +6,7 @@ struct ChatBubbleView: View {
     let turn: ChatTurn
 
     @State private var isHovered = false
+    @State private var reveal = StreamRevealController()
 
     var body: some View {
         if turn.role == .system { return AnyView(EmptyView()) }
@@ -20,7 +21,7 @@ struct ChatBubbleView: View {
                         Text(skill)
                             .font(.system(size: 13))
                             .foregroundStyle(.secondary)
-                            .padding(.horizontal, 6)
+                            .padding(.horizontal, 4)
                             .padding(.vertical, 2)
                             .background(Capsule().fill(Color.accentColor.opacity(0.1)))
                     }
@@ -35,13 +36,8 @@ struct ChatBubbleView: View {
 
                     // Streaming indicator
                     if turn.isStreaming {
-                        HStack(spacing: 4) {
-                            ProgressView()
-                                .controlSize(.mini)
-                            Text("Generating...")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
+                        GridSpinner()
+                            .padding(.leading, 4)
                     }
 
                     // Error indicator
@@ -65,28 +61,53 @@ struct ChatBubbleView: View {
                         }
                         .buttonStyle(.plain)
                         .help("Copy")
+                        .padding(.leading, 4)
                     }
                 }
 
-                if turn.role == .assistant { Spacer(minLength: 40) }
+                if turn.role == .assistant { Spacer(minLength: 4) }
             }
             .clipped()
             .onHover { isHovered = $0 }
             .animation(.easeInOut(duration: 0.15), value: isHovered)
+            .onChange(of: turn.content) { _, newContent in
+                if turn.isStreaming && turn.role == .assistant {
+                    reveal.push(newContent)
+                } else {
+                    reveal.flush(newContent)
+                }
+            }
+            .onChange(of: turn.isStreaming) { _, streaming in
+                if !streaming {
+                    reveal.flush(turn.content)
+                }
+            }
+            .onAppear {
+                if turn.isStreaming && turn.role == .assistant {
+                    reveal.push(turn.content)
+                } else {
+                    reveal.flush(turn.content)
+                }
+            }
+            .onDisappear {
+                reveal.stop()
+            }
         )
     }
 
+    // MARK: - Message Bubble
+
     @ViewBuilder
     private var messageBubble: some View {
-        let base = StructuredText(markdown: turn.content, syntaxExtensions: [.math])
+        let base = StructuredText(markdown: reveal.displayedContent, syntaxExtensions: [.math])
             .textual.headingStyle(ChatHeadingStyle())
             .textual.textSelection(.enabled)
-            .font(.system(size: 15))
+            .font(.body)
 
         if turn.role == .assistant {
             base
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 12)
+                .padding(.horizontal, 4)
                 .padding(.vertical, 8)
                 .background(
                     RoundedRectangle(cornerRadius: 12)
@@ -95,7 +116,7 @@ struct ChatBubbleView: View {
                 .foregroundStyle(Color(nsColor: .labelColor))
         } else {
             base
-                .padding(.horizontal, 12)
+                .padding(.horizontal, 4)
                 .padding(.vertical, 8)
                 .background(
                     RoundedRectangle(cornerRadius: 12)
@@ -117,6 +138,143 @@ struct ChatBubbleView: View {
     private func copyContent() {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(turn.content, forType: .string)
+    }
+}
+
+// MARK: - Stream Reveal Controller
+
+/// Reference-type controller that smoothly reveals streaming text line-by-line.
+/// Timer captures `self` by reference, so it always sees the latest target.
+@Observable
+private final class StreamRevealController {
+    var displayedContent = ""
+
+    private var targetContent = ""
+    private var cursorOffset = 0 // character offset into targetContent
+    private var timer: Timer?
+
+    /// Feed new target content from streaming deltas.
+    func push(_ content: String) {
+        targetContent = content
+        if timer == nil {
+            startTimer()
+        }
+    }
+
+    /// Show all content immediately (streaming ended or non-streaming message).
+    func flush(_ content: String) {
+        stopTimer()
+        targetContent = content
+        cursorOffset = content.count
+        displayedContent = content
+    }
+
+    func stop() {
+        stopTimer()
+    }
+
+    deinit {
+        timer?.invalidate()
+    }
+
+    // MARK: - Timer
+
+    /// ~30 fps — enough for smooth feel without burning CPU on markdown re-parse.
+    private func startTimer() {
+        stopTimer()
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
+            self?.tick()
+        }
+    }
+
+    private func stopTimer() {
+        timer?.invalidate()
+        timer = nil
+    }
+
+    private func tick() {
+        let target = targetContent
+        guard cursorOffset < target.count else { return }
+
+        // Advance to the next newline boundary (reveal one line per tick).
+        // If no newline found, reveal a chunk of characters instead.
+        let startIdx = target.index(target.startIndex, offsetBy: cursorOffset)
+        let remaining = target[startIdx...]
+
+        var newOffset: Int
+        if let nlIdx = remaining.firstIndex(of: "\n") {
+            // Reveal up to and including the newline
+            newOffset = target.distance(from: target.startIndex, to: target.index(after: nlIdx))
+        } else {
+            // No newline yet — reveal a small chunk (partial line arriving)
+            let gap = target.count - cursorOffset
+            let step = max(min(gap, 8), 1)
+            newOffset = min(cursorOffset + step, target.count)
+        }
+
+        cursorOffset = newOffset
+        let endIdx = target.index(target.startIndex, offsetBy: cursorOffset)
+        displayedContent = String(target[..<endIdx])
+    }
+}
+
+// MARK: - Grid Spinner (3×3, outer ring cycles clockwise)
+
+private struct GridSpinner: View {
+    @State private var active = 0
+
+    /// Clockwise order of the 8 outer cells: (row, col)
+    private static let ring: [(Int, Int)] = [
+        (0, 0), (0, 1), (0, 2),
+        (1, 2),
+        (2, 2), (2, 1), (2, 0),
+        (1, 0),
+    ]
+
+    private let timer = Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        Grid(horizontalSpacing: 2, verticalSpacing: 2) {
+            ForEach(0..<3, id: \.self) { row in
+                GridRow {
+                    ForEach(0..<3, id: \.self) { col in
+                        cell(row: row, col: col)
+                    }
+                }
+            }
+        }
+        .onReceive(timer) { _ in
+            active = (active + 1) % Self.ring.count
+        }
+    }
+
+    private func cell(row: Int, col: Int) -> some View {
+        let size: CGFloat = 3
+        let opacity = cellOpacity(row: row, col: col)
+
+        return RoundedRectangle(cornerRadius: 0.5)
+            .fill(Color.secondary)
+            .opacity(opacity)
+            .frame(width: size, height: size)
+            .animation(.easeInOut(duration: 0.15), value: active)
+    }
+
+    private func cellOpacity(row: Int, col: Int) -> Double {
+        // Center cell: always dim
+        if row == 1 && col == 1 { return 0.1 }
+
+        guard let idx = Self.ring.firstIndex(where: { $0.0 == row && $0.1 == col }) else {
+            return 0.1
+        }
+
+        let distance = (idx - active + Self.ring.count) % Self.ring.count
+        // Active cell + 2 trailing cells form a fading tail
+        switch distance {
+        case 0: return 1.0
+        case 1: return 0.55
+        case 2: return 0.3
+        default: return 0.1
+        }
     }
 }
 
