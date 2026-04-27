@@ -20,6 +20,18 @@
 			<key>NSDocumentClass</key>
 			<string>OakReader.OakReaderDocument</string>
 		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>HTML Document</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>None</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>public.html</string>
+			</array>
+		</dict>
 	</array>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>

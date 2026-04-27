@@ -7,6 +7,9 @@ import OakReaderAI
 @Observable
 class DocumentViewModel {
     weak var document: OakReaderDocument?
+    var webSnapshot: WebSnapshotDocument?
+    var mediaDocument: MediaDocument?
+    var documentType: DocumentType
     var state: DocumentState
 
     // MARK: - Child ViewModels (lazy)
@@ -63,12 +66,20 @@ class DocumentViewModel {
 
     /// Returns the document's managed storage directory if the file is in ~/OakReader/storage/.
     private var documentStoragePath: URL? {
-        guard let fileURL = document?.fileURL else { return nil }
-        let storageDirPath = CatalogDatabase.storageDirectory.path
-        let filePath = fileURL.path
-        guard filePath.hasPrefix(storageDirPath) else { return nil }
-        // Path is .../storage/{key}/document.pdf → parent is the document directory
-        return fileURL.deletingLastPathComponent()
+        switch documentType {
+        case .pdf:
+            guard let fileURL = document?.fileURL else { return nil }
+            let storageDirPath = CatalogDatabase.storageDirectory.path
+            guard fileURL.path.hasPrefix(storageDirPath) else { return nil }
+            return fileURL.deletingLastPathComponent()
+        case .webSnapshot:
+            guard let fileURL = webSnapshot?.htmlURL else { return nil }
+            let storageDirPath = CatalogDatabase.storageDirectory.path
+            guard fileURL.path.hasPrefix(storageDirPath) else { return nil }
+            return fileURL.deletingLastPathComponent()
+        case .youtubeVideo, .podcast:
+            return mediaDocument?.storageDirectory
+        }
     }
 
     // MARK: - Computed Properties
@@ -78,21 +89,37 @@ class DocumentViewModel {
     }
 
     var pageCount: Int {
-        pdfDocument?.pageCount ?? 0
+        switch documentType {
+        case .pdf: return pdfDocument?.pageCount ?? 0
+        case .webSnapshot: return 1
+        case .youtubeVideo, .podcast: return 1
+        }
     }
 
     var hasDocument: Bool {
-        pdfDocument != nil
+        switch documentType {
+        case .pdf: return pdfDocument != nil
+        case .webSnapshot: return webSnapshot != nil
+        case .youtubeVideo, .podcast: return mediaDocument != nil
+        }
     }
 
     var fileName: String {
-        document?.fileURL?.lastPathComponent ?? "Untitled"
+        switch documentType {
+        case .pdf:
+            return document?.fileURL?.lastPathComponent ?? "Untitled"
+        case .webSnapshot:
+            return webSnapshot?.htmlURL.deletingPathExtension().lastPathComponent ?? "Untitled"
+        case .youtubeVideo, .podcast:
+            return mediaDocument?.metadata.title ?? "Untitled"
+        }
     }
 
     // MARK: - Initialization
 
     init(document: OakReaderDocument) {
         self.document = document
+        self.documentType = .pdf
         self.state = DocumentState()
 
         let prefs = Preferences.shared
@@ -100,6 +127,22 @@ class DocumentViewModel {
         state.displayMode = prefs.displayMode
         state.isSidebarVisible = prefs.showSidebar
         state.sidebarMode = prefs.sidebarMode
+    }
+
+    init(webSnapshot: WebSnapshotDocument) {
+        self.webSnapshot = webSnapshot
+        self.documentType = .webSnapshot
+        self.state = DocumentState()
+
+        let prefs = Preferences.shared
+        state.isSidebarVisible = false
+    }
+
+    init(media: MediaDocument) {
+        self.mediaDocument = media
+        self.documentType = media.audioURL != nil ? .podcast : .youtubeVideo
+        self.state = DocumentState()
+        state.isSidebarVisible = false
     }
 
     // MARK: - Action Handling (called directly by AppState)

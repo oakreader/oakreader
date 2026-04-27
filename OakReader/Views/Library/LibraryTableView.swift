@@ -17,7 +17,7 @@ struct LibraryTableView: View {
             Table(of: PDFLibraryItem.self, selection: $selection) {
                 TableColumn("Title") { item in
                     HStack(spacing: 7) {
-                        Image(systemName: "doc.fill")
+                        Image(systemName: item.documentType.icon)
                             .foregroundStyle(Color.primary.opacity(0.4))
                             .font(.system(size: 14))
 
@@ -86,7 +86,7 @@ struct LibraryTableView: View {
             } primaryAction: { ids in
                 openItems(ids)
             }
-            .onDrop(of: [.pdf], isTargeted: nil) { providers in
+            .onDrop(of: [.pdf, .html], isTargeted: nil) { providers in
                 handleDrop(providers)
                 return true
             }
@@ -196,16 +196,21 @@ struct LibraryTableView: View {
 
     private func importPDFs() {
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.pdf]
+        panel.allowedContentTypes = [.pdf, .html]
         panel.allowsMultipleSelection = true
-        panel.message = "Select PDF files to add to your library"
+        panel.message = "Select PDF or HTML files to add to your library"
         panel.begin { response in
             guard response == .OK else { return }
             for url in panel.urls {
-                if let item = appState.importService.importPDF(from: url) {
-                    if let collection = store.selectedCollection {
-                        store.addItem(item, to: collection)
-                    }
+                let ext = url.pathExtension.lowercased()
+                let item: PDFLibraryItem?
+                if ext == "html" || ext == "htm" {
+                    item = appState.importService.importWebSnapshot(from: url)
+                } else {
+                    item = appState.importService.importPDF(from: url)
+                }
+                if let item, let collection = store.selectedCollection {
+                    store.addItem(item, to: collection)
                 }
             }
         }
@@ -213,14 +218,26 @@ struct LibraryTableView: View {
 
     private func handleDrop(_ providers: [NSItemProvider]) {
         for provider in providers {
-            provider.loadItem(forTypeIdentifier: UTType.pdf.identifier, options: nil) { data, _ in
-                guard let url = data as? URL else { return }
-                DispatchQueue.main.async {
-                    if let item = appState.importService.importPDF(from: url) {
-                        if let collection = store.selectedCollection {
-                            store.addItem(item, to: collection)
+            // Try PDF first, then HTML
+            let types = [UTType.pdf.identifier, UTType.html.identifier]
+            for typeId in types {
+                if provider.hasItemConformingToTypeIdentifier(typeId) {
+                    provider.loadItem(forTypeIdentifier: typeId, options: nil) { data, _ in
+                        guard let url = data as? URL else { return }
+                        DispatchQueue.main.async {
+                            let ext = url.pathExtension.lowercased()
+                            let item: PDFLibraryItem?
+                            if ext == "html" || ext == "htm" {
+                                item = appState.importService.importWebSnapshot(from: url)
+                            } else {
+                                item = appState.importService.importPDF(from: url)
+                            }
+                            if let item, let collection = store.selectedCollection {
+                                store.addItem(item, to: collection)
+                            }
                         }
                     }
+                    break
                 }
             }
         }

@@ -118,6 +118,13 @@ final class CatalogDatabase {
             }
         }
 
+        migrator.registerMigration("v2-document-type") { db in
+            try db.alter(table: "documents") { t in
+                t.add(column: "document_type", .text).notNull().defaults(to: "pdf")
+                t.add(column: "source_url", .text)
+            }
+        }
+
         return migrator
     }
 
@@ -141,9 +148,29 @@ final class CatalogDatabase {
         documentDirectory(storageKey: storageKey).appendingPathComponent(fileName)
     }
 
+    /// HTML file URL for a web snapshot document.
+    static func documentHTMLURL(storageKey: String, fileName: String = "snapshot.html") -> URL {
+        documentDirectory(storageKey: storageKey).appendingPathComponent(fileName)
+    }
+
     /// Cover image URL for a document.
     static func documentCoverURL(storageKey: String) -> URL {
         documentDirectory(storageKey: storageKey).appendingPathComponent("cover.webp")
+    }
+
+    /// Metadata JSON URL for a media document (YouTube/podcast).
+    static func documentMetadataURL(storageKey: String) -> URL {
+        documentDirectory(storageKey: storageKey).appendingPathComponent("metadata.json")
+    }
+
+    /// Transcript file URL for a media document.
+    static func documentTranscriptURL(storageKey: String) -> URL {
+        documentDirectory(storageKey: storageKey).appendingPathComponent("transcript.txt")
+    }
+
+    /// Audio file URL for a podcast episode.
+    static func documentAudioURL(storageKey: String) -> URL {
+        documentDirectory(storageKey: storageKey).appendingPathComponent("audio.m4a")
     }
 
     /// Sessions directory for a document.

@@ -19,6 +19,8 @@ struct DocumentRecord: Codable, FetchableRecord, MutablePersistableRecord, Hasha
     var syncStatus: String
     var createdAt: String
     var updatedAt: String
+    var documentType: String
+    var sourceURL: String?
 
     enum CodingKeys: String, CodingKey, ColumnExpression {
         case id
@@ -33,6 +35,8 @@ struct DocumentRecord: Codable, FetchableRecord, MutablePersistableRecord, Hasha
         case syncStatus = "sync_status"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+        case documentType = "document_type"
+        case sourceURL = "source_url"
     }
 }
 

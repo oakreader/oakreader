@@ -127,7 +127,9 @@ final class MigrationService {
             dateLastOpened: item.dateLastOpened.map { $0.iso8601String },
             syncStatus: SyncStatus.local.rawValue,
             createdAt: item.dateAdded.iso8601String,
-            updatedAt: now
+            updatedAt: now,
+            documentType: DocumentType.pdf.rawValue,
+            sourceURL: nil
         )
 
         store.insertDocument(record)
