@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="header">
+    <svg class="header-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19"></line>
+      <line x1="5" y1="12" x2="19" y2="12"></line>
+    </svg>
+    <span>OakReader</span>
+  </div>
+
+  <div id="loading" class="loading">Detecting page...</div>
+
+  <div id="content" style="display: none;">
+    <div class="card">
+      <div class="card-title" id="pageTitle"></div>
+      <span class="card-type" id="pageType"></span>
+    </div>
+
+    <button class="save-btn" id="saveBtn">
+      <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <line x1="5" y1="12" x2="19" y2="12"></line>
+      </svg>
+      Save to OakReader
+    </button>
+    <div class="status" id="status"></div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>
