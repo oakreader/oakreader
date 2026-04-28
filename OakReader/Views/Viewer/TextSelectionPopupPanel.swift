@@ -165,13 +165,24 @@ class TextSelectionPopupPanel: NSPanel {
         addToChatBtn.leadingAnchor.constraint(equalTo: stack.leadingAnchor, constant: 6).isActive = true
         addToChatBtn.trailingAnchor.constraint(equalTo: stack.trailingAnchor, constant: -6).isActive = true
 
+        // Row 5: Add to Note (full width)
+        let addToNoteBtn = PopupActionButton(
+            systemImage: "note.text.badge.plus",
+            title: "Add to Note"
+        ) { [weak self] in
+            self?.addToNote()
+        }
+        stack.addArrangedSubview(addToNoteBtn)
+        addToNoteBtn.leadingAnchor.constraint(equalTo: stack.leadingAnchor, constant: 6).isActive = true
+        addToNoteBtn.trailingAnchor.constraint(equalTo: stack.trailingAnchor, constant: -6).isActive = true
+
         // Separator
         let sep3 = NSBox()
         sep3.boxType = .separator
         sep3.translatesAutoresizingMaskIntoConstraints = false
         stack.addArrangedSubview(sep3)
 
-        // Row 4: Copy (full width)
+        // Row 6: Copy (full width)
         let copyBtn = PopupActionButton(
             systemImage: "doc.on.doc",
             title: "Copy"
@@ -206,6 +217,15 @@ class TextSelectionPopupPanel: NSPanel {
         let pageIndex = viewModel.state.currentPageIndex
         viewModel.chat.addTextAttachment(text, pageIndex: pageIndex)
         viewModel.state.rightPanelMode = .aiChat
+        pdfView?.clearSelection()
+        dismissWithAction()
+    }
+
+    private func addToNote() {
+        guard let text = selection.string, !text.isEmpty else { return }
+        let pageIndex = viewModel.state.currentPageIndex
+        viewModel.notes.addTextToNote(text, pageIndex: pageIndex, source: "PDF")
+        viewModel.state.rightPanelMode = .notes
         pdfView?.clearSelection()
         dismissWithAction()
     }

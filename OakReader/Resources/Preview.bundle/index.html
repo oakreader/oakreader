@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="initial-scale=1.0" />
+  <meta name="color-scheme" content="light dark" />
+
+  <style>
+    /* Critical styles to prevent flash */
+    :root {
+      --bg-color: #FFFFFF;
+      --text-color: #262626;
+      --code-bg: #f7f7f7;
+    }
+
+    .darkmode {
+      --bg-color: #23282D;
+      --text-color: #E7E9EA;
+      --code-bg: #282e33;
+    }
+
+    html,
+    body {
+      background: var(--bg-color);
+      color: var(--text-color);
+      margin: 0;
+      padding: 0;
+    }
+
+    img {
+      image-rendering: auto;
+      color-scheme: only light;
+      image-orientation: from-image;
+      max-width: 100%;
+      height: auto;
+    }
+  </style>
+
+  <link rel="stylesheet" href="css/typography.css" />
+  <link rel="stylesheet" href="css/katex.min.css" />
+  <link rel="stylesheet" href="css/theme-light.css" />
+  <link rel="stylesheet" href="css/theme-dark.css" />
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/diagrams.css" />
+
+  <script defer src="js/highlight.min.js"></script>
+  <script defer src="js/katex.min.js"></script>
+  <script defer src="js/auto-render.min.js"></script>
+  <script defer src="js/lightense.min.js"></script>
+  <script defer src="js/common.js"></script>
+
+  <!-- Theme system (must load before diagram-handler) -->
+  <script defer src="js/theme-config.js"></script>
+  <script defer src="js/theme-manager.js"></script>
+
+  <!-- Diagram libraries -->
+  <script defer src="js/mermaid.min.js"></script>
+  <script defer src="js/mermaid-layout-elk.js"></script>
+  <script defer src="js/plantuml-encoder.min.js"></script>
+  <script defer src="js/d3.min.js"></script>
+  <script defer src="js/markmap.min.js"></script>
+  <script defer src="js/markmap-view.min.js"></script>
+
+  <!-- Diagram handler (orchestrates all diagrams) -->
+  <script defer src="js/diagram-handler.js"></script>
+
+  <script>
+    if ('CUSTOM_CSS' === 'darkmode') {
+      document.documentElement.classList.add('darkmode');
+    }
+  </script>
+
+  <title></title>
+
+  <style>
+    DOWN_CSS
+  </style>
+</head>
+
+<body>
+  <script>
+    if ('CUSTOM_CSS' === 'darkmode') {
+      document.body.classList.add('darkmode');
+    }
+  </script>
+
+  <div class="markdown-body heti" id="write">DOWN_HTML</div>
+  <script>
+    if ('CUSTOM_CSS' === 'darkmode') {
+      document.getElementById('write').classList.add('darkmode');
+    }
+  </script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      OakPreview.initializeCore();
+      OakPreview.setupTextSelection();
+      OakPreview.setupInteractiveCheckboxes();
+      OakPreview.setupReferenceLinks();
+
+      if ('CUSTOM_CSS' === 'darkmode') {
+        document.documentElement.classList.add('darkmode');
+        document.body.classList.add('darkmode');
+        document.getElementById('write')?.classList.add('darkmode');
+      }
+
+      OakPreview.setupHeaderAnchors();
+      OakPreview.optimizeImages();
+      OakPreview.setupImageZoom();
+
+      // Initialize diagrams (Mermaid, PlantUML, Markmap)
+      if (window.DiagramHandler) {
+        DiagramHandler.initializeAll();
+      }
+
+      // Defer KaTeX rendering so it doesn't block image loading
+      const renderMath = () => {
+        if (typeof renderMathInElement === 'function') {
+          renderMathInElement(document.body, {
+            delimiters: [
+              { left: "$$", right: "$$", display: true },
+              { left: "$", right: "$", display: false },
+              { left: "\\(", right: "\\)", display: false },
+              { left: "\\[", right: "\\]", display: true }
+            ],
+            processEscapes: true,
+            ignoredClasses: ['katex-display', 'katex', 'skip-math-dollar']
+          });
+        }
+      };
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(renderMath, { timeout: 200 });
+      } else {
+        setTimeout(renderMath, 0);
+      }
+    });
+  </script>
+</body>
+
+</html>
