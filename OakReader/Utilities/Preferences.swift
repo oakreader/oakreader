@@ -27,14 +27,18 @@ final class Preferences {
         static let aiProvider = "aiProvider"
         static let aiModel = "aiModel"
         // Note editor preferences
+        static let noteEditorMode = "noteEditorMode"
         static let noteEditorFontFamily = "noteEditorFontFamily"
         static let noteEditorFontSize = "noteEditorFontSize"
         static let noteEditorCodeFontFamily = "noteEditorCodeFontFamily"
         static let noteEditorLineHeight = "noteEditorLineHeight"
+        static let noteEditorLineSpacing = "noteEditorLineSpacing"
+        static let noteEditorLetterSpacing = "noteEditorLetterSpacing"
         static let noteEditorShowLineNumbers = "noteEditorShowLineNumbers"
         static let noteEditorRenderMath = "noteEditorRenderMath"
         static let noteEditorRenderImages = "noteEditorRenderImages"
         static let noteEditorHideSyntax = "noteEditorHideSyntax"
+        static let noteEditorAccentColor = "noteEditorAccentColor"
     }
 
     private init() {
@@ -54,14 +58,18 @@ final class Preferences {
             Keys.showStatusBar: true,
             Keys.aiProvider: AIProvider.anthropic.rawValue,
             Keys.aiModel: "",
-            Keys.noteEditorFontFamily: "'Georgia', 'Times New Roman', 'Iowan Old Style', serif",
-            Keys.noteEditorFontSize: 17.0,
-            Keys.noteEditorCodeFontFamily: "'Iosevka Mono', 'SF Mono', Menlo, Monaco, monospace",
-            Keys.noteEditorLineHeight: 1.75,
+            Keys.noteEditorMode: "edit",
+            Keys.noteEditorFontFamily: ".AppleSystemUIFont",
+            Keys.noteEditorFontSize: 16.0,
+            Keys.noteEditorCodeFontFamily: "Menlo",
+            Keys.noteEditorLineHeight: 1.3,
+            Keys.noteEditorLineSpacing: 3.0,
+            Keys.noteEditorLetterSpacing: 0.5,
             Keys.noteEditorShowLineNumbers: false,
             Keys.noteEditorRenderMath: true,
             Keys.noteEditorRenderImages: true,
             Keys.noteEditorHideSyntax: true,
+            Keys.noteEditorAccentColor: "#0CA69A",
         ])
     }
 
@@ -136,8 +144,13 @@ final class Preferences {
 
     // MARK: - Note Editor Preferences
 
+    var noteEditorMode: String {
+        get { defaults.string(forKey: Keys.noteEditorMode) ?? "edit" }
+        set { defaults.set(newValue, forKey: Keys.noteEditorMode) }
+    }
+
     var noteEditorFontFamily: String {
-        get { defaults.string(forKey: Keys.noteEditorFontFamily) ?? "'Georgia', 'Times New Roman', serif" }
+        get { defaults.string(forKey: Keys.noteEditorFontFamily) ?? ".AppleSystemUIFont" }
         set { defaults.set(newValue, forKey: Keys.noteEditorFontFamily) }
     }
 
@@ -147,13 +160,23 @@ final class Preferences {
     }
 
     var noteEditorCodeFontFamily: String {
-        get { defaults.string(forKey: Keys.noteEditorCodeFontFamily) ?? "'Iosevka Mono', 'SF Mono', monospace" }
+        get { defaults.string(forKey: Keys.noteEditorCodeFontFamily) ?? "Menlo" }
         set { defaults.set(newValue, forKey: Keys.noteEditorCodeFontFamily) }
     }
 
     var noteEditorLineHeight: CGFloat {
         get { CGFloat(defaults.double(forKey: Keys.noteEditorLineHeight)) }
         set { defaults.set(Double(newValue), forKey: Keys.noteEditorLineHeight) }
+    }
+
+    var noteEditorLineSpacing: CGFloat {
+        get { CGFloat(defaults.double(forKey: Keys.noteEditorLineSpacing)) }
+        set { defaults.set(Double(newValue), forKey: Keys.noteEditorLineSpacing) }
+    }
+
+    var noteEditorLetterSpacing: CGFloat {
+        get { CGFloat(defaults.double(forKey: Keys.noteEditorLetterSpacing)) }
+        set { defaults.set(Double(newValue), forKey: Keys.noteEditorLetterSpacing) }
     }
 
     var noteEditorShowLineNumbers: Bool {
@@ -174,5 +197,10 @@ final class Preferences {
     var noteEditorHideSyntax: Bool {
         get { defaults.bool(forKey: Keys.noteEditorHideSyntax) }
         set { defaults.set(newValue, forKey: Keys.noteEditorHideSyntax) }
+    }
+
+    var noteEditorAccentColor: String {
+        get { defaults.string(forKey: Keys.noteEditorAccentColor) ?? "#0CA69A" }
+        set { defaults.set(newValue, forKey: Keys.noteEditorAccentColor) }
     }
 }
