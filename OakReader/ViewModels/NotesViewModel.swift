@@ -209,6 +209,64 @@ class NotesViewModel {
         return noteService.notesDirectoryURL(storageKey: storageKey)
     }
 
+    // MARK: - Add Content from Selection
+
+    /// Add quoted text with a [[Page X]] reference to the current (or new) note.
+    func addTextToNote(_ text: String, pageIndex: Int?, source: String = "PDF") {
+        ensureNoteSelected()
+        let ref: String
+        if let page = pageIndex {
+            ref = "[[Page \(page + 1)]]"
+        } else {
+            ref = "[[\(source)]]"
+        }
+        let snippet = "\n\n> \(text.replacingOccurrences(of: "\n", with: "\n> "))\n>\n> — \(ref)\n"
+        appendToEditor(snippet)
+    }
+
+    /// Add an image attachment with a [[Page X]] reference to the current (or new) note.
+    func addImageToNote(_ data: Data, pageIndex: Int?, source: String = "PDF", fileExtension: String = "png") {
+        ensureNoteSelected()
+        guard let relativePath = saveImage(data, fileExtension: fileExtension) else { return }
+        let ref: String
+        if let page = pageIndex {
+            ref = "[[Page \(page + 1)]]"
+        } else {
+            ref = "[[\(source)]]"
+        }
+        let snippet = "\n\n![capture](\(relativePath))\n\n— \(ref)\n"
+        appendToEditor(snippet)
+    }
+
+    /// If no note is selected, create one and select it.
+    private func ensureNoteSelected() {
+        if selectedNoteId == nil {
+            if let first = notes.first {
+                selectNote(first)
+            } else {
+                createNote()
+            }
+        }
+    }
+
+    /// Append text to the current editor content.
+    private func appendToEditor(_ text: String) {
+        editorContentDidChange(editorContent + text)
+    }
+
+    // MARK: - Reference Navigation
+
+    /// Parse a `[[Page X]]` reference and return the 0-based page index, or nil.
+    static func pageIndex(from reference: String) -> Int? {
+        // Match [[Page 5]] or [[p.5]] or [[page 5]]
+        let pattern = #"\[\[(?:[Pp]age\s*|p\.)(\d+)\]\]"#
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: reference, range: NSRange(reference.startIndex..., in: reference)),
+              let range = Range(match.range(at: 1), in: reference),
+              let page = Int(reference[range]) else { return nil }
+        return page - 1 // Convert 1-based display to 0-based index
+    }
+
     // MARK: - Grouped Notes (for list display)
 
     /// Notes grouped by month for the Apple Notes-style section headers.
