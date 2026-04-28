@@ -120,7 +120,7 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .inspector: return "info.circle"
-        case .aiChat: return "bubble.left.and.text.bubble.right"
+        case .aiChat: return "bubble.left.and.bubble.right"
         case .notes: return "note.text"
         }
     }
