@@ -59,5 +59,7 @@
 	<true/>
 	<key>NSSupportsSuddenTermination</key>
 	<false/>
+	<key>ATSApplicationFontsPath</key>
+	<string>.</string>
 </dict>
 </plist>

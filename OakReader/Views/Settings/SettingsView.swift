@@ -7,6 +7,7 @@ struct SettingsView: View {
     enum Tab: String, CaseIterable, Identifiable {
         case general
         case ai
+        case notes
 
         var id: String { rawValue }
 
@@ -14,6 +15,7 @@ struct SettingsView: View {
             switch self {
             case .general: return "General"
             case .ai: return "AI"
+            case .notes: return "Notes"
             }
         }
 
@@ -21,6 +23,7 @@ struct SettingsView: View {
             switch self {
             case .general: return "gearshape"
             case .ai: return "brain"
+            case .notes: return "note.text"
             }
         }
     }
@@ -56,6 +59,8 @@ struct SettingsView: View {
             GeneralSettingsView()
         case .ai:
             AISettingsView()
+        case .notes:
+            NoteSettingsView()
         }
     }
 }

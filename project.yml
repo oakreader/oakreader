@@ -17,6 +17,12 @@ packages:
   GRDB:
     url: https://github.com/groue/GRDB.swift
     from: "7.0.0"
+  Highlightr:
+    url: https://github.com/raspu/Highlightr.git
+    from: "2.3.0"
+  CMarkGFM:
+    url: https://github.com/stackotter/swift-cmark-gfm
+    from: "1.0.2"
 
 settings:
   base:
@@ -38,6 +44,8 @@ targets:
       - package: Textual
       - package: GRDB
         product: GRDB
+      - package: Highlightr
+      - package: CMarkGFM
     postCompileScripts:
       - script: |
           if which swiftlint > /dev/null; then
