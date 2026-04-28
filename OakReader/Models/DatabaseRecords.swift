@@ -136,3 +136,25 @@ struct ChatSessionRecord: Codable, FetchableRecord, MutablePersistableRecord, Ha
         case updatedAt = "updated_at"
     }
 }
+
+struct NoteRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable {
+    static let databaseTableName = "notes"
+
+    var id: String
+    var userId: String
+    var documentId: String
+    var title: String
+    var isPinned: Bool
+    var createdAt: String
+    var updatedAt: String
+
+    enum CodingKeys: String, CodingKey, ColumnExpression {
+        case id
+        case userId = "user_id"
+        case documentId = "document_id"
+        case title
+        case isPinned = "is_pinned"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+}

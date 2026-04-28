@@ -11,6 +11,8 @@ class DocumentViewModel {
     var mediaDocument: MediaDocument?
     var documentType: DocumentType
     var state: DocumentState
+    /// Database reference, set by AppState when the tab is created.
+    var database: CatalogDatabase?
 
     // MARK: - Child ViewModels (lazy)
 
@@ -62,6 +64,20 @@ class DocumentViewModel {
         let vm = ChatViewModel(parent: self, documentStoragePath: storagePath)
         _chat = vm
         return vm
+    }
+
+    private var _notes: NotesViewModel?
+    var notes: NotesViewModel {
+        if let vm = _notes { return vm }
+        let vm = NotesViewModel(parent: self, database: database, storageKey: storageKey)
+        _notes = vm
+        return vm
+    }
+
+    /// The storage key for this document's managed directory, derived from the file path.
+    var storageKey: String? {
+        guard let storagePath = documentStoragePath else { return nil }
+        return storagePath.lastPathComponent
     }
 
     /// Returns the document's managed storage directory if the file is in ~/OakReader/storage/.

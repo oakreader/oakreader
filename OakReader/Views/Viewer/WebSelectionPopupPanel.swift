@@ -92,6 +92,17 @@ class WebSelectionPopupPanel: NSPanel {
         chatBtn.leadingAnchor.constraint(equalTo: stack.leadingAnchor, constant: 6).isActive = true
         chatBtn.trailingAnchor.constraint(equalTo: stack.trailingAnchor, constant: -6).isActive = true
 
+        // Add to Note
+        let noteBtn = PopupActionButton(
+            systemImage: "note.text.badge.plus",
+            title: "Add to Note"
+        ) { [weak self] in
+            self?.addToNote()
+        }
+        stack.addArrangedSubview(noteBtn)
+        noteBtn.leadingAnchor.constraint(equalTo: stack.leadingAnchor, constant: 6).isActive = true
+        noteBtn.trailingAnchor.constraint(equalTo: stack.trailingAnchor, constant: -6).isActive = true
+
         // Separator
         let sep = NSBox()
         sep.boxType = .separator
@@ -134,6 +145,12 @@ class WebSelectionPopupPanel: NSPanel {
     private func addToChat() {
         viewModel.chat.addTextAttachment(selectedText, pageIndex: 0)
         viewModel.state.rightPanelMode = .aiChat
+        dismiss()
+    }
+
+    private func addToNote() {
+        viewModel.notes.addTextToNote(selectedText, pageIndex: nil, source: "Web Snapshot")
+        viewModel.state.rightPanelMode = .notes
         dismiss()
     }
 
@@ -250,6 +267,17 @@ class WebAreaPopupPanel: NSPanel {
         chatBtn.leadingAnchor.constraint(equalTo: stack.leadingAnchor, constant: 6).isActive = true
         chatBtn.trailingAnchor.constraint(equalTo: stack.trailingAnchor, constant: -6).isActive = true
 
+        // Add to Note
+        let noteBtn = PopupActionButton(
+            systemImage: "note.text.badge.plus",
+            title: "Add to Note"
+        ) { [weak self] in
+            self?.addToNote()
+        }
+        stack.addArrangedSubview(noteBtn)
+        noteBtn.leadingAnchor.constraint(equalTo: stack.leadingAnchor, constant: 6).isActive = true
+        noteBtn.trailingAnchor.constraint(equalTo: stack.trailingAnchor, constant: -6).isActive = true
+
         // Separator
         let sep = NSBox()
         sep.boxType = .separator
@@ -292,6 +320,12 @@ class WebAreaPopupPanel: NSPanel {
     private func addToChat() {
         viewModel.chat.addImageAttachment(imageData, pageIndex: 0)
         viewModel.state.rightPanelMode = .aiChat
+        dismiss()
+    }
+
+    private func addToNote() {
+        viewModel.notes.addImageToNote(imageData, pageIndex: nil, source: "Web Snapshot")
+        viewModel.state.rightPanelMode = .notes
         dismiss()
     }
 

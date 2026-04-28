@@ -134,13 +134,24 @@ class AreaSelectionPopupPanel: NSPanel {
         chatBtn.leadingAnchor.constraint(equalTo: stack.leadingAnchor, constant: 6).isActive = true
         chatBtn.trailingAnchor.constraint(equalTo: stack.trailingAnchor, constant: -6).isActive = true
 
+        // Row 3: Add to Note (full width)
+        let noteBtn = AreaPopupActionButton(
+            systemImage: "note.text.badge.plus",
+            title: "Add to Note"
+        ) { [weak self] in
+            self?.addToNote()
+        }
+        stack.addArrangedSubview(noteBtn)
+        noteBtn.leadingAnchor.constraint(equalTo: stack.leadingAnchor, constant: 6).isActive = true
+        noteBtn.trailingAnchor.constraint(equalTo: stack.trailingAnchor, constant: -6).isActive = true
+
         // Separator
         let sep2 = NSBox()
         sep2.boxType = .separator
         sep2.translatesAutoresizingMaskIntoConstraints = false
         stack.addArrangedSubview(sep2)
 
-        // Row 3: Copy Image (full width)
+        // Row 4: Copy Image (full width)
         let copyBtn = AreaPopupActionButton(
             systemImage: "doc.on.doc",
             title: "Copy Image"
@@ -171,40 +182,46 @@ class AreaSelectionPopupPanel: NSPanel {
     }
 
     private func addToChat() {
-        let renderService = PDFRenderingService()
-        guard let cgImage = renderService.renderPageRegion(page, region: pdfRect, dpi: 300) else {
+        guard let pngData = renderAreaAsPNG() else {
             dismiss()
             return
         }
-
-        let nsImage = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
-        guard let tiffData = nsImage.tiffRepresentation,
-              let bitmap = NSBitmapImageRep(data: tiffData),
-              let pngData = bitmap.representation(using: .png, properties: [:]) else {
-            dismiss()
-            return
-        }
-
         viewModel.chat.addImageAttachment(pngData, pageIndex: pageIndex)
         viewModel.state.rightPanelMode = .aiChat
         dismiss()
     }
 
-    private func copyImage() {
-        let renderService = PDFRenderingService()
-        guard let cgImage = renderService.renderPageRegion(page, region: pdfRect, dpi: 300) else {
+    private func addToNote() {
+        guard let pngData = renderAreaAsPNG() else {
             dismiss()
             return
         }
+        viewModel.notes.addImageToNote(pngData, pageIndex: pageIndex, source: "PDF")
+        viewModel.state.rightPanelMode = .notes
+        dismiss()
+    }
 
+    private func renderAreaAsPNG() -> Data? {
+        let renderService = PDFRenderingService()
+        guard let cgImage = renderService.renderPageRegion(page, region: pdfRect, dpi: 300) else { return nil }
         let nsImage = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+        guard let tiffData = nsImage.tiffRepresentation,
+              let bitmap = NSBitmapImageRep(data: tiffData),
+              let pngData = bitmap.representation(using: .png, properties: [:]) else { return nil }
+        return pngData
+    }
+
+    private func copyImage() {
+        guard let pngData = renderAreaAsPNG(),
+              let nsImage = NSImage(data: pngData) else {
+            dismiss()
+            return
+        }
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.writeObjects([nsImage])
 
         dismiss()
-
-        // Show brief "Copied" feedback via notification
         showCopiedToast()
     }
 
