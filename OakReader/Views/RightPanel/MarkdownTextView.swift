@@ -12,6 +12,7 @@ struct MarkdownTextView: NSViewRepresentable {
     var letterSpacing: CGFloat
     var accentColorHex: String
     var onReferenceClick: ((String) -> Void)?
+    var onImagePaste: ((Data) -> String?)?
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -44,6 +45,7 @@ struct MarkdownTextView: NSViewRepresentable {
         _ = textView.layoutManager
         textView.delegate = context.coordinator
         textView.onReferenceClick = onReferenceClick
+        textView.onImagePaste = onImagePaste
 
         let ps = Self.paragraphStyle(font: font, lineHeight: lineHeight, lineSpacing: lineSpacing)
         textView.defaultParagraphStyle = ps
@@ -117,6 +119,7 @@ struct MarkdownTextView: NSViewRepresentable {
         }
 
         textView.onReferenceClick = onReferenceClick
+        textView.onImagePaste = onImagePaste
     }
 
     /// TextKit 2 compatible paragraph style: lineSpacing only.
@@ -163,6 +166,7 @@ struct MarkdownTextView: NSViewRepresentable {
 
 final class MarkdownNSTextView: NSTextView {
     var onReferenceClick: ((String) -> Void)?
+    var onImagePaste: ((Data) -> String?)?
 
     /// Slash-command state
     private var slashPanel: SlashCommandPanel?
@@ -191,6 +195,46 @@ final class MarkdownNSTextView: NSTextView {
             r.size.width = Self.cursorWidth
         }
         super.setNeedsDisplay(r, avoidAdditionalLayout: flag)
+    }
+
+    override func paste(_ sender: Any?) {
+        let pb = NSPasteboard.general
+
+        // Check for image data on the pasteboard
+        if let imageData = pb.data(forType: .png) ?? pb.data(forType: .tiff) {
+            let pngData: Data
+            if pb.data(forType: .png) != nil {
+                pngData = imageData
+            } else if let image = NSImage(data: imageData), let rep = image.tiffRepresentation,
+                      let bitmap = NSBitmapImageRep(data: rep),
+                      let converted = bitmap.representation(using: .png, properties: [:]) {
+                pngData = converted
+            } else {
+                super.paste(sender)
+                return
+            }
+            if let relativePath = onImagePaste?(pngData) {
+                insertText("![paste](\(relativePath))", replacementRange: selectedRange())
+            }
+            return
+        }
+
+        // Check for image file URLs on the pasteboard
+        if let urls = pb.readObjects(forClasses: [NSURL.self]) as? [URL] {
+            let imageExts: Set<String> = ["png", "jpg", "jpeg", "gif", "webp", "tiff", "bmp"]
+            if let url = urls.first, imageExts.contains(url.pathExtension.lowercased()),
+               let data = try? Data(contentsOf: url) {
+                let ext = url.pathExtension.lowercased()
+                // Convert non-PNG formats to PNG for consistency, or pass through
+                if let relativePath = onImagePaste?(data) {
+                    let name = url.deletingPathExtension().lastPathComponent
+                    insertText("![\(name)](\(relativePath))", replacementRange: selectedRange())
+                }
+                return
+            }
+        }
+
+        super.paste(sender)
     }
 
     override func keyDown(with event: NSEvent) {
