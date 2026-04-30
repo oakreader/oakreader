@@ -1,6 +1,5 @@
 import SwiftUI
 import AppKit
-import UniformTypeIdentifiers
 
 /// Editor modes for the note editor.
 enum NoteEditorMode: String, CaseIterable {
@@ -87,11 +86,6 @@ struct NoteEditorView: View {
 
             Spacer()
 
-            // Insert Image (only in edit/split modes)
-            if currentMode != .preview {
-                toolbarButton(icon: "photo", help: "Insert Image", action: insertImage)
-            }
-
             // Mode toggle — individual icon buttons
             ForEach(NoteEditorMode.allCases, id: \.rawValue) { mode in
                 toolbarButton(
@@ -115,15 +109,14 @@ struct NoteEditorView: View {
                         Label("Delete Note", systemImage: "trash")
                     }
                 } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .font(.system(size: OakStyle.Font.icon))
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: OakStyle.Font.icon, weight: .medium))
                         .foregroundStyle(.secondary)
-                        .frame(width: OakStyle.Size.buttonStandard, height: OakStyle.Size.buttonStandard)
-                        .contentShape(Rectangle())
                 }
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
-                .fixedSize()
+                .frame(width: OakStyle.Size.buttonStandard, height: OakStyle.Size.buttonStandard)
+                .contentShape(Rectangle())
                 .help("More options")
             }
         }
@@ -144,7 +137,8 @@ struct NoteEditorView: View {
             lineSpacing: CGFloat(lineSpacing),
             letterSpacing: CGFloat(letterSpacing),
             accentColorHex: accentColorHex,
-            onReferenceClick: handleReferenceClick
+            onReferenceClick: handleReferenceClick,
+            onImagePaste: { data in notesVM.saveImage(data) }
         )
     }
 
@@ -195,23 +189,4 @@ struct NoteEditorView: View {
         }
     }
 
-    // MARK: - Insert Image
-
-    private func insertImage() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.png, .jpeg, .gif, .webP, .tiff, .bmp]
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        panel.message = "Select an image to insert into the note"
-
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        guard let data = try? Data(contentsOf: url) else { return }
-
-        let ext = url.pathExtension.lowercased()
-        guard let relativePath = notesVM.saveImage(data, fileExtension: ext.isEmpty ? "png" : ext) else { return }
-
-        let imageName = url.deletingPathExtension().lastPathComponent
-        let markdown = "\n![\(imageName)](\(relativePath))\n"
-        notesVM.editorContentDidChange(notesVM.editorContent + markdown)
-    }
 }
