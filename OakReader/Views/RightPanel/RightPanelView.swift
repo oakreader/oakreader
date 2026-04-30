@@ -8,7 +8,7 @@ struct RightPanelContentView: View {
         Group {
             if let mode = viewModel.state.rightPanelMode {
                 switch mode {
-                case .inspector:
+                case .reference:
                     InspectorPanelView(viewModel: viewModel)
                 case .aiChat:
                     AIChatView(chatVM: viewModel.chat)

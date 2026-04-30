@@ -4,11 +4,16 @@ import PDFKit
 struct InspectorPanelView: View {
     let viewModel: DocumentViewModel
 
+    @State private var hasTriggeredAutoExtract = false
+
     var body: some View {
         VStack(spacing: 0) {
             // Header
-            HStack(spacing: 8) {
-                Text("Info")
+            HStack(spacing: 6) {
+                Image(systemName: "quote.opening")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
+                Text("Reference")
                     .font(.system(size: 16, weight: .semibold))
                 Spacer()
             }
@@ -16,7 +21,7 @@ struct InspectorPanelView: View {
             .padding(.vertical, OakStyle.Spacing.sm)
 
             ScrollView {
-                VStack(spacing: 16) {
+                VStack(spacing: 12) {
                     switch viewModel.state.editorMode {
                     case .annotate:
                         if viewModel.state.selectedAnnotation != nil {
@@ -25,12 +30,78 @@ struct InspectorPanelView: View {
                             emptyAnnotationState
                         }
                     default:
-                        documentInfoCard
-                        pageInfoCard
+                        referenceContent
                     }
                 }
                 .padding(.horizontal, OakStyle.Spacing.sm)
                 .padding(.top, OakStyle.Spacing.xs)
+                .padding(.bottom, OakStyle.Spacing.sm)
+            }
+        }
+        .onAppear {
+            autoExtractIfNeeded()
+        }
+    }
+
+    // MARK: - Reference Content
+
+    @ViewBuilder
+    private var referenceContent: some View {
+        if let item = viewModel.libraryItem,
+           let store = viewModel.libraryStore,
+           let refService = viewModel.referenceService {
+            ReferenceMetadataView(
+                item: item,
+                store: store,
+                referenceService: refService
+            )
+        } else {
+            notInLibraryState
+        }
+    }
+
+    // MARK: - Not In Library
+
+    private var notInLibraryState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "quote.opening")
+                .font(.system(size: 28))
+                .foregroundStyle(.tertiary)
+            Text("Not in Library")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.secondary)
+            Text("Import this document to your library to manage reference metadata.")
+                .font(.system(size: 12))
+                .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 20)
+    }
+
+    // MARK: - Auto-Extract
+
+    private func autoExtractIfNeeded() {
+        guard !hasTriggeredAutoExtract else { return }
+        hasTriggeredAutoExtract = true
+
+        guard let item = viewModel.libraryItem,
+              item.referenceMetadata == nil,
+              item.documentType == .pdf,
+              let refService = viewModel.referenceService,
+              let store = viewModel.libraryStore else { return }
+
+        Task {
+            let pdfURL = item.fileURL
+            guard let doi = DOIExtractorService.extractDOI(from: pdfURL) else { return }
+            do {
+                let cslItem = try await CrossRefService.fetchMetadata(doi: doi)
+                try refService.saveMetadata(cslItem, forDocumentId: item.id.uuidString)
+                await MainActor.run {
+                    store.invalidate()
+                }
+            } catch {
+                Log.error(Log.importer, "Auto-extract on open failed for DOI \(doi): \(error)")
             }
         }
     }
@@ -49,98 +120,5 @@ struct InspectorPanelView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity)
-    }
-
-    // MARK: - Document Info Card
-
-    private var documentInfoCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            sectionHeader("Document", icon: "doc.fill")
-
-            Divider().padding(.horizontal, 12)
-
-            VStack(spacing: 0) {
-                infoRow(label: "File Name", value: viewModel.fileName)
-                Divider().padding(.leading, 12)
-                infoRow(label: "Pages", value: "\(viewModel.pageCount)")
-
-                if let url = viewModel.document?.fileURL,
-                   let size = FileCoordination.fileSizeString(for: url) {
-                    Divider().padding(.leading, 12)
-                    infoRow(label: "File Size", value: size)
-                }
-            }
-        }
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color(nsColor: .controlBackgroundColor))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5)
-        )
-    }
-
-    // MARK: - Page Info Card
-
-    @ViewBuilder
-    private var pageInfoCard: some View {
-        if let doc = viewModel.pdfDocument,
-           let page = doc.page(at: viewModel.state.currentPageIndex) {
-            let bounds = page.bounds(for: .mediaBox)
-
-            VStack(alignment: .leading, spacing: 0) {
-                sectionHeader("Current Page", icon: "doc.richtext")
-
-                Divider().padding(.horizontal, 12)
-
-                VStack(spacing: 0) {
-                    infoRow(label: "Page", value: "\(viewModel.state.currentPageIndex + 1) of \(viewModel.pageCount)")
-                    Divider().padding(.leading, 12)
-                    infoRow(label: "Size", value: "\(Int(bounds.width)) × \(Int(bounds.height)) pts")
-                    Divider().padding(.leading, 12)
-                    infoRow(label: "Orientation", value: bounds.width > bounds.height ? "Landscape" : "Portrait")
-                }
-            }
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color(nsColor: .controlBackgroundColor))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5)
-            )
-        }
-    }
-
-    // MARK: - Reusable Components
-
-    private func sectionHeader(_ title: String, icon: String) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-            Text(title)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.secondary)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-    }
-
-    private func infoRow(label: String, value: String) -> some View {
-        HStack {
-            Text(label)
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
-            Spacer()
-            Text(value)
-                .font(.system(size: 13))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-                .truncationMode(.middle)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 7)
     }
 }

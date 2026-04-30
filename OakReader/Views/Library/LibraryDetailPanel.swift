@@ -20,6 +20,15 @@ struct LibraryDetailPanel: View {
                     infoGrid
                 }
 
+                // Reference section
+                sectionView(title: "Reference", icon: "quote.opening", iconColor: Color(hex: "8B5CF6")) {
+                    ReferenceMetadataView(
+                        item: item,
+                        store: store,
+                        referenceService: appState.referenceService
+                    )
+                }
+
                 // Tags section
                 sectionView(title: "Tags", icon: "tag.fill", iconColor: Color(hex: "FF794C")) {
                     tagsContent

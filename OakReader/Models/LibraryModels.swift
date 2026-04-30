@@ -24,6 +24,7 @@ struct PDFLibraryItem: Identifiable, Hashable {
     var tags: [PDFTag]
     var collections: [PDFCollection]
     var coverImageData: Data?
+    var referenceMetadata: ReferenceMetadata?
 
     /// File URL within managed storage.
     /// For web snapshots, returns the HTML file path.
@@ -60,7 +61,7 @@ struct PDFLibraryItem: Identifiable, Hashable {
 
     // MARK: - Record conversion
 
-    init(record: DocumentRecord, tags: [PDFTag] = [], collections: [PDFCollection] = [], coverImageData: Data? = nil) {
+    init(record: DocumentRecord, tags: [PDFTag] = [], collections: [PDFCollection] = [], coverImageData: Data? = nil, referenceMetadata: ReferenceMetadata? = nil) {
         self.id = UUID(uuidString: record.id) ?? UUID()
         self.storageKey = record.storageKey
         self.fileName = record.originalFileName
@@ -78,6 +79,7 @@ struct PDFLibraryItem: Identifiable, Hashable {
         self.tags = tags
         self.collections = collections
         self.coverImageData = coverImageData
+        self.referenceMetadata = referenceMetadata
     }
 }
 
@@ -132,5 +134,36 @@ struct PDFTag: Identifiable, Hashable {
         self.name = name
         self.colorHex = colorHex
         self.position = position
+    }
+}
+
+// MARK: - Reference Metadata
+
+/// Reference metadata for a library item, parsed from CSL JSON.
+struct ReferenceMetadata: Hashable {
+    let cslItem: CSLItem
+
+    var type: String { cslItem.type }
+    var displayType: CSLItemType? { CSLItemType(rawValue: cslItem.type) }
+    var doi: String? { cslItem.DOI }
+    var year: Int? { cslItem.issued?.year }
+    var journal: String? { cslItem.containerTitle }
+
+    /// Formatted author display string parsed from CSL JSON.
+    var authorDisplayString: String {
+        (cslItem.author ?? [])
+            .map { $0.displayString }
+            .joined(separator: ", ")
+    }
+
+    init(cslItem: CSLItem) {
+        self.cslItem = cslItem
+    }
+
+    init?(jsonString: String) {
+        guard let data = jsonString.data(using: .utf8),
+              let item = try? JSONDecoder().decode(CSLItem.self, from: data)
+        else { return nil }
+        self.cslItem = item
     }
 }

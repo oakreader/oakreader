@@ -13,6 +13,10 @@ class DocumentViewModel {
     var state: DocumentState
     /// Database reference, set by AppState when the tab is created.
     var database: CatalogDatabase?
+    /// Reference service, set by AppState when the tab is created.
+    var referenceService: ReferenceService?
+    /// Library store, set by AppState when the tab is created.
+    var libraryStore: LibraryStore?
 
     // MARK: - Child ViewModels (lazy)
 
@@ -129,6 +133,12 @@ class DocumentViewModel {
         case .embed:
             return mediaDocument?.metadata.title ?? "Untitled"
         }
+    }
+
+    /// The library item for this document, looked up by storage key.
+    var libraryItem: PDFLibraryItem? {
+        guard let key = storageKey else { return nil }
+        return libraryStore?.findItem(byStorageKey: key)
     }
 
     // MARK: - Initialization

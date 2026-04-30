@@ -146,6 +146,38 @@ final class CatalogDatabase {
             try db.create(index: "idx_notes_document_id", on: "notes", columns: ["document_id"])
         }
 
+        migrator.registerMigration("v5-reference-metadata") { db in
+            try db.create(table: "reference_metadata") { t in
+                t.column("document_id", .text).primaryKey()
+                    .references("documents", onDelete: .cascade)
+                t.column("csl_json", .text).notNull()
+                t.column("csl_type", .text).notNull().defaults(to: "document")
+                t.column("doi", .text)
+                t.column("year", .integer)
+                t.column("container_title", .text)
+                t.column("created_at", .text).notNull()
+                t.column("updated_at", .text).notNull()
+            }
+            try db.create(
+                index: "idx_ref_meta_doi",
+                on: "reference_metadata",
+                columns: ["doi"],
+                ifNotExists: true
+            )
+            try db.create(
+                index: "idx_ref_meta_year",
+                on: "reference_metadata",
+                columns: ["year"],
+                ifNotExists: true
+            )
+            try db.create(
+                index: "idx_ref_meta_type",
+                on: "reference_metadata",
+                columns: ["csl_type"],
+                ifNotExists: true
+            )
+        }
+
         return migrator
     }
 
