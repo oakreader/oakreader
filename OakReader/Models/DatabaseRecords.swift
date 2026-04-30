@@ -158,3 +158,26 @@ struct NoteRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable 
         case updatedAt = "updated_at"
     }
 }
+
+struct ReferenceMetadataRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable {
+    static let databaseTableName = "reference_metadata"
+
+    var documentId: String      // PK, FK → documents.id
+    var cslJson: String         // Full CSL JSON string
+    var cslType: String         // "article-journal", "book", etc.
+    var doi: String?
+    var year: Int?
+    var containerTitle: String?
+    var createdAt: String
+    var updatedAt: String
+
+    enum CodingKeys: String, CodingKey, ColumnExpression {
+        case documentId = "document_id"
+        case cslJson = "csl_json"
+        case cslType = "csl_type"
+        case doi, year
+        case containerTitle = "container_title"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+}

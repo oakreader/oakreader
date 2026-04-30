@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import GRDB
 import PDFKit
@@ -16,6 +17,11 @@ final class LibraryStore {
 
     // Observation trigger — bump this to force computed properties to re-evaluate
     private(set) var revision: Int = 0
+
+    /// Notify the store that data has changed externally.
+    func invalidate() {
+        revision += 1
+    }
 
     init(database: CatalogDatabase) {
         self.database = database
@@ -108,10 +114,18 @@ final class LibraryStore {
             let allTags = try TagRecord.order(TagRecord.CodingKeys.position).fetchAll(db)
             let allDocCollections = try DocumentCollectionRecord.fetchAll(db)
             let allCollections = try CollectionRecord.order(CollectionRecord.CodingKeys.sortOrder).fetchAll(db)
+            let allRefMetadata = try ReferenceMetadataRecord.fetchAll(db)
 
             // Build lookup maps
             let tagMap = Dictionary(uniqueKeysWithValues: allTags.map { ($0.id, PDFTag(record: $0)) })
             let collMap = Dictionary(uniqueKeysWithValues: allCollections.map { ($0.id, PDFCollection(record: $0)) })
+
+            var refMetadataMap: [String: ReferenceMetadata] = [:]
+            for record in allRefMetadata {
+                if let meta = ReferenceMetadata(jsonString: record.cslJson) {
+                    refMetadataMap[record.documentId] = meta
+                }
+            }
 
             var docTagsMap: [String: [PDFTag]] = [:]
             for dt in allDocTags {
@@ -131,7 +145,8 @@ final class LibraryStore {
                 let tags = docTagsMap[doc.id] ?? []
                 let collections = docCollectionsMap[doc.id] ?? []
                 let coverData = Self.loadCoverData(storageKey: doc.storageKey)
-                return PDFLibraryItem(record: doc, tags: tags, collections: collections, coverImageData: coverData)
+                let refMeta = refMetadataMap[doc.id]
+                return PDFLibraryItem(record: doc, tags: tags, collections: collections, coverImageData: coverData, referenceMetadata: refMeta)
             }
         }
     }
@@ -539,6 +554,48 @@ final class LibraryStore {
         } catch {
             Log.error(Log.store, "removeTag failed: \(error)")
         }
+    }
+
+    // MARK: - Citation Export
+
+    /// Copy a formatted citation to the pasteboard.
+    func copyCitation(_ item: PDFLibraryItem, style: CitationStyle) {
+        guard let csl = item.referenceMetadata?.cslItem else { return }
+        let text: String
+        switch style {
+        case .apa: text = CitationFormatter.toAPA(csl: csl)
+        case .mla: text = CitationFormatter.toMLA(csl: csl)
+        case .chicago: text = CitationFormatter.toChicago(csl: csl)
+        case .bibtex: text = CitationFormatter.toBibTeX(csl: csl)
+        case .ris: text = CitationFormatter.toRIS(csl: csl)
+        case .cslJson: text = CitationFormatter.toCSLJSON(csl: csl)
+        }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+    }
+
+    /// Export multiple items as BibTeX.
+    func exportBibTeX(items: [PDFLibraryItem]) -> String {
+        items.compactMap { $0.referenceMetadata?.cslItem }
+            .map { CitationFormatter.toBibTeX(csl: $0) }
+            .joined(separator: "\n\n")
+    }
+
+    /// Export multiple items as RIS.
+    func exportRIS(items: [PDFLibraryItem]) -> String {
+        items.compactMap { $0.referenceMetadata?.cslItem }
+            .map { CitationFormatter.toRIS(csl: $0) }
+            .joined(separator: "\n")
+    }
+
+    /// Export multiple items as CSL JSON array.
+    func exportCSLJSON(items: [PDFLibraryItem]) -> String {
+        let cslItems = items.compactMap { $0.referenceMetadata?.cslItem }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        guard let data = try? encoder.encode(cslItems),
+              let str = String(data: data, encoding: .utf8) else { return "[]" }
+        return str
     }
 
     // MARK: - Cover helpers

@@ -63,6 +63,7 @@ final class DocumentTab: Identifiable {
 final class AppState {
     let libraryStore: LibraryStore
     let coverService = LibraryCoverService()
+    let referenceService: ReferenceService
     let importService: ImportService
 
 
@@ -98,7 +99,8 @@ final class AppState {
             fatalError("[AppState] Failed to initialize database: \(error)")
         }
         self.libraryStore = LibraryStore(database: database)
-        self.importService = ImportService(store: libraryStore, coverService: coverService)
+        self.referenceService = ReferenceService(database: database)
+        self.importService = ImportService(store: libraryStore, coverService: coverService, referenceService: referenceService)
         startAutosaveTimer()
     }
 
@@ -149,6 +151,8 @@ final class AppState {
 
         let tab = DocumentTab(document: doc, storageKey: storageKey)
         tab.viewModel.database = libraryStore.database
+        tab.viewModel.referenceService = referenceService
+        tab.viewModel.libraryStore = libraryStore
         // Use original filename (not "document.pdf" from managed storage)
         tab.title = item?.fileName ?? url.lastPathComponent
         NSDocumentController.shared.addDocument(doc)
@@ -167,6 +171,8 @@ final class AppState {
             let snapshot = try WebSnapshotDocument(htmlURL: htmlURL, sourceURL: item?.sourceURL)
             let tab = DocumentTab(webSnapshot: snapshot, storageKey: storageKey)
             tab.viewModel.database = libraryStore.database
+        tab.viewModel.referenceService = referenceService
+        tab.viewModel.libraryStore = libraryStore
             tab.title = item?.title ?? url.deletingPathExtension().lastPathComponent
             openTabs.append(tab)
             activeTabID = tab.id
@@ -227,6 +233,8 @@ final class AppState {
 
         let tab = DocumentTab(document: doc, storageKey: item.storageKey)
         tab.viewModel.database = libraryStore.database
+        tab.viewModel.referenceService = referenceService
+        tab.viewModel.libraryStore = libraryStore
         // Use original filename from library item
         tab.title = item.fileName
         NSDocumentController.shared.addDocument(doc)
@@ -259,6 +267,8 @@ final class AppState {
 
             let tab = DocumentTab(webSnapshot: snapshot, storageKey: item.storageKey)
             tab.viewModel.database = libraryStore.database
+        tab.viewModel.referenceService = referenceService
+        tab.viewModel.libraryStore = libraryStore
             tab.title = item.title
             openTabs.append(tab)
             activeTabID = tab.id
@@ -295,6 +305,8 @@ final class AppState {
 
             let tab = DocumentTab(media: media, storageKey: item.storageKey)
             tab.viewModel.database = libraryStore.database
+        tab.viewModel.referenceService = referenceService
+        tab.viewModel.libraryStore = libraryStore
             tab.title = item.title
             openTabs.append(tab)
             activeTabID = tab.id

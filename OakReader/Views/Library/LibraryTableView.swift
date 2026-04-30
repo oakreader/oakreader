@@ -64,6 +64,16 @@ struct LibraryTableView: View {
                 }
                 .width(min: 80, ideal: 120)
 
+                TableColumn("Year") { item in
+                    if let year = item.referenceMetadata?.year {
+                        Text("\(year)")
+                            .font(.system(size: 13))
+                            .foregroundStyle(Color.primary.opacity(0.55))
+                            .monospacedDigit()
+                    }
+                }
+                .width(min: 40, ideal: 50)
+
                 TableColumn("Pages") { item in
                     Text("\(item.pageCount)")
                         .font(.system(size: 13))
@@ -176,6 +186,17 @@ struct LibraryTableView: View {
                 }
             }
 
+            // Citation
+            if item.referenceMetadata != nil {
+                Menu("Copy Citation") {
+                    ForEach(CitationStyle.allCases) { style in
+                        Button(style.displayName) {
+                            store.copyCitation(item, style: style)
+                        }
+                    }
+                }
+            }
+
             Divider()
 
             if let sourceURL = item.sourceURL {
@@ -196,6 +217,16 @@ struct LibraryTableView: View {
         } else if selectedItems.count > 1 {
             Button("Open \(selectedItems.count) Items") {
                 for item in selectedItems { openItem(item) }
+            }
+
+            // Export citations for multi-select
+            let itemsWithRefs = selectedItems.filter { $0.referenceMetadata != nil }
+            if !itemsWithRefs.isEmpty {
+                Menu("Export Citations") {
+                    Button("BibTeX") { exportCitations(itemsWithRefs, format: .bibtex) }
+                    Button("RIS") { exportCitations(itemsWithRefs, format: .ris) }
+                    Button("CSL JSON") { exportCitations(itemsWithRefs, format: .cslJson) }
+                }
             }
 
             Divider()
@@ -239,6 +270,32 @@ struct LibraryTableView: View {
                     store.addItem(item, to: collection)
                 }
             }
+        }
+    }
+
+    private func exportCitations(_ items: [PDFLibraryItem], format: CitationStyle) {
+        let content: String
+        let ext: String
+        switch format {
+        case .bibtex:
+            content = store.exportBibTeX(items: items)
+            ext = "bib"
+        case .ris:
+            content = store.exportRIS(items: items)
+            ext = "ris"
+        case .cslJson:
+            content = store.exportCSLJSON(items: items)
+            ext = "json"
+        default:
+            return
+        }
+
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.plainText]
+        panel.nameFieldStringValue = "references.\(ext)"
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
+            try? content.write(to: url, atomically: true, encoding: .utf8)
         }
     }
 

@@ -7,10 +7,12 @@ import CommonCrypto
 final class ImportService {
     let store: LibraryStore
     let coverService: LibraryCoverService
+    let referenceService: ReferenceService
 
-    init(store: LibraryStore, coverService: LibraryCoverService) {
+    init(store: LibraryStore, coverService: LibraryCoverService, referenceService: ReferenceService) {
         self.store = store
         self.coverService = coverService
+        self.referenceService = referenceService
     }
 
     // MARK: - Import
@@ -106,6 +108,11 @@ final class ImportService {
                     store.updateCover(item, imageData: coverData)
                 }
             }
+        }
+
+        // Auto-extract DOI and fetch reference metadata
+        Task {
+            await autoExtractReference(documentId: docId.uuidString, pdfURL: destURL)
         }
 
         return item
@@ -270,6 +277,23 @@ final class ImportService {
         }
 
         return item
+    }
+
+    // MARK: - Reference Extraction
+
+    /// Extract DOI from PDF text and fetch metadata from CrossRef.
+    private func autoExtractReference(documentId: String, pdfURL: URL) async {
+        guard let doi = DOIExtractorService.extractDOI(from: pdfURL) else { return }
+
+        do {
+            let cslItem = try await CrossRefService.fetchMetadata(doi: doi)
+            try referenceService.saveMetadata(cslItem, forDocumentId: documentId)
+            await MainActor.run {
+                store.invalidate()
+            }
+        } catch {
+            Log.error(Log.importer, "CrossRef lookup failed for DOI \(doi): \(error)")
+        }
     }
 
     // MARK: - Duplicate Detection
