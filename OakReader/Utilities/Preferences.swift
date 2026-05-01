@@ -23,6 +23,8 @@ final class Preferences {
         // Library preferences
         static let librarySortOrder = "librarySortOrder"
         static let librarySortAscending = "librarySortAscending"
+        // Library smart collections
+        static let hiddenSystemCollectionIds = "hiddenSystemCollectionIds"
         // AI preferences
         static let aiProvider = "aiProvider"
         static let aiModel = "aiModel"
@@ -128,6 +130,18 @@ final class Preferences {
     var librarySortAscending: Bool {
         get { defaults.bool(forKey: Keys.librarySortAscending) }
         set { defaults.set(newValue, forKey: Keys.librarySortAscending) }
+    }
+
+    // MARK: - Library Smart Collections
+
+    var hiddenSystemCollectionIds: Set<UUID> {
+        get {
+            let strings = defaults.stringArray(forKey: Keys.hiddenSystemCollectionIds) ?? []
+            return Set(strings.compactMap { UUID(uuidString: $0) })
+        }
+        set {
+            defaults.set(newValue.map(\.uuidString), forKey: Keys.hiddenSystemCollectionIds)
+        }
     }
 
     // MARK: - AI Preferences
