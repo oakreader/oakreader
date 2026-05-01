@@ -1,52 +1,156 @@
 import SwiftUI
 
-// Detail panel: collapsible sections with colored icons,
-// grid metadata layout with 8px column gap, 2px row gap, secondary labels at 55% opacity
+// Detail panel: header + tabbed content + side nav icon strip
 struct LibrarySidebarPanel: View {
-    let item: PDFLibraryItem
-    let appState: AppState
+    let item: LibraryItem
+    @Bindable var appState: AppState
+
+    @State private var notes: [Note] = []
 
     private var store: LibraryStore { appState.libraryStore }
+    private var noteService: NoteService { NoteService(database: store.database) }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 1) {
-                // Header: cover + title
-                headerSection
-                    .padding(.bottom, 8)
+        VStack(alignment: .leading, spacing: 0) {
+            // Header: cover + title + author
+            headerSection
+                .padding(.bottom, 8)
 
-                // Info section
-                sectionView(title: "Info", icon: "info.circle.fill", iconColor: Color(hex: "4072E5")) {
-                    infoGrid
+            Divider()
+
+            // Tabbed content
+            ScrollView {
+                VStack(alignment: .leading, spacing: 1) {
+                    switch appState.libraryDetailTab {
+                    case .info:
+                        infoTabContent
+                    case .reference:
+                        referenceTabContent
+                    case .properties:
+                        propertiesTabContent
+                    case .notes:
+                        notesTabContent
+                    case .chat:
+                        EmptyView()
+                    }
                 }
-
-                // Reference section
-                sectionView(title: "Reference", icon: "quote.opening", iconColor: Color(hex: "8B5CF6")) {
-                    ReferenceMetadataView(
-                        item: item,
-                        store: store,
-                        referenceService: appState.referenceService
-                    )
-                }
-
-                // Tags section
-                sectionView(title: "Tags", icon: "tag.fill", iconColor: Color(hex: "FF794C")) {
-                    tagsContent
-                }
-
-                // Collections section
-                sectionView(title: "Collections", icon: "folder.fill", iconColor: Color(hex: "59ADC4")) {
-                    collectionsContent
-                }
-
-                // Actions
-                actionsSection
-                    .padding(.top, 8)
+                .padding(8)
             }
-            .padding(8)
         }
-        .frame(maxHeight: .infinity, alignment: .top)
-        .background(Color(hex: "F2F2F2"))
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .onChange(of: item.id) {
+            loadNotes()
+        }
+        .onChange(of: appState.libraryDetailTab) {
+            if appState.libraryDetailTab == .notes {
+                loadNotes()
+            }
+        }
+        .onAppear {
+            if appState.libraryDetailTab == .notes {
+                loadNotes()
+            }
+        }
+    }
+
+    // MARK: - Tab content
+
+    @ViewBuilder
+    private var infoTabContent: some View {
+        sectionView(title: "Info", icon: "info.circle.fill", iconColor: Color(hex: "4072E5")) {
+            infoGrid
+        }
+
+        sectionView(title: "Collections", icon: "folder.fill", iconColor: Color(hex: "59ADC4")) {
+            collectionsContent
+        }
+
+        actionsSection
+            .padding(.top, 8)
+    }
+
+    @ViewBuilder
+    private var referenceTabContent: some View {
+        ReferenceMetadataView(
+            item: item,
+            store: store,
+            referenceService: appState.referenceService
+        )
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private var propertiesTabContent: some View {
+        propertiesContent
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private var notesTabContent: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if notes.isEmpty {
+                VStack(spacing: 8) {
+                    Image(systemName: "note.text")
+                        .font(.system(size: 24))
+                        .foregroundStyle(Color.primary.opacity(0.20))
+                    Text("No notes")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.primary.opacity(0.35))
+                    Text("Open the document to create notes")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.primary.opacity(0.25))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 24)
+            } else {
+                ForEach(notes) { note in
+                    noteRow(note)
+                }
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+    }
+
+    // MARK: - Note row
+
+    @ViewBuilder
+    private func noteRow(_ note: Note) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 4) {
+                if note.isPinned {
+                    Image(systemName: "pin.fill")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Color.accentColor)
+                }
+                Text(note.displayTitle)
+                    .font(.system(size: 13, weight: .medium))
+                    .lineLimit(1)
+            }
+            Text(note.updatedAt.formatted(date: .abbreviated, time: .shortened))
+                .font(.system(size: 12))
+                .foregroundStyle(Color.primary.opacity(0.45))
+        }
+        .padding(.vertical, 4)
+        .padding(.horizontal, 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Color.primary.opacity(0.05))
+                .frame(height: 1)
+        }
+    }
+
+    // MARK: - Notes loading
+
+    private func loadNotes() {
+        do {
+            notes = try noteService.fetchNotes(forItemId: item.id.uuidString)
+        } catch {
+            notes = []
+        }
     }
 
     // MARK: - Section wrapper (OakReader collapsible section style)
@@ -137,7 +241,7 @@ struct LibrarySidebarPanel: View {
             infoGridRow("Pages", value: "\(item.pageCount)")
             infoGridRow("Size", value: ByteCountFormatter.string(fromByteCount: item.fileSize, countStyle: .file))
             infoGridRow("Added", value: item.dateAdded.formatted(date: .abbreviated, time: .omitted))
-            if let lastOpened = item.dateLastOpened {
+            if let lastOpened = item.lastOpenedAt {
                 infoGridRow("Opened", value: lastOpened.formatted(date: .abbreviated, time: .omitted))
             }
         }
@@ -158,55 +262,74 @@ struct LibrarySidebarPanel: View {
         }
     }
 
-    // MARK: - Tags
+    // MARK: - Properties
 
     @ViewBuilder
-    private var tagsContent: some View {
-        FlowLayout(spacing: 4) {
-            ForEach(item.tags, id: \.id) { tag in
-                TagChip(
-                    name: tag.name,
-                    colorHex: tag.colorHex,
-                    showRemove: true,
-                    onRemove: {
-                        store.removeTag(tag, from: item)
-                    }
-                )
-            }
+    private var propertiesContent: some View {
+        let selectProperties = store.properties.filter { $0.type == .multiSelect || $0.type == .singleSelect }
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(selectProperties) { property in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(property.name)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.primary.opacity(0.55))
 
-            // Add tag button
-            Menu {
-                ForEach(store.tags.filter { tag in
-                    !item.tags.contains(where: { $0.id == tag.id })
-                }, id: \.id) { tag in
-                    Button {
-                        store.addTag(tag, to: item)
-                    } label: {
-                        HStack {
-                            RoundedRectangle(cornerRadius: 2)
-                                .fill(Color(hex: tag.colorHex))
-                                .frame(width: 10, height: 10)
-                            Text(tag.name)
+                    FlowLayout(spacing: 4) {
+                        let assignedValues = item.propertyValues.filter { $0.propertyId == property.id }
+                        ForEach(assignedValues) { pv in
+                            if let opt = pv.option {
+                                HStack(spacing: 4) {
+                                    RoundedRectangle(cornerRadius: 2)
+                                        .fill(Color(hex: opt.colorHex))
+                                        .frame(width: 10, height: 10)
+                                    Text(opt.name)
+                                        .font(.system(size: 12))
+                                    Button {
+                                        store.removeItemSelectValue(item: item, property: property, option: opt)
+                                    } label: {
+                                        Image(systemName: "xmark")
+                                            .font(.system(size: 8, weight: .bold))
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 3)
+                                .background(RoundedRectangle(cornerRadius: 5).fill(Color(hex: opt.colorHex).opacity(0.15)))
+                            }
                         }
+
+                        // Add option button
+                        Menu {
+                            let assignedOptionIds = Set(assignedValues.compactMap { $0.option?.id })
+                            ForEach(property.options.filter { !assignedOptionIds.contains($0.id) }) { option in
+                                Button {
+                                    store.setItemSelectValue(item: item, property: property, option: option)
+                                } label: {
+                                    HStack {
+                                        RoundedRectangle(cornerRadius: 2)
+                                            .fill(Color(hex: option.colorHex))
+                                            .frame(width: 10, height: 10)
+                                        Text(option.name)
+                                    }
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 2) {
+                                Image(systemName: "plus")
+                                    .font(.system(size: 10, weight: .bold))
+                                Text("Add")
+                                    .font(.system(size: 12))
+                            }
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(RoundedRectangle(cornerRadius: 5).fill(Color.primary.opacity(0.05)))
+                        }
+                        .menuStyle(.borderlessButton)
+                        .fixedSize()
                     }
                 }
-
-                if store.tags.isEmpty || store.tags.allSatisfy({ tag in item.tags.contains(where: { $0.id == tag.id }) }) {
-                    Text("No more tags available")
-                }
-            } label: {
-                HStack(spacing: 2) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 10, weight: .bold))
-                    Text("Add")
-                        .font(.system(size: 12))
-                }
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-                .background(RoundedRectangle(cornerRadius: 5).fill(Color.primary.opacity(0.05)))
             }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
         }
     }
 

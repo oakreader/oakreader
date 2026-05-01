@@ -24,7 +24,7 @@ struct RootView: View {
             get: { appState.showSettings },
             set: { appState.showSettings = $0 }
         )) {
-            SettingsView()
+            SettingsView(store: appState.libraryStore)
         }
     }
 }

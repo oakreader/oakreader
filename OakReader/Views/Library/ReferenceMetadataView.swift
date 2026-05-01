@@ -3,7 +3,7 @@ import SwiftUI
 /// Reference metadata view — Zotero-style two-column grid.
 /// Labels right-aligned on the left, values left-aligned on the right.
 struct ReferenceMetadataView: View {
-    let item: PDFLibraryItem
+    let item: LibraryItem
     let store: LibraryStore
     let referenceService: ReferenceService
 
@@ -84,7 +84,7 @@ struct ReferenceMetadataView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.regular)
-                .disabled(isExtracting || item.documentType != .pdf)
+                .disabled(isExtracting || item.itemType != .pdf)
 
                 Button {
                     createEmptyMetadata()
@@ -428,7 +428,7 @@ struct ReferenceMetadataView: View {
     private func saveDebounced() {
         let csl = buildCSLItem()
         do {
-            try referenceService.saveMetadata(csl, forDocumentId: item.id.uuidString)
+            try referenceService.saveMetadata(csl, forItemId: item.id.uuidString)
             store.invalidate()
         } catch {
             Log.error(Log.store, "Failed to save reference metadata: \(error)")
@@ -443,7 +443,7 @@ struct ReferenceMetadataView: View {
                 doi = foundDOI
                 do {
                     let cslItem = try await CrossRefService.fetchMetadata(doi: foundDOI)
-                    try referenceService.saveMetadata(cslItem, forDocumentId: item.id.uuidString)
+                    try referenceService.saveMetadata(cslItem, forItemId: item.id.uuidString)
                     await MainActor.run {
                         store.invalidate()
                         isExtracting = false
@@ -466,7 +466,7 @@ struct ReferenceMetadataView: View {
         Task {
             do {
                 let cslItem = try await CrossRefService.fetchMetadata(doi: doi)
-                try referenceService.saveMetadata(cslItem, forDocumentId: item.id.uuidString)
+                try referenceService.saveMetadata(cslItem, forItemId: item.id.uuidString)
                 await MainActor.run {
                     store.invalidate()
                     isLookingUp = false
@@ -485,7 +485,7 @@ struct ReferenceMetadataView: View {
             csl.author = [CSLName(family: item.author, given: nil)]
         }
         do {
-            try referenceService.saveMetadata(csl, forDocumentId: item.id.uuidString)
+            try referenceService.saveMetadata(csl, forItemId: item.id.uuidString)
             store.invalidate()
         } catch {
             Log.error(Log.store, "Failed to create empty reference metadata: \(error)")

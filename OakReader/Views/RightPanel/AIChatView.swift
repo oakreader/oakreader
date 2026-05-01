@@ -9,6 +9,32 @@ struct AIChatView: View {
             // Header
             header
 
+            // Content: either history drawer or chat
+            if chatVM.showHistory {
+                ChatHistoryDrawer(chatVM: chatVM)
+                    .transition(.move(edge: .leading))
+            } else {
+                chatContent
+                    .transition(.move(edge: .trailing))
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: chatVM.showHistory)
+        .onAppear {
+            // Auto-focus the chat input when the AI chat panel opens.
+            // Delayed so the NSTextView is attached to its NSWindow before
+            // we call makeFirstResponder (otherwise textView.window is nil
+            // and the call silently no-ops, leaving keystrokes to hit the
+            // toolbar responder chain — e.g. triggering the search field).
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                inputFocusRef.focus()
+            }
+        }
+    }
+
+    // MARK: - Chat Content
+
+    private var chatContent: some View {
+        VStack(spacing: 0) {
             if chatVM.turns.isEmpty {
                 emptyState
             } else {
@@ -22,35 +48,38 @@ struct AIChatView: View {
 
             inputBar
         }
-        .onAppear {
-            // Auto-focus the chat input when the AI chat panel opens.
-            // Delayed so the NSTextView is attached to its NSWindow before
-            // we call makeFirstResponder (otherwise textView.window is nil
-            // and the call silently no-ops, leaving keystrokes to hit the
-            // toolbar responder chain — e.g. triggering the search field).
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                inputFocusRef.focus()
-            }
-        }
     }
 
     // MARK: - Header
 
     private var header: some View {
         HStack(spacing: 8) {
-            Text("AI Chat")
-                .font(.system(size: 16, weight: .semibold))
+            if chatVM.showHistory {
+                Text("History")
+                    .font(.system(size: 16, weight: .semibold))
+            } else {
+                Text("AI Chat")
+                    .font(.system(size: 16, weight: .semibold))
+            }
 
             Spacer()
 
-            SessionPickerMenu(chatVM: chatVM)
-
-            Button(action: { chatVM.newSession() }) {
-                Image(systemName: "plus.bubble")
-                    .font(.system(size: OakStyle.Font.icon))
+            OakToolButton(systemImage: "plus.bubble", tooltip: "New Chat") {
+                chatVM.newSession()
             }
-            .buttonStyle(.plain)
-            .help("New Chat")
+
+            OakToolButton(
+                systemImage: chatVM.showHistory ? "xmark" : "list.bullet",
+                isSelected: chatVM.showHistory,
+                tooltip: chatVM.showHistory ? "Close History" : "Chat History"
+            ) {
+                if chatVM.showHistory {
+                    chatVM.showHistory = false
+                } else {
+                    chatVM.loadSessionList()
+                    chatVM.showHistory = true
+                }
+            }
         }
         .padding(.horizontal, OakStyle.Spacing.sm)
         .padding(.vertical, OakStyle.Spacing.sm)
@@ -64,10 +93,12 @@ struct AIChatView: View {
             Image(systemName: "bubble.left.and.text.bubble.right")
                 .font(.system(size: 40))
                 .foregroundStyle(.tertiary)
-            Text("Ask about this PDF")
+            Text(chatVM.parent != nil ? "Ask about this PDF" : "Ask anything")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.secondary)
-            Text("Ask questions, get summaries, or find information in your document.")
+            Text(chatVM.parent != nil
+                 ? "Ask questions, get summaries, or find information in your document."
+                 : "Ask questions or chat with AI — no document needed.")
                 .font(.system(size: 14))
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
@@ -200,7 +231,7 @@ struct AIChatView: View {
                     get: { chatVM.inputText },
                     set: { chatVM.inputText = $0 }
                 ),
-                placeholder: "Ask about this PDF...",
+                placeholder: chatVM.parent != nil ? "Ask about this PDF..." : "Ask a question...",
                 onSend: { if inputHasText { chatVM.send() } },
                 onPasteImage: { data in chatVM.addClipboardImage(data) },
                 contentHeight: $inputContentHeight,

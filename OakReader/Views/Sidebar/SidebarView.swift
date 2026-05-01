@@ -5,20 +5,33 @@ struct SidebarView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Icon-only mode picker
-            HStack(spacing: 2) {
+            // Tab-style mode picker
+            HStack(spacing: 0) {
                 ForEach(SidebarMode.allCases) { mode in
-                    OakToolButton(
-                        systemImage: mode.systemImage,
-                        isSelected: viewModel.state.sidebarMode == mode,
-                        tooltip: mode.label
-                    ) {
-                        viewModel.state.sidebarMode = mode
+                    let selected = viewModel.state.sidebarMode == mode
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            viewModel.state.sidebarMode = mode
+                        }
+                    } label: {
+                        Image(systemName: mode.systemImage)
+                            .font(.system(size: OakStyle.Font.icon))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 28)
+                            .foregroundStyle(selected ? .white : .secondary)
+                            .background(
+                                Capsule()
+                                    .fill(selected ? Color.accentColor : .clear)
+                            )
+                            .contentShape(Capsule())
                     }
+                    .buttonStyle(.plain)
+                    .help(mode.label)
                 }
-                Spacer()
             }
-            .padding(.horizontal, OakStyle.Spacing.xs)
+            .padding(3)
+            .background(Capsule().fill(Color.primary.opacity(0.06)))
+            .padding(.horizontal, OakStyle.Spacing.sm)
             .padding(.vertical, OakStyle.Spacing.xs)
 
             // Content

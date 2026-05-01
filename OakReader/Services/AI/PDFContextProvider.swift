@@ -11,7 +11,7 @@ struct PDFContextProvider {
         from viewModel: DocumentViewModel,
         contextMode: ContextMode
     ) -> PDFContextSnapshot? {
-        switch viewModel.documentType {
+        switch viewModel.itemType {
         case .pdf:
             return pdfSnapshot(from: viewModel, contextMode: contextMode)
         case .webSnapshot:

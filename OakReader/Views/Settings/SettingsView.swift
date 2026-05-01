@@ -2,10 +2,12 @@ import SwiftUI
 
 /// Unified settings view with left sidebar list navigation.
 struct SettingsView: View {
+    let store: LibraryStore
     @Environment(\.dismiss) private var dismiss
 
     enum Tab: String, CaseIterable, Identifiable {
         case general
+        case library
         case ai
         case notes
 
@@ -14,6 +16,7 @@ struct SettingsView: View {
         var label: String {
             switch self {
             case .general: return "General"
+            case .library: return "Library"
             case .ai: return "AI"
             case .notes: return "Notes"
             }
@@ -22,6 +25,7 @@ struct SettingsView: View {
         var icon: String {
             switch self {
             case .general: return "gearshape"
+            case .library: return "books.vertical"
             case .ai: return "brain"
             case .notes: return "note.text"
             }
@@ -57,6 +61,8 @@ struct SettingsView: View {
         switch selectedTab {
         case .general:
             GeneralSettingsView()
+        case .library:
+            LibrarySettingsView(store: store)
         case .ai:
             AISettingsView()
         case .notes:

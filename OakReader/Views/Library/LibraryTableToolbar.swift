@@ -104,7 +104,7 @@ struct LibraryTableToolbar: View {
             guard response == .OK else { return }
             for url in panel.urls {
                 if let item = appState.importService.importPDF(from: url) {
-                    if let collection = store.selectedCollection {
+                    if let collection = store.selectedCollection, !collection.isSmart {
                         store.addItem(item, to: collection)
                     }
                 }

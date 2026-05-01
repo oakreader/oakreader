@@ -17,13 +17,22 @@ class ChatViewModel {
 
     // Session
     var sessionId: UUID = UUID()
-    var sessions: [ChatSessionMeta] = []
+    var sessions: [ConversationMeta] = []
+
+    // History
+    var sessionService: ConversationService?
+    var sessionList: [ConversationMeta] = []
+    var showHistory: Bool = false
+    /// The item ID to associate sessions with (set externally for document-scoped chat).
+    var itemId: String?
 
     // MARK: - Private
 
     private let engine: ChatEngine
     private let contextProvider = PDFContextProvider()
     private var streamTask: Task<Void, Never>?
+    /// Whether a DB record has been created for the current session.
+    private var sessionRecordCreated: Bool = false
 
     init(parent: DocumentViewModel, documentStoragePath: URL? = nil) {
         self.parent = parent
@@ -32,6 +41,11 @@ class ChatViewModel {
         } else {
             self.engine = ChatEngine()
         }
+    }
+
+    init() {
+        self.parent = nil
+        self.engine = ChatEngine()
     }
 
     // MARK: - Configuration
@@ -55,6 +69,9 @@ class ChatViewModel {
         pendingAttachments = []
         isStreaming = true
         errorMessage = nil
+
+        // Create or update session record in DB
+        persistSessionMetadata(firstUserMessage: text)
 
         // Build PDF context
         let contextMode = selectedSkill?.contextMode ?? .currentPage
@@ -190,15 +207,19 @@ class ChatViewModel {
     func newSession() {
         turns = []
         sessionId = UUID()
+        sessionRecordCreated = false
         selectedSkill = nil
         pendingAttachments = []
         inputText = ""
         errorMessage = nil
+        showHistory = false
     }
 
     func loadSession(_ id: UUID) {
         sessionId = id
+        sessionRecordCreated = true  // already exists in DB
         turns = []
+        showHistory = false
         Task { @MainActor in
             do {
                 turns = try await engine.loadSession(id)
@@ -209,10 +230,65 @@ class ChatViewModel {
     }
 
     func clearSession() {
+        let oldSessionId = sessionId
         Task {
-            await engine.deleteSession(sessionId)
+            await engine.deleteSession(oldSessionId)
+        }
+        if sessionRecordCreated {
+            try? sessionService?.deleteSession(id: oldSessionId)
         }
         turns = []
         errorMessage = nil
+        sessionId = UUID()
+        sessionRecordCreated = false
+    }
+
+    // MARK: - Session History
+
+    func loadSessionList() {
+        guard let service = sessionService else { return }
+        do {
+            if let docId = itemId {
+                sessionList = try service.fetchSessions(forItemId: docId)
+            } else {
+                sessionList = try service.fetchLibrarySessions()
+            }
+        } catch {
+            sessionList = []
+        }
+    }
+
+    func deleteSessionFromList(_ id: UUID) {
+        // Delete from DB
+        try? sessionService?.deleteSession(id: id)
+        // Delete JSONL file
+        Task {
+            await engine.deleteSession(id)
+        }
+        // Remove from local list
+        sessionList.removeAll { $0.id == id }
+        // If the deleted session is the current one, start fresh
+        if sessionId == id {
+            newSession()
+        }
+    }
+
+    // MARK: - Private — Session Persistence
+
+    private func persistSessionMetadata(firstUserMessage: String) {
+        guard let service = sessionService else { return }
+
+        if !sessionRecordCreated {
+            // First message in this session — create the DB record
+            let title = String(firstUserMessage.prefix(50))
+            try? service.createSession(id: sessionId, title: title, itemId: itemId)
+            sessionRecordCreated = true
+        } else {
+            // Subsequent messages — update count and timestamp
+            let messageCount = turns.filter { !$0.isStreaming }.count + 1 // +1 for this message
+            let title = turns.first(where: { $0.role == .user })?.content.prefix(50).description
+                ?? firstUserMessage.prefix(50).description
+            try? service.updateSession(id: sessionId, title: title, messageCount: messageCount)
+        }
     }
 }

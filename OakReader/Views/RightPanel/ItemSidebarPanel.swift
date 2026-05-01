@@ -87,7 +87,7 @@ struct ItemSidebarPanel: View {
 
         guard let item = viewModel.libraryItem,
               item.referenceMetadata == nil,
-              item.documentType == .pdf,
+              item.itemType == .pdf,
               let refService = viewModel.referenceService,
               let store = viewModel.libraryStore else { return }
 
@@ -96,7 +96,7 @@ struct ItemSidebarPanel: View {
             guard let doi = DOIExtractorService.extractDOI(from: pdfURL) else { return }
             do {
                 let cslItem = try await CrossRefService.fetchMetadata(doi: doi)
-                try refService.saveMetadata(cslItem, forDocumentId: item.id.uuidString)
+                try refService.saveMetadata(cslItem, forItemId: item.id.uuidString)
                 await MainActor.run {
                     store.invalidate()
                 }

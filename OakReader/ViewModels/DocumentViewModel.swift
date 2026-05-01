@@ -9,7 +9,7 @@ class DocumentViewModel {
     weak var document: OakReaderDocument?
     var webSnapshot: WebSnapshotDocument?
     var mediaDocument: MediaDocument?
-    var documentType: DocumentType
+    var itemType: ItemType
     var state: DocumentState
     /// Database reference, set by AppState when the tab is created.
     var database: CatalogDatabase?
@@ -66,6 +66,12 @@ class DocumentViewModel {
         // Derive document storage path from file URL if it's in managed storage
         let storagePath = documentStoragePath
         let vm = ChatViewModel(parent: self, documentStoragePath: storagePath)
+        if let db = database {
+            vm.sessionService = ConversationService(database: db)
+        }
+        if let item = libraryItem {
+            vm.itemId = item.id.uuidString
+        }
         _chat = vm
         return vm
     }
@@ -78,28 +84,18 @@ class DocumentViewModel {
         return vm
     }
 
-    /// The storage key for this document's managed directory, derived from the file path.
+    /// The item-level storage key, set externally by AppState when creating the tab.
+    var itemStorageKey: String?
+
+    /// The storage key for this document's item directory.
     var storageKey: String? {
-        guard let storagePath = documentStoragePath else { return nil }
-        return storagePath.lastPathComponent
+        itemStorageKey
     }
 
-    /// Returns the document's managed storage directory if the file is in ~/OakReader/storage/.
+    /// Returns the document's item-level storage directory (for sessions, notes).
     private var documentStoragePath: URL? {
-        switch documentType {
-        case .pdf:
-            guard let fileURL = document?.fileURL else { return nil }
-            let storageDirPath = CatalogDatabase.storageDirectory.path
-            guard fileURL.path.hasPrefix(storageDirPath) else { return nil }
-            return fileURL.deletingLastPathComponent()
-        case .webSnapshot:
-            guard let fileURL = webSnapshot?.htmlURL else { return nil }
-            let storageDirPath = CatalogDatabase.storageDirectory.path
-            guard fileURL.path.hasPrefix(storageDirPath) else { return nil }
-            return fileURL.deletingLastPathComponent()
-        case .embed:
-            return mediaDocument?.storageDirectory
-        }
+        guard let key = itemStorageKey else { return nil }
+        return CatalogDatabase.documentDirectory(storageKey: key)
     }
 
     // MARK: - Computed Properties
@@ -109,7 +105,7 @@ class DocumentViewModel {
     }
 
     var pageCount: Int {
-        switch documentType {
+        switch itemType {
         case .pdf: return pdfDocument?.pageCount ?? 0
         case .webSnapshot: return 1
         case .embed: return 1
@@ -117,7 +113,7 @@ class DocumentViewModel {
     }
 
     var hasDocument: Bool {
-        switch documentType {
+        switch itemType {
         case .pdf: return pdfDocument != nil
         case .webSnapshot: return webSnapshot != nil
         case .embed: return mediaDocument != nil
@@ -125,7 +121,7 @@ class DocumentViewModel {
     }
 
     var fileName: String {
-        switch documentType {
+        switch itemType {
         case .pdf:
             return document?.fileURL?.lastPathComponent ?? "Untitled"
         case .webSnapshot:
@@ -136,7 +132,7 @@ class DocumentViewModel {
     }
 
     /// The library item for this document, looked up by storage key.
-    var libraryItem: PDFLibraryItem? {
+    var libraryItem: LibraryItem? {
         guard let key = storageKey else { return nil }
         return libraryStore?.findItem(byStorageKey: key)
     }
@@ -145,7 +141,7 @@ class DocumentViewModel {
 
     init(document: OakReaderDocument) {
         self.document = document
-        self.documentType = .pdf
+        self.itemType = .pdf
         self.state = DocumentState()
 
         let prefs = Preferences.shared
@@ -157,7 +153,7 @@ class DocumentViewModel {
 
     init(webSnapshot: WebSnapshotDocument) {
         self.webSnapshot = webSnapshot
-        self.documentType = .webSnapshot
+        self.itemType = .webSnapshot
         self.state = DocumentState()
 
         let prefs = Preferences.shared
@@ -166,7 +162,7 @@ class DocumentViewModel {
 
     init(media: MediaDocument) {
         self.mediaDocument = media
-        self.documentType = .embed
+        self.itemType = .embed
         self.state = DocumentState()
         state.isSidebarVisible = false
     }
