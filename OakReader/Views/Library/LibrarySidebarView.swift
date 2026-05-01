@@ -39,7 +39,7 @@ struct LibrarySidebarView: View {
             .font(.system(size: 11, weight: .bold))
             .foregroundColor(Color(nsColor: .labelColor).opacity(0.55))
             .tracking(0.5)
-            .padding(.horizontal, 18)
+            .padding(.horizontal, 20)
             .padding(.vertical, 6)
     }
 
@@ -68,25 +68,25 @@ struct LibrarySidebarView: View {
             store.currentFilter = filter
             appState.switchToLibrary()
         } label: {
-            HStack(spacing: 7) {
+            HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: OakStyle.Font.icon))
+                    .font(.system(size: 15))
                     .foregroundStyle(isSelected ? .white : .primary)
-                    .frame(width: 18)
+                    .frame(width: 20)
 
                 Text(label)
-                    .font(.system(size: 13, weight: isSelected ? .medium : .regular))
+                    .font(.system(size: 14, weight: isSelected ? .medium : .regular))
                     .foregroundStyle(isSelected ? .white : .primary)
                     .lineLimit(1)
 
                 Spacer()
             }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 6)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 8)
             .background(
-                RoundedRectangle(cornerRadius: 6)
+                RoundedRectangle(cornerRadius: 8)
                     .fill(isSelected ? Color.accentColor : Color.clear)
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, 6)
             )
             .contentShape(Rectangle())
         }
@@ -119,14 +119,14 @@ private extension LibrarySidebarView {
             store.currentFilter = .inbox
             appState.switchToLibrary()
         } label: {
-            HStack(spacing: 7) {
+            HStack(spacing: 6) {
                 Image(systemName: "tray.and.arrow.down")
-                    .font(.system(size: OakStyle.Font.icon))
+                    .font(.system(size: 15))
                     .foregroundStyle(isSelected ? .white : .primary)
-                    .frame(width: 18)
+                    .frame(width: 20)
 
                 Text("Inbox")
-                    .font(.system(size: 13, weight: isSelected ? .medium : .regular))
+                    .font(.system(size: 14, weight: isSelected ? .medium : .regular))
                     .foregroundStyle(isSelected ? .white : .primary)
                     .lineLimit(1)
 
@@ -141,12 +141,12 @@ private extension LibrarySidebarView {
                         .background(Capsule().fill(Color.accentColor))
                 }
             }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 6)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 8)
             .background(
-                RoundedRectangle(cornerRadius: 6)
+                RoundedRectangle(cornerRadius: 8)
                     .fill(isSelected ? Color.accentColor : Color.clear)
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, 6)
             )
             .contentShape(Rectangle())
         }
@@ -180,7 +180,7 @@ private extension LibrarySidebarView {
             }
             .buttonStyle(.plain)
             .help("New Collection")
-            .padding(.trailing, 14)
+            .padding(.trailing, 12)
         }
         .contextMenu {
             Button("New Collection") {
@@ -206,13 +206,14 @@ private extension LibrarySidebarView {
                     )
                 }
             }
+            .id(store.revision)
         }
     }
 
     var tagsSection: some View {
         VStack(spacing: 0) {
             Divider()
-                .padding(.horizontal, 14)
+                .padding(.horizontal, 16)
 
             TagSelectorView(store: store)
         }
@@ -250,37 +251,26 @@ private struct CollectionRowView: View {
             } label: {
                 HStack(spacing: 0) {
                     Spacer()
-                        .frame(width: CGFloat(depth) * 16)
+                        .frame(width: CGFloat(depth) * 18)
 
-                    // Disclosure triangle
+                    // Disclosure triangle (static image, toggle handled by overlay)
                     if hasChildren {
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.15)) {
-                                if isExpanded {
-                                    expandedCollections.remove(collection.id)
-                                } else {
-                                    expandedCollections.insert(collection.id)
-                                }
-                            }
-                        } label: {
-                            Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(isSelected ? .white.opacity(0.8) : .secondary)
-                                .frame(width: 16, height: 16)
-                        }
-                        .buttonStyle(.plain)
+                        Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(isSelected ? .white.opacity(0.8) : .secondary)
+                            .frame(width: 16, height: 16)
                     } else {
                         Spacer().frame(width: 16)
                     }
 
                     Image(systemName: collection.icon)
-                        .font(.system(size: OakStyle.Font.icon))
+                        .font(.system(size: 15))
                         .foregroundStyle(isSelected ? .white : .primary)
-                        .frame(width: 18)
+                        .frame(width: 20)
                         .padding(.trailing, 6)
 
                     Text(collection.name)
-                        .font(.system(size: 13, weight: isSelected ? .medium : .regular))
+                        .font(.system(size: 14, weight: isSelected ? .medium : .regular))
                         .foregroundStyle(isSelected ? .white : .primary)
                         .lineLimit(1)
 
@@ -289,21 +279,37 @@ private struct CollectionRowView: View {
                     let count = collection.itemCount
                     if count > 0 {
                         Text("\(count)")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(isSelected ? .white.opacity(0.8) : .secondary)
                             .padding(.trailing, 4)
                     }
                 }
-                .padding(.horizontal, 18)
-                .padding(.vertical, 6)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 8)
                 .background(
-                    RoundedRectangle(cornerRadius: 6)
+                    RoundedRectangle(cornerRadius: 8)
                         .fill(isSelected ? Color.accentColor : Color.clear)
-                        .padding(.horizontal, 10)
+                        .padding(.horizontal, 6)
                 )
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .overlay(alignment: .leading) {
+                if hasChildren {
+                    Color.clear
+                        .frame(width: CGFloat(depth) * 18 + 16 + 20, height: 34)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            withAnimation(.easeInOut(duration: 0.15)) {
+                                if isExpanded {
+                                    expandedCollections.remove(collection.id)
+                                } else {
+                                    expandedCollections.insert(collection.id)
+                                }
+                            }
+                        }
+                }
+            }
             .contextMenu {
                 Button("Rename...") {
                     renameCollection(collection)

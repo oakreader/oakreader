@@ -97,7 +97,12 @@ struct PDFCollection: Identifiable, Hashable {
     var itemCount: Int
 
     static func == (lhs: PDFCollection, rhs: PDFCollection) -> Bool {
-        lhs.id == rhs.id
+        lhs.id == rhs.id &&
+        lhs.name == rhs.name &&
+        lhs.icon == rhs.icon &&
+        lhs.sortOrder == rhs.sortOrder &&
+        lhs.parentId == rhs.parentId &&
+        lhs.itemCount == rhs.itemCount
     }
 
     func hash(into hasher: inout Hasher) {
