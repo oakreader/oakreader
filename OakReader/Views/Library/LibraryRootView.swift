@@ -71,7 +71,7 @@ struct LibraryRootView: View {
                 if let item = appState.selectedLibraryItem {
                     VStack(spacing: 0) {
                         Divider()
-                        LibraryDetailPanel(item: item, appState: appState)
+                        LibrarySidebarPanel(item: item, appState: appState)
                     }
                     .frame(minWidth: 280, idealWidth: 320, maxWidth: 380)
                 }

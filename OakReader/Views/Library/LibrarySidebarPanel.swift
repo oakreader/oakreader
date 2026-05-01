@@ -2,7 +2,7 @@ import SwiftUI
 
 // Detail panel: collapsible sections with colored icons,
 // grid metadata layout with 8px column gap, 2px row gap, secondary labels at 55% opacity
-struct LibraryDetailPanel: View {
+struct LibrarySidebarPanel: View {
     let item: PDFLibraryItem
     let appState: AppState
 
