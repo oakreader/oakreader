@@ -95,10 +95,10 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
             guard let self,
                   let pdfView = self.pdfView else { return event }
 
-            // Dismiss popup on any mouse down (but not clicks on the popup itself)
+            // Dismiss popup on any mouse down (but not clicks on the popup itself or its sub-panels)
             if event.type == .leftMouseDown {
-                if let popup = self.selectionPopup, event.window === popup {
-                    // Click is on the popup panel — let it handle it
+                if let popup = self.selectionPopup, let eventWindow = event.window, popup.ownsWindow(eventWindow) {
+                    // Click is on the popup panel or its color sub-panel — let it handle it
                 } else {
                     self.dismissSelectionPopup()
                 }
@@ -181,8 +181,9 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
         let selBounds = selection.bounds(for: page)
 
         // Convert PDF page coords → PDFView coords → screen coords
+        // Use maxY (top of selection) so popup appears above the selected text
         let viewPoint = pdfView.convert(
-            NSPoint(x: selBounds.midX, y: selBounds.minY),
+            NSPoint(x: selBounds.midX, y: selBounds.maxY),
             from: page
         )
         guard let window = pdfView.window else { return }
@@ -199,7 +200,7 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
             selection: selection,
             pdfView: pdfView,
             anchorPage: page,
-            anchorPoint: NSPoint(x: selBounds.midX, y: selBounds.minY)
+            anchorPoint: NSPoint(x: selBounds.midX, y: selBounds.maxY)
         ) { [weak self] in
             self?.selectionPopup = nil
         }
