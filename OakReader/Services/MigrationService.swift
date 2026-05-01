@@ -91,14 +91,17 @@ final class MigrationService {
         }
 
         let docId = item.id
-        let storageKey = CatalogDatabase.generateStorageKey()
-        let docDir = CatalogDatabase.documentDirectory(storageKey: storageKey)
+        let itemStorageKey = CatalogDatabase.generateStorageKey()
+        let attStorageKey = CatalogDatabase.generateStorageKey()
+        let docDir = CatalogDatabase.documentDirectory(storageKey: itemStorageKey)
+        let attDir = CatalogDatabase.attachmentDirectory(itemStorageKey: itemStorageKey, attachmentStorageKey: attStorageKey)
         let originalFileName = sourceURL.lastPathComponent
-        let destURL = CatalogDatabase.documentPDFURL(storageKey: storageKey, fileName: originalFileName)
+        let destURL = CatalogDatabase.attachmentFileURL(itemStorageKey: itemStorageKey, attachmentStorageKey: attStorageKey, fileName: originalFileName)
 
         do {
             try FileManager.default.createDirectory(at: docDir, withIntermediateDirectories: true)
-            let sessionsDir = CatalogDatabase.documentSessionsDirectory(storageKey: storageKey)
+            try FileManager.default.createDirectory(at: attDir, withIntermediateDirectories: true)
+            let sessionsDir = CatalogDatabase.documentSessionsDirectory(storageKey: itemStorageKey)
             try FileManager.default.createDirectory(at: sessionsDir, withIntermediateDirectories: true)
             try FileManager.default.copyItem(at: sourceURL, to: destURL)
         } catch {
@@ -109,31 +112,41 @@ final class MigrationService {
 
         // Save cover image if we have it
         if let coverData = item.coverImageData {
-            let coverURL = CatalogDatabase.documentCoverURL(storageKey: storageKey)
+            let coverURL = CatalogDatabase.attachmentCoverURL(itemStorageKey: itemStorageKey, attachmentStorageKey: attStorageKey)
             try? coverData.write(to: coverURL, options: .atomic)
         }
 
         let now = Date().iso8601String
-        let record = DocumentRecord(
+        let attId = UUID()
+        let itemRecord = ItemRecord(
             id: docId.uuidString,
             userId: localUserId,
-            storageKey: storageKey,
-            originalFileName: item.fileName,
+            storageKey: itemStorageKey,
             title: item.title,
             author: item.author,
-            pageCount: item.pageCount,
-            fileSize: item.fileSize,
             isFavorite: item.isFavorite,
-            dateLastOpened: item.dateLastOpened.map { $0.iso8601String },
+            lastOpenedAt: item.lastOpenedAt.map { $0.iso8601String },
             syncStatus: SyncStatus.local.rawValue,
             createdAt: item.dateAdded.iso8601String,
             updatedAt: now,
-            documentType: DocumentType.pdf.rawValue,
-            sourceURL: nil,
-            isInInbox: false
+            isInbox: false
         )
 
-        store.insertDocument(record)
+        let attRecord = AttachmentRecord(
+            id: attId.uuidString,
+            itemId: docId.uuidString,
+            storageKey: attStorageKey,
+            fileName: item.fileName,
+            attachmentType: ItemType.pdf.rawValue,
+            sourceURL: nil,
+            fileSize: item.fileSize,
+            pageCount: item.pageCount,
+            isPrimary: true,
+            createdAt: now,
+            updatedAt: now
+        )
+
+        store.insertItem(itemRecord, attachment: attRecord)
         return true
     }
 
@@ -218,7 +231,7 @@ private class OldSQLiteReader {
                 title: stringColumn(stmt, col: 4) ?? "Untitled",
                 author: stringColumn(stmt, col: 5) ?? "",
                 dateAdded: dateColumn(stmt, col: 6) ?? Date(),
-                dateLastOpened: dateColumn(stmt, col: 7),
+                lastOpenedAt: dateColumn(stmt, col: 7),
                 pageCount: Int(sqlite3_column_int(stmt, 8)),
                 fileSize: sqlite3_column_int64(stmt, 9),
                 isFavorite: sqlite3_column_int(stmt, 10) != 0,
@@ -262,7 +275,7 @@ private struct OldLibraryItem {
     let title: String
     let author: String
     let dateAdded: Date
-    let dateLastOpened: Date?
+    let lastOpenedAt: Date?
     let pageCount: Int
     let fileSize: Int64
     let isFavorite: Bool
