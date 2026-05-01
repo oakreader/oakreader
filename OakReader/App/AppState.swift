@@ -74,6 +74,16 @@ final class AppState {
     var selectedLibraryItemIDs: Set<UUID> = []
     var showSettings: Bool = false
     var isLibrarySidebarVisible: Bool = true
+    var libraryDetailTab: LibraryDetailTab = .chat
+
+    private var _libraryChatVM: ChatViewModel?
+    var libraryChatVM: ChatViewModel {
+        if let vm = _libraryChatVM { return vm }
+        let vm = ChatViewModel()
+        vm.sessionService = ConversationService(database: libraryStore.database)
+        _libraryChatVM = vm
+        return vm
+    }
 
     private var autosaveTimer: Timer?
 
@@ -86,7 +96,7 @@ final class AppState {
         return openTabs.first { $0.id == id }
     }
 
-    var selectedLibraryItem: PDFLibraryItem? {
+    var selectedLibraryItem: LibraryItem? {
         guard let firstID = selectedLibraryItemIDs.first else { return nil }
         return libraryStore.items.first { $0.id == firstID }
     }
@@ -153,6 +163,7 @@ final class AppState {
         tab.viewModel.database = libraryStore.database
         tab.viewModel.referenceService = referenceService
         tab.viewModel.libraryStore = libraryStore
+        tab.viewModel.itemStorageKey = storageKey
         // Use original filename (not "document.pdf" from managed storage)
         tab.title = item?.fileName ?? url.lastPathComponent
         NSDocumentController.shared.addDocument(doc)
@@ -171,8 +182,9 @@ final class AppState {
             let snapshot = try WebSnapshotDocument(htmlURL: htmlURL, sourceURL: item?.sourceURL)
             let tab = DocumentTab(webSnapshot: snapshot, storageKey: storageKey)
             tab.viewModel.database = libraryStore.database
-        tab.viewModel.referenceService = referenceService
-        tab.viewModel.libraryStore = libraryStore
+            tab.viewModel.referenceService = referenceService
+            tab.viewModel.libraryStore = libraryStore
+            tab.viewModel.itemStorageKey = storageKey
             tab.title = item?.title ?? url.deletingPathExtension().lastPathComponent
             openTabs.append(tab)
             activeTabID = tab.id
@@ -188,8 +200,8 @@ final class AppState {
     }
 
     /// Open a library item directly (already imported). Dispatches by document type.
-    func openLibraryItem(_ item: PDFLibraryItem) {
-        switch item.documentType {
+    func openLibraryItem(_ item: LibraryItem) {
+        switch item.itemType {
         case .webSnapshot:
             openWebSnapshotItem(item)
         case .pdf:
@@ -199,7 +211,7 @@ final class AppState {
         }
     }
 
-    private func openPDFItem(_ item: PDFLibraryItem) {
+    private func openPDFItem(_ item: LibraryItem) {
         let pdfURL = item.fileURL
 
         // Check if already open
@@ -235,6 +247,7 @@ final class AppState {
         tab.viewModel.database = libraryStore.database
         tab.viewModel.referenceService = referenceService
         tab.viewModel.libraryStore = libraryStore
+        tab.viewModel.itemStorageKey = item.storageKey
         // Use original filename from library item
         tab.title = item.fileName
         NSDocumentController.shared.addDocument(doc)
@@ -243,7 +256,7 @@ final class AppState {
         updateWindowTitle()
     }
 
-    private func openWebSnapshotItem(_ item: PDFLibraryItem) {
+    private func openWebSnapshotItem(_ item: LibraryItem) {
         let htmlURL = item.fileURL
         // Check if already open by storage key
         if let existing = openTabs.first(where: { $0.storageKey == item.storageKey }) {
@@ -267,8 +280,9 @@ final class AppState {
 
             let tab = DocumentTab(webSnapshot: snapshot, storageKey: item.storageKey)
             tab.viewModel.database = libraryStore.database
-        tab.viewModel.referenceService = referenceService
-        tab.viewModel.libraryStore = libraryStore
+            tab.viewModel.referenceService = referenceService
+            tab.viewModel.libraryStore = libraryStore
+            tab.viewModel.itemStorageKey = item.storageKey
             tab.title = item.title
             openTabs.append(tab)
             activeTabID = tab.id
@@ -279,20 +293,21 @@ final class AppState {
         }
     }
 
-    private func openMediaItem(_ item: PDFLibraryItem) {
+    private func openMediaItem(_ item: LibraryItem) {
         // Check if already open by storage key
         if let existing = openTabs.first(where: { $0.storageKey == item.storageKey }) {
             switchToTab(existing.id)
             return
         }
 
-        let docDir = CatalogDatabase.documentDirectory(storageKey: item.storageKey)
-        let metadataURL = CatalogDatabase.documentMetadataURL(storageKey: item.storageKey)
+        guard let primary = item.primaryAttachment else { return }
+        let attDir = primary.documentDirectory
+        let metadataURL = primary.fileURL
 
         guard FileManager.default.fileExists(atPath: metadataURL.path) else {
             let alert = NSAlert()
-            alert.messageText = "Cannot Open \(item.documentType.label)"
-            alert.informativeText = "The metadata for \"\(item.title)\" could not be found in managed storage."
+            alert.messageText = "Cannot Open \(item.itemType.label)"
+            alert.informativeText = "The metadata for \"\(item.title)\" could not be found."
             alert.alertStyle = .warning
             alert.addButton(withTitle: "OK")
             alert.runModal()
@@ -300,13 +315,14 @@ final class AppState {
         }
 
         do {
-            let media = try MediaDocument(storageDirectory: docDir)
+            let media = try MediaDocument(storageDirectory: attDir)
             libraryStore.markOpened(item)
 
             let tab = DocumentTab(media: media, storageKey: item.storageKey)
             tab.viewModel.database = libraryStore.database
-        tab.viewModel.referenceService = referenceService
-        tab.viewModel.libraryStore = libraryStore
+            tab.viewModel.referenceService = referenceService
+            tab.viewModel.libraryStore = libraryStore
+            tab.viewModel.itemStorageKey = item.storageKey
             tab.title = item.title
             openTabs.append(tab)
             activeTabID = tab.id

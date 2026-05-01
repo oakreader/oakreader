@@ -1,0 +1,202 @@
+import SwiftUI
+
+struct SmartCollectionEditorSheet: View {
+    let store: LibraryStore
+    let collection: PDFCollection?
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var name: String = ""
+    @State private var icon: String = "magnifyingglass"
+    @State private var matchMode: FilterRuleSet.MatchMode = .all
+    @State private var conditions: [FilterCondition] = [
+        FilterCondition(field: .title, op: .contains, value: "")
+    ]
+
+    private var isEditing: Bool { collection != nil }
+
+    private let iconOptions = [
+        "magnifyingglass", "line.3.horizontal.decrease.circle", "sparkle.magnifyingglass",
+        "folder", "folder.fill", "tray.full", "books.vertical",
+        "star", "bookmark", "tag", "archivebox",
+        "graduationcap", "briefcase", "heart", "flag"
+    ]
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text(isEditing ? "Edit Smart Collection" : "New Smart Collection")
+                .font(.headline)
+
+            TextField("Collection Name", text: $name)
+                .textFieldStyle(.roundedBorder)
+
+            // Icon picker
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Icon")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 36))], spacing: 8) {
+                    ForEach(iconOptions, id: \.self) { iconName in
+                        Button {
+                            icon = iconName
+                        } label: {
+                            Image(systemName: iconName)
+                                .font(.system(size: 16))
+                                .frame(width: 32, height: 32)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .fill(icon == iconName ? Color.accentColor.opacity(0.2) : Color.clear)
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(icon == iconName ? Color.accentColor : Color.clear, lineWidth: 1.5)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
+            Divider()
+
+            // Match mode
+            HStack {
+                Text("Match")
+                    .font(.system(size: 13))
+                Picker("", selection: $matchMode) {
+                    Text("All").tag(FilterRuleSet.MatchMode.all)
+                    Text("Any").tag(FilterRuleSet.MatchMode.any)
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 120)
+                Text("of the following conditions:")
+                    .font(.system(size: 13))
+                Spacer()
+            }
+
+            // Conditions
+            VStack(spacing: 8) {
+                ForEach(conditions.indices, id: \.self) { index in
+                    conditionRow(index: index)
+                }
+            }
+
+            Button {
+                conditions.append(FilterCondition(field: .title, op: .contains, value: ""))
+            } label: {
+                Label("Add Condition", systemImage: "plus.circle")
+                    .font(.system(size: 13))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(Color.accentColor)
+
+            Divider()
+
+            HStack {
+                Button("Cancel") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+
+                Spacer()
+
+                Button(isEditing ? "Save" : "Create") {
+                    let trimmed = name.trimmingCharacters(in: .whitespaces)
+                    guard !trimmed.isEmpty else { return }
+                    let validConditions = conditions.filter { !$0.value.isEmpty }
+                    let rules = FilterRuleSet(match: matchMode, conditions: validConditions)
+
+                    if let collection {
+                        store.renameCollection(collection, to: trimmed)
+                        store.updateSmartCollectionRules(collection, rules: rules)
+                    } else {
+                        store.createSmartCollection(name: trimmed, icon: icon, rules: rules)
+                    }
+                    dismiss()
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+        }
+        .padding()
+        .frame(width: 480)
+        .onAppear {
+            if let collection {
+                name = collection.name
+                icon = collection.icon
+                if let rules = collection.filterRules {
+                    matchMode = rules.match
+                    conditions = rules.conditions.isEmpty
+                        ? [FilterCondition(field: .title, op: .contains, value: "")]
+                        : rules.conditions
+                }
+            }
+        }
+    }
+
+    // MARK: - Condition Row
+
+    @ViewBuilder
+    private func conditionRow(index: Int) -> some View {
+        HStack(spacing: 6) {
+            Picker("", selection: $conditions[index].field) {
+                Text("Title").tag(FilterField.title)
+                Text("Author").tag(FilterField.author)
+                Text("Type").tag(FilterField.itemType)
+                Text("Inbox").tag(FilterField.isInbox)
+                Text("Favorite").tag(FilterField.isFavorite)
+                Text("Date Added").tag(FilterField.createdAt)
+                Text("Property").tag(FilterField.property)
+            }
+            .frame(width: 100)
+
+            Picker("", selection: $conditions[index].op) {
+                ForEach(operatorsForField(conditions[index].field), id: \.self) { op in
+                    Text(op.displayName).tag(op)
+                }
+            }
+            .frame(width: 100)
+
+            TextField("Value", text: $conditions[index].value)
+                .textFieldStyle(.roundedBorder)
+                .frame(minWidth: 100)
+
+            if conditions.count > 1 {
+                Button {
+                    conditions.remove(at: index)
+                } label: {
+                    Image(systemName: "minus.circle.fill")
+                        .foregroundStyle(.red)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func operatorsForField(_ field: FilterField) -> [FilterOperator] {
+        switch field {
+        case .isInbox, .isFavorite:
+            return [.eq, .neq]
+        case .itemType:
+            return [.eq, .neq]
+        case .title, .author:
+            return [.eq, .neq, .contains]
+        case .createdAt:
+            return [.withinDays]
+        case .property:
+            return [.hasOption, .eq, .contains]
+        }
+    }
+}
+
+// MARK: - Display Names
+
+private extension FilterOperator {
+    var displayName: String {
+        switch self {
+        case .eq: return "is"
+        case .neq: return "is not"
+        case .contains: return "contains"
+        case .withinDays: return "within days"
+        case .hasOption: return "has option"
+        }
+    }
+}

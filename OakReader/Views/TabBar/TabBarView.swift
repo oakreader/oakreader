@@ -113,17 +113,11 @@ struct TabBarView: View {
     // MARK: - Pinned Tab Content
 
     private var pinnedTabTitle: String {
-        if let col = store.selectedCollection {
-            return col.name
-        }
-        return store.currentFilter.rawValue
+        store.selectedCollection?.name ?? "All Items"
     }
 
     private var pinnedTabIcon: String {
-        if let col = store.selectedCollection {
-            return col.icon
-        }
-        return store.currentFilter.icon
+        store.selectedCollection?.icon ?? "books.vertical"
     }
 
     @ViewBuilder

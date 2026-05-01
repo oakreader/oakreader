@@ -14,22 +14,25 @@ struct LibraryTableView: View {
         if items.isEmpty {
             emptyState
         } else {
-            Table(of: PDFLibraryItem.self, selection: $selection) {
+            Table(of: LibraryItem.self, selection: $selection) {
                 TableColumn("Title") { item in
                     HStack(spacing: 7) {
-                        Image(systemName: item.documentType.icon)
+                        Image(systemName: item.primaryAttachment?.attachmentType.icon ?? "doc")
                             .foregroundStyle(Color.primary.opacity(0.4))
                             .font(.system(size: 14))
-                            .accessibilityLabel(item.documentType.label)
+                            .accessibilityLabel(item.primaryAttachment?.attachmentType.label ?? "Document")
 
-                        // Tag swatches: overlapping colored squares
-                        if !item.tags.isEmpty {
+                        // Property value chips: overlapping colored squares
+                        let selectValues = item.propertyValues.filter { $0.option != nil }
+                        if !selectValues.isEmpty {
                             HStack(spacing: -3) {
-                                ForEach(item.tags.prefix(3), id: \.id) { tag in
-                                    RoundedRectangle(cornerRadius: 2)
-                                        .fill(Color(hex: tag.colorHex))
-                                        .frame(width: 11, height: 11)
-                                        .accessibilityLabel("Tag: \(tag.name)")
+                                ForEach(selectValues.prefix(3), id: \.id) { pv in
+                                    if let opt = pv.option {
+                                        RoundedRectangle(cornerRadius: 2)
+                                            .fill(Color(hex: opt.colorHex))
+                                            .frame(width: 11, height: 11)
+                                            .accessibilityLabel("\(pv.propertyName): \(opt.name)")
+                                    }
                                 }
                             }
                             .padding(.trailing, 2)
@@ -64,30 +67,6 @@ struct LibraryTableView: View {
                 }
                 .width(min: 80, ideal: 120)
 
-                TableColumn("Year") { item in
-                    if let year = item.referenceMetadata?.year {
-                        Text("\(year)")
-                            .font(.system(size: 13))
-                            .foregroundStyle(Color.primary.opacity(0.55))
-                            .monospacedDigit()
-                    }
-                }
-                .width(min: 40, ideal: 50)
-
-                TableColumn("Pages") { item in
-                    Text("\(item.pageCount)")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color.primary.opacity(0.55))
-                        .monospacedDigit()
-                }
-                .width(min: 50, ideal: 60)
-
-                TableColumn("Size") { item in
-                    Text(ByteCountFormatter.string(fromByteCount: item.fileSize, countStyle: .file))
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color.primary.opacity(0.55))
-                }
-                .width(min: 60, ideal: 80)
             } rows: {
                 ForEach(items, id: \.id) { item in
                     TableRow(item)
@@ -110,7 +89,21 @@ struct LibraryTableView: View {
 
     private var emptyState: some View {
         VStack(spacing: 16) {
-            if store.currentFilter == .inbox {
+            if store.selectedTagOptionId != nil {
+                Image(systemName: "tag")
+                    .font(.system(size: 48))
+                    .foregroundStyle(Color.primary.opacity(0.15))
+                    .accessibilityHidden(true)
+
+                Text("No Items with This Tag")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Color.primary.opacity(0.55))
+
+                Text("Assign this tag to items from their properties panel.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.primary.opacity(0.25))
+                    .multilineTextAlignment(.center)
+            } else if store.selectedCollectionId == SystemCollectionID.inbox {
                 Image(systemName: "tray")
                     .font(.system(size: 48))
                     .foregroundStyle(Color.primary.opacity(0.15))
@@ -164,9 +157,10 @@ struct LibraryTableView: View {
                 store.toggleFavorite(item)
             }
 
-            if !store.collections.isEmpty {
+            let traditionalCollections = store.userCollections.filter { !$0.isSmart }
+            if !traditionalCollections.isEmpty {
                 Menu("Add to Collection") {
-                    ForEach(store.collections) { collection in
+                    ForEach(traditionalCollections) { collection in
                         Button(collection.name) {
                             store.addItem(item, to: collection)
                         }
@@ -174,13 +168,22 @@ struct LibraryTableView: View {
                 }
             }
 
-            if !store.tags.isEmpty {
-                Menu("Add Tag") {
-                    ForEach(store.tags, id: \.id) { tag in
-                        Button {
-                            store.addTag(tag, to: item)
-                        } label: {
-                            Label(tag.name, systemImage: item.tags.contains(where: { $0.id == tag.id }) ? "checkmark.circle.fill" : "circle")
+            // Property assignments via context menu
+            let selectProperties = store.properties.filter { $0.type == .multiSelect || $0.type == .singleSelect }
+            if !selectProperties.isEmpty {
+                ForEach(selectProperties) { property in
+                    Menu(property.name) {
+                        ForEach(property.options) { option in
+                            let isAssigned = item.propertyValues.contains { $0.option?.id == option.id }
+                            Button {
+                                if isAssigned {
+                                    store.removeItemSelectValue(item: item, property: property, option: option)
+                                } else {
+                                    store.setItemSelectValue(item: item, property: property, option: option)
+                                }
+                            } label: {
+                                Label(option.name, systemImage: isAssigned ? "checkmark.circle.fill" : "circle")
+                            }
                         }
                     }
                 }
@@ -247,7 +250,7 @@ struct LibraryTableView: View {
         }
     }
 
-    private func openItem(_ item: PDFLibraryItem) {
+    private func openItem(_ item: LibraryItem) {
         appState.openLibraryItem(item)
     }
 
@@ -260,20 +263,20 @@ struct LibraryTableView: View {
             guard response == .OK else { return }
             for url in panel.urls {
                 let ext = url.pathExtension.lowercased()
-                let item: PDFLibraryItem?
+                let item: LibraryItem?
                 if ext == "html" || ext == "htm" {
                     item = appState.importService.importWebSnapshot(from: url)
                 } else {
                     item = appState.importService.importPDF(from: url)
                 }
-                if let item, let collection = store.selectedCollection {
+                if let item, let collection = store.selectedCollection, !collection.isSmart {
                     store.addItem(item, to: collection)
                 }
             }
         }
     }
 
-    private func exportCitations(_ items: [PDFLibraryItem], format: CitationStyle) {
+    private func exportCitations(_ items: [LibraryItem], format: CitationStyle) {
         let content: String
         let ext: String
         switch format {
@@ -309,13 +312,13 @@ struct LibraryTableView: View {
                         guard let url = data as? URL else { return }
                         DispatchQueue.main.async {
                             let ext = url.pathExtension.lowercased()
-                            let item: PDFLibraryItem?
+                            let item: LibraryItem?
                             if ext == "html" || ext == "htm" {
                                 item = appState.importService.importWebSnapshot(from: url)
                             } else {
                                 item = appState.importService.importPDF(from: url)
                             }
-                            if let item, let collection = store.selectedCollection {
+                            if let item, let collection = store.selectedCollection, !collection.isSmart {
                                 store.addItem(item, to: collection)
                             }
                         }

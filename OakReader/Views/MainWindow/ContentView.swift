@@ -136,7 +136,7 @@ struct ContentView: View {
 
     @ViewBuilder
     private var mainContentView: some View {
-        switch viewModel.documentType {
+        switch viewModel.itemType {
         case .pdf:
             ZStack {
                 PDFViewerRepresentable(viewModel: viewModel)

@@ -67,14 +67,24 @@ struct LibraryRootView: View {
                         .fill(Color(nsColor: .separatorColor))
                 )
 
-                // Right pane: Detail
-                if let item = appState.selectedLibraryItem {
-                    VStack(spacing: 0) {
-                        Divider()
-                        LibrarySidebarPanel(item: item, appState: appState)
+                // Right pane: sidenav always visible + conditional content
+                VStack(spacing: 0) {
+                    Divider()
+                    HStack(spacing: 0) {
+                        if appState.libraryDetailTab == .chat {
+                            AIChatView(chatVM: appState.libraryChatVM)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else if let item = appState.selectedLibraryItem {
+                            LibrarySidebarPanel(item: item, appState: appState)
+                        } else {
+                            Spacer()
+                        }
+
+                        LibrarySideNavView(tab: $appState.libraryDetailTab)
                     }
-                    .frame(minWidth: 280, idealWidth: 320, maxWidth: 380)
                 }
+                .background(Color(hex: "F2F2F2"))
+                .frame(minWidth: 200, idealWidth: 358, maxWidth: 800)
             }
         }
     }

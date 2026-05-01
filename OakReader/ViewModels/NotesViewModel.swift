@@ -22,7 +22,7 @@ class NotesViewModel {
 
     private let noteService: NoteService?
     private let storageKey: String?
-    private var documentId: String?
+    private var itemId: String?
     private var saveTask: Task<Void, Never>?
     private var lastSavedContent: String = ""
 
@@ -36,16 +36,16 @@ class NotesViewModel {
         } else {
             self.noteService = nil
         }
-        resolveDocumentId()
+        resolveItemId()
         loadNotes()
     }
 
-    /// Resolve the library document UUID from the storage key.
-    private func resolveDocumentId() {
+    /// Resolve the library item UUID from the storage key.
+    private func resolveItemId() {
         guard let storageKey, let noteService else { return }
-        documentId = try? noteService.database.dbQueue.read { db in
-            try DocumentRecord
-                .filter(DocumentRecord.CodingKeys.storageKey == storageKey)
+        itemId = try? noteService.database.dbQueue.read { db in
+            try ItemRecord
+                .filter(ItemRecord.CodingKeys.storageKey == storageKey)
                 .fetchOne(db)?.id
         }
     }
@@ -53,12 +53,12 @@ class NotesViewModel {
     // MARK: - Load
 
     func loadNotes() {
-        guard let documentId, let noteService else {
+        guard let itemId, let noteService else {
             notes = []
             return
         }
         do {
-            notes = try noteService.fetchNotes(forDocumentId: documentId)
+            notes = try noteService.fetchNotes(forItemId: itemId)
         } catch {
             Log.error(Log.store, "Failed to load notes: \(error)")
             errorMessage = error.localizedDescription
@@ -68,9 +68,9 @@ class NotesViewModel {
     // MARK: - Create
 
     func createNote() {
-        guard let documentId, let storageKey, let noteService else { return }
+        guard let itemId, let storageKey, let noteService else { return }
         do {
-            let note = try noteService.createNote(documentId: documentId, storageKey: storageKey)
+            let note = try noteService.createNote(itemId: itemId, storageKey: storageKey)
             notes.insert(note, at: 0)
             selectNote(note)
         } catch {
