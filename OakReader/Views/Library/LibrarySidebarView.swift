@@ -6,6 +6,7 @@ struct LibrarySidebarView: View {
     @State private var sidebarMode: LibrarySidebarMode = .collections
     @State private var showNewCollection = false
     @State private var showNewSmartCollection = false
+    @State private var showNewTag = false
     @State private var newSubcollectionParent: PDFCollection?
     @State private var expandedCollections: Set<UUID> = []
     @State private var expandedTagNodes: Set<UUID> = []
@@ -19,28 +20,20 @@ struct LibrarySidebarView: View {
 
             Spacer().frame(height: 14)
 
-            // Grouped section: tabs + list in a bordered container
-            VStack(spacing: 0) {
-                sectionSwitcher
+            sectionSwitcher
 
-                switch sidebarMode {
-                case .collections:
-                    collectionsScrollView
-                case .tags:
-                    tagsScrollView
-                }
+            switch sidebarMode {
+            case .collections:
+                collectionsScrollView
+            case .tags:
+                tagsScrollView
             }
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.primary.opacity(0.04))
-            )
-            .padding(.horizontal, 10)
 
             Spacer()
         }
-        .background(OakStyle.Colors.sidebarBackground)
+        .background(.thinMaterial)
         .sheet(isPresented: $showNewCollection) {
-            CollectionEditorSheet(store: store, collection: nil)
+            CollectionEditorSheet(store: store, collection: nil, parent: nil)
         }
         .sheet(isPresented: $showNewSmartCollection) {
             SmartCollectionEditorSheet(store: store, collection: nil)
@@ -49,7 +42,10 @@ struct LibrarySidebarView: View {
             SmartCollectionEditorSheet(store: store, collection: collection)
         }
         .sheet(item: $newSubcollectionParent) { parent in
-            SubcollectionEditorSheet(store: store, parent: parent)
+            CollectionEditorSheet(store: store, collection: nil, parent: parent)
+        }
+        .sheet(isPresented: $showNewTag) {
+            TagEditorSheet(store: store)
         }
     }
 
@@ -92,12 +88,12 @@ struct LibrarySidebarView: View {
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: collection.icon)
-                    .font(.system(size: 15))
+                    .font(.system(size: 13))
                     .foregroundStyle(.primary)
-                    .frame(width: 20)
+                    .frame(width: 18)
 
                 Text(collection.name)
-                    .font(.system(size: 14, weight: isSelected ? .medium : .regular))
+                    .font(.system(size: 13, weight: isSelected ? .medium : .regular))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
 
@@ -105,19 +101,19 @@ struct LibrarySidebarView: View {
 
                 if isInbox && count > 0 {
                     Text("\(count)")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 6)
+                        .padding(.horizontal, 5)
                         .padding(.vertical, 1)
                         .background(Capsule().fill(Color.accentColor))
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 5)
             .background(
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: 6)
                     .fill(isSelected ? Color.primary.opacity(0.08) : Color.clear)
-                    .padding(.horizontal, 6)
+                    .padding(.horizontal, 12)
             )
             .contentShape(Rectangle())
         }
@@ -142,7 +138,7 @@ private extension LibrarySidebarView {
     }
 
     var sectionSwitcher: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: 2) {
             ForEach(LibrarySidebarMode.allCases) { mode in
                 let selected = sidebarMode == mode
                 Button {
@@ -150,28 +146,30 @@ private extension LibrarySidebarView {
                         sidebarMode = mode
                     }
                 } label: {
-                    HStack(spacing: 4) {
+                    HStack(spacing: 3) {
                         Image(systemName: mode.systemImage)
-                            .font(.system(size: 11))
+                            .font(.system(size: 10))
                         Text(mode.label)
-                            .font(.system(size: 11, weight: .medium))
+                            .font(.system(size: 11, weight: selected ? .semibold : .medium))
                     }
                     .frame(maxWidth: .infinity)
                     .frame(height: 22)
-                    .foregroundStyle(selected ? .white : .secondary)
+                    .foregroundStyle(selected ? .primary : .secondary)
                     .background(
-                        Capsule()
-                            .fill(selected ? Color.accentColor : .clear)
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(selected ? Color(nsColor: .textBackgroundColor) : .clear)
+                            .shadow(color: selected ? .black.opacity(0.12) : .clear, radius: 2, y: 1)
                     )
-                    .contentShape(Capsule())
+                    .contentShape(RoundedRectangle(cornerRadius: 6))
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(3)
-        .background(Capsule().fill(Color.primary.opacity(0.06)))
-        .padding(.horizontal, 6)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 3)
+        .padding(.vertical, 4)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
+        .padding(.horizontal, 12)
+        .padding(.bottom, 4)
     }
 
     var tagsScrollView: some View {
@@ -211,90 +209,12 @@ private extension LibrarySidebarView {
         .id(store.revision)
         .contextMenu {
             Button("New Tag...") {
-                showNewTag()
+                showNewTag = true
             }
-        }
-    }
-
-    private static let tagColorPalette: [(name: String, hex: String)] = [
-        ("Red",     "E57373"),
-        ("Blue",    "64B5F6"),
-        ("Green",   "81C784"),
-        ("Yellow",  "FFD54F"),
-        ("Purple",  "BA68C8"),
-        ("Teal",    "4DB6AC"),
-        ("Orange",  "FF8A65"),
-        ("Gray",    "90A4AE"),
-        ("Pink",    "F06292"),
-        ("Indigo",  "7986CB"),
-        ("Lime",    "AED581"),
-        ("Amber",   "FFB74D"),
-    ]
-
-    func showNewTag() {
-        guard let tagsProp = store.tagsProperty else { return }
-
-        let alert = NSAlert()
-        alert.messageText = "New Tag"
-        alert.informativeText = "Use slash (/) for hierarchy, e.g. \"Research/AI\""
-        alert.addButton(withTitle: "Create")
-        alert.addButton(withTitle: "Cancel")
-
-        // Container for name field + color picker
-        let container = NSView(frame: NSRect(x: 0, y: 0, width: 260, height: 68))
-
-        let textField = NSTextField(frame: NSRect(x: 0, y: 42, width: 260, height: 24))
-        textField.placeholderString = "Tag name"
-        container.addSubview(textField)
-
-        // Color picker row
-        let palette = Self.tagColorPalette
-        let dotSize: CGFloat = 18
-        let spacing: CGFloat = 4
-        var selectedIndex = 0
-
-        let colorContainer = NSView(frame: NSRect(x: 0, y: 0, width: 260, height: 34))
-
-        var colorButtons: [NSButton] = []
-        for (i, entry) in palette.enumerated() {
-            let x = CGFloat(i) * (dotSize + spacing)
-            let btn = NSButton(frame: NSRect(x: x, y: 6, width: dotSize, height: dotSize))
-            btn.bezelStyle = .inline
-            btn.isBordered = false
-            btn.title = ""
-            btn.wantsLayer = true
-            btn.layer?.cornerRadius = dotSize / 2
-            btn.layer?.masksToBounds = true
-            btn.layer?.backgroundColor = NSColor(hex: entry.hex)?.cgColor
-            btn.layer?.borderWidth = i == 0 ? 2 : 0
-            btn.layer?.borderColor = NSColor.controlAccentColor.cgColor
-            btn.tag = i
-            btn.target = colorContainer
-            colorButtons.append(btn)
-            colorContainer.addSubview(btn)
-        }
-
-        // Use a helper class for color selection
-        let colorSelector = TagColorSelector(buttons: colorButtons)
-        colorContainer.subviews.forEach { view in
-            if let btn = view as? NSButton {
-                btn.target = colorSelector
-                btn.action = #selector(TagColorSelector.selectColor(_:))
+            Divider()
+            Button("Show Collections") {
+                sidebarMode = .collections
             }
-        }
-
-        container.addSubview(colorContainer)
-        alert.accessoryView = container
-
-        // Keep selector alive during the modal
-        let _ = withExtendedLifetime(colorSelector) {
-            guard alert.runModal() == .alertFirstButtonReturn else { return }
-            let name = textField.stringValue.trimmingCharacters(in: .whitespaces)
-            guard !name.isEmpty else { return }
-
-            selectedIndex = colorSelector.selectedIndex
-            let color = palette[selectedIndex].hex
-            store.addPropertyOption(propertyId: tagsProp.id, name: name, colorHex: color)
         }
     }
 
@@ -355,13 +275,6 @@ private struct CollectionRowView: View {
         expandedCollections.contains(collection.id)
     }
 
-    private var displayCount: Int {
-        if collection.isSmart {
-            return store.smartCollectionItemCount(for: collection)
-        }
-        return collection.itemCount
-    }
-
     var body: some View {
         VStack(spacing: 0) {
             Button {
@@ -375,40 +288,32 @@ private struct CollectionRowView: View {
                     // Disclosure triangle (static image, toggle handled by overlay)
                     if hasChildren {
                         Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.system(size: 9, weight: .bold))
                             .foregroundStyle(.secondary)
-                            .frame(width: 16, height: 16)
+                            .frame(width: 14, height: 14)
                     } else {
-                        Spacer().frame(width: 16)
+                        Spacer().frame(width: 14)
                     }
 
-                    Image(systemName: collection.icon)
-                        .font(.system(size: 15))
-                        .foregroundStyle(.primary)
-                        .frame(width: 20)
-                        .padding(.trailing, 6)
+                    Image(systemName: collection.icon == "folder" ? "folder.fill" : collection.icon)
+                        .font(.system(size: 13))
+                        .foregroundStyle(isSelected ? .primary : .secondary)
+                        .frame(width: 18)
+                        .padding(.trailing, 5)
 
                     Text(collection.name)
-                        .font(.system(size: 14, weight: isSelected ? .medium : .regular))
+                        .font(.system(size: 13, weight: isSelected ? .medium : .regular))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
 
                     Spacer()
-
-                    let count = displayCount
-                    if count > 0 {
-                        Text("\(count)")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.secondary)
-                            .padding(.trailing, 4)
-                    }
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 5)
                 .background(
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: 6)
                         .fill(isSelected ? Color.primary.opacity(0.08) : Color.clear)
-                        .padding(.horizontal, 6)
+                        .padding(.horizontal, 12)
                 )
                 .contentShape(Rectangle())
             }
@@ -523,6 +428,36 @@ private struct TagNodeRowView: View {
         expandedTagNodes.contains(node.id)
     }
 
+    /// Color for this node: use the option's color, or derive from first child.
+    private var nodeColorHex: String {
+        if let option = node.option {
+            return option.colorHex
+        }
+        return firstChildColorHex(in: node) ?? "90A4AE"
+    }
+
+    private func firstChildColorHex(in node: TagNode) -> String? {
+        for child in node.children {
+            if let option = child.option {
+                return option.colorHex
+            }
+            if let found = firstChildColorHex(in: child) {
+                return found
+            }
+        }
+        return nil
+    }
+
+    private func toggleExpand() {
+        withAnimation(.easeInOut(duration: 0.15)) {
+            if isExpanded {
+                expandedTagNodes.remove(node.id)
+            } else {
+                expandedTagNodes.insert(node.id)
+            }
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             Button {
@@ -530,42 +465,18 @@ private struct TagNodeRowView: View {
                     store.selectTag(option.id)
                     appState.switchToLibrary()
                 } else if hasChildren {
-                    // Intermediate node: toggle expand
-                    withAnimation(.easeInOut(duration: 0.15)) {
-                        if isExpanded {
-                            expandedTagNodes.remove(node.id)
-                        } else {
-                            expandedTagNodes.insert(node.id)
-                        }
-                    }
+                    toggleExpand()
                 }
             } label: {
                 HStack(spacing: 0) {
                     Spacer()
-                        .frame(width: CGFloat(depth) * 18)
-
-                    if hasChildren {
-                        Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 16, height: 16)
-                    } else {
-                        Spacer().frame(width: 16)
-                    }
+                        .frame(width: CGFloat(depth) * 16)
 
                     // Color indicator
-                    if let option = node.option {
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(Color(hex: option.colorHex))
-                            .frame(width: 12, height: 12)
-                            .padding(.trailing, 6)
-                    } else {
-                        Image(systemName: "folder")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 12)
-                            .padding(.trailing, 6)
-                    }
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color(hex: nodeColorHex))
+                        .frame(width: 11, height: 11)
+                        .padding(.trailing, 5)
 
                     Text(node.name)
                         .font(.system(size: 13, weight: isSelected ? .medium : .regular))
@@ -581,37 +492,40 @@ private struct TagNodeRowView: View {
                             .foregroundStyle(.secondary)
                             .padding(.trailing, 4)
                     }
+
+                    if hasChildren {
+                        Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 14, height: 14)
+                            .contentShape(Rectangle())
+                            .onTapGesture { toggleExpand() }
+                    }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 18)
                 .padding(.vertical, 5)
                 .background(
                     RoundedRectangle(cornerRadius: 6)
                         .fill(isSelected ? Color.primary.opacity(0.08) : Color.clear)
-                        .padding(.horizontal, 6)
+                        .padding(.horizontal, 12)
                 )
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .overlay(alignment: .leading) {
-                if hasChildren {
-                    Color.clear
-                        .frame(width: CGFloat(depth) * 18 + 16 + 20, height: 34)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            withAnimation(.easeInOut(duration: 0.15)) {
-                                if isExpanded {
-                                    expandedTagNodes.remove(node.id)
-                                } else {
-                                    expandedTagNodes.insert(node.id)
-                                }
-                            }
-                        }
-                }
-            }
             .contextMenu {
                 if let option = node.option {
                     Button("Rename...") {
                         renameTag(option)
+                    }
+                    Menu("Change Color") {
+                        ForEach(tagColorPalette, id: \.hex) { entry in
+                            Button {
+                                store.updatePropertyOptionColor(option, colorHex: entry.hex)
+                            } label: {
+                                Label(entry.name, systemImage: option.colorHex == entry.hex ? "checkmark.circle.fill" : "circle.fill")
+                            }
+                            .tint(Color(hex: entry.hex))
+                        }
                     }
                     Divider()
                     Button("Delete", role: .destructive) {
@@ -654,70 +568,68 @@ private struct TagNodeRowView: View {
     }
 }
 
-// MARK: - Tag Color Selector
+// MARK: - Tag Color Palette
 
-private class TagColorSelector: NSObject {
-    let buttons: [NSButton]
-    var selectedIndex: Int = 0
+private let tagColorPalette: [(name: String, hex: String)] = [
+    ("Red",     "E57373"),
+    ("Blue",    "64B5F6"),
+    ("Green",   "81C784"),
+    ("Yellow",  "FFD54F"),
+    ("Purple",  "BA68C8"),
+    ("Teal",    "4DB6AC"),
+    ("Orange",  "FF8A65"),
+    ("Gray",    "90A4AE"),
+    ("Pink",    "F06292"),
+    ("Indigo",  "7986CB"),
+    ("Lime",    "AED581"),
+    ("Amber",   "FFB74D"),
+]
 
-    init(buttons: [NSButton]) {
-        self.buttons = buttons
-    }
+// MARK: - Tag Editor Sheet
 
-    @objc func selectColor(_ sender: NSButton) {
-        selectedIndex = sender.tag
-        for (i, btn) in buttons.enumerated() {
-            btn.layer?.borderWidth = i == selectedIndex ? 2 : 0
-        }
-    }
-}
-
-// MARK: - Subcollection Editor Sheet
-
-private struct SubcollectionEditorSheet: View {
+private struct TagEditorSheet: View {
     let store: LibraryStore
-    let parent: PDFCollection
 
     @Environment(\.dismiss) private var dismiss
     @State private var name: String = ""
-    @State private var icon: String = "folder"
-
-    private let iconOptions = [
-        "folder", "folder.fill", "tray.full", "books.vertical",
-        "star", "bookmark", "tag", "archivebox",
-        "graduationcap", "briefcase", "heart", "flag"
-    ]
+    @State private var selectedColorHex: String = "E57373"
 
     var body: some View {
         VStack(spacing: 16) {
-            Text("New Subcollection")
+            Text("New Tag")
                 .font(.headline)
 
-            Text("Under: \(parent.name)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 6) {
+                TextField("Tag name", text: $name)
+                    .textFieldStyle(.roundedBorder)
 
-            TextField("Subcollection Name", text: $name)
-                .textFieldStyle(.roundedBorder)
+                Text("Use slash (/) for hierarchy, e.g. \"Research/AI\"")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
 
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 36))], spacing: 8) {
-                ForEach(iconOptions, id: \.self) { iconName in
-                    Button {
-                        icon = iconName
-                    } label: {
-                        Image(systemName: iconName)
-                            .font(.system(size: 16))
-                            .frame(width: 32, height: 32)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(icon == iconName ? Color.accentColor.opacity(0.2) : Color.clear)
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .stroke(icon == iconName ? Color.accentColor : Color.clear, lineWidth: 1.5)
-                            )
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Color")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 24))], spacing: 8) {
+                    ForEach(tagColorPalette, id: \.hex) { entry in
+                        Button {
+                            selectedColorHex = entry.hex
+                        } label: {
+                            Circle()
+                                .fill(Color(hex: entry.hex))
+                                .frame(width: 22, height: 22)
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.primary, lineWidth: selectedColorHex == entry.hex ? 2 : 0)
+                                        .padding(selectedColorHex == entry.hex ? -2 : 0)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .help(entry.name)
                     }
-                    .buttonStyle(.plain)
                 }
             }
 
@@ -729,8 +641,9 @@ private struct SubcollectionEditorSheet: View {
 
                 Button("Create") {
                     let trimmed = name.trimmingCharacters(in: .whitespaces)
-                    guard !trimmed.isEmpty else { return }
-                    store.createSubcollection(name: trimmed, icon: icon, parent: parent)
+                    guard !trimmed.isEmpty,
+                          let tagsProp = store.tagsProperty else { return }
+                    store.addPropertyOption(propertyId: tagsProp.id, name: trimmed, colorHex: selectedColorHex)
                     dismiss()
                 }
                 .keyboardShortcut(.defaultAction)
@@ -738,6 +651,6 @@ private struct SubcollectionEditorSheet: View {
             }
         }
         .padding()
-        .frame(width: 340)
+        .frame(width: 300)
     }
 }

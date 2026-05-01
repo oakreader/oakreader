@@ -450,7 +450,7 @@ final class LibraryStore {
     }
 
     @discardableResult
-    func createCollection(name: String, icon: String = "folder") -> PDFCollection {
+    func createCollection(name: String, icon: String = "folder.fill") -> PDFCollection {
         let now = Date().iso8601String
         let record = CollectionRecord(
             id: UUID().uuidString,
@@ -523,7 +523,7 @@ final class LibraryStore {
     }
 
     @discardableResult
-    func createSubcollection(name: String, icon: String = "folder", parent: PDFCollection) -> PDFCollection {
+    func createSubcollection(name: String, icon: String = "folder.fill", parent: PDFCollection) -> PDFCollection {
         let now = Date().iso8601String
         let record = CollectionRecord(
             id: UUID().uuidString,
@@ -777,6 +777,20 @@ final class LibraryStore {
             revision += 1
         } catch {
             Log.error(Log.store, "renamePropertyOption failed: \(error)")
+        }
+    }
+
+    func updatePropertyOptionColor(_ option: PropertyOption, colorHex: String) {
+        do {
+            try database.dbQueue.write { db in
+                try db.execute(
+                    sql: "UPDATE property_options SET color_hex = ? WHERE id = ?",
+                    arguments: [colorHex, option.id.uuidString]
+                )
+            }
+            revision += 1
+        } catch {
+            Log.error(Log.store, "updatePropertyOptionColor failed: \(error)")
         }
     }
 
