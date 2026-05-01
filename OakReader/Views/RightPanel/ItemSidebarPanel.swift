@@ -1,7 +1,7 @@
 import SwiftUI
 import PDFKit
 
-struct InspectorPanelView: View {
+struct ItemSidebarPanel: View {
     let viewModel: DocumentViewModel
 
     @State private var hasTriggeredAutoExtract = false
