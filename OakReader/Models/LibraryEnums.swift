@@ -1,27 +1,5 @@
 import Foundation
 
-// MARK: - Tag Colors
-
-enum TagColor: String, CaseIterable, Identifiable {
-    case red, orange, gray, green, teal, blue, indigo, purple, plum
-
-    var id: String { rawValue }
-
-    var hex: String {
-        switch self {
-        case .red:    return "FF6666"
-        case .orange: return "FF8C19"
-        case .gray:   return "999999"
-        case .green:  return "5FB236"
-        case .teal:   return "009980"
-        case .blue:   return "2EA8E5"
-        case .indigo: return "576DD9"
-        case .purple: return "A28AE5"
-        case .plum:   return "A6507B"
-        }
-    }
-}
-
 // MARK: - Enums
 
 enum SyncStatus: String, Codable {
@@ -42,28 +20,15 @@ enum LibrarySortOrder: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-enum LibraryFilter: String, CaseIterable, Identifiable {
-    case inbox = "Inbox"
-    case all = "All Items"
-    case recentlyAdded = "Recently Added"
-    case favorites = "Favorites"
-    case pdfs = "PDFs"
-    case webSnapshots = "Web Snapshots"
-    case videos = "Videos"
+enum SystemCollectionID {
+    static let inbox       = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+    static let allItems    = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+    static let recent      = UUID(uuidString: "00000000-0000-0000-0000-000000000003")!
+    static let pdfs        = UUID(uuidString: "00000000-0000-0000-0000-000000000005")!
+    static let webSnapshots = UUID(uuidString: "00000000-0000-0000-0000-000000000006")!
+    static let videos      = UUID(uuidString: "00000000-0000-0000-0000-000000000007")!
 
-    var id: String { rawValue }
-
-    var icon: String {
-        switch self {
-        case .inbox: return "tray.and.arrow.down"
-        case .all: return "books.vertical"
-        case .recentlyAdded: return "clock"
-        case .favorites: return "star"
-        case .pdfs: return "doc.fill"
-        case .webSnapshots: return "globe"
-        case .videos: return "play.rectangle"
-        }
-    }
+    static let all: [UUID] = [inbox, allItems, recent, pdfs, webSnapshots, videos]
 }
 
 // MARK: - Local user ID

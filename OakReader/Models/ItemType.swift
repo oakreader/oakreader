@@ -1,6 +1,6 @@
 import Foundation
 
-enum DocumentType: String, Codable {
+enum ItemType: String, Codable {
     case pdf
     case webSnapshot
     case embed
@@ -16,7 +16,7 @@ enum DocumentType: String, Codable {
     var label: String {
         switch self {
         case .pdf: return "PDF"
-        case .webSnapshot: return "Web Snapshot"
+        case .webSnapshot: return "Web"
         case .embed: return "Embed"
         }
     }

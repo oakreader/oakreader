@@ -20,7 +20,7 @@ final class ImportService {
     /// Import a PDF from any URL into managed storage.
     /// Returns the library item if successful, or the existing item if already imported.
     @discardableResult
-    func importPDF(from sourceURL: URL) -> PDFLibraryItem? {
+    func importPDF(from sourceURL: URL) -> LibraryItem? {
         // Duplicate detection: hash first 64KB
         if let hash = hashPrefix(of: sourceURL),
            let existing = findByHash(hash) {
@@ -33,19 +33,21 @@ final class ImportService {
         }
 
         let docId = UUID()
-        let storageKey = CatalogDatabase.generateStorageKey()
-        let docDir = CatalogDatabase.documentDirectory(storageKey: storageKey)
-        let destURL = CatalogDatabase.documentPDFURL(storageKey: storageKey, fileName: sourceURL.lastPathComponent)
+        let attId = UUID()
+        let itemStorageKey = CatalogDatabase.generateStorageKey()
+        let attStorageKey = CatalogDatabase.generateStorageKey()
+        let docDir = CatalogDatabase.documentDirectory(storageKey: itemStorageKey)
+        let attDir = CatalogDatabase.attachmentDirectory(itemStorageKey: itemStorageKey, attachmentStorageKey: attStorageKey)
+        let destURL = CatalogDatabase.attachmentFileURL(itemStorageKey: itemStorageKey, attachmentStorageKey: attStorageKey, fileName: sourceURL.lastPathComponent)
 
         do {
-            // Create document directory
+            // Create item directory and subdirectories
             try FileManager.default.createDirectory(at: docDir, withIntermediateDirectories: true)
-
-            // Create sessions subdirectory
-            let sessionsDir = CatalogDatabase.documentSessionsDirectory(storageKey: storageKey)
+            try FileManager.default.createDirectory(at: attDir, withIntermediateDirectories: true)
+            let sessionsDir = CatalogDatabase.documentSessionsDirectory(storageKey: itemStorageKey)
             try FileManager.default.createDirectory(at: sessionsDir, withIntermediateDirectories: true)
 
-            // Copy PDF to managed storage
+            // Copy PDF to attachment directory
             try FileManager.default.copyItem(at: sourceURL, to: destURL)
         } catch {
             Log.error(Log.importer, "Failed to copy PDF: \(error)")
@@ -77,26 +79,35 @@ final class ImportService {
 
         // Insert into DB
         let now = Date().iso8601String
-        let record = DocumentRecord(
+        let itemRecord = ItemRecord(
             id: docId.uuidString,
             userId: localUserId,
-            storageKey: storageKey,
-            originalFileName: sourceURL.lastPathComponent,
+            storageKey: itemStorageKey,
             title: title,
             author: author,
-            pageCount: pageCount,
-            fileSize: fileSize,
             isFavorite: false,
-            dateLastOpened: nil,
+            lastOpenedAt: nil,
             syncStatus: SyncStatus.local.rawValue,
             createdAt: now,
             updatedAt: now,
-            documentType: DocumentType.pdf.rawValue,
-            sourceURL: nil,
-            isInInbox: false
+            isInbox: false
         )
 
-        guard let item = store.insertDocument(record) else {
+        let attRecord = AttachmentRecord(
+            id: attId.uuidString,
+            itemId: docId.uuidString,
+            storageKey: attStorageKey,
+            fileName: sourceURL.lastPathComponent,
+            attachmentType: ItemType.pdf.rawValue,
+            sourceURL: nil,
+            fileSize: fileSize,
+            pageCount: pageCount,
+            isPrimary: true,
+            createdAt: now,
+            updatedAt: now
+        )
+
+        guard let item = store.insertItem(itemRecord, attachment: attRecord) else {
             try? FileManager.default.removeItem(at: docDir)
             return nil
         }
@@ -112,7 +123,7 @@ final class ImportService {
 
         // Auto-extract DOI and fetch reference metadata
         Task {
-            await autoExtractReference(documentId: docId.uuidString, pdfURL: destURL)
+            await autoExtractReference(itemId: docId.uuidString, pdfURL: destURL)
         }
 
         return item
@@ -122,7 +133,7 @@ final class ImportService {
 
     /// Import an HTML web snapshot into managed storage.
     @discardableResult
-    func importWebSnapshot(from sourceURL: URL, originalPageURL: URL? = nil, title: String? = nil) -> PDFLibraryItem? {
+    func importWebSnapshot(from sourceURL: URL, originalPageURL: URL? = nil, title: String? = nil) -> LibraryItem? {
         // Duplicate detection
         if let hash = hashPrefix(of: sourceURL),
            let existing = findByHash(hash) {
@@ -130,14 +141,17 @@ final class ImportService {
         }
 
         let docId = UUID()
-        let storageKey = CatalogDatabase.generateStorageKey()
-        let docDir = CatalogDatabase.documentDirectory(storageKey: storageKey)
-        let destURL = CatalogDatabase.documentHTMLURL(storageKey: storageKey, fileName: sourceURL.lastPathComponent)
+        let attId = UUID()
+        let itemStorageKey = CatalogDatabase.generateStorageKey()
+        let attStorageKey = CatalogDatabase.generateStorageKey()
+        let docDir = CatalogDatabase.documentDirectory(storageKey: itemStorageKey)
+        let attDir = CatalogDatabase.attachmentDirectory(itemStorageKey: itemStorageKey, attachmentStorageKey: attStorageKey)
+        let destURL = CatalogDatabase.attachmentFileURL(itemStorageKey: itemStorageKey, attachmentStorageKey: attStorageKey, fileName: sourceURL.lastPathComponent)
 
         do {
             try FileManager.default.createDirectory(at: docDir, withIntermediateDirectories: true)
-
-            let sessionsDir = CatalogDatabase.documentSessionsDirectory(storageKey: storageKey)
+            try FileManager.default.createDirectory(at: attDir, withIntermediateDirectories: true)
+            let sessionsDir = CatalogDatabase.documentSessionsDirectory(storageKey: itemStorageKey)
             try FileManager.default.createDirectory(at: sessionsDir, withIntermediateDirectories: true)
 
             try FileManager.default.copyItem(at: sourceURL, to: destURL)
@@ -166,26 +180,35 @@ final class ImportService {
         }
 
         let now = Date().iso8601String
-        let record = DocumentRecord(
+        let itemRecord = ItemRecord(
             id: docId.uuidString,
             userId: localUserId,
-            storageKey: storageKey,
-            originalFileName: sourceURL.lastPathComponent,
+            storageKey: itemStorageKey,
             title: resolvedTitle,
             author: "",
-            pageCount: 1,
-            fileSize: fileSize,
             isFavorite: false,
-            dateLastOpened: nil,
+            lastOpenedAt: nil,
             syncStatus: SyncStatus.local.rawValue,
             createdAt: now,
             updatedAt: now,
-            documentType: DocumentType.webSnapshot.rawValue,
-            sourceURL: originalPageURL?.absoluteString,
-            isInInbox: originalPageURL != nil
+            isInbox: originalPageURL != nil
         )
 
-        guard let item = store.insertDocument(record) else {
+        let attRecord = AttachmentRecord(
+            id: attId.uuidString,
+            itemId: docId.uuidString,
+            storageKey: attStorageKey,
+            fileName: sourceURL.lastPathComponent,
+            attachmentType: ItemType.webSnapshot.rawValue,
+            sourceURL: originalPageURL?.absoluteString,
+            fileSize: fileSize,
+            pageCount: 1,
+            isPrimary: true,
+            createdAt: now,
+            updatedAt: now
+        )
+
+        guard let item = store.insertItem(itemRecord, attachment: attRecord) else {
             try? FileManager.default.removeItem(at: docDir)
             return nil
         }
@@ -214,35 +237,39 @@ final class ImportService {
         thumbnailData: Data?,
         transcript: String?,
         metadata: MediaMetadata
-    ) -> PDFLibraryItem? {
+    ) -> LibraryItem? {
         // Duplicate detection by source URL
         if let existing = store.items.first(where: { $0.sourceURL == sourceURL }) {
             return existing
         }
 
         let docId = UUID()
-        let storageKey = CatalogDatabase.generateStorageKey()
-        let docDir = CatalogDatabase.documentDirectory(storageKey: storageKey)
+        let attId = UUID()
+        let itemStorageKey = CatalogDatabase.generateStorageKey()
+        let attStorageKey = CatalogDatabase.generateStorageKey()
+        let docDir = CatalogDatabase.documentDirectory(storageKey: itemStorageKey)
+        let attDir = CatalogDatabase.attachmentDirectory(itemStorageKey: itemStorageKey, attachmentStorageKey: attStorageKey)
 
         do {
             try FileManager.default.createDirectory(at: docDir, withIntermediateDirectories: true)
-            let sessionsDir = CatalogDatabase.documentSessionsDirectory(storageKey: storageKey)
+            try FileManager.default.createDirectory(at: attDir, withIntermediateDirectories: true)
+            let sessionsDir = CatalogDatabase.documentSessionsDirectory(storageKey: itemStorageKey)
             try FileManager.default.createDirectory(at: sessionsDir, withIntermediateDirectories: true)
 
-            // Write metadata.json
-            let metadataURL = CatalogDatabase.documentMetadataURL(storageKey: storageKey)
+            // Write metadata.json to attachment directory
+            let metadataURL = CatalogDatabase.attachmentMetadataURL(itemStorageKey: itemStorageKey, attachmentStorageKey: attStorageKey)
             let encoded = try JSONEncoder().encode(metadata)
             try encoded.write(to: metadataURL, options: .atomic)
 
-            // Write transcript
+            // Write transcript to attachment directory
             if let transcript, !transcript.isEmpty {
-                let transcriptURL = CatalogDatabase.documentTranscriptURL(storageKey: storageKey)
+                let transcriptURL = CatalogDatabase.attachmentTranscriptURL(itemStorageKey: itemStorageKey, attachmentStorageKey: attStorageKey)
                 try transcript.write(to: transcriptURL, atomically: true, encoding: .utf8)
             }
 
-            // Write thumbnail as cover
+            // Write thumbnail as cover to attachment directory
             if let thumbnailData {
-                let coverURL = CatalogDatabase.documentCoverURL(storageKey: storageKey)
+                let coverURL = CatalogDatabase.attachmentCoverURL(itemStorageKey: itemStorageKey, attachmentStorageKey: attStorageKey)
                 try thumbnailData.write(to: coverURL, options: .atomic)
             }
         } catch {
@@ -252,26 +279,35 @@ final class ImportService {
         }
 
         let now = Date().iso8601String
-        let record = DocumentRecord(
+        let itemRecord = ItemRecord(
             id: docId.uuidString,
             userId: localUserId,
-            storageKey: storageKey,
-            originalFileName: "metadata.json",
+            storageKey: itemStorageKey,
             title: title,
             author: author,
-            pageCount: duration ?? 0,
-            fileSize: 0,
             isFavorite: false,
-            dateLastOpened: nil,
+            lastOpenedAt: nil,
             syncStatus: SyncStatus.local.rawValue,
             createdAt: now,
             updatedAt: now,
-            documentType: DocumentType.embed.rawValue,
-            sourceURL: sourceURL.absoluteString,
-            isInInbox: true
+            isInbox: true
         )
 
-        guard let item = store.insertDocument(record) else {
+        let attRecord = AttachmentRecord(
+            id: attId.uuidString,
+            itemId: docId.uuidString,
+            storageKey: attStorageKey,
+            fileName: "metadata.json",
+            attachmentType: ItemType.embed.rawValue,
+            sourceURL: sourceURL.absoluteString,
+            fileSize: 0,
+            pageCount: duration ?? 0,
+            isPrimary: true,
+            createdAt: now,
+            updatedAt: now
+        )
+
+        guard let item = store.insertItem(itemRecord, attachment: attRecord) else {
             try? FileManager.default.removeItem(at: docDir)
             return nil
         }
@@ -282,12 +318,12 @@ final class ImportService {
     // MARK: - Reference Extraction
 
     /// Extract DOI from PDF text and fetch metadata from CrossRef.
-    private func autoExtractReference(documentId: String, pdfURL: URL) async {
+    private func autoExtractReference(itemId: String, pdfURL: URL) async {
         guard let doi = DOIExtractorService.extractDOI(from: pdfURL) else { return }
 
         do {
             let cslItem = try await CrossRefService.fetchMetadata(doi: doi)
-            try referenceService.saveMetadata(cslItem, forDocumentId: documentId)
+            try referenceService.saveMetadata(cslItem, forItemId: itemId)
             await MainActor.run {
                 store.invalidate()
             }
@@ -314,7 +350,7 @@ final class ImportService {
 
     /// Find a document with the same hash prefix.
     /// Checks existing PDFs in storage by hashing their first 64KB.
-    private func findByHash(_ hash: String) -> PDFLibraryItem? {
+    private func findByHash(_ hash: String) -> LibraryItem? {
         for item in store.items {
             let pdfURL = item.fileURL
             if let existingHash = hashPrefix(of: pdfURL), existingHash == hash {

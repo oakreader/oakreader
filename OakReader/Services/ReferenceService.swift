@@ -2,16 +2,16 @@ import Foundation
 import GRDB
 
 /// Stateless service for reference metadata CRUD operations.
-/// Stores CSL JSON as the canonical representation in the `reference_metadata` table.
+/// Stores CSL JSON as the canonical representation in the `citations` table.
 struct ReferenceService {
     let database: CatalogDatabase
 
     // MARK: - Fetch
 
-    func fetchMetadata(forDocumentId documentId: String) -> ReferenceMetadata? {
+    func fetchMetadata(forItemId itemId: String) -> ReferenceMetadata? {
         guard let record = try? database.dbQueue.read({ db in
-            try ReferenceMetadataRecord
-                .filter(ReferenceMetadataRecord.CodingKeys.documentId == documentId)
+            try CitationRecord
+                .filter(CitationRecord.CodingKeys.itemId == itemId)
                 .fetchOne(db)
         }) else { return nil }
         return ReferenceMetadata(jsonString: record.cslJson)
@@ -19,7 +19,7 @@ struct ReferenceService {
 
     // MARK: - Save
 
-    func saveMetadata(_ cslItem: CSLItem, forDocumentId documentId: String) throws {
+    func saveMetadata(_ cslItem: CSLItem, forItemId itemId: String) throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         let jsonData = try encoder.encode(cslItem)
@@ -31,12 +31,12 @@ struct ReferenceService {
 
         try database.dbQueue.write { db in
             // Check if record exists
-            let existing = try ReferenceMetadataRecord
-                .filter(ReferenceMetadataRecord.CodingKeys.documentId == documentId)
+            let existing = try CitationRecord
+                .filter(CitationRecord.CodingKeys.itemId == itemId)
                 .fetchOne(db)
 
-            var record = ReferenceMetadataRecord(
-                documentId: documentId,
+            var record = CitationRecord(
+                itemId: itemId,
                 cslJson: jsonString,
                 cslType: cslItem.type,
                 doi: cslItem.DOI,
@@ -48,21 +48,21 @@ struct ReferenceService {
 
             try record.save(db)
 
-            // Update DocumentRecord author/title from CSL data
+            // Update ItemRecord author/title from CSL data
             let authorDisplay = (cslItem.author ?? [])
                 .map { $0.displayString }
                 .joined(separator: ", ")
 
             if !authorDisplay.isEmpty {
                 try db.execute(
-                    sql: "UPDATE documents SET author = ?, updated_at = ? WHERE id = ?",
-                    arguments: [authorDisplay, now, documentId]
+                    sql: "UPDATE items SET author = ?, updated_at = ? WHERE id = ?",
+                    arguments: [authorDisplay, now, itemId]
                 )
             }
             if let title = cslItem.title, !title.isEmpty {
                 try db.execute(
-                    sql: "UPDATE documents SET title = ?, updated_at = ? WHERE id = ?",
-                    arguments: [title, now, documentId]
+                    sql: "UPDATE items SET title = ?, updated_at = ? WHERE id = ?",
+                    arguments: [title, now, itemId]
                 )
             }
         }
@@ -70,11 +70,11 @@ struct ReferenceService {
 
     // MARK: - Delete
 
-    func deleteMetadata(forDocumentId documentId: String) throws {
+    func deleteMetadata(forItemId itemId: String) throws {
         try database.dbQueue.write { db in
             try db.execute(
-                sql: "DELETE FROM reference_metadata WHERE document_id = ?",
-                arguments: [documentId]
+                sql: "DELETE FROM citations WHERE item_id = ?",
+                arguments: [itemId]
             )
         }
     }

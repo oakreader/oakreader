@@ -261,7 +261,7 @@ final class SnapshotServer {
 
     /// Assigns an imported item to a collection if a collectionId was provided.
     /// Must be called on the main thread.
-    private func assignToCollection(item: PDFLibraryItem, collectionId: String?) {
+    private func assignToCollection(item: LibraryItem, collectionId: String?) {
         guard let collectionId else { return }
         let store = importService.store
         guard let collection = store.collections.first(where: { $0.id.uuidString == collectionId }) else {

@@ -10,10 +10,10 @@ struct NoteService {
     // MARK: - Fetch
 
     /// Fetch all notes for a document, ordered by pinned-first then updated_at descending.
-    func fetchNotes(forDocumentId documentId: String) throws -> [Note] {
+    func fetchNotes(forItemId itemId: String) throws -> [Note] {
         try database.dbQueue.read { db in
             let records = try NoteRecord
-                .filter(NoteRecord.CodingKeys.documentId == documentId)
+                .filter(NoteRecord.CodingKeys.itemId == itemId)
                 .order(
                     NoteRecord.CodingKeys.isPinned.desc,
                     NoteRecord.CodingKeys.updatedAt.desc
@@ -52,14 +52,14 @@ struct NoteService {
     // MARK: - Create
 
     @discardableResult
-    func createNote(documentId: String, storageKey: String) throws -> Note {
+    func createNote(itemId: String, storageKey: String) throws -> Note {
         let noteId = UUID()
         let now = Date().iso8601String
 
         var record = NoteRecord(
             id: noteId.uuidString,
             userId: localUserId,
-            documentId: documentId,
+            itemId: itemId,
             title: "",
             isPinned: false,
             createdAt: now,
