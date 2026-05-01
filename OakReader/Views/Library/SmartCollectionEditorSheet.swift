@@ -6,20 +6,12 @@ struct SmartCollectionEditorSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var name: String = ""
-    @State private var icon: String = "magnifyingglass"
     @State private var matchMode: FilterRuleSet.MatchMode = .all
     @State private var conditions: [FilterCondition] = [
         FilterCondition(field: .title, op: .contains, value: "")
     ]
 
     private var isEditing: Bool { collection != nil }
-
-    private let iconOptions = [
-        "magnifyingglass", "line.3.horizontal.decrease.circle", "sparkle.magnifyingglass",
-        "folder", "folder.fill", "tray.full", "books.vertical",
-        "star", "bookmark", "tag", "archivebox",
-        "graduationcap", "briefcase", "heart", "flag"
-    ]
 
     var body: some View {
         VStack(spacing: 16) {
@@ -28,34 +20,6 @@ struct SmartCollectionEditorSheet: View {
 
             TextField("Collection Name", text: $name)
                 .textFieldStyle(.roundedBorder)
-
-            // Icon picker
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Icon")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 36))], spacing: 8) {
-                    ForEach(iconOptions, id: \.self) { iconName in
-                        Button {
-                            icon = iconName
-                        } label: {
-                            Image(systemName: iconName)
-                                .font(.system(size: 16))
-                                .frame(width: 32, height: 32)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .fill(icon == iconName ? Color.accentColor.opacity(0.2) : Color.clear)
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .stroke(icon == iconName ? Color.accentColor : Color.clear, lineWidth: 1.5)
-                                )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
 
             Divider()
 
@@ -108,7 +72,7 @@ struct SmartCollectionEditorSheet: View {
                         store.renameCollection(collection, to: trimmed)
                         store.updateSmartCollectionRules(collection, rules: rules)
                     } else {
-                        store.createSmartCollection(name: trimmed, icon: icon, rules: rules)
+                        store.createSmartCollection(name: trimmed, icon: "magnifyingglass", rules: rules)
                     }
                     dismiss()
                 }
@@ -121,7 +85,6 @@ struct SmartCollectionEditorSheet: View {
         .onAppear {
             if let collection {
                 name = collection.name
-                icon = collection.icon
                 if let rules = collection.filterRules {
                     matchMode = rules.match
                     conditions = rules.conditions.isEmpty

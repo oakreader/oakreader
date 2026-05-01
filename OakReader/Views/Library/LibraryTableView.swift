@@ -157,13 +157,11 @@ struct LibraryTableView: View {
                 store.toggleFavorite(item)
             }
 
-            let traditionalCollections = store.userCollections.filter { !$0.isSmart }
-            if !traditionalCollections.isEmpty {
+            let rootCollections = store.rootCollections.sorted(by: { $0.sortOrder < $1.sortOrder })
+            if !rootCollections.isEmpty {
                 Menu("Add to Collection") {
-                    ForEach(traditionalCollections) { collection in
-                        Button(collection.name) {
-                            store.addItem(item, to: collection)
-                        }
+                    ForEach(rootCollections) { collection in
+                        collectionMenuItem(for: item, collection: collection)
                     }
                 }
             }
@@ -182,7 +180,12 @@ struct LibraryTableView: View {
                                     store.setItemSelectValue(item: item, property: property, option: option)
                                 }
                             } label: {
-                                Label(option.name, systemImage: isAssigned ? "checkmark.circle.fill" : "circle")
+                                Label {
+                                    Text(option.name)
+                                } icon: {
+                                    Image(systemName: isAssigned ? "checkmark.circle.fill" : "circle.fill")
+                                        .foregroundStyle(Color(hex: option.colorHex))
+                                }
                             }
                         }
                     }
@@ -237,6 +240,37 @@ struct LibraryTableView: View {
             Button("Remove \(selectedItems.count) Items", role: .destructive) {
                 for item in selectedItems { store.removeItem(item) }
             }
+        }
+    }
+
+    // MARK: - Collection Menu (hierarchical)
+
+    private func collectionMenuItem(for item: LibraryItem, collection: PDFCollection) -> AnyView {
+        let children = collection.subcollections.filter { !$0.isSmart }.sorted(by: { $0.sortOrder < $1.sortOrder })
+        if children.isEmpty {
+            return AnyView(
+                Button {
+                    store.addItem(item, to: collection)
+                } label: {
+                    Label(collection.name, systemImage: "folder.fill")
+                }
+            )
+        } else {
+            return AnyView(
+                Menu {
+                    Button {
+                        store.addItem(item, to: collection)
+                    } label: {
+                        Label(collection.name, systemImage: "folder.fill")
+                    }
+                    Divider()
+                    ForEach(children) { child in
+                        collectionMenuItem(for: item, collection: child)
+                    }
+                } label: {
+                    Label(collection.name, systemImage: "folder.fill")
+                }
+            )
         }
     }
 
