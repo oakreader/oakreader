@@ -110,6 +110,27 @@ enum FormFieldType: String, CaseIterable, Identifiable {
 }
 
 
+enum LibrarySidebarMode: String, CaseIterable, Identifiable {
+    case collections
+    case tags
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .collections: return "Collections"
+        case .tags: return "Tags"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .collections: return "folder"
+        case .tags: return "tag"
+        }
+    }
+}
+
 enum RightPanelMode: String, CaseIterable, Identifiable {
     case aiChat
     case notes
@@ -130,6 +151,36 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
         case .reference: return "Reference"
         case .aiChat: return "AI Chat"
         case .notes: return "Notes"
+        }
+    }
+}
+
+enum LibraryDetailTab: String, CaseIterable, Identifiable {
+    case chat
+    case info
+    case reference
+    case properties
+    case notes
+
+    var id: String { rawValue }
+
+    var systemImage: String {
+        switch self {
+        case .info: return "info.circle"
+        case .reference: return "quote.opening"
+        case .properties: return "tag"
+        case .notes: return "note.text"
+        case .chat: return "bubble.left.and.bubble.right"
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .info: return "Info"
+        case .reference: return "Reference"
+        case .properties: return "Properties"
+        case .notes: return "Notes"
+        case .chat: return "Chat"
         }
     }
 }
