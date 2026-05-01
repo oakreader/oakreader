@@ -103,3 +103,79 @@ class PopupActionButton: NSButton {
         onClick()
     }
 }
+
+// MARK: - Popup Icon Button (icon-only, hover highlight)
+
+class PopupIconButton: NSView {
+    private let onClick: () -> Void
+    private var isHovered = false
+    private var trackingArea: NSTrackingArea?
+    private let iconView: NSImageView
+
+    init(systemImage: String, accessibilityLabel: String, onClick: @escaping () -> Void) {
+        self.onClick = onClick
+        self.iconView = NSImageView()
+        super.init(frame: NSRect(x: 0, y: 0, width: 32, height: 32))
+
+        wantsLayer = true
+        layer?.cornerRadius = 6
+        translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            widthAnchor.constraint(equalToConstant: 32),
+            heightAnchor.constraint(equalToConstant: 32),
+        ])
+
+        if let img = NSImage(systemSymbolName: systemImage, accessibilityDescription: accessibilityLabel) {
+            let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
+            iconView.image = img.withSymbolConfiguration(config)
+        }
+        iconView.contentTintColor = .secondaryLabelColor
+        iconView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(iconView)
+        NSLayoutConstraint.activate([
+            iconView.centerXAnchor.constraint(equalTo: centerXAnchor),
+            iconView.centerYAnchor.constraint(equalTo: centerYAnchor),
+            iconView.widthAnchor.constraint(equalToConstant: 18),
+            iconView.heightAnchor.constraint(equalToConstant: 18),
+        ])
+
+        toolTip = accessibilityLabel
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let ta = trackingArea { removeTrackingArea(ta) }
+        trackingArea = NSTrackingArea(
+            rect: bounds, options: [.mouseEnteredAndExited, .activeAlways], owner: self
+        )
+        addTrackingArea(trackingArea!)
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        isHovered = true
+        layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.10).cgColor
+        iconView.contentTintColor = .labelColor
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        isHovered = false
+        layer?.backgroundColor = nil
+        iconView.contentTintColor = .secondaryLabelColor
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.18).cgColor
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        let pt = convert(event.locationInWindow, from: nil)
+        if bounds.contains(pt) {
+            onClick()
+        }
+        layer?.backgroundColor = isHovered
+            ? NSColor.controlAccentColor.withAlphaComponent(0.10).cgColor
+            : nil
+    }
+}
