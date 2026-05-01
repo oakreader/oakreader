@@ -4,7 +4,7 @@ import SwiftUI
 /// Reports its content height so the parent can size it to fit.
 struct ChatInputTextView: NSViewRepresentable {
     @Binding var text: String
-    var placeholder: String = "Ask about this PDF..."
+    var placeholder: String = "Ask about this Document..."
     var onSend: () -> Void
     var onPasteImage: ((Data) -> Void)?
     @Binding var contentHeight: CGFloat

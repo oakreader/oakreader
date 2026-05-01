@@ -172,6 +172,18 @@ private extension LibrarySidebarView {
         .padding(.bottom, 4)
     }
 
+    /// Collect IDs of all nodes that have children.
+    private func collectParentIds(from nodes: [TagNode]) -> Set<UUID> {
+        var ids = Set<UUID>()
+        for node in nodes {
+            if !node.children.isEmpty {
+                ids.insert(node.id)
+                ids.formUnion(collectParentIds(from: node.children))
+            }
+        }
+        return ids
+    }
+
     var tagsScrollView: some View {
         ScrollView {
             let pairs = store.tagOptionsWithCounts()
@@ -204,6 +216,10 @@ private extension LibrarySidebarView {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .onAppear {
+                    let parentIds = collectParentIds(from: nodes)
+                    expandedTagNodes.formUnion(parentIds)
+                }
             }
         }
         .id(store.revision)

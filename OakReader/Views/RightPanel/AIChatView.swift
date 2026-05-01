@@ -93,7 +93,7 @@ struct AIChatView: View {
             Image(systemName: "bubble.left.and.text.bubble.right")
                 .font(.system(size: 40))
                 .foregroundStyle(.tertiary)
-            Text(chatVM.parent != nil ? "Ask about this PDF" : "Ask anything")
+            Text(chatVM.parent != nil ? "Ask about this Document" : "Ask anything")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.secondary)
             Text(chatVM.parent != nil
@@ -231,7 +231,7 @@ struct AIChatView: View {
                     get: { chatVM.inputText },
                     set: { chatVM.inputText = $0 }
                 ),
-                placeholder: chatVM.parent != nil ? "Ask about this PDF..." : "Ask a question...",
+                placeholder: chatVM.parent != nil ? "Ask about this Document..." : "Ask a question...",
                 onSend: { if inputHasText { chatVM.send() } },
                 onPasteImage: { data in chatVM.addClipboardImage(data) },
                 contentHeight: $inputContentHeight,
