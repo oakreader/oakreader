@@ -46,10 +46,10 @@ Thumbs.db
 *.mobileprovision
 *.provisionprofile
 
-# Chrome Extension
-chrome-extension/node_modules/
-chrome-extension/.output/
-chrome-extension/.wxt/
+# Browser Extension
+browser-extension/node_modules/
+browser-extension/.output/
+browser-extension/.wxt/
 
 # Keys and secrets
 *.pem

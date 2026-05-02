@@ -25,19 +25,19 @@ generate:
 build: generate
 	xcodebuild -scheme OakReader build
 
-# ---------- Chrome Extension ----------
+# ---------- Browser Extension ----------
 
 extension-install:
-	cd chrome-extension && pnpm install
+	cd browser-extension && pnpm install
 
 extension: extension-install
-	cd chrome-extension && pnpm build
+	cd browser-extension && pnpm build
 
 extension-dev: extension-install
-	cd chrome-extension && pnpm dev
+	cd browser-extension && pnpm dev
 
 extension-clean:
-	rm -rf chrome-extension/.output chrome-extension/node_modules
+	rm -rf browser-extension/.output browser-extension/node_modules
 
 # ---------- Clean ----------
 
