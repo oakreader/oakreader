@@ -23,12 +23,13 @@ class NotesViewModel {
     private let noteService: NoteService?
     private let storageKey: String?
     private var itemId: String?
+    private var citeKey: String?
     private var saveTask: Task<Void, Never>?
     private var lastSavedContent: String = ""
 
     // MARK: - Init
 
-    init(parent: DocumentViewModel, database: CatalogDatabase?, storageKey: String?) {
+    init(parent: DocumentViewModel? = nil, database: CatalogDatabase?, storageKey: String?) {
         self.parent = parent
         self.storageKey = storageKey
         if let database {
@@ -40,14 +41,16 @@ class NotesViewModel {
         loadNotes()
     }
 
-    /// Resolve the library item UUID from the storage key.
+    /// Resolve the library item UUID and cite key from the storage key.
     private func resolveItemId() {
         guard let storageKey, let noteService else { return }
-        itemId = try? noteService.database.dbQueue.read { db in
+        let record = try? noteService.database.dbQueue.read { db in
             try ItemRecord
                 .filter(ItemRecord.CodingKeys.storageKey == storageKey)
-                .fetchOne(db)?.id
+                .fetchOne(db)
         }
+        itemId = record?.id
+        citeKey = record?.citeKey
     }
 
     // MARK: - Load
@@ -211,31 +214,36 @@ class NotesViewModel {
 
     // MARK: - Add Content from Selection
 
-    /// Add quoted text with a [[Page X]] reference to the current (or new) note.
+    /// Add quoted text with a `[[@key, p.N]]` or `[[Page X]]` reference to the current (or new) note.
     func addTextToNote(_ text: String, pageIndex: Int?, source: String = "PDF") {
         ensureNoteSelected()
-        let ref: String
-        if let page = pageIndex {
-            ref = "[[Page \(page + 1)]]"
-        } else {
-            ref = "[[\(source)]]"
-        }
+        let ref = buildReference(pageIndex: pageIndex, source: source)
         let snippet = "\n\n> \(text.replacingOccurrences(of: "\n", with: "\n> "))\n>\n> — \(ref)\n"
         appendToEditor(snippet)
     }
 
-    /// Add an image attachment with a [[Page X]] reference to the current (or new) note.
+    /// Add an image attachment with a `[[@key, p.N]]` or `[[Page X]]` reference to the current (or new) note.
     func addImageToNote(_ data: Data, pageIndex: Int?, source: String = "PDF", fileExtension: String = "png") {
         ensureNoteSelected()
         guard let relativePath = saveImage(data, fileExtension: fileExtension) else { return }
-        let ref: String
-        if let page = pageIndex {
-            ref = "[[Page \(page + 1)]]"
-        } else {
-            ref = "[[\(source)]]"
-        }
+        let ref = buildReference(pageIndex: pageIndex, source: source)
         let snippet = "\n\n![capture](\(relativePath))\n\n— \(ref)\n"
         appendToEditor(snippet)
+    }
+
+    /// Build a `[[@key, p.N]]` or `[[Page N]]` reference string.
+    private func buildReference(pageIndex: Int?, source: String) -> String {
+        if let key = citeKey, !key.isEmpty {
+            if let page = pageIndex {
+                return "[[@\(key), p.\(page + 1)]]"
+            } else {
+                return "[[@\(key)]]"
+            }
+        }
+        if let page = pageIndex {
+            return "[[Page \(page + 1)]]"
+        }
+        return "[[\(source)]]"
     }
 
     /// If no note is selected, create one and select it.
