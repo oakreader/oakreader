@@ -5,10 +5,9 @@ struct LibrarySidebarPanel: View {
     let item: LibraryItem
     @Bindable var appState: AppState
 
-    @State private var notes: [Note] = []
+    @State private var notesVM: NotesViewModel?
 
     private var store: LibraryStore { appState.libraryStore }
-    private var noteService: NoteService { NoteService(database: store.database) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -19,36 +18,41 @@ struct LibrarySidebarPanel: View {
             Divider()
 
             // Tabbed content
-            ScrollView {
-                VStack(alignment: .leading, spacing: 1) {
-                    switch appState.libraryDetailTab {
-                    case .info:
-                        infoTabContent
-                    case .reference:
-                        referenceTabContent
-                    case .properties:
-                        propertiesTabContent
-                    case .notes:
-                        notesTabContent
-                    case .chat:
-                        EmptyView()
-                    }
+            if appState.libraryDetailTab == .notes {
+                // NotePanelView manages its own scrolling
+                if let notesVM {
+                    NotePanelView(notesVM: notesVM)
                 }
-                .padding(8)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 1) {
+                        switch appState.libraryDetailTab {
+                        case .info:
+                            infoTabContent
+                        case .reference:
+                            referenceTabContent
+                        case .properties:
+                            propertiesTabContent
+                        case .notes, .chat:
+                            EmptyView()
+                        }
+                    }
+                    .padding(8)
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onChange(of: item.id) {
-            loadNotes()
+            createNotesVM()
         }
         .onChange(of: appState.libraryDetailTab) {
-            if appState.libraryDetailTab == .notes {
-                loadNotes()
+            if appState.libraryDetailTab == .notes && notesVM == nil {
+                createNotesVM()
             }
         }
         .onAppear {
             if appState.libraryDetailTab == .notes {
-                loadNotes()
+                createNotesVM()
             }
         }
     }
@@ -87,70 +91,13 @@ struct LibrarySidebarPanel: View {
             .padding(.vertical, 4)
     }
 
-    @ViewBuilder
-    private var notesTabContent: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if notes.isEmpty {
-                VStack(spacing: 8) {
-                    Image(systemName: "note.text")
-                        .font(.system(size: 24))
-                        .foregroundStyle(Color.primary.opacity(0.20))
-                    Text("No notes")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color.primary.opacity(0.35))
-                    Text("Open the document to create notes")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Color.primary.opacity(0.25))
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 24)
-            } else {
-                ForEach(notes) { note in
-                    noteRow(note)
-                }
-            }
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-    }
+    // MARK: - Notes VM
 
-    // MARK: - Note row
-
-    @ViewBuilder
-    private func noteRow(_ note: Note) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 4) {
-                if note.isPinned {
-                    Image(systemName: "pin.fill")
-                        .font(.system(size: 10))
-                        .foregroundStyle(Color.accentColor)
-                }
-                Text(note.displayTitle)
-                    .font(.system(size: 13, weight: .medium))
-                    .lineLimit(1)
-            }
-            Text(note.updatedAt.formatted(date: .abbreviated, time: .shortened))
-                .font(.system(size: 12))
-                .foregroundStyle(Color.primary.opacity(0.45))
-        }
-        .padding(.vertical, 4)
-        .padding(.horizontal, 4)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(Color.primary.opacity(0.05))
-                .frame(height: 1)
-        }
-    }
-
-    // MARK: - Notes loading
-
-    private func loadNotes() {
-        do {
-            notes = try noteService.fetchNotes(forItemId: item.id.uuidString)
-        } catch {
-            notes = []
-        }
+    private func createNotesVM() {
+        notesVM = NotesViewModel(
+            database: store.database,
+            storageKey: item.storageKey
+        )
     }
 
     // MARK: - Section wrapper (OakReader collapsible section style)
