@@ -92,7 +92,7 @@ struct TabBarView: View {
         }
         .padding(.leading, isFullScreen ? fullScreenPadding : trafficLightPadding)
         .frame(height: OakStyle.Size.tabBarHeight)
-        .background(OakStyle.Colors.tabBarBackground)
+        .background(.thinMaterial)
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEnterFullScreenNotification)) { _ in
             isFullScreen = true
         }

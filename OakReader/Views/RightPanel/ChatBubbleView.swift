@@ -6,6 +6,8 @@ struct ChatBubbleView: View {
     let turn: ChatTurn
 
     @State private var isHovered = false
+    @State private var isCopyHovered = false
+    @State private var showCopied = false
     @State private var reveal = StreamRevealController()
 
     var body: some View {
@@ -54,14 +56,27 @@ struct ChatBubbleView: View {
 
                     // Copy button — always visible after response is done
                     if !turn.isStreaming && turn.role == .assistant {
-                        Button(action: copyContent) {
-                            Image(systemName: "doc.on.doc")
-                                .font(.system(size: 13))
-                                .foregroundStyle(.secondary)
+                        Button(action: {
+                            copyContent()
+                            showCopied = true
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                                showCopied = false
+                            }
+                        }) {
+                            Image(systemName: showCopied ? "checkmark" : "doc.on.doc")
+                                .font(.system(size: 12))
+                                .foregroundStyle(showCopied ? .green : .secondary)
+                                .frame(width: 24, height: 24)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .fill(isCopyHovered ? Color.primary.opacity(0.08) : Color.clear)
+                                )
                         }
                         .buttonStyle(.plain)
-                        .help("Copy")
-                        .padding(.leading, 4)
+                        .onHover { isCopyHovered = $0 }
+                        .help(showCopied ? "Copied!" : "Copy")
+                        .animation(.easeInOut(duration: 0.15), value: showCopied)
+                        .animation(.easeInOut(duration: 0.15), value: isCopyHovered)
                     }
                 }
 
@@ -116,7 +131,7 @@ struct ChatBubbleView: View {
                 .foregroundStyle(Color(nsColor: .labelColor))
         } else {
             base
-                .padding(.horizontal, 4)
+                .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .background(
                     RoundedRectangle(cornerRadius: 12)

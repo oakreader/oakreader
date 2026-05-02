@@ -28,6 +28,6 @@ struct SideNavView: View {
         }
         .padding(.top, 6)
         .frame(width: OakStyle.Size.sidenavWidth)
-        .background(OakStyle.Colors.sidebarBackground)
+        .background(.thinMaterial)
     }
 }
