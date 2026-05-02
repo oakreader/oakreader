@@ -1,0 +1,39 @@
+import type { CollectionInfo, PageCapture, PDFSavePayload, TagNodeInfo } from "./types";
+
+const SERVER_BASE = "http://127.0.0.1:23119";
+const SNAPSHOT_URL = `${SERVER_BASE}/snapshot`;
+const COLLECTIONS_URL = `${SERVER_BASE}/collections`;
+const TAGS_URL = `${SERVER_BASE}/tags`;
+
+export async function fetchCollections(): Promise<CollectionInfo[]> {
+  const response = await fetch(COLLECTIONS_URL);
+  return response.json();
+}
+
+export async function fetchTags(): Promise<TagNodeInfo[]> {
+  const response = await fetch(TAGS_URL);
+  return response.json();
+}
+
+export async function postSnapshot(
+  payload: PageCapture | PDFSavePayload,
+  collectionId: string | undefined,
+  tagOptionIds: string[]
+): Promise<{ status: string; message?: string }> {
+  const body: Record<string, unknown> = {
+    ...payload,
+    collectionId,
+  };
+
+  if (tagOptionIds.length > 0) {
+    body.tagOptionIds = tagOptionIds;
+  }
+
+  const response = await fetch(SNAPSHOT_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  return response.json();
+}

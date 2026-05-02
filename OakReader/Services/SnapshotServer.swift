@@ -257,6 +257,8 @@ final class SnapshotServer {
             handleHTMLSnapshot(payload, completion: completion)
         case "embed":
             handleEmbed(payload, completion: completion)
+        case "pdf":
+            handlePDFSnapshot(payload, completion: completion)
         default:
             completion(.failure(OakReaderError.serverError("Unknown type: \(payload.type)")))
         }
@@ -334,6 +336,73 @@ final class SnapshotServer {
                 }
             }
         }
+    }
+
+    // MARK: - PDF Snapshot
+
+    private func handlePDFSnapshot(_ payload: SnapshotPayload, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let pdfURL = URL(string: payload.url) else {
+            completion(.failure(OakReaderError.serverError("Invalid PDF URL")))
+            return
+        }
+
+        // Build request with forwarded cookies for authenticated downloads
+        var request = URLRequest(url: pdfURL)
+        if let cookies = payload.cookies, !cookies.isEmpty {
+            request.setValue(cookies, forHTTPHeaderField: "Cookie")
+        }
+
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            guard let self else { return }
+
+            if let error {
+                completion(.failure(OakReaderError.serverError("PDF download failed: \(error.localizedDescription)")))
+                return
+            }
+
+            guard let data, !data.isEmpty else {
+                completion(.failure(OakReaderError.serverError("PDF download returned empty data")))
+                return
+            }
+
+            // Verify we got a PDF (check magic bytes %PDF)
+            let prefix = data.prefix(5)
+            guard prefix.count >= 4, String(data: Data(prefix.prefix(4)), encoding: .ascii) == "%PDF" else {
+                completion(.failure(OakReaderError.serverError("Downloaded content is not a valid PDF")))
+                return
+            }
+
+            // Derive filename from URL or title
+            let filename: String
+            if let urlFilename = pdfURL.lastPathComponent.removingPercentEncoding,
+               urlFilename.lowercased().hasSuffix(".pdf") {
+                filename = urlFilename
+            } else {
+                filename = self.sanitizeFileName(payload.title ?? "download") + ".pdf"
+            }
+
+            // Write to temp file
+            let tempURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent(UUID().uuidString + "_" + filename)
+            do {
+                try data.write(to: tempURL)
+            } catch {
+                completion(.failure(error))
+                return
+            }
+
+            DispatchQueue.main.async {
+                let item = self.importService.importPDF(from: tempURL)
+                try? FileManager.default.removeItem(at: tempURL)
+                if let item {
+                    self.assignToCollection(item: item, collectionId: payload.collectionId)
+                    self.assignTags(item: item, tagOptionIds: payload.tagOptionIds)
+                    completion(.success(()))
+                } else {
+                    completion(.failure(OakReaderError.serverError("PDF import failed")))
+                }
+            }
+        }.resume()
     }
 
     // MARK: - Collection Assignment
@@ -423,7 +492,7 @@ final class SnapshotServer {
 // MARK: - Payload
 
 struct SnapshotPayload: Codable {
-    let type: String            // "html" | "embed"
+    let type: String            // "html" | "embed" | "pdf"
     let url: String
     let title: String?
     let author: String?
@@ -433,6 +502,7 @@ struct SnapshotPayload: Codable {
     let thumbnailURL: String?
     let transcript: String?
     let description: String?
+    let cookies: String?        // pdf only — forwarded cookies for authenticated downloads
     let collectionId: String?   // optional — target collection, nil = inbox
     let tagOptionIds: [String]? // optional — tag option UUIDs to assign
 }
