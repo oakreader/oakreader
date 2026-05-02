@@ -206,7 +206,7 @@ struct AIChatView: View {
 
     // MARK: - Input Bar
 
-    @State private var inputContentHeight: CGFloat = 36
+    @State private var inputContentHeight: CGFloat = 48
     private let inputFocusRef = ChatInputTextView.FocusRef()
 
     private var inputHasText: Bool {

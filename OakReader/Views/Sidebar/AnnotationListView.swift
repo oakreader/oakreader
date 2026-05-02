@@ -40,7 +40,8 @@ struct AnnotationListView: View {
                         }
                     }
                 }
-                .listStyle(.sidebar)
+                .listStyle(.plain)
+                .listRowSeparator(.hidden)
             }
 
             Divider()
@@ -62,7 +63,7 @@ struct AnnotationListView: View {
             }
             .padding(8)
         }
-        .background(.white)
+        .background(Color(nsColor: .controlBackgroundColor))
         .onAppear { loadAnnotations() }
     }
 

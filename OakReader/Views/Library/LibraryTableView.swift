@@ -22,22 +22,6 @@ struct LibraryTableView: View {
                             .font(.system(size: 14))
                             .accessibilityLabel(item.primaryAttachment?.attachmentType.label ?? "Document")
 
-                        // Property value chips: overlapping colored squares
-                        let selectValues = item.propertyValues.filter { $0.option != nil }
-                        if !selectValues.isEmpty {
-                            HStack(spacing: -3) {
-                                ForEach(selectValues.prefix(3), id: \.id) { pv in
-                                    if let opt = pv.option {
-                                        RoundedRectangle(cornerRadius: 2)
-                                            .fill(Color(hex: opt.colorHex))
-                                            .frame(width: 11, height: 11)
-                                            .accessibilityLabel("\(pv.propertyName): \(opt.name)")
-                                    }
-                                }
-                            }
-                            .padding(.trailing, 2)
-                        }
-
                         Text(item.title)
                             .font(.system(size: 14))
                             .lineLimit(1)

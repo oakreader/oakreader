@@ -31,6 +31,35 @@ private struct TopLeftBorderFill: Shape {
     }
 }
 
+/// L-shaped filled border: 1px top + right edges with a rounded top-right corner.
+struct TopRightBorderFill: Shape {
+    let radius: CGFloat
+    let thickness: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        let t = thickness
+        let r = radius
+        var path = Path()
+
+        // Outer edge
+        path.move(to: CGPoint(x: 0, y: 0))
+        path.addLine(to: CGPoint(x: rect.maxX - r, y: 0))
+        path.addArc(center: CGPoint(x: rect.maxX - r, y: r), radius: r,
+                     startAngle: .degrees(-90), endAngle: .degrees(0), clockwise: false)
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+
+        // Inner edge (back up)
+        path.addLine(to: CGPoint(x: rect.maxX - t, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.maxX - t, y: r))
+        path.addArc(center: CGPoint(x: rect.maxX - r, y: r), radius: r - t,
+                     startAngle: .degrees(0), endAngle: .degrees(-90), clockwise: true)
+        path.addLine(to: CGPoint(x: 0, y: t))
+        path.closeSubpath()
+
+        return path
+    }
+}
+
 // 3-pane layout: sidebar, table, detail panel
 struct LibraryRootView: View {
     @Bindable var appState: AppState
@@ -68,9 +97,9 @@ struct LibraryRootView: View {
                 )
 
                 // Right pane: sidenav always visible + conditional content
-                VStack(spacing: 0) {
-                    Divider()
-                    HStack(spacing: 0) {
+                HStack(spacing: 0) {
+                    // Content panel with rounded top-right corner
+                    VStack(spacing: 0) {
                         if appState.libraryDetailTab == .chat {
                             AIChatView(chatVM: appState.libraryChatVM)
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -79,11 +108,22 @@ struct LibraryRootView: View {
                         } else {
                             Spacer()
                         }
-
-                        LibrarySideNavView(tab: $appState.libraryDetailTab)
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(nsColor: .textBackgroundColor))
+                    .clipShape(UnevenRoundedRectangle(
+                        topLeadingRadius: 0,
+                        bottomLeadingRadius: 0,
+                        bottomTrailingRadius: 0,
+                        topTrailingRadius: OakStyle.Radius.standard
+                    ))
+                    .overlay(
+                        TopRightBorderFill(radius: OakStyle.Radius.standard, thickness: 1)
+                            .fill(Color(nsColor: .separatorColor))
+                    )
+
+                    LibrarySideNavView(tab: $appState.libraryDetailTab)
                 }
-                .background(Color(hex: "F2F2F2"))
                 .frame(minWidth: 200, idealWidth: 358, maxWidth: 800)
             }
         }

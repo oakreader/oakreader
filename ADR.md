@@ -148,7 +148,7 @@ Architectural decisions made during OakReader development, extracted from 52 Cla
 - **Context**: Textual-based SwiftUI preview was too limited (no custom CSS, basic code blocks, no image zoom).
 - **Decision**: Switch note preview from Textual StructuredText to WKWebView with MiaoYan's CSS/JS bundle (stripped from ~6MB to ~468KB), using cmark-gfm for markdown-to-HTML conversion. Kept: highlight.js, KaTeX, Lightense, Heti. Stripped: mermaid, d3, markmap, plantuml, emoji, tocbot.
 - **Alternatives Considered**: Textual StructuredText (rejected for limited styling control, no diagram support)
-- **Rationale**: WKWebView allows full CSS control for typography. MiaoYan's proven bundle provides all features out of the box.
+- **Rationale**: WKWebView allows full CSS control for typsography. MiaoYan's proven bundle provides all features out of the box.
 
 ### ADR-023: Force TextKit 1 for Cursor Height Fix on macOS 15
 - **Context**: Empty lines in the markdown editor had overly tall cursors. The `drawInsertionPoint` override wasn't being called on macOS 15 (TextKit 2 default).

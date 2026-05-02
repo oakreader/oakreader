@@ -6,7 +6,7 @@ struct SidebarView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Tab-style mode picker
-            HStack(spacing: 0) {
+            HStack(spacing: 2) {
                 ForEach(SidebarMode.allCases) { mode in
                     let selected = viewModel.state.sidebarMode == mode
                     Button {
@@ -15,22 +15,24 @@ struct SidebarView: View {
                         }
                     } label: {
                         Image(systemName: mode.systemImage)
-                            .font(.system(size: OakStyle.Font.icon))
+                            .font(.system(size: 13))
                             .frame(maxWidth: .infinity)
-                            .frame(height: 28)
-                            .foregroundStyle(selected ? .white : .secondary)
+                            .frame(height: 22)
+                            .foregroundStyle(selected ? .primary : .secondary)
                             .background(
-                                Capsule()
-                                    .fill(selected ? Color.accentColor : .clear)
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(selected ? Color(nsColor: .textBackgroundColor) : .clear)
+                                    .shadow(color: selected ? .black.opacity(0.12) : .clear, radius: 2, y: 1)
                             )
-                            .contentShape(Capsule())
+                            .contentShape(RoundedRectangle(cornerRadius: 6))
                     }
                     .buttonStyle(.plain)
                     .help(mode.label)
                 }
             }
-            .padding(3)
-            .background(Capsule().fill(Color.primary.opacity(0.06)))
+            .padding(.horizontal, 3)
+            .padding(.vertical, 4)
+            .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
             .padding(.horizontal, OakStyle.Spacing.sm)
             .padding(.vertical, OakStyle.Spacing.xs)
 

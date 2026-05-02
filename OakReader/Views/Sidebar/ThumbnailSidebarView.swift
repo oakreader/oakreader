@@ -84,20 +84,19 @@ private struct ThumbnailItemView: View {
             .padding(.top, cardPadding)
             .padding(.bottom, 4)
 
-            // Page number bar at bottom
+            // Page number at bottom
             Text("\(pageIndex + 1)")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.white)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 4)
-                .background(isSelected ? Color.accentColor : Color.gray.opacity(0.45))
         }
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .overlay(
             RoundedRectangle(cornerRadius: 6)
                 .strokeBorder(
-                    isSelected ? Color.accentColor : Color.black.opacity(0.08),
+                    isSelected ? Color.primary.opacity(0.25) : Color.black.opacity(0.08),
                     lineWidth: isSelected ? borderWidth : 1
                 )
         )

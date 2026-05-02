@@ -71,7 +71,7 @@ struct ContentView: View {
                     topLeadingRadius: 2,
                     bottomLeadingRadius: 0,
                     bottomTrailingRadius: 0,
-                    topTrailingRadius: 2
+                    topTrailingRadius: OakStyle.Radius.standard
                 )
             )
 
