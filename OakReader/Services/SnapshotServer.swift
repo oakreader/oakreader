@@ -54,18 +54,52 @@ final class SnapshotServer {
 
     private func handleConnection(_ connection: NWConnection) {
         connection.start(queue: .global(qos: .userInitiated))
+        accumulateRequest(connection: connection, buffer: Data())
+    }
 
-        // Read up to maxPayload + some headroom for headers
-        connection.receive(minimumIncompleteLength: 1, maximumLength: maxPayload + 65536) { [weak self] data, _, _, error in
-            guard let self, let data else {
-                if let error {
-                    Log.error(Log.server, "Receive error: \(error)")
-                }
+    /// Accumulate TCP segments until the full HTTP request (headers + body) has arrived.
+    private func accumulateRequest(connection: NWConnection, buffer: Data) {
+        connection.receive(minimumIncompleteLength: 1, maximumLength: maxPayload + 65536) { [weak self] data, _, isComplete, error in
+            guard let self else { connection.cancel(); return }
+
+            guard let data else {
+                if let error { Log.error(Log.server, "Receive error: \(error)") }
                 connection.cancel()
                 return
             }
 
-            self.processHTTPRequest(data: data, connection: connection)
+            var accumulated = buffer
+            accumulated.append(data)
+
+            // Check if we have the full request by parsing Content-Length
+            if let raw = String(data: accumulated, encoding: .utf8),
+               let headerEnd = raw.range(of: "\r\n\r\n") {
+                let headerSection = String(raw[raw.startIndex..<headerEnd.lowerBound])
+                let bodyStart = accumulated.count - raw[headerEnd.upperBound...].utf8.count
+                let bodyReceived = accumulated.count - bodyStart
+
+                // Parse Content-Length from headers
+                let contentLength = headerSection
+                    .components(separatedBy: "\r\n")
+                    .first(where: { $0.lowercased().hasPrefix("content-length:") })
+                    .flatMap { Int($0.split(separator: ":").last?.trimmingCharacters(in: .whitespaces) ?? "") }
+                    ?? 0
+
+                if bodyReceived >= contentLength || isComplete {
+                    self.processHTTPRequest(data: accumulated, connection: connection)
+                    return
+                }
+            }
+
+            if isComplete {
+                // Connection closed before we could parse — process what we have
+                self.processHTTPRequest(data: accumulated, connection: connection)
+            } else if accumulated.count > self.maxPayload + 65536 {
+                self.sendResponse(connection: connection, status: 413, body: #"{"status":"error","message":"Payload too large"}"#)
+            } else {
+                // Need more data — keep reading
+                self.accumulateRequest(connection: connection, buffer: accumulated)
+            }
         }
     }
 
@@ -106,6 +140,12 @@ final class SnapshotServer {
         // GET /collections
         if method == "GET", path == "/collections" {
             handleGetCollections(connection: connection)
+            return
+        }
+
+        // GET /tags
+        if method == "GET", path == "/tags" {
+            handleGetTags(connection: connection)
             return
         }
 
@@ -172,6 +212,43 @@ final class SnapshotServer {
         }
     }
 
+    // MARK: - GET /tags
+
+    private func handleGetTags(connection: NWConnection) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            let store = self.importService.store
+            let pairs = store.tagOptionsWithCounts()
+            let tree = TagNode.buildHierarchy(from: pairs)
+
+            func serialize(_ nodes: [TagNode]) -> [[String: Any]] {
+                nodes.map { node in
+                    var entry: [String: Any] = [
+                        "id": node.id.uuidString,
+                        "name": node.name,
+                        "fullPath": node.fullPath,
+                        "count": node.count,
+                    ]
+                    if !node.children.isEmpty {
+                        entry["children"] = serialize(node.children)
+                    }
+                    if node.option != nil {
+                        entry["isTag"] = true
+                    }
+                    return entry
+                }
+            }
+
+            let result = serialize(tree)
+            if let jsonData = try? JSONSerialization.data(withJSONObject: result),
+               let jsonString = String(data: jsonData, encoding: .utf8) {
+                self.sendResponse(connection: connection, status: 200, body: jsonString)
+            } else {
+                self.sendResponse(connection: connection, status: 200, body: "[]")
+            }
+        }
+    }
+
     // MARK: - Payload Dispatch
 
     private func handlePayload(_ payload: SnapshotPayload, completion: @escaping (Result<Void, Error>) -> Void) {
@@ -211,6 +288,7 @@ final class SnapshotServer {
             try? FileManager.default.removeItem(at: tempURL)
             if let item {
                 self.assignToCollection(item: item, collectionId: payload.collectionId)
+                self.assignTags(item: item, tagOptionIds: payload.tagOptionIds)
                 completion(.success(()))
             } else {
                 completion(.failure(OakReaderError.serverError("Import failed")))
@@ -249,6 +327,7 @@ final class SnapshotServer {
                 )
                 if let item {
                     self.assignToCollection(item: item, collectionId: payload.collectionId)
+                    self.assignTags(item: item, tagOptionIds: payload.tagOptionIds)
                     completion(.success(()))
                 } else {
                     completion(.failure(OakReaderError.serverError("Embed import failed")))
@@ -269,6 +348,24 @@ final class SnapshotServer {
             return
         }
         store.addItem(item, to: collection)
+    }
+
+    /// Assigns tags to an imported item.
+    /// Must be called on the main thread.
+    private func assignTags(item: LibraryItem, tagOptionIds: [String]?) {
+        guard let tagOptionIds, !tagOptionIds.isEmpty else { return }
+        let store = importService.store
+        guard let tagsProp = store.tagsProperty else {
+            Log.error(Log.server, "Tags property not found")
+            return
+        }
+        for optionIdStr in tagOptionIds {
+            guard let option = tagsProp.options.first(where: { $0.id.uuidString == optionIdStr }) else {
+                Log.error(Log.server, "Tag option not found: \(optionIdStr)")
+                continue
+            }
+            store.setItemSelectValue(item: item, property: tagsProp, option: option)
+        }
     }
 
     // MARK: - HTTP Response
@@ -337,4 +434,5 @@ struct SnapshotPayload: Codable {
     let transcript: String?
     let description: String?
     let collectionId: String?   // optional — target collection, nil = inbox
+    let tagOptionIds: [String]? // optional — tag option UUIDs to assign
 }
