@@ -47,123 +47,79 @@ struct NoteSettingsView: View {
     ]
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                // MARK: - Editor
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Editor")
-                        .font(.headline)
-
-                    HStack {
-                        Text("Default Mode")
-                            .frame(width: 100, alignment: .leading)
-                        Picker("", selection: $editorMode) {
-                            ForEach(modeOptions, id: \.value) { option in
-                                Text(option.label).tag(option.value)
-                            }
-                        }
-                        .labelsHidden()
-                        .frame(maxWidth: 200)
+        Form {
+            Section("Editor") {
+                Picker("Default Mode", selection: $editorMode) {
+                    ForEach(modeOptions, id: \.value) { option in
+                        Text(option.label).tag(option.value)
                     }
-                    .onChange(of: editorMode) { _, val in Preferences.shared.noteEditorMode = val }
                 }
+                .onChange(of: editorMode) { _, val in Preferences.shared.noteEditorMode = val }
+            }
 
-                Divider()
-
-                // MARK: - Typography
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Typography")
-                        .font(.headline)
-
-                    HStack {
-                        Text("Body Font")
-                            .frame(width: 100, alignment: .leading)
-                        Picker("", selection: $fontFamily) {
-                            ForEach(fontOptions, id: \.value) { option in
-                                Text(option.label).tag(option.value)
-                            }
-                        }
-                        .labelsHidden()
-                        .frame(maxWidth: 300)
+            Section("Typography") {
+                Picker("Body Font", selection: $fontFamily) {
+                    ForEach(fontOptions, id: \.value) { option in
+                        Text(option.label).tag(option.value)
                     }
-                    .onChange(of: fontFamily) { _, val in Preferences.shared.noteEditorFontFamily = val }
+                }
+                .onChange(of: fontFamily) { _, val in Preferences.shared.noteEditorFontFamily = val }
 
-                    HStack {
-                        Text("Code Font")
-                            .frame(width: 100, alignment: .leading)
-                        Picker("", selection: $codeFontFamily) {
-                            ForEach(codeFontOptions, id: \.value) { option in
-                                Text(option.label).tag(option.value)
-                            }
-                        }
-                        .labelsHidden()
-                        .frame(maxWidth: 300)
+                Picker("Code Font", selection: $codeFontFamily) {
+                    ForEach(codeFontOptions, id: \.value) { option in
+                        Text(option.label).tag(option.value)
                     }
-                    .onChange(of: codeFontFamily) { _, val in Preferences.shared.noteEditorCodeFontFamily = val }
+                }
+                .onChange(of: codeFontFamily) { _, val in Preferences.shared.noteEditorCodeFontFamily = val }
 
+                LabeledContent("Font Size") {
                     HStack {
-                        Text("Font Size")
-                            .frame(width: 100, alignment: .leading)
-                        Slider(value: $fontSize, in: 13...24, step: 1) {
-                            Text("Font Size")
-                        }
-                        .frame(maxWidth: 200)
+                        Slider(value: $fontSize, in: 13...24, step: 1)
                         Text("\(Int(fontSize)) px")
                             .foregroundStyle(.secondary)
-                            .frame(width: 50)
+                            .monospacedDigit()
+                            .frame(width: 56, alignment: .trailing)
                     }
-                    .onChange(of: fontSize) { _, val in Preferences.shared.noteEditorFontSize = val }
+                }
+                .onChange(of: fontSize) { _, val in Preferences.shared.noteEditorFontSize = val }
 
+                LabeledContent("Line Height") {
                     HStack {
-                        Text("Line Height")
-                            .frame(width: 100, alignment: .leading)
-                        Slider(value: $lineHeight, in: 1.0...1.8, step: 0.05) {
-                            Text("Line Height")
-                        }
-                        .frame(maxWidth: 200)
+                        Slider(value: $lineHeight, in: 1.0...1.8, step: 0.05)
                         Text(String(format: "%.2f", lineHeight))
                             .foregroundStyle(.secondary)
-                            .frame(width: 50)
+                            .monospacedDigit()
+                            .frame(width: 56, alignment: .trailing)
                     }
-                    .onChange(of: lineHeight) { _, val in Preferences.shared.noteEditorLineHeight = val }
+                }
+                .onChange(of: lineHeight) { _, val in Preferences.shared.noteEditorLineHeight = val }
 
+                LabeledContent("Line Spacing") {
                     HStack {
-                        Text("Line Spacing")
-                            .frame(width: 100, alignment: .leading)
-                        Slider(value: $lineSpacing, in: 0...8, step: 0.5) {
-                            Text("Line Spacing")
-                        }
-                        .frame(maxWidth: 200)
+                        Slider(value: $lineSpacing, in: 0...8, step: 0.5)
                         Text(String(format: "%.1f pt", lineSpacing))
                             .foregroundStyle(.secondary)
-                            .frame(width: 50)
+                            .monospacedDigit()
+                            .frame(width: 56, alignment: .trailing)
                     }
-                    .onChange(of: lineSpacing) { _, val in Preferences.shared.noteEditorLineSpacing = val }
+                }
+                .onChange(of: lineSpacing) { _, val in Preferences.shared.noteEditorLineSpacing = val }
 
+                LabeledContent("Letter Spacing") {
                     HStack {
-                        Text("Letter Spacing")
-                            .frame(width: 100, alignment: .leading)
-                        Slider(value: $letterSpacing, in: 0...1.0, step: 0.1) {
-                            Text("Letter Spacing")
-                        }
-                        .frame(maxWidth: 200)
+                        Slider(value: $letterSpacing, in: 0...1.0, step: 0.1)
                         Text(String(format: "%.1f", letterSpacing))
                             .foregroundStyle(.secondary)
-                            .frame(width: 50)
+                            .monospacedDigit()
+                            .frame(width: 56, alignment: .trailing)
                     }
-                    .onChange(of: letterSpacing) { _, val in Preferences.shared.noteEditorLetterSpacing = val }
                 }
+                .onChange(of: letterSpacing) { _, val in Preferences.shared.noteEditorLetterSpacing = val }
+            }
 
-                Divider()
-
-                // MARK: - Appearance
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Appearance")
-                        .font(.headline)
-
-                    HStack {
-                        Text("Accent Color")
-                            .frame(width: 100, alignment: .leading)
+            Section("Appearance") {
+                LabeledContent("Accent Color") {
+                    VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 8) {
                             ForEach(Self.presetColors, id: \.hex) { preset in
                                 Button {
@@ -182,11 +138,6 @@ struct NoteSettingsView: View {
                                 .help(preset.label)
                             }
                         }
-                    }
-
-                    HStack {
-                        Text("")
-                            .frame(width: 100, alignment: .leading)
                         HStack(spacing: 8) {
                             Circle()
                                 .fill(Color(hex: accentColorHex))
@@ -204,25 +155,17 @@ struct NoteSettingsView: View {
                         }
                     }
                 }
-
-                Divider()
-
-                // MARK: - Rendering
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Preview")
-                        .font(.headline)
-
-                    Toggle("Render math formulas (KaTeX)", isOn: $renderMath)
-                        .onChange(of: renderMath) { _, val in Preferences.shared.noteEditorRenderMath = val }
-                }
-
-                Spacer()
-
-                Text("Changes apply to newly opened notes.")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
             }
-            .padding(20)
+
+            Section("Preview") {
+                Toggle("Render math formulas (KaTeX)", isOn: $renderMath)
+                    .onChange(of: renderMath) { _, val in Preferences.shared.noteEditorRenderMath = val }
+            }
+
+            Text("Changes apply to newly opened notes.")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
         }
+        .formStyle(.grouped)
     }
 }
