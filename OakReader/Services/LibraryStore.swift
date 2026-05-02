@@ -318,6 +318,15 @@ final class LibraryStore {
                 try rec.insert(db)
                 try attRec.insert(db)
             }
+            // Auto-assign cite key for the new item
+            let citeKeyService = CiteKeyService(database: database)
+            try? citeKeyService.assignCiteKey(forItemId: rec.id)
+            // Re-read to pick up the assigned cite key
+            if let updated = try? database.dbQueue.read({ db in
+                try ItemRecord.fetchOne(db, key: rec.id)
+            }) {
+                rec = updated
+            }
             revision += 1
             let att = Attachment(record: attRec, itemStorageKey: rec.storageKey)
             let coverData = Self.loadCoverData(attachment: att)

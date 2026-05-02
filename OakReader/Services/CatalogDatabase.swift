@@ -30,42 +30,10 @@ final class CatalogDatabase {
 
         let dbPath = dataDir.appendingPathComponent("library.sqlite").path
 
-        // Greenfield: if old schema exists (has "documents" table), delete and recreate
-        if FileManager.default.fileExists(atPath: dbPath) {
-            Self.deleteIfOldSchema(path: dbPath)
-        }
-
         var config = Configuration()
         config.foreignKeysEnabled = true
         dbQueue = try DatabaseQueue(path: dbPath, configuration: config)
         try Self.migrator.migrate(dbQueue)
-    }
-
-    /// Detect old schema and delete the DB file.
-    /// Checks for legacy `documents` table or pre-attachment `items` table (has `file_name` column).
-    private static func deleteIfOldSchema(path: String) {
-        do {
-            var config = Configuration()
-            config.foreignKeysEnabled = false
-            config.readonly = true
-            let tmpQueue = try DatabaseQueue(path: path, configuration: config)
-            let isOld = try tmpQueue.read { db in
-                if try db.tableExists("documents") { return true }
-                // Pre-attachment schema: items table has file_name column but no attachments table
-                if try db.tableExists("items") && !db.tableExists("attachments") { return true }
-                return false
-            }
-            if isOld {
-                try? FileManager.default.removeItem(atPath: path)
-                try? FileManager.default.removeItem(atPath: path + "-wal")
-                try? FileManager.default.removeItem(atPath: path + "-shm")
-            }
-        } catch {
-            // If we can't open it, delete it anyway
-            try? FileManager.default.removeItem(atPath: path)
-            try? FileManager.default.removeItem(atPath: path + "-wal")
-            try? FileManager.default.removeItem(atPath: path + "-shm")
-        }
     }
 
     // MARK: - Migrations
@@ -87,7 +55,15 @@ final class CatalogDatabase {
                 t.column("created_at", .text).notNull()
                 t.column("updated_at", .text).notNull()
                 t.column("is_inbox", .integer).notNull().defaults(to: false)
+                t.column("cite_key", .text)
             }
+            try db.create(
+                index: "idx_items_cite_key",
+                on: "items",
+                columns: ["cite_key"],
+                unique: true,
+                ifNotExists: true
+            )
 
             // Attachments (files belonging to items)
             try db.create(table: "attachments") { t in

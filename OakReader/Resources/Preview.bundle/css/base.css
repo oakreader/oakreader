@@ -50,6 +50,14 @@ a {
   color: var(--link-color);
 }
 
+/* Cite key reference links: [[@smith2024, p.12]] */
+a[href*="oak-ref://%40"] {
+  color: var(--accent-color);
+  font-style: italic;
+  text-decoration: none;
+  border-bottom: 1px dashed var(--accent-color);
+}
+
 /* ==================== Code Styles ==================== */
 .heti p > code,
 .heti li > code,
