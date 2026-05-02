@@ -183,8 +183,25 @@ struct NoteEditorView: View {
     // MARK: - Reference Click
 
     private func handleReferenceClick(_ reference: String) {
-        // Try to navigate to the referenced page
-        if let pageIndex = NotesViewModel.pageIndex(from: "[[\(reference)]]") {
+        if reference.hasPrefix("@") {
+            // Cite key reference: "@smith2024, p.12"
+            let body = reference.dropFirst()
+            let parts = body.split(separator: ",", maxSplits: 1)
+            var pageIndex: Int?
+            if parts.count > 1 {
+                let pageStr = String(parts[1])
+                let pattern = #"pp?\.\s*(\d+)"#
+                if let regex = try? NSRegularExpression(pattern: pattern),
+                   let match = regex.firstMatch(in: pageStr, range: NSRange(pageStr.startIndex..., in: pageStr)),
+                   let range = Range(match.range(at: 1), in: pageStr),
+                   let page = Int(pageStr[range]) {
+                    pageIndex = page - 1
+                }
+            }
+            if let pageIndex {
+                notesVM.parent?.viewer.goToPage(pageIndex)
+            }
+        } else if let pageIndex = NotesViewModel.pageIndex(from: "[[\(reference)]]") {
             notesVM.parent?.viewer.goToPage(pageIndex)
         }
     }

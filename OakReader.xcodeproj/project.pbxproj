@@ -201,6 +201,7 @@
 		F3096C59543289A0288565A6 /* FillSignViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DCADA3916F2556ACD865277 /* FillSignViewModel.swift */; };
 		F3103BA9E1F1D7E3F58BE781 /* SearchResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10FB6CFF764763D1ABDF7A20 /* SearchResultsView.swift */; };
 		F352CAC7A2DA675416A9F5C0 /* ImportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8F0DFB13B0B926C36190A1C /* ImportSheet.swift */; };
+		F404B1B9EE85677B6CBA6D4C /* CiteKeyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21CDA00C280D985B61794989 /* CiteKeyService.swift */; };
 		F4E0078F177963200FD349F5 /* BatchOperationPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A0DB84FE5CD637396CB7BA5 /* BatchOperationPicker.swift */; };
 		F4F4F52387D2973AD69D4A1C /* Log.swift in Sources */ = {isa = PBXBuildFile; fileRef = 444CCC199D01E402686514A7 /* Log.swift */; };
 		F53D8F6488C116863FDFABDE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 256ADF9E2EFEF436F81B426A /* AppDelegate.swift */; };
@@ -250,6 +251,7 @@
 		203FB2B8AAC61EDD2FD22B9A /* ChatHistoryDrawer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatHistoryDrawer.swift; sourceTree = "<group>"; };
 		211059104B79C753168C10AC /* DigitalSignatureService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DigitalSignatureService.swift; sourceTree = "<group>"; };
 		213E072D4DBDA107DB9C8194 /* LibraryCoverService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryCoverService.swift; sourceTree = "<group>"; };
+		21CDA00C280D985B61794989 /* CiteKeyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CiteKeyService.swift; sourceTree = "<group>"; };
 		22CA95845DB43F37012BFFEA /* MediaDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaDocument.swift; sourceTree = "<group>"; };
 		237C82BC359D06F1ECCF7DCD /* ConversationMeta.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationMeta.swift; sourceTree = "<group>"; };
 		23C25D15A76CFA4B81EACCAD /* BatchOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchOperation.swift; sourceTree = "<group>"; };
@@ -631,6 +633,7 @@
 				3365106A06C3516BB125705C /* BatchProcessingService.swift */,
 				B759AEF7B571932C2B41C37C /* CatalogDatabase.swift */,
 				321349C45AEC61F2E40F34B9 /* CitationFormatter.swift */,
+				21CDA00C280D985B61794989 /* CiteKeyService.swift */,
 				C497912FB85EEFBF241327F9 /* ComparisonService.swift */,
 				ACEBA28EA4CB1D91190356B4 /* CompressionService.swift */,
 				B1428432F0FC92A5486EAF1E /* ConversationService.swift */,
@@ -1106,6 +1109,7 @@
 				AF69C97966EB24620D0D683B /* ChatInputTextView.swift in Sources */,
 				D3FDC0F775EC2D91FF876566 /* ChatViewModel.swift in Sources */,
 				A11D9E56DCAEA0A563A18512 /* CitationFormatter.swift in Sources */,
+				F404B1B9EE85677B6CBA6D4C /* CiteKeyService.swift in Sources */,
 				B6A62E7510B64EA1156765DC /* ClipboardCoordinator.swift in Sources */,
 				986C134F1FD341E0D275E0DB /* CollectionEditorSheet.swift in Sources */,
 				B0F40B872CFA21EB17E14CBF /* Color+Hex.swift in Sources */,

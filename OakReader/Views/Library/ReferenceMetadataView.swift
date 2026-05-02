@@ -23,6 +23,8 @@ struct ReferenceMetadataView: View {
     @State private var abstract: String = ""
     @State private var authors: [CSLName] = []
     @State private var editors: [CSLName] = []
+    @State private var citeKeyText: String = ""
+    @State private var citeKeyError: String?
 
     @State private var isLookingUp = false
     @State private var isExtracting = false
@@ -30,6 +32,7 @@ struct ReferenceMetadataView: View {
     @FocusState private var focusedField: Field?
 
     private enum Field: Hashable {
+        case citeKey
         case doi, title, containerTitle, year, volume, issue, page
         case publisher, publisherPlace, isbn, issn, url, abstract
         case authorFamily(Int), authorGiven(Int)
@@ -116,6 +119,27 @@ struct ReferenceMetadataView: View {
                 .labelsHidden()
                 .controlSize(.small)
                 .onChange(of: cslType) { _, _ in saveDebounced() }
+            }
+
+            // Cite Key
+            gridRow("Cite Key") {
+                VStack(alignment: .leading, spacing: 2) {
+                    underlinedField {
+                        TextField("", text: $citeKeyText)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 13, design: .monospaced))
+                            .focused($focusedField, equals: .citeKey)
+                            .onSubmit { saveCiteKey() }
+                            .onChange(of: focusedField) { old, new in
+                                if old == .citeKey && new != .citeKey { saveCiteKey() }
+                            }
+                    }
+                    if let error = citeKeyError {
+                        Text(error)
+                            .font(.system(size: 10))
+                            .foregroundStyle(.red)
+                    }
+                }
             }
 
             // Title
@@ -382,6 +406,8 @@ struct ReferenceMetadataView: View {
 
     private func loadFromMetadata() {
         guard let meta = item.referenceMetadata else { return }
+        citeKeyText = item.citeKey ?? ""
+        citeKeyError = nil
         let csl = meta.cslItem
         cslType = csl.type
         doi = csl.DOI ?? ""
@@ -432,6 +458,19 @@ struct ReferenceMetadataView: View {
             store.invalidate()
         } catch {
             Log.error(Log.store, "Failed to save reference metadata: \(error)")
+        }
+    }
+
+    private func saveCiteKey() {
+        let key = citeKeyText.trimmingCharacters(in: .whitespaces)
+        guard !key.isEmpty else { return }
+        let service = CiteKeyService(database: store.database)
+        do {
+            try service.saveCiteKey(key, forItemId: item.id.uuidString)
+            citeKeyError = nil
+            store.invalidate()
+        } catch {
+            citeKeyError = error.localizedDescription
         }
     }
 

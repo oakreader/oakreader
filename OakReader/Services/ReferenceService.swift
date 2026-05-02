@@ -5,6 +5,7 @@ import GRDB
 /// Stores CSL JSON as the canonical representation in the `citations` table.
 struct ReferenceService {
     let database: CatalogDatabase
+    private var citeKeyService: CiteKeyService { CiteKeyService(database: database) }
 
     // MARK: - Fetch
 
@@ -66,6 +67,9 @@ struct ReferenceService {
                 )
             }
         }
+
+        // Auto-assign cite key if none exists
+        try? citeKeyService.assignCiteKey(forItemId: itemId)
     }
 
     // MARK: - Delete
