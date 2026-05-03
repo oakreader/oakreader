@@ -129,7 +129,7 @@ export function App() {
   return (
     <>
       <Header />
-      <div className="px-3 pb-3 space-y-3">
+      <div className="flex-1 min-h-0 overflow-y-auto px-3 space-y-2">
         {pageMeta && <PageCard pageMeta={pageMeta} />}
 
         <CollectionPicker
@@ -146,7 +146,9 @@ export function App() {
           onAddNewTag={handleAddNewTag}
           onRemoveNewTag={handleRemoveNewTag}
         />
+      </div>
 
+      <div className="shrink-0 px-3 pt-2 pb-3">
         <SaveButton
           state={saveState}
           label={`Saving to ${collectionName}\u2026`}
