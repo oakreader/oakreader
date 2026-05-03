@@ -4,13 +4,14 @@ import { postSnapshot } from "@/src/lib/api";
 import type { PageCapture, PDFSavePayload } from "@/src/lib/types";
 import { PageCard } from "./PageCard";
 import { CollectionPicker } from "./CollectionPicker";
-import { TagTreePicker } from "./TagTreePicker";
+import { TagInput } from "./TagInput";
 import { SaveButton, type SaveState } from "./SaveButton";
 
 export function App() {
   const { pageMeta, tabId, collections, tags, loading, error } = usePopupData();
   const [collectionId, setCollectionId] = useState("__all__");
   const [selectedTagIds, setSelectedTagIds] = useState<Set<string>>(new Set());
+  const [newTags, setNewTags] = useState<string[]>([]);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -24,6 +25,17 @@ export function App() {
       }
       return next;
     });
+  }, []);
+
+  const handleAddNewTag = useCallback((name: string) => {
+    setNewTags((prev) => {
+      if (prev.some((t) => t.toLowerCase() === name.toLowerCase())) return prev;
+      return [...prev, name];
+    });
+  }, []);
+
+  const handleRemoveNewTag = useCallback((name: string) => {
+    setNewTags((prev) => prev.filter((t) => t !== name));
   }, []);
 
   const collectionName =
@@ -72,7 +84,8 @@ export function App() {
       const result = await postSnapshot(
         payload,
         selectedCollection,
-        Array.from(selectedTagIds)
+        Array.from(selectedTagIds),
+        newTags
       );
 
       if (result.status === "ok") {
@@ -92,7 +105,7 @@ export function App() {
         setErrorMessage(msg);
       }
     }
-  }, [pageMeta, tabId, collectionId, collections, selectedTagIds]);
+  }, [pageMeta, tabId, collectionId, collections, selectedTagIds, newTags]);
 
   if (loading) {
     return (
@@ -125,10 +138,13 @@ export function App() {
           onChange={setCollectionId}
         />
 
-        <TagTreePicker
+        <TagInput
           tags={tags}
           selectedIds={selectedTagIds}
+          newTags={newTags}
           onToggle={handleTagToggle}
+          onAddNewTag={handleAddNewTag}
+          onRemoveNewTag={handleRemoveNewTag}
         />
 
         <SaveButton
