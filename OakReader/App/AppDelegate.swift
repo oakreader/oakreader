@@ -79,6 +79,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.titlebarSeparatorStyle = .none
         window.backgroundColor = NSColor(srgbRed: 242/255, green: 242/255, blue: 242/255, alpha: 1)
         window.styleMask.insert(.fullSizeContentView)
+        window.collectionBehavior.insert(.fullScreenPrimary)
         window.minSize = NSSize(width: 800, height: 500)
         window.title = ""
 

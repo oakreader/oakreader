@@ -1,4 +1,5 @@
 import SwiftUI
+import WebKit
 
 struct MediaSnapshotOverlayView: View {
     let viewModel: DocumentViewModel
@@ -61,8 +62,8 @@ struct MediaSnapshotOverlayView: View {
         }
 
         guard let window = NSApp.keyWindow,
-              let contentView = window.contentView,
-              let hitTestView = findMediaSnapshotHitTestView(in: contentView) else {
+              let webView = findWKWebView(in: window.contentView),
+              let hitTestView = findMediaSnapshotHitTestView(in: window.contentView) else {
             showSelection = false
             return
         }
@@ -72,22 +73,31 @@ struct MediaSnapshotOverlayView: View {
         let nsPoint1 = NSPoint(x: selectionRect.minX, y: overlayHeight - selectionRect.minY)
         let nsPoint2 = NSPoint(x: selectionRect.maxX, y: overlayHeight - selectionRect.maxY)
 
-        // Convert from overlay NSView coords → window content view coords
-        let contentPoint1 = hitTestView.convert(nsPoint1, to: contentView)
-        let contentPoint2 = hitTestView.convert(nsPoint2, to: contentView)
+        // Convert from overlay NSView coords → WKWebView coords
+        let webViewPoint1 = hitTestView.convert(nsPoint1, to: webView)
+        let webViewPoint2 = hitTestView.convert(nsPoint2, to: webView)
 
-        // Build the capture rect in content view coordinates (Y-up AppKit)
+        // Build the capture rect in WKWebView coordinates (Y-up AppKit)
         let captureRect = CGRect(
-            x: min(contentPoint1.x, contentPoint2.x),
-            y: min(contentPoint1.y, contentPoint2.y),
-            width: abs(contentPoint2.x - contentPoint1.x),
-            height: abs(contentPoint2.y - contentPoint1.y)
+            x: min(webViewPoint1.x, webViewPoint2.x),
+            y: min(webViewPoint1.y, webViewPoint2.y),
+            width: abs(webViewPoint2.x - webViewPoint1.x),
+            height: abs(webViewPoint2.y - webViewPoint1.y)
         )
 
         guard captureRect.width > 1, captureRect.height > 1 else {
             showSelection = false
             return
         }
+
+        // WKSnapshotConfiguration uses flipped coords (Y-down from top of webView)
+        let webViewHeight = webView.bounds.height
+        let snapshotRect = CGRect(
+            x: captureRect.origin.x,
+            y: webViewHeight - captureRect.origin.y - captureRect.height,
+            width: captureRect.width,
+            height: captureRect.height
+        )
 
         // Get screen position for popup (bottom-center of selection in screen coords)
         let bottomCenterNS = NSPoint(
@@ -97,38 +107,45 @@ struct MediaSnapshotOverlayView: View {
         let windowPoint = hitTestView.convert(bottomCenterNS, to: nil)
         let screenPoint = window.convertPoint(toScreen: windowPoint)
 
-        // Hide the selection overlay before capture so it doesn't appear in the screenshot
-        showSelection = false
+        // Capture the region via WKWebView snapshot
+        let config = WKSnapshotConfiguration()
+        config.rect = snapshotRect
 
-        // Use a short delay to allow SwiftUI to remove the selection overlay before capturing
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            // Capture the region using cacheDisplay on the window's content view
-            let backingScale = window.backingScaleFactor
-            let pixelRect = CGRect(
-                x: captureRect.origin.x * backingScale,
-                y: captureRect.origin.y * backingScale,
-                width: captureRect.width * backingScale,
-                height: captureRect.height * backingScale
-            )
-
-            guard let bitmap = contentView.bitmapImageRepForCachingDisplay(in: captureRect) else {
-                return
-            }
-            contentView.cacheDisplay(in: captureRect, to: bitmap)
-
-            guard let pngData = bitmap.representation(using: .png, properties: [:]) else {
-                return
-            }
-
-            // Re-show selection and present popup
-            self.showSelection = true
-            WebAreaPopupPanel.show(
-                at: screenPoint,
-                imageData: pngData,
-                viewModel: viewModel,
-                onDismiss: { self.showSelection = false }
-            )
+        // Use device pixel ratio for sharp captures
+        if let backingScale = webView.window?.backingScaleFactor {
+            config.snapshotWidth = NSNumber(value: Double(snapshotRect.width) * Double(backingScale))
         }
+
+        webView.takeSnapshot(with: config) { [viewModel, self] image, error in
+            guard let image, error == nil,
+                  let tiffData = image.tiffRepresentation,
+                  let bitmap = NSBitmapImageRep(data: tiffData),
+                  let pngData = bitmap.representation(using: .png, properties: [:]) else {
+                DispatchQueue.main.async { self.showSelection = false }
+                return
+            }
+
+            DispatchQueue.main.async {
+                WebAreaPopupPanel.show(
+                    at: screenPoint,
+                    imageData: pngData,
+                    viewModel: viewModel,
+                    onDismiss: {
+                        self.showSelection = false
+                        viewModel.setEditorMode(.viewer)
+                    }
+                )
+            }
+        }
+    }
+
+    private func findWKWebView(in view: NSView?) -> WKWebView? {
+        guard let view else { return nil }
+        if let webView = view as? WKWebView { return webView }
+        for subview in view.subviews {
+            if let found = findWKWebView(in: subview) { return found }
+        }
+        return nil
     }
 
     private func findMediaSnapshotHitTestView(in view: NSView?) -> MediaSnapshotHitTestNSView? {
