@@ -25,15 +25,20 @@
 
 body {
   width: 320px;
-  max-height: 480px;
+  min-height: 420px;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   letter-spacing: -0.01em;
   background: var(--color-background);
   color: var(--color-foreground);
+}
+
+#root {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Apple-style thin scrollbar */

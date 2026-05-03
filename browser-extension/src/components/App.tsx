@@ -116,11 +116,20 @@ export function App() {
   }
 
   if (error && !pageMeta) {
+    const isNotRunning = error.includes("not running");
     return (
       <>
         <Header />
-        <div className="px-3 py-8 text-center text-[12px] text-destructive">
-          {error}
+        <div className="px-3 py-8 text-center space-y-2">
+          <p className="text-[20px]">{isNotRunning ? "\u{1F4D6}" : "\u26A0\uFE0F"}</p>
+          <p className="text-[13px] font-semibold text-foreground">
+            {isNotRunning ? "OakReader is not running" : "Cannot access page"}
+          </p>
+          <p className="text-[12px] text-secondary">
+            {isNotRunning
+              ? "Start the app to save pages."
+              : error}
+          </p>
         </div>
       </>
     );

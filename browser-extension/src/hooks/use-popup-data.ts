@@ -63,6 +63,16 @@ export function usePopupData(): PopupData {
             pageMetaPromise,
           ]);
 
+        // If both server calls failed, the app is not running
+        if (
+          collectionsResult.status === "rejected" &&
+          tagsResult.status === "rejected"
+        ) {
+          setError("OakReader is not running.");
+          setLoading(false);
+          return;
+        }
+
         if (collectionsResult.status === "fulfilled") {
           setCollections(collectionsResult.value);
         }
