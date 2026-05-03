@@ -20,7 +20,6 @@ struct FilterCondition: Codable, Hashable {
 }
 
 enum FilterField: String, Codable, CaseIterable {
-    case isInbox = "is_inbox"
     case isFavorite = "is_favorite"
     case itemType = "item_type"
     case createdAt = "created_at"

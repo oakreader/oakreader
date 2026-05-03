@@ -79,8 +79,6 @@ struct LibrarySidebarView: View {
 
     private func smartCollectionRow(_ collection: PDFCollection) -> some View {
         let isSelected = store.selectedCollectionId == collection.id && store.selectedTagOptionId == nil && appState.isLibraryActive
-        let isInbox = collection.id == SystemCollectionID.inbox
-        let count = isInbox ? store.inboxCount : store.smartCollectionItemCount(for: collection)
 
         return Button {
             store.selectCollection(collection.id)
@@ -98,15 +96,6 @@ struct LibrarySidebarView: View {
                     .lineLimit(1)
 
                 Spacer()
-
-                if isInbox && count > 0 {
-                    Text("\(count)")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 1)
-                        .background(Capsule().fill(Color.accentColor))
-                }
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 5)

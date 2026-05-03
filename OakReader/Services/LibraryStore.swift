@@ -73,11 +73,6 @@ final class LibraryStore {
         return (try? fetchAllItems()) ?? []
     }
 
-    var inboxCount: Int {
-        _ = revision
-        return items.filter { $0.isInbox }.count
-    }
-
     var filteredItems: [LibraryItem] {
         var results = items
 
@@ -138,8 +133,6 @@ final class LibraryStore {
 
     private func evaluateCondition(_ condition: FilterCondition, against item: LibraryItem) -> Bool {
         switch condition.field {
-        case .isInbox:
-            return matchBool(item.isInbox, op: condition.op, value: condition.value)
         case .isFavorite:
             return matchBool(item.isFavorite, op: condition.op, value: condition.value)
         case .itemType:
@@ -410,7 +403,7 @@ final class LibraryStore {
         return (try? fetchAllCollections()) ?? []
     }
 
-    /// System smart collections (Inbox, All Items, etc.).
+    /// System smart collections (All Items, Recently Added, etc.).
     var systemSmartCollections: [PDFCollection] {
         collections.filter { $0.isSystem && $0.isSmart }
     }
@@ -616,11 +609,6 @@ final class LibraryStore {
         do {
             try database.dbQueue.write { db in
                 try junction.insert(db)
-                // Archive from inbox when organized into a collection
-                try db.execute(
-                    sql: "UPDATE items SET is_inbox = 0, updated_at = ? WHERE id = ?",
-                    arguments: [now, item.id.uuidString]
-                )
             }
             revision += 1
         } catch {

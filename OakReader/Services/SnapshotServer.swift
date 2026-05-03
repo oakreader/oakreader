@@ -503,6 +503,6 @@ struct SnapshotPayload: Codable {
     let transcript: String?
     let description: String?
     let cookies: String?        // pdf only — forwarded cookies for authenticated downloads
-    let collectionId: String?   // optional — target collection, nil = inbox
+    let collectionId: String?   // optional — target collection, nil = unsorted
     let tagOptionIds: [String]? // optional — tag option UUIDs to assign
 }

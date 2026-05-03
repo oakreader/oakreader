@@ -4,7 +4,6 @@ struct LibrarySettingsView: View {
     let store: LibraryStore
 
     private let systemCollections: [(id: UUID, name: String, icon: String)] = [
-        (SystemCollectionID.inbox, "Inbox", "tray.and.arrow.down"),
         (SystemCollectionID.allItems, "All Items", "books.vertical"),
         (SystemCollectionID.recent, "Recently Added", "clock"),
         (SystemCollectionID.pdfs, "PDFs", "doc.fill"),

@@ -54,7 +54,6 @@ final class CatalogDatabase {
                 t.column("sync_status", .text).notNull().defaults(to: "local")
                 t.column("created_at", .text).notNull()
                 t.column("updated_at", .text).notNull()
-                t.column("is_inbox", .integer).notNull().defaults(to: false)
                 t.column("cite_key", .text)
             }
             try db.create(
@@ -235,17 +234,15 @@ final class CatalogDatabase {
 
             let now = Date().iso8601String
             let systemCollections: [(id: String, name: String, icon: String, order: Int, rules: String)] = [
-                (SystemCollectionID.inbox.uuidString, "Inbox", "tray.and.arrow.down", 0,
-                 #"{"match":"all","conditions":[{"field":"is_inbox","op":"eq","value":"true"}]}"#),
-                (SystemCollectionID.allItems.uuidString, "All Items", "books.vertical", 1,
+                (SystemCollectionID.allItems.uuidString, "All Items", "books.vertical", 0,
                  #"{"match":"all","conditions":[]}"#),
-                (SystemCollectionID.recent.uuidString, "Recently Added", "clock", 2,
+                (SystemCollectionID.recent.uuidString, "Recently Added", "clock", 1,
                  #"{"match":"all","conditions":[{"field":"created_at","op":"within_days","value":"7"}]}"#),
-                (SystemCollectionID.pdfs.uuidString, "PDFs", "doc.fill", 3,
+                (SystemCollectionID.pdfs.uuidString, "PDFs", "doc.fill", 2,
                  #"{"match":"all","conditions":[{"field":"item_type","op":"eq","value":"pdf"}]}"#),
-                (SystemCollectionID.webSnapshots.uuidString, "Web", "globe", 4,
+                (SystemCollectionID.webSnapshots.uuidString, "Web", "globe", 3,
                  #"{"match":"all","conditions":[{"field":"item_type","op":"eq","value":"webSnapshot"}]}"#),
-                (SystemCollectionID.videos.uuidString, "Videos", "play.rectangle", 5,
+                (SystemCollectionID.videos.uuidString, "Videos", "play.rectangle", 4,
                  #"{"match":"all","conditions":[{"field":"item_type","op":"eq","value":"embed"}]}"#),
             ]
             for sc in systemCollections {

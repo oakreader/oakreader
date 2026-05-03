@@ -21,14 +21,13 @@ enum LibrarySortOrder: String, CaseIterable, Identifiable {
 }
 
 enum SystemCollectionID {
-    static let inbox       = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
     static let allItems    = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
     static let recent      = UUID(uuidString: "00000000-0000-0000-0000-000000000003")!
     static let pdfs        = UUID(uuidString: "00000000-0000-0000-0000-000000000005")!
     static let webSnapshots = UUID(uuidString: "00000000-0000-0000-0000-000000000006")!
     static let videos      = UUID(uuidString: "00000000-0000-0000-0000-000000000007")!
 
-    static let all: [UUID] = [inbox, allItems, recent, pdfs, webSnapshots, videos]
+    static let all: [UUID] = [allItems, recent, pdfs, webSnapshots, videos]
 }
 
 // MARK: - Local user ID
