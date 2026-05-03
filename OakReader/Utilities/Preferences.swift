@@ -41,6 +41,8 @@ final class Preferences {
         static let noteEditorRenderImages = "noteEditorRenderImages"
         static let noteEditorHideSyntax = "noteEditorHideSyntax"
         static let noteEditorAccentColor = "noteEditorAccentColor"
+        // External tools
+        static let ytDlpPath = "ytDlpPath"
     }
 
     private init() {
@@ -216,5 +218,12 @@ final class Preferences {
     var noteEditorAccentColor: String {
         get { defaults.string(forKey: Keys.noteEditorAccentColor) ?? "#0CA69A" }
         set { defaults.set(newValue, forKey: Keys.noteEditorAccentColor) }
+    }
+
+    // MARK: - External Tools
+
+    var ytDlpPath: String {
+        get { defaults.string(forKey: Keys.ytDlpPath) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.ytDlpPath) }
     }
 }
