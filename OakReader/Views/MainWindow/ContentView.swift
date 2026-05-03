@@ -153,7 +153,12 @@ struct ContentView: View {
                 }
             }
         case .embed:
-            MediaViewerView(viewModel: viewModel)
+            ZStack {
+                MediaViewerView(viewModel: viewModel)
+                if viewModel.state.editorMode == .snapshot {
+                    MediaSnapshotOverlayView(viewModel: viewModel)
+                }
+            }
         }
     }
 

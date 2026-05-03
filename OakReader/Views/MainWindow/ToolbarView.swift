@@ -11,17 +11,24 @@ struct OakReaderToolbarView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            leftSection
-            Spacer(minLength: 4)
-            centerSection
+            switch viewModel.itemType {
+            case .pdf:
+                leftSection
+                Spacer(minLength: 4)
+                centerSection
+            case .webSnapshot, .embed:
+                areaToolButton
+            }
             Spacer()
         }
         .padding(.horizontal, OakStyle.Spacing.xs)
         .frame(height: OakStyle.Size.toolbarHeight)
         .background(Color(nsColor: .windowBackgroundColor))
-        .onAppear { syncPageText() }
+        .onAppear {
+            if viewModel.itemType == .pdf { syncPageText() }
+        }
         .onChange(of: viewModel.state.currentPageIndex) { _, _ in
-            syncPageText()
+            if viewModel.itemType == .pdf { syncPageText() }
         }
     }
 
@@ -99,22 +106,27 @@ struct OakReaderToolbarView: View {
                 annotationButton(for: tool)
             }
 
-            // Area (snapshot)
-            OakToolButton(
-                systemImage: "rectangle.dashed",
-                isSelected: viewModel.state.editorMode == .snapshot,
-                tooltip: "Area"
-            ) {
-                if viewModel.state.editorMode == .snapshot {
-                    viewModel.setEditorMode(.viewer)
-                } else {
-                    viewModel.setEditorMode(.snapshot)
-                }
-            }
+            areaToolButton
 
             separator
 
             AnnotationColorDropdown(viewModel: viewModel)
+        }
+    }
+
+    // MARK: - Area Tool
+
+    private var areaToolButton: some View {
+        OakToolButton(
+            systemImage: "rectangle.dashed",
+            isSelected: viewModel.state.editorMode == .snapshot,
+            tooltip: "Area"
+        ) {
+            if viewModel.state.editorMode == .snapshot {
+                viewModel.setEditorMode(.viewer)
+            } else {
+                viewModel.setEditorMode(.snapshot)
+            }
         }
     }
 
