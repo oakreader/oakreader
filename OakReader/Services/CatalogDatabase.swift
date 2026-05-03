@@ -253,6 +253,34 @@ final class CatalogDatabase {
             }
         }
 
+        migrator.registerMigration("v2-remove-inbox") { db in
+            // Drop is_inbox column (SQLite requires table rebuild)
+            if try db.columns(in: "items").contains(where: { $0.name == "is_inbox" }) {
+                try db.alter(table: "items") { t in
+                    t.drop(column: "is_inbox")
+                }
+            }
+
+            // Delete the Inbox system collection
+            let inboxId = "00000000-0000-0000-0000-000000000001"
+            try db.execute(sql: "DELETE FROM collections WHERE id = ?", arguments: [inboxId])
+
+            // Shift sort orders: All Items → 0, Recently Added → 1, etc.
+            let reorder: [(id: String, order: Int)] = [
+                ("00000000-0000-0000-0000-000000000002", 0), // All Items
+                ("00000000-0000-0000-0000-000000000003", 1), // Recently Added
+                ("00000000-0000-0000-0000-000000000005", 2), // PDFs
+                ("00000000-0000-0000-0000-000000000006", 3), // Web
+                ("00000000-0000-0000-0000-000000000007", 4), // Videos
+            ]
+            for entry in reorder {
+                try db.execute(
+                    sql: "UPDATE collections SET sort_order = ? WHERE id = ?",
+                    arguments: [entry.order, entry.id]
+                )
+            }
+        }
+
         return migrator
     }
 
