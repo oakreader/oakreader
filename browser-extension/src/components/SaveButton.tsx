@@ -28,7 +28,7 @@ export function SaveButton({ state, label, errorMessage, onClick }: SaveButtonPr
   } else if (state === "saving") {
     buttonLabel = label;
   } else {
-    buttonLabel = "Save to Research";
+    buttonLabel = "Save to OakReader";
   }
 
   return (

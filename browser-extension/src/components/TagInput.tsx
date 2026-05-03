@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { X, Plus } from "lucide-react";
 import type { TagNodeInfo } from "@/src/lib/types";
 
@@ -49,7 +50,10 @@ export function TagInput({
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const inputAreaRef = useRef<HTMLDivElement>(null);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 });
 
   const flatTags = useMemo(() => flattenTags(tags), [tags]);
 
@@ -78,11 +82,31 @@ export function TagInput({
     ) || newTags.some((t) => t.toLowerCase() === q);
   }, [flatTags, newTags, query]);
 
-  // Close on outside click
+  // Position dropdown below the input area
+  const updateDropdownPos = useCallback(() => {
+    if (inputAreaRef.current) {
+      const rect = inputAreaRef.current.getBoundingClientRect();
+      setDropdownPos({
+        top: rect.bottom + 4,
+        left: rect.left,
+        width: rect.width,
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (open) updateDropdownPos();
+  }, [open, updateDropdownPos]);
+
+  // Close on outside click (check both container and portal dropdown)
   useEffect(() => {
     if (!open) return;
     function handleClick(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        containerRef.current && !containerRef.current.contains(target) &&
+        (!dropdownRef.current || !dropdownRef.current.contains(target))
+      ) {
         setOpen(false);
       }
     }
@@ -129,13 +153,15 @@ export function TagInput({
   };
 
   const hasSelections = selectedTags.length > 0 || newTags.length > 0;
+  const showDropdown = open && (filtered.length > 0 || (query.trim() && !exactMatch));
 
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef}>
       <p className="text-[11px] font-semibold text-secondary mb-1">Tags</p>
 
       {/* Input area with pills */}
       <div
+        ref={inputAreaRef}
         className="flex flex-wrap items-center gap-1 min-h-[36px] rounded-[var(--radius-outer)] bg-grouped px-2 py-1.5 cursor-text"
         style={{ boxShadow: "0 0 0 0.5px rgba(0,0,0,0.06)" }}
         onClick={() => {
@@ -199,11 +225,17 @@ export function TagInput({
         />
       </div>
 
-      {/* Dropdown */}
-      {open && (filtered.length > 0 || (query.trim() && !exactMatch)) && (
+      {/* Dropdown — rendered via portal to escape scroll container */}
+      {showDropdown && createPortal(
         <div
-          className="absolute left-0 right-0 top-full z-50 mt-1 max-h-32 overflow-y-auto rounded-[var(--radius-outer)] bg-grouped p-1"
-          style={{ boxShadow: "0 0 0 0.5px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.12)" }}
+          ref={dropdownRef}
+          className="fixed z-50 max-h-32 overflow-y-auto rounded-[var(--radius-outer)] bg-grouped p-1"
+          style={{
+            top: dropdownPos.top,
+            left: dropdownPos.left,
+            width: dropdownPos.width,
+            boxShadow: "0 0 0 0.5px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.12)",
+          }}
         >
           {filtered.map((tag) => {
             const isSelected = selectedIds.has(tag.id);
@@ -216,17 +248,14 @@ export function TagInput({
                 }`}
                 onClick={() => handleSelect(tag)}
               >
-                {/* Checkmark or empty space */}
-                <span className="size-3.5 shrink-0 flex items-center justify-center">
-                  {isSelected && (
-                    <svg className="size-3 text-primary" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M2 6l3 3 5-5" />
-                    </svg>
-                  )}
-                </span>
                 <span className="flex-1 text-[12px] text-foreground truncate">
                   {tag.fullPath}
                 </span>
+                {isSelected && (
+                  <svg className="size-3 text-primary shrink-0" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M2 6l3 3 5-5" />
+                  </svg>
+                )}
               </button>
             );
           })}
@@ -249,7 +278,8 @@ export function TagInput({
               </button>
             </>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
