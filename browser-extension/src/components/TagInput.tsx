@@ -132,7 +132,7 @@ export function TagInput({
 
   return (
     <div ref={containerRef} className="relative">
-      <p className="text-[11px] font-semibold text-secondary mb-1.5">Tags</p>
+      <p className="text-[11px] font-semibold text-secondary mb-1">Tags</p>
 
       {/* Input area with pills */}
       <div
@@ -202,7 +202,7 @@ export function TagInput({
       {/* Dropdown */}
       {open && (filtered.length > 0 || (query.trim() && !exactMatch)) && (
         <div
-          className="absolute left-0 right-0 top-full z-50 mt-1 max-h-40 overflow-y-auto rounded-[var(--radius-outer)] bg-grouped p-1"
+          className="absolute left-0 right-0 top-full z-50 mt-1 max-h-32 overflow-y-auto rounded-[var(--radius-outer)] bg-grouped p-1"
           style={{ boxShadow: "0 0 0 0.5px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.12)" }}
         >
           {filtered.map((tag) => {
@@ -211,7 +211,7 @@ export function TagInput({
               <button
                 key={tag.id}
                 type="button"
-                className={`flex w-full items-center gap-2 px-2.5 h-7 rounded-[var(--radius-control)] text-left transition-colors duration-150 ${
+                className={`flex w-full items-center gap-2 px-2.5 h-[26px] rounded-[var(--radius-control)] text-left transition-colors duration-150 ${
                   isSelected ? "bg-primary/8" : "hover:bg-fill-hover"
                 }`}
                 onClick={() => handleSelect(tag)}
@@ -239,7 +239,7 @@ export function TagInput({
               )}
               <button
                 type="button"
-                className="flex w-full items-center gap-2 px-2.5 h-7 rounded-[var(--radius-control)] text-left transition-colors duration-150 hover:bg-fill-hover"
+                className="flex w-full items-center gap-2 px-2.5 h-[26px] rounded-[var(--radius-control)] text-left transition-colors duration-150 hover:bg-fill-hover"
                 onClick={handleCreateTag}
               >
                 <Plus className="size-3.5 text-success shrink-0" strokeWidth={2.5} />
