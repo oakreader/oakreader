@@ -20,6 +20,9 @@ packages:
   Highlightr:
     url: https://github.com/raspu/Highlightr.git
     from: "2.3.0"
+  YouTubePlayerKit:
+    url: https://github.com/SvenTiigi/YouTubePlayerKit.git
+    from: "2.0.0"
   CMarkGFM:
     url: https://github.com/stackotter/swift-cmark-gfm
     from: "1.0.2"
@@ -46,6 +49,7 @@ targets:
         product: GRDB
       - package: Highlightr
       - package: CMarkGFM
+      - package: YouTubePlayerKit
     postCompileScripts:
       - script: |
           if which swiftlint > /dev/null; then

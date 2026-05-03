@@ -28,6 +28,7 @@
 		1C1463F40053DC9120B4720E /* CompressionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACEBA28EA4CB1D91190356B4 /* CompressionService.swift */; };
 		1D25C901096C9BAE25EB186F /* UndoCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B1412A04CA324A15BF891F4 /* UndoCoordinator.swift */; };
 		1E3F82E60DADFC923DEE78AD /* SignatureModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D62609E48881FD798A356BDD /* SignatureModel.swift */; };
+		20A5EA555198EDD09927D2CE /* MediaSnapshotOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C893DD12AC4437684DB48663 /* MediaSnapshotOverlayView.swift */; };
 		21B926FA4DD8E5340B898C10 /* BatchProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ACEDD57AE336C99EBE59CF1 /* BatchProgressView.swift */; };
 		21D6E7FC33246E5792605570 /* MergeDocumentsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3F153B13C17589F1BF5DFB8 /* MergeDocumentsSheet.swift */; };
 		27926C8DE8B6E9E53CF5553D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35C3D7C67DA37CE045FCE96F /* ContentView.swift */; };
@@ -83,6 +84,7 @@
 		5967878A95FEAB1001C9CD7B /* AccessibilityCheckerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA017F31D0A69846D78444B1 /* AccessibilityCheckerView.swift */; };
 		59B6D8A2E666CEDCCF423111 /* LibrarySideNavView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF43FBB98C456723EFCE009D /* LibrarySideNavView.swift */; };
 		59D7DE87653A5CDB741C1E0B /* WatermarkViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D1CCFEA748A76C70A2E4601 /* WatermarkViewModel.swift */; };
+		5E203AE21E16EA6F26B580B6 /* YouTubePlayerKit in Frameworks */ = {isa = PBXBuildFile; productRef = 9E2276FDBD0016EB459B84BC /* YouTubePlayerKit */; };
 		5E8B8AB39E7BA7E9F8529E2F /* MainMenuBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86F8522DF838B0A5C1D31B28 /* MainMenuBuilder.swift */; };
 		5FAA0AB62E835FF6C66A904C /* OakStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD0666D04A8F068B01A5C328 /* OakStyle.swift */; };
 		60C2E9229F9BAD55574472A9 /* ReferenceMetadataView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9ECEF7734548F19CC7579D7 /* ReferenceMetadataView.swift */; };
@@ -383,6 +385,7 @@
 		C5078B5988D5C8EEA78A023A /* GeneralSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralSettingsView.swift; sourceTree = "<group>"; };
 		C6C6798F1279D0348557EF79 /* EditViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditViewModel.swift; sourceTree = "<group>"; };
 		C7D638724571F0F10662E5F3 /* MigrationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MigrationService.swift; sourceTree = "<group>"; };
+		C893DD12AC4437684DB48663 /* MediaSnapshotOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaSnapshotOverlayView.swift; sourceTree = "<group>"; };
 		C89EEADCAA40A0524474DF72 /* PDFContextProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFContextProvider.swift; sourceTree = "<group>"; };
 		C8A961A719BC4E42A1B3FB61 /* AccessibilityViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityViewModel.swift; sourceTree = "<group>"; };
 		C8F0DFB13B0B926C36190A1C /* ImportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportSheet.swift; sourceTree = "<group>"; };
@@ -445,6 +448,7 @@
 				055A3A7F37ECA58BFCFE749A /* GRDB in Frameworks */,
 				B81B9BA647234E09506AC8D5 /* Highlightr in Frameworks */,
 				2EF9EF12D7A03AAADC42CD14 /* CMarkGFM in Frameworks */,
+				5E203AE21E16EA6F26B580B6 /* YouTubePlayerKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -467,6 +471,7 @@
 			children = (
 				CBDEAC41F0AF9C06236E365F /* AreaSelectionPopupPanel.swift */,
 				F62FA62E452AE2C6D5F47C62 /* AudioPlayerView.swift */,
+				C893DD12AC4437684DB48663 /* MediaSnapshotOverlayView.swift */,
 				1C68328C9891BD05075C4993 /* MediaViewerView.swift */,
 				00C73F9EEB44740568DAFD2A /* PageNavigationView.swift */,
 				6D46DC9842C708EE4F886379 /* PDFViewCoordinator.swift */,
@@ -993,6 +998,7 @@
 				DBFC960D58BB4D238DFC9FF1 /* GRDB */,
 				7AB56BF574F3683388F071F2 /* Highlightr */,
 				EE983D369D941923AF2F04FF /* CMarkGFM */,
+				9E2276FDBD0016EB459B84BC /* YouTubePlayerKit */,
 			);
 			productName = OakReader;
 			productReference = 62D8CC8D7C726C11792024B3 /* OakReader.app */;
@@ -1023,6 +1029,7 @@
 				DD10350F424FE099033E1375 /* XCRemoteSwiftPackageReference "GRDB.swift" */,
 				225B7FE5AC36B1D8CF482B3A /* XCRemoteSwiftPackageReference "Highlightr" */,
 				F474D9310432E71E4A4CF5E8 /* XCRemoteSwiftPackageReference "textual" */,
+				24190CE4AF0B5944ACA7AEE4 /* XCRemoteSwiftPackageReference "YouTubePlayerKit" */,
 				4185696E65EB0B7D8D202B59 /* XCLocalSwiftPackageReference "Packages/OakReaderAI" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -1186,6 +1193,7 @@
 				83AC874935F4B6BDBA30DDBF /* MarkdownRenderer.swift in Sources */,
 				D6E762AB3257C090203BCF2D /* MarkdownTextView.swift in Sources */,
 				B346916E0BE2FE17E1F7FC5C /* MediaDocument.swift in Sources */,
+				20A5EA555198EDD09927D2CE /* MediaSnapshotOverlayView.swift in Sources */,
 				A4734AE72DCAFD235B91DFD5 /* MediaViewerView.swift in Sources */,
 				21D6E7FC33246E5792605570 /* MergeDocumentsSheet.swift in Sources */,
 				BE678A0288B9835A3E7B4012 /* MergeService.swift in Sources */,
@@ -1525,6 +1533,14 @@
 				minimumVersion = 2.3.0;
 			};
 		};
+		24190CE4AF0B5944ACA7AEE4 /* XCRemoteSwiftPackageReference "YouTubePlayerKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/SvenTiigi/YouTubePlayerKit.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.0;
+			};
+		};
 		A0FC1AC836FC06E7C9FCEAFE /* XCRemoteSwiftPackageReference "swift-cmark-gfm" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/stackotter/swift-cmark-gfm";
@@ -1565,6 +1581,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 225B7FE5AC36B1D8CF482B3A /* XCRemoteSwiftPackageReference "Highlightr" */;
 			productName = Highlightr;
+		};
+		9E2276FDBD0016EB459B84BC /* YouTubePlayerKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 24190CE4AF0B5944ACA7AEE4 /* XCRemoteSwiftPackageReference "YouTubePlayerKit" */;
+			productName = YouTubePlayerKit;
 		};
 		B0FA5FDF627CF3003240BE67 /* OakReaderAI */ = {
 			isa = XCSwiftPackageProductDependency;

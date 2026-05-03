@@ -1,9 +1,11 @@
 import SwiftUI
-import WebKit
+import YouTubePlayerKit
 
 /// Viewer for embed documents (YouTube).
 struct MediaViewerView: View {
     let viewModel: DocumentViewModel
+
+    @State private var youtubePlayer: YouTubePlayer?
 
     var body: some View {
         if let media = viewModel.mediaDocument {
@@ -31,6 +33,14 @@ struct MediaViewerView: View {
                 }
             }
             .background(OakStyle.Colors.contentBackground)
+            .onAppear {
+                if let videoId = extractYouTubeVideoId(from: media.sourceURL) {
+                    youtubePlayer = YouTubePlayer(
+                        source: .video(id: videoId),
+                        parameters: .init(autoPlay: false)
+                    )
+                }
+            }
         } else {
             Text("No media loaded")
                 .foregroundStyle(.secondary)
@@ -42,11 +52,27 @@ struct MediaViewerView: View {
 
     @ViewBuilder
     private func youtubeEmbed(media: MediaDocument) -> some View {
-        let videoId = extractYouTubeVideoId(from: media.sourceURL)
-        if let videoId {
-            YouTubeEmbedView(videoId: videoId)
-                .aspectRatio(16/9, contentMode: .fit)
-                .frame(maxWidth: .infinity)
+        if let player = youtubePlayer {
+            YouTubePlayerView(player) { state in
+                switch state {
+                case .idle:
+                    ProgressView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                case .ready:
+                    EmptyView()
+                case .error:
+                    VStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.title)
+                            .foregroundStyle(.secondary)
+                        Text("Failed to load video")
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
+            .aspectRatio(16/9, contentMode: .fit)
+            .frame(maxWidth: .infinity)
         }
     }
 
@@ -130,46 +156,5 @@ struct MediaViewerView: View {
             return String(format: "%d:%02d:%02d", h, m, s)
         }
         return String(format: "%d:%02d", m, s)
-    }
-}
-
-// MARK: - YouTube Embed (WKWebView)
-
-/// NSViewRepresentable wrapping WKWebView for YouTube privacy-enhanced embed.
-struct YouTubeEmbedView: NSViewRepresentable {
-    let videoId: String
-
-    func makeNSView(context: Context) -> WKWebView {
-        let config = WKWebViewConfiguration()
-        config.allowsAirPlayForMediaPlayback = true
-        let webView = WKWebView(frame: .zero, configuration: config)
-        webView.allowsBackForwardNavigationGestures = false
-        loadEmbed(in: webView)
-        return webView
-    }
-
-    func updateNSView(_ webView: WKWebView, context: Context) {}
-
-    private func loadEmbed(in webView: WKWebView) {
-        let html = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-        <meta charset="utf-8">
-        <style>
-            * { margin: 0; padding: 0; }
-            body { background: #000; }
-            iframe { width: 100%; height: 100vh; border: none; }
-        </style>
-        </head>
-        <body>
-        <iframe src="https://www.youtube-nocookie.com/embed/\(videoId)?rel=0&modestbranding=1"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowfullscreen>
-        </iframe>
-        </body>
-        </html>
-        """
-        webView.loadHTMLString(html, baseURL: nil)
     }
 }
