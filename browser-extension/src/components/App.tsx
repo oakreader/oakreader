@@ -9,7 +9,7 @@ import { SaveButton, type SaveState } from "./SaveButton";
 
 export function App() {
   const { pageMeta, tabId, collections, tags, loading, error } = usePopupData();
-  const [collectionId, setCollectionId] = useState("__inbox__");
+  const [collectionId, setCollectionId] = useState("__all__");
   const [selectedTagIds, setSelectedTagIds] = useState<Set<string>>(new Set());
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [errorMessage, setErrorMessage] = useState("");
@@ -27,15 +27,15 @@ export function App() {
   }, []);
 
   const collectionName =
-    collectionId === "__inbox__"
-      ? "Inbox"
-      : collections.find((c) => c.id === collectionId)?.name || "Inbox";
+    collectionId === "__all__"
+      ? "All Items"
+      : collections.find((c) => c.id === collectionId)?.name || "All Items";
 
   const handleSave = useCallback(async () => {
     if (!pageMeta || tabId === null) return;
 
     setErrorMessage("");
-    const selectedCollection = collectionId === "__inbox__" ? undefined : collectionId;
+    const selectedCollection = collectionId === "__all__" ? undefined : collectionId;
 
     try {
       let payload: PageCapture | PDFSavePayload;
@@ -96,8 +96,8 @@ export function App() {
 
   if (loading) {
     return (
-      <div className="py-12 text-center text-[12px] text-muted-foreground">
-        Loading\u2026
+      <div className="py-12 text-center text-[12px] text-secondary">
+        Loading&hellip;
       </div>
     );
   }
@@ -106,7 +106,7 @@ export function App() {
     return (
       <>
         <Header />
-        <div className="px-4 py-8 text-center text-[12px] text-destructive">
+        <div className="px-3 py-8 text-center text-[12px] text-destructive">
           {error}
         </div>
       </>
@@ -116,10 +116,8 @@ export function App() {
   return (
     <>
       <Header />
-      <div className="px-4 pb-4 space-y-3">
+      <div className="px-3 pb-3 space-y-3">
         {pageMeta && <PageCard pageMeta={pageMeta} />}
-
-        <div className="border-t border-border" />
 
         <CollectionPicker
           collections={collections}
@@ -146,8 +144,8 @@ export function App() {
 
 function Header() {
   return (
-    <div className="px-4 py-3">
-      <span className="text-[14px] font-semibold text-foreground">OakReader</span>
+    <div className="px-3 pt-3 pb-2">
+      <span className="text-[13px] font-semibold text-secondary">OakReader</span>
     </div>
   );
 }

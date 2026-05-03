@@ -1,18 +1,26 @@
 @import "tailwindcss";
 
 @theme inline {
-  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
 
-  --color-background: #f5f5f5;
-  --color-foreground: #1a1a1a;
-  --color-muted: #f0f0f0;
-  --color-muted-foreground: #6e6e6e;
-  --color-border: #e0e0e0;
+  /* Apple HIG system colors */
+  --color-background: #f5f5f7;
+  --color-foreground: rgba(0, 0, 0, 0.85);
+  --color-secondary: rgba(0, 0, 0, 0.5);
+  --color-tertiary: rgba(0, 0, 0, 0.3);
+  --color-separator: rgba(0, 0, 0, 0.08);
+  --color-fill: rgba(0, 0, 0, 0.04);
+  --color-fill-hover: rgba(0, 0, 0, 0.08);
+  --color-grouped: #ffffff;
   --color-primary: #007aff;
   --color-primary-foreground: #ffffff;
   --color-success: #34c759;
   --color-destructive: #ff3b30;
-  --radius: 0.625rem;
+
+  /* Concentric radii: outer 10px, inner = outer - padding */
+  --radius-outer: 10px;
+  --radius-inner: 8px;
+  --radius-control: 6px;
 }
 
 body {
@@ -21,4 +29,11 @@ body {
   -webkit-font-smoothing: antialiased;
   letter-spacing: -0.01em;
   background: var(--color-background);
+  color: var(--color-foreground);
+}
+
+/* Apple-style thin scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
 }

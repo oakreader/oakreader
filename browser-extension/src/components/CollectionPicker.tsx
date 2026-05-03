@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { ChevronDown, Inbox, Folder } from "lucide-react";
+import { ChevronDown, BookOpen, Folder, Check } from "lucide-react";
 import type { CollectionInfo } from "@/src/lib/types";
 
 interface CollectionPickerProps {
@@ -9,7 +9,7 @@ interface CollectionPickerProps {
 }
 
 interface TreeNode {
-  collection: CollectionInfo | null; // null for Inbox
+  collection: CollectionInfo | null; // null for "All Items"
   id: string;
   name: string;
   depth: number;
@@ -17,15 +17,15 @@ interface TreeNode {
 }
 
 function buildTree(collections: CollectionInfo[]): TreeNode[] {
-  const inbox: TreeNode = {
+  const allItems: TreeNode = {
     collection: null,
-    id: "__inbox__",
-    name: "Inbox",
+    id: "__all__",
+    name: "All Items",
     depth: 0,
     children: [],
   };
 
-  // Map id → children
+  // Map id -> children
   const childrenMap = new Map<string | null, CollectionInfo[]>();
   for (const c of collections) {
     const key = c.parentId;
@@ -44,7 +44,7 @@ function buildTree(collections: CollectionInfo[]): TreeNode[] {
     }));
   }
 
-  return [inbox, ...buildNodes(null, 0)];
+  return [allItems, ...buildNodes(null, 0)];
 }
 
 function flattenTree(nodes: TreeNode[]): TreeNode[] {
@@ -85,51 +85,61 @@ export function CollectionPicker({
 
   return (
     <div ref={containerRef} className="relative">
+      {/* Section label */}
+      <p className="text-[11px] font-semibold text-secondary mb-1.5">Collection</p>
+
+      {/* Trigger — Apple popup button style */}
       <button
         type="button"
-        className="flex w-full items-center gap-2 rounded-lg bg-white px-3 py-2.5 text-left shadow-sm border border-border"
+        className="flex w-full items-center gap-2 rounded-[var(--radius-outer)] bg-grouped px-3 h-9 text-left transition-colors duration-200 hover:bg-fill-hover"
+        style={{ boxShadow: "0 0 0 0.5px rgba(0,0,0,0.06)" }}
         onClick={() => setOpen(!open)}
       >
-        {selected.id === "__inbox__" ? (
-          <Inbox className="size-4 text-muted-foreground shrink-0" />
+        {selected.id === "__all__" ? (
+          <BookOpen className="size-[15px] text-secondary shrink-0" strokeWidth={1.8} />
         ) : (
-          <Folder className="size-4 text-muted-foreground shrink-0" />
+          <Folder className="size-[15px] text-secondary shrink-0" strokeWidth={1.8} />
         )}
         <span className="flex-1 text-[13px] font-medium text-foreground truncate">
           {selected.name}
         </span>
         <ChevronDown
-          className={`size-3.5 text-muted-foreground shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
+          className={`size-3 text-tertiary shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+          strokeWidth={2.5}
         />
       </button>
 
+      {/* Dropdown menu */}
       {open && (
-        <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-48 overflow-y-auto rounded-lg bg-white border border-border shadow-lg">
+        <div
+          className="absolute left-0 right-0 top-full z-50 mt-1 max-h-48 overflow-y-auto rounded-[var(--radius-outer)] bg-grouped p-1"
+          style={{ boxShadow: "0 0 0 0.5px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.12)" }}
+        >
           {flat.map((node) => (
             <button
               key={node.id}
               type="button"
-              className={`flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-muted ${
-                node.id === value ? "bg-muted" : ""
+              className={`flex w-full items-center gap-2 px-2.5 h-8 rounded-[var(--radius-control)] text-left transition-colors duration-150 ${
+                node.id === value
+                  ? "bg-primary/8"
+                  : "hover:bg-fill-hover"
               }`}
-              style={{ paddingLeft: `${12 + node.depth * 16}px` }}
+              style={{ paddingLeft: `${10 + node.depth * 20}px` }}
               onClick={() => {
                 onChange(node.id);
                 setOpen(false);
               }}
             >
-              {node.id === "__inbox__" ? (
-                <Inbox className="size-3.5 text-muted-foreground shrink-0" />
+              {node.id === "__all__" ? (
+                <BookOpen className="size-[14px] text-secondary shrink-0" strokeWidth={1.8} />
               ) : (
-                <Folder className="size-3.5 text-muted-foreground shrink-0" />
+                <Folder className="size-[14px] text-secondary shrink-0" strokeWidth={1.8} />
               )}
               <span className="flex-1 text-[12px] text-foreground truncate">
                 {node.name}
               </span>
               {node.id === value && (
-                <svg className="size-3.5 text-primary shrink-0" viewBox="0 0 16 16" fill="currentColor">
-                  <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z" />
-                </svg>
+                <Check className="size-3.5 text-primary shrink-0" strokeWidth={2.5} />
               )}
             </button>
           ))}

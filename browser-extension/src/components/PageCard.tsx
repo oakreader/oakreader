@@ -37,17 +37,13 @@ function getPDFTitle(url: string): string {
 function PDFIcon() {
   return (
     <svg
-      className="size-5 mt-0.5 shrink-0 text-red-500"
-      viewBox="0 0 24 24"
+      className="size-8 shrink-0"
+      viewBox="0 0 32 32"
       fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
     >
-      <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
-      <path d="M14 2v4a2 2 0 0 0 2 2h4" />
-      <path d="M10 17v-1a1 1 0 0 1 1-1h.6a1 1 0 0 0 .9-.6l.2-.3a1 1 0 0 1 .9-.6H14" />
+      <rect x="4" y="2" width="24" height="28" rx="4" fill="#FF3B30" opacity="0.1" />
+      <rect x="4" y="2" width="24" height="28" rx="4" stroke="#FF3B30" opacity="0.3" strokeWidth="1" />
+      <text x="16" y="20" textAnchor="middle" fill="#FF3B30" fontSize="8" fontWeight="700" fontFamily="-apple-system, system-ui, sans-serif">PDF</text>
     </svg>
   );
 }
@@ -68,24 +64,25 @@ export function PageCard({ pageMeta }: PageCardProps) {
     `https://www.google.com/s2/favicons?sz=32&domain=${encodeURIComponent(domain)}`;
 
   return (
-    <div className="flex items-start gap-3">
+    <div className="flex items-start gap-2.5 rounded-[var(--radius-outer)] bg-grouped p-3"
+         style={{ boxShadow: "0 0 0 0.5px rgba(0,0,0,0.06)" }}>
       {isPDF ? (
         <PDFIcon />
       ) : (
         <img
           src={faviconSrc}
           alt=""
-          className="size-5 mt-0.5 rounded shrink-0"
+          className="size-8 rounded-[6px] shrink-0 bg-fill"
           onError={(e) => {
             (e.target as HTMLImageElement).style.display = "none";
           }}
         />
       )}
-      <div className="min-w-0 flex-1">
-        <p className="text-[13px] font-medium leading-snug text-foreground line-clamp-2">
+      <div className="min-w-0 flex-1 py-0.5">
+        <p className="text-[13px] font-semibold leading-snug text-foreground line-clamp-2">
           {displayTitle}
         </p>
-        <p className="mt-0.5 text-[11px] text-muted-foreground truncate">
+        <p className="mt-0.5 text-[11px] text-secondary">
           {domain} &middot; {typeLabel}
         </p>
       </div>
