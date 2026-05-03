@@ -12,9 +12,9 @@ interface SaveButtonProps {
 export function SaveButton({ state, label, errorMessage, onClick }: SaveButtonProps) {
   if (state === "saved") {
     return (
-      <div className="flex items-center justify-center gap-2 rounded-lg bg-success/10 py-2.5 px-4">
-        <Check className="size-4 text-success" />
-        <span className="text-[13px] font-medium text-success">Saved</span>
+      <div className="flex items-center justify-center gap-2 rounded-full bg-success/10 h-9 px-4">
+        <Check className="size-[14px] text-success" strokeWidth={2.5} />
+        <span className="text-[13px] font-semibold text-success">Saved</span>
       </div>
     );
   }
@@ -35,11 +35,11 @@ export function SaveButton({ state, label, errorMessage, onClick }: SaveButtonPr
     <div className="space-y-2">
       <button
         type="button"
-        className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2.5 px-4 text-[13px] font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+        className="flex w-full items-center justify-center gap-2 rounded-full bg-primary h-9 px-4 text-[13px] font-semibold text-primary-foreground transition-all duration-200 ease-in-out hover:brightness-110 active:scale-[0.98] disabled:opacity-40"
         disabled={disabled}
         onClick={onClick}
       >
-        {isWorking && <Loader2 className="size-4 animate-spin" />}
+        {isWorking && <Loader2 className="size-[14px] animate-spin" />}
         {buttonLabel}
       </button>
       {state === "error" && errorMessage && (

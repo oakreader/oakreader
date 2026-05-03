@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronRight, Folder, Tag } from "lucide-react";
+import { ChevronRight, Tag } from "lucide-react";
 import { Checkbox } from "@/src/components/ui/checkbox";
 import type { TagNodeInfo } from "@/src/lib/types";
 
@@ -20,22 +20,27 @@ export function TagTreePicker({
 
   return (
     <div>
+      {/* Section header — Apple HIG: semibold, secondary, no uppercase */}
       <button
         type="button"
-        className="flex items-center gap-1.5 mb-2 text-left"
+        className="flex items-center gap-1 mb-1.5 text-left"
         onClick={() => setSectionExpanded(!sectionExpanded)}
       >
         <ChevronRight
-          className={`size-3 text-muted-foreground transition-transform ${
+          className={`size-3 text-tertiary transition-transform duration-200 ${
             sectionExpanded ? "rotate-90" : ""
           }`}
+          strokeWidth={2.5}
         />
-        <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+        <span className="text-[11px] font-semibold text-secondary">
           Tags
         </span>
       </button>
       {sectionExpanded && (
-        <div className="rounded-lg bg-white border border-border p-2 max-h-40 overflow-y-auto">
+        <div
+          className="rounded-[var(--radius-outer)] bg-grouped p-2 max-h-40 overflow-y-auto"
+          style={{ boxShadow: "0 0 0 0.5px rgba(0,0,0,0.06)" }}
+        >
           <TagNodeList nodes={tags} depth={0} selectedIds={selectedIds} onToggle={onToggle} />
         </div>
       )}
@@ -81,31 +86,32 @@ function TagNodeItem({ node, depth, selectedIds, onToggle }: TagNodeItemProps) {
   return (
     <div>
       <div
-        className="flex items-center gap-1.5 py-1 min-w-0"
-        style={{ paddingLeft: `${depth * 16}px` }}
+        className="flex items-center gap-1.5 h-7 min-w-0"
+        style={{ paddingLeft: `${depth * 20}px` }}
       >
         {/* Expand/collapse chevron for group nodes */}
         {hasChildren ? (
           <button
             type="button"
-            className="shrink-0 p-0.5 rounded hover:bg-muted"
+            className="shrink-0 size-5 flex items-center justify-center rounded-[var(--radius-control)] transition-colors duration-150 hover:bg-fill-hover"
             onClick={() => setExpanded(!expanded)}
           >
             <ChevronRight
-              className={`size-3 text-muted-foreground transition-transform ${
+              className={`size-3 text-tertiary transition-transform duration-200 ${
                 expanded ? "rotate-90" : ""
               }`}
+              strokeWidth={2.5}
             />
           </button>
         ) : (
-          <span className="w-4 shrink-0" />
+          <span className="w-5 shrink-0" />
         )}
 
         {/* Icon */}
         {isSelectable ? (
-          <Tag className="size-3 text-muted-foreground shrink-0" />
+          <Tag className="size-3 text-tertiary shrink-0" strokeWidth={2} />
         ) : (
-          <Folder className="size-3 text-muted-foreground shrink-0" />
+          <span className="text-[10px] text-tertiary shrink-0">&#9679;</span>
         )}
 
         {/* Checkbox + Label */}
@@ -114,14 +120,13 @@ function TagNodeItem({ node, depth, selectedIds, onToggle }: TagNodeItemProps) {
             <Checkbox
               checked={selectedIds.has(node.id)}
               onCheckedChange={() => onToggle(node.id)}
-              className="size-3.5 rounded border-border"
             />
             <span className="text-[12px] text-foreground truncate">
               {node.name}
             </span>
           </label>
         ) : (
-          <span className="text-[12px] font-medium text-muted-foreground truncate">
+          <span className="text-[12px] font-medium text-secondary truncate">
             {node.name}
           </span>
         )}
