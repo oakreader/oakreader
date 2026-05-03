@@ -9,26 +9,26 @@ struct MediaViewerView: View {
 
     var body: some View {
         if let media = viewModel.mediaDocument {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    // Player area
-                    youtubeEmbed(media: media)
+            VStack(spacing: 0) {
+                // Video player — fills full width, 16:9 aspect ratio
+                youtubeEmbed(media: media)
+                    .layoutPriority(1)
 
-                    Divider()
-
-                    // Metadata
-                    metadataSection(media: media)
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 16)
-
-                    // Transcript
-                    if let transcriptURL = media.transcriptURL,
-                       let transcript = try? String(contentsOf: transcriptURL, encoding: .utf8),
-                       !transcript.isEmpty {
-                        Divider()
-                        transcriptSection(transcript: transcript)
+                // Metadata + transcript fills remaining space
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        metadataSection(media: media)
                             .padding(.horizontal, 24)
                             .padding(.vertical, 16)
+
+                        if let transcriptURL = media.transcriptURL,
+                           let transcript = try? String(contentsOf: transcriptURL, encoding: .utf8),
+                           !transcript.isEmpty {
+                            Divider()
+                            transcriptSection(transcript: transcript)
+                                .padding(.horizontal, 24)
+                                .padding(.vertical, 16)
+                        }
                     }
                 }
             }
@@ -56,19 +56,25 @@ struct MediaViewerView: View {
             YouTubePlayerView(player) { state in
                 switch state {
                 case .idle:
-                    ProgressView()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    ZStack {
+                        Color.black
+                        ProgressView()
+                            .controlSize(.large)
+                            .tint(.white)
+                    }
                 case .ready:
                     EmptyView()
                 case .error:
-                    VStack(spacing: 8) {
-                        Image(systemName: "exclamationmark.triangle")
-                            .font(.title)
-                            .foregroundStyle(.secondary)
-                        Text("Failed to load video")
-                            .foregroundStyle(.secondary)
+                    ZStack {
+                        Color.black
+                        VStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle")
+                                .font(.title)
+                                .foregroundStyle(.gray)
+                            Text("Failed to load video")
+                                .foregroundStyle(.gray)
+                        }
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
             .aspectRatio(16/9, contentMode: .fit)
