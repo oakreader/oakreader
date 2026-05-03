@@ -1,5 +1,4 @@
 import SwiftUI
-import WebKit
 import YouTubePlayerKit
 import YoutubeTranscript
 
@@ -338,16 +337,31 @@ struct MediaViewerView: View {
         defer { isLoadingTranscript = false }
 
         do {
-            var entries: [TranscriptEntry]
-            do {
-                let responses = try await YoutubeTranscript.fetchTranscript(for: videoId)
-                entries = responses.enumerated().map { index, response in
-                    TranscriptEntry(id: index, offset: response.offset, text: response.text)
-                }
-            } catch {
-                // Library failed (e.g. "disabled") — try via WKWebView (uses system proxy)
-                entries = try await fetchTranscriptViaWebView(videoId: videoId)
+            // 3a. Try yt-dlp first (most reliable, uses system proxy)
+            let ytDlpPath = Preferences.shared.ytDlpPath
+            var entries: [TranscriptEntry] = []
+
+            if !ytDlpPath.isEmpty, FileManager.default.isExecutableFile(atPath: ytDlpPath) {
+                entries = await fetchTranscriptViaYtDlp(videoId: videoId, ytDlpPath: ytDlpPath)
             }
+
+            // 3b. Fall back to Swift library
+            if entries.isEmpty {
+                do {
+                    let responses = try await YoutubeTranscript.fetchTranscript(for: videoId)
+                    entries = responses.enumerated().map { index, response in
+                        TranscriptEntry(id: index, offset: response.offset, text: response.text)
+                    }
+                } catch {
+                    // If yt-dlp wasn't configured, surface the error with a hint
+                    if ytDlpPath.isEmpty {
+                        throw error
+                    }
+                    // Both methods failed — yt-dlp returned nothing and library threw
+                    throw error
+                }
+            }
+
             guard !entries.isEmpty else { return }
 
             transcriptEntries = entries
@@ -360,16 +374,94 @@ struct MediaViewerView: View {
             let fileURL = media.storageDirectory.appendingPathComponent("transcript.txt")
             try? formatted.write(to: fileURL, atomically: true, encoding: .utf8)
         } catch {
-            transcriptErrorMessage = error.localizedDescription
+            let ytDlpPath = Preferences.shared.ytDlpPath
+            if ytDlpPath.isEmpty {
+                transcriptErrorMessage = "\(error.localizedDescription)\n\nTip: Install yt-dlp for more reliable transcripts (Settings > General > External Tools)."
+            } else {
+                transcriptErrorMessage = error.localizedDescription
+            }
         }
     }
 
-    /// Fallback: fetch transcript via a hidden WKWebView (uses the same network/proxy
-    /// path as the YouTube player, bypassing URLSession proxy issues).
-    @MainActor
-    private func fetchTranscriptViaWebView(videoId: String) async throws -> [TranscriptEntry] {
-        let fetcher = WebViewTranscriptFetcher()
-        return try await fetcher.fetch(videoId: videoId)
+    /// Fetch transcript using yt-dlp CLI (runs as a subprocess, inherits system proxy).
+    private func fetchTranscriptViaYtDlp(videoId: String, ytDlpPath: String) async -> [TranscriptEntry] {
+        await withCheckedContinuation { continuation in
+            Task.detached {
+                let tempDir = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("oakreader-transcript-\(videoId)")
+
+                try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+                defer { try? FileManager.default.removeItem(at: tempDir) }
+
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: ytDlpPath)
+                process.arguments = [
+                    "--skip-download",
+                    "--write-auto-sub",
+                    "--write-sub",
+                    "--sub-lang", "en",
+                    "--sub-format", "json3",
+                    "-o", tempDir.appendingPathComponent("%(id)s").path,
+                    "https://www.youtube.com/watch?v=\(videoId)",
+                ]
+                process.standardOutput = Pipe()
+                process.standardError = Pipe()
+
+                do {
+                    try process.run()
+                    process.waitUntilExit()
+                } catch {
+                    continuation.resume(returning: [])
+                    return
+                }
+
+                guard process.terminationStatus == 0 else {
+                    continuation.resume(returning: [])
+                    return
+                }
+
+                // Find the generated subtitle file (e.g. VIDEO_ID.en.json3)
+                let files = (try? FileManager.default.contentsOfDirectory(
+                    at: tempDir, includingPropertiesForKeys: nil
+                )) ?? []
+                guard let subFile = files.first(where: { $0.pathExtension == "json3" }),
+                      let data = try? Data(contentsOf: subFile) else {
+                    continuation.resume(returning: [])
+                    return
+                }
+
+                let entries = Self.parseJSON3Subtitles(data)
+                continuation.resume(returning: entries)
+            }
+        }
+    }
+
+    /// Parse yt-dlp JSON3 subtitle format into transcript entries.
+    private static func parseJSON3Subtitles(_ data: Data) -> [TranscriptEntry] {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let events = json["events"] as? [[String: Any]] else {
+            return []
+        }
+
+        var entries: [TranscriptEntry] = []
+        for event in events {
+            guard let tStartMs = event["tStartMs"] as? Double,
+                  let segs = event["segs"] as? [[String: Any]] else {
+                continue
+            }
+
+            let text = segs.compactMap { $0["utf8"] as? String }.joined()
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty, text != "\n" else { continue }
+
+            entries.append(TranscriptEntry(
+                id: entries.count,
+                offset: tStartMs / 1000.0,
+                text: text
+            ))
+        }
+
+        return entries
     }
 
     /// Parse cached `[M:SS] text` or `[H:MM:SS] text` lines back into structured entries.
@@ -399,149 +491,5 @@ struct MediaViewerView: View {
             return String(format: "[%d:%02d:%02d]", h, m, s)
         }
         return String(format: "[%d:%02d]", m, s)
-    }
-}
-
-// MARK: - WKWebView-based Transcript Fetcher
-
-/// Fetches YouTube transcript via a hidden WKWebView, which uses the system proxy/VPN
-/// settings (same network path as the YouTube player). This works around URLSession
-/// not routing through certain proxy configurations.
-@MainActor
-private final class WebViewTranscriptFetcher: NSObject, WKNavigationDelegate {
-    private var webView: WKWebView?
-    private var continuation: CheckedContinuation<[TranscriptEntry], any Error>?
-
-    func fetch(videoId: String) async throws -> [TranscriptEntry] {
-        try await withCheckedThrowingContinuation { continuation in
-            self.continuation = continuation
-
-            let config = WKWebViewConfiguration()
-            let webView = WKWebView(frame: .zero, configuration: config)
-            webView.navigationDelegate = self
-            webView.customUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
-            self.webView = webView
-
-            let url = URL(string: "https://www.youtube.com/watch?v=\(videoId)")!
-            webView.load(URLRequest(url: url))
-
-            // Timeout after 15 seconds
-            Task { @MainActor [weak self] in
-                try? await Task.sleep(for: .seconds(15))
-                if let self, self.continuation != nil {
-                    self.continuation?.resume(throwing: URLError(.timedOut))
-                    self.continuation = nil
-                    self.webView = nil
-                }
-            }
-        }
-    }
-
-    nonisolated func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        Task { @MainActor in
-            self.extractTranscript(from: webView)
-        }
-    }
-
-    nonisolated func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: any Error) {
-        Task { @MainActor in
-            self.continuation?.resume(throwing: error)
-            self.continuation = nil
-            self.webView = nil
-        }
-    }
-
-    private func extractTranscript(from webView: WKWebView) {
-        // Step 1: Extract the captions track URL from ytInitialPlayerResponse
-        let js = """
-        (function() {
-            try {
-                var scripts = document.querySelectorAll('script');
-                for (var i = 0; i < scripts.length; i++) {
-                    var text = scripts[i].textContent;
-                    var idx = text.indexOf('"captions":');
-                    if (idx === -1) continue;
-                    var sub = text.substring(idx + 11);
-                    var end = sub.indexOf(',"videoDetails');
-                    if (end === -1) end = sub.indexOf(',"microformat');
-                    if (end === -1) continue;
-                    var json = sub.substring(0, end);
-                    var caps = JSON.parse(json);
-                    var tracks = caps.playerCaptionsTracklistRenderer.captionTracks;
-                    if (tracks && tracks.length > 0) return tracks[0].baseUrl;
-                }
-            } catch(e) {}
-            return null;
-        })();
-        """
-
-        webView.evaluateJavaScript(js) { [weak self] result, error in
-            guard let self else { return }
-            Task { @MainActor in
-                if let trackURL = result as? String {
-                    self.fetchTranscriptXML(from: trackURL, webView: webView)
-                } else {
-                    self.continuation?.resume(throwing: URLError(.cannotParseResponse))
-                    self.continuation = nil
-                    self.webView = nil
-                }
-            }
-        }
-    }
-
-    private func fetchTranscriptXML(from trackURL: String, webView: WKWebView) {
-        // Step 2: Fetch transcript XML via XMLHttpRequest (same origin, uses WKWebView network)
-        let escapedURL = trackURL.replacingOccurrences(of: "'", with: "\\'")
-        let js = """
-        new Promise(function(resolve, reject) {
-            var xhr = new XMLHttpRequest();
-            xhr.open('GET', '\(escapedURL)');
-            xhr.onload = function() { resolve(xhr.responseText); };
-            xhr.onerror = function() { reject('XHR failed'); };
-            xhr.send();
-        });
-        """
-
-        Task { @MainActor [weak self] in
-            guard let self else { return }
-            do {
-                let value = try await webView.callAsyncJavaScript(js, contentWorld: .page)
-                if let xmlString = value as? String {
-                    let entries = self.parseTranscriptXML(xmlString)
-                    self.continuation?.resume(returning: entries)
-                } else {
-                    self.continuation?.resume(throwing: URLError(.cannotDecodeContentData))
-                }
-            } catch {
-                self.continuation?.resume(throwing: error)
-            }
-            self.continuation = nil
-            self.webView = nil
-        }
-    }
-
-    private func parseTranscriptXML(_ xmlString: String) -> [TranscriptEntry] {
-        guard let regex = try? NSRegularExpression(
-            pattern: "<text start=\"([^\"]*)\" dur=\"([^\"]*)\">([^<]*)</text>"
-        ) else { return [] }
-
-        let range = NSRange(xmlString.startIndex..., in: xmlString)
-        let matches = regex.matches(in: xmlString, range: range)
-
-        return matches.enumerated().map { index, match in
-            let offsetStr = (xmlString as NSString).substring(with: match.range(at: 1))
-            let text = (xmlString as NSString).substring(with: match.range(at: 3))
-                .replacingOccurrences(of: "&#39;", with: "'")
-                .replacingOccurrences(of: "&amp;", with: "&")
-                .replacingOccurrences(of: "&quot;", with: "\"")
-                .replacingOccurrences(of: "&lt;", with: "<")
-                .replacingOccurrences(of: "&gt;", with: ">")
-
-            return TranscriptEntry(
-                id: index,
-                offset: Double(offsetStr) ?? 0,
-                text: text
-            )
-        }
     }
 }
