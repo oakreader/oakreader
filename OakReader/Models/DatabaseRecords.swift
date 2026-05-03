@@ -16,7 +16,6 @@ struct ItemRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable 
     var syncStatus: String
     var createdAt: String
     var updatedAt: String
-    var isInbox: Bool
     var citeKey: String?
 
     enum CodingKeys: String, CodingKey, ColumnExpression {
@@ -29,7 +28,6 @@ struct ItemRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable 
         case syncStatus = "sync_status"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
-        case isInbox = "is_inbox"
         case citeKey = "cite_key"
     }
 }

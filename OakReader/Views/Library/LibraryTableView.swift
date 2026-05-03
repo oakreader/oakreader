@@ -87,20 +87,6 @@ struct LibraryTableView: View {
                     .font(.system(size: 13))
                     .foregroundStyle(Color.primary.opacity(0.25))
                     .multilineTextAlignment(.center)
-            } else if store.selectedCollectionId == SystemCollectionID.inbox {
-                Image(systemName: "tray")
-                    .font(.system(size: 48))
-                    .foregroundStyle(Color.primary.opacity(0.15))
-                    .accessibilityHidden(true)
-
-                Text("Inbox is Empty")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Color.primary.opacity(0.55))
-
-                Text("Items saved from the Chrome extension will appear here.")
-                    .font(.system(size: 13))
-                    .foregroundStyle(Color.primary.opacity(0.25))
-                    .multilineTextAlignment(.center)
             } else {
                 Image(systemName: "books.vertical")
                     .font(.system(size: 48))

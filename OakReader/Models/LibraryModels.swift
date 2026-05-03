@@ -67,7 +67,6 @@ struct LibraryItem: Identifiable, Hashable {
     var lastOpenedAt: Date?
     var isFavorite: Bool
     var syncStatus: SyncStatus
-    var isInbox: Bool
     var citeKey: String?
 
     // Attachments (files belonging to this item)
@@ -120,7 +119,6 @@ struct LibraryItem: Identifiable, Hashable {
         self.lastOpenedAt = record.lastOpenedAt.flatMap { Date(iso8601String: $0) }
         self.isFavorite = record.isFavorite
         self.syncStatus = SyncStatus(rawValue: record.syncStatus) ?? .local
-        self.isInbox = record.isInbox
         self.citeKey = record.citeKey
         self.attachments = attachments
         self.propertyValues = propertyValues

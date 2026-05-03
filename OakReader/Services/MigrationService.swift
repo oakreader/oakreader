@@ -128,8 +128,7 @@ final class MigrationService {
             lastOpenedAt: item.lastOpenedAt.map { $0.iso8601String },
             syncStatus: SyncStatus.local.rawValue,
             createdAt: item.dateAdded.iso8601String,
-            updatedAt: now,
-            isInbox: false
+            updatedAt: now
         )
 
         let attRecord = AttachmentRecord(

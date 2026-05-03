@@ -89,8 +89,7 @@ final class ImportService {
             lastOpenedAt: nil,
             syncStatus: SyncStatus.local.rawValue,
             createdAt: now,
-            updatedAt: now,
-            isInbox: false
+            updatedAt: now
         )
 
         let attRecord = AttachmentRecord(
@@ -190,8 +189,7 @@ final class ImportService {
             lastOpenedAt: nil,
             syncStatus: SyncStatus.local.rawValue,
             createdAt: now,
-            updatedAt: now,
-            isInbox: originalPageURL != nil
+            updatedAt: now
         )
 
         let attRecord = AttachmentRecord(
@@ -289,8 +287,7 @@ final class ImportService {
             lastOpenedAt: nil,
             syncStatus: SyncStatus.local.rawValue,
             createdAt: now,
-            updatedAt: now,
-            isInbox: true
+            updatedAt: now
         )
 
         let attRecord = AttachmentRecord(
