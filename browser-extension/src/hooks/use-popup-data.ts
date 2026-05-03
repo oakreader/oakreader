@@ -2,6 +2,22 @@ import { useEffect, useState } from "react";
 import { fetchCollections, fetchTags } from "@/src/lib/api";
 import type { CollectionInfo, PageMeta, TagNodeInfo } from "@/src/lib/types";
 
+function detectPageType(url: string): "html" | "embed" {
+  try {
+    const u = new URL(url);
+    if (
+      (u.hostname === "www.youtube.com" ||
+        u.hostname === "youtube.com" ||
+        u.hostname === "m.youtube.com") &&
+      u.pathname === "/watch" &&
+      u.searchParams.has("v")
+    ) {
+      return "embed";
+    }
+  } catch { /* ignore */ }
+  return "html";
+}
+
 interface PopupData {
   pageMeta: PageMeta | null;
   tabId: number | null;
@@ -84,10 +100,11 @@ export function usePopupData(): PopupData {
         if (metaResult.status === "fulfilled" && metaResult.value) {
           setPageMeta(metaResult.value as PageMeta);
         } else {
-          // Fallback: construct meta from tab info
+          // Fallback: construct meta from tab info with URL-based type detection
+          const tabUrl = tab.url || "";
           setPageMeta({
-            type: "html",
-            url: tab.url || "",
+            type: detectPageType(tabUrl),
+            url: tabUrl,
             title: tab.title || null,
             favicon: tab.favIconUrl || null,
           });
