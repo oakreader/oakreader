@@ -86,7 +86,7 @@ export function CollectionPicker({
   return (
     <div ref={containerRef} className="relative">
       {/* Section label */}
-      <p className="text-[11px] font-semibold text-secondary mb-1.5">Collection</p>
+      <p className="text-[11px] font-semibold text-secondary mb-1">Collection</p>
 
       {/* Trigger — Apple popup button style */}
       <button
