@@ -385,6 +385,20 @@ final class LibraryStore {
         }
     }
 
+    func updateLastPosition(_ item: LibraryItem, position: Double) {
+        let now = Date().iso8601String
+        do {
+            try database.dbQueue.write { db in
+                try db.execute(
+                    sql: "UPDATE items SET last_position = ?, updated_at = ? WHERE id = ?",
+                    arguments: [position, now, item.id.uuidString]
+                )
+            }
+        } catch {
+            Log.error(Log.store, "updateLastPosition failed: \(error)")
+        }
+    }
+
     func updateCover(_ item: LibraryItem, imageData: Data) {
         guard let primary = item.primaryAttachment else { return }
         let coverURL = primary.coverURL

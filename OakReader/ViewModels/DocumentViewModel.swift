@@ -160,6 +160,9 @@ class DocumentViewModel {
         state.isSidebarVisible = false
     }
 
+    /// Last playback time (seconds) for embed videos, preserved across tab switches.
+    var lastPlaybackTime: Double?
+
     init(media: MediaDocument) {
         self.mediaDocument = media
         self.itemType = .embed

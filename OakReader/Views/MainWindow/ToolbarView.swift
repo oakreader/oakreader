@@ -14,12 +14,12 @@ struct OakReaderToolbarView: View {
             switch viewModel.itemType {
             case .pdf:
                 leftSection
-                Spacer(minLength: 4)
+                Spacer()
                 centerSection
             case .webSnapshot, .embed:
+                Spacer()
                 areaToolButton
             }
-            Spacer()
         }
         .padding(.horizontal, OakStyle.Spacing.xs)
         .frame(height: OakStyle.Size.toolbarHeight)
@@ -106,11 +106,11 @@ struct OakReaderToolbarView: View {
                 annotationButton(for: tool)
             }
 
-            areaToolButton
+            AnnotationColorDropdown(viewModel: viewModel)
 
             separator
 
-            AnnotationColorDropdown(viewModel: viewModel)
+            areaToolButton
         }
     }
 

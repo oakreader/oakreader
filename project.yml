@@ -26,6 +26,9 @@ packages:
   CMarkGFM:
     url: https://github.com/stackotter/swift-cmark-gfm
     from: "1.0.2"
+  YoutubeTranscript:
+    url: https://github.com/skainguyen1412/swift-youtube-transcript.git
+    from: "1.0.0"
 
 settings:
   base:
@@ -50,6 +53,7 @@ targets:
       - package: Highlightr
       - package: CMarkGFM
       - package: YouTubePlayerKit
+      - package: YoutubeTranscript
     postCompileScripts:
       - script: |
           if which swiftlint > /dev/null; then

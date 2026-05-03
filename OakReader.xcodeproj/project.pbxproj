@@ -107,6 +107,7 @@
 		77DADB7F1FB366E675048377 /* DigitalSignatureSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16C3E00AB1FA2424C9D33B5B /* DigitalSignatureSheet.swift */; };
 		785110B982E23861D414F9B1 /* AreaSelectionPopupPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBDEAC41F0AF9C06236E365F /* AreaSelectionPopupPanel.swift */; };
 		7AC812D52B938CA16B55F7C4 /* DragDropCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFA3972EDD5CDE8D8B303685 /* DragDropCoordinator.swift */; };
+		7CD7B12462D12E8B04AABBDA /* YoutubeTranscript in Frameworks */ = {isa = PBXBuildFile; productRef = 3C1F95B9934A22BBA51A5047 /* YoutubeTranscript */; };
 		7E69E6EE49F85C05E60DAF93 /* ImageConversionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0724C6AE2119D33624CEADB2 /* ImageConversionService.swift */; };
 		7E81C0C114AB4D91278EE378 /* WatermarkConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B817EB306EBAFA044303568 /* WatermarkConfig.swift */; };
 		806B3FDB25EF504E461636A4 /* PDFAnnotation+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BC5B006B91985952010BF6E /* PDFAnnotation+Extensions.swift */; };
@@ -449,6 +450,7 @@
 				B81B9BA647234E09506AC8D5 /* Highlightr in Frameworks */,
 				2EF9EF12D7A03AAADC42CD14 /* CMarkGFM in Frameworks */,
 				5E203AE21E16EA6F26B580B6 /* YouTubePlayerKit in Frameworks */,
+				7CD7B12462D12E8B04AABBDA /* YoutubeTranscript in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -999,6 +1001,7 @@
 				7AB56BF574F3683388F071F2 /* Highlightr */,
 				EE983D369D941923AF2F04FF /* CMarkGFM */,
 				9E2276FDBD0016EB459B84BC /* YouTubePlayerKit */,
+				3C1F95B9934A22BBA51A5047 /* YoutubeTranscript */,
 			);
 			productName = OakReader;
 			productReference = 62D8CC8D7C726C11792024B3 /* OakReader.app */;
@@ -1030,6 +1033,7 @@
 				225B7FE5AC36B1D8CF482B3A /* XCRemoteSwiftPackageReference "Highlightr" */,
 				F474D9310432E71E4A4CF5E8 /* XCRemoteSwiftPackageReference "textual" */,
 				24190CE4AF0B5944ACA7AEE4 /* XCRemoteSwiftPackageReference "YouTubePlayerKit" */,
+				159B6E97585769D8037891EE /* XCRemoteSwiftPackageReference "swift-youtube-transcript" */,
 				4185696E65EB0B7D8D202B59 /* XCLocalSwiftPackageReference "Packages/OakReaderAI" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -1525,6 +1529,14 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		159B6E97585769D8037891EE /* XCRemoteSwiftPackageReference "swift-youtube-transcript" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/skainguyen1412/swift-youtube-transcript.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
+			};
+		};
 		225B7FE5AC36B1D8CF482B3A /* XCRemoteSwiftPackageReference "Highlightr" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/raspu/Highlightr.git";
@@ -1576,6 +1588,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = F474D9310432E71E4A4CF5E8 /* XCRemoteSwiftPackageReference "textual" */;
 			productName = Textual;
+		};
+		3C1F95B9934A22BBA51A5047 /* YoutubeTranscript */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 159B6E97585769D8037891EE /* XCRemoteSwiftPackageReference "swift-youtube-transcript" */;
+			productName = YoutubeTranscript;
 		};
 		7AB56BF574F3683388F071F2 /* Highlightr */ = {
 			isa = XCSwiftPackageProductDependency;
