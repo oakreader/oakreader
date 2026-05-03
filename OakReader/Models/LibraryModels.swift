@@ -68,6 +68,7 @@ struct LibraryItem: Identifiable, Hashable {
     var isFavorite: Bool
     var syncStatus: SyncStatus
     var citeKey: String?
+    var lastPosition: Double?
 
     // Attachments (files belonging to this item)
     var attachments: [Attachment]
@@ -120,6 +121,7 @@ struct LibraryItem: Identifiable, Hashable {
         self.isFavorite = record.isFavorite
         self.syncStatus = SyncStatus(rawValue: record.syncStatus) ?? .local
         self.citeKey = record.citeKey
+        self.lastPosition = record.lastPosition
         self.attachments = attachments
         self.propertyValues = propertyValues
         self.collections = collections

@@ -281,6 +281,12 @@ final class CatalogDatabase {
             }
         }
 
+        migrator.registerMigration("v3-last-position") { db in
+            try db.alter(table: "items") { t in
+                t.add(column: "last_position", .double)
+            }
+        }
+
         return migrator
     }
 
