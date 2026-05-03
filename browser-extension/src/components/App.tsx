@@ -71,12 +71,49 @@ export function App() {
         // HTML / embed: capture page content first
         setSaveState("capturing");
 
-        payload = await Promise.race([
-          chrome.tabs.sendMessage(tabId, { action: "capturePageHTML" }),
-          new Promise((_resolve, reject) =>
-            setTimeout(() => reject(new Error("Capture timed out")), 15000)
-          ),
-        ]) as PageCapture;
+        try {
+          payload = await Promise.race([
+            chrome.tabs.sendMessage(tabId, { action: "capturePageHTML" }),
+            new Promise((_resolve, reject) =>
+              setTimeout(() => reject(new Error("Capture timed out")), 15000)
+            ),
+          ]) as PageCapture;
+        } catch {
+          // Content script not loaded (tab opened before extension install/reload)
+          // Fall back to injecting a capture function directly
+          const [result] = await chrome.scripting.executeScript({
+            target: { tabId },
+            func: () => {
+              const url = location.href;
+              try {
+                const u = new URL(url);
+                if (
+                  (u.hostname === "www.youtube.com" || u.hostname === "youtube.com") &&
+                  u.pathname === "/watch" &&
+                  u.searchParams.has("v")
+                ) {
+                  const videoId = u.searchParams.get("v");
+                  return {
+                    type: "embed" as const,
+                    url,
+                    title: document.title,
+                    videoId,
+                    thumbnailURL: videoId
+                      ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
+                      : null,
+                  };
+                }
+              } catch { /* ignore */ }
+              return {
+                type: "html" as const,
+                url,
+                title: document.title || url,
+                html: document.documentElement.outerHTML,
+              };
+            },
+          });
+          payload = result.result as PageCapture;
+        }
 
         setSaveState("saving");
       }
