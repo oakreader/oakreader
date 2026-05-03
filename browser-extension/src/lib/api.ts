@@ -18,7 +18,8 @@ export async function fetchTags(): Promise<TagNodeInfo[]> {
 export async function postSnapshot(
   payload: PageCapture | PDFSavePayload,
   collectionId: string | undefined,
-  tagOptionIds: string[]
+  tagOptionIds: string[],
+  newTags: string[] = []
 ): Promise<{ status: string; message?: string }> {
   const body: Record<string, unknown> = {
     ...payload,
@@ -27,6 +28,10 @@ export async function postSnapshot(
 
   if (tagOptionIds.length > 0) {
     body.tagOptionIds = tagOptionIds;
+  }
+
+  if (newTags.length > 0) {
+    body.newTags = newTags;
   }
 
   const response = await fetch(SNAPSHOT_URL, {

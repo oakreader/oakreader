@@ -291,6 +291,7 @@ final class SnapshotServer {
             if let item {
                 self.assignToCollection(item: item, collectionId: payload.collectionId)
                 self.assignTags(item: item, tagOptionIds: payload.tagOptionIds)
+                self.createAndAssignNewTags(item: item, newTags: payload.newTags)
                 completion(.success(()))
             } else {
                 completion(.failure(OakReaderError.serverError("Import failed")))
@@ -330,6 +331,7 @@ final class SnapshotServer {
                 if let item {
                     self.assignToCollection(item: item, collectionId: payload.collectionId)
                     self.assignTags(item: item, tagOptionIds: payload.tagOptionIds)
+                    self.createAndAssignNewTags(item: item, newTags: payload.newTags)
                     completion(.success(()))
                 } else {
                     completion(.failure(OakReaderError.serverError("Embed import failed")))
@@ -397,6 +399,7 @@ final class SnapshotServer {
                 if let item {
                     self.assignToCollection(item: item, collectionId: payload.collectionId)
                     self.assignTags(item: item, tagOptionIds: payload.tagOptionIds)
+                    self.createAndAssignNewTags(item: item, newTags: payload.newTags)
                     completion(.success(()))
                 } else {
                     completion(.failure(OakReaderError.serverError("PDF import failed")))
@@ -434,6 +437,42 @@ final class SnapshotServer {
                 continue
             }
             store.setItemSelectValue(item: item, property: tagsProp, option: option)
+        }
+    }
+
+    /// Creates new tag options and assigns them to an imported item.
+    /// Must be called on the main thread.
+    private func createAndAssignNewTags(item: LibraryItem, newTags: [String]?) {
+        guard let newTags, !newTags.isEmpty else { return }
+        let store = importService.store
+        guard let tagsProp = store.tagsProperty else {
+            Log.error(Log.server, "Tags property not found")
+            return
+        }
+
+        // Color palette for auto-created tags (matching the app's tag editor)
+        let palette = ["2EA8E5", "A28AE5", "5FB236", "FF8C19", "E57373",
+                        "4DB6AC", "FFB74D", "7986CB", "F48FB1", "AED581"]
+
+        for tagName in newTags {
+            let trimmed = tagName.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty else { continue }
+
+            // Check if a tag with this name already exists
+            if let existing = tagsProp.options.first(where: { $0.name.caseInsensitiveCompare(trimmed) == .orderedSame }) {
+                store.setItemSelectValue(item: item, property: tagsProp, option: existing)
+                continue
+            }
+
+            // Pick a color from palette based on name hash for consistency
+            let colorIndex = abs(trimmed.hashValue) % palette.count
+            let colorHex = palette[colorIndex]
+
+            if let newOption = store.addPropertyOption(propertyId: tagsProp.id, name: trimmed, colorHex: colorHex) {
+                store.setItemSelectValue(item: item, property: tagsProp, option: newOption)
+            } else {
+                Log.error(Log.server, "Failed to create tag: \(trimmed)")
+            }
         }
     }
 
@@ -505,4 +544,5 @@ struct SnapshotPayload: Codable {
     let cookies: String?        // pdf only — forwarded cookies for authenticated downloads
     let collectionId: String?   // optional — target collection, nil = unsorted
     let tagOptionIds: [String]? // optional — tag option UUIDs to assign
+    let newTags: [String]?      // optional — tag names to create and assign
 }
