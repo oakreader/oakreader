@@ -181,7 +181,7 @@ class TextSelectionPopupPanel: NSPanel {
 
         if Preferences.shared.isPluginEnabled(.translation) {
             let translateBtn = PopupIconButton(
-                systemImage: "character.book.closed",
+                systemImage: "translate",
                 accessibilityLabel: "Translate"
             ) { [weak self] in
                 self?.translateSelection()

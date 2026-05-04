@@ -108,7 +108,7 @@ class WebSelectionPopupPanel: NSPanel {
         // Translate
         if Preferences.shared.isPluginEnabled(.translation) {
             let translateBtn = PopupActionButton(
-                systemImage: "character.book.closed",
+                systemImage: "translate",
                 title: "Translate"
             ) { [weak self] in
                 self?.translateText()
