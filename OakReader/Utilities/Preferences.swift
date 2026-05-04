@@ -44,6 +44,13 @@ final class Preferences {
         // YouTube preferences
         static let youtubeAIProvider = "youtubeAIProvider"
         static let youtubeAIModel = "youtubeAIModel"
+        // Plugins
+        static let disabledPlugins = "disabledPlugins"
+        // Translation preferences
+        static let translationAIProvider = "translationAIProvider"
+        static let translationAIModel = "translationAIModel"
+        static let translationSourceLang = "translationSourceLang"
+        static let translationTargetLang = "translationTargetLang"
         // External tools
         static let ytDlpPath = "ytDlpPath"
         static let ytDlpCachedVersion = "ytDlpCachedVersion"
@@ -152,6 +159,27 @@ final class Preferences {
         }
     }
 
+    // MARK: - Plugins
+
+    var disabledPlugins: Set<String> {
+        get { Set(defaults.stringArray(forKey: Keys.disabledPlugins) ?? []) }
+        set { defaults.set(Array(newValue), forKey: Keys.disabledPlugins) }
+    }
+
+    func isPluginEnabled(_ plugin: Plugin) -> Bool {
+        !disabledPlugins.contains(plugin.rawValue)
+    }
+
+    func setPlugin(_ plugin: Plugin, enabled: Bool) {
+        var disabled = disabledPlugins
+        if enabled {
+            disabled.remove(plugin.rawValue)
+        } else {
+            disabled.insert(plugin.rawValue)
+        }
+        disabledPlugins = disabled
+    }
+
     // MARK: - AI Preferences
 
     var aiProvider: AIProvider {
@@ -242,6 +270,28 @@ final class Preferences {
         CatalogDatabase.dataDirectory
             .appendingPathComponent("prompts")
             .appendingPathComponent("chapter-generation.md")
+    }
+
+    // MARK: - Translation Preferences
+
+    var translationAIProvider: AIProvider {
+        get { AIProvider(rawValue: defaults.string(forKey: Keys.translationAIProvider) ?? "") ?? aiProvider }
+        set { defaults.set(newValue.rawValue, forKey: Keys.translationAIProvider) }
+    }
+
+    var translationAIModel: String {
+        get { defaults.string(forKey: Keys.translationAIModel) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.translationAIModel) }
+    }
+
+    var translationSourceLang: TranslationLanguage {
+        get { TranslationLanguage(rawValue: defaults.string(forKey: Keys.translationSourceLang) ?? "") ?? .auto }
+        set { defaults.set(newValue.rawValue, forKey: Keys.translationSourceLang) }
+    }
+
+    var translationTargetLang: TranslationLanguage {
+        get { TranslationLanguage(rawValue: defaults.string(forKey: Keys.translationTargetLang) ?? "") ?? .zhHans }
+        set { defaults.set(newValue.rawValue, forKey: Keys.translationTargetLang) }
     }
 
     // MARK: - External Tools

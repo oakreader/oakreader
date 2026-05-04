@@ -167,14 +167,27 @@ class TextSelectionPopupPanel: NSPanel {
         ) { [weak self] in
             self?.addToChat()
         }
-        let noteBtn = PopupIconButton(
-            systemImage: "note.text.badge.plus",
-            accessibilityLabel: "Add to Note"
-        ) { [weak self] in
-            self?.addToNote()
-        }
         mainStack.addArrangedSubview(chatBtn)
-        mainStack.addArrangedSubview(noteBtn)
+
+        if Preferences.shared.isPluginEnabled(.notes) {
+            let noteBtn = PopupIconButton(
+                systemImage: "note.text.badge.plus",
+                accessibilityLabel: "Add to Note"
+            ) { [weak self] in
+                self?.addToNote()
+            }
+            mainStack.addArrangedSubview(noteBtn)
+        }
+
+        if Preferences.shared.isPluginEnabled(.translation) {
+            let translateBtn = PopupIconButton(
+                systemImage: "character.book.closed",
+                accessibilityLabel: "Translate"
+            ) { [weak self] in
+                self?.translateSelection()
+            }
+            mainStack.addArrangedSubview(translateBtn)
+        }
 
         // Separator 2
         mainStack.addArrangedSubview(makeVerticalSeparator())
@@ -321,6 +334,14 @@ class TextSelectionPopupPanel: NSPanel {
         let pageIndex = viewModel.state.currentPageIndex
         viewModel.notes.addTextToNote(text, pageIndex: pageIndex, source: "PDF")
         viewModel.state.rightPanelMode = .notes
+        pdfView?.clearSelection()
+        dismissWithAction()
+    }
+
+    private func translateSelection() {
+        guard let text = selection.string, !text.isEmpty else { return }
+        viewModel.translation.setSourceText(text)
+        viewModel.state.rightPanelMode = .translation
         pdfView?.clearSelection()
         dismissWithAction()
     }

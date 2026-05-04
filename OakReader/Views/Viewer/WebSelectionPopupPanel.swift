@@ -93,15 +93,30 @@ class WebSelectionPopupPanel: NSPanel {
         chatBtn.trailingAnchor.constraint(equalTo: stack.trailingAnchor, constant: -6).isActive = true
 
         // Add to Note
-        let noteBtn = PopupActionButton(
-            systemImage: "note.text.badge.plus",
-            title: "Add to Note"
-        ) { [weak self] in
-            self?.addToNote()
+        if Preferences.shared.isPluginEnabled(.notes) {
+            let noteBtn = PopupActionButton(
+                systemImage: "note.text.badge.plus",
+                title: "Add to Note"
+            ) { [weak self] in
+                self?.addToNote()
+            }
+            stack.addArrangedSubview(noteBtn)
+            noteBtn.leadingAnchor.constraint(equalTo: stack.leadingAnchor, constant: 6).isActive = true
+            noteBtn.trailingAnchor.constraint(equalTo: stack.trailingAnchor, constant: -6).isActive = true
         }
-        stack.addArrangedSubview(noteBtn)
-        noteBtn.leadingAnchor.constraint(equalTo: stack.leadingAnchor, constant: 6).isActive = true
-        noteBtn.trailingAnchor.constraint(equalTo: stack.trailingAnchor, constant: -6).isActive = true
+
+        // Translate
+        if Preferences.shared.isPluginEnabled(.translation) {
+            let translateBtn = PopupActionButton(
+                systemImage: "character.book.closed",
+                title: "Translate"
+            ) { [weak self] in
+                self?.translateText()
+            }
+            stack.addArrangedSubview(translateBtn)
+            translateBtn.leadingAnchor.constraint(equalTo: stack.leadingAnchor, constant: 6).isActive = true
+            translateBtn.trailingAnchor.constraint(equalTo: stack.trailingAnchor, constant: -6).isActive = true
+        }
 
         // Separator
         let sep = NSBox()
@@ -151,6 +166,12 @@ class WebSelectionPopupPanel: NSPanel {
     private func addToNote() {
         viewModel.notes.addTextToNote(selectedText, pageIndex: nil, source: "Web Snapshot")
         viewModel.state.rightPanelMode = .notes
+        dismiss()
+    }
+
+    private func translateText() {
+        viewModel.translation.setSourceText(selectedText)
+        viewModel.state.rightPanelMode = .translation
         dismiss()
     }
 
@@ -268,15 +289,17 @@ class WebAreaPopupPanel: NSPanel {
         chatBtn.trailingAnchor.constraint(equalTo: stack.trailingAnchor, constant: -6).isActive = true
 
         // Add to Note
-        let noteBtn = PopupActionButton(
-            systemImage: "note.text.badge.plus",
-            title: "Add to Note"
-        ) { [weak self] in
-            self?.addToNote()
+        if Preferences.shared.isPluginEnabled(.notes) {
+            let noteBtn = PopupActionButton(
+                systemImage: "note.text.badge.plus",
+                title: "Add to Note"
+            ) { [weak self] in
+                self?.addToNote()
+            }
+            stack.addArrangedSubview(noteBtn)
+            noteBtn.leadingAnchor.constraint(equalTo: stack.leadingAnchor, constant: 6).isActive = true
+            noteBtn.trailingAnchor.constraint(equalTo: stack.trailingAnchor, constant: -6).isActive = true
         }
-        stack.addArrangedSubview(noteBtn)
-        noteBtn.leadingAnchor.constraint(equalTo: stack.leadingAnchor, constant: 6).isActive = true
-        noteBtn.trailingAnchor.constraint(equalTo: stack.trailingAnchor, constant: -6).isActive = true
 
         // Separator
         let sep = NSBox()

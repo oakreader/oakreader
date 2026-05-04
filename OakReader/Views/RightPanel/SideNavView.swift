@@ -3,10 +3,21 @@ import SwiftUI
 struct SideNavView: View {
     @Binding var rightPanelMode: RightPanelMode?
 
+    /// Bumped by UserDefaults observer to force SwiftUI to re-evaluate visibleModes.
+    @State private var pluginRefresh = false
+
+    private var visibleModes: [RightPanelMode] {
+        _ = pluginRefresh // read to establish dependency
+        let disabledModes = Plugin.allCases
+            .filter { !Preferences.shared.isPluginEnabled($0) }
+            .flatMap(\.rightPanelModes)
+        return RightPanelMode.allCases.filter { !disabledModes.contains($0) }
+    }
+
     var body: some View {
         VStack(spacing: 2) {
             // Panel mode icons — right below settings button in tab bar
-            ForEach(RightPanelMode.allCases) { mode in
+            ForEach(visibleModes) { mode in
                 Button {
                     if rightPanelMode == mode {
                         rightPanelMode = nil
@@ -29,5 +40,12 @@ struct SideNavView: View {
         .padding(.top, 6)
         .frame(width: OakStyle.Size.sidenavWidth)
         .background(.thinMaterial)
+        .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in
+            let modes = visibleModes
+            if let current = rightPanelMode, !modes.contains(current) {
+                rightPanelMode = nil
+            }
+            pluginRefresh.toggle()
+        }
     }
 }
