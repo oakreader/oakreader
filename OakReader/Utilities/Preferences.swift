@@ -46,6 +46,8 @@ final class Preferences {
         static let youtubeAIModel = "youtubeAIModel"
         // External tools
         static let ytDlpPath = "ytDlpPath"
+        static let ytDlpCachedLatestVersion = "ytDlpCachedLatestVersion"
+        static let ytDlpLastVersionCheck = "ytDlpLastVersionCheck"
     }
 
     private init() {
@@ -246,5 +248,15 @@ final class Preferences {
     var ytDlpPath: String {
         get { defaults.string(forKey: Keys.ytDlpPath) ?? "" }
         set { defaults.set(newValue, forKey: Keys.ytDlpPath) }
+    }
+
+    var ytDlpCachedLatestVersion: String? {
+        get { defaults.string(forKey: Keys.ytDlpCachedLatestVersion) }
+        set { defaults.set(newValue, forKey: Keys.ytDlpCachedLatestVersion) }
+    }
+
+    var ytDlpLastVersionCheck: Date? {
+        get { defaults.object(forKey: Keys.ytDlpLastVersionCheck) as? Date }
+        set { defaults.set(newValue, forKey: Keys.ytDlpLastVersionCheck) }
     }
 }
