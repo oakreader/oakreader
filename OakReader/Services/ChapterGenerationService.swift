@@ -32,7 +32,7 @@ final class ChapterGenerationService {
 
         let ytDlpPath = Preferences.shared.ytDlpPath
         let hasYtDlp = !ytDlpPath.isEmpty && FileManager.default.isExecutableFile(atPath: ytDlpPath)
-        let hasAIKey = KeychainService.apiKey(for: Preferences.shared.aiProvider) != nil
+        let hasAIKey = KeychainService.apiKey(for: Preferences.shared.youtubeAIProvider) != nil
 
         // Skip entirely when neither yt-dlp nor AI is available
         guard hasYtDlp || hasAIKey else {
@@ -179,8 +179,8 @@ final class ChapterGenerationService {
         // Check for AI API key
         let prefs = Preferences.shared
         let config = ProviderConfig(
-            provider: prefs.aiProvider,
-            model: prefs.aiModel.isEmpty ? prefs.aiProvider.defaultModel : prefs.aiModel
+            provider: prefs.youtubeAIProvider,
+            model: prefs.youtubeAIModel.isEmpty ? prefs.youtubeAIProvider.defaultModel : prefs.youtubeAIModel
         )
 
         let router = ProviderRouter()
@@ -194,23 +194,7 @@ final class ChapterGenerationService {
         // Truncate transcript to 32K characters
         let truncated = String(transcript.prefix(32_000))
 
-        let systemPrompt = """
-        You are a video chapter generator. Given a transcript with timestamps, \
-        produce chapter markers that divide the video into logical sections.
-
-        Rules:
-        - Each chapter covers approximately 3-10 minutes of content
-        - First chapter MUST start at 0:00
-        - Align chapters with natural topic transitions
-        - Concise, descriptive titles (3-8 words)
-        - Include a 1-sentence summary per chapter
-        - Short videos (<15 min): 3-5 chapters
-        - Medium videos (15-60 min): 6-12 chapters
-        - Long videos (60+ min): up to 15-20 chapters
-
-        Output ONLY a JSON array, no markdown:
-        [{"startTime": <seconds>, "title": "...", "summary": "..."}]
-        """
+        let systemPrompt = Self.loadChapterPrompt()
 
         let messages = [LLMMessage(role: .user, text: truncated)]
 
@@ -415,6 +399,47 @@ final class ChapterGenerationService {
     }
 
     // MARK: - Helpers
+
+    // MARK: - Prompt Loading
+
+    static let defaultChapterPrompt = """
+    You are a video chapter generator. Given a transcript with timestamps, \
+    produce chapter markers that divide the video into logical sections.
+
+    ## Rules
+
+    - Each chapter covers approximately 3-10 minutes of content
+    - First chapter MUST start at 0:00
+    - Align chapters with natural topic transitions
+    - Concise, descriptive titles (3-8 words)
+    - Include a 1-sentence summary per chapter
+    - Short videos (<15 min): 3-5 chapters
+    - Medium videos (15-60 min): 6-12 chapters
+    - Long videos (60+ min): up to 15-20 chapters
+
+    ## Output Format
+
+    Output ONLY a JSON array, no markdown fences:
+
+    [{"startTime": <seconds>, "title": "...", "summary": "..."}]
+    """
+
+    static func loadChapterPrompt() -> String {
+        let url = Preferences.chapterPromptURL
+        let fm = FileManager.default
+
+        if fm.fileExists(atPath: url.path),
+           let content = try? String(contentsOf: url, encoding: .utf8),
+           !content.isEmpty {
+            return content
+        }
+
+        // Create default prompt file
+        let dir = url.deletingLastPathComponent()
+        try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        try? defaultChapterPrompt.write(to: url, atomically: true, encoding: .utf8)
+        return defaultChapterPrompt
+    }
 
     private func extractVideoId(from url: URL) -> String? {
         if let components = URLComponents(url: url, resolvingAgainstBaseURL: false),

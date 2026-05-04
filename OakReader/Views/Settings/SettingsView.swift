@@ -9,6 +9,7 @@ struct SettingsView: View {
         case general
         case library
         case ai
+        case youtube
         case notes
 
         var id: String { rawValue }
@@ -18,6 +19,7 @@ struct SettingsView: View {
             case .general: return "General"
             case .library: return "Library"
             case .ai: return "AI"
+            case .youtube: return "YouTube"
             case .notes: return "Notes"
             }
         }
@@ -27,6 +29,7 @@ struct SettingsView: View {
             case .general: return "gearshape"
             case .library: return "books.vertical"
             case .ai: return "brain"
+            case .youtube: return "play.rectangle"
             case .notes: return "note.text"
             }
         }
@@ -65,6 +68,8 @@ struct SettingsView: View {
             LibrarySettingsView(store: store)
         case .ai:
             AISettingsView()
+        case .youtube:
+            YouTubeSettingsView()
         case .notes:
             NoteSettingsView()
         }

@@ -12,9 +12,18 @@ struct TranscriptEntry: Identifiable {
 }
 
 /// Tab selection for the content area below video.
-private enum MediaTab: String, CaseIterable {
+private enum MediaTab: String, CaseIterable, Identifiable {
     case transcript = "Transcript"
     case outline = "Outline"
+
+    var id: String { rawValue }
+
+    var systemImage: String {
+        switch self {
+        case .transcript: return "text.bubble"
+        case .outline: return "list.bullet.indent"
+        }
+    }
 }
 
 /// Viewer for embed documents (YouTube).
@@ -38,41 +47,71 @@ struct MediaViewerView: View {
 
     var body: some View {
         if let media = viewModel.mediaDocument {
-            VStack(spacing: 0) {
-                // Video player — fills full width, 16:9 aspect ratio (PINNED)
-                youtubeEmbed(media: media)
-                    .layoutPriority(1)
+            GeometryReader { geo in
+                let videoHeight = geo.size.height * 0.7
+                let contentHeight = geo.size.height * 0.3
 
-                // Metadata (PINNED)
-                metadataSection(media: media)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 12)
+                VStack(spacing: 0) {
+                    // Top: video player (60%)
+                    youtubeEmbed(media: media)
+                        .frame(height: videoHeight)
+                        .clipped()
 
-                Divider()
+                    // Bottom half: metadata + tabs + transcript/outline
+                    VStack(spacing: 0) {
+                        // Metadata (PINNED)
+                        metadataSection(media: media)
+                            .padding(.horizontal, 8)
+                            .padding(.top, 8)
+                            .padding(.bottom, 4)
 
-                // Segmented tab picker (PINNED)
-                Picker("", selection: $selectedTab) {
-                    ForEach(MediaTab.allCases, id: \.self) { tab in
-                        Text(tab.rawValue).tag(tab)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal, 24)
-                .padding(.vertical, 8)
+                        // Tab picker (PINNED) — matches PDF sidebar style, left-aligned
+                        HStack(spacing: 0) {
+                            HStack(spacing: 2) {
+                                ForEach(MediaTab.allCases) { tab in
+                                    let selected = selectedTab == tab
+                                    Button {
+                                        withAnimation(.easeInOut(duration: 0.2)) {
+                                            selectedTab = tab
+                                        }
+                                    } label: {
+                                        Image(systemName: tab.systemImage)
+                                            .font(.system(size: 13))
+                                            .frame(width: 36, height: 22)
+                                            .foregroundStyle(selected ? .primary : .secondary)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 6)
+                                                    .fill(selected ? Color(nsColor: .textBackgroundColor) : .clear)
+                                                    .shadow(color: selected ? .black.opacity(0.12) : .clear, radius: 2, y: 1)
+                                            )
+                                            .contentShape(RoundedRectangle(cornerRadius: 6))
+                                    }
+                                    .buttonStyle(.plain)
+                                    .help(tab.rawValue)
+                                }
+                            }
+                            .padding(.horizontal, 3)
+                            .padding(.vertical, 4)
+                            .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
 
-                Divider()
+                            Spacer()
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
 
-                // Scrollable tab content
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        switch selectedTab {
-                        case .transcript:
-                            transcriptContent(proxy: proxy)
-                        case .outline:
-                            outlineContent(media: media)
+                        // Scrollable tab content
+                        ScrollViewReader { proxy in
+                            ScrollView {
+                                switch selectedTab {
+                                case .transcript:
+                                    transcriptContent(proxy: proxy)
+                                case .outline:
+                                    outlineContent(media: media)
+                                }
+                            }
                         }
                     }
-                    .frame(minHeight: 300)
+                    .frame(height: contentHeight)
                 }
             }
             .background(OakStyle.Colors.contentBackground)
@@ -199,16 +238,16 @@ struct MediaViewerView: View {
                     .padding(.vertical, 16)
             } else if let transcript = transcriptText, !transcript.isEmpty {
                 transcriptPlainSection(transcript: transcript)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 16)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 8)
             } else if isLoadingTranscript {
                 transcriptLoadingSection()
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 16)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 8)
             } else if let errorMessage = transcriptErrorMessage {
                 transcriptErrorSection(message: errorMessage)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 16)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 8)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -223,11 +262,11 @@ struct MediaViewerView: View {
                 Button {
                     seekTo(seconds: entry.offset)
                 } label: {
-                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(formatTimestamp(seconds: entry.offset))
                             .font(.system(.subheadline, design: .monospaced))
                             .foregroundStyle(activeEntryID == entry.id ? Color.accentColor : .secondary)
-                            .frame(width: 56, alignment: .trailing)
+                            .frame(width: 50, alignment: .trailing)
 
                         Text(entry.text)
                             .font(.title3)
@@ -235,7 +274,7 @@ struct MediaViewerView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .textSelection(.enabled)
                     }
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, 8)
                     .padding(.vertical, 7)
                     .contentShape(Rectangle())
                 }
@@ -269,37 +308,37 @@ struct MediaViewerView: View {
             switch chapterStatus {
             case .completed(let source):
                 chapterListSection(source: source)
-                    .padding(.vertical, 16)
+                    .padding(.vertical, 8)
 
             case .extractingChapters:
                 chapterProgressSection(message: "Extracting chapters...")
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 16)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 8)
 
             case .fetchingTranscript:
                 chapterProgressSection(message: "Fetching transcript...")
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 16)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 8)
 
             case .generatingChapters:
                 chapterProgressSection(message: "Generating outline...")
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 16)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 8)
 
             case .failed(let message):
                 chapterErrorSection(message: message, media: media)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 16)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 8)
 
             case .skipped(let reason):
                 chapterIdleSection(reason: reason, media: media)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 16)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 8)
 
             case .idle:
                 chapterIdleSection(reason: nil, media: media)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 16)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 8)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -320,7 +359,7 @@ struct MediaViewerView: View {
                         .foregroundStyle(.tertiary)
                 }
             }
-            .padding(.horizontal, 24)
+            .padding(.horizontal, 8)
             .padding(.bottom, 8)
 
             LazyVStack(alignment: .leading, spacing: 0) {
@@ -328,11 +367,11 @@ struct MediaViewerView: View {
                     Button {
                         seekTo(seconds: chapter.startTime)
                     } label: {
-                        HStack(alignment: .top, spacing: 10) {
+                        HStack(alignment: .top, spacing: 8) {
                             Text(formatTimestamp(seconds: chapter.startTime))
                                 .font(.system(.subheadline, design: .monospaced))
                                 .foregroundStyle(activeChapterID == chapter.id ? Color.accentColor : .secondary)
-                                .frame(width: 56, alignment: .trailing)
+                                .frame(width: 50, alignment: .trailing)
 
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(chapter.title)
@@ -348,7 +387,7 @@ struct MediaViewerView: View {
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        .padding(.horizontal, 24)
+                        .padding(.horizontal, 8)
                         .padding(.vertical, 8)
                         .background(activeChapterID == chapter.id ? Color.accentColor.opacity(0.08) : .clear)
                         .contentShape(Rectangle())
@@ -401,14 +440,14 @@ struct MediaViewerView: View {
                     .foregroundStyle(.secondary)
             }
 
-            if KeychainService.apiKey(for: Preferences.shared.aiProvider) != nil {
+            if KeychainService.apiKey(for: Preferences.shared.youtubeAIProvider) != nil {
                 Button("Generate AI Outline") {
                     Task { await generateChaptersManually(media: media) }
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
             } else {
-                Text("Configure an AI provider in Settings to generate chapter outlines.")
+                Text("Configure an AI provider in Settings > YouTube to generate chapter outlines.")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             }
@@ -577,7 +616,7 @@ struct MediaViewerView: View {
         } catch {
             let ytDlpPath = Preferences.shared.ytDlpPath
             if ytDlpPath.isEmpty {
-                transcriptErrorMessage = "\(error.localizedDescription)\n\nTip: Install yt-dlp for more reliable transcripts (Settings > General > External Tools)."
+                transcriptErrorMessage = "\(error.localizedDescription)\n\nTip: Install yt-dlp for more reliable transcripts (Settings > YouTube)."
             } else {
                 transcriptErrorMessage = error.localizedDescription
             }

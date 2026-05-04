@@ -41,6 +41,9 @@ final class Preferences {
         static let noteEditorRenderImages = "noteEditorRenderImages"
         static let noteEditorHideSyntax = "noteEditorHideSyntax"
         static let noteEditorAccentColor = "noteEditorAccentColor"
+        // YouTube preferences
+        static let youtubeAIProvider = "youtubeAIProvider"
+        static let youtubeAIModel = "youtubeAIModel"
         // External tools
         static let ytDlpPath = "ytDlpPath"
     }
@@ -218,6 +221,24 @@ final class Preferences {
     var noteEditorAccentColor: String {
         get { defaults.string(forKey: Keys.noteEditorAccentColor) ?? "#0CA69A" }
         set { defaults.set(newValue, forKey: Keys.noteEditorAccentColor) }
+    }
+
+    // MARK: - YouTube Preferences
+
+    var youtubeAIProvider: AIProvider {
+        get { AIProvider(rawValue: defaults.string(forKey: Keys.youtubeAIProvider) ?? "") ?? aiProvider }
+        set { defaults.set(newValue.rawValue, forKey: Keys.youtubeAIProvider) }
+    }
+
+    var youtubeAIModel: String {
+        get { defaults.string(forKey: Keys.youtubeAIModel) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.youtubeAIModel) }
+    }
+
+    static var chapterPromptURL: URL {
+        CatalogDatabase.dataDirectory
+            .appendingPathComponent("prompts")
+            .appendingPathComponent("chapter-generation.md")
     }
 
     // MARK: - External Tools
