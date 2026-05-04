@@ -14,11 +14,6 @@ struct PluginSettingsView: View {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Plugin.allCases) { plugin in
                     pluginRow(plugin)
-
-                    if plugin != Plugin.allCases.last {
-                        Divider()
-                            .padding(.horizontal, 20)
-                    }
                 }
             }
         }
@@ -52,6 +47,7 @@ struct PluginSettingsView: View {
                 }
             ))
             .toggleStyle(.switch)
+            .controlSize(.small)
             .labelsHidden()
         }
         .padding(20)
