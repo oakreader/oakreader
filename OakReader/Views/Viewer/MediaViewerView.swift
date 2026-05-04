@@ -1,4 +1,5 @@
 import SwiftUI
+import WebKit
 import YouTubePlayerKit
 import YoutubeTranscript
 
@@ -19,6 +20,7 @@ struct MediaViewerView: View {
     @State private var activeEntryID: Int?
     @State private var isLoadingTranscript = false
     @State private var transcriptErrorMessage: String?
+    @State private var contextMenuHandler: MediaContextMenuHandler?
 
     var body: some View {
         if let media = viewModel.mediaDocument {
@@ -36,26 +38,23 @@ struct MediaViewerView: View {
                                 .padding(.vertical, 16)
 
                             if !transcriptEntries.isEmpty {
-                                Divider()
                                 transcriptListSection(proxy: proxy)
                                     .padding(.vertical, 16)
                             } else if let transcript = transcriptText, !transcript.isEmpty {
-                                Divider()
                                 transcriptPlainSection(transcript: transcript)
                                     .padding(.horizontal, 24)
                                     .padding(.vertical, 16)
                             } else if isLoadingTranscript {
-                                Divider()
                                 transcriptLoadingSection()
                                     .padding(.horizontal, 24)
                                     .padding(.vertical, 16)
                             } else if let errorMessage = transcriptErrorMessage {
-                                Divider()
                                 transcriptErrorSection(message: errorMessage, media: media)
                                     .padding(.horizontal, 24)
                                     .padding(.vertical, 16)
                             }
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
             }
@@ -76,8 +75,13 @@ struct MediaViewerView: View {
                         parameters: params
                     )
                 }
+                let handler = MediaContextMenuHandler(viewModel: viewModel)
+                handler.install()
+                contextMenuHandler = handler
             }
             .onDisappear {
+                contextMenuHandler?.remove()
+                contextMenuHandler = nil
                 guard let player = youtubePlayer else { return }
                 Task { @MainActor in
                     guard let time = try? await player.getCurrentTime() else { return }
@@ -189,23 +193,18 @@ struct MediaViewerView: View {
                     } label: {
                         HStack(alignment: .firstTextBaseline, spacing: 10) {
                             Text(formatTimestamp(seconds: entry.offset))
-                                .font(.system(.caption, design: .monospaced))
-                                .foregroundStyle(.secondary)
-                                .frame(width: 52, alignment: .trailing)
+                                .font(.system(.subheadline, design: .monospaced))
+                                .foregroundStyle(activeEntryID == entry.id ? Color.accentColor : .secondary)
+                                .frame(width: 56, alignment: .trailing)
 
                             Text(entry.text)
-                                .font(.body)
-                                .foregroundStyle(.primary)
+                                .font(.title3)
+                                .foregroundStyle(activeEntryID == entry.id ? Color.accentColor : .primary)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .textSelection(.enabled)
                         }
                         .padding(.horizontal, 24)
-                        .padding(.vertical, 6)
-                        .background(
-                            activeEntryID == entry.id
-                                ? Color.accentColor.opacity(0.12)
-                                : Color.clear
-                        )
+                        .padding(.vertical, 7)
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -491,5 +490,117 @@ struct MediaViewerView: View {
             return String(format: "[%d:%02d:%02d]", h, m, s)
         }
         return String(format: "[%d:%02d]", m, s)
+    }
+}
+
+// MARK: - Video Context Menu Handler
+
+private final class MediaContextMenuHandler: NSObject {
+    let viewModel: DocumentViewModel
+    private var monitor: Any?
+
+    init(viewModel: DocumentViewModel) {
+        self.viewModel = viewModel
+    }
+
+    func install() {
+        remove()
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .rightMouseDown) { [weak self] event in
+            guard let self else { return event }
+            return self.handleRightClick(event)
+        }
+    }
+
+    func remove() {
+        if let monitor {
+            NSEvent.removeMonitor(monitor)
+            self.monitor = nil
+        }
+    }
+
+    private func handleRightClick(_ event: NSEvent) -> NSEvent? {
+        guard let window = event.window,
+              let webView = findWKWebView(in: window.contentView) else {
+            return event
+        }
+
+        let locationInWebView = webView.convert(event.locationInWindow, from: nil)
+        guard webView.bounds.contains(locationInWebView) else {
+            return event
+        }
+
+        let menu = NSMenu()
+
+        let chatItem = NSMenuItem(title: "Add Screen to Chat", action: #selector(addScreenToChat), keyEquivalent: "")
+        chatItem.target = self
+        chatItem.image = NSImage(systemSymbolName: "bubble.left", accessibilityDescription: nil)
+        menu.addItem(chatItem)
+
+        let noteItem = NSMenuItem(title: "Add Screen to Note", action: #selector(addScreenToNote), keyEquivalent: "")
+        noteItem.target = self
+        noteItem.image = NSImage(systemSymbolName: "note.text.badge.plus", accessibilityDescription: nil)
+        menu.addItem(noteItem)
+
+        menu.addItem(.separator())
+
+        let areaItem = NSMenuItem(title: "Area Selection", action: #selector(activateAreaSelection), keyEquivalent: "")
+        areaItem.target = self
+        areaItem.image = NSImage(systemSymbolName: "rectangle.dashed", accessibilityDescription: nil)
+        menu.addItem(areaItem)
+
+        NSMenu.popUpContextMenu(menu, with: event, for: webView)
+        return nil
+    }
+
+    @objc private func addScreenToChat() {
+        captureScreen { [weak self] pngData in
+            guard let self, let pngData else { return }
+            self.viewModel.chat.addImageAttachment(pngData, pageIndex: 0)
+            self.viewModel.state.rightPanelMode = .aiChat
+        }
+    }
+
+    @objc private func addScreenToNote() {
+        captureScreen { [weak self] pngData in
+            guard let self, let pngData else { return }
+            self.viewModel.notes.addImageToNote(pngData, pageIndex: nil, source: "Video")
+            self.viewModel.state.rightPanelMode = .notes
+        }
+    }
+
+    @objc private func activateAreaSelection() {
+        viewModel.setEditorMode(.snapshot)
+    }
+
+    private func captureScreen(completion: @escaping (Data?) -> Void) {
+        guard let window = NSApp.keyWindow,
+              let webView = findWKWebView(in: window.contentView) else {
+            completion(nil)
+            return
+        }
+
+        webView.takeSnapshot(with: nil) { image, error in
+            guard let image, error == nil,
+                  let tiffData = image.tiffRepresentation,
+                  let bitmap = NSBitmapImageRep(data: tiffData),
+                  let pngData = bitmap.representation(using: .png, properties: [:]) else {
+                DispatchQueue.main.async { completion(nil) }
+                return
+            }
+            DispatchQueue.main.async { completion(pngData) }
+        }
+    }
+
+    private func findWKWebView(in view: NSView?) -> WKWebView? {
+        guard let view else { return nil }
+        if let webView = view as? WKWebView { return webView }
+        for subview in view.subviews {
+            if let found = findWKWebView(in: subview) { return found }
+        }
+        return nil
+    }
+
+    deinit {
+        remove()
     }
 }

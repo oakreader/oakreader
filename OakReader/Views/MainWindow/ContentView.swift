@@ -33,9 +33,13 @@ struct ContentView: View {
 
                 // Main content column (toolbar + content)
                 VStack(spacing: 0) {
-                    // Inline toolbar (below tab bar)
-                    OakReaderToolbarView(viewModel: viewModel)
-                    Divider()
+                    // Inline toolbar (below tab bar) — hidden for embed (video) documents
+                    if viewModel.itemType != .embed {
+                        OakReaderToolbarView(viewModel: viewModel)
+                        Divider()
+                    } else {
+                        Spacer().frame(height: 8)
+                    }
 
                     // Main content area
                     ZStack {
@@ -159,6 +163,9 @@ struct ContentView: View {
                     MediaSnapshotOverlayView(viewModel: viewModel)
                 }
             }
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .padding(.horizontal, 8)
+            .padding(.bottom, 8)
         }
     }
 
