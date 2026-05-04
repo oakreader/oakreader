@@ -5,12 +5,15 @@ struct SettingsView: View {
     let store: LibraryStore
     @Environment(\.dismiss) private var dismiss
 
-    enum Tab: String, CaseIterable, Identifiable {
+    enum Tab: String, Identifiable {
         case general
         case library
         case ai
         case plugins
         case youtube
+        // Plugin tabs
+        case pluginNotes
+        case pluginTranslation
 
         var id: String { rawValue }
 
@@ -21,6 +24,8 @@ struct SettingsView: View {
             case .ai: return "AI"
             case .plugins: return "Plugins"
             case .youtube: return "YouTube"
+            case .pluginNotes: return Plugin.notes.label
+            case .pluginTranslation: return Plugin.translation.label
             }
         }
 
@@ -31,15 +36,50 @@ struct SettingsView: View {
             case .ai: return "brain"
             case .plugins: return "puzzlepiece.extension"
             case .youtube: return "play.rectangle"
+            case .pluginNotes: return Plugin.notes.systemImage
+            case .pluginTranslation: return Plugin.translation.systemImage
+            }
+        }
+
+        /// The plugin this tab belongs to, if any.
+        var plugin: Plugin? {
+            switch self {
+            case .pluginNotes: return .notes
+            case .pluginTranslation: return .translation
+            default: return nil
+            }
+        }
+
+        static func tab(for plugin: Plugin) -> Tab {
+            switch plugin {
+            case .notes: return .pluginNotes
+            case .translation: return .pluginTranslation
             }
         }
     }
 
+    /// Fixed tabs that always appear.
+    private static let fixedTabs: [Tab] = [.general, .library, .ai, .plugins, .youtube]
+
     @State private var selectedTab: Tab = .general
+    @State private var pluginRefresh = false
+
+    private var visibleTabs: [Tab] {
+        _ = pluginRefresh
+        var tabs = Self.fixedTabs
+        // Insert enabled plugin tabs after .plugins
+        let pluginTabs = Plugin.allCases
+            .filter { Preferences.shared.isPluginEnabled($0) }
+            .map { Tab.tab(for: $0) }
+        if let idx = tabs.firstIndex(of: .plugins) {
+            tabs.insert(contentsOf: pluginTabs, at: idx + 1)
+        }
+        return tabs
+    }
 
     var body: some View {
         NavigationSplitView {
-            List(Tab.allCases, selection: $selectedTab) { tab in
+            List(visibleTabs, selection: $selectedTab) { tab in
                 Label(tab.label, systemImage: tab.icon)
                     .tag(tab)
             }
@@ -57,6 +97,13 @@ struct SettingsView: View {
                 }
         }
         .frame(width: 780, height: 580)
+        .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in
+            // If current tab's plugin was disabled, fall back to .plugins
+            if let plugin = selectedTab.plugin, !Preferences.shared.isPluginEnabled(plugin) {
+                selectedTab = .plugins
+            }
+            pluginRefresh.toggle()
+        }
     }
 
     @ViewBuilder
@@ -72,6 +119,10 @@ struct SettingsView: View {
             PluginSettingsView()
         case .youtube:
             YouTubeSettingsView()
+        case .pluginNotes:
+            NoteSettingsView()
+        case .pluginTranslation:
+            TranslationSettingsView()
         }
     }
 }
