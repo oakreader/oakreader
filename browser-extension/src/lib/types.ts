@@ -18,6 +18,7 @@ export interface PageCapture {
   thumbnailURL?: string | null;
   transcript?: string | null;
   description?: string | null;
+  markdown?: string | null;
 }
 
 /** Payload for saving a PDF by URL (no HTML capture needed). */

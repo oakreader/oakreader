@@ -1,3 +1,5 @@
+import { Readability } from "@mozilla/readability";
+import TurndownService from "turndown";
 import { defineContentScript } from "wxt/utils/define-content-script";
 
 interface PageMeta {
@@ -18,6 +20,7 @@ interface PageCapture {
   thumbnailURL?: string | null;
   transcript?: string | null;
   description?: string | null;
+  markdown?: string | null;
 }
 
 // ─── Background Fetch Plumbing ──────────────────────────────────────────────────
@@ -271,9 +274,29 @@ async function singleFileFetch(
   return backgroundFetch(url, options);
 }
 
+// ─── Markdown Extraction (Readability + Turndown) ───────────────────────────────
+
+function extractMarkdown(): string | null {
+  try {
+    const clonedDoc = document.cloneNode(true) as Document;
+    const article = new Readability(clonedDoc).parse();
+    if (!article?.content) return null;
+    return new TurndownService({
+      headingStyle: "atx",
+      codeBlockStyle: "fenced",
+      bulletListMarker: "-",
+    }).turndown(article.content);
+  } catch {
+    return null;
+  }
+}
+
 // ─── SingleFile Capture ─────────────────────────────────────────────────────────
 
 async function extractWebPageWithSingleFile(): Promise<PageCapture> {
+  // Extract markdown BEFORE SingleFile (which mutates the DOM)
+  const markdown = extractMarkdown();
+
   try {
     // Wait briefly for lazy images triggered by page-hooks IntersectionObserver
     await new Promise((r) => setTimeout(r, 300));
@@ -292,8 +315,8 @@ async function extractWebPageWithSingleFile(): Promise<PageCapture> {
         filenameTemplate: "{page-title}",
         infobarContent: "",
         includeInfobar: false,
-        removeHiddenElements: true,
-        removeUnusedStyles: true,
+        removeHiddenElements: false,
+        removeUnusedStyles: false,
         removeUnusedFonts: true,
         removeSavedDate: true,
         compressCSS: true,
@@ -301,14 +324,14 @@ async function extractWebPageWithSingleFile(): Promise<PageCapture> {
         loadDeferredImagesDispatchScrollEvent: true,
         loadDeferredImagesBeforeFrames: false,
         backgroundSave: false,
-        insertMetaCSP: true,
+        insertMetaCSP: false,
         insertMetaNoIndex: false,
         password: "",
         woleetKey: "",
         blockMixedContent: false,
         saveOriginalURLs: false,
-        removeAlternativeFonts: true,
-        removeAlternativeMedias: true,
+        removeAlternativeFonts: false,
+        removeAlternativeMedias: false,
         removeAlternativeImages: true,
         groupDuplicateImages: true,
         maxResourceSize: 10,
@@ -323,6 +346,7 @@ async function extractWebPageWithSingleFile(): Promise<PageCapture> {
       url: location.href,
       title: document.title || location.href,
       html: pageData.content as string,
+      markdown,
     };
   } catch (error) {
     console.warn("SingleFile capture failed, falling back to raw HTML:", error);
@@ -331,6 +355,7 @@ async function extractWebPageWithSingleFile(): Promise<PageCapture> {
       url: location.href,
       title: document.title || location.href,
       html: document.documentElement.outerHTML,
+      markdown,
     };
   }
 }
