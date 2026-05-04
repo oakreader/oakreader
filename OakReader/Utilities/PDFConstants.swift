@@ -134,13 +134,13 @@ enum LibrarySidebarMode: String, CaseIterable, Identifiable {
 enum RightPanelMode: String, CaseIterable, Identifiable {
     case aiChat
     case notes
-    case reference
+    case metadata
 
     var id: String { rawValue }
 
     var systemImage: String {
         switch self {
-        case .reference: return "quote.opening"
+        case .metadata: return "square.grid.2x2"
         case .aiChat: return "bubble.left.and.bubble.right"
         case .notes: return "note.text"
         }
@@ -148,7 +148,7 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .reference: return "Reference"
+        case .metadata: return "Metadata"
         case .aiChat: return "AI Chat"
         case .notes: return "Notes"
         }
@@ -157,18 +157,14 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
 
 enum LibraryDetailTab: String, CaseIterable, Identifiable {
     case chat
-    case info
-    case reference
-    case properties
+    case metadata
     case notes
 
     var id: String { rawValue }
 
     var systemImage: String {
         switch self {
-        case .info: return "info.circle"
-        case .reference: return "quote.opening"
-        case .properties: return "tag"
+        case .metadata: return "square.grid.2x2"
         case .notes: return "note.text"
         case .chat: return "bubble.left.and.bubble.right"
         }
@@ -176,9 +172,7 @@ enum LibraryDetailTab: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .info: return "Info"
-        case .reference: return "Reference"
-        case .properties: return "Properties"
+        case .metadata: return "Metadata"
         case .notes: return "Notes"
         case .chat: return "Chat"
         }

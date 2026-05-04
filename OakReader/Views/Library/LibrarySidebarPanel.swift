@@ -1,6 +1,6 @@
 import SwiftUI
 
-// Detail panel: header + tabbed content + side nav icon strip
+// Detail panel: tabbed content + side nav icon strip
 struct LibrarySidebarPanel: View {
     let item: LibraryItem
     @Bindable var appState: AppState
@@ -11,31 +11,25 @@ struct LibrarySidebarPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header: cover + title + author
-            headerSection
-                .padding(.bottom, 8)
-
-            Divider()
-
             // Tabbed content
             if appState.libraryDetailTab == .notes {
                 // NotePanelView manages its own scrolling
                 if let notesVM {
                     NotePanelView(notesVM: notesVM)
                 }
-            } else {
+            } else if appState.libraryDetailTab == .metadata {
+                // Fixed header
+                HStack {
+                    Text("Metadata")
+                        .font(.system(size: 16, weight: .semibold))
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+
                 ScrollView {
                     VStack(alignment: .leading, spacing: 1) {
-                        switch appState.libraryDetailTab {
-                        case .info:
-                            infoTabContent
-                        case .reference:
-                            referenceTabContent
-                        case .properties:
-                            propertiesTabContent
-                        case .notes, .chat:
-                            EmptyView()
-                        }
+                        infoTabContent
                     }
                     .padding(8)
                 }
@@ -61,8 +55,16 @@ struct LibrarySidebarPanel: View {
 
     @ViewBuilder
     private var infoTabContent: some View {
-        sectionView(title: "Info", icon: "info.circle.fill", iconColor: Color(hex: "4072E5")) {
+        coverSection
+
+        metadataSection
+
+        sectionView(title: "File", icon: "doc.fill", iconColor: Color(hex: "8E8E93")) {
             infoGrid
+        }
+
+        sectionView(title: "Properties", icon: "tag.fill", iconColor: Color(hex: "E5A540")) {
+            propertiesContent
         }
 
         sectionView(title: "Collections", icon: "folder.fill", iconColor: Color(hex: "59ADC4")) {
@@ -71,24 +73,6 @@ struct LibrarySidebarPanel: View {
 
         actionsSection
             .padding(.top, 8)
-    }
-
-    @ViewBuilder
-    private var referenceTabContent: some View {
-        ReferenceMetadataView(
-            item: item,
-            store: store,
-            referenceService: appState.referenceService
-        )
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-    }
-
-    @ViewBuilder
-    private var propertiesTabContent: some View {
-        propertiesContent
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
     }
 
     // MARK: - Notes VM
@@ -132,54 +116,80 @@ struct LibrarySidebarPanel: View {
         }
     }
 
-    // MARK: - Header
+    // MARK: - Cover
 
     @ViewBuilder
-    private var headerSection: some View {
-        VStack(spacing: 8) {
-            // Cover
+    private var coverSection: some View {
+        if let data = item.coverImageData, let nsImage = NSImage(data: data) {
             HStack {
                 Spacer()
-                if let data = item.coverImageData, let nsImage = NSImage(data: data) {
-                    Image(nsImage: nsImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(maxHeight: 160)
-                        .cornerRadius(4)
-                        .shadow(color: .black.opacity(0.15), radius: 3, y: 1)
-                } else {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.primary.opacity(0.06))
-                        Image(systemName: "doc.text")
-                            .font(.system(size: 28))
-                            .foregroundStyle(Color.primary.opacity(0.25))
-                    }
-                    .frame(width: 100, height: 140)
-                }
+                Image(nsImage: nsImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(maxHeight: 160)
+                    .cornerRadius(4)
+                    .shadow(color: .black.opacity(0.15), radius: 3, y: 1)
                 Spacer()
             }
-
-            // Title — OakReader: semibold, line-height 1.333
-            Text(item.title)
-                .font(.system(size: 14, weight: .semibold))
-                .lineLimit(3)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
-
-            // Author — OakReader: secondary color
-            if !item.author.isEmpty {
-                Text(item.author)
-                    .font(.system(size: 13))
-                    .foregroundStyle(Color.primary.opacity(0.55))
-                    .lineLimit(1)
-                    .frame(maxWidth: .infinity)
-            }
+            .padding(8)
         }
-        .padding(8)
     }
 
-    // MARK: - Info Grid (OakReader: CSS Grid, max-content 1fr, gap 8px col / 2px row)
+    // MARK: - Reference
+
+    @ViewBuilder
+    private var metadataSection: some View {
+        if item.referenceMetadata != nil {
+            sectionView(title: "Reference", icon: "text.book.closed.fill", iconColor: Color(hex: "4072E5")) {
+                ReferenceMetadataView(
+                    item: item,
+                    store: store,
+                    referenceService: appState.referenceService
+                )
+            }
+        } else {
+            sectionView(title: "Reference", icon: "text.book.closed.fill", iconColor: Color(hex: "4072E5")) {
+                HStack(spacing: 8) {
+                    Text("No reference data")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.primary.opacity(0.25))
+
+                    Spacer()
+
+                    Button {
+                        createEmptyMetadataForItem()
+                    } label: {
+                        HStack(spacing: 2) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 10, weight: .bold))
+                            Text("Add")
+                                .font(.system(size: 12))
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(RoundedRectangle(cornerRadius: 5).fill(Color.primary.opacity(0.05)))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private func createEmptyMetadataForItem() {
+        var csl = CSLItem(type: "document")
+        csl.title = item.title
+        if !item.author.isEmpty {
+            csl.author = [CSLName(family: item.author, given: nil)]
+        }
+        do {
+            try appState.referenceService.saveMetadata(csl, forItemId: item.id.uuidString)
+            store.invalidate()
+        } catch {
+            Log.error(Log.store, "Failed to create empty reference metadata: \(error)")
+        }
+    }
+
+    // MARK: - Info Grid (File details)
 
     @ViewBuilder
     private var infoGrid: some View {

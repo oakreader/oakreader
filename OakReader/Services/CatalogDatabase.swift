@@ -352,6 +352,12 @@ final class CatalogDatabase {
         attachmentDirectory(itemStorageKey: itemStorageKey, attachmentStorageKey: attachmentStorageKey)
             .appendingPathComponent("transcript.txt")
     }
+
+    /// Chapters JSON URL for an embed attachment.
+    static func attachmentChaptersURL(itemStorageKey: String, attachmentStorageKey: String) -> URL {
+        attachmentDirectory(itemStorageKey: itemStorageKey, attachmentStorageKey: attachmentStorageKey)
+            .appendingPathComponent("chapters.json")
+    }
 }
 
 // MARK: - ISO 8601 Date Helpers

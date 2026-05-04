@@ -2,12 +2,19 @@ import SwiftUI
 import WebKit
 import YouTubePlayerKit
 import YoutubeTranscript
+import OakReaderAI
 
 /// A single timestamped line in the transcript.
 struct TranscriptEntry: Identifiable {
     let id: Int        // index in array
     let offset: Double // seconds from start
     let text: String
+}
+
+/// Tab selection for the content area below video.
+private enum MediaTab: String, CaseIterable {
+    case transcript = "Transcript"
+    case outline = "Outline"
 }
 
 /// Viewer for embed documents (YouTube).
@@ -22,44 +29,55 @@ struct MediaViewerView: View {
     @State private var transcriptErrorMessage: String?
     @State private var contextMenuHandler: MediaContextMenuHandler?
 
+    // Chapter / Outline state
+    @State private var selectedTab: MediaTab = .transcript
+    @State private var chapters: [VideoChapter] = []
+    @State private var chapterSource: ChapterSource? = nil
+    @State private var chapterStatus: ChapterGenerationStatus = .idle
+    @State private var activeChapterID: UUID?
+
     var body: some View {
         if let media = viewModel.mediaDocument {
             VStack(spacing: 0) {
-                // Video player — fills full width, 16:9 aspect ratio
+                // Video player — fills full width, 16:9 aspect ratio (PINNED)
                 youtubeEmbed(media: media)
                     .layoutPriority(1)
 
-                // Metadata + transcript fills remaining space
+                // Metadata (PINNED)
+                metadataSection(media: media)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
+
+                Divider()
+
+                // Segmented tab picker (PINNED)
+                Picker("", selection: $selectedTab) {
+                    ForEach(MediaTab.allCases, id: \.self) { tab in
+                        Text(tab.rawValue).tag(tab)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 8)
+
+                Divider()
+
+                // Scrollable tab content
                 ScrollViewReader { proxy in
                     ScrollView {
-                        VStack(alignment: .leading, spacing: 0) {
-                            metadataSection(media: media)
-                                .padding(.horizontal, 24)
-                                .padding(.vertical, 16)
-
-                            if !transcriptEntries.isEmpty {
-                                transcriptListSection(proxy: proxy)
-                                    .padding(.vertical, 16)
-                            } else if let transcript = transcriptText, !transcript.isEmpty {
-                                transcriptPlainSection(transcript: transcript)
-                                    .padding(.horizontal, 24)
-                                    .padding(.vertical, 16)
-                            } else if isLoadingTranscript {
-                                transcriptLoadingSection()
-                                    .padding(.horizontal, 24)
-                                    .padding(.vertical, 16)
-                            } else if let errorMessage = transcriptErrorMessage {
-                                transcriptErrorSection(message: errorMessage, media: media)
-                                    .padding(.horizontal, 24)
-                                    .padding(.vertical, 16)
-                            }
+                        switch selectedTab {
+                        case .transcript:
+                            transcriptContent(proxy: proxy)
+                        case .outline:
+                            outlineContent(media: media)
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
+                    .frame(minHeight: 300)
                 }
             }
             .background(OakStyle.Colors.contentBackground)
             .task { await loadOrFetchTranscript(media: media) }
+            .task { await loadChapters(media: media) }
             .task(id: youtubePlayer != nil) { await trackPlayback() }
             .onAppear {
                 if let videoId = extractYouTubeVideoId(from: media.sourceURL) {
@@ -168,48 +186,61 @@ struct MediaViewerView: View {
                     .padding(.top, 4)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: - Transcript Tab Content
+
+    @ViewBuilder
+    private func transcriptContent(proxy: ScrollViewProxy) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if !transcriptEntries.isEmpty {
+                transcriptListSection(proxy: proxy)
+                    .padding(.vertical, 16)
+            } else if let transcript = transcriptText, !transcript.isEmpty {
+                transcriptPlainSection(transcript: transcript)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 16)
+            } else if isLoadingTranscript {
+                transcriptLoadingSection()
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 16)
+            } else if let errorMessage = transcriptErrorMessage {
+                transcriptErrorSection(message: errorMessage)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 16)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: - Transcript Sections
 
     @ViewBuilder
     private func transcriptListSection(proxy: ScrollViewProxy) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("Transcript")
-                .font(.headline)
-                .padding(.horizontal, 24)
-                .padding(.bottom, 8)
+        LazyVStack(alignment: .leading, spacing: 0) {
+            ForEach(transcriptEntries) { entry in
+                Button {
+                    seekTo(seconds: entry.offset)
+                } label: {
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        Text(formatTimestamp(seconds: entry.offset))
+                            .font(.system(.subheadline, design: .monospaced))
+                            .foregroundStyle(activeEntryID == entry.id ? Color.accentColor : .secondary)
+                            .frame(width: 56, alignment: .trailing)
 
-            LazyVStack(alignment: .leading, spacing: 0) {
-                ForEach(transcriptEntries) { entry in
-                    Button {
-                        guard let player = youtubePlayer else { return }
-                        Task { @MainActor in
-                            try? await player.seek(
-                                to: .init(value: entry.offset, unit: .seconds),
-                                allowSeekAhead: true
-                            )
-                        }
-                    } label: {
-                        HStack(alignment: .firstTextBaseline, spacing: 10) {
-                            Text(formatTimestamp(seconds: entry.offset))
-                                .font(.system(.subheadline, design: .monospaced))
-                                .foregroundStyle(activeEntryID == entry.id ? Color.accentColor : .secondary)
-                                .frame(width: 56, alignment: .trailing)
-
-                            Text(entry.text)
-                                .font(.title3)
-                                .foregroundStyle(activeEntryID == entry.id ? Color.accentColor : .primary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .textSelection(.enabled)
-                        }
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 7)
-                        .contentShape(Rectangle())
+                        Text(entry.text)
+                            .font(.title3)
+                            .foregroundStyle(activeEntryID == entry.id ? Color.accentColor : .primary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .textSelection(.enabled)
                     }
-                    .buttonStyle(.plain)
-                    .id(entry.id)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 7)
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .id(entry.id)
             }
         }
         .onChange(of: activeEntryID) { _, newID in
@@ -223,9 +254,6 @@ struct MediaViewerView: View {
     @ViewBuilder
     private func transcriptPlainSection(transcript: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Transcript")
-                .font(.headline)
-
             Text(transcript)
                 .font(.body)
                 .textSelection(.enabled)
@@ -233,7 +261,171 @@ struct MediaViewerView: View {
         }
     }
 
+    // MARK: - Outline Tab Content
+
+    @ViewBuilder
+    private func outlineContent(media: MediaDocument) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            switch chapterStatus {
+            case .completed(let source):
+                chapterListSection(source: source)
+                    .padding(.vertical, 16)
+
+            case .extractingChapters:
+                chapterProgressSection(message: "Extracting chapters...")
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 16)
+
+            case .fetchingTranscript:
+                chapterProgressSection(message: "Fetching transcript...")
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 16)
+
+            case .generatingChapters:
+                chapterProgressSection(message: "Generating outline...")
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 16)
+
+            case .failed(let message):
+                chapterErrorSection(message: message, media: media)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 16)
+
+            case .skipped(let reason):
+                chapterIdleSection(reason: reason, media: media)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 16)
+
+            case .idle:
+                chapterIdleSection(reason: nil, media: media)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 16)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func chapterListSection(source: ChapterSource) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text(source == .youtube ? "Chapters" : "AI Chapters")
+                    .font(.headline)
+
+                Spacer()
+
+                if source == .ai {
+                    Text("generated by AI")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .padding(.horizontal, 24)
+            .padding(.bottom, 8)
+
+            LazyVStack(alignment: .leading, spacing: 0) {
+                ForEach(chapters) { chapter in
+                    Button {
+                        seekTo(seconds: chapter.startTime)
+                    } label: {
+                        HStack(alignment: .top, spacing: 10) {
+                            Text(formatTimestamp(seconds: chapter.startTime))
+                                .font(.system(.subheadline, design: .monospaced))
+                                .foregroundStyle(activeChapterID == chapter.id ? Color.accentColor : .secondary)
+                                .frame(width: 56, alignment: .trailing)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(chapter.title)
+                                    .font(.body.bold())
+                                    .foregroundStyle(activeChapterID == chapter.id ? Color.accentColor : .primary)
+
+                                if let summary = chapter.summary, !summary.isEmpty {
+                                    Text(summary)
+                                        .font(.callout)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(2)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 8)
+                        .background(activeChapterID == chapter.id ? Color.accentColor.opacity(0.08) : .clear)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func chapterProgressSection(message: String) -> some View {
+        HStack(spacing: 8) {
+            ProgressView()
+                .controlSize(.small)
+            Text(message)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder
+    private func chapterErrorSection(message: String, media: MediaDocument) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.triangle")
+                    .foregroundStyle(.secondary)
+                Text(message)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+
+            Button("Retry") {
+                Task { await generateChaptersManually(media: media) }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+    }
+
+    @ViewBuilder
+    private func chapterIdleSection(reason: String?, media: MediaDocument) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let reason {
+                Text(reason)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("No chapters available yet.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+
+            if KeychainService.apiKey(for: Preferences.shared.aiProvider) != nil {
+                Button("Generate AI Outline") {
+                    Task { await generateChaptersManually(media: media) }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            } else {
+                Text("Configure an AI provider in Settings to generate chapter outlines.")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+    }
+
     // MARK: - Helpers
+
+    private func seekTo(seconds: Double) {
+        guard let player = youtubePlayer else { return }
+        Task { @MainActor in
+            try? await player.seek(
+                to: .init(value: seconds, unit: .seconds),
+                allowSeekAhead: true
+            )
+        }
+    }
 
     private func extractYouTubeVideoId(from url: URL) -> String? {
         let urlString = url.absoluteString
@@ -274,11 +466,8 @@ struct MediaViewerView: View {
     }
 
     @ViewBuilder
-    private func transcriptErrorSection(message: String, media: MediaDocument) -> some View {
+    private func transcriptErrorSection(message: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Transcript")
-                .font(.headline)
-
             HStack(spacing: 8) {
                 Image(systemName: "exclamationmark.triangle")
                     .foregroundStyle(.secondary)
@@ -287,28 +476,41 @@ struct MediaViewerView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Button("Retry") {
-                transcriptErrorMessage = nil
-                Task { await loadOrFetchTranscript(media: media) }
+            if let media = viewModel.mediaDocument {
+                Button("Retry") {
+                    transcriptErrorMessage = nil
+                    Task { await loadOrFetchTranscript(media: media) }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
         }
     }
 
     // MARK: - Playback Tracking
 
     private func trackPlayback() async {
-        guard let player = youtubePlayer, !transcriptEntries.isEmpty else { return }
+        guard let player = youtubePlayer else { return }
         while !Task.isCancelled {
             try? await Task.sleep(for: .milliseconds(500))
             guard !Task.isCancelled else { break }
             guard let time = try? await player.getCurrentTime() else { continue }
             let currentSeconds = time.converted(to: .seconds).value
-            // Find the last entry whose offset <= currentTime
-            let matchID = transcriptEntries.last(where: { $0.offset <= currentSeconds })?.id
-            if matchID != activeEntryID {
-                activeEntryID = matchID
+
+            // Update active transcript entry
+            if !transcriptEntries.isEmpty {
+                let matchID = transcriptEntries.last(where: { $0.offset <= currentSeconds })?.id
+                if matchID != activeEntryID {
+                    activeEntryID = matchID
+                }
+            }
+
+            // Update active chapter
+            if !chapters.isEmpty {
+                let matchChapter = chapters.last(where: { $0.startTime <= currentSeconds })?.id
+                if matchChapter != activeChapterID {
+                    activeChapterID = matchChapter
+                }
             }
         }
     }
@@ -490,6 +692,65 @@ struct MediaViewerView: View {
             return String(format: "[%d:%02d:%02d]", h, m, s)
         }
         return String(format: "[%d:%02d]", m, s)
+    }
+
+    // MARK: - Chapter Loading
+
+    private func loadChapters(media: MediaDocument) async {
+        let chaptersFileURL = media.storageDirectory.appendingPathComponent("chapters.json")
+
+        // Try loading immediately
+        if let data = ChapterData.load(from: chaptersFileURL) {
+            chapters = data.chapters
+            chapterSource = data.source
+            chapterStatus = .completed(data.source)
+            return
+        }
+
+        // Poll for up to 12 seconds (post-import may still be running)
+        for _ in 0..<6 {
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+
+            if let data = ChapterData.load(from: chaptersFileURL) {
+                chapters = data.chapters
+                chapterSource = data.source
+                chapterStatus = .completed(data.source)
+                return
+            }
+        }
+
+        // Fall back to idle
+        chapterStatus = .idle
+    }
+
+    private func generateChaptersManually(media: MediaDocument) async {
+        chapterStatus = .generatingChapters
+
+        guard let item = viewModel.libraryItem,
+              let attachment = viewModel.libraryItem?.primaryAttachment else {
+            chapterStatus = .failed("Could not determine storage location")
+            return
+        }
+
+        let service = ChapterGenerationService()
+        await service.run(
+            itemStorageKey: item.storageKey,
+            attachmentStorageKey: attachment.storageKey,
+            sourceURL: media.sourceURL,
+            duration: media.metadata.duration,
+            transcriptAlreadyExists: media.transcriptURL != nil
+        )
+
+        // Reload from disk
+        let chaptersFileURL = media.storageDirectory.appendingPathComponent("chapters.json")
+        if let data = ChapterData.load(from: chaptersFileURL) {
+            chapters = data.chapters
+            chapterSource = data.source
+            chapterStatus = .completed(data.source)
+        } else {
+            chapterStatus = .failed("Chapter generation did not produce results")
+        }
     }
 }
 
