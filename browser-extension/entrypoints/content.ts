@@ -501,17 +501,19 @@ function extractTweet(): PageCapture {
       ? ogTitle.split(" on Twitter:")[0].trim()
       : handle;
 
-  // Tweet text from og:description
+  // Tweet text — prefer DOM (most reliable), fall back to meta tags
+  const tweetTextEl = document.querySelector('[data-testid="tweetText"]');
   const description =
-    document.querySelector<HTMLMetaElement>('meta[property="og:description"]')?.content ??
-    document.querySelector<HTMLMetaElement>('meta[name="description"]')?.content ??
+    tweetTextEl?.textContent?.trim() ||
+    document.querySelector<HTMLMetaElement>('meta[property="og:description"]')?.content ||
+    document.querySelector<HTMLMetaElement>('meta[name="description"]')?.content ||
     null;
 
   // Thumbnail
   const thumbnailURL =
     document.querySelector<HTMLMetaElement>('meta[property="og:image"]')?.content ?? null;
 
-  const title = document.title || `@${handle} post`;
+  const title = authorName || document.title || `@${handle} post`;
 
   return {
     type: "embed",

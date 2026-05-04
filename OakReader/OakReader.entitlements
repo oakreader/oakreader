@@ -8,9 +8,5 @@
 	<true/>
 	<key>com.apple.security.network.server</key>
 	<true/>
-	<key>com.apple.security.keychain-access-groups</key>
-	<array>
-		<string>$(AppIdentifierPrefix)com.oakreader.OakReader</string>
-	</array>
 </dict>
 </plist>
