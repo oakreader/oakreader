@@ -13,7 +13,13 @@ struct RightPanelContentView: View {
                 case .aiChat:
                     AIChatView(chatVM: viewModel.chat)
                 case .notes:
-                    NotePanelView(notesVM: viewModel.notes)
+                    if Preferences.shared.isPluginEnabled(.notes) {
+                        NotePanelView(notesVM: viewModel.notes)
+                    }
+                case .translation:
+                    if Preferences.shared.isPluginEnabled(.translation) {
+                        TranslationPanelView(translationVM: viewModel.translation)
+                    }
                 }
             }
         }

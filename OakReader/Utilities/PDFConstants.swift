@@ -135,6 +135,7 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
     case aiChat
     case notes
     case metadata
+    case translation
 
     var id: String { rawValue }
 
@@ -143,6 +144,7 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
         case .metadata: return "square.grid.2x2"
         case .aiChat: return "bubble.left.and.bubble.right"
         case .notes: return "note.text"
+        case .translation: return "character.book.closed"
         }
     }
 
@@ -151,6 +153,49 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
         case .metadata: return "Metadata"
         case .aiChat: return "AI Chat"
         case .notes: return "Notes"
+        case .translation: return "Translation"
+        }
+    }
+}
+
+enum Plugin: String, CaseIterable, Identifiable {
+    case notes
+    case translation
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .notes: return "Notes"
+        case .translation: return "Translation"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .notes: return "Rich markdown notes panel with Mermaid diagrams and image paste."
+        case .translation: return "Translate selected text using AI-powered translation."
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .notes: return "note.text"
+        case .translation: return "character.book.closed"
+        }
+    }
+
+    var rightPanelModes: [RightPanelMode] {
+        switch self {
+        case .notes: return [.notes]
+        case .translation: return [.translation]
+        }
+    }
+
+    var enabledByDefault: Bool {
+        switch self {
+        case .notes: return true
+        case .translation: return true
         }
     }
 }
