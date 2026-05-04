@@ -21,22 +21,31 @@ public enum KeychainService: Sendable {
     @discardableResult
     public static func setAPIKey(_ key: String, for provider: AIProvider) -> Bool {
         let service = "\(servicePrefix).\(provider.rawValue)"
-        // Delete existing
-        let deleteQuery: [String: Any] = [
+        let baseQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
         ]
-        SecItemDelete(deleteQuery as CFDictionary)
 
-        guard !key.isEmpty else { return true } // Just delete if empty
+        // Empty key → just delete
+        guard !key.isEmpty else {
+            SecItemDelete(baseQuery as CFDictionary)
+            return true
+        }
 
         let data = key.data(using: .utf8)!
-        let addQuery: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
+
+        // Try to update existing item first (non-destructive)
+        let updateAttrs: [String: Any] = [
             kSecValueData as String: data,
             kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked,
         ]
+        let updateStatus = SecItemUpdate(baseQuery as CFDictionary, updateAttrs as CFDictionary)
+        if updateStatus == errSecSuccess { return true }
+
+        // No existing item — add new
+        var addQuery = baseQuery
+        addQuery[kSecValueData as String] = data
+        addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlocked
         return SecItemAdd(addQuery as CFDictionary, nil) == errSecSuccess
     }
 

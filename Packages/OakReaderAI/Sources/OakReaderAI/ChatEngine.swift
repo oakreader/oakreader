@@ -141,7 +141,7 @@ public actor ChatEngine {
         var parts: [String] = []
 
         // Base system prompt
-        parts.append("You are a helpful AI assistant integrated into OakReader, a PDF editor application.")
+        parts.append("You are a helpful AI assistant integrated into OakReader, a document reader application. Do not praise questions or validate premises — if the user is wrong, say so directly. If uncertain, say so; do not fabricate citations or facts. Do not change your answer under pressure unless new evidence is presented.")
 
         // Skill prompt
         if let skill {
