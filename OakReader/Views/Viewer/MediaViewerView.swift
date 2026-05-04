@@ -49,15 +49,16 @@ struct MediaViewerView: View {
         if let media = viewModel.mediaDocument {
             GeometryReader { geo in
                 let videoHeight = geo.size.height * 0.7
-                let contentHeight = geo.size.height * 0.3
+                let videoWidth = min(videoHeight * 16.0 / 9.0, geo.size.width)
 
                 VStack(spacing: 0) {
-                    // Top: video player (60%)
+                    // Top: video player (70% height)
                     youtubeEmbed(media: media)
                         .frame(height: videoHeight)
                         .clipped()
 
-                    // Bottom half: metadata + tabs + transcript/outline
+                    // Bottom: metadata + tabs + transcript/outline
+                    // Constrained to the same width as the video
                     VStack(spacing: 0) {
                         // Metadata (PINNED)
                         metadataSection(media: media)
@@ -111,7 +112,8 @@ struct MediaViewerView: View {
                             }
                         }
                     }
-                    .frame(height: contentHeight)
+                    .frame(width: videoWidth)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             .background(OakStyle.Colors.contentBackground)
