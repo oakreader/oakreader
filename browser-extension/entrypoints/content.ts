@@ -82,6 +82,22 @@ function enqueueBgFetch<T>(fn: () => Promise<T>): Promise<T> {
 
 // ─── Page Type Detection ────────────────────────────────────────────────────────
 
+function isTwitterURL(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return (
+      (u.hostname === "x.com" ||
+        u.hostname === "www.x.com" ||
+        u.hostname === "twitter.com" ||
+        u.hostname === "www.twitter.com" ||
+        u.hostname === "mobile.twitter.com") &&
+      /^\/[^/]+\/status\/\d+/.test(u.pathname)
+    );
+  } catch {
+    return false;
+  }
+}
+
 function detectPageType(url: string): "html" | "embed" {
   try {
     const u = new URL(url);
@@ -96,6 +112,9 @@ function detectPageType(url: string): "html" | "embed" {
     }
   } catch {
     // ignore
+  }
+  if (isTwitterURL(url)) {
+    return "embed";
   }
   return "html";
 }
@@ -257,20 +276,58 @@ function handleFetchResponse(message: {
   pendingResponses.delete(message.requestId);
 }
 
-// ─── Combined Fetch: page context first, background fallback ─────────────────────
+// ─── Combined Fetch (mirrors official SingleFile pattern for Chrome) ─────────────
+//
+// In Chrome, SingleFile uses the content script's isolation-world fetch() as the
+// primary method — it has the extension's host_permissions so it can fetch any
+// cross-origin resource. Page-context fetch (MAIN world events) is only primary
+// in Firefox. Background fetch via messaging is the last resort.
 
 async function singleFileFetch(
   url: string,
   options: Record<string, unknown> = {}
-) {
-  // Try page-context fetch first (has cookies, correct CORS origin)
+): Promise<{
+  status: number;
+  headers: { get(name: string): string | null };
+  arrayBuffer(): Promise<ArrayBuffer>;
+}> {
+  const fetchOptions: RequestInit = {
+    cache: (options.cache as RequestCache) || "force-cache",
+    headers: options.headers as HeadersInit,
+    referrerPolicy:
+      (options.referrerPolicy as ReferrerPolicy) ||
+      "strict-origin-when-cross-origin",
+  };
+
+  // Primary: content script's fetch (isolation world — has extension host_permissions)
+  try {
+    const response = await fetch(url, fetchOptions);
+    // Retry with no-referrer on auth/not-found errors (matches SingleFile behavior)
+    if (
+      (response.status === 401 ||
+        response.status === 403 ||
+        response.status === 404) &&
+      fetchOptions.referrerPolicy !== "no-referrer"
+    ) {
+      const retry = await fetch(url, {
+        ...fetchOptions,
+        referrerPolicy: "no-referrer",
+      });
+      return retry;
+    }
+    return response;
+  } catch {
+    // Fall through to page-context fetch
+  }
+
+  // Fallback: page-context fetch (MAIN world — has page's cookies for auth resources)
   try {
     return await pageContextFetch(url, options);
   } catch {
     // Fall through to background
   }
 
-  // Fallback: fetch via background service worker (has host_permissions)
+  // Last resort: background service worker fetch via messaging
   return backgroundFetch(url, options);
 }
 
@@ -429,6 +486,70 @@ function extractYouTube(): PageCapture {
   };
 }
 
+// ─── Twitter/X Extraction ────────────────────────────────────────────────────
+
+function extractTweet(): PageCapture {
+  const url = new URL(location.href);
+  const handle = url.pathname.split("/")[1] || "";
+
+  // Author from og:title — format is typically "Author Name on X: ..."
+  const ogTitle =
+    document.querySelector<HTMLMetaElement>('meta[property="og:title"]')?.content ?? "";
+  const authorName = ogTitle.includes(" on X:")
+    ? ogTitle.split(" on X:")[0].trim()
+    : ogTitle.includes(" on Twitter:")
+      ? ogTitle.split(" on Twitter:")[0].trim()
+      : handle;
+
+  // Tweet text from og:description
+  const description =
+    document.querySelector<HTMLMetaElement>('meta[property="og:description"]')?.content ??
+    document.querySelector<HTMLMetaElement>('meta[name="description"]')?.content ??
+    null;
+
+  // Thumbnail
+  const thumbnailURL =
+    document.querySelector<HTMLMetaElement>('meta[property="og:image"]')?.content ?? null;
+
+  const title = document.title || `@${handle} post`;
+
+  return {
+    type: "embed",
+    url: location.href,
+    title,
+    author: `@${handle}`,
+    description,
+    thumbnailURL,
+    embedType: "twitter",
+  };
+}
+
+// ─── Generic Link Metadata Extraction ────────────────────────────────────────
+
+function extractLinkMeta(): PageCapture {
+  const title = document.title || location.href;
+  const description =
+    document.querySelector<HTMLMetaElement>('meta[name="description"]')?.content ??
+    document.querySelector<HTMLMetaElement>('meta[property="og:description"]')?.content ??
+    null;
+  const thumbnailURL =
+    document.querySelector<HTMLMetaElement>('meta[property="og:image"]')?.content ?? null;
+  const author =
+    document.querySelector<HTMLMetaElement>('meta[name="author"]')?.content ??
+    document.querySelector<HTMLMetaElement>('meta[property="og:site_name"]')?.content ??
+    null;
+
+  return {
+    type: "embed",
+    url: location.href,
+    title,
+    author,
+    description,
+    thumbnailURL,
+    embedType: "link",
+  };
+}
+
 // ─── Content Script Entry ───────────────────────────────────────────────────────
 
 export default defineContentScript({
@@ -477,6 +598,11 @@ export default defineContentScript({
         return true;
       }
 
+      if (request.action === "extractLinkMeta") {
+        sendResponse(extractLinkMeta());
+        return true;
+      }
+
       if (request.action === "capturePageHTML") {
         const pageType = detectPageType(location.href);
 
@@ -495,7 +621,11 @@ export default defineContentScript({
           return true;
         }
 
-        sendResponse(extractYouTube());
+        if (isTwitterURL(location.href)) {
+          sendResponse(extractTweet());
+        } else {
+          sendResponse(extractYouTube());
+        }
         return true;
       }
 
@@ -518,10 +648,16 @@ export default defineContentScript({
           return true;
         }
 
-        sendResponse(extractYouTube());
+        if (isTwitterURL(location.href)) {
+          sendResponse(extractTweet());
+        } else {
+          sendResponse(extractYouTube());
+        }
         return true;
       }
-      return true;
+      // Don't return true for unhandled messages (e.g. singlefile.fetchResponse) —
+      // returning true holds the sendResponse port open, which causes
+      // chrome.tabs.sendMessage in the background to hang indefinitely.
     });
   },
 });

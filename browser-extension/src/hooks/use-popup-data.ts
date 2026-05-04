@@ -14,6 +14,16 @@ function detectPageType(url: string): "html" | "embed" {
     ) {
       return "embed";
     }
+    if (
+      (u.hostname === "x.com" ||
+        u.hostname === "www.x.com" ||
+        u.hostname === "twitter.com" ||
+        u.hostname === "www.twitter.com" ||
+        u.hostname === "mobile.twitter.com") &&
+      /^\/[^/]+\/status\/\d+/.test(u.pathname)
+    ) {
+      return "embed";
+    }
   } catch { /* ignore */ }
   return "html";
 }

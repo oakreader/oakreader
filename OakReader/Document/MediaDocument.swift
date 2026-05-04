@@ -1,23 +1,37 @@
 import Foundation
 
-/// Metadata for embed documents (YouTube), stored as metadata.json.
+/// Discriminator for embed subtypes.
+enum EmbedType: String, Codable {
+    case youtube
+    case twitter
+    case link       // generic bookmark — any URL saved as "link" mode
+}
+
+/// Metadata for embed documents (YouTube, Twitter, generic links), stored as metadata.json.
 struct MediaMetadata: Codable {
     let title: String
-    let author: String              // Channel name
+    let author: String              // Channel name / @handle / site name
     let sourceURL: URL              // Original URL
-    let duration: Int?              // Seconds
+    let duration: Int?              // Seconds (YouTube only)
     let thumbnailURL: URL?
     let publishedAt: String?        // ISO 8601
     let description: String?
+    let embedType: String?          // "youtube" | "twitter" | "link", nil → defaults to "youtube"
+
+    /// Resolved enum from the optional string field (backward-compatible).
+    var resolvedEmbedType: EmbedType {
+        EmbedType(rawValue: embedType ?? "youtube") ?? .youtube
+    }
 }
 
-/// Lightweight data holder for embed documents (YouTube).
+/// Lightweight data holder for embed documents (YouTube, Twitter posts, generic links).
 /// Not an NSDocument — media items are read-only.
 final class MediaDocument {
     let storageDirectory: URL
     let metadata: MediaMetadata
     let transcriptURL: URL?         // transcript.txt if available
     let chaptersURL: URL?           // chapters.json if available
+    let embedHTMLURL: URL?          // embed.html for tweet/link rendering
     let sourceURL: URL
 
     init(storageDirectory: URL) throws {
@@ -36,5 +50,8 @@ final class MediaDocument {
 
         let chapters = storageDirectory.appendingPathComponent("chapters.json")
         self.chaptersURL = FileManager.default.fileExists(atPath: chapters.path) ? chapters : nil
+
+        let embedHTML = storageDirectory.appendingPathComponent("embed.html")
+        self.embedHTMLURL = FileManager.default.fileExists(atPath: embedHTML.path) ? embedHTML : nil
     }
 }

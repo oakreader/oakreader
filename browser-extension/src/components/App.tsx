@@ -6,6 +6,9 @@ import { PageCard } from "./PageCard";
 import { CollectionPicker } from "./CollectionPicker";
 import { TagInput } from "./TagInput";
 import { SaveButton, type SaveState } from "./SaveButton";
+import { Button } from "./ui/button";
+
+type SaveMode = "snapshot" | "link";
 
 export function App() {
   const { pageMeta, tabId, collections, tags, loading, error } = usePopupData();
@@ -14,6 +17,7 @@ export function App() {
   const [newTags, setNewTags] = useState<string[]>([]);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [errorMessage, setErrorMessage] = useState("");
+  const [saveMode, setSaveMode] = useState<SaveMode>("snapshot");
 
   const handleTagToggle = useCallback((id: string) => {
     setSelectedTagIds((prev) => {
@@ -67,6 +71,28 @@ export function App() {
           title: pageMeta.title,
           cookies: cookieResult?.cookies || undefined,
         };
+      } else if (saveMode === "link" && pageMeta.type === "html") {
+        // "Save as Link" mode: extract lightweight metadata only (no SingleFile)
+        setSaveState("capturing");
+
+        try {
+          payload = await Promise.race([
+            chrome.tabs.sendMessage(tabId, { action: "extractLinkMeta" }),
+            new Promise((_resolve, reject) =>
+              setTimeout(() => reject(new Error("Capture timed out")), 5000)
+            ),
+          ]) as PageCapture;
+        } catch {
+          // Fallback: construct link meta from tab info
+          payload = {
+            type: "embed",
+            url: pageMeta.url,
+            title: pageMeta.title,
+            embedType: "link",
+          };
+        }
+
+        setSaveState("saving");
       } else {
         // HTML / embed: capture page content first
         setSaveState("capturing");
@@ -101,6 +127,24 @@ export function App() {
                     thumbnailURL: videoId
                       ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
                       : null,
+                  };
+                }
+                // Twitter/X fallback
+                if (
+                  (u.hostname === "x.com" || u.hostname === "www.x.com" ||
+                    u.hostname === "twitter.com" || u.hostname === "www.twitter.com" ||
+                    u.hostname === "mobile.twitter.com") &&
+                  /^\/[^/]+\/status\/\d+/.test(u.pathname)
+                ) {
+                  const handle = u.pathname.split("/")[1] || "";
+                  return {
+                    type: "embed" as const,
+                    url,
+                    title: document.title,
+                    author: `@${handle}`,
+                    description: document.querySelector<HTMLMetaElement>('meta[property="og:description"]')?.content ?? null,
+                    thumbnailURL: document.querySelector<HTMLMetaElement>('meta[property="og:image"]')?.content ?? null,
+                    embedType: "twitter" as const,
                   };
                 }
               } catch { /* ignore */ }
@@ -142,7 +186,7 @@ export function App() {
         setErrorMessage(msg);
       }
     }
-  }, [pageMeta, tabId, collectionId, collections, selectedTagIds, newTags]);
+  }, [pageMeta, tabId, collectionId, collections, selectedTagIds, newTags, saveMode]);
 
   if (loading) {
     return (
@@ -177,6 +221,28 @@ export function App() {
       <Header />
       <div className="flex-1 min-h-0 overflow-y-auto px-3 space-y-2">
         {pageMeta && <PageCard pageMeta={pageMeta} />}
+
+        {pageMeta?.type === "html" && (
+          <div className="flex items-center gap-1 rounded-[var(--radius-outer)] bg-grouped p-1"
+               style={{ boxShadow: "0 0 0 0.5px rgba(0,0,0,0.06)" }}>
+            <Button
+              variant={saveMode === "snapshot" ? "secondary" : "ghost"}
+              size="xs"
+              className="flex-1"
+              onClick={() => setSaveMode("snapshot")}
+            >
+              Snapshot
+            </Button>
+            <Button
+              variant={saveMode === "link" ? "secondary" : "ghost"}
+              size="xs"
+              className="flex-1"
+              onClick={() => setSaveMode("link")}
+            >
+              Link
+            </Button>
+          </div>
+        )}
 
         <CollectionPicker
           collections={collections}

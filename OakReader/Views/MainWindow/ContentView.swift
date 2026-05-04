@@ -158,7 +158,11 @@ struct ContentView: View {
             }
         case .embed:
             ZStack {
-                MediaViewerView(viewModel: viewModel)
+                if viewModel.mediaDocument?.metadata.resolvedEmbedType == .youtube {
+                    MediaViewerView(viewModel: viewModel)
+                } else {
+                    EmbedCardView(viewModel: viewModel)
+                }
                 if viewModel.state.editorMode == .snapshot {
                     MediaSnapshotOverlayView(viewModel: viewModel)
                 }
