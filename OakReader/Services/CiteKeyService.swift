@@ -59,16 +59,19 @@ struct CiteKeyService {
                 .filter(CitationRecord.CodingKeys.itemId == itemId)
                 .fetchOne(db)
 
+            var cslType: String?
             let author = citation.flatMap { record -> String? in
                 guard let data = record.cslJson.data(using: .utf8),
                       let csl = try? JSONDecoder().decode(CSLItem.self, from: data),
                       let firstAuthor = csl.author?.first else { return nil }
+                cslType = csl.type
                 return firstAuthor.family ?? firstAuthor.literal
             } ?? item.author
 
             let year = citation?.year
+            let isVideo = cslType == "motion_picture"
 
-            let base = generateBase(author: author, year: year, title: item.title)
+            let base = generateBase(author: author, year: year, title: item.title, titleSuffix: isVideo)
             guard !base.isEmpty else { return }
 
             // Find unique key within the write transaction
@@ -127,7 +130,8 @@ struct CiteKeyService {
 
     // MARK: - Private
 
-    private func generateBase(author: String, year: Int?, title: String? = nil) -> String {
+    /// - Parameter titleSuffix: When `true`, appends `_firsttitleword` for disambiguation (used for videos).
+    private func generateBase(author: String, year: Int?, title: String? = nil, titleSuffix: Bool = false) -> String {
         let family = author
             .components(separatedBy: ",").first?
             .trimmingCharacters(in: .whitespaces)
@@ -151,7 +155,21 @@ struct CiteKeyService {
         }
 
         let yearStr = year.map { "\($0)" } ?? ""
-        return base + yearStr
+        var key = base + yearStr
+
+        // For videos, append first meaningful title word for disambiguation (e.g. "3blue1brown2024_linear")
+        if titleSuffix, !family.isEmpty, let title, !title.isEmpty {
+            let word = title
+                .components(separatedBy: .whitespaces)
+                .first { !$0.isEmpty }?
+                .lowercased()
+                .filter { $0.isLetter || $0.isNumber } ?? ""
+            if !word.isEmpty {
+                key += "_" + word
+            }
+        }
+
+        return key
     }
 }
 
