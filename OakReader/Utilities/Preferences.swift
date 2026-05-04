@@ -46,6 +46,7 @@ final class Preferences {
         static let youtubeAIModel = "youtubeAIModel"
         // External tools
         static let ytDlpPath = "ytDlpPath"
+        static let ytDlpCachedVersion = "ytDlpCachedVersion"
         static let ytDlpCachedLatestVersion = "ytDlpCachedLatestVersion"
         static let ytDlpLastVersionCheck = "ytDlpLastVersionCheck"
     }
@@ -248,6 +249,12 @@ final class Preferences {
     var ytDlpPath: String {
         get { defaults.string(forKey: Keys.ytDlpPath) ?? "" }
         set { defaults.set(newValue, forKey: Keys.ytDlpPath) }
+    }
+
+    /// Cached local yt-dlp version (avoids running the binary every time settings opens).
+    var ytDlpCachedVersion: String? {
+        get { defaults.string(forKey: Keys.ytDlpCachedVersion) }
+        set { defaults.set(newValue, forKey: Keys.ytDlpCachedVersion) }
     }
 
     var ytDlpCachedLatestVersion: String? {

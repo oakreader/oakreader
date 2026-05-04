@@ -50,7 +50,7 @@ struct YouTubeSettingsView: View {
             if ytDlpPath.isEmpty {
                 autoDetectYtDlp()
             } else {
-                verifyYtDlp(at: ytDlpPath)
+                restoreOrVerifyYtDlp(at: ytDlpPath)
             }
             loadPromptPreview()
         }
@@ -77,6 +77,7 @@ struct YouTubeSettingsView: View {
                     .frame(maxWidth: 360)
                     .onChange(of: ytDlpPath) { _, newValue in
                         Preferences.shared.ytDlpPath = newValue
+                        Preferences.shared.ytDlpCachedVersion = nil
                         if !newValue.isEmpty {
                             verifyYtDlp(at: newValue)
                         } else {
@@ -306,6 +307,7 @@ struct YouTubeSettingsView: View {
             for path in candidates {
                 if FileManager.default.isExecutableFile(atPath: path) {
                     let version = Self.ytDlpVersion(at: path)
+                    Preferences.shared.ytDlpCachedVersion = version
                     await MainActor.run {
                         ytDlpPath = path
                         Preferences.shared.ytDlpPath = path
@@ -329,6 +331,7 @@ struct YouTubeSettingsView: View {
             if process.terminationStatus == 0, !output.isEmpty,
                FileManager.default.isExecutableFile(atPath: output) {
                 let version = Self.ytDlpVersion(at: output)
+                Preferences.shared.ytDlpCachedVersion = version
                 await MainActor.run {
                     ytDlpPath = output
                     Preferences.shared.ytDlpPath = output
@@ -342,13 +345,28 @@ struct YouTubeSettingsView: View {
         }
     }
 
+    /// Restore from cache if available, otherwise run the binary to verify.
+    private func restoreOrVerifyYtDlp(at path: String) {
+        let prefs = Preferences.shared
+        if let cached = prefs.ytDlpCachedVersion, !cached.isEmpty {
+            ytDlpStatus = .found(cached)
+            latestVersion = prefs.ytDlpCachedLatestVersion
+        } else {
+            verifyYtDlp(at: path)
+        }
+    }
+
+    /// Run the yt-dlp binary to get its version and check for updates. Caches the results.
     private func verifyYtDlp(at path: String) {
         ytDlpStatus = .checking
         Task.detached {
             let version = Self.ytDlpVersion(at: path)
 
-            // Use cached latest version if checked within 7 days
+            // Cache the local version
             let prefs = Preferences.shared
+            prefs.ytDlpCachedVersion = version
+
+            // Use cached latest version if checked within 7 days
             let cached = prefs.ytDlpCachedLatestVersion
             let lastCheck = prefs.ytDlpLastVersionCheck
             let cacheValid = lastCheck.map { Date().timeIntervalSince($0) < 7 * 24 * 3600 } ?? false
@@ -424,6 +442,7 @@ struct YouTubeSettingsView: View {
                 )
 
                 let version = Self.ytDlpVersion(at: destURL.path)
+                Preferences.shared.ytDlpCachedVersion = version
                 await MainActor.run {
                     ytDlpPath = destURL.path
                     Preferences.shared.ytDlpPath = destURL.path
