@@ -309,6 +309,29 @@ final class ImportService {
             return nil
         }
 
+        // Auto-create reference metadata with motion_picture type for video embeds
+        var csl = CSLItem(type: "motion_picture")
+        csl.title = title
+        if !author.isEmpty {
+            csl.author = [CSLName(family: author, given: nil)]
+        }
+        csl.URL = sourceURL.absoluteString
+        try? referenceService.saveMetadata(csl, forItemId: docId.uuidString)
+        store.invalidate()
+
+        // Auto-generate chapters (native YouTube + AI fallback)
+        let hasTranscript = transcript != nil && !transcript!.isEmpty
+        Task {
+            let service = ChapterGenerationService()
+            await service.run(
+                itemStorageKey: itemStorageKey,
+                attachmentStorageKey: attStorageKey,
+                sourceURL: sourceURL,
+                duration: duration,
+                transcriptAlreadyExists: hasTranscript
+            )
+        }
+
         return item
     }
 

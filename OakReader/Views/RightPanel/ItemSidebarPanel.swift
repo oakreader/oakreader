@@ -9,11 +9,8 @@ struct ItemSidebarPanel: View {
     var body: some View {
         VStack(spacing: 0) {
             // Header
-            HStack(spacing: 6) {
-                Image(systemName: "quote.opening")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
-                Text("Reference")
+            HStack {
+                Text("Metadata")
                     .font(.system(size: 16, weight: .semibold))
                 Spacer()
             }

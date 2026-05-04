@@ -10,7 +10,7 @@ struct LibrarySideNavView: View {
                     tab = mode
                 } label: {
                     Image(systemName: mode.systemImage)
-                        .font(.system(size: OakStyle.Font.icon))
+                        .font(.system(size: mode == .chat ? 14 : OakStyle.Font.icon))
                         .frame(width: OakStyle.Size.buttonStandard, height: OakStyle.Size.buttonStandard)
                         .contentShape(Rectangle())
                 }

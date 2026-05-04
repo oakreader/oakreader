@@ -108,6 +108,7 @@ enum CSLItemType: String, CaseIterable, Identifiable {
     case articleNewspaper = "article-newspaper"
     case articleMagazine = "article-magazine"
     case patent = "patent"
+    case motionPicture = "motion_picture"
     case document = "document"
 
     var id: String { rawValue }
@@ -124,6 +125,7 @@ enum CSLItemType: String, CaseIterable, Identifiable {
         case .articleNewspaper: return "Newspaper Article"
         case .articleMagazine: return "Magazine Article"
         case .patent: return "Patent"
+        case .motionPicture: return "Video"
         case .document: return "Document"
         }
     }
@@ -140,6 +142,7 @@ enum CSLItemType: String, CaseIterable, Identifiable {
         case .articleNewspaper: return "newspaper"
         case .articleMagazine: return "magazine"
         case .patent: return "lightbulb"
+        case .motionPicture: return "film"
         case .document: return "doc"
         }
     }
