@@ -12,10 +12,43 @@ function getDomain(url: string): string {
   }
 }
 
-function getTypeLabel(type: string): string {
+function isTwitterURL(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return (
+      (u.hostname === "x.com" ||
+        u.hostname === "www.x.com" ||
+        u.hostname === "twitter.com" ||
+        u.hostname === "www.twitter.com" ||
+        u.hostname === "mobile.twitter.com") &&
+      /^\/[^/]+\/status\/\d+/.test(u.pathname)
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isYouTubeURL(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return (
+      (u.hostname === "www.youtube.com" ||
+        u.hostname === "youtube.com" ||
+        u.hostname === "m.youtube.com") &&
+      u.pathname === "/watch" &&
+      u.searchParams.has("v")
+    );
+  } catch {
+    return false;
+  }
+}
+
+function getTypeLabel(type: string, url: string): string {
   switch (type) {
     case "embed":
-      return "Video";
+      if (isTwitterURL(url)) return "Post";
+      if (isYouTubeURL(url)) return "Video";
+      return "Link";
     case "pdf":
       return "PDF Document";
     default:
@@ -50,7 +83,7 @@ function PDFIcon() {
 
 export function PageCard({ pageMeta }: PageCardProps) {
   const domain = getDomain(pageMeta.url);
-  const typeLabel = getTypeLabel(pageMeta.type);
+  const typeLabel = getTypeLabel(pageMeta.type, pageMeta.url);
   const isPDF = pageMeta.type === "pdf";
 
   // For PDFs, derive a clean title from URL if no title is available

@@ -311,14 +311,17 @@ final class SnapshotServer {
             return
         }
 
+        let resolvedEmbedType = payload.embedType ?? Self.detectEmbedType(from: payload.url)
+
         let metadata = MediaMetadata(
-            title: payload.title ?? "Untitled Video",
+            title: payload.title ?? "Untitled",
             author: payload.author ?? "",
             sourceURL: sourceURL,
             duration: payload.duration,
             thumbnailURL: payload.thumbnailURL.flatMap { URL(string: $0) },
             publishedAt: nil,
-            description: payload.description
+            description: payload.description,
+            embedType: resolvedEmbedType
         )
 
         // Download thumbnail if available
@@ -326,13 +329,14 @@ final class SnapshotServer {
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
                 let item = self.importService.importEmbed(
-                    title: payload.title ?? "Untitled Video",
+                    title: payload.title ?? "Untitled",
                     author: payload.author ?? "",
                     sourceURL: sourceURL,
                     duration: payload.duration,
                     thumbnailData: thumbnailData,
                     transcript: payload.transcript,
-                    metadata: metadata
+                    metadata: metadata,
+                    embedType: resolvedEmbedType
                 )
                 if let item {
                     self.assignToCollection(item: item, collectionId: payload.collectionId)
@@ -344,6 +348,14 @@ final class SnapshotServer {
                 }
             }
         }
+    }
+
+    /// Infer embed type from URL when not explicitly provided by the extension.
+    private static func detectEmbedType(from urlString: String) -> String {
+        guard let url = URL(string: urlString), let host = url.host?.lowercased() else { return "youtube" }
+        if host.contains("youtube.com") || host.contains("youtu.be") { return "youtube" }
+        if host.contains("x.com") || host.contains("twitter.com") { return "twitter" }
+        return "link"
     }
 
     // MARK: - PDF Snapshot
@@ -552,4 +564,5 @@ struct SnapshotPayload: Codable {
     let collectionId: String?   // optional — target collection, nil = unsorted
     let tagOptionIds: [String]? // optional — tag option UUIDs to assign
     let newTags: [String]?      // optional — tag names to create and assign
+    let embedType: String?      // "youtube" | "twitter" | "link", nil → inferred from URL
 }

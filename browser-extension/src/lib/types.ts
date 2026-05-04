@@ -19,6 +19,7 @@ export interface PageCapture {
   transcript?: string | null;
   description?: string | null;
   markdown?: string | null;
+  embedType?: "youtube" | "twitter" | "link";
 }
 
 /** Payload for saving a PDF by URL (no HTML capture needed). */
