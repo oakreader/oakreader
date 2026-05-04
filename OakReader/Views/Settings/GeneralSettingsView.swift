@@ -7,6 +7,10 @@ struct GeneralSettingsView: View {
     @State private var ytDlpPath: String = Preferences.shared.ytDlpPath
     @State private var ytDlpStatus: YtDlpStatus = .unknown
 
+    @State private var isInstalling = false
+    @State private var installMessage: String?
+    @State private var latestVersion: String?
+
     private enum YtDlpStatus: Equatable {
         case unknown
         case checking
@@ -111,7 +115,7 @@ struct GeneralSettingsView: View {
             Text("External Tools")
                 .font(.system(size: 13, weight: .bold))
 
-            Text("yt-dlp is used to fetch YouTube video transcripts. Install via `brew install yt-dlp`.")
+            Text("yt-dlp is used to fetch YouTube video transcripts.")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
 
@@ -157,8 +161,36 @@ struct GeneralSettingsView: View {
                     Text("Not found at this path")
                         .foregroundStyle(.secondary)
                 }
+
+                Spacer().frame(width: 4)
+
+                if isInstalling {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Installing…")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                } else if case .found(let current) = ytDlpStatus {
+                    if let latest = latestVersion, latest != current {
+                        Button("Update to \(latest)") {
+                            installOrUpdateYtDlp()
+                        }
+                        .controlSize(.small)
+                    }
+                } else {
+                    Button("Install") {
+                        installOrUpdateYtDlp()
+                    }
+                    .controlSize(.small)
+                }
             }
             .font(.system(size: 11))
+
+            if let installMessage {
+                Text(installMessage)
+                    .font(.system(size: 11))
+                    .foregroundStyle(installMessage.contains("Error") ? .red : .green)
+            }
         }
     }
 
@@ -179,13 +211,25 @@ struct GeneralSettingsView: View {
     private func autoDetectYtDlp() {
         ytDlpStatus = .checking
         Task.detached {
-            let candidates = [
-                "/usr/local/bin/yt-dlp",
-                "/opt/homebrew/bin/yt-dlp",
-                "/usr/bin/yt-dlp",
-            ]
+            // 1. OakReader's own bin directory (installed via "Install" button)
+            let appSupportBin = FileManager.default.urls(
+                for: .applicationSupportDirectory, in: .userDomainMask
+            ).first?.appendingPathComponent("OakReader/bin/yt-dlp").path
 
-            // Check known paths first
+            // 2. System paths (Homebrew, system)
+            // 3. Python user script directories
+            let homeDir = FileManager.default.homeDirectoryForCurrentUser.path
+            let candidates = [
+                appSupportBin,
+                "/opt/homebrew/bin/yt-dlp",
+                "/usr/local/bin/yt-dlp",
+                "/usr/bin/yt-dlp",
+                "\(homeDir)/Library/Python/3.13/bin/yt-dlp",
+                "\(homeDir)/Library/Python/3.12/bin/yt-dlp",
+                "\(homeDir)/Library/Python/3.11/bin/yt-dlp",
+                "\(homeDir)/Library/Python/3.10/bin/yt-dlp",
+            ].compactMap { $0 }
+
             for path in candidates {
                 if FileManager.default.isExecutableFile(atPath: path) {
                     let version = Self.ytDlpVersion(at: path)
@@ -198,7 +242,7 @@ struct GeneralSettingsView: View {
                 }
             }
 
-            // Try `which yt-dlp`
+            // Fallback: try `which yt-dlp`
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
             process.arguments = ["which", "yt-dlp"]
@@ -230,8 +274,76 @@ struct GeneralSettingsView: View {
         ytDlpStatus = .checking
         Task.detached {
             let version = Self.ytDlpVersion(at: path)
+            let latest = await Self.fetchLatestYtDlpVersion()
             await MainActor.run {
                 ytDlpStatus = version.map { .found($0) } ?? .notFound
+                latestVersion = latest
+            }
+        }
+    }
+
+    private static func fetchLatestYtDlpVersion() async -> String? {
+        // GitHub API: get latest release tag (e.g. "2026.04.09")
+        guard let url = URL(string: "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest") else {
+            return nil
+        }
+        var request = URLRequest(url: url)
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 10
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200,
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let tagName = json["tag_name"] as? String else {
+            return nil
+        }
+        return tagName
+    }
+
+    private func installOrUpdateYtDlp() {
+        isInstalling = true
+        installMessage = nil
+        Task.detached {
+            do {
+                // Download to <AppSupport>/OakReader/bin/yt-dlp
+                let appSupport = FileManager.default.urls(
+                    for: .applicationSupportDirectory, in: .userDomainMask
+                ).first!.appendingPathComponent("OakReader/bin")
+                try FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
+                let destURL = appSupport.appendingPathComponent("yt-dlp")
+
+                let downloadURL = URL(string: "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos")!
+                let (tempURL, response) = try await URLSession.shared.download(from: downloadURL)
+
+                guard let httpResponse = response as? HTTPURLResponse,
+                      httpResponse.statusCode == 200 else {
+                    throw URLError(.badServerResponse)
+                }
+
+                // Replace existing binary
+                try? FileManager.default.removeItem(at: destURL)
+                try FileManager.default.moveItem(at: tempURL, to: destURL)
+
+                // Make executable (chmod +x)
+                try FileManager.default.setAttributes(
+                    [.posixPermissions: 0o755],
+                    ofItemAtPath: destURL.path
+                )
+
+                let version = Self.ytDlpVersion(at: destURL.path)
+                await MainActor.run {
+                    ytDlpPath = destURL.path
+                    Preferences.shared.ytDlpPath = destURL.path
+                    ytDlpStatus = version.map { .found($0) } ?? .found("installed")
+                    latestVersion = version // now current = latest, hides Update button
+                    installMessage = "Installed successfully."
+                    isInstalling = false
+                }
+            } catch {
+                await MainActor.run {
+                    installMessage = "Error: \(error.localizedDescription)"
+                    isInstalling = false
+                }
             }
         }
     }
