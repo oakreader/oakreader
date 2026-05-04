@@ -127,6 +127,11 @@ struct YouTubeSettingsView: View {
                             installOrUpdateYtDlp()
                         }
                         .controlSize(.small)
+                    } else {
+                        Button("Check for Updates") {
+                            checkForUpdates()
+                        }
+                        .controlSize(.small)
                     }
                 } else {
                     Button("Install") {
@@ -341,12 +346,37 @@ struct YouTubeSettingsView: View {
         ytDlpStatus = .checking
         Task.detached {
             let version = Self.ytDlpVersion(at: path)
-            let latest = await Self.fetchLatestYtDlpVersion()
+
+            // Use cached latest version if checked within 7 days
+            let prefs = Preferences.shared
+            let cached = prefs.ytDlpCachedLatestVersion
+            let lastCheck = prefs.ytDlpLastVersionCheck
+            let cacheValid = lastCheck.map { Date().timeIntervalSince($0) < 7 * 24 * 3600 } ?? false
+            let latest = (cacheValid && cached != nil) ? cached : await Self.fetchAndCacheLatestVersion()
+
             await MainActor.run {
                 ytDlpStatus = version.map { .found($0) } ?? .notFound
                 latestVersion = latest
             }
         }
+    }
+
+    private func checkForUpdates() {
+        Task.detached {
+            let latest = await Self.fetchAndCacheLatestVersion()
+            await MainActor.run {
+                latestVersion = latest
+            }
+        }
+    }
+
+    private static func fetchAndCacheLatestVersion() async -> String? {
+        let version = await fetchLatestYtDlpVersion()
+        if let version {
+            Preferences.shared.ytDlpCachedLatestVersion = version
+            Preferences.shared.ytDlpLastVersionCheck = Date()
+        }
+        return version
     }
 
     private static func fetchLatestYtDlpVersion() async -> String? {
