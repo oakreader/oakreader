@@ -54,11 +54,10 @@ struct MediaViewerView: View {
                 VStack(spacing: 0) {
                     // Top: video player (70% height)
                     youtubeEmbed(media: media)
-                        .frame(height: videoHeight)
+                        .frame(width: videoWidth, height: videoHeight)
                         .clipped()
 
                     // Bottom: metadata + tabs + transcript/outline
-                    // Constrained to the same width as the video
                     VStack(spacing: 0) {
                         // Metadata (PINNED)
                         metadataSection(media: media)
@@ -113,8 +112,8 @@ struct MediaViewerView: View {
                         }
                     }
                     .frame(width: videoWidth)
-                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .frame(maxWidth: .infinity, alignment: .center)
             }
             .background(OakStyle.Colors.contentBackground)
             .task { await loadOrFetchTranscript(media: media) }
