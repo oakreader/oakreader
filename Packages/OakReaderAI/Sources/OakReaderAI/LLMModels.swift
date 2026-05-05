@@ -13,6 +13,8 @@ public struct LLMMessage: Sendable {
     public enum ContentPart: Sendable {
         case text(String)
         case imageBase64(data: String, mediaType: String) // "image/png", "image/jpeg"
+        case toolUse(ToolCall)
+        case toolResult(ToolResult)
     }
 
     public init(role: Role, text: String) {
@@ -38,12 +40,15 @@ public struct LLMMessage: Sendable {
 
 public enum StreamChunk: Sendable {
     case delta(String)
+    case toolUse(ToolCall)
     case finished(stopReason: String?)
     case error(String)
 }
 
 public enum StreamEvent: Sendable {
     case delta(String)
+    case toolUseStarted(ToolUseRecord)
+    case toolUseCompleted(ToolUseRecord)
     case finished(ChatTurn)
     case error(Error)
 }
