@@ -1,32 +1,7 @@
 import { useEffect, useState } from "react";
 import { fetchCollections, fetchTags } from "@/src/lib/api";
 import type { CollectionInfo, PageMeta, TagNodeInfo } from "@/src/lib/types";
-
-function detectPageType(url: string): "html" | "embed" {
-  try {
-    const u = new URL(url);
-    if (
-      (u.hostname === "www.youtube.com" ||
-        u.hostname === "youtube.com" ||
-        u.hostname === "m.youtube.com") &&
-      u.pathname === "/watch" &&
-      u.searchParams.has("v")
-    ) {
-      return "embed";
-    }
-    if (
-      (u.hostname === "x.com" ||
-        u.hostname === "www.x.com" ||
-        u.hostname === "twitter.com" ||
-        u.hostname === "www.twitter.com" ||
-        u.hostname === "mobile.twitter.com") &&
-      /^\/[^/]+\/status\/\d+/.test(u.pathname)
-    ) {
-      return "embed";
-    }
-  } catch { /* ignore */ }
-  return "html";
-}
+import { detectContentKind, contentKindToPageType } from "@/src/lib/translators";
 
 interface PopupData {
   pageMeta: PageMeta | null;
@@ -112,11 +87,13 @@ export function usePopupData(): PopupData {
         } else {
           // Fallback: construct meta from tab info with URL-based type detection
           const tabUrl = tab.url || "";
+          const kind = detectContentKind(tabUrl);
           setPageMeta({
-            type: detectPageType(tabUrl),
+            type: contentKindToPageType(kind),
             url: tabUrl,
             title: tab.title || null,
             favicon: tab.favIconUrl || null,
+            contentKind: kind,
           });
         }
       } catch {

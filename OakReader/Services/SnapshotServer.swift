@@ -298,9 +298,70 @@ final class SnapshotServer {
                 self.assignToCollection(item: item, collectionId: payload.collectionId)
                 self.assignTags(item: item, tagOptionIds: payload.tagOptionIds)
                 self.createAndAssignNewTags(item: item, newTags: payload.newTags)
+                // Process scholarly bibliographic metadata if present
+                if let biblio = payload.biblio {
+                    self.processScholarlyMetadata(biblio, forItem: item)
+                }
                 completion(.success(()))
             } else {
                 completion(.failure(OakReaderError.serverError("Import failed")))
+            }
+        }
+    }
+
+    // MARK: - Scholarly Metadata Processing
+
+    /// Processes bibliographic metadata from the browser extension's scholarly translator.
+    /// If a DOI is present, attempts CrossRef lookup for full CSL; otherwise builds CSL from provided fields.
+    private func processScholarlyMetadata(_ biblio: BiblioPayload, forItem item: LibraryItem) {
+        let itemId = item.id.uuidString
+
+        Task {
+            var cslItem: CSLItem?
+
+            // If DOI present, try CrossRef for complete metadata
+            if let doi = biblio.doi, !doi.isEmpty {
+                do {
+                    cslItem = try await CrossRefService.fetchMetadata(doi: doi)
+                } catch {
+                    Log.error(Log.server, "CrossRef lookup failed for DOI \(doi): \(error)")
+                }
+            }
+
+            // If CrossRef failed or no DOI, build CSL from biblio fields
+            if cslItem == nil {
+                var csl = CSLItem(type: biblio.cslType ?? "webpage")
+                csl.title = item.title
+                csl.DOI = biblio.doi
+                csl.ISSN = biblio.issn
+                csl.ISBN = biblio.isbn
+                csl.containerTitle = biblio.journal
+                csl.volume = biblio.volume
+                csl.issue = biblio.issue
+                csl.page = biblio.pages
+                csl.publisher = biblio.publisher
+                csl.URL = item.sourceURL?.absoluteString
+
+                if let year = biblio.year {
+                    csl.issued = CSLDate(dateParts: [[year]])
+                }
+
+                if let authors = biblio.authors, !authors.isEmpty {
+                    csl.author = authors.map { CSLName(family: $0.family, given: $0.given) }
+                }
+
+                cslItem = csl
+            }
+
+            if let csl = cslItem {
+                do {
+                    try self.importService.referenceService.saveMetadata(csl, forItemId: itemId)
+                    await MainActor.run {
+                        self.importService.store.invalidate()
+                    }
+                } catch {
+                    Log.error(Log.server, "Failed to save scholarly metadata: \(error)")
+                }
             }
         }
     }
@@ -565,4 +626,26 @@ struct SnapshotPayload: Codable {
     let tagOptionIds: [String]? // optional — tag option UUIDs to assign
     let newTags: [String]?      // optional — tag names to create and assign
     let embedType: String?      // "youtube" | "twitter" | "link", nil → inferred from URL
+    let biblio: BiblioPayload?  // scholarly metadata from browser extension
+}
+
+// MARK: - Bibliographic Metadata
+
+struct BiblioPayload: Codable {
+    let doi: String?
+    let issn: String?
+    let isbn: String?
+    let journal: String?
+    let volume: String?
+    let issue: String?
+    let pages: String?
+    let publisher: String?
+    let year: Int?
+    let authors: [BiblioAuthor]?
+    let cslType: String?
+}
+
+struct BiblioAuthor: Codable {
+    let given: String?
+    let family: String?
 }

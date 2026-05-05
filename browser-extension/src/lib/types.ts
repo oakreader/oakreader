@@ -1,9 +1,12 @@
+import type { BiblioMetadata, ContentKind } from "./translators/types";
+
 /** Lightweight metadata returned instantly by content script (no SingleFile). */
 export interface PageMeta {
   type: "html" | "embed" | "pdf";
   url: string;
   title: string | null;
   favicon: string | null;
+  contentKind?: ContentKind;
 }
 
 /** Full page capture including HTML content. */
@@ -20,6 +23,7 @@ export interface PageCapture {
   description?: string | null;
   markdown?: string | null;
   embedType?: "youtube" | "twitter" | "link";
+  biblio?: BiblioMetadata;
 }
 
 /** Payload for saving a PDF by URL (no HTML capture needed). */

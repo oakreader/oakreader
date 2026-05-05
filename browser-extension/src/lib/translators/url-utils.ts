@@ -1,0 +1,114 @@
+/**
+ * Shared URL detection utilities — single source of truth for all URL-based detection.
+ */
+
+export function isYouTubeWatchURL(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return (
+      (u.hostname === "www.youtube.com" ||
+        u.hostname === "youtube.com" ||
+        u.hostname === "m.youtube.com") &&
+      u.pathname === "/watch" &&
+      u.searchParams.has("v")
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function isTwitterStatusURL(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return (
+      (u.hostname === "x.com" ||
+        u.hostname === "www.x.com" ||
+        u.hostname === "twitter.com" ||
+        u.hostname === "www.twitter.com" ||
+        u.hostname === "mobile.twitter.com") &&
+      /^\/[^/]+\/status\/\d+/.test(u.pathname)
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function isDOIURL(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return (
+      u.hostname === "doi.org" ||
+      u.hostname === "www.doi.org" ||
+      u.hostname === "dx.doi.org"
+    );
+  } catch {
+    return false;
+  }
+}
+
+const SCHOLARLY_DOMAINS = [
+  "arxiv.org",
+  "pubmed.ncbi.nlm.nih.gov",
+  "ncbi.nlm.nih.gov",
+  "scholar.google.com",
+  "jstor.org",
+  "springer.com",
+  "link.springer.com",
+  "nature.com",
+  "science.org",
+  "sciencedirect.com",
+  "ieeexplore.ieee.org",
+  "ieee.org",
+  "dl.acm.org",
+  "acm.org",
+  "wiley.com",
+  "onlinelibrary.wiley.com",
+  "tandfonline.com",
+  "sagepub.com",
+  "cambridge.org",
+  "oxford.org",
+  "academic.oup.com",
+  "oup.com",
+  "plos.org",
+  "journals.plos.org",
+  "biorxiv.org",
+  "medrxiv.org",
+  "ssrn.com",
+  "researchgate.net",
+  "frontiersin.org",
+  "mdpi.com",
+  "cell.com",
+  "thelancet.com",
+  "bmj.com",
+  "pnas.org",
+  "aps.org",
+  "aip.org",
+];
+
+export function isScholarlyDomain(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    return SCHOLARLY_DOMAINS.some(
+      (domain) => hostname === domain || hostname.endsWith("." + domain)
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function extractYouTubeVideoId(url: string): string | null {
+  try {
+    return new URL(url).searchParams.get("v");
+  } catch {
+    return null;
+  }
+}
+
+export function extractTwitterHandle(url: string): string {
+  try {
+    const pathname = new URL(url).pathname;
+    return pathname.split("/")[1] || "";
+  } catch {
+    return "";
+  }
+}
