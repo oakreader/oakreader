@@ -133,8 +133,6 @@ final class LibraryStore {
 
     private func evaluateCondition(_ condition: FilterCondition, against item: LibraryItem) -> Bool {
         switch condition.field {
-        case .isFavorite:
-            return matchBool(item.isFavorite, op: condition.op, value: condition.value)
         case .itemType:
             // Match if any attachment has the specified type
             let hasType = item.attachments.contains { $0.attachmentType.rawValue == condition.value }
@@ -143,6 +141,9 @@ final class LibraryStore {
             case .neq: return !hasType
             default: return matchString(item.itemType.rawValue, op: condition.op, value: condition.value)
             }
+        case .lastOpenedAt:
+            guard let date = item.lastOpenedAt else { return false }
+            return matchDate(date, op: condition.op, value: condition.value)
         case .createdAt:
             return matchDate(item.dateAdded, op: condition.op, value: condition.value)
         case .title:
@@ -151,15 +152,6 @@ final class LibraryStore {
             return matchString(item.author, op: condition.op, value: condition.value)
         case .property:
             return matchProperty(item, condition: condition)
-        }
-    }
-
-    private func matchBool(_ actual: Bool, op: FilterOperator, value: String) -> Bool {
-        let expected = (value == "true")
-        switch op {
-        case .eq: return actual == expected
-        case .neq: return actual != expected
-        default: return false
         }
     }
 
@@ -351,22 +343,6 @@ final class LibraryStore {
             revision += 1
         } catch {
             Log.error(Log.store, "removeItem failed: \(error)")
-        }
-    }
-
-    func toggleFavorite(_ item: LibraryItem) {
-        let newValue = !item.isFavorite
-        let now = Date().iso8601String
-        do {
-            try database.dbQueue.write { db in
-                try db.execute(
-                    sql: "UPDATE items SET is_favorite = ?, updated_at = ? WHERE id = ?",
-                    arguments: [newValue, now, item.id.uuidString]
-                )
-            }
-            revision += 1
-        } catch {
-            Log.error(Log.store, "toggleFavorite failed: \(error)")
         }
     }
 

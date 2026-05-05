@@ -82,6 +82,7 @@ struct LibrarySidebarView: View {
 
         return Button {
             store.selectCollection(collection.id)
+            appState.selectedLibraryItemIDs = []
             appState.switchToLibrary()
         } label: {
             HStack(spacing: 6) {
@@ -284,6 +285,7 @@ private struct CollectionRowView: View {
         VStack(spacing: 0) {
             Button {
                 store.selectCollection(collection.id)
+                appState.selectedLibraryItemIDs = []
                 appState.switchToLibrary()
             } label: {
                 HStack(spacing: 0) {
@@ -468,6 +470,7 @@ private struct TagNodeRowView: View {
             Button {
                 if let option = node.option {
                     store.selectTag(option.id)
+                    appState.selectedLibraryItemIDs = []
                     appState.switchToLibrary()
                 } else if hasChildren {
                     toggleExpand()

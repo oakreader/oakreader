@@ -36,6 +36,20 @@ struct Attachment: Identifiable, Hashable {
         CatalogDatabase.attachmentDirectory(itemStorageKey: itemStorageKey, attachmentStorageKey: storageKey)
     }
 
+    /// Icon name resolved from attachment type and source URL domain.
+    var icon: String {
+        if attachmentType == .embed, let host = sourceURL?.host?.lowercased() {
+            if host.contains("youtube.com") || host.contains("youtu.be") {
+                return "play.rectangle"
+            }
+            if host.contains("x.com") || host.contains("twitter.com") {
+                return "at"
+            }
+            return "link"
+        }
+        return attachmentType.icon
+    }
+
     /// Cover image URL for this attachment.
     var coverURL: URL {
         CatalogDatabase.attachmentCoverURL(itemStorageKey: itemStorageKey, attachmentStorageKey: storageKey)
@@ -65,7 +79,6 @@ struct LibraryItem: Identifiable, Hashable {
     var author: String
     var dateAdded: Date
     var lastOpenedAt: Date?
-    var isFavorite: Bool
     var syncStatus: SyncStatus
     var citeKey: String?
     var lastPosition: Double?
@@ -118,7 +131,6 @@ struct LibraryItem: Identifiable, Hashable {
         self.author = record.author
         self.dateAdded = Date(iso8601String: record.createdAt) ?? Date()
         self.lastOpenedAt = record.lastOpenedAt.flatMap { Date(iso8601String: $0) }
-        self.isFavorite = record.isFavorite
         self.syncStatus = SyncStatus(rawValue: record.syncStatus) ?? .local
         self.citeKey = record.citeKey
         self.lastPosition = record.lastPosition

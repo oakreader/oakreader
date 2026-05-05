@@ -85,7 +85,6 @@ final class ImportService {
             storageKey: itemStorageKey,
             title: title,
             author: author,
-            isFavorite: false,
             lastOpenedAt: nil,
             syncStatus: SyncStatus.local.rawValue,
             createdAt: now,
@@ -185,7 +184,6 @@ final class ImportService {
             storageKey: itemStorageKey,
             title: resolvedTitle,
             author: "",
-            isFavorite: false,
             lastOpenedAt: nil,
             syncStatus: SyncStatus.local.rawValue,
             createdAt: now,
@@ -296,7 +294,6 @@ final class ImportService {
             storageKey: itemStorageKey,
             title: title,
             author: author,
-            isFavorite: false,
             lastOpenedAt: nil,
             syncStatus: SyncStatus.local.rawValue,
             createdAt: now,
@@ -338,17 +335,29 @@ final class ImportService {
         try? referenceService.saveMetadata(csl, forItemId: docId.uuidString)
         store.invalidate()
 
-        // Auto-generate chapters only for YouTube embeds
+        // Auto-generate chapters and highlights for YouTube embeds
         if embedType == "youtube" {
             let hasTranscript = transcript != nil && !transcript!.isEmpty
             Task {
                 let service = ChapterGenerationService()
+                // Generate structural chapters (native YouTube or AI sections)
                 await service.run(
                     itemStorageKey: itemStorageKey,
                     attachmentStorageKey: attStorageKey,
                     sourceURL: sourceURL,
                     duration: duration,
-                    transcriptAlreadyExists: hasTranscript
+                    transcriptAlreadyExists: hasTranscript,
+                    mode: .chapters
+                )
+                // Generate AI highlights
+                await service.run(
+                    itemStorageKey: itemStorageKey,
+                    attachmentStorageKey: attStorageKey,
+                    sourceURL: sourceURL,
+                    duration: duration,
+                    transcriptAlreadyExists: hasTranscript,
+                    tryNativeChapters: false,
+                    mode: .highlights
                 )
             }
         }
@@ -441,6 +450,14 @@ final class ImportService {
             word-wrap: break-word;
             margin-bottom: 16px;
           }
+          .media {
+            margin-bottom: 16px;
+          }
+          .media img {
+            width: 100%;
+            border-radius: 12px;
+            display: block;
+          }
           .source {
             color: #71767b;
             font-size: 13px;
@@ -466,6 +483,7 @@ final class ImportService {
             </svg>
           </div>
           <div class="content">\(description)</div>
+          <div class="media"><img src="cover.webp" onerror="this.parentElement.style.display='none'"></div>
           <div class="source">
             <a href="\(sourceURL)">View on X</a>
           </div>

@@ -1,4 +1,5 @@
 import SwiftUI
+import OakReaderAI
 
 /// Resizable right panel content shown inside HSplitView.
 struct RightPanelContentView: View {
@@ -11,7 +12,10 @@ struct RightPanelContentView: View {
                 case .metadata:
                     ItemSidebarPanel(viewModel: viewModel)
                 case .aiChat:
-                    AIChatView(chatVM: viewModel.chat)
+                    AIChatView(
+                        chatVM: viewModel.chat,
+                        onSaveAssistantResponse: saveAssistantResponseAction
+                    )
                 case .notes:
                     if Preferences.shared.isPluginEnabled(.notes) {
                         NotePanelView(notesVM: viewModel.notes)
@@ -24,5 +28,13 @@ struct RightPanelContentView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private var saveAssistantResponseAction: ((ChatTurn) -> Bool)? {
+        Preferences.shared.isPluginEnabled(.notes) ? saveAssistantResponseToNote : nil
+    }
+
+    private func saveAssistantResponseToNote(_ turn: ChatTurn) -> Bool {
+        viewModel.notes.addChatResponseToNote(turn.content)
     }
 }

@@ -8,6 +8,21 @@ struct LibraryTableView: View {
 
     private var store: LibraryStore { appState.libraryStore }
 
+    private var isRecentlyRead: Bool {
+        store.selectedCollectionId == SystemCollectionID.recentlyRead
+    }
+
+    private var dateColumnTitle: String {
+        isRecentlyRead ? "Last Opened" : "Date Added"
+    }
+
+    private func dateColumnValue(for item: LibraryItem) -> Date {
+        if isRecentlyRead, let lastOpened = item.lastOpenedAt {
+            return lastOpened
+        }
+        return item.dateAdded
+    }
+
     var body: some View {
         let items = store.filteredItems
 
@@ -17,7 +32,7 @@ struct LibraryTableView: View {
             Table(of: LibraryItem.self, selection: $selection) {
                 TableColumn("Title") { item in
                     HStack(spacing: 7) {
-                        Image(systemName: item.primaryAttachment?.attachmentType.icon ?? "doc")
+                        Image(systemName: item.primaryAttachment?.icon ?? "doc")
                             .foregroundStyle(Color.primary.opacity(0.4))
                             .font(.system(size: 14))
                             .accessibilityLabel(item.primaryAttachment?.attachmentType.label ?? "Document")
@@ -26,12 +41,6 @@ struct LibraryTableView: View {
                             .font(.system(size: 14))
                             .lineLimit(1)
 
-                        if item.isFavorite {
-                            Image(systemName: "star.fill")
-                                .foregroundStyle(Color(hex: "FAA700"))
-                                .font(.system(size: 11))
-                                .accessibilityLabel("Favorite")
-                        }
                     }
                 }
                 .width(min: 150, ideal: 300)
@@ -44,8 +53,8 @@ struct LibraryTableView: View {
                 }
                 .width(min: 80, ideal: 150)
 
-                TableColumn("Date Added") { item in
-                    Text(item.dateAdded, style: .date)
+                TableColumn(dateColumnTitle) { item in
+                    Text(dateColumnValue(for: item), style: .date)
                         .font(.system(size: 13))
                         .foregroundStyle(Color.primary.opacity(0.55))
                 }
@@ -123,10 +132,6 @@ struct LibraryTableView: View {
 
             Divider()
 
-            Button(item.isFavorite ? "Remove from Favorites" : "Add to Favorites") {
-                store.toggleFavorite(item)
-            }
-
             let rootCollections = store.rootCollections.sorted(by: { $0.sortOrder < $1.sortOrder })
             if !rootCollections.isEmpty {
                 Menu("Add to Collection") {
@@ -150,13 +155,9 @@ struct LibraryTableView: View {
                                     store.setItemSelectValue(item: item, property: property, option: option)
                                 }
                             } label: {
-                                Label {
-                                    Text(option.name)
-                                } icon: {
-                                    Image(systemName: isAssigned ? "checkmark.circle.fill" : "circle.fill")
-                                        .foregroundStyle(Color(hex: option.colorHex))
-                                }
+                                Label(option.name, systemImage: isAssigned ? "checkmark.circle.fill" : "circle.fill")
                             }
+                            .tint(Color(hex: option.colorHex))
                         }
                     }
                 }
