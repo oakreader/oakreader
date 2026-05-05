@@ -151,14 +151,14 @@ struct YouTubeSettingsView: View {
         }
     }
 
-    // MARK: - Section 2: AI Chapter Generation
+    // MARK: - Section 2: AI Highlight Generation
 
     private var aiChapterSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("AI Chapter Generation")
+            Text("AI Highlight Generation")
                 .font(.system(size: 13, weight: .bold))
 
-            Text("Select the AI provider and model used to generate video chapter outlines from transcripts.")
+            Text("Select the AI provider and model used to find video highlights from transcripts.")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
 
@@ -233,14 +233,14 @@ struct YouTubeSettingsView: View {
         }
     }
 
-    // MARK: - Section 3: Chapter Prompt
+    // MARK: - Section 3: Highlight Prompt
 
     private var chapterPromptSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Chapter Generation Prompt")
+            Text("Highlight Generation Prompt")
                 .font(.system(size: 13, weight: .bold))
 
-            Text("The system prompt sent to the AI model. Edit to customize chapter output.")
+            Text("The system prompt sent to the AI model. Edit to customize highlight output.")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
 
@@ -539,7 +539,7 @@ struct YouTubeSettingsView: View {
         if !fm.fileExists(atPath: url.path) {
             let dir = url.deletingLastPathComponent()
             try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
-            try? ChapterGenerationService.defaultChapterPrompt.write(to: url, atomically: true, encoding: .utf8)
+            try? ChapterGenerationService.defaultHighlightPrompt.write(to: url, atomically: true, encoding: .utf8)
             loadPromptPreview()
         }
 

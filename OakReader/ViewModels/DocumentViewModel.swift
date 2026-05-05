@@ -92,6 +92,14 @@ class DocumentViewModel {
         return vm
     }
 
+    private var _media: MediaViewModel?
+    var media: MediaViewModel {
+        if let vm = _media { return vm }
+        let vm = MediaViewModel(parent: self)
+        _media = vm
+        return vm
+    }
+
     /// The item-level storage key, set externally by AppState when creating the tab.
     var itemStorageKey: String?
 
@@ -126,6 +134,10 @@ class DocumentViewModel {
         case .webSnapshot: return webSnapshot != nil
         case .embed: return mediaDocument != nil
         }
+    }
+
+    var usesMediaSidebar: Bool {
+        itemType == .embed && mediaDocument?.metadata.resolvedEmbedType == .youtube
     }
 
     var fileName: String {
@@ -175,7 +187,8 @@ class DocumentViewModel {
         self.mediaDocument = media
         self.itemType = .embed
         self.state = DocumentState()
-        state.isSidebarVisible = false
+        state.isSidebarVisible = media.metadata.resolvedEmbedType == .youtube
+        state.mediaSidebarMode = .outline
     }
 
     // MARK: - Action Handling (called directly by AppState)
@@ -205,7 +218,11 @@ class DocumentViewModel {
         case .displayTwoUpContinuous:
             viewer.setDisplayMode(.twoUpContinuous)
         case .find:
-            state.sidebarMode = .search
+            if usesMediaSidebar {
+                state.mediaSidebarMode = .transcript
+            } else {
+                state.sidebarMode = .search
+            }
             state.isSidebarVisible = true
         case .accessibilityCheck:
             Task { @MainActor in
