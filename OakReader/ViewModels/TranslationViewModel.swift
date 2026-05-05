@@ -76,6 +76,8 @@ class TranslationViewModel {
                     switch chunk {
                     case .delta(let delta):
                         translatedText += delta
+                    case .toolUse:
+                        break
                     case .finished:
                         break
                     case .error(let msg):

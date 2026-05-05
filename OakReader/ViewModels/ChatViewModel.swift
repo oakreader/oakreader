@@ -33,11 +33,15 @@ class ChatViewModel {
     private var streamTask: Task<Void, Never>?
     /// Whether a DB record has been created for the current session.
     private var sessionRecordCreated: Bool = false
+    /// Sandboxed tool executor for AI agent tool use.
+    private var toolExecutor: ToolExecutor?
 
     init(parent: DocumentViewModel, documentStoragePath: URL? = nil) {
         self.parent = parent
         if let path = documentStoragePath {
             self.engine = ChatEngine(documentStoragePath: path)
+            // Sandbox tool access to the document storage directory
+            self.toolExecutor = ToolExecutor(allowedPaths: [path])
         } else {
             self.engine = ChatEngine()
         }
@@ -87,6 +91,8 @@ class ChatViewModel {
         let currentConfig = config
         let currentSkill = selectedSkill
 
+        let currentToolExecutor = toolExecutor
+
         streamTask = Task { @MainActor in
             do {
                 let stream = await engine.send(
@@ -96,7 +102,8 @@ class ChatViewModel {
                     sessionId: currentSessionId,
                     config: currentConfig,
                     skill: currentSkill,
-                    pdfContext: pdfContext
+                    pdfContext: pdfContext,
+                    toolExecutor: currentToolExecutor
                 )
 
                 var assistantTurnId: UUID?
@@ -120,6 +127,21 @@ class ChatViewModel {
                             turns.append(newTurn)
                         }
 
+                    case .toolUseStarted(let record):
+                        if let id = assistantTurnId,
+                           let idx = turns.lastIndex(where: { $0.id == id })
+                        {
+                            turns[idx].toolUses.append(record)
+                        }
+
+                    case .toolUseCompleted(let record):
+                        if let id = assistantTurnId,
+                           let idx = turns.lastIndex(where: { $0.id == id }),
+                           let toolIdx = turns[idx].toolUses.firstIndex(where: { $0.id == record.id })
+                        {
+                            turns[idx].toolUses[toolIdx] = record
+                        }
+
                     case .finished(let turn):
                         if turn.role == .user {
                             turns.append(turn)
@@ -128,10 +150,21 @@ class ChatViewModel {
                         {
                             turns[idx].content = turn.content
                             turns[idx].isStreaming = false
+                            turns[idx].toolUses = turn.toolUses
+
+                            // If this turn had tool uses, reset assistantTurnId
+                            // so the next loop iteration creates a new bubble
+                            if !turn.toolUses.isEmpty {
+                                assistantTurnId = nil
+                            }
                         } else {
                             var finalTurn = turn
                             finalTurn.isStreaming = false
                             turns.append(finalTurn)
+
+                            if !turn.toolUses.isEmpty {
+                                assistantTurnId = nil
+                            }
                         }
 
                     case .error(let error):
