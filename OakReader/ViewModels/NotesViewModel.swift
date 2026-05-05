@@ -216,7 +216,7 @@ class NotesViewModel {
 
     /// Add quoted text with a `[[@key, p.N]]` or `[[Page X]]` reference to the current (or new) note.
     func addTextToNote(_ text: String, pageIndex: Int?, source: String = "PDF") {
-        ensureNoteSelected()
+        guard ensureNoteSelected() else { return }
         let ref = buildReference(pageIndex: pageIndex, source: source)
         let snippet = "\n\n> \(text.replacingOccurrences(of: "\n", with: "\n> "))\n>\n> — \(ref)\n"
         appendToEditor(snippet)
@@ -224,11 +224,22 @@ class NotesViewModel {
 
     /// Add an image attachment with a `[[@key, p.N]]` or `[[Page X]]` reference to the current (or new) note.
     func addImageToNote(_ data: Data, pageIndex: Int?, source: String = "PDF", fileExtension: String = "png") {
-        ensureNoteSelected()
+        guard ensureNoteSelected() else { return }
         guard let relativePath = saveImage(data, fileExtension: fileExtension) else { return }
         let ref = buildReference(pageIndex: pageIndex, source: source)
         let snippet = "\n\n![capture](\(relativePath))\n\n— \(ref)\n"
         appendToEditor(snippet)
+    }
+
+    /// Save an assistant response to the current (or first available) note, preserving markdown.
+    @discardableResult
+    func addChatResponseToNote(_ response: String) -> Bool {
+        let content = response.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !content.isEmpty, ensureNoteSelected() else { return false }
+
+        let snippet = "\n\n### AI Response\n\n\(content)\n"
+        appendToEditor(snippet, saveImmediately: true)
+        return true
     }
 
     /// Build a `[[@key, p.N]]` or `[[Page N]]` reference string.
@@ -247,7 +258,8 @@ class NotesViewModel {
     }
 
     /// If no note is selected, create one and select it.
-    private func ensureNoteSelected() {
+    @discardableResult
+    private func ensureNoteSelected() -> Bool {
         if selectedNoteId == nil {
             if let first = notes.first {
                 selectNote(first)
@@ -255,11 +267,16 @@ class NotesViewModel {
                 createNote()
             }
         }
+        return selectedNoteId != nil
     }
 
     /// Append text to the current editor content.
-    private func appendToEditor(_ text: String) {
+    private func appendToEditor(_ text: String, saveImmediately: Bool = false) {
         editorContentDidChange(editorContent + text)
+        if saveImmediately {
+            saveTask?.cancel()
+            saveCurrentNoteIfNeeded()
+        }
     }
 
     // MARK: - Reference Navigation

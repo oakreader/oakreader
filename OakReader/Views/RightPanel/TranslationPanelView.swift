@@ -6,13 +6,10 @@ struct TranslationPanelView: View {
     var body: some View {
         VStack(spacing: 0) {
             headerBar
-            Divider()
             languageBar
-            Divider()
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     sourceSection
-                    Divider()
                     targetSection
                 }
                 .padding(12)
@@ -25,7 +22,7 @@ struct TranslationPanelView: View {
     private var headerBar: some View {
         HStack {
             Text("Translation")
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 16, weight: .semibold))
             Spacer()
             if translationVM.isTranslating {
                 Button {
@@ -124,7 +121,7 @@ struct TranslationPanelView: View {
                     }
                 }
                 .disabled(translationVM.sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || translationVM.isTranslating)
-                .controlSize(.small)
+                .controlSize(.regular)
             }
         }
     }

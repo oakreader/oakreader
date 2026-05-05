@@ -124,7 +124,6 @@ final class MigrationService {
             storageKey: itemStorageKey,
             title: item.title,
             author: item.author,
-            isFavorite: item.isFavorite,
             lastOpenedAt: item.lastOpenedAt.map { $0.iso8601String },
             syncStatus: SyncStatus.local.rawValue,
             createdAt: item.dateAdded.iso8601String,
@@ -233,7 +232,6 @@ private class OldSQLiteReader {
                 lastOpenedAt: dateColumn(stmt, col: 7),
                 pageCount: Int(sqlite3_column_int(stmt, 8)),
                 fileSize: sqlite3_column_int64(stmt, 9),
-                isFavorite: sqlite3_column_int(stmt, 10) != 0,
                 coverImageData: blobColumn(stmt, col: 11)
             )
             results.append(item)
@@ -277,6 +275,5 @@ private struct OldLibraryItem {
     let lastOpenedAt: Date?
     let pageCount: Int
     let fileSize: Int64
-    let isFavorite: Bool
     let coverImageData: Data?
 }

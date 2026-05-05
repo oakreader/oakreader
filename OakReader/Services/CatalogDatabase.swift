@@ -238,11 +238,13 @@ final class CatalogDatabase {
                  #"{"match":"all","conditions":[]}"#),
                 (SystemCollectionID.recent.uuidString, "Recently Added", "clock", 1,
                  #"{"match":"all","conditions":[{"field":"created_at","op":"within_days","value":"7"}]}"#),
-                (SystemCollectionID.pdfs.uuidString, "PDFs", "doc.fill", 2,
+                (SystemCollectionID.recentlyRead.uuidString, "Recently Read", "book", 2,
+                 #"{"match":"all","conditions":[{"field":"last_opened_at","op":"within_days","value":"14"}]}"#),
+                (SystemCollectionID.pdfs.uuidString, "PDFs", "doc.fill", 3,
                  #"{"match":"all","conditions":[{"field":"item_type","op":"eq","value":"pdf"}]}"#),
-                (SystemCollectionID.webSnapshots.uuidString, "Web", "globe", 3,
+                (SystemCollectionID.webSnapshots.uuidString, "Web", "globe", 4,
                  #"{"match":"all","conditions":[{"field":"item_type","op":"eq","value":"webSnapshot"}]}"#),
-                (SystemCollectionID.videos.uuidString, "Videos", "play.rectangle", 4,
+                (SystemCollectionID.videos.uuidString, "Videos", "play.rectangle", 5,
                  #"{"match":"all","conditions":[{"field":"item_type","op":"eq","value":"embed"}]}"#),
             ]
             for sc in systemCollections {
@@ -272,6 +274,28 @@ final class CatalogDatabase {
                 ("00000000-0000-0000-0000-000000000005", 2), // PDFs
                 ("00000000-0000-0000-0000-000000000006", 3), // Web
                 ("00000000-0000-0000-0000-000000000007", 4), // Videos
+            ]
+            for entry in reorder {
+                try db.execute(
+                    sql: "UPDATE collections SET sort_order = ? WHERE id = ?",
+                    arguments: [entry.order, entry.id]
+                )
+            }
+        }
+
+        migrator.registerMigration("v3-recently-read") { db in
+            let now = Date().iso8601String
+            let rules = #"{"match":"all","conditions":[{"field":"last_opened_at","op":"within_days","value":"14"}]}"#
+            try db.execute(sql: """
+                INSERT OR IGNORE INTO collections (id, user_id, name, icon, sort_order, parent_id, is_smart, is_system, filter_rules, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, NULL, 1, 1, ?, ?, ?)
+            """, arguments: [SystemCollectionID.recentlyRead.uuidString, localUserId, "Recently Read", "book", 2, rules, now, now])
+
+            // Shift sort orders for collections after Recently Read
+            let reorder: [(id: String, order: Int)] = [
+                (SystemCollectionID.pdfs.uuidString, 3),
+                (SystemCollectionID.webSnapshots.uuidString, 4),
+                (SystemCollectionID.videos.uuidString, 5),
             ]
             for entry in reorder {
                 try db.execute(
@@ -357,6 +381,12 @@ final class CatalogDatabase {
     static func attachmentChaptersURL(itemStorageKey: String, attachmentStorageKey: String) -> URL {
         attachmentDirectory(itemStorageKey: itemStorageKey, attachmentStorageKey: attachmentStorageKey)
             .appendingPathComponent("chapters.json")
+    }
+
+    /// Highlights JSON URL for an embed attachment.
+    static func attachmentHighlightsURL(itemStorageKey: String, attachmentStorageKey: String) -> URL {
+        attachmentDirectory(itemStorageKey: itemStorageKey, attachmentStorageKey: attachmentStorageKey)
+            .appendingPathComponent("highlights.json")
     }
 }
 

@@ -11,7 +11,6 @@ struct ItemRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable 
     var storageKey: String
     var title: String
     var author: String
-    var isFavorite: Bool
     var lastOpenedAt: String?
     var syncStatus: String
     var createdAt: String
@@ -24,7 +23,6 @@ struct ItemRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable 
         case userId = "user_id"
         case storageKey = "storage_key"
         case title, author
-        case isFavorite = "is_favorite"
         case lastOpenedAt = "last_opened_at"
         case syncStatus = "sync_status"
         case createdAt = "created_at"

@@ -104,7 +104,7 @@ struct SmartCollectionEditorSheet: View {
                 Text("Title").tag(FilterField.title)
                 Text("Author").tag(FilterField.author)
                 Text("Type").tag(FilterField.itemType)
-                Text("Favorite").tag(FilterField.isFavorite)
+                Text("Last Opened").tag(FilterField.lastOpenedAt)
                 Text("Date Added").tag(FilterField.createdAt)
                 Text("Property").tag(FilterField.property)
             }
@@ -135,10 +135,10 @@ struct SmartCollectionEditorSheet: View {
 
     private func operatorsForField(_ field: FilterField) -> [FilterOperator] {
         switch field {
-        case .isFavorite:
-            return [.eq, .neq]
         case .itemType:
             return [.eq, .neq]
+        case .lastOpenedAt:
+            return [.withinDays]
         case .title, .author:
             return [.eq, .neq, .contains]
         case .createdAt:
