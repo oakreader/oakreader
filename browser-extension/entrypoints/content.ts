@@ -1,12 +1,20 @@
 import { Readability } from "@mozilla/readability";
 import TurndownService from "turndown";
 import { defineContentScript } from "wxt/utils/define-content-script";
+import {
+  getTranslator,
+  detectContentKind,
+  contentKindToPageType,
+  extractLinkMetadata,
+} from "@/src/lib/translators";
+import type { TranslatorResult } from "@/src/lib/translators";
 
 interface PageMeta {
   type: "html" | "embed" | "pdf";
   url: string;
   title: string | null;
   favicon: string | null;
+  contentKind?: string;
 }
 
 interface PageCapture {
@@ -21,6 +29,8 @@ interface PageCapture {
   transcript?: string | null;
   description?: string | null;
   markdown?: string | null;
+  embedType?: string;
+  biblio?: Record<string, unknown>;
 }
 
 // ─── Background Fetch Plumbing ──────────────────────────────────────────────────
@@ -80,44 +90,7 @@ function enqueueBgFetch<T>(fn: () => Promise<T>): Promise<T> {
   });
 }
 
-// ─── Page Type Detection ────────────────────────────────────────────────────────
-
-function isTwitterURL(url: string): boolean {
-  try {
-    const u = new URL(url);
-    return (
-      (u.hostname === "x.com" ||
-        u.hostname === "www.x.com" ||
-        u.hostname === "twitter.com" ||
-        u.hostname === "www.twitter.com" ||
-        u.hostname === "mobile.twitter.com") &&
-      /^\/[^/]+\/status\/\d+/.test(u.pathname)
-    );
-  } catch {
-    return false;
-  }
-}
-
-function detectPageType(url: string): "html" | "embed" {
-  try {
-    const u = new URL(url);
-    if (
-      (u.hostname === "www.youtube.com" ||
-        u.hostname === "youtube.com" ||
-        u.hostname === "m.youtube.com") &&
-      u.pathname === "/watch" &&
-      u.searchParams.has("v")
-    ) {
-      return "embed";
-    }
-  } catch {
-    // ignore
-  }
-  if (isTwitterURL(url)) {
-    return "embed";
-  }
-  return "html";
-}
+// ─── Page Meta ──────────────────────────────────────────────────────────────────
 
 function getFavicon(): string | null {
   const link =
@@ -147,11 +120,13 @@ function getPageMeta(): PageMeta {
     };
   }
 
+  const kind = detectContentKind(location.href);
   return {
-    type: detectPageType(location.href),
+    type: contentKindToPageType(kind),
     url: location.href,
     title: document.title || null,
     favicon: getFavicon(),
+    contentKind: kind,
   };
 }
 
@@ -350,10 +325,7 @@ function extractMarkdown(): string | null {
 
 // ─── SingleFile Capture ─────────────────────────────────────────────────────────
 
-async function extractWebPageWithSingleFile(): Promise<PageCapture> {
-  // Extract markdown BEFORE SingleFile (which mutates the DOM)
-  const markdown = extractMarkdown();
-
+async function captureWithSingleFile(): Promise<string> {
   try {
     // Wait briefly for lazy images triggered by page-hooks IntersectionObserver
     await new Promise((r) => setTimeout(r, 300));
@@ -398,158 +370,77 @@ async function extractWebPageWithSingleFile(): Promise<PageCapture> {
       { fetch: singleFileFetch }
     );
 
-    return {
-      type: "html",
-      url: location.href,
-      title: document.title || location.href,
-      html: pageData.content as string,
-      markdown,
-    };
+    return pageData.content as string;
   } catch (error) {
     console.warn("SingleFile capture failed, falling back to raw HTML:", error);
-    return {
-      type: "html",
-      url: location.href,
-      title: document.title || location.href,
-      html: document.documentElement.outerHTML,
-      markdown,
-    };
+    return document.documentElement.outerHTML;
   }
 }
 
-// ─── YouTube Extraction ─────────────────────────────────────────────────────────
+// ─── Translator → Legacy Payload Bridge ─────────────────────────────────────────
 
-function extractYouTube(): PageCapture {
-  const url = new URL(location.href);
-  const videoId = url.searchParams.get("v");
+function toLegacyPayload(result: TranslatorResult): PageCapture {
+  switch (result.kind) {
+    case "youtube":
+      return {
+        type: "embed",
+        url: result.url,
+        title: result.title,
+        author: result.author,
+        videoId: result.videoId,
+        duration: result.duration,
+        thumbnailURL: result.thumbnailURL,
+        transcript: result.transcript,
+      };
 
-  const title =
-    document.querySelector<HTMLMetaElement>('meta[name="title"]')?.content ??
-    document.querySelector("h1.ytd-watch-metadata yt-formatted-string")
-      ?.textContent ??
-    document.title;
+    case "twitter":
+      return {
+        type: "embed",
+        url: result.url,
+        title: result.title,
+        author: result.author,
+        description: result.description,
+        thumbnailURL: result.thumbnailURL,
+        embedType: "twitter",
+      };
 
-  const author =
-    document
-      .querySelector("#owner #channel-name a")
-      ?.textContent?.trim() ??
-    document.querySelector<HTMLLinkElement>('link[itemprop="name"]')?.content ??
-    null;
+    case "link":
+      return {
+        type: "embed",
+        url: result.url,
+        title: result.title,
+        author: result.author,
+        description: result.description,
+        thumbnailURL: result.thumbnailURL,
+        embedType: "link",
+      };
 
-  let duration: number | null = null;
-  const durationMeta = document.querySelector<HTMLMetaElement>(
-    'meta[itemprop="duration"]'
-  )?.content;
-  if (durationMeta) {
-    const match = durationMeta.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
-    if (match) {
-      duration =
-        (parseInt(match[1] || "0") * 3600) +
-        (parseInt(match[2] || "0") * 60) +
-        parseInt(match[3] || "0");
-    }
+    case "scholarly":
+      return {
+        type: "html",
+        url: result.url,
+        title: result.title,
+        author: result.author,
+        description: result.description,
+        thumbnailURL: result.thumbnailURL,
+        html: result.html,
+        markdown: result.markdown,
+        biblio: result.biblio as unknown as Record<string, unknown>,
+      };
+
+    case "webpage":
+    default:
+      return {
+        type: "html",
+        url: result.url,
+        title: result.title,
+        author: result.author,
+        description: result.description,
+        thumbnailURL: result.thumbnailURL,
+        html: result.html,
+        markdown: result.markdown,
+      };
   }
-
-  const thumbnailURL = videoId
-    ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
-    : null;
-
-  let transcript: string | null = null;
-  try {
-    const segments = document.querySelectorAll(
-      "ytd-transcript-segment-renderer"
-    );
-    if (segments.length > 0) {
-      transcript = Array.from(segments)
-        .map((seg) => {
-          const time =
-            seg.querySelector(".segment-timestamp")?.textContent?.trim() ?? "";
-          const text =
-            seg.querySelector(".segment-text")?.textContent?.trim() ?? "";
-          return `[${time}] ${text}`;
-        })
-        .join("\n");
-    }
-  } catch {
-    // best-effort
-  }
-
-  return {
-    type: "embed",
-    url: location.href,
-    title,
-    author,
-    videoId,
-    duration,
-    thumbnailURL,
-    transcript,
-  };
-}
-
-// ─── Twitter/X Extraction ────────────────────────────────────────────────────
-
-function extractTweet(): PageCapture {
-  const url = new URL(location.href);
-  const handle = url.pathname.split("/")[1] || "";
-
-  // Author from og:title — format is typically "Author Name on X: ..."
-  const ogTitle =
-    document.querySelector<HTMLMetaElement>('meta[property="og:title"]')?.content ?? "";
-  const authorName = ogTitle.includes(" on X:")
-    ? ogTitle.split(" on X:")[0].trim()
-    : ogTitle.includes(" on Twitter:")
-      ? ogTitle.split(" on Twitter:")[0].trim()
-      : handle;
-
-  // Tweet text — prefer DOM (most reliable), fall back to meta tags
-  const tweetTextEl = document.querySelector('[data-testid="tweetText"]');
-  const description =
-    tweetTextEl?.textContent?.trim() ||
-    document.querySelector<HTMLMetaElement>('meta[property="og:description"]')?.content ||
-    document.querySelector<HTMLMetaElement>('meta[name="description"]')?.content ||
-    null;
-
-  // Thumbnail
-  const thumbnailURL =
-    document.querySelector<HTMLMetaElement>('meta[property="og:image"]')?.content ?? null;
-
-  const title = authorName || document.title || `@${handle} post`;
-
-  return {
-    type: "embed",
-    url: location.href,
-    title,
-    author: `@${handle}`,
-    description,
-    thumbnailURL,
-    embedType: "twitter",
-  };
-}
-
-// ─── Generic Link Metadata Extraction ────────────────────────────────────────
-
-function extractLinkMeta(): PageCapture {
-  const title = document.title || location.href;
-  const description =
-    document.querySelector<HTMLMetaElement>('meta[name="description"]')?.content ??
-    document.querySelector<HTMLMetaElement>('meta[property="og:description"]')?.content ??
-    null;
-  const thumbnailURL =
-    document.querySelector<HTMLMetaElement>('meta[property="og:image"]')?.content ?? null;
-  const author =
-    document.querySelector<HTMLMetaElement>('meta[name="author"]')?.content ??
-    document.querySelector<HTMLMetaElement>('meta[property="og:site_name"]')?.content ??
-    null;
-
-  return {
-    type: "embed",
-    url: location.href,
-    title,
-    author,
-    description,
-    thumbnailURL,
-    embedType: "link",
-  };
 }
 
 // ─── Content Script Entry ───────────────────────────────────────────────────────
@@ -601,18 +492,28 @@ export default defineContentScript({
       }
 
       if (request.action === "extractLinkMeta") {
-        sendResponse(extractLinkMeta());
+        const result = extractLinkMetadata(document, location.href);
+        sendResponse(toLegacyPayload(result));
         return true;
       }
 
-      if (request.action === "capturePageHTML") {
-        const pageType = detectPageType(location.href);
+      if (request.action === "capturePageHTML" || request.action === "getPageData") {
+        const translator = getTranslator(location.href);
 
-        if (pageType === "html") {
+        if (translator.contentKind === "webpage" || translator.contentKind === "scholarly") {
+          // HTML-based pages: extract markdown first, then SingleFile capture, then translator metadata
           const timeout = new Promise<PageCapture>((_, reject) =>
             setTimeout(() => reject(new Error("extraction timeout")), 15000)
           );
-          Promise.race([extractWebPageWithSingleFile(), timeout])
+
+          const capturePromise = (async (): Promise<PageCapture> => {
+            const markdown = extractMarkdown();
+            const html = await captureWithSingleFile();
+            const result = await translator.extract(document, location.href);
+            return toLegacyPayload({ ...result, html, markdown });
+          })();
+
+          Promise.race([capturePromise, timeout])
             .catch(() => ({
               type: "html" as const,
               url: location.href,
@@ -623,40 +524,12 @@ export default defineContentScript({
           return true;
         }
 
-        if (isTwitterURL(location.href)) {
-          sendResponse(extractTweet());
-        } else {
-          sendResponse(extractYouTube());
-        }
+        // Embed types (YouTube, Twitter): no SingleFile needed
+        translator.extract(document, location.href)
+          .then((result) => sendResponse(toLegacyPayload(result)));
         return true;
       }
 
-      // Legacy fallback
-      if (request.action === "getPageData") {
-        const pageType = detectPageType(location.href);
-
-        if (pageType === "html") {
-          const timeout = new Promise<PageCapture>((_, reject) =>
-            setTimeout(() => reject(new Error("extraction timeout")), 15000)
-          );
-          Promise.race([extractWebPageWithSingleFile(), timeout])
-            .catch(() => ({
-              type: "html" as const,
-              url: location.href,
-              title: document.title || location.href,
-              html: document.documentElement.outerHTML,
-            }))
-            .then(sendResponse);
-          return true;
-        }
-
-        if (isTwitterURL(location.href)) {
-          sendResponse(extractTweet());
-        } else {
-          sendResponse(extractYouTube());
-        }
-        return true;
-      }
       // Don't return true for unhandled messages (e.g. singlefile.fetchResponse) —
       // returning true holds the sendResponse port open, which causes
       // chrome.tabs.sendMessage in the background to hang indefinitely.

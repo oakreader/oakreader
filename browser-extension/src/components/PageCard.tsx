@@ -1,4 +1,5 @@
 import type { PageMeta } from "@/src/lib/types";
+import { detectContentKind, contentKindToLabel } from "@/src/lib/translators";
 
 interface PageCardProps {
   pageMeta: PageMeta;
@@ -12,47 +13,16 @@ function getDomain(url: string): string {
   }
 }
 
-function isTwitterURL(url: string): boolean {
-  try {
-    const u = new URL(url);
-    return (
-      (u.hostname === "x.com" ||
-        u.hostname === "www.x.com" ||
-        u.hostname === "twitter.com" ||
-        u.hostname === "www.twitter.com" ||
-        u.hostname === "mobile.twitter.com") &&
-      /^\/[^/]+\/status\/\d+/.test(u.pathname)
-    );
-  } catch {
-    return false;
-  }
-}
-
-function isYouTubeURL(url: string): boolean {
-  try {
-    const u = new URL(url);
-    return (
-      (u.hostname === "www.youtube.com" ||
-        u.hostname === "youtube.com" ||
-        u.hostname === "m.youtube.com") &&
-      u.pathname === "/watch" &&
-      u.searchParams.has("v")
-    );
-  } catch {
-    return false;
-  }
-}
-
 function getTypeLabel(type: string, url: string): string {
   switch (type) {
-    case "embed":
-      if (isTwitterURL(url)) return "Post";
-      if (isYouTubeURL(url)) return "Video";
-      return "Link";
     case "pdf":
       return "PDF Document";
+    case "embed": {
+      const kind = detectContentKind(url);
+      return contentKindToLabel(kind);
+    }
     default:
-      return "Web Page";
+      return contentKindToLabel(detectContentKind(url));
   }
 }
 
