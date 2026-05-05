@@ -29,6 +29,8 @@ struct CLIChatRunner {
             case .delta(let text):
                 print(text, terminator: "")
                 fflush(stdout)
+            case .toolUseStarted, .toolUseCompleted:
+                break
             case .finished(let turn):
                 if turn.role == .assistant && turn.content.isEmpty == false {
                     // Delta already printed the content
@@ -91,6 +93,8 @@ struct CLIChatRunner {
                     case .delta(let text):
                         print(text, terminator: "")
                         fflush(stdout)
+                    case .toolUseStarted, .toolUseCompleted:
+                        break
                     case .finished(let turn):
                         if turn.role == .user {
                             history.append(turn)
