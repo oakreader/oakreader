@@ -4,10 +4,14 @@ import Textual
 
 struct ChatBubbleView: View {
     let turn: ChatTurn
+    var onSaveToNote: ((ChatTurn) -> Bool)?
 
     @State private var isHovered = false
     @State private var isCopyHovered = false
+    @State private var isSaveHovered = false
     @State private var showCopied = false
+    @State private var showSaved = false
+    @State private var showSaveFailed = false
     @State private var reveal = StreamRevealController()
 
     var body: some View {
@@ -33,6 +37,13 @@ struct ChatBubbleView: View {
                         FannedAttachmentStack(attachments: turn.attachments)
                     }
 
+                    // Tool call cards for assistant messages
+                    if turn.role == .assistant && !turn.toolUses.isEmpty {
+                        ForEach(turn.toolUses) { record in
+                            ToolCallCardView(record: record)
+                        }
+                    }
+
                     // Message content
                     messageBubble
 
@@ -54,29 +65,40 @@ struct ChatBubbleView: View {
                         }
                     }
 
-                    // Copy button — always visible after response is done
+                    // Actions — always visible after response is done
                     if !turn.isStreaming && turn.role == .assistant {
-                        Button(action: {
-                            copyContent()
-                            showCopied = true
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                                showCopied = false
+                        HStack(spacing: 2) {
+                            actionButton(
+                                systemImage: showCopied ? "checkmark" : "doc.on.doc",
+                                foregroundStyle: showCopied ? .green : .secondary,
+                                isHovered: isCopyHovered,
+                                tooltip: showCopied ? "Copied!" : "Copy"
+                            ) {
+                                copyContent()
+                                showCopied = true
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                                    showCopied = false
+                                }
                             }
-                        }) {
-                            Image(systemName: showCopied ? "checkmark" : "doc.on.doc")
-                                .font(.system(size: 12))
-                                .foregroundStyle(showCopied ? .green : .secondary)
-                                .frame(width: 24, height: 24)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .fill(isCopyHovered ? Color.primary.opacity(0.08) : Color.clear)
-                                )
+                            .onHover { isCopyHovered = $0 }
+                            .animation(.easeInOut(duration: 0.15), value: showCopied)
+                            .animation(.easeInOut(duration: 0.15), value: isCopyHovered)
+
+                            if onSaveToNote != nil {
+                                actionButton(
+                                    systemImage: saveIcon,
+                                    foregroundStyle: saveColor,
+                                    isHovered: isSaveHovered,
+                                    tooltip: saveTooltip
+                                ) {
+                                    saveToNote()
+                                }
+                                .onHover { isSaveHovered = $0 }
+                                .animation(.easeInOut(duration: 0.15), value: showSaved)
+                                .animation(.easeInOut(duration: 0.15), value: showSaveFailed)
+                                .animation(.easeInOut(duration: 0.15), value: isSaveHovered)
+                            }
                         }
-                        .buttonStyle(.plain)
-                        .onHover { isCopyHovered = $0 }
-                        .help(showCopied ? "Copied!" : "Copy")
-                        .animation(.easeInOut(duration: 0.15), value: showCopied)
-                        .animation(.easeInOut(duration: 0.15), value: isCopyHovered)
                     }
                 }
 
@@ -150,9 +172,63 @@ struct ChatBubbleView: View {
         }
     }
 
+    private var saveIcon: String {
+        if showSaved { return "checkmark" }
+        if showSaveFailed { return "exclamationmark.triangle" }
+        return "note.text.badge.plus"
+    }
+
+    private var saveColor: Color {
+        if showSaved { return .green }
+        if showSaveFailed { return .red }
+        return .secondary
+    }
+
+    private var saveTooltip: String {
+        if showSaved { return "Saved to Note" }
+        if showSaveFailed { return "Could Not Save" }
+        return "Save to Note"
+    }
+
+    private func actionButton(
+        systemImage: String,
+        foregroundStyle: Color,
+        isHovered: Bool,
+        tooltip: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 12))
+                .foregroundStyle(foregroundStyle)
+                .frame(width: 24, height: 24)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(isHovered ? Color.primary.opacity(0.08) : Color.clear)
+                )
+        }
+        .buttonStyle(.plain)
+        .help(tooltip)
+    }
+
     private func copyContent() {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(turn.content, forType: .string)
+    }
+
+    private func saveToNote() {
+        guard let onSaveToNote else { return }
+        if onSaveToNote(turn) {
+            showSaved = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                showSaved = false
+            }
+        } else {
+            showSaveFailed = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                showSaveFailed = false
+            }
+        }
     }
 }
 

@@ -14,6 +14,16 @@ public struct GoogleProvider: LLMProviderService {
         systemPrompt: String?,
         maxTokens: Int
     ) -> AsyncThrowingStream<StreamChunk, Error> {
+        sendMessage(messages: messages, model: model, systemPrompt: systemPrompt, maxTokens: maxTokens, tools: nil)
+    }
+
+    public func sendMessage(
+        messages: [LLMMessage],
+        model: String,
+        systemPrompt: String?,
+        maxTokens: Int,
+        tools: [ToolDefinition]?
+    ) -> AsyncThrowingStream<StreamChunk, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
@@ -24,7 +34,8 @@ public struct GoogleProvider: LLMProviderService {
 
                     let body = buildRequestBody(
                         messages: messages, systemPrompt: systemPrompt,
-                        maxTokens: maxTokens
+                        maxTokens: maxTokens,
+                        tools: tools
                     )
                     request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
@@ -54,7 +65,8 @@ public struct GoogleProvider: LLMProviderService {
     private func buildRequestBody(
         messages: [LLMMessage],
         systemPrompt: String?,
-        maxTokens: Int
+        maxTokens: Int,
+        tools: [ToolDefinition]?
     ) -> [String: Any] {
         var body: [String: Any] = [
             "generationConfig": [
@@ -67,6 +79,19 @@ public struct GoogleProvider: LLMProviderService {
             body["systemInstruction"] = [
                 "parts": [["text": system]]
             ] as [String: Any]
+        }
+
+        // Tools (function declarations)
+        if let tools, !tools.isEmpty {
+            body["tools"] = [[
+                "functionDeclarations": tools.map { tool in
+                    [
+                        "name": tool.name,
+                        "description": tool.description,
+                        "parameters": tool.inputSchema,
+                    ] as [String: Any]
+                }
+            ] as [String: Any]]
         }
 
         // Convert messages to Gemini format
@@ -84,6 +109,23 @@ public struct GoogleProvider: LLMProviderService {
                         "inlineData": [
                             "mimeType": mediaType,
                             "data": data,
+                        ] as [String: Any]
+                    ])
+                case .toolUse(let toolCall):
+                    let args: [String: Any] = toolCall.input.reduce(into: [:]) { $0[$1.key] = $1.value }
+                    parts.append([
+                        "functionCall": [
+                            "name": toolCall.name,
+                            "args": args,
+                        ] as [String: Any]
+                    ])
+                case .toolResult(let result):
+                    parts.append([
+                        "functionResponse": [
+                            "name": result.toolName,
+                            "response": [
+                                "content": result.content
+                            ] as [String: Any],
                         ] as [String: Any]
                     ])
                 }
@@ -121,7 +163,7 @@ public struct GoogleProvider: LLMProviderService {
                 return
             }
 
-            // Extract text from candidates
+            // Extract content from candidates
             if let candidates = json["candidates"] as? [[String: Any]],
                let candidate = candidates.first,
                let content = candidate["content"] as? [String: Any],
@@ -130,16 +172,32 @@ public struct GoogleProvider: LLMProviderService {
                 for part in parts {
                     if let text = part["text"] as? String {
                         continuation.yield(.delta(text))
+                    } else if let functionCall = part["functionCall"] as? [String: Any],
+                              let name = functionCall["name"] as? String
+                    {
+                        // Gemini doesn't provide call IDs — generate a client-side UUID
+                        let callId = UUID().uuidString
+                        let args = functionCall["args"] as? [String: Any] ?? [:]
+                        var input: [String: String] = [:]
+                        for (key, value) in args {
+                            input[key] = "\(value)"
+                        }
+                        let toolCall = ToolCall(id: callId, name: name, input: input)
+                        continuation.yield(.toolUse(toolCall))
                     }
                 }
 
                 // Check finish reason
-                if let finishReason = candidate["finishReason"] as? String,
-                   finishReason == "STOP"
-                {
-                    continuation.yield(.finished(stopReason: finishReason))
-                    continuation.finish()
-                    return
+                if let finishReason = candidate["finishReason"] as? String {
+                    if finishReason == "STOP" {
+                        continuation.yield(.finished(stopReason: finishReason))
+                        continuation.finish()
+                        return
+                    } else if finishReason == "TOOL_USE" || finishReason == "FUNCTION_CALL" {
+                        continuation.yield(.finished(stopReason: "tool_use"))
+                        continuation.finish()
+                        return
+                    }
                 }
             }
         }

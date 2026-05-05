@@ -9,6 +9,27 @@ public protocol LLMProviderService: Sendable {
         systemPrompt: String?,
         maxTokens: Int
     ) -> AsyncThrowingStream<StreamChunk, Error>
+
+    func sendMessage(
+        messages: [LLMMessage],
+        model: String,
+        systemPrompt: String?,
+        maxTokens: Int,
+        tools: [ToolDefinition]?
+    ) -> AsyncThrowingStream<StreamChunk, Error>
+}
+
+extension LLMProviderService {
+    public func sendMessage(
+        messages: [LLMMessage],
+        model: String,
+        systemPrompt: String?,
+        maxTokens: Int,
+        tools: [ToolDefinition]?
+    ) -> AsyncThrowingStream<StreamChunk, Error> {
+        // Default: ignore tools and delegate to the base method
+        sendMessage(messages: messages, model: model, systemPrompt: systemPrompt, maxTokens: maxTokens)
+    }
 }
 
 // MARK: - Provider Errors

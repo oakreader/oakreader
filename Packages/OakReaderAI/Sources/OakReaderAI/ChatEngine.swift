@@ -50,7 +50,8 @@ public actor ChatEngine {
         sessionId: UUID,
         config: ProviderConfig,
         skill: Skill?,
-        pdfContext: PDFContextSnapshot?
+        pdfContext: PDFContextSnapshot?,
+        toolExecutor: ToolExecutor? = nil
     ) -> AsyncThrowingStream<StreamEvent, Error> {
         AsyncThrowingStream { continuation in
             Task {
@@ -67,56 +68,111 @@ public actor ChatEngine {
                     // 2. Build system prompt
                     let systemPrompt = buildSystemPrompt(skill: skill, context: pdfContext)
 
-                    // 3. Build LLM messages
-                    let messages = buildMessages(
+                    // 3. Build initial LLM messages
+                    var llmMessages = buildMessages(
                         history: history,
                         userTurn: userTurn
                     )
 
-                    // 4. Get provider and stream
+                    // 4. Get provider
                     let provider = try router.provider(for: config)
-                    let stream = provider.sendMessage(
-                        messages: messages,
-                        model: config.model,
-                        systemPrompt: systemPrompt,
-                        maxTokens: config.maxTokens
-                    )
 
-                    // 5. Create assistant turn and stream deltas
-                    var assistantTurn = ChatTurn(
-                        role: .assistant,
-                        content: "",
-                        isStreaming: true,
-                        skill: skill?.id
-                    )
+                    // 5. Determine tools to send
+                    let tools: [ToolDefinition]? = toolExecutor != nil ? BuiltInTools.all : nil
 
-                    for try await chunk in stream {
-                        switch chunk {
-                        case .delta(let text):
-                            assistantTurn.content += text
-                            continuation.yield(.delta(text))
-                        case .finished:
+                    // 6. Agentic loop — up to 10 iterations
+                    let maxIterations = 10
+                    for _ in 0..<maxIterations {
+                        let stream = provider.sendMessage(
+                            messages: llmMessages,
+                            model: config.model,
+                            systemPrompt: systemPrompt,
+                            maxTokens: config.maxTokens,
+                            tools: tools
+                        )
+
+                        var assistantTurn = ChatTurn(
+                            role: .assistant,
+                            content: "",
+                            isStreaming: true,
+                            skill: skill?.id
+                        )
+                        var toolCalls: [ToolCall] = []
+                        var stopReason: String?
+
+                        for try await chunk in stream {
+                            switch chunk {
+                            case .delta(let text):
+                                assistantTurn.content += text
+                                continuation.yield(.delta(text))
+                            case .toolUse(let toolCall):
+                                toolCalls.append(toolCall)
+                            case .finished(let reason):
+                                stopReason = reason
+                            case .error(let msg):
+                                assistantTurn.isStreaming = false
+                                assistantTurn.error = msg
+                                try await store.appendTurn(assistantTurn, sessionId: sessionId)
+                                continuation.finish(throwing: LLMProviderError.streamError(msg))
+                                return
+                            }
+                        }
+
+                        if !toolCalls.isEmpty, let executor = toolExecutor {
+                            // Execute tools and collect results
+                            var toolUseRecords: [ToolUseRecord] = []
+                            var toolResults: [ToolResult] = []
+
+                            for call in toolCalls {
+                                var record = ToolUseRecord(from: call)
+                                continuation.yield(.toolUseStarted(record))
+
+                                let result = await executor.execute(call)
+                                record.result = result.content
+                                record.isError = result.isError
+                                toolResults.append(result)
+                                toolUseRecords.append(record)
+
+                                continuation.yield(.toolUseCompleted(record))
+                            }
+
+                            // Persist the assistant turn with tool uses
                             assistantTurn.isStreaming = false
+                            assistantTurn.toolUses = toolUseRecords
                             try await store.appendTurn(assistantTurn, sessionId: sessionId)
                             continuation.yield(.finished(assistantTurn))
-                            continuation.finish()
-                            return
-                        case .error(let msg):
-                            assistantTurn.isStreaming = false
-                            assistantTurn.error = msg
-                            try await store.appendTurn(assistantTurn, sessionId: sessionId)
-                            continuation.finish(throwing: LLMProviderError.streamError(msg))
-                            return
-                        }
-                    }
 
-                    // Stream ended without explicit finish
-                    if assistantTurn.isStreaming {
+                            // Append assistant message (with tool use blocks) and
+                            // user message (with tool results) to conversation for next iteration
+                            var assistantParts: [LLMMessage.ContentPart] = []
+                            if !assistantTurn.content.isEmpty {
+                                assistantParts.append(.text(assistantTurn.content))
+                            }
+                            for call in toolCalls {
+                                assistantParts.append(.toolUse(call))
+                            }
+                            llmMessages.append(LLMMessage(role: .assistant, content: assistantParts))
+
+                            var resultParts: [LLMMessage.ContentPart] = []
+                            for result in toolResults {
+                                resultParts.append(.toolResult(result))
+                            }
+                            llmMessages.append(LLMMessage(role: .user, content: resultParts))
+
+                            // Continue the loop for the next LLM response
+                            continue
+                        }
+
+                        // No tool calls — final response
                         assistantTurn.isStreaming = false
                         try await store.appendTurn(assistantTurn, sessionId: sessionId)
                         continuation.yield(.finished(assistantTurn))
                         continuation.finish()
+                        return
                     }
+
+                    // Exhausted max iterations
+                    continuation.finish()
                 } catch {
                     continuation.yield(.error(error))
                     continuation.finish(throwing: error)
@@ -185,7 +241,34 @@ public actor ChatEngine {
         // Add history (skip system turns, they go in system prompt)
         for turn in history where turn.role != .system {
             let role: LLMMessage.Role = turn.role == .user ? .user : .assistant
-            messages.append(LLMMessage(role: role, text: turn.content))
+
+            // Reconstruct tool use/result content parts from persisted tool records
+            if turn.role == .assistant && !turn.toolUses.isEmpty {
+                var parts: [LLMMessage.ContentPart] = []
+                if !turn.content.isEmpty {
+                    parts.append(.text(turn.content))
+                }
+                for record in turn.toolUses {
+                    let call = ToolCall(id: record.id, name: record.name, input: record.input)
+                    parts.append(.toolUse(call))
+                }
+                messages.append(LLMMessage(role: .assistant, content: parts))
+
+                // Add tool results as a user message
+                var resultParts: [LLMMessage.ContentPart] = []
+                for record in turn.toolUses {
+                    let result = ToolResult(
+                        toolCallId: record.id,
+                        toolName: record.name,
+                        content: record.result ?? "",
+                        isError: record.isError
+                    )
+                    resultParts.append(.toolResult(result))
+                }
+                messages.append(LLMMessage(role: .user, content: resultParts))
+            } else {
+                messages.append(LLMMessage(role: role, text: turn.content))
+            }
         }
 
         // Build user message with attachments

@@ -14,6 +14,16 @@ public struct AnthropicProvider: LLMProviderService {
         systemPrompt: String?,
         maxTokens: Int
     ) -> AsyncThrowingStream<StreamChunk, Error> {
+        sendMessage(messages: messages, model: model, systemPrompt: systemPrompt, maxTokens: maxTokens, tools: nil)
+    }
+
+    public func sendMessage(
+        messages: [LLMMessage],
+        model: String,
+        systemPrompt: String?,
+        maxTokens: Int,
+        tools: [ToolDefinition]?
+    ) -> AsyncThrowingStream<StreamChunk, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
@@ -26,7 +36,8 @@ public struct AnthropicProvider: LLMProviderService {
                     let body = buildRequestBody(
                         messages: messages, model: model,
                         systemPrompt: systemPrompt,
-                        maxTokens: maxTokens
+                        maxTokens: maxTokens,
+                        tools: tools
                     )
                     request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
@@ -57,7 +68,8 @@ public struct AnthropicProvider: LLMProviderService {
         messages: [LLMMessage],
         model: String,
         systemPrompt: String?,
-        maxTokens: Int
+        maxTokens: Int,
+        tools: [ToolDefinition]?
     ) -> [String: Any] {
         var body: [String: Any] = [
             "model": model,
@@ -69,18 +81,35 @@ public struct AnthropicProvider: LLMProviderService {
             body["system"] = system
         }
 
+        // Add tools if provided
+        if let tools, !tools.isEmpty {
+            body["tools"] = tools.map { tool in
+                [
+                    "name": tool.name,
+                    "description": tool.description,
+                    "input_schema": tool.inputSchema,
+                ] as [String: Any]
+            }
+        }
+
         let apiMessages: [[String: Any]] = messages.compactMap { msg in
             guard msg.role != .system else { return nil }
-            let role = msg.role == .user ? "user" : "assistant"
-
-            // Check if we have image content
-            let hasImages = msg.content.contains { part in
-                if case .imageBase64 = part { return true }
-                return false
+            let role: String
+            switch msg.role {
+            case .user: role = "user"
+            case .assistant: role = "assistant"
+            default: return nil
             }
 
-            if hasImages {
-                let contentParts: [[String: Any]] = msg.content.map { part in
+            let hasComplexContent = msg.content.contains { part in
+                switch part {
+                case .text: return false
+                case .imageBase64, .toolUse, .toolResult: return true
+                }
+            }
+
+            if hasComplexContent {
+                let contentParts: [[String: Any]] = msg.content.compactMap { part in
                     switch part {
                     case .text(let text):
                         return ["type": "text", "text": text]
@@ -93,6 +122,20 @@ public struct AnthropicProvider: LLMProviderService {
                                 "data": data,
                             ] as [String: Any],
                         ]
+                    case .toolUse(let toolCall):
+                        return [
+                            "type": "tool_use",
+                            "id": toolCall.id,
+                            "name": toolCall.name,
+                            "input": toolCall.input,
+                        ] as [String: Any]
+                    case .toolResult(let result):
+                        return [
+                            "type": "tool_result",
+                            "tool_use_id": result.toolCallId,
+                            "content": result.content,
+                            "is_error": result.isError,
+                        ] as [String: Any]
                     }
                 }
                 return ["role": role, "content": contentParts]
@@ -109,6 +152,11 @@ public struct AnthropicProvider: LLMProviderService {
         bytes: URLSession.AsyncBytes,
         continuation: AsyncThrowingStream<StreamChunk, Error>.Continuation
     ) async throws {
+        // State for accumulating tool use blocks
+        var currentToolId: String?
+        var currentToolName: String?
+        var currentToolInput = ""
+
         for try await line in bytes.lines {
             guard !Task.isCancelled else {
                 continuation.finish(throwing: LLMProviderError.cancelled)
@@ -123,16 +171,39 @@ public struct AnthropicProvider: LLMProviderService {
             else { continue }
 
             switch type {
-            case "content_block_delta":
-                if let delta = json["delta"] as? [String: Any],
-                   let text = delta["text"] as? String
+            case "content_block_start":
+                if let contentBlock = json["content_block"] as? [String: Any],
+                   let blockType = contentBlock["type"] as? String,
+                   blockType == "tool_use"
                 {
-                    continuation.yield(.delta(text))
+                    currentToolId = contentBlock["id"] as? String
+                    currentToolName = contentBlock["name"] as? String
+                    currentToolInput = ""
                 }
-            case "message_stop":
-                continuation.yield(.finished(stopReason: "end_turn"))
-                continuation.finish()
-                return
+
+            case "content_block_delta":
+                if let delta = json["delta"] as? [String: Any] {
+                    let deltaType = delta["type"] as? String
+                    if deltaType == "text_delta", let text = delta["text"] as? String {
+                        continuation.yield(.delta(text))
+                    } else if deltaType == "input_json_delta",
+                              let partial = delta["partial_json"] as? String
+                    {
+                        currentToolInput += partial
+                    }
+                }
+
+            case "content_block_stop":
+                // If we were accumulating a tool use block, emit it
+                if let toolId = currentToolId, let toolName = currentToolName {
+                    let input = parseToolInput(currentToolInput)
+                    let toolCall = ToolCall(id: toolId, name: toolName, input: input)
+                    continuation.yield(.toolUse(toolCall))
+                    currentToolId = nil
+                    currentToolName = nil
+                    currentToolInput = ""
+                }
+
             case "message_delta":
                 if let delta = json["delta"] as? [String: Any],
                    let stopReason = delta["stop_reason"] as? String
@@ -141,6 +212,12 @@ public struct AnthropicProvider: LLMProviderService {
                     continuation.finish()
                     return
                 }
+
+            case "message_stop":
+                continuation.yield(.finished(stopReason: "end_turn"))
+                continuation.finish()
+                return
+
             case "error":
                 if let error = json["error"] as? [String: Any],
                    let message = error["message"] as? String
@@ -148,10 +225,25 @@ public struct AnthropicProvider: LLMProviderService {
                     continuation.finish(throwing: LLMProviderError.streamError(message))
                     return
                 }
+
             default:
                 break
             }
         }
         continuation.finish()
+    }
+
+    /// Parse accumulated JSON string into a [String: String] dictionary.
+    private func parseToolInput(_ jsonString: String) -> [String: String] {
+        guard !jsonString.isEmpty,
+              let data = jsonString.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return [:] }
+
+        var result: [String: String] = [:]
+        for (key, value) in obj {
+            result[key] = "\(value)"
+        }
+        return result
     }
 }

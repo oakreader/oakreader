@@ -3,6 +3,7 @@ import OakReaderAI
 
 struct AIChatView: View {
     let chatVM: ChatViewModel
+    var onSaveAssistantResponse: ((ChatTurn) -> Bool)?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -130,7 +131,10 @@ struct AIChatView: View {
             ScrollView {
                 LazyVStack(spacing: 8) {
                     ForEach(chatVM.turns) { turn in
-                        ChatBubbleView(turn: turn)
+                        ChatBubbleView(
+                            turn: turn,
+                            onSaveToNote: onSaveAssistantResponse
+                        )
                             .id(turn.id)
                     }
                 }
