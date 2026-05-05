@@ -22,12 +22,13 @@ struct ContentView: View {
             HStack(spacing: 0) {
                 // Left sidebar — full height
                 if viewModel.state.isSidebarVisible {
-                    SidebarView(viewModel: viewModel)
-                        .frame(width: sidebarWidth)
+                    sidebarContentView
+                        .frame(width: effectiveSidebarWidth)
                         .background(Color(nsColor: .controlBackgroundColor))
 
                     panelDivider { delta in
-                        sidebarWidth = min(max(sidebarWidth + delta, 140), 380)
+                        let range = sidebarWidthRange
+                        sidebarWidth = min(max(effectiveSidebarWidth + delta, range.lowerBound), range.upperBound)
                     }
                 }
 
@@ -105,8 +106,36 @@ struct ContentView: View {
         .sheet(isPresented: $showAccessibilityChecker) {
             AccessibilityCheckerView(viewModel: viewModel)
         }
-        .onAppear { setupActionObserver() }
+        .onAppear {
+            setupActionObserver()
+            adjustSidebarWidthForMediaIfNeeded()
+        }
+        .onChange(of: viewModel.usesMediaSidebar) { _, _ in
+            adjustSidebarWidthForMediaIfNeeded()
+        }
         .onDisappear { removeActionObserver() }
+    }
+
+    private var sidebarWidthRange: ClosedRange<CGFloat> {
+        viewModel.usesMediaSidebar ? 260...460 : 140...380
+    }
+
+    private var effectiveSidebarWidth: CGFloat {
+        viewModel.usesMediaSidebar ? max(sidebarWidth, 280) : sidebarWidth
+    }
+
+    @ViewBuilder
+    private var sidebarContentView: some View {
+        if viewModel.usesMediaSidebar {
+            MediaSidebarView(viewModel: viewModel)
+        } else {
+            SidebarView(viewModel: viewModel)
+        }
+    }
+
+    private func adjustSidebarWidthForMediaIfNeeded() {
+        guard viewModel.usesMediaSidebar else { return }
+        sidebarWidth = max(sidebarWidth, 280)
     }
 
     // MARK: - Draggable Panel Divider

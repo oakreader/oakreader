@@ -272,6 +272,12 @@ final class Preferences {
             .appendingPathComponent("chapter-generation.md")
     }
 
+    static var sectionPromptURL: URL {
+        CatalogDatabase.dataDirectory
+            .appendingPathComponent("prompts")
+            .appendingPathComponent("section-generation.md")
+    }
+
     // MARK: - Translation Preferences
 
     var translationAIProvider: AIProvider {

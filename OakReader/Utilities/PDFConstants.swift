@@ -45,9 +45,30 @@ enum SidebarMode: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .thumbnails: return "rectangle.split.3x3"
-        case .outline: return "list.bullet.indent"
+        case .outline: return "list.number"
         case .annotations: return "text.bubble"
         case .search: return "magnifyingglass"
+        }
+    }
+}
+
+enum MediaSidebarMode: String, CaseIterable, Identifiable {
+    case transcript
+    case outline
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .transcript: return "Transcript"
+        case .outline: return "Chapters"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .transcript: return "captions.bubble"
+        case .outline: return "list.number"
         }
     }
 }
@@ -108,7 +129,6 @@ enum FormFieldType: String, CaseIterable, Identifiable {
         }
     }
 }
-
 
 enum LibrarySidebarMode: String, CaseIterable, Identifiable {
     case collections
