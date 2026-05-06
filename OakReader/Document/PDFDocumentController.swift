@@ -21,9 +21,6 @@ class PDFDocumentController: NSDocumentController {
         if ext == "pdf" {
             return UTType.pdf.identifier
         }
-        if ext == "oakgraph" {
-            return "com.oakreader.oakgraph"
-        }
         return try super.typeForContents(of: url)
     }
 
