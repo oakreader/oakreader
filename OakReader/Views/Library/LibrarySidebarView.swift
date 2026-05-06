@@ -292,16 +292,6 @@ private struct CollectionRowView: View {
                     Spacer()
                         .frame(width: CGFloat(depth) * 18)
 
-                    // Disclosure triangle (static image, toggle handled by overlay)
-                    if hasChildren {
-                        Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 14, height: 14)
-                    } else {
-                        Spacer().frame(width: 14)
-                    }
-
                     Image(systemName: collection.icon == "folder" ? "folder.fill" : collection.icon)
                         .font(.system(size: 13))
                         .foregroundStyle(isSelected ? .primary : .secondary)
@@ -314,6 +304,23 @@ private struct CollectionRowView: View {
                         .lineLimit(1)
 
                     Spacer()
+
+                    if hasChildren {
+                        Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 14, height: 14)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                withAnimation(.easeInOut(duration: 0.15)) {
+                                    if isExpanded {
+                                        expandedCollections.remove(collection.id)
+                                    } else {
+                                        expandedCollections.insert(collection.id)
+                                    }
+                                }
+                            }
+                    }
                 }
                 .padding(.horizontal, 18)
                 .padding(.vertical, 5)
@@ -325,22 +332,6 @@ private struct CollectionRowView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .overlay(alignment: .leading) {
-                if hasChildren {
-                    Color.clear
-                        .frame(width: CGFloat(depth) * 18 + 16 + 20, height: 34)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            withAnimation(.easeInOut(duration: 0.15)) {
-                                if isExpanded {
-                                    expandedCollections.remove(collection.id)
-                                } else {
-                                    expandedCollections.insert(collection.id)
-                                }
-                            }
-                        }
-                }
-            }
             .contextMenu {
                 if collection.isSmart && !collection.isSystem {
                     Button("Edit Smart Collection...") {
