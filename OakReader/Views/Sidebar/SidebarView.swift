@@ -321,7 +321,7 @@ private struct MediaOutlineSidebarContent: View {
                 message: message
             )
 
-            if KeychainService.apiKey(for: Preferences.shared.youtubeAIProvider) != nil {
+            if CredentialResolver.hasCredentials(for: Preferences.shared.youtubeAIProviderId) {
                 Button {
                     Task { await model.generateChaptersManually(media: media) }
                 } label: {

@@ -51,7 +51,9 @@ public actor ChatEngine {
         config: ProviderConfig,
         skill: Skill?,
         pdfContext: PDFContextSnapshot?,
-        toolExecutor: ToolExecutor? = nil
+        toolExecutor: ToolExecutor? = nil,
+        enabledTools: [String]? = nil,
+        toolConfirmation: (@Sendable (ToolCall) async -> Bool)? = nil
     ) -> AsyncThrowingStream<StreamEvent, Error> {
         AsyncThrowingStream { continuation in
             Task {
@@ -77,8 +79,17 @@ public actor ChatEngine {
                     // 4. Get provider
                     let provider = try router.provider(for: config)
 
-                    // 5. Determine tools to send
-                    let tools: [ToolDefinition]? = toolExecutor != nil ? BuiltInTools.all : nil
+                    // 5. Determine tools to send (filtered by enabledTools)
+                    let tools: [ToolDefinition]?
+                    if toolExecutor != nil {
+                        if let enabled = enabledTools {
+                            tools = BuiltInTools.all.filter { enabled.contains($0.name) }
+                        } else {
+                            tools = BuiltInTools.all
+                        }
+                    } else {
+                        tools = nil
+                    }
 
                     // 6. Agentic loop — up to 10 iterations
                     let maxIterations = 10
@@ -125,11 +136,37 @@ public actor ChatEngine {
 
                             for call in toolCalls {
                                 var record = ToolUseRecord(from: call)
+
+                                // If confirmation callback is set, ask for approval
+                                if let confirmationCallback = toolConfirmation {
+                                    record.status = .pending
+                                    continuation.yield(.toolUsePending(record))
+
+                                    let approved = await confirmationCallback(call)
+                                    if !approved {
+                                        record.status = .denied
+                                        record.result = "User denied tool execution."
+                                        record.isError = true
+                                        let deniedResult = ToolResult(
+                                            toolCallId: call.id,
+                                            toolName: call.name,
+                                            content: "User denied tool execution.",
+                                            isError: true
+                                        )
+                                        toolResults.append(deniedResult)
+                                        toolUseRecords.append(record)
+                                        continuation.yield(.toolUseCompleted(record))
+                                        continue
+                                    }
+                                }
+
+                                record.status = .executing
                                 continuation.yield(.toolUseStarted(record))
 
                                 let result = await executor.execute(call)
                                 record.result = result.content
                                 record.isError = result.isError
+                                record.status = .completed
                                 toolResults.append(result)
                                 toolUseRecords.append(record)
 

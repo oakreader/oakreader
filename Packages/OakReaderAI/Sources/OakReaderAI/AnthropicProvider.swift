@@ -2,10 +2,13 @@ import Foundation
 
 public struct AnthropicProvider: LLMProviderService {
     private let apiKey: String
-    private let baseURL = URL(string: "https://api.anthropic.com/v1/messages")!
+    private let baseURL: URL
+    private let customHeaders: [String: String]
 
-    public init(apiKey: String) {
+    public init(apiKey: String, baseURL: URL = URL(string: "https://api.anthropic.com/v1/messages")!, customHeaders: [String: String] = [:]) {
         self.apiKey = apiKey
+        self.baseURL = baseURL
+        self.customHeaders = customHeaders
     }
 
     public func sendMessage(
@@ -32,6 +35,10 @@ public struct AnthropicProvider: LLMProviderService {
                     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
                     request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
                     request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+
+                    for (key, value) in customHeaders {
+                        request.setValue(value, forHTTPHeaderField: key)
+                    }
 
                     let body = buildRequestBody(
                         messages: messages, model: model,
@@ -81,7 +88,6 @@ public struct AnthropicProvider: LLMProviderService {
             body["system"] = system
         }
 
-        // Add tools if provided
         if let tools, !tools.isEmpty {
             body["tools"] = tools.map { tool in
                 [
@@ -152,7 +158,6 @@ public struct AnthropicProvider: LLMProviderService {
         bytes: URLSession.AsyncBytes,
         continuation: AsyncThrowingStream<StreamChunk, Error>.Continuation
     ) async throws {
-        // State for accumulating tool use blocks
         var currentToolId: String?
         var currentToolName: String?
         var currentToolInput = ""
@@ -194,7 +199,6 @@ public struct AnthropicProvider: LLMProviderService {
                 }
 
             case "content_block_stop":
-                // If we were accumulating a tool use block, emit it
                 if let toolId = currentToolId, let toolName = currentToolName {
                     let input = parseToolInput(currentToolInput)
                     let toolCall = ToolCall(id: toolId, name: toolName, input: input)
@@ -233,7 +237,6 @@ public struct AnthropicProvider: LLMProviderService {
         continuation.finish()
     }
 
-    /// Parse accumulated JSON string into a [String: String] dictionary.
     private func parseToolInput(_ jsonString: String) -> [String: String] {
         guard !jsonString.isEmpty,
               let data = jsonString.data(using: .utf8),

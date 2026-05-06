@@ -2,7 +2,7 @@ import SwiftUI
 import OakReaderAI
 
 struct TranslationSettingsView: View {
-    @State private var translationProvider: AIProvider
+    @State private var translationProviderId: String
     @State private var translationModel: String
     @State private var sourceLang: TranslationLanguage
     @State private var targetLang: TranslationLanguage
@@ -11,10 +11,11 @@ struct TranslationSettingsView: View {
 
     init() {
         let prefs = Preferences.shared
-        _translationProvider = State(initialValue: prefs.translationAIProvider)
+        let pid = prefs.translationAIProviderId
+        _translationProviderId = State(initialValue: pid)
         _translationModel = State(initialValue: {
             let m = prefs.translationAIModel
-            return m.isEmpty ? prefs.translationAIProvider.defaultModel : m
+            return m.isEmpty ? (ProviderRegistry.shared.provider(for: pid)?.defaultModelId ?? "") : m
         }())
         _sourceLang = State(initialValue: prefs.translationSourceLang)
         _targetLang = State(initialValue: prefs.translationTargetLang)
@@ -51,15 +52,15 @@ struct TranslationSettingsView: View {
                     Text("Provider")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
-                    Picker("Provider", selection: $translationProvider) {
-                        ForEach(AIProvider.allCases) { p in
-                            Text(p.displayName).tag(p)
+                    Picker("Provider", selection: $translationProviderId) {
+                        ForEach(ProviderRegistry.shared.allProviders) { p in
+                            Text(p.displayName).tag(p.id)
                         }
                     }
                     .labelsHidden()
                     .frame(width: 160)
-                    .onChange(of: translationProvider) { _, newValue in
-                        translationModel = newValue.defaultModel
+                    .onChange(of: translationProviderId) { _, newValue in
+                        translationModel = ProviderRegistry.shared.provider(for: newValue)?.defaultModelId ?? ""
                         testResult = nil
                     }
                 }
@@ -69,7 +70,7 @@ struct TranslationSettingsView: View {
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                     Picker("Model", selection: $translationModel) {
-                        ForEach(translationProvider.models) { m in
+                        ForEach(ProviderRegistry.shared.provider(for: translationProviderId)?.models ?? []) { m in
                             Text(m.name).tag(m.id)
                         }
                     }
@@ -79,7 +80,7 @@ struct TranslationSettingsView: View {
             }
 
             HStack(spacing: 6) {
-                if let key = KeychainService.apiKey(for: translationProvider), !key.isEmpty {
+                if CredentialResolver.hasCredentials(for: translationProviderId) {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                     Text("API key configured")
@@ -104,7 +105,7 @@ struct TranslationSettingsView: View {
                 } else {
                     Button("Test Connection") { testConnection() }
                         .controlSize(.small)
-                        .disabled(KeychainService.apiKey(for: translationProvider) == nil)
+                        .disabled(!CredentialResolver.hasCredentials(for: translationProviderId))
                 }
 
                 if let result = testResult {
@@ -161,7 +162,7 @@ struct TranslationSettingsView: View {
 
     private func saveSettings() {
         let prefs = Preferences.shared
-        prefs.translationAIProvider = translationProvider
+        prefs.translationAIProviderId = translationProviderId
         prefs.translationAIModel = translationModel
         prefs.translationSourceLang = sourceLang
         prefs.translationTargetLang = targetLang
@@ -175,7 +176,7 @@ struct TranslationSettingsView: View {
         Task {
             do {
                 let router = ProviderRouter()
-                let config = ProviderConfig(provider: translationProvider, model: translationModel)
+                let config = ProviderConfig(providerId: translationProviderId, model: translationModel)
                 let svc = try router.provider(for: config)
                 let messages = [LLMMessage(role: .user, text: "Say 'OK' and nothing else.")]
                 let stream = svc.sendMessage(

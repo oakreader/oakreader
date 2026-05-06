@@ -5,22 +5,21 @@ public struct ProviderRouter: Sendable {
     public init() {}
 
     public func provider(for config: ProviderConfig) throws -> LLMProviderService {
-        switch config.provider {
-        case .openai:
-            guard let key = KeychainService.apiKey(for: .openai) else {
-                throw LLMProviderError.missingAPIKey
-            }
-            return OpenAIProvider(apiKey: key)
-        case .anthropic:
-            guard let key = KeychainService.apiKey(for: .anthropic) else {
-                throw LLMProviderError.missingAPIKey
-            }
-            return AnthropicProvider(apiKey: key)
-        case .google:
-            guard let key = KeychainService.apiKey(for: .google) else {
-                throw LLMProviderError.missingAPIKey
-            }
-            return GoogleProvider(apiKey: key)
+        guard let info = ProviderRegistry.shared.provider(for: config.providerId) else {
+            throw LLMProviderError.unknownProvider(config.providerId)
+        }
+
+        guard let credential = CredentialResolver.resolve(for: config.providerId) else {
+            throw LLMProviderError.missingAPIKey
+        }
+
+        switch info.apiFormat {
+        case .anthropicMessages:
+            return AnthropicProvider(apiKey: credential, baseURL: info.baseURL, customHeaders: info.customHeaders)
+        case .openaiCompletions:
+            return OpenAIProvider(apiKey: credential, baseURL: info.baseURL, customHeaders: info.customHeaders)
+        case .googleGenerativeAI:
+            return GoogleProvider(apiKey: credential, baseURL: info.baseURL, customHeaders: info.customHeaders)
         }
     }
 }

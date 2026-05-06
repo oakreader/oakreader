@@ -1,6 +1,5 @@
 import Foundation
 import PDFKit
-import OakReaderAI
 
 final class Preferences {
     static let shared = Preferences()
@@ -51,6 +50,11 @@ final class Preferences {
         static let translationAIModel = "translationAIModel"
         static let translationSourceLang = "translationSourceLang"
         static let translationTargetLang = "translationTargetLang"
+        // Agent tools
+        static let agentToolsEnabled = "agentToolsEnabled"
+        static let agentReadFileEnabled = "agentReadFileEnabled"
+        static let agentWriteFileEnabled = "agentWriteFileEnabled"
+        static let agentRequireConfirmation = "agentRequireConfirmation"
         // External tools
         static let ytDlpPath = "ytDlpPath"
         static let ytDlpCachedVersion = "ytDlpCachedVersion"
@@ -73,7 +77,7 @@ final class Preferences {
             Keys.defaultFontName: PDFDefaults.defaultFontName,
             Keys.defaultFontSize: PDFDefaults.defaultFontSize,
             Keys.showStatusBar: true,
-            Keys.aiProvider: AIProvider.anthropic.rawValue,
+            Keys.aiProvider: "anthropic",
             Keys.aiModel: "",
             Keys.noteEditorMode: "edit",
             Keys.noteEditorFontFamily: ".AppleSystemUIFont",
@@ -87,6 +91,10 @@ final class Preferences {
             Keys.noteEditorRenderImages: true,
             Keys.noteEditorHideSyntax: true,
             Keys.noteEditorAccentColor: "#0CA69A",
+            Keys.agentToolsEnabled: true,
+            Keys.agentReadFileEnabled: true,
+            Keys.agentWriteFileEnabled: true,
+            Keys.agentRequireConfirmation: true,
         ])
     }
 
@@ -182,9 +190,9 @@ final class Preferences {
 
     // MARK: - AI Preferences
 
-    var aiProvider: AIProvider {
-        get { AIProvider(rawValue: defaults.string(forKey: Keys.aiProvider) ?? "") ?? .anthropic }
-        set { defaults.set(newValue.rawValue, forKey: Keys.aiProvider) }
+    var aiProviderId: String {
+        get { defaults.string(forKey: Keys.aiProvider) ?? "anthropic" }
+        set { defaults.set(newValue, forKey: Keys.aiProvider) }
     }
 
     var aiModel: String {
@@ -256,9 +264,9 @@ final class Preferences {
 
     // MARK: - YouTube Preferences
 
-    var youtubeAIProvider: AIProvider {
-        get { AIProvider(rawValue: defaults.string(forKey: Keys.youtubeAIProvider) ?? "") ?? aiProvider }
-        set { defaults.set(newValue.rawValue, forKey: Keys.youtubeAIProvider) }
+    var youtubeAIProviderId: String {
+        get { defaults.string(forKey: Keys.youtubeAIProvider) ?? aiProviderId }
+        set { defaults.set(newValue, forKey: Keys.youtubeAIProvider) }
     }
 
     var youtubeAIModel: String {
@@ -280,9 +288,9 @@ final class Preferences {
 
     // MARK: - Translation Preferences
 
-    var translationAIProvider: AIProvider {
-        get { AIProvider(rawValue: defaults.string(forKey: Keys.translationAIProvider) ?? "") ?? aiProvider }
-        set { defaults.set(newValue.rawValue, forKey: Keys.translationAIProvider) }
+    var translationAIProviderId: String {
+        get { defaults.string(forKey: Keys.translationAIProvider) ?? aiProviderId }
+        set { defaults.set(newValue, forKey: Keys.translationAIProvider) }
     }
 
     var translationAIModel: String {
@@ -298,6 +306,28 @@ final class Preferences {
     var translationTargetLang: TranslationLanguage {
         get { TranslationLanguage(rawValue: defaults.string(forKey: Keys.translationTargetLang) ?? "") ?? .zhHans }
         set { defaults.set(newValue.rawValue, forKey: Keys.translationTargetLang) }
+    }
+
+    // MARK: - Agent Tools
+
+    var agentToolsEnabled: Bool {
+        get { defaults.bool(forKey: Keys.agentToolsEnabled) }
+        set { defaults.set(newValue, forKey: Keys.agentToolsEnabled) }
+    }
+
+    var agentReadFileEnabled: Bool {
+        get { defaults.bool(forKey: Keys.agentReadFileEnabled) }
+        set { defaults.set(newValue, forKey: Keys.agentReadFileEnabled) }
+    }
+
+    var agentWriteFileEnabled: Bool {
+        get { defaults.bool(forKey: Keys.agentWriteFileEnabled) }
+        set { defaults.set(newValue, forKey: Keys.agentWriteFileEnabled) }
+    }
+
+    var agentRequireConfirmation: Bool {
+        get { defaults.bool(forKey: Keys.agentRequireConfirmation) }
+        set { defaults.set(newValue, forKey: Keys.agentRequireConfirmation) }
     }
 
     // MARK: - External Tools

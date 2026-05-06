@@ -2,10 +2,13 @@ import Foundation
 
 public struct OpenAIProvider: LLMProviderService {
     private let apiKey: String
-    private let baseURL = URL(string: "https://api.openai.com/v1/chat/completions")!
+    private let baseURL: URL
+    private let customHeaders: [String: String]
 
-    public init(apiKey: String) {
+    public init(apiKey: String, baseURL: URL = URL(string: "https://api.openai.com/v1/chat/completions")!, customHeaders: [String: String] = [:]) {
         self.apiKey = apiKey
+        self.baseURL = baseURL
+        self.customHeaders = customHeaders
     }
 
     public func sendMessage(
@@ -31,6 +34,10 @@ public struct OpenAIProvider: LLMProviderService {
                     request.httpMethod = "POST"
                     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
                     request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+
+                    for (key, value) in customHeaders {
+                        request.setValue(value, forHTTPHeaderField: key)
+                    }
 
                     let body = buildRequestBody(
                         messages: messages, model: model,
@@ -92,7 +99,6 @@ public struct OpenAIProvider: LLMProviderService {
                 }
 
                 if hasToolResults {
-                    // Tool results go as separate role:"tool" messages in OpenAI format
                     for part in msg.content {
                         if case .toolResult(let result) = part {
                             apiMessages.append([
@@ -195,7 +201,6 @@ public struct OpenAIProvider: LLMProviderService {
         bytes: URLSession.AsyncBytes,
         continuation: AsyncThrowingStream<StreamChunk, Error>.Continuation
     ) async throws {
-        // State for accumulating tool calls (OpenAI uses index-based deltas)
         var toolCallAccumulators: [Int: (id: String, name: String, arguments: String)] = [:]
 
         for try await line in bytes.lines {
@@ -220,17 +225,14 @@ public struct OpenAIProvider: LLMProviderService {
             else { continue }
 
             if let delta = choice["delta"] as? [String: Any] {
-                // Text content
                 if let content = delta["content"] as? String {
                     continuation.yield(.delta(content))
                 }
 
-                // Tool calls
                 if let toolCalls = delta["tool_calls"] as? [[String: Any]] {
                     for tc in toolCalls {
                         guard let index = tc["index"] as? Int else { continue }
 
-                        // Initialize accumulator on first chunk
                         if let id = tc["id"] as? String {
                             let funcInfo = tc["function"] as? [String: Any]
                             toolCallAccumulators[index] = (
@@ -249,7 +251,6 @@ public struct OpenAIProvider: LLMProviderService {
 
             if let finishReason = choice["finish_reason"] as? String {
                 if finishReason == "tool_calls" {
-                    // Emit all accumulated tool calls
                     for index in toolCallAccumulators.keys.sorted() {
                         if let acc = toolCallAccumulators[index] {
                             let input = parseToolInput(acc.arguments)

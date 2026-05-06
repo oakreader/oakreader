@@ -3,6 +3,8 @@ import OakReaderAI
 
 struct ToolCallCardView: View {
     let record: ToolUseRecord
+    var onApprove: (() -> Void)?
+    var onDeny: (() -> Void)?
 
     @State private var isExpanded = false
 
@@ -38,26 +40,50 @@ struct ToolCallCardView: View {
                     Spacer()
 
                     // Status indicator
-                    if record.isExecuting {
-                        ProgressView()
-                            .controlSize(.mini)
-                            .frame(width: 12, height: 12)
-                    } else {
-                        Image(systemName: record.isError ? "xmark.circle.fill" : "checkmark.circle.fill")
-                            .font(.system(size: 11))
-                            .foregroundStyle(record.isError ? .red : .green)
-                    }
+                    statusView
 
-                    // Expand chevron
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(.tertiary)
-                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    // Expand chevron (hidden when awaiting confirmation)
+                    if record.status != .pending {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(.tertiary)
+                            .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    }
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 6)
             }
             .buttonStyle(.plain)
+
+            // Confirmation buttons
+            if record.status == .pending {
+                Divider()
+                    .padding(.horizontal, 8)
+
+                HStack(spacing: 8) {
+                    Button {
+                        onApprove?()
+                    } label: {
+                        Label("Approve", systemImage: "checkmark.circle")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.green)
+                    .controlSize(.small)
+
+                    Button {
+                        onDeny?()
+                    } label: {
+                        Label("Deny", systemImage: "xmark.circle")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.red)
+                    .controlSize(.small)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+            }
 
             // Expanded result
             if isExpanded, let result = record.result {
@@ -83,6 +109,34 @@ struct ToolCallCardView: View {
             RoundedRectangle(cornerRadius: 8)
                 .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
         )
+    }
+
+    // MARK: - Status View
+
+    @ViewBuilder
+    private var statusView: some View {
+        switch record.status {
+        case .pending:
+            Image(systemName: "questionmark.circle.fill")
+                .font(.system(size: 11))
+                .foregroundStyle(.orange)
+        case .executing:
+            ProgressView()
+                .controlSize(.mini)
+                .frame(width: 12, height: 12)
+        case .completed:
+            Image(systemName: record.isError ? "xmark.circle.fill" : "checkmark.circle.fill")
+                .font(.system(size: 11))
+                .foregroundStyle(record.isError ? .red : .green)
+        case .denied:
+            HStack(spacing: 3) {
+                Image(systemName: "hand.raised.fill")
+                    .font(.system(size: 10))
+                Text("Denied")
+                    .font(.system(size: 10, weight: .medium))
+            }
+            .foregroundStyle(.red)
+        }
     }
 
     // MARK: - Display Helpers

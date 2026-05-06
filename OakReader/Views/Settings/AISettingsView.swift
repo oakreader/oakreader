@@ -2,27 +2,42 @@ import SwiftUI
 import OakReaderAI
 
 struct AISettingsView: View {
-    @State private var provider: AIProvider
+    @State private var providerId: String
     @State private var model: String
     @State private var apiKey: String = ""
     @State private var testResult: String?
     @State private var isTesting: Bool = false
+    @State private var agentToolsEnabled: Bool
+    @State private var agentReadFileEnabled: Bool
+    @State private var agentWriteFileEnabled: Bool
+    @State private var agentRequireConfirmation: Bool
+
+    private var selectedProvider: ProviderInfo? {
+        ProviderRegistry.shared.provider(for: providerId)
+    }
 
     private var selectedModelInfo: ModelInfo? {
-        provider.models.first { $0.id == model }
+        selectedProvider?.models.first { $0.id == model }
     }
 
     init() {
         let prefs = Preferences.shared
-        _provider = State(initialValue: prefs.aiProvider)
-        _model = State(initialValue: prefs.aiModel.isEmpty ? prefs.aiProvider.defaultModel : prefs.aiModel)
+        let pid = prefs.aiProviderId
+        _providerId = State(initialValue: pid)
+        let defaultModel = ProviderRegistry.shared.provider(for: pid)?.defaultModelId ?? ""
+        _model = State(initialValue: prefs.aiModel.isEmpty ? defaultModel : prefs.aiModel)
+        _agentToolsEnabled = State(initialValue: prefs.agentToolsEnabled)
+        _agentReadFileEnabled = State(initialValue: prefs.agentReadFileEnabled)
+        _agentWriteFileEnabled = State(initialValue: prefs.agentWriteFileEnabled)
+        _agentRequireConfirmation = State(initialValue: prefs.agentRequireConfirmation)
     }
 
     var body: some View {
         Form {
             providerSection
             modelInfoSection
-            apiKeySection
+            authSection
+            agentToolsSection
         }
         .formStyle(.grouped)
         .onAppear { loadAPIKey() }
@@ -33,19 +48,21 @@ struct AISettingsView: View {
 
     private var providerSection: some View {
         Section("Provider") {
-            Picker("Provider", selection: $provider) {
-                ForEach(AIProvider.allCases) { p in
-                    Text(p.displayName).tag(p)
+            Picker("Provider", selection: $providerId) {
+                ForEach(ProviderRegistry.shared.allProviders) { p in
+                    Text(p.displayName).tag(p.id)
                 }
             }
-            .onChange(of: provider) { _, newValue in
-                model = newValue.defaultModel
+            .onChange(of: providerId) { _, newValue in
+                model = ProviderRegistry.shared.provider(for: newValue)?.defaultModelId ?? ""
                 loadAPIKey()
             }
 
-            Picker("Model", selection: $model) {
-                ForEach(provider.models) { m in
-                    Text(m.name).tag(m.id)
+            if let provider = selectedProvider {
+                Picker("Model", selection: $model) {
+                    ForEach(provider.models) { m in
+                        Text(m.name).tag(m.id)
+                    }
                 }
             }
         }
@@ -63,26 +80,100 @@ struct AISettingsView: View {
         }
     }
 
-    private var apiKeySection: some View {
-        Section("API Key") {
-            SecureField("API Key for \(provider.displayName)", text: $apiKey)
-                .textFieldStyle(.roundedBorder)
+    @ViewBuilder
+    private var authSection: some View {
+        if let provider = selectedProvider {
+            Section("Authentication") {
+                switch provider.authStrategy {
+                case .apiKey(let envVar):
+                    SecureField("API Key for \(provider.displayName)", text: $apiKey)
+                        .textFieldStyle(.roundedBorder)
 
-            HStack {
-                Button("Test Connection") { testConnection() }
-                    .disabled(apiKey.isEmpty || isTesting)
+                    if let envVar {
+                        Text("Or set the \(envVar) environment variable.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
 
-                if isTesting {
-                    ProgressView()
-                        .controlSize(.small)
-                }
+                    HStack {
+                        Button("Test Connection") { testConnection() }
+                            .disabled(apiKey.isEmpty || isTesting)
 
-                if let result = testResult {
-                    Text(result)
+                        if isTesting {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+
+                        if let result = testResult {
+                            Text(result)
+                                .font(.caption)
+                                .foregroundStyle(result.contains("Success") ? .green : .red)
+                        }
+                    }
+
+                case .oauthPKCE:
+                    if OAuthTokenStore.accessToken(for: provider.id) != nil {
+                        HStack(spacing: 6) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                            Text("Signed in")
+                            Spacer()
+                            Button("Sign Out") {
+                                OAuthTokenStore.delete(for: provider.id)
+                                apiKey = ""
+                                testResult = nil
+                            }
+                        }
+                    } else {
+                        Button("Sign in with \(provider.displayName)...") {
+                            // OAuth PKCE flow will be implemented in Phase 3/4
+                        }
+                    }
+
+                case .oauthDeviceCode:
+                    if OAuthTokenStore.accessToken(for: provider.id) != nil {
+                        HStack(spacing: 6) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                            Text("Connected")
+                            Spacer()
+                            Button("Disconnect") {
+                                OAuthTokenStore.delete(for: provider.id)
+                                apiKey = ""
+                                testResult = nil
+                            }
+                        }
+                    } else {
+                        Button("Connect \(provider.displayName)...") {
+                            // Device code flow will be implemented in Phase 3/4
+                        }
+                    }
+
+                case .none:
+                    Text("No authentication required.")
                         .font(.caption)
-                        .foregroundStyle(result.contains("Success") ? .green : .red)
+                        .foregroundStyle(.secondary)
                 }
             }
+        }
+    }
+
+    private var agentToolsSection: some View {
+        Section("Agent Tools") {
+            Toggle("Enable Agent Tools", isOn: $agentToolsEnabled)
+
+            Toggle("Read File", isOn: $agentReadFileEnabled)
+                .disabled(!agentToolsEnabled)
+
+            Toggle("Write File", isOn: $agentWriteFileEnabled)
+                .disabled(!agentToolsEnabled)
+
+            Toggle("Require Confirmation", isOn: $agentRequireConfirmation)
+                .disabled(!agentToolsEnabled)
+
+            Text("When enabled, the AI will ask for your approval before executing tools.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -95,15 +186,19 @@ struct AISettingsView: View {
     }
 
     private func loadAPIKey() {
-        apiKey = KeychainService.apiKey(for: provider) ?? ""
+        apiKey = KeychainService.apiKey(forProviderId: providerId) ?? ""
         testResult = nil
     }
 
     private func save() {
         let prefs = Preferences.shared
-        prefs.aiProvider = provider
+        prefs.aiProviderId = providerId
         prefs.aiModel = model
-        KeychainService.setAPIKey(apiKey, for: provider)
+        KeychainService.setAPIKey(apiKey, forProviderId: providerId)
+        prefs.agentToolsEnabled = agentToolsEnabled
+        prefs.agentReadFileEnabled = agentReadFileEnabled
+        prefs.agentWriteFileEnabled = agentWriteFileEnabled
+        prefs.agentRequireConfirmation = agentRequireConfirmation
     }
 
     private func testConnection() {
@@ -114,7 +209,7 @@ struct AISettingsView: View {
         Task {
             do {
                 let router = ProviderRouter()
-                let config = ProviderConfig(provider: provider, model: model)
+                let config = ProviderConfig(providerId: providerId, model: model)
                 let svc = try router.provider(for: config)
                 let messages = [LLMMessage(role: .user, text: "Say 'OK' and nothing else.")]
                 let stream = svc.sendMessage(

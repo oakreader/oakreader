@@ -311,7 +311,7 @@ final class MediaViewModel {
 
         // No highlights found — auto-generate if AI key is available
         guard !Task.isCancelled else { return }
-        if KeychainService.apiKey(for: Preferences.shared.youtubeAIProvider) != nil {
+        if CredentialResolver.hasCredentials(for: Preferences.shared.youtubeAIProviderId) {
             highlightsLoadingKey = nil // allow generateHighlightsManually to proceed
             await generateHighlightsManually(media: media)
             return
@@ -915,7 +915,7 @@ struct MediaViewerView: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
             Spacer()
-            if KeychainService.apiKey(for: Preferences.shared.youtubeAIProvider) != nil {
+            if CredentialResolver.hasCredentials(for: Preferences.shared.youtubeAIProviderId) {
                 generateOutlineButton(media: media, title: "Find AI Highlights")
             }
         }
