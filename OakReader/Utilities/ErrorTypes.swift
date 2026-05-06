@@ -6,6 +6,7 @@ enum OakReaderError: LocalizedError {
     case fileWriteFailed(URL, underlying: Error?)
     case invalidPDF
     case invalidHTML
+    case invalidEPUB(String)
     case snapshotImportFailed(String)
     case mediaImportFailed(String)
     case passwordRequired
@@ -42,6 +43,8 @@ enum OakReaderError: LocalizedError {
             return "The file is not a valid PDF document."
         case .invalidHTML:
             return "The file is not a valid HTML document."
+        case .invalidEPUB(let reason):
+            return "The file is not a valid EPUB document: \(reason)"
         case .snapshotImportFailed(let reason):
             return "Web snapshot import failed: \(reason)"
         case .mediaImportFailed(let reason):

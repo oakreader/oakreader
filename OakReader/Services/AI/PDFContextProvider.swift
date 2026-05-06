@@ -18,6 +18,8 @@ struct PDFContextProvider {
             return webSnapshotSnapshot(from: viewModel, contextMode: contextMode)
         case .embed:
             return mediaSnapshot(from: viewModel, contextMode: contextMode)
+        case .epub:
+            return webSnapshotSnapshot(from: viewModel, contextMode: contextMode)
         }
     }
 

@@ -156,6 +156,7 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
     case notes
     case metadata
     case translation
+    case graphMap
 
     var id: String { rawValue }
 
@@ -165,6 +166,7 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
         case .aiChat: return "bubble.left.and.bubble.right"
         case .notes: return "note.text"
         case .translation: return "translate"
+        case .graphMap: return "point.3.connected.trianglepath.dotted"
         }
     }
 
@@ -174,6 +176,7 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
         case .aiChat: return "AI Chat"
         case .notes: return "Notes"
         case .translation: return "Translation"
+        case .graphMap: return "Graph Map"
         }
     }
 }
@@ -181,6 +184,7 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
 enum Plugin: String, CaseIterable, Identifiable {
     case notes
     case translation
+    case graphMap
 
     var id: String { rawValue }
 
@@ -188,6 +192,7 @@ enum Plugin: String, CaseIterable, Identifiable {
         switch self {
         case .notes: return "Notes"
         case .translation: return "Translation"
+        case .graphMap: return "Graph Map"
         }
     }
 
@@ -195,6 +200,7 @@ enum Plugin: String, CaseIterable, Identifiable {
         switch self {
         case .notes: return "Rich markdown notes panel with Mermaid diagrams and image paste."
         case .translation: return "Translate selected text using AI-powered translation."
+        case .graphMap: return "AI-generated concept maps and mind maps from document content."
         }
     }
 
@@ -202,6 +208,7 @@ enum Plugin: String, CaseIterable, Identifiable {
         switch self {
         case .notes: return "note.text"
         case .translation: return "translate"
+        case .graphMap: return "point.3.connected.trianglepath.dotted"
         }
     }
 
@@ -209,6 +216,7 @@ enum Plugin: String, CaseIterable, Identifiable {
         switch self {
         case .notes: return [.notes]
         case .translation: return [.translation]
+        case .graphMap: return [.graphMap]
         }
     }
 
@@ -216,6 +224,7 @@ enum Plugin: String, CaseIterable, Identifiable {
         switch self {
         case .notes: return true
         case .translation: return true
+        case .graphMap: return true
         }
     }
 }

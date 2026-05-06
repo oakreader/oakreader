@@ -9,6 +9,7 @@ class DocumentViewModel {
     weak var document: OakReaderDocument?
     var webSnapshot: WebSnapshotDocument?
     var mediaDocument: MediaDocument?
+    var epubDocument: EPUBDocument?
     var itemType: ItemType
     var state: DocumentState
     /// Database reference, set by AppState when the tab is created.
@@ -92,6 +93,14 @@ class DocumentViewModel {
         return vm
     }
 
+    private var _graph: GraphViewModel?
+    var graph: GraphViewModel {
+        if let vm = _graph { return vm }
+        let vm = GraphViewModel(parent: self, storageKey: storageKey)
+        _graph = vm
+        return vm
+    }
+
     private var _media: MediaViewModel?
     var media: MediaViewModel {
         if let vm = _media { return vm }
@@ -125,6 +134,7 @@ class DocumentViewModel {
         case .pdf: return pdfDocument?.pageCount ?? 0
         case .webSnapshot: return 1
         case .embed: return 1
+        case .epub: return epubDocument?.spineItems.count ?? 0
         }
     }
 
@@ -133,6 +143,7 @@ class DocumentViewModel {
         case .pdf: return pdfDocument != nil
         case .webSnapshot: return webSnapshot != nil
         case .embed: return mediaDocument != nil
+        case .epub: return epubDocument != nil
         }
     }
 
@@ -148,6 +159,8 @@ class DocumentViewModel {
             return webSnapshot?.htmlURL.deletingPathExtension().lastPathComponent ?? "Untitled"
         case .embed:
             return mediaDocument?.metadata.title ?? "Untitled"
+        case .epub:
+            return epubDocument?.title ?? "Untitled"
         }
     }
 
@@ -189,6 +202,21 @@ class DocumentViewModel {
         self.state = DocumentState()
         state.isSidebarVisible = media.metadata.resolvedEmbedType == .youtube
         state.mediaSidebarMode = .outline
+    }
+
+    init(epub: EPUBDocument) {
+        self.epubDocument = epub
+        self.itemType = .epub
+        self.state = DocumentState()
+        state.isSidebarVisible = true
+        state.sidebarMode = .outline
+
+        let prefs = Preferences.shared
+        state.epubFontSize = prefs.epubFontSize
+        state.epubFontFamily = prefs.epubFontFamily
+        state.epubTheme = prefs.epubTheme
+        state.epubMargin = prefs.epubMargin
+        state.epubLineHeight = prefs.epubLineHeight
     }
 
     // MARK: - Action Handling (called directly by AppState)

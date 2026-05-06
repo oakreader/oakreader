@@ -126,7 +126,9 @@ struct ContentView: View {
 
     @ViewBuilder
     private var sidebarContentView: some View {
-        if viewModel.usesMediaSidebar {
+        if viewModel.itemType == .epub {
+            EPUBSidebarView(viewModel: viewModel)
+        } else if viewModel.usesMediaSidebar {
             MediaSidebarView(viewModel: viewModel)
         } else {
             SidebarView(viewModel: viewModel)
@@ -198,6 +200,18 @@ struct ContentView: View {
             }
             .padding(.horizontal, 8)
             .padding(.bottom, 8)
+        case .epub:
+            EPUBViewerRepresentable(
+                viewModel: viewModel,
+                currentSpineIndex: viewModel.state.currentSpineIndex,
+                navigationToken: viewModel.state.epubNavigationToken,
+                fontSize: viewModel.state.epubFontSize,
+                fontFamily: viewModel.state.epubFontFamily,
+                theme: viewModel.state.epubTheme,
+                margin: viewModel.state.epubMargin,
+                lineHeight: viewModel.state.epubLineHeight,
+                zoomLevel: viewModel.state.zoomLevel
+            )
         }
     }
 

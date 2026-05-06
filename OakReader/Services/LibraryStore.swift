@@ -633,14 +633,16 @@ final class LibraryStore {
             options: [.skipsHiddenFiles]
         ) else { return 0 }
 
-        let supportedExtensions: Set<String> = ["pdf", "html", "htm"]
+        let supportedExtensions: Set<String> = ["pdf", "html", "htm", "epub"]
         var count = 0
         for case let fileURL as URL in enumerator {
             let ext = fileURL.pathExtension.lowercased()
             guard supportedExtensions.contains(ext) else { continue }
 
             let item: LibraryItem?
-            if ext == "html" || ext == "htm" {
+            if ext == "epub" {
+                item = importService.importEPUB(from: fileURL)
+            } else if ext == "html" || ext == "htm" {
                 item = importService.importWebSnapshot(from: fileURL)
             } else {
                 item = importService.importPDF(from: fileURL)

@@ -221,6 +221,114 @@ final class ImportService {
         return item
     }
 
+    // MARK: - EPUB Import
+
+    /// Import an EPUB from any URL into managed storage.
+    @discardableResult
+    func importEPUB(from sourceURL: URL) -> LibraryItem? {
+        // Duplicate detection: hash first 64KB
+        if let hash = hashPrefix(of: sourceURL),
+           let existing = findByHash(hash) {
+            return existing
+        }
+
+        if let existing = store.findItem(byFileName: sourceURL.lastPathComponent) {
+            return existing
+        }
+
+        let docId = UUID()
+        let attId = UUID()
+        let itemStorageKey = CatalogDatabase.generateStorageKey()
+        let attStorageKey = CatalogDatabase.generateStorageKey()
+        let docDir = CatalogDatabase.documentDirectory(storageKey: itemStorageKey)
+        let attDir = CatalogDatabase.attachmentDirectory(itemStorageKey: itemStorageKey, attachmentStorageKey: attStorageKey)
+        let destURL = CatalogDatabase.attachmentFileURL(itemStorageKey: itemStorageKey, attachmentStorageKey: attStorageKey, fileName: sourceURL.lastPathComponent)
+
+        do {
+            try FileManager.default.createDirectory(at: docDir, withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(at: attDir, withIntermediateDirectories: true)
+            let sessionsDir = CatalogDatabase.documentSessionsDirectory(storageKey: itemStorageKey)
+            try FileManager.default.createDirectory(at: sessionsDir, withIntermediateDirectories: true)
+
+            try FileManager.default.copyItem(at: sourceURL, to: destURL)
+        } catch {
+            Log.error(Log.importer, "Failed to copy EPUB: \(error)")
+            try? FileManager.default.removeItem(at: docDir)
+            return nil
+        }
+
+        // Parse EPUB to extract metadata
+        var title = sourceURL.deletingPathExtension().lastPathComponent
+        var author = ""
+        var spineCount = 0
+
+        if let epub = try? EPUBDocument(url: destURL) {
+            title = epub.title
+            author = epub.author
+            spineCount = epub.spineItems.count
+
+            // Extract cover image for library thumbnail
+            if let coverURL = epub.coverImageURL {
+                Task {
+                    if let coverData = try? Data(contentsOf: coverURL) {
+                        await MainActor.run {
+                            // Cover will be set after item is created below
+                            _ = coverData  // captured for use after insertItem
+                        }
+                    }
+                }
+            }
+        }
+
+        // File size
+        var fileSize: Int64 = 0
+        if let attrs = try? FileManager.default.attributesOfItem(atPath: destURL.path),
+           let size = attrs[.size] as? Int64 {
+            fileSize = size
+        }
+
+        let now = Date().iso8601String
+        let itemRecord = ItemRecord(
+            id: docId.uuidString,
+            userId: localUserId,
+            storageKey: itemStorageKey,
+            title: title,
+            author: author,
+            lastOpenedAt: nil,
+            syncStatus: SyncStatus.local.rawValue,
+            createdAt: now,
+            updatedAt: now
+        )
+
+        let attRecord = AttachmentRecord(
+            id: attId.uuidString,
+            itemId: docId.uuidString,
+            storageKey: attStorageKey,
+            fileName: sourceURL.lastPathComponent,
+            attachmentType: ItemType.epub.rawValue,
+            sourceURL: nil,
+            fileSize: fileSize,
+            pageCount: spineCount,
+            isPrimary: true,
+            createdAt: now,
+            updatedAt: now
+        )
+
+        guard let item = store.insertItem(itemRecord, attachment: attRecord) else {
+            try? FileManager.default.removeItem(at: docDir)
+            return nil
+        }
+
+        // Generate cover thumbnail from EPUB cover image
+        if let epub = try? EPUBDocument(url: destURL),
+           let coverURL = epub.coverImageURL,
+           let coverData = try? Data(contentsOf: coverURL) {
+            store.updateCover(item, imageData: coverData)
+        }
+
+        return item
+    }
+
     // MARK: - Embed Import
 
     /// Import an embed (YouTube, Twitter, or generic link) from Chrome extension payload.
