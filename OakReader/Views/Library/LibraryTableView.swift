@@ -131,14 +131,10 @@ struct LibraryTableView: View {
         if selectedItems.count == 1, let item = selectedItems.first {
             Button("Open") { openItem(item) }
 
-            if Preferences.shared.isPluginEnabled(.conceptMap) || Preferences.shared.isPluginEnabled(.mindMap) {
+            if Preferences.shared.isPluginEnabled(.graphMap) {
                 Menu("Generate Graph") {
-                    if Preferences.shared.isPluginEnabled(.conceptMap) {
-                        Button("AI Concept Map") { generateGraph(item, type: .conceptMap) }
-                    }
-                    if Preferences.shared.isPluginEnabled(.mindMap) {
-                        Button("AI Mind Map") { generateGraph(item, type: .mindMap) }
-                    }
+                    Button("AI Concept Map") { generateGraph(item, type: .conceptMap) }
+                    Button("AI Mind Map") { generateGraph(item, type: .mindMap) }
                 }
             }
 
@@ -276,7 +272,7 @@ struct LibraryTableView: View {
         // After opening, activate the graph panel and start generation
         DispatchQueue.main.async {
             guard let tab = appState.activeTab else { return }
-            tab.viewModel.state.rightPanelMode = type == .conceptMap ? .conceptMap : .mindMap
+            tab.viewModel.state.rightPanelMode = .graphMap
             tab.viewModel.graph.generate(graphType: type)
         }
     }

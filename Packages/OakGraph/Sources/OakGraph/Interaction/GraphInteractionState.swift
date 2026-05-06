@@ -72,6 +72,25 @@ public class GraphInteractionState {
         offset = .zero
     }
 
+    /// Adjust scale and offset so that `contentRect` fits within `viewSize` with padding.
+    public func zoomToFit(contentRect: CGRect, viewSize: CGSize, padding: CGFloat = 40) {
+        guard contentRect.width > 0, contentRect.height > 0,
+              viewSize.width > 0, viewSize.height > 0 else { return }
+
+        let availableWidth = viewSize.width - padding * 2
+        let availableHeight = viewSize.height - padding * 2
+
+        let scaleX = availableWidth / contentRect.width
+        let scaleY = availableHeight / contentRect.height
+        let fitScale = min(min(scaleX, scaleY), 2.0)
+
+        scale = max(0.25, fitScale)
+        offset = CGPoint(
+            x: (viewSize.width - contentRect.width * scale) / 2 - contentRect.origin.x * scale,
+            y: (viewSize.height - contentRect.height * scale) / 2 - contentRect.origin.y * scale
+        )
+    }
+
     // MARK: - Coordinate Transform
 
     /// Convert a point from view coordinates to canvas coordinates.

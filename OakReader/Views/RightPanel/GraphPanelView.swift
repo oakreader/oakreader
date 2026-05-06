@@ -2,22 +2,13 @@ import SwiftUI
 import OakGraph
 
 /// Right panel view for the Graph Map feature.
-/// Shows either a graph list or the canvas with toolbar.
+/// Shows either a graph card list or the canvas editor.
 struct GraphPanelView: View {
     @Bindable var graphVM: GraphViewModel
-    let graphType: GraphType
-
-    private var filteredGraphs: [GraphMapMeta] {
-        graphVM.graphs(ofType: graphType)
-    }
-
-    private var headerTitle: String {
-        graphType == .conceptMap ? "Concept Maps" : "Mind Maps"
-    }
 
     var body: some View {
         VStack(spacing: 0) {
-            if graphVM.selectedGraphId != nil {
+            if graphVM.selectedGraph != nil {
                 graphEditorView
             } else {
                 graphListView
@@ -31,18 +22,28 @@ struct GraphPanelView: View {
         VStack(spacing: 0) {
             // Header
             HStack(spacing: 8) {
-                Text(headerTitle)
+                Text("Graph Maps")
                     .font(.system(size: 16, weight: .semibold))
                 Spacer()
 
-                Button {
-                    graphVM.generate(graphType: graphType)
+                Menu {
+                    Button {
+                        graphVM.generate(graphType: .conceptMap)
+                    } label: {
+                        Label("Concept Map", systemImage: "point.3.filled.connected.trianglepath.dotted")
+                    }
+                    Button {
+                        graphVM.generate(graphType: .mindMap)
+                    } label: {
+                        Label("Mind Map", systemImage: "brain")
+                    }
                 } label: {
                     Image(systemName: "sparkles")
                 }
-                .buttonStyle(.plain)
-                .help("Generate \(graphType == .conceptMap ? "concept map" : "mind map") from document")
+                .menuStyle(.borderlessButton)
+                .fixedSize()
                 .disabled(graphVM.isGenerating)
+                .help("Generate graph map from document")
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
@@ -63,17 +64,15 @@ struct GraphPanelView: View {
                     .foregroundStyle(.red)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if filteredGraphs.isEmpty {
+            } else if graphVM.graphs.isEmpty {
                 VStack(spacing: 12) {
-                    Image(systemName: graphType == .conceptMap
-                          ? "point.3.connected.trianglepath.dotted"
-                          : "point.3.filled.connected.trianglepath.dotted")
+                    Image(systemName: "point.3.filled.connected.trianglepath.dotted")
                         .font(.system(size: 32))
                         .foregroundStyle(.secondary)
-                    Text("No \(graphType == .conceptMap ? "concept maps" : "mind maps") yet")
+                    Text("No graph maps yet")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                    Text("Generate a \(graphType == .conceptMap ? "concept map" : "mind map") from your document using AI.")
+                    Text("Generate a concept map or mind map from your document using AI.")
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                         .multilineTextAlignment(.center)
@@ -81,19 +80,23 @@ struct GraphPanelView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                List(filteredGraphs) { graph in
-                    GraphListRow(graph: graph)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            graphVM.selectGraph(graph)
+                ScrollView {
+                    LazyVStack(spacing: 8) {
+                        ForEach(graphVM.graphs) { graph in
+                            GraphCardView(graph: graph)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    graphVM.selectGraph(graph)
+                                }
+                                .contextMenu {
+                                    Button("Delete", role: .destructive) {
+                                        graphVM.deleteGraph(graph)
+                                    }
+                                }
                         }
-                        .contextMenu {
-                            Button("Delete", role: .destructive) {
-                                graphVM.deleteGraph(graph)
-                            }
-                        }
+                    }
+                    .padding(8)
                 }
-                .listStyle(.plain)
             }
 
             if let error = graphVM.errorMessage {
@@ -135,11 +138,6 @@ struct GraphPanelView: View {
 
             Divider()
 
-            // Toolbar
-            GraphToolbar(graphVM: graphVM)
-
-            Divider()
-
             // Canvas
             if let doc = graphVM.currentDocument {
                 GraphCanvasView(
@@ -157,7 +155,9 @@ struct GraphPanelView: View {
                     onEditCommitted: { nodeId, newLabel in
                         graphVM.updateNodeLabel(nodeId, label: newLabel)
                     }
-                )
+                ) {
+                    GraphToolbarButtons(graphVM: graphVM)
+                }
             } else {
                 Text("Failed to load graph.")
                     .foregroundStyle(.secondary)
@@ -167,28 +167,78 @@ struct GraphPanelView: View {
     }
 }
 
-// MARK: - List Row
+// MARK: - Card View
 
-private struct GraphListRow: View {
+private struct GraphCardView: View {
     let graph: GraphMapMeta
 
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: graph.graphType == "mindMap" ? "point.3.filled.connected.trianglepath.dotted" : "point.3.connected.trianglepath.dotted")
-                .foregroundStyle(.secondary)
-                .frame(width: 20)
+    private var typeBadge: String {
+        graph.graphType == "mindMap" ? "Mind Map" : "Concept Map"
+    }
 
-            VStack(alignment: .leading, spacing: 2) {
+    private var typeIcon: String {
+        graph.graphType == "mindMap" ? "brain" : "point.3.filled.connected.trianglepath.dotted"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Thumbnail cover
+            thumbnailView
+                .frame(maxWidth: .infinity)
+                .frame(height: 120)
+                .clipped()
+
+            // Info row
+            VStack(alignment: .leading, spacing: 4) {
                 Text(graph.displayTitle)
                     .font(.system(size: 13, weight: .medium))
                     .lineLimit(1)
-                Text(graph.updatedAt.formatted(date: .abbreviated, time: .shortened))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
 
-            Spacer()
+                HStack(spacing: 6) {
+                    // Type badge
+                    HStack(spacing: 3) {
+                        Image(systemName: typeIcon)
+                            .font(.system(size: 9))
+                        Text(typeBadge)
+                            .font(.system(size: 10, weight: .medium))
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(.secondary.opacity(0.12), in: Capsule())
+                    .foregroundStyle(.secondary)
+
+                    Spacer()
+
+                    Text(graph.updatedAt.formatted(date: .abbreviated, time: .omitted))
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
         }
-        .padding(.vertical, 4)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5)
+        )
+    }
+
+    @ViewBuilder
+    private var thumbnailView: some View {
+        if let data = graph.thumbnailData, let nsImage = NSImage(data: data) {
+            Image(nsImage: nsImage)
+                .resizable()
+                .scaledToFill()
+        } else {
+            // Placeholder
+            ZStack {
+                Color(nsColor: .windowBackgroundColor)
+                Image(systemName: typeIcon)
+                    .font(.system(size: 28))
+                    .foregroundStyle(.quaternary)
+            }
+        }
     }
 }

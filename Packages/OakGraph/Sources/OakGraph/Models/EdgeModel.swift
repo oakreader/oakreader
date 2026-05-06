@@ -22,4 +22,14 @@ public struct EdgeModel: Identifiable, Codable, Sendable, Hashable {
         self.label = label
         self.style = style
     }
+
+    // Custom decoder: provides defaults for fields the LLM may omit.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = (try? c.decode(UUID.self, forKey: .id)) ?? UUID()
+        self.sourceId = try c.decode(UUID.self, forKey: .sourceId)
+        self.targetId = try c.decode(UUID.self, forKey: .targetId)
+        self.label = (try? c.decode(String.self, forKey: .label)) ?? ""
+        self.style = (try? c.decode(EdgeStyle.self, forKey: .style)) ?? .default
+    }
 }

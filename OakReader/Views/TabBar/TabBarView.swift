@@ -41,7 +41,7 @@ struct TabBarView: View {
                     Image(systemName: pinnedTabIcon)
                         .font(.system(size: OakStyle.Font.icon))
                     Text(pinnedTabTitle)
-                        .font(.system(size: OakStyle.Font.body, weight: .regular))
+                        .font(OakStyle.Font.styled(size: OakStyle.Font.body, weight: .regular))
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }

@@ -26,6 +26,18 @@ public struct GraphDocument: Codable, Sendable {
         self.canvasSize = canvasSize
     }
 
+    // Custom decoder: provides defaults for fields the LLM may omit.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = (try? c.decode(UUID.self, forKey: .id)) ?? UUID()
+        self.title = try c.decode(String.self, forKey: .title)
+        self.graphType = try c.decode(GraphType.self, forKey: .graphType)
+        self.nodes = try c.decode([NodeModel].self, forKey: .nodes)
+        self.edges = try c.decode([EdgeModel].self, forKey: .edges)
+        self.canvasSize = (try? c.decode(CGSize.self, forKey: .canvasSize))
+            ?? CGSize(width: 2000, height: 2000)
+    }
+
     /// Look up a node by ID.
     public func node(withId id: UUID) -> NodeModel? {
         nodes.first { $0.id == id }
@@ -72,6 +84,16 @@ public struct GraphDocument: Codable, Sendable {
     /// Remove an edge by ID.
     public mutating func removeEdge(_ edgeId: UUID) {
         edges.removeAll { $0.id == edgeId }
+    }
+
+    /// Bounding rectangle enclosing all nodes.
+    public var boundingRect: CGRect {
+        guard let first = nodes.first else { return .zero }
+        var rect = first.bounds
+        for node in nodes.dropFirst() {
+            rect = rect.union(node.bounds)
+        }
+        return rect
     }
 
     /// Filter out edges that reference non-existent nodes.

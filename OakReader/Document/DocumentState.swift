@@ -72,6 +72,10 @@ class DocumentState {
     var currentSpineIndex: Int = 0
     /// Incremented on every TOC click to force the viewer to reload even when spine index is unchanged.
     var epubNavigationToken: Int = 0
+    /// Fragment identifier from the TOC href (e.g. "section2" from "chapter.xhtml#section2").
+    var epubNavigationFragment: String?
+    /// TOC label for heuristic heading search when no fragment exists.
+    var epubNavigationLabel: String?
 
     // EPUB Reader Settings (loaded from Preferences on init)
     var epubFontSize: Int = 18

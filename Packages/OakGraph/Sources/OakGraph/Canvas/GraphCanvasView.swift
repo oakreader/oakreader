@@ -1,9 +1,12 @@
 import SwiftUI
+import AppKit
 
 /// Main graph canvas view providing rendering, zoom, pan, and interaction.
-public struct GraphCanvasView: View {
+/// Includes built-in floating zoom controls and auto-fit on appear.
+public struct GraphCanvasView<FloatingActions: View>: View {
     @Bindable var interaction: GraphInteractionState
     let document: GraphDocument
+    let floatingActions: FloatingActions
 
     // Callbacks
     var onNodeMoved: ((UUID, CGPoint) -> Void)?
@@ -13,6 +16,8 @@ public struct GraphCanvasView: View {
     var onDeleteRequested: (() -> Void)?
     var onEditCommitted: ((UUID, String) -> Void)?
 
+    @State private var viewSize: CGSize = .zero
+
     public init(
         interaction: GraphInteractionState,
         document: GraphDocument,
@@ -21,7 +26,8 @@ public struct GraphCanvasView: View {
         onEdgeSelected: ((UUID?) -> Void)? = nil,
         onNodeDoubleTapped: ((UUID) -> Void)? = nil,
         onDeleteRequested: (() -> Void)? = nil,
-        onEditCommitted: ((UUID, String) -> Void)? = nil
+        onEditCommitted: ((UUID, String) -> Void)? = nil,
+        @ViewBuilder floatingActions: () -> FloatingActions
     ) {
         self.interaction = interaction
         self.document = document
@@ -31,12 +37,15 @@ public struct GraphCanvasView: View {
         self.onNodeDoubleTapped = onNodeDoubleTapped
         self.onDeleteRequested = onDeleteRequested
         self.onEditCommitted = onEditCommitted
+        self.floatingActions = floatingActions()
     }
 
     public var body: some View {
         ZStack {
             canvas
             inlineEditorOverlay
+            ScrollZoomOverlay(interaction: interaction)
+            floatingZoomControls
         }
         .clipped()
         .onKeyPress(.delete) {
@@ -44,6 +53,83 @@ public struct GraphCanvasView: View {
             return .handled
         }
         .focusable()
+        .background(GeometryReader { geo in
+            Color.clear
+                .onAppear { viewSize = geo.size }
+                .onChange(of: geo.size) { _, newSize in viewSize = newSize }
+        })
+        .onAppear {
+            // Auto-fit graph to view on first appearance
+            DispatchQueue.main.async {
+                if viewSize.width > 0 {
+                    interaction.zoomToFit(
+                        contentRect: document.boundingRect,
+                        viewSize: viewSize
+                    )
+                }
+            }
+        }
+    }
+
+    // MARK: - Floating Zoom Controls
+
+    private var floatingZoomControls: some View {
+        VStack {
+            Spacer()
+            HStack(spacing: 6) {
+                HStack(spacing: 4) {
+                    Button {
+                        interaction.zoom(by: 0.8)
+                    } label: {
+                        Image(systemName: "minus")
+                            .font(.system(size: 11, weight: .medium))
+                            .frame(width: 24, height: 24)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Zoom out")
+
+                    Divider()
+                        .frame(height: 14)
+
+                    Button {
+                        interaction.zoomToFit(
+                            contentRect: document.boundingRect,
+                            viewSize: viewSize
+                        )
+                    } label: {
+                        Text("\(Int(interaction.scale * 100))%")
+                            .font(.system(size: 11, weight: .medium).monospacedDigit())
+                            .frame(minWidth: 36)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Zoom to fit")
+
+                    Divider()
+                        .frame(height: 14)
+
+                    Button {
+                        interaction.zoom(by: 1.25)
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 11, weight: .medium))
+                            .frame(width: 24, height: 24)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Zoom in")
+                }
+                .padding(.horizontal, 4)
+                .padding(.vertical, 2)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 6))
+                .shadow(color: .black.opacity(0.08), radius: 2, y: 1)
+
+                floatingActions
+
+                Spacer()
+            }
+            .padding(.leading, 10)
+            .padding(.bottom, 10)
+        }
+        .allowsHitTesting(true)
     }
 
     // MARK: - Canvas
@@ -205,5 +291,77 @@ public struct GraphCanvasView: View {
                 let newScale = min(4.0, max(0.25, interaction.scale * factor))
                 interaction.scale = newScale
             }
+    }
+}
+
+// MARK: - Convenience Init (no floating actions)
+
+extension GraphCanvasView where FloatingActions == EmptyView {
+    public init(
+        interaction: GraphInteractionState,
+        document: GraphDocument,
+        onNodeMoved: ((UUID, CGPoint) -> Void)? = nil,
+        onNodeSelected: ((UUID?) -> Void)? = nil,
+        onEdgeSelected: ((UUID?) -> Void)? = nil,
+        onNodeDoubleTapped: ((UUID) -> Void)? = nil,
+        onDeleteRequested: (() -> Void)? = nil,
+        onEditCommitted: ((UUID, String) -> Void)? = nil
+    ) {
+        self.init(
+            interaction: interaction,
+            document: document,
+            onNodeMoved: onNodeMoved,
+            onNodeSelected: onNodeSelected,
+            onEdgeSelected: onEdgeSelected,
+            onNodeDoubleTapped: onNodeDoubleTapped,
+            onDeleteRequested: onDeleteRequested,
+            onEditCommitted: onEditCommitted,
+            floatingActions: { EmptyView() }
+        )
+    }
+}
+
+// MARK: - Cmd + Scroll Wheel Zoom
+
+/// Transparent NSView overlay that intercepts Cmd+scroll-wheel events for zoom.
+private struct ScrollZoomOverlay: NSViewRepresentable {
+    let interaction: GraphInteractionState
+
+    func makeNSView(context: Context) -> ScrollZoomNSView {
+        let view = ScrollZoomNSView()
+        view.interaction = interaction
+        return view
+    }
+
+    func updateNSView(_ nsView: ScrollZoomNSView, context: Context) {
+        nsView.interaction = interaction
+    }
+}
+
+private class ScrollZoomNSView: NSView {
+    var interaction: GraphInteractionState?
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        // Only capture events when Cmd is held; otherwise pass through
+        if NSEvent.modifierFlags.contains(.command) {
+            return super.hitTest(point)
+        }
+        return nil
+    }
+
+    override func scrollWheel(with event: NSEvent) {
+        guard let interaction,
+              event.modifierFlags.contains(.command) else {
+            super.scrollWheel(with: event)
+            return
+        }
+
+        let delta = event.scrollingDeltaY
+        guard delta != 0 else { return }
+
+        let factor: CGFloat = delta > 0 ? 1.03 : 0.97
+        let location = convert(event.locationInWindow, from: nil)
+        let anchor = CGPoint(x: location.x, y: bounds.height - location.y)
+        interaction.zoom(by: factor, anchor: anchor)
     }
 }

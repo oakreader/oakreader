@@ -139,6 +139,63 @@ public struct GraphExporter {
         return svg
     }
 
+    // MARK: - Thumbnail
+
+    /// Export a small thumbnail PNG of the graph for list previews.
+    @MainActor
+    public func exportThumbnail(_ document: GraphDocument, targetSize: CGSize = CGSize(width: 320, height: 200)) -> Data? {
+        let bounds = computeBounds(document)
+        guard bounds.width > 0, bounds.height > 0 else { return nil }
+
+        let padding: CGFloat = 20
+        let contentWidth = bounds.width + padding * 2
+        let contentHeight = bounds.height + padding * 2
+
+        // Fit content into target size
+        let scaleX = targetSize.width / contentWidth
+        let scaleY = targetSize.height / contentHeight
+        let fitScale = min(scaleX, scaleY, 1.0) // don't upscale
+
+        let width = contentWidth * fitScale
+        let height = contentHeight * fitScale
+        let offsetX = (-bounds.minX + padding) * fitScale
+        let offsetY = (-bounds.minY + padding) * fitScale
+
+        let view = Canvas { context, size in
+            // White background
+            context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.white))
+            context.scaleBy(x: fitScale, y: fitScale)
+            context.translateBy(x: (-bounds.minX + padding), y: (-bounds.minY + padding))
+
+            // Draw edges
+            for edge in document.edges {
+                guard let source = document.node(withId: edge.sourceId),
+                      let target = document.node(withId: edge.targetId) else { continue }
+                EdgeRenderer.draw(
+                    edge: edge, source: source, target: target,
+                    isSelected: false, in: &context, canvasSize: size
+                )
+            }
+
+            // Draw nodes
+            for node in document.nodes {
+                NodeRenderer.draw(
+                    node: node, isSelected: false,
+                    in: &context, canvasSize: size
+                )
+            }
+        }
+        .frame(width: width, height: height)
+
+        let renderer = ImageRenderer(content: view)
+        renderer.scale = 1.0 // 1x for speed
+
+        guard let nsImage = renderer.nsImage else { return nil }
+        guard let tiff = nsImage.tiffRepresentation,
+              let bitmap = NSBitmapImageRep(data: tiff) else { return nil }
+        return bitmap.representation(using: .png, properties: [:])
+    }
+
     // MARK: - Helpers
 
     /// Compute the bounding rectangle of all nodes.

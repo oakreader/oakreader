@@ -12,6 +12,7 @@ class GraphViewModel {
     var selectedGraphId: UUID?
     var currentDocument: GraphDocument?
     var interaction = GraphInteractionState()
+    var fullScreenInteraction = GraphInteractionState()
     var isGenerating: Bool = false
     var isFullScreen: Bool = false
     var errorMessage: String?
@@ -21,8 +22,9 @@ class GraphViewModel {
         return graphs.first { $0.id == id }
     }
 
-    func graphs(ofType type: GraphType) -> [GraphMapMeta] {
-        graphs.filter { $0.graphType == type.rawValue }
+    func enterFullScreen() {
+        fullScreenInteraction = GraphInteractionState()
+        isFullScreen = true
     }
 
     // MARK: - Private
@@ -196,6 +198,9 @@ class GraphViewModel {
                 selectGraph(meta)
                 currentDocument = document
 
+                // Generate thumbnail
+                generateThumbnail(for: document, storageKey: storageKey)
+
             } catch is CancellationError {
                 // User cancelled
             } catch {
@@ -241,6 +246,19 @@ class GraphViewModel {
         return GraphExporter().exportSVG(doc)
     }
 
+    // MARK: - Thumbnails
+
+    private nonisolated func generateThumbnail(for document: GraphDocument, storageKey: String) {
+        let svc = graphService
+        Task { @MainActor in
+            guard let data = GraphExporter().exportThumbnail(document) else { return }
+            svc.saveThumbnail(data, for: document, storageKey: storageKey)
+            if let idx = self.graphs.firstIndex(where: { $0.id == document.id }) {
+                self.graphs[idx].thumbnailData = data
+            }
+        }
+    }
+
     // MARK: - Auto-Save (debounced)
 
     private func scheduleSave() {
@@ -262,6 +280,7 @@ class GraphViewModel {
                 graphs[idx].graphType = document.graphType.rawValue
                 graphs[idx].updatedAt = Date()
             }
+            generateThumbnail(for: document, storageKey: storageKey)
         } catch {
             Log.error(Log.store, "Failed to save graph: \(error)")
         }

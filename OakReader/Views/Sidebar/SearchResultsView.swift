@@ -17,7 +17,7 @@ struct SearchSidebarView: View {
 
                 TextField("Find in document...", text: $searchText)
                     .textFieldStyle(.plain)
-                    .font(.system(size: OakStyle.Font.body))
+                    .font(OakStyle.Font.styledBody)
                     .focused($isSearchFieldFocused)
                     .onSubmit {
                         performSearch()
@@ -47,15 +47,15 @@ struct SearchSidebarView: View {
                         ProgressView()
                             .controlSize(.small)
                         Text("Searching...")
-                            .font(.system(size: OakStyle.Font.caption))
+                            .font(OakStyle.Font.styledCaption)
                             .foregroundStyle(.secondary)
                     } else if viewModel.viewer.hasSearchResults {
                         Text(viewModel.viewer.searchResultLabel)
-                            .font(.system(size: OakStyle.Font.caption))
+                            .font(OakStyle.Font.styledCaption)
                             .foregroundStyle(.secondary)
                     } else {
                         Text("No results")
-                            .font(.system(size: OakStyle.Font.caption))
+                            .font(OakStyle.Font.styledCaption)
                             .foregroundStyle(.secondary)
                     }
 
@@ -66,7 +66,7 @@ struct SearchSidebarView: View {
                             viewModel.viewer.previousSearchResult()
                         } label: {
                             Image(systemName: "chevron.up")
-                                .font(.system(size: OakStyle.Font.body, weight: .medium))
+                                .font(OakStyle.Font.styled(size: OakStyle.Font.body, weight: .medium))
                                 .frame(width: 24, height: 24)
                                 .contentShape(Rectangle())
                         }
@@ -76,7 +76,7 @@ struct SearchSidebarView: View {
                             viewModel.viewer.nextSearchResult()
                         } label: {
                             Image(systemName: "chevron.down")
-                                .font(.system(size: OakStyle.Font.body, weight: .medium))
+                                .font(OakStyle.Font.styled(size: OakStyle.Font.body, weight: .medium))
                                 .frame(width: 24, height: 24)
                                 .contentShape(Rectangle())
                         }
@@ -128,7 +128,7 @@ struct SearchSidebarView: View {
                         .font(.title)
                         .foregroundStyle(.tertiary)
                     Text("No matches found")
-                        .font(.system(size: OakStyle.Font.body))
+                        .font(OakStyle.Font.styledBody)
                         .foregroundStyle(.secondary)
                     Spacer()
                 }
@@ -167,12 +167,12 @@ private struct SearchResultRow: View {
         VStack(alignment: .leading, spacing: 3) {
             if let page = selection.pages.first, let doc = document {
                 Text("Page \(doc.index(for: page) + 1)")
-                    .font(.system(size: OakStyle.Font.caption, weight: .medium))
+                    .font(OakStyle.Font.styled(size: OakStyle.Font.caption, weight: .medium))
                     .foregroundStyle(.secondary)
             }
 
             Text(snippetText)
-                .font(.system(size: OakStyle.Font.body))
+                .font(OakStyle.Font.styledBody)
                 .lineLimit(3)
                 .foregroundStyle(isSelected ? .primary : .secondary)
         }

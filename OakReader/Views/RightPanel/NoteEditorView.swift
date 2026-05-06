@@ -37,6 +37,9 @@ struct NoteEditorView: View {
     @AppStorage("noteEditorLineSpacing") private var lineSpacing: Double = 3.0
     @AppStorage("noteEditorLetterSpacing") private var letterSpacing: Double = 0.5
     @AppStorage("noteEditorAccentColor") private var accentColorHex: String = "#0CA69A"
+    @AppStorage("noteEditorFontOverridden") private var fontOverridden: Bool = false
+    @AppStorage("globalFontFamily") private var globalFontFamily: String = "system"
+    @AppStorage("globalFontSize") private var globalFontSize: Double = 14.0
 
     @State private var editorCoordinator: MarkdownTextView.Coordinator?
 
@@ -44,9 +47,19 @@ struct NoteEditorView: View {
         NoteEditorMode(rawValue: currentModeRaw) ?? .edit
     }
 
+    private var effectiveFontFamily: String {
+        if fontOverridden { return fontFamily }
+        return FontFamily(rawValue: globalFontFamily)?.fontName ?? ".AppleSystemUIFont"
+    }
+
+    private var effectiveFontSize: CGFloat {
+        if fontOverridden { return CGFloat(fontSize) }
+        return CGFloat(globalFontSize)
+    }
+
     private var editorFont: NSFont {
-        NSFont(name: fontFamily, size: CGFloat(fontSize))
-            ?? NSFont.systemFont(ofSize: CGFloat(fontSize))
+        NSFont(name: effectiveFontFamily, size: effectiveFontSize)
+            ?? NSFont.systemFont(ofSize: effectiveFontSize)
     }
 
     var body: some View {

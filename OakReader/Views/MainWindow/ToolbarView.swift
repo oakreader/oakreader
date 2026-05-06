@@ -45,7 +45,7 @@ struct OakReaderToolbarView: View {
             }
 
             Text(viewModel.viewer.zoomPercentage)
-                .font(.system(size: OakStyle.Font.body).monospacedDigit())
+                .font(OakStyle.Font.styledBody.monospacedDigit())
                 .frame(width: 40)
 
             OakToolButton(
@@ -77,7 +77,7 @@ struct OakReaderToolbarView: View {
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 38)
                     .multilineTextAlignment(.center)
-                    .font(.system(size: OakStyle.Font.body))
+                    .font(OakStyle.Font.styledBody)
                     .onSubmit {
                         if let page = Int(goToPageText) {
                             viewModel.viewer.goToPage(page - 1)
@@ -85,7 +85,7 @@ struct OakReaderToolbarView: View {
                         syncPageText()
                     }
                 Text("/ \(viewModel.pageCount)")
-                    .font(.system(size: OakStyle.Font.body).monospacedDigit())
+                    .font(OakStyle.Font.styledBody.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
 

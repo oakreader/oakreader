@@ -57,7 +57,7 @@ struct ChatHistoryDrawer: View {
             HStack(spacing: 8) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(session.title.isEmpty ? "New Chat" : session.title)
-                        .font(.system(size: OakStyle.Font.body))
+                        .font(OakStyle.Font.styledBody)
                         .foregroundStyle(.primary)
                         .lineLimit(1)
 

@@ -1,4 +1,41 @@
 import SwiftUI
+import AppKit
+
+// MARK: - Font Family
+
+enum FontFamily: String, CaseIterable, Identifiable {
+    case system = "system"
+    case serif = "serif"
+    case sansSerif = "sans-serif"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .system: return "System"
+        case .serif: return "Serif"
+        case .sansSerif: return "Sans-serif"
+        }
+    }
+
+    /// SwiftUI `Font.Design` for use with `.system(size:weight:design:)`.
+    var swiftUIDesign: Font.Design {
+        switch self {
+        case .system: return .default
+        case .serif: return .serif
+        case .sansSerif: return .default
+        }
+    }
+
+    /// Concrete font name for `NSFont` contexts.
+    var fontName: String {
+        switch self {
+        case .system: return ".AppleSystemUIFont"
+        case .serif: return "New York"
+        case .sansSerif: return ".AppleSystemUIFont"
+        }
+    }
+}
 
 enum OakStyle {
     // MARK: - Colors
@@ -52,14 +89,60 @@ enum OakStyle {
     // MARK: - Typography
 
     enum Font {
-        /// Primary text size used in tabs, toolbar controls, page input
-        static let body: CGFloat = 13
-        /// Secondary text for labels, search results, popover controls
-        static let caption: CGFloat = 12
-        /// Toolbar and tab bar icon size
+        /// Primary text size — derived from the user's global base font size.
+        static var body: CGFloat {
+            Preferences.shared.globalFontSize - 1
+        }
+        /// Secondary text size — derived from the user's global base font size.
+        static var caption: CGFloat {
+            Preferences.shared.globalFontSize - 2
+        }
+        /// Toolbar and tab bar icon size (fixed).
         static let icon: CGFloat = 16
-        /// Small icon size (close buttons, chevrons in search)
+        /// Small icon size (close buttons, chevrons in search) (fixed).
         static let iconSmall: CGFloat = 11
+
+        // MARK: - Styled Font Helpers
+
+        /// The user's chosen global font family.
+        private static var family: FontFamily {
+            FontFamily(rawValue: Preferences.shared.globalFontFamily) ?? .system
+        }
+
+        /// Returns a SwiftUI `Font` with the correct design for the user's chosen family.
+        static func styled(size: CGFloat, weight: SwiftUI.Font.Weight = .regular) -> SwiftUI.Font {
+            .system(size: size, weight: weight, design: family.swiftUIDesign)
+        }
+
+        /// Body-sized styled font.
+        static var styledBody: SwiftUI.Font {
+            styled(size: body)
+        }
+
+        /// Caption-sized styled font.
+        static var styledCaption: SwiftUI.Font {
+            styled(size: caption)
+        }
+
+        /// Returns an `NSFont` respecting the user's chosen font family.
+        static func nsFont(size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont {
+            let fam = family
+            switch fam {
+            case .system:
+                return NSFont.systemFont(ofSize: size, weight: weight)
+            case .serif:
+                if let font = NSFont(name: "New York", size: size) {
+                    return font
+                }
+                // Fallback: use serif descriptor
+                let descriptor = NSFontDescriptor.preferredFontDescriptor(forTextStyle: .body)
+                    .withDesign(.serif) ?? NSFontDescriptor()
+                return NSFont(descriptor: descriptor.withSize(size), size: size)
+                    ?? NSFont.systemFont(ofSize: size, weight: weight)
+            case .sansSerif:
+                return NSFont.systemFont(ofSize: size, weight: weight)
+            }
+        }
     }
 
     // MARK: - Spacing

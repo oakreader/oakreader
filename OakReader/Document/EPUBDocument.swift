@@ -63,21 +63,36 @@ final class EPUBDocument {
         }
         self.spineItems = resolved
 
-        // Build href-to-spine-index lookup for TOC resolution
+        // Build href-to-spine-index lookup for TOC resolution.
+        // Store multiple key variants to handle path format mismatches between
+        // the TOC (NCX src / EPUB3 nav href) and the OPF manifest href.
         var hrefToSpineIndex: [String: Int] = [:]
         for (index, item) in resolved.enumerated() {
-            // Store both with and without fragment
-            hrefToSpineIndex[item.path] = index
-            // Also store the filename without directory prefix for flexible matching
-            let fileName = (item.path as NSString).lastPathComponent
+            let path = item.path
+            hrefToSpineIndex[path] = index
+            // Percent-decoded variant
+            if let decoded = path.removingPercentEncoding, decoded != path {
+                hrefToSpineIndex[decoded] = index
+            }
+            // Filename-only variant for flexible matching
+            let fileName = (path as NSString).lastPathComponent
             if hrefToSpineIndex[fileName] == nil {
                 hrefToSpineIndex[fileName] = index
             }
+            if let decodedName = fileName.removingPercentEncoding,
+               decodedName != fileName,
+               hrefToSpineIndex[decodedName] == nil {
+                hrefToSpineIndex[decodedName] = index
+            }
         }
+
+        // Collect all spine paths for suffix matching fallback
+        let spinePaths = resolved.map(\.path)
 
         self.tableOfContents = EPUBDocument.buildTOC(
             from: document.tableOfContents,
-            hrefLookup: hrefToSpineIndex
+            hrefLookup: hrefToSpineIndex,
+            spinePaths: spinePaths
         )
     }
 
@@ -91,33 +106,28 @@ final class EPUBDocument {
 
     private static func buildTOC(
         from toc: EPUBTableOfContents,
-        hrefLookup: [String: Int]
+        hrefLookup: [String: Int],
+        spinePaths: [String]
     ) -> [EPUBTOCEntry] {
         guard let subTable = toc.subTable else { return [] }
-        return subTable.map { buildTOCEntry(from: $0, hrefLookup: hrefLookup) }
+        return subTable.map { buildTOCEntry(from: $0, hrefLookup: hrefLookup, spinePaths: spinePaths) }
     }
 
     private static func buildTOCEntry(
         from toc: EPUBTableOfContents,
-        hrefLookup: [String: Int]
+        hrefLookup: [String: Int],
+        spinePaths: [String]
     ) -> EPUBTOCEntry {
         let href = toc.item
         var spineIndex: Int?
 
         if let href {
-            // Strip fragment identifier for spine lookup
-            let basePath = href.components(separatedBy: "#").first ?? href
-            spineIndex = hrefLookup[basePath]
-            if spineIndex == nil {
-                // Try filename-only match
-                let fileName = (basePath as NSString).lastPathComponent
-                spineIndex = hrefLookup[fileName]
-            }
+            spineIndex = resolveSpineIndex(href: href, hrefLookup: hrefLookup, spinePaths: spinePaths)
         }
 
         let children: [EPUBTOCEntry]
         if let subTable = toc.subTable {
-            children = subTable.map { buildTOCEntry(from: $0, hrefLookup: hrefLookup) }
+            children = subTable.map { buildTOCEntry(from: $0, hrefLookup: hrefLookup, spinePaths: spinePaths) }
         } else {
             children = []
         }
@@ -129,5 +139,63 @@ final class EPUBDocument {
             spineIndex: spineIndex,
             children: children
         )
+    }
+
+    /// Resolve a TOC href to a spine index using multiple matching strategies.
+    /// Handles mismatches between NCX/nav hrefs and manifest paths (different base dirs,
+    /// percent-encoding, relative path prefixes).
+    private static func resolveSpineIndex(
+        href: String,
+        hrefLookup: [String: Int],
+        spinePaths: [String]
+    ) -> Int? {
+        // Strip fragment identifier
+        let basePath = href.components(separatedBy: "#").first ?? href
+        let cleanPath = basePath.replacingOccurrences(of: "./", with: "")
+
+        // 1. Exact match
+        if let idx = hrefLookup[cleanPath] { return idx }
+
+        // 2. Percent-decoded match
+        if let decoded = cleanPath.removingPercentEncoding, decoded != cleanPath {
+            if let idx = hrefLookup[decoded] { return idx }
+        }
+
+        // 3. Filename-only match
+        let fileName = (cleanPath as NSString).lastPathComponent
+        if let idx = hrefLookup[fileName] { return idx }
+        if let decodedName = fileName.removingPercentEncoding, decodedName != fileName {
+            if let idx = hrefLookup[decodedName] { return idx }
+        }
+
+        // 4. Suffix match: the TOC href might be relative to a subdirectory
+        //    (e.g., nav href "chapter1.xhtml" should match spine path "Text/chapter1.xhtml")
+        for (index, spinePath) in spinePaths.enumerated() {
+            if spinePath.hasSuffix("/\(cleanPath)") || spinePath == cleanPath {
+                return index
+            }
+            // Also try: spine path might be a suffix of the TOC href
+            // (e.g., href "../Text/chapter1.xhtml" should match spine path "Text/chapter1.xhtml")
+            if cleanPath.hasSuffix("/\(spinePath)") {
+                return index
+            }
+            // Percent-decoded comparison
+            if let decodedSpine = spinePath.removingPercentEncoding {
+                if decodedSpine.hasSuffix("/\(cleanPath)") || decodedSpine == cleanPath {
+                    return index
+                }
+            }
+        }
+
+        // 5. Case-insensitive filename match as last resort
+        let lowerFileName = fileName.lowercased()
+        for (index, spinePath) in spinePaths.enumerated() {
+            let spineFileName = (spinePath as NSString).lastPathComponent.lowercased()
+            if spineFileName == lowerFileName {
+                return index
+            }
+        }
+
+        return nil
     }
 }
