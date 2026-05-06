@@ -1,6 +1,5 @@
 import SwiftUI
 import PDFKit
-import OakGraph
 
 struct ContentView: View {
     let viewModel: DocumentViewModel
@@ -87,11 +86,6 @@ struct ContentView: View {
                 set: { viewModel.state.rightPanelMode = $0 }
             ))
         }
-        .overlay {
-            if viewModel.graph.isFullScreen, let doc = viewModel.graph.currentDocument {
-                graphFullScreenOverlay(document: doc)
-            }
-        }
         .background(OakStyle.Colors.tabBarBackground)
         .alert("Error", isPresented: Binding(
             get: { viewModel.state.showError },
@@ -144,69 +138,6 @@ struct ContentView: View {
     private func adjustSidebarWidthForMediaIfNeeded() {
         guard viewModel.usesMediaSidebar else { return }
         sidebarWidth = max(sidebarWidth, 280)
-    }
-
-    // MARK: - Full Screen Graph Overlay
-
-    private func exitFullScreen() {
-        viewModel.graph.isFullScreen = false
-    }
-
-    @ViewBuilder
-    private func graphFullScreenOverlay(document: GraphDocument) -> some View {
-        ZStack {
-            Color(nsColor: .windowBackgroundColor)
-
-            GraphCanvasView(
-                interaction: viewModel.graph.fullScreenInteraction,
-                document: document,
-                onNodeMoved: { nodeId, position in
-                    viewModel.graph.moveNode(nodeId, to: position)
-                },
-                onNodeSelected: { _ in },
-                onEdgeSelected: { _ in },
-                onNodeDoubleTapped: { _ in },
-                onDeleteRequested: {
-                    viewModel.graph.deleteSelected()
-                },
-                onEditCommitted: { nodeId, newLabel in
-                    viewModel.graph.updateNodeLabel(nodeId, label: newLabel)
-                }
-            )
-
-            // Close button (top-right)
-            VStack {
-                HStack {
-                    Text(document.title.isEmpty ? "Graph" : document.title)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.secondary)
-
-                    Spacer()
-
-                    Button {
-                        exitFullScreen()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 24, height: 24)
-                            .background(.ultraThinMaterial, in: Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .help("Close (Esc)")
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-
-                Spacer()
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onKeyPress(.escape) {
-            exitFullScreen()
-            return .handled
-        }
-        .focusable()
     }
 
     // MARK: - Draggable Panel Divider
