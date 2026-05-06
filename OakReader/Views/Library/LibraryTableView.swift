@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import OakGraph
 
 // Items table: white bg, 13px font, colored tag squares inline
 struct LibraryTableView: View {
@@ -130,6 +131,13 @@ struct LibraryTableView: View {
         if selectedItems.count == 1, let item = selectedItems.first {
             Button("Open") { openItem(item) }
 
+            if Preferences.shared.isPluginEnabled(.graphMap) {
+                Menu("Generate Graph") {
+                    Button("AI Concept Map") { generateGraph(item, type: .conceptMap) }
+                    Button("AI Mind Map") { generateGraph(item, type: .mindMap) }
+                }
+            }
+
             Divider()
 
             let rootCollections = store.rootCollections.sorted(by: { $0.sortOrder < $1.sortOrder })
@@ -257,6 +265,16 @@ struct LibraryTableView: View {
 
     private func openItem(_ item: LibraryItem) {
         appState.openLibraryItem(item)
+    }
+
+    private func generateGraph(_ item: LibraryItem, type: GraphType) {
+        appState.openLibraryItem(item)
+        // After opening, activate the graph panel and start generation
+        DispatchQueue.main.async {
+            guard let tab = appState.activeTab else { return }
+            tab.viewModel.state.rightPanelMode = .graphMap
+            tab.viewModel.graph.generate(graphType: type)
+        }
     }
 
     private func importPDFs() {

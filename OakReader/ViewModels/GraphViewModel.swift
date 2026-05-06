@@ -262,6 +262,7 @@ class GraphViewModel {
             try graphService.saveDocument(document, storageKey: storageKey)
             if let idx = graphs.firstIndex(where: { $0.id == document.id }) {
                 graphs[idx].title = document.title
+                graphs[idx].graphType = document.graphType.rawValue
                 graphs[idx].updatedAt = Date()
             }
         } catch {

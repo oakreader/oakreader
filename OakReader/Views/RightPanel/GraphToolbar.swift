@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 import OakGraph
 
 /// Toolbar for graph panel: layout, export, type switching.
@@ -27,7 +28,7 @@ struct GraphToolbar: View {
             Menu {
                 Button("Export PNG") { exportPNG() }
                 Button("Export SVG") { exportSVG() }
-                Button("Export JSON") { exportJSON() }
+                Button("Export .oakgraph") { exportOakGraph() }
             } label: {
                 Image(systemName: "square.and.arrow.up")
             }
@@ -70,15 +71,21 @@ struct GraphToolbar: View {
         }
     }
 
-    private func exportJSON() {
+    private func exportOakGraph() {
         guard let data = graphVM.exportJSON() else { return }
         let panel = NSSavePanel()
-        panel.allowedContentTypes = [.json]
-        panel.nameFieldStringValue = "\(graphVM.currentDocument?.title ?? "graph").json"
+        panel.allowedContentTypes = [.oakgraph]
+        let doc = graphVM.currentDocument
+        let meta = GraphMapMeta(document: doc ?? GraphDocument())
+        panel.nameFieldStringValue = meta.fileName
         panel.begin { response in
             if response == .OK, let url = panel.url {
                 try? data.write(to: url)
             }
         }
     }
+}
+
+extension UTType {
+    static let oakgraph = UTType(exportedAs: "com.oakreader.oakgraph")
 }

@@ -219,6 +219,13 @@ class DocumentViewModel {
         state.epubLineHeight = prefs.epubLineHeight
     }
 
+    /// Lightweight init for standalone graph viewing (no document backing).
+    init(standalone: Bool) {
+        self.itemType = .pdf // placeholder — graph tabs bypass ContentView
+        self.state = DocumentState()
+        state.isSidebarVisible = false
+    }
+
     // MARK: - Action Handling (called directly by AppState)
 
     func handleAction(_ action: DocumentAction) {
