@@ -11,7 +11,7 @@ struct NoteListView: View {
                     // Section header
                     HStack {
                         Text(group.key)
-                            .font(.system(size: OakStyle.Font.caption, weight: .semibold))
+                            .font(OakStyle.Font.styled(size: OakStyle.Font.caption, weight: .semibold))
                             .foregroundStyle(.secondary)
                         Spacer()
                     }
@@ -64,14 +64,14 @@ private struct NoteRowView: View {
                             .foregroundStyle(.orange)
                     }
                     Text(note.displayTitle)
-                        .font(.system(size: OakStyle.Font.body, weight: .semibold))
+                        .font(OakStyle.Font.styled(size: OakStyle.Font.body, weight: .semibold))
                         .foregroundStyle(OakStyle.Colors.textPrimary)
                         .lineLimit(1)
                 }
 
                 // Date
                 Text(Self.dateFormatter.string(from: note.updatedAt))
-                    .font(.system(size: OakStyle.Font.caption))
+                    .font(OakStyle.Font.styledCaption)
                     .foregroundStyle(OakStyle.Colors.textTertiary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)

@@ -14,7 +14,7 @@ struct LibraryTableToolbar: View {
             // Search field
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: OakStyle.Font.caption))
+                    .font(OakStyle.Font.styledCaption)
                     .foregroundStyle(Color.primary.opacity(0.55))
                     .accessibilityHidden(true)
                 TextField("Search PDFs", text: $searchText)
@@ -29,7 +29,7 @@ struct LibraryTableToolbar: View {
                         searchText = ""
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: OakStyle.Font.caption))
+                            .font(OakStyle.Font.styledCaption)
                             .foregroundStyle(Color.primary.opacity(0.25))
                     }
                     .buttonStyle(.plain)

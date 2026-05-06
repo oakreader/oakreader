@@ -66,13 +66,13 @@ struct AnnotationColorDropdown: View {
     private func sliderRow(label: String, value: Binding<CGFloat>, range: ClosedRange<CGFloat>, step: CGFloat, format: String) -> some View {
         HStack {
             Text(label)
-                .font(.system(size: OakStyle.Font.caption))
+                .font(OakStyle.Font.styledCaption)
                 .foregroundStyle(.secondary)
             Spacer()
             Slider(value: value, in: range, step: step)
                 .frame(width: 120)
             Text(String(format: format, value.wrappedValue))
-                .font(.system(size: OakStyle.Font.caption))
+                .font(OakStyle.Font.styledCaption)
                 .monospacedDigit()
                 .frame(width: 30)
         }

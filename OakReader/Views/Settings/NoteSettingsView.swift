@@ -10,6 +10,9 @@ struct NoteSettingsView: View {
     @State private var letterSpacing: CGFloat = Preferences.shared.noteEditorLetterSpacing
     @State private var renderMath: Bool = Preferences.shared.noteEditorRenderMath
     @State private var accentColorHex: String = Preferences.shared.noteEditorAccentColor
+    @AppStorage("noteEditorFontOverridden") private var fontOverridden: Bool = false
+    @AppStorage("globalFontFamily") private var globalFontFamily: String = "system"
+    @AppStorage("globalFontSize") private var globalFontSize: Double = 14.0
 
     private static let presetColors: [(label: String, hex: String)] = [
         ("Teal", "#0CA69A"),
@@ -58,12 +61,33 @@ struct NoteSettingsView: View {
             }
 
             Section("Typography") {
-                Picker("Body Font", selection: $fontFamily) {
-                    ForEach(fontOptions, id: \.value) { option in
-                        Text(option.label).tag(option.value)
+                Toggle("Use custom font", isOn: $fontOverridden)
+
+                if fontOverridden {
+                    Picker("Body Font", selection: $fontFamily) {
+                        ForEach(fontOptions, id: \.value) { option in
+                            Text(option.label).tag(option.value)
+                        }
+                    }
+                    .onChange(of: fontFamily) { _, val in Preferences.shared.noteEditorFontFamily = val }
+
+                    LabeledContent("Font Size") {
+                        HStack {
+                            Slider(value: $fontSize, in: 13...24, step: 1)
+                            Text("\(Int(fontSize)) px")
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                                .frame(width: 56, alignment: .trailing)
+                        }
+                    }
+                    .onChange(of: fontSize) { _, val in Preferences.shared.noteEditorFontSize = val }
+                } else {
+                    let familyName = FontFamily(rawValue: globalFontFamily)?.displayName ?? "System"
+                    LabeledContent("Using global font") {
+                        Text("\(familyName), \(Int(globalFontSize)) pt")
+                            .foregroundStyle(.secondary)
                     }
                 }
-                .onChange(of: fontFamily) { _, val in Preferences.shared.noteEditorFontFamily = val }
 
                 Picker("Code Font", selection: $codeFontFamily) {
                     ForEach(codeFontOptions, id: \.value) { option in
@@ -71,17 +95,6 @@ struct NoteSettingsView: View {
                     }
                 }
                 .onChange(of: codeFontFamily) { _, val in Preferences.shared.noteEditorCodeFontFamily = val }
-
-                LabeledContent("Font Size") {
-                    HStack {
-                        Slider(value: $fontSize, in: 13...24, step: 1)
-                        Text("\(Int(fontSize)) px")
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
-                            .frame(width: 56, alignment: .trailing)
-                    }
-                }
-                .onChange(of: fontSize) { _, val in Preferences.shared.noteEditorFontSize = val }
 
                 LabeledContent("Line Height") {
                     HStack {

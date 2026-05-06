@@ -33,23 +33,15 @@ struct TranslationPanelView: View {
                 .buttonStyle(.borderless)
                 .help("Stop")
             }
-            Button {
-                translationVM.clear()
-            } label: {
-                Image(systemName: "trash")
-            }
-            .buttonStyle(.borderless)
-            .help("Clear")
-            .disabled(translationVM.sourceText.isEmpty && translationVM.translatedText.isEmpty)
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.vertical, 12)
     }
 
     // MARK: - Language Bar
 
     private var languageBar: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 0) {
             Picker("Source", selection: $translationVM.sourceLang) {
                 ForEach(TranslationLanguage.allCases) { lang in
                     Text(lang.displayName).tag(lang)
@@ -69,6 +61,7 @@ struct TranslationPanelView: View {
             .buttonStyle(.borderless)
             .disabled(translationVM.sourceLang == .auto)
             .help("Swap languages")
+            .padding(.horizontal, 4)
 
             Picker("Target", selection: $translationVM.targetLang) {
                 ForEach(TranslationLanguage.targetCases) { lang in
@@ -97,6 +90,7 @@ struct TranslationPanelView: View {
                 .font(.system(size: 13))
                 .frame(minHeight: 80, maxHeight: 160)
                 .scrollContentBackground(.hidden)
+                .scrollIndicators(.never)
                 .padding(6)
                 .background(
                     RoundedRectangle(cornerRadius: 6)
@@ -107,22 +101,20 @@ struct TranslationPanelView: View {
                         .stroke(Color.primary.opacity(0.08), lineWidth: 1)
                 )
 
-            HStack {
-                Spacer()
-                Button {
-                    translationVM.translate()
-                } label: {
-                    HStack(spacing: 4) {
-                        if translationVM.isTranslating {
-                            ProgressView()
-                                .controlSize(.small)
-                        }
-                        Text("Translate")
+            Button {
+                translationVM.translate()
+            } label: {
+                HStack(spacing: 4) {
+                    if translationVM.isTranslating {
+                        ProgressView()
+                            .controlSize(.small)
                     }
+                    Text("Translate")
+                        .frame(maxWidth: .infinity)
                 }
-                .disabled(translationVM.sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || translationVM.isTranslating)
-                .controlSize(.regular)
             }
+            .disabled(translationVM.sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || translationVM.isTranslating)
+            .controlSize(.large)
         }
     }
 

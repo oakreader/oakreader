@@ -3,6 +3,8 @@ import OakGraph
 
 struct RootView: View {
     let appState: AppState
+    @AppStorage("globalFontFamily") private var globalFontFamily: String = "system"
+    @AppStorage("globalFontSize") private var globalFontSize: Double = 14.0
 
     var body: some View {
         VStack(spacing: 0) {

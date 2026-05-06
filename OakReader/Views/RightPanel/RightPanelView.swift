@@ -24,13 +24,9 @@ struct RightPanelContentView: View {
                     if Preferences.shared.isPluginEnabled(.translation) {
                         TranslationPanelView(translationVM: viewModel.translation)
                     }
-                case .conceptMap:
-                    if Preferences.shared.isPluginEnabled(.conceptMap) {
-                        GraphPanelView(graphVM: viewModel.graph, graphType: .conceptMap)
-                    }
-                case .mindMap:
-                    if Preferences.shared.isPluginEnabled(.mindMap) {
-                        GraphPanelView(graphVM: viewModel.graph, graphType: .mindMap)
+                case .graphMap:
+                    if Preferences.shared.isPluginEnabled(.graphMap) {
+                        GraphPanelView(graphVM: viewModel.graph)
                     }
                 }
             }

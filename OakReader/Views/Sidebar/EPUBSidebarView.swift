@@ -44,6 +44,14 @@ struct EPUBSidebarView: View {
                                         if let spineIndex = tapped.spineIndex {
                                             viewModel.state.currentSpineIndex = spineIndex
                                         }
+                                        // Extract fragment from href (e.g. "chapter.xhtml#sec2" → "sec2")
+                                        if let href = tapped.href, let fragIndex = href.firstIndex(of: "#") {
+                                            viewModel.state.epubNavigationFragment = String(href[href.index(after: fragIndex)...])
+                                        } else {
+                                            viewModel.state.epubNavigationFragment = nil
+                                        }
+                                        // Store label for heuristic heading search fallback
+                                        viewModel.state.epubNavigationLabel = tapped.label
                                         // Always increment token to force reload even if spine index is the same
                                         viewModel.state.epubNavigationToken += 1
                                     }

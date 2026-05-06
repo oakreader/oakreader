@@ -11,6 +11,8 @@ struct EPUBViewerRepresentable: NSViewRepresentable {
     // These MUST be passed explicitly from the parent view's body.
     let currentSpineIndex: Int
     let navigationToken: Int
+    let navigationFragment: String?
+    let navigationLabel: String?
     let fontSize: Int
     let fontFamily: String
     let theme: EPUBTheme
@@ -109,7 +111,11 @@ struct EPUBViewerRepresentable: NSViewRepresentable {
         if targetIndex != context.coordinator.loadedSpineIndex ||
            token != context.coordinator.loadedNavigationToken {
             context.coordinator.loadedNavigationToken = token
-            context.coordinator.loadSpineItem(at: targetIndex)
+            context.coordinator.loadSpineItem(
+                at: targetIndex,
+                fragment: navigationFragment,
+                searchLabel: navigationLabel
+            )
         }
 
         // Apply reader settings changes dynamically
@@ -138,7 +144,7 @@ struct EPUBViewerRepresentable: NSViewRepresentable {
             root.style.setProperty('--oak-bg-color', '\(theme.backgroundColor)');
             root.style.setProperty('--oak-text-color', '\(theme.textColor)');
             root.style.setProperty('--oak-link-color', '\(theme.linkColor)');
-            root.style.setProperty('--oak-column-gap', '80px');
+            root.style.setProperty('--oak-column-gap', '\(margin * 2)px');
             root.style.setProperty('--oak-td-clamp', '300px');
             root.setAttribute('data-oak-theme', '\(theme.rawValue)');
             root.setAttribute('data-oak-dark', '\(theme.isDark)');
@@ -169,8 +175,7 @@ struct EPUBViewerRepresentable: NSViewRepresentable {
                     -webkit-hyphenate-limit-lines: 2;
                     column-fill: auto;
                     column-gap: var(--oak-column-gap);
-                    overflow-x: auto;
-                    overflow-y: hidden;
+                    overflow: hidden;
                 }
                 a { color: var(--oak-link-color); }
                 img, svg, video {
@@ -243,6 +248,7 @@ struct EPUBViewerRepresentable: NSViewRepresentable {
             root.style.setProperty('--oak-font-family', '"\(fontFamily)", "Georgia", serif');
             root.style.setProperty('--oak-line-height', '\(lineHeight)');
             root.style.setProperty('--oak-margin', '\(margin)px');
+            root.style.setProperty('--oak-column-gap', '\(margin * 2)px');
             root.style.setProperty('--oak-bg-color', '\(theme.backgroundColor)');
             root.style.setProperty('--oak-text-color', '\(theme.textColor)');
             root.style.setProperty('--oak-link-color', '\(theme.linkColor)');

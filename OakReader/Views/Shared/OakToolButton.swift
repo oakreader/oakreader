@@ -109,7 +109,7 @@ class TooltipNSView: NSView {
         panel.ignoresMouseEvents = true
 
         let label = NSTextField(labelWithString: tip)
-        label.font = NSFont.systemFont(ofSize: OakStyle.Font.caption)
+        label.font = OakStyle.Font.nsFont(size: OakStyle.Font.caption)
         label.textColor = .white
         label.alignment = .center
         label.sizeToFit()

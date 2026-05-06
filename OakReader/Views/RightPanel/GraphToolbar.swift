@@ -2,65 +2,57 @@ import SwiftUI
 import UniformTypeIdentifiers
 import OakGraph
 
-/// Toolbar for graph panel: layout, zoom, export, full-screen.
-struct GraphToolbar: View {
+/// Compact toolbar buttons for graph panel: relayout, full-screen, export.
+/// Zoom controls are now built into GraphCanvasView.
+struct GraphToolbarButtons: View {
     @Bindable var graphVM: GraphViewModel
-
-    private var zoomPercentage: String {
-        "\(Int(graphVM.interaction.scale * 100))%"
-    }
 
     var body: some View {
         HStack(spacing: 6) {
-            // Zoom controls
-            Button(action: { graphVM.interaction.zoom(by: 0.8) }) {
-                Image(systemName: "minus.magnifyingglass")
+            // Canvas actions pill
+            HStack(spacing: 4) {
+                Button(action: { graphVM.relayout() }) {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 11, weight: .medium))
+                        .frame(width: 24, height: 24)
+                }
+                .buttonStyle(.plain)
+                .help("Re-layout")
+
+                Divider()
+                    .frame(height: 14)
+
+                Button(action: { graphVM.enterFullScreen() }) {
+                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                        .font(.system(size: 11, weight: .medium))
+                        .frame(width: 24, height: 24)
+                }
+                .buttonStyle(.plain)
+                .help("Full screen")
             }
-            .buttonStyle(.plain)
-            .help("Zoom out")
+            .padding(.horizontal, 4)
+            .padding(.vertical, 2)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 6))
+            .shadow(color: .black.opacity(0.08), radius: 2, y: 1)
 
-            Button(action: { graphVM.interaction.resetZoom() }) {
-                Text(zoomPercentage)
-                    .font(.system(size: 11, weight: .medium).monospacedDigit())
-                    .frame(minWidth: 36)
-            }
-            .buttonStyle(.plain)
-            .help("Reset zoom")
-
-            Button(action: { graphVM.interaction.zoom(by: 1.25) }) {
-                Image(systemName: "plus.magnifyingglass")
-            }
-            .buttonStyle(.plain)
-            .help("Zoom in")
-
-            Spacer()
-
-            // Re-layout
-            Button(action: { graphVM.relayout() }) {
-                Image(systemName: "arrow.triangle.2.circlepath")
-            }
-            .buttonStyle(.plain)
-            .help("Re-layout")
-
-            // Full screen
-            Button(action: { graphVM.isFullScreen = true }) {
-                Image(systemName: "arrow.up.left.and.arrow.down.right")
-            }
-            .buttonStyle(.plain)
-            .help("Full screen")
-
-            // Export menu
+            // More / export pill
             Menu {
                 Button("Export PNG") { exportPNG() }
                 Button("Export SVG") { exportSVG() }
                 Button("Export .oakgraph") { exportOakGraph() }
             } label: {
-                Image(systemName: "square.and.arrow.up")
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 11, weight: .medium))
+                    .frame(width: 24, height: 24)
             }
-            .help("Export")
+            .menuStyle(.borderlessButton)
+            .frame(width: 24)
+            .padding(.horizontal, 4)
+            .padding(.vertical, 2)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 6))
+            .shadow(color: .black.opacity(0.08), radius: 2, y: 1)
+            .help("More")
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
     }
 
     // MARK: - Export Actions

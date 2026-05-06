@@ -140,7 +140,7 @@ struct DocumentTabView: View {
 
             // Title
             Text(tab.title)
-                .font(.system(size: OakStyle.Font.body, weight: .regular))
+                .font(OakStyle.Font.styled(size: OakStyle.Font.body, weight: .regular))
                 .lineLimit(1)
                 .truncationMode(.middle)
 

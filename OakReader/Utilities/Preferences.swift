@@ -55,6 +55,10 @@ final class Preferences {
         static let agentReadFileEnabled = "agentReadFileEnabled"
         static let agentWriteFileEnabled = "agentWriteFileEnabled"
         static let agentRequireConfirmation = "agentRequireConfirmation"
+        // Global font
+        static let globalFontFamily = "globalFontFamily"
+        static let globalFontSize = "globalFontSize"
+        static let noteEditorFontOverridden = "noteEditorFontOverridden"
         // EPUB Reader
         static let epubFontSize = "epubFontSize"
         static let epubFontFamily = "epubFontFamily"
@@ -70,6 +74,7 @@ final class Preferences {
 
     private init() {
         registerDefaults()
+        migrateNoteEditorFontOverride()
     }
 
     private func registerDefaults() {
@@ -97,6 +102,9 @@ final class Preferences {
             Keys.noteEditorRenderImages: true,
             Keys.noteEditorHideSyntax: true,
             Keys.noteEditorAccentColor: "#0CA69A",
+            Keys.globalFontFamily: "system",
+            Keys.globalFontSize: 14.0,
+            Keys.noteEditorFontOverridden: false,
             Keys.epubFontSize: 18,
             Keys.epubFontFamily: "Palatino",
             Keys.epubTheme: EPUBTheme.original.rawValue,
@@ -152,6 +160,52 @@ final class Preferences {
     var showStatusBar: Bool {
         get { defaults.bool(forKey: Keys.showStatusBar) }
         set { defaults.set(newValue, forKey: Keys.showStatusBar) }
+    }
+
+    // MARK: - Global Font
+
+    var globalFontFamily: String {
+        get { defaults.string(forKey: Keys.globalFontFamily) ?? "system" }
+        set { defaults.set(newValue, forKey: Keys.globalFontFamily) }
+    }
+
+    var globalFontSize: CGFloat {
+        get { CGFloat(defaults.double(forKey: Keys.globalFontSize)) }
+        set { defaults.set(Double(newValue), forKey: Keys.globalFontSize) }
+    }
+
+    var noteEditorFontOverridden: Bool {
+        get { defaults.bool(forKey: Keys.noteEditorFontOverridden) }
+        set { defaults.set(newValue, forKey: Keys.noteEditorFontOverridden) }
+    }
+
+    /// Effective font family for the note editor — note-specific if overridden, global otherwise.
+    var effectiveNoteEditorFontFamily: String {
+        if noteEditorFontOverridden {
+            return noteEditorFontFamily
+        }
+        return FontFamily(rawValue: globalFontFamily)?.fontName ?? ".AppleSystemUIFont"
+    }
+
+    /// Effective font size for the note editor — note-specific if overridden, global otherwise.
+    var effectiveNoteEditorFontSize: CGFloat {
+        if noteEditorFontOverridden {
+            return noteEditorFontSize
+        }
+        return globalFontSize
+    }
+
+    /// One-time migration: if user previously customized note font, mark it as overridden.
+    private func migrateNoteEditorFontOverride() {
+        let migrationKey = "noteEditorFontOverrideMigrated"
+        guard !defaults.bool(forKey: migrationKey) else { return }
+        defaults.set(true, forKey: migrationKey)
+
+        let currentFont = defaults.string(forKey: Keys.noteEditorFontFamily) ?? ".AppleSystemUIFont"
+        let currentSize = defaults.double(forKey: Keys.noteEditorFontSize)
+        if currentFont != ".AppleSystemUIFont" || (currentSize != 0 && currentSize != 16.0) {
+            defaults.set(true, forKey: Keys.noteEditorFontOverridden)
+        }
     }
 
     // MARK: - Library Preferences

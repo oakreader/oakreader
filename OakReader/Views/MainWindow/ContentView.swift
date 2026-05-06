@@ -148,14 +148,17 @@ struct ContentView: View {
 
     // MARK: - Full Screen Graph Overlay
 
+    private func exitFullScreen() {
+        viewModel.graph.isFullScreen = false
+    }
+
     @ViewBuilder
     private func graphFullScreenOverlay(document: GraphDocument) -> some View {
         ZStack {
-            Color.black.opacity(0.85)
-                .ignoresSafeArea()
+            Color(nsColor: .windowBackgroundColor)
 
             GraphCanvasView(
-                interaction: viewModel.graph.interaction,
+                interaction: viewModel.graph.fullScreenInteraction,
                 document: document,
                 onNodeMoved: { nodeId, position in
                     viewModel.graph.moveNode(nodeId, to: position)
@@ -174,59 +177,33 @@ struct ContentView: View {
             // Close button (top-right)
             VStack {
                 HStack {
+                    Text(document.title.isEmpty ? "Graph" : document.title)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
+
                     Spacer()
-                    Button {
-                        viewModel.graph.isFullScreen = false
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 24))
-                            .foregroundStyle(.white.opacity(0.8))
-                    }
-                    .buttonStyle(.plain)
-                    .help("Close full screen (Esc)")
-                    .padding(16)
-                }
-                Spacer()
-            }
-
-            // Bottom zoom controls
-            VStack {
-                Spacer()
-                HStack(spacing: 12) {
-                    Button {
-                        viewModel.graph.interaction.zoom(by: 0.8)
-                    } label: {
-                        Image(systemName: "minus.magnifyingglass")
-                            .foregroundStyle(.white)
-                    }
-                    .buttonStyle(.plain)
 
                     Button {
-                        viewModel.graph.interaction.resetZoom()
+                        exitFullScreen()
                     } label: {
-                        Text("\(Int(viewModel.graph.interaction.scale * 100))%")
-                            .font(.system(size: 12, weight: .medium).monospacedDigit())
-                            .foregroundStyle(.white)
-                            .frame(minWidth: 40)
+                        Image(systemName: "xmark")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 24, height: 24)
+                            .background(.ultraThinMaterial, in: Circle())
                     }
                     .buttonStyle(.plain)
-
-                    Button {
-                        viewModel.graph.interaction.zoom(by: 1.25)
-                    } label: {
-                        Image(systemName: "plus.magnifyingglass")
-                            .foregroundStyle(.white)
-                    }
-                    .buttonStyle(.plain)
+                    .help("Close (Esc)")
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(.black.opacity(0.6), in: Capsule())
-                .padding(.bottom, 20)
+                .padding(.vertical, 10)
+
+                Spacer()
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onKeyPress(.escape) {
-            viewModel.graph.isFullScreen = false
+            exitFullScreen()
             return .handled
         }
         .focusable()

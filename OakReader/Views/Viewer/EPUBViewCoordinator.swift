@@ -13,6 +13,10 @@ final class EPUBViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessage
     var loadedNavigationToken: Int = 0
     /// When true, the next `didFinish` will scroll to the last page.
     private var pendingScrollToEnd: Bool = false
+    /// Fragment identifier to scroll to after page load (e.g. "section2").
+    private var pendingFragment: String?
+    /// TOC label for heuristic heading search when no fragment exists.
+    private var pendingSearchLabel: String?
 
     private var mouseMonitor: Any?
     private var scrollMonitor: Any?
@@ -77,6 +81,12 @@ final class EPUBViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessage
             case 124: // Right arrow
                 self.pageForward()
                 return nil
+            case 125: // Down arrow
+                self.pageForward()
+                return nil
+            case 126: // Up arrow
+                self.pageBack()
+                return nil
             case 49: // Space
                 if event.modifierFlags.contains(.shift) {
                     self.pageBack()
@@ -122,17 +132,13 @@ final class EPUBViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessage
         guard let webView = webView else { return }
         webView.evaluateJavaScript("""
             (function() {
-                var totalWidth = document.body.scrollWidth;
-                var pageWidth = window.innerWidth;
-                var currentScroll = Math.round(window.scrollX);
-                var maxScroll = totalWidth - pageWidth;
-                if (currentScroll >= maxScroll - 2) {
-                    return 'next_chapter';
-                } else {
-                    var target = Math.min(Math.round(currentScroll + pageWidth), maxScroll);
-                    window.scrollTo({ left: target, top: 0, behavior: 'auto' });
-                    return 'ok';
-                }
+                var b = document.body;
+                var pw = window.innerWidth;
+                var maxPage = Math.round((b.scrollWidth - pw) / pw);
+                var cur = Math.round(b.scrollLeft / pw);
+                if (cur >= maxPage) return 'next_chapter';
+                b.scrollLeft = (cur + 1) * pw;
+                return 'ok';
             })();
         """) { [weak self] result, _ in
             if let action = result as? String, action == "next_chapter" {
@@ -145,15 +151,12 @@ final class EPUBViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessage
         guard let webView = webView else { return }
         webView.evaluateJavaScript("""
             (function() {
-                var currentScroll = Math.round(window.scrollX);
-                if (currentScroll <= 2) {
-                    return 'prev_chapter';
-                } else {
-                    var pageWidth = window.innerWidth;
-                    var target = Math.max(Math.round(currentScroll - pageWidth), 0);
-                    window.scrollTo({ left: target, top: 0, behavior: 'auto' });
-                    return 'ok';
-                }
+                var b = document.body;
+                var pw = window.innerWidth;
+                var cur = Math.round(b.scrollLeft / pw);
+                if (cur <= 0) return 'prev_chapter';
+                b.scrollLeft = (cur - 1) * pw;
+                return 'ok';
             })();
         """) { [weak self] result, _ in
             if let action = result as? String, action == "prev_chapter" {
@@ -205,11 +208,19 @@ final class EPUBViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessage
             lineHeight: state.epubLineHeight
         )
         webView.evaluateJavaScript(js) { [weak self] _, _ in
-            guard let self, self.pendingScrollToEnd else { return }
-            self.pendingScrollToEnd = false
-            webView.evaluateJavaScript("""
-                window.scrollTo(document.body.scrollWidth - window.innerWidth, 0);
-            """, completionHandler: nil)
+            guard let self else { return }
+            if self.pendingScrollToEnd {
+                self.pendingScrollToEnd = false
+                webView.evaluateJavaScript("""
+                    document.body.scrollLeft = document.body.scrollWidth - window.innerWidth;
+                """, completionHandler: nil)
+            } else if self.pendingFragment != nil || self.pendingSearchLabel != nil {
+                let frag = self.pendingFragment
+                let label = self.pendingSearchLabel
+                self.pendingFragment = nil
+                self.pendingSearchLabel = nil
+                self.scrollToTarget(fragment: frag, searchLabel: label)
+            }
         }
     }
 
@@ -296,14 +307,89 @@ final class EPUBViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessage
         }
     }
 
-    func loadSpineItem(at index: Int, scrollToEnd: Bool = false) {
+    func loadSpineItem(at index: Int, scrollToEnd: Bool = false, fragment: String? = nil, searchLabel: String? = nil) {
         guard let epub = viewModel.epubDocument,
               let url = epub.contentURL(for: index),
               let webView = webView else { return }
 
+        // If same spine item is already loaded and we have a scroll target, scroll without reload
+        if index == loadedSpineIndex && (fragment != nil || searchLabel != nil) {
+            scrollToTarget(fragment: fragment, searchLabel: searchLabel)
+            return
+        }
+
         loadedSpineIndex = index
         pendingScrollToEnd = scrollToEnd
+        pendingFragment = fragment
+        pendingSearchLabel = searchLabel
         webView.loadFileURL(url, allowingReadAccessTo: epub.contentDirectory)
+    }
+
+    /// Scroll to a fragment ID or heuristically find a heading matching the label.
+    /// Uses page-aligned scrolling compatible with CSS multi-column layout.
+    private func scrollToTarget(fragment: String?, searchLabel: String?) {
+        guard let webView = webView else { return }
+
+        // Helper JS that finds an element and scrolls to its column page
+        let scrollFn = """
+        function __oak_scrollToElement(el) {
+            if (!el) return false;
+            var b = document.body;
+            var pageWidth = window.innerWidth;
+            var rect = el.getBoundingClientRect();
+            var absLeft = rect.left + b.scrollLeft;
+            var targetPage = Math.floor(absLeft / pageWidth);
+            b.scrollLeft = targetPage * pageWidth;
+            return true;
+        }
+        """
+
+        let js: String
+        if let frag = fragment, !frag.isEmpty {
+            let escaped = frag.replacingOccurrences(of: "'", with: "\\'")
+            js = """
+            (function() {
+                \(scrollFn)
+                var el = document.getElementById('\(escaped)');
+                if (__oak_scrollToElement(el)) return 'found';
+                // Try name attribute fallback
+                el = document.querySelector('[name="\(escaped)"]');
+                if (__oak_scrollToElement(el)) return 'found';
+                return 'not_found';
+            })();
+            """
+        } else if let label = searchLabel, !label.isEmpty {
+            let escaped = label.replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "'", with: "\\'")
+            js = """
+            (function() {
+                \(scrollFn)
+                var label = '\(escaped)';
+                var cleanLabel = label.replace(/^\\d+\\.?\\s*/, '');
+                var headings = document.querySelectorAll('h1, h2, h3, h4, h5, h6, [class*="heading"], [class*="chapter"], section[id]');
+                // Exact match
+                for (var i = 0; i < headings.length; i++) {
+                    var text = headings[i].textContent.trim();
+                    if (text === label || text === cleanLabel ||
+                        text.toLowerCase() === cleanLabel.toLowerCase()) {
+                        if (__oak_scrollToElement(headings[i])) return 'found:' + text;
+                    }
+                }
+                // Partial match
+                for (var i = 0; i < headings.length; i++) {
+                    var text = headings[i].textContent.trim().toLowerCase();
+                    if (text.indexOf(cleanLabel.toLowerCase()) >= 0 ||
+                        cleanLabel.toLowerCase().indexOf(text) >= 0) {
+                        if (__oak_scrollToElement(headings[i])) return 'partial:' + headings[i].textContent.trim();
+                    }
+                }
+                return 'not_found';
+            })();
+            """
+        } else {
+            return
+        }
+        webView.evaluateJavaScript(js, completionHandler: nil)
     }
 
     // MARK: - Mouse Monitor

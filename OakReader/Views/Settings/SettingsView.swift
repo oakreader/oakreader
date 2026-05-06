@@ -15,8 +15,7 @@ struct SettingsView: View {
         // Plugin tabs
         case pluginNotes
         case pluginTranslation
-        case pluginConceptMap
-        case pluginMindMap
+        case pluginGraphMap
 
         var id: String { rawValue }
 
@@ -30,8 +29,7 @@ struct SettingsView: View {
             case .youtube: return "YouTube"
             case .pluginNotes: return Plugin.notes.label
             case .pluginTranslation: return Plugin.translation.label
-            case .pluginConceptMap: return Plugin.conceptMap.label
-            case .pluginMindMap: return Plugin.mindMap.label
+            case .pluginGraphMap: return Plugin.graphMap.label
             }
         }
 
@@ -45,8 +43,7 @@ struct SettingsView: View {
             case .youtube: return "play.rectangle"
             case .pluginNotes: return Plugin.notes.systemImage
             case .pluginTranslation: return Plugin.translation.systemImage
-            case .pluginConceptMap: return Plugin.conceptMap.systemImage
-            case .pluginMindMap: return Plugin.mindMap.systemImage
+            case .pluginGraphMap: return Plugin.graphMap.systemImage
             }
         }
 
@@ -55,8 +52,7 @@ struct SettingsView: View {
             switch self {
             case .pluginNotes: return .notes
             case .pluginTranslation: return .translation
-            case .pluginConceptMap: return .conceptMap
-            case .pluginMindMap: return .mindMap
+            case .pluginGraphMap: return .graphMap
             default: return nil
             }
         }
@@ -65,8 +61,7 @@ struct SettingsView: View {
             switch plugin {
             case .notes: return .pluginNotes
             case .translation: return .pluginTranslation
-            case .conceptMap: return .pluginConceptMap
-            case .mindMap: return .pluginMindMap
+            case .graphMap: return .pluginGraphMap
             }
         }
     }
@@ -138,7 +133,7 @@ struct SettingsView: View {
             NoteSettingsView()
         case .pluginTranslation:
             TranslationSettingsView()
-        case .pluginConceptMap, .pluginMindMap:
+        case .pluginGraphMap:
             GraphMapSettingsView()
         }
     }

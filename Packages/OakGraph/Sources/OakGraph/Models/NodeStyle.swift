@@ -60,16 +60,4 @@ public struct NodeStyle: Codable, Sendable, Hashable {
     }
 
     public static let `default` = NodeStyle()
-
-    /// Predefined color palette for AI-generated nodes.
-    public static let palette: [NodeStyle] = [
-        NodeStyle(fillColorHex: "#E3F2FD", borderColorHex: "#1976D2"),
-        NodeStyle(fillColorHex: "#F3E5F5", borderColorHex: "#7B1FA2"),
-        NodeStyle(fillColorHex: "#E8F5E9", borderColorHex: "#388E3C"),
-        NodeStyle(fillColorHex: "#FFF3E0", borderColorHex: "#E65100"),
-        NodeStyle(fillColorHex: "#FCE4EC", borderColorHex: "#C62828"),
-        NodeStyle(fillColorHex: "#E0F7FA", borderColorHex: "#00838F"),
-        NodeStyle(fillColorHex: "#FFF9C4", borderColorHex: "#F9A825"),
-        NodeStyle(fillColorHex: "#F1F8E9", borderColorHex: "#558B2F"),
-    ]
 }
