@@ -17,8 +17,12 @@ class PDFDocumentController: NSDocumentController {
     }
 
     override func typeForContents(of url: URL) throws -> String {
-        if url.pathExtension.lowercased() == "pdf" {
+        let ext = url.pathExtension.lowercased()
+        if ext == "pdf" {
             return UTType.pdf.identifier
+        }
+        if ext == "oakgraph" {
+            return "com.oakreader.oakgraph"
         }
         return try super.typeForContents(of: url)
     }
