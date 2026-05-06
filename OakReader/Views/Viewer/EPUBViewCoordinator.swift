@@ -11,6 +11,8 @@ final class EPUBViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessage
     var loadedSpineIndex: Int = -1
     /// Tracks navigation token to detect forced reloads from TOC clicks.
     var loadedNavigationToken: Int = 0
+    /// When true, the next `didFinish` will scroll to the last page.
+    private var pendingScrollToEnd: Bool = false
 
     private var mouseMonitor: Any?
     private var scrollMonitor: Any?
@@ -75,6 +77,25 @@ final class EPUBViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessage
             case 124: // Right arrow
                 self.pageForward()
                 return nil
+            case 49: // Space
+                if event.modifierFlags.contains(.shift) {
+                    self.pageBack()
+                } else {
+                    self.pageForward()
+                }
+                return nil
+            case 121: // Page Down
+                self.pageForward()
+                return nil
+            case 116: // Page Up
+                self.pageBack()
+                return nil
+            case 115: // Home
+                self.goToFirstChapter()
+                return nil
+            case 119: // End
+                self.goToLastChapter()
+                return nil
             default:
                 return event
             }
@@ -103,12 +124,13 @@ final class EPUBViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessage
             (function() {
                 var totalWidth = document.body.scrollWidth;
                 var pageWidth = window.innerWidth;
-                var currentScroll = window.scrollX;
+                var currentScroll = Math.round(window.scrollX);
                 var maxScroll = totalWidth - pageWidth;
                 if (currentScroll >= maxScroll - 2) {
                     return 'next_chapter';
                 } else {
-                    window.scrollBy({ left: pageWidth, top: 0, behavior: 'auto' });
+                    var target = Math.min(Math.round(currentScroll + pageWidth), maxScroll);
+                    window.scrollTo({ left: target, top: 0, behavior: 'auto' });
                     return 'ok';
                 }
             })();
@@ -123,12 +145,13 @@ final class EPUBViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessage
         guard let webView = webView else { return }
         webView.evaluateJavaScript("""
             (function() {
-                var currentScroll = window.scrollX;
+                var currentScroll = Math.round(window.scrollX);
                 if (currentScroll <= 2) {
                     return 'prev_chapter';
                 } else {
                     var pageWidth = window.innerWidth;
-                    window.scrollBy({ left: -pageWidth, top: 0, behavior: 'auto' });
+                    var target = Math.max(Math.round(currentScroll - pageWidth), 0);
+                    window.scrollTo({ left: target, top: 0, behavior: 'auto' });
                     return 'ok';
                 }
             })();
@@ -156,7 +179,39 @@ final class EPUBViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessage
         }
     }
 
+    private func goToFirstChapter() {
+        guard viewModel.epubDocument != nil else { return }
+        viewModel.state.currentSpineIndex = 0
+        loadSpineItem(at: 0)
+    }
+
+    private func goToLastChapter() {
+        guard let epub = viewModel.epubDocument else { return }
+        let last = epub.spineItems.count - 1
+        guard last >= 0 else { return }
+        viewModel.state.currentSpineIndex = last
+        loadSpineItem(at: last)
+    }
+
     // MARK: - WKNavigationDelegate
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        let state = viewModel.state
+        let js = EPUBViewerRepresentable.applySettingsJS(
+            fontSize: state.epubFontSize,
+            fontFamily: state.epubFontFamily,
+            theme: state.epubTheme,
+            margin: state.epubMargin,
+            lineHeight: state.epubLineHeight
+        )
+        webView.evaluateJavaScript(js) { [weak self] _, _ in
+            guard let self, self.pendingScrollToEnd else { return }
+            self.pendingScrollToEnd = false
+            webView.evaluateJavaScript("""
+                window.scrollTo(document.body.scrollWidth - window.innerWidth, 0);
+            """, completionHandler: nil)
+        }
+    }
 
     func webView(
         _ webView: WKWebView,
@@ -247,16 +302,8 @@ final class EPUBViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessage
               let webView = webView else { return }
 
         loadedSpineIndex = index
+        pendingScrollToEnd = scrollToEnd
         webView.loadFileURL(url, allowingReadAccessTo: epub.contentDirectory)
-
-        if scrollToEnd {
-            // After load completes, scroll to the last page
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak webView] in
-                webView?.evaluateJavaScript("""
-                    window.scrollTo(document.body.scrollWidth - window.innerWidth, 0);
-                """, completionHandler: nil)
-            }
-        }
     }
 
     // MARK: - Mouse Monitor

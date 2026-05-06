@@ -130,35 +130,55 @@ struct EPUBViewerRepresentable: NSViewRepresentable {
     static func readerScript(fontSize: Int, fontFamily: String, theme: EPUBTheme, margin: Int, lineHeight: Double) -> String {
         """
         (function() {
+            var root = document.documentElement;
+            root.style.setProperty('--oak-font-size', '\(fontSize)px');
+            root.style.setProperty('--oak-font-family', '"\(fontFamily)", "Georgia", serif');
+            root.style.setProperty('--oak-line-height', '\(lineHeight)');
+            root.style.setProperty('--oak-margin', '\(margin)px');
+            root.style.setProperty('--oak-bg-color', '\(theme.backgroundColor)');
+            root.style.setProperty('--oak-text-color', '\(theme.textColor)');
+            root.style.setProperty('--oak-link-color', '\(theme.linkColor)');
+            root.style.setProperty('--oak-column-gap', '80px');
+            root.style.setProperty('--oak-td-clamp', '300px');
+            root.setAttribute('data-oak-theme', '\(theme.rawValue)');
+            root.setAttribute('data-oak-dark', '\(theme.isDark)');
+
             var style = document.createElement('style');
             style.id = 'oak-reader-style';
             style.textContent = `
                 html {
                     height: 100%;
                     overflow: hidden;
+                    -webkit-text-size-adjust: none;
                 }
                 body {
                     height: 100%;
                     margin: 0 !important;
-                    padding: \(margin)px \(margin)px !important;
+                    padding: var(--oak-margin) var(--oak-margin) !important;
                     box-sizing: border-box;
-                    font-family: "\(fontFamily)", "Georgia", serif;
-                    font-size: \(fontSize)px;
-                    line-height: \(lineHeight);
-                    color: \(theme.textColor);
-                    background: \(theme.backgroundColor) !important;
+                    font-family: var(--oak-font-family);
+                    font-size: var(--oak-font-size);
+                    line-height: var(--oak-line-height);
+                    color: var(--oak-text-color);
+                    background: var(--oak-bg-color) !important;
                     word-wrap: break-word;
                     overflow-wrap: break-word;
+                    -webkit-hyphens: auto;
+                    -webkit-hyphenate-limit-before: 3;
+                    -webkit-hyphenate-limit-after: 3;
+                    -webkit-hyphenate-limit-lines: 2;
                     column-fill: auto;
-                    column-gap: 80px;
+                    column-gap: var(--oak-column-gap);
                     overflow-x: auto;
                     overflow-y: hidden;
                 }
-                a { color: \(theme.linkColor); }
+                a { color: var(--oak-link-color); }
                 img, svg, video {
                     max-width: 100%;
-                    max-height: 80vh;
+                    max-height: 95%;
                     height: auto;
+                    object-fit: contain;
+                    box-sizing: border-box;
                     page-break-inside: avoid;
                     break-inside: avoid;
                 }
@@ -171,18 +191,45 @@ struct EPUBViewerRepresentable: NSViewRepresentable {
                     break-after: avoid;
                 }
                 p { orphans: 2; widows: 2; }
+                td { max-width: var(--oak-td-clamp, 300px); }
                 body::-webkit-scrollbar { display: none; }
             `;
             document.head.appendChild(style);
 
-            function applyColumns() {
+            var darkStyle = document.createElement('style');
+            darkStyle.id = 'oak-dark-override';
+            document.head.appendChild(darkStyle);
+
+            window.__oak_applyColumns = function() {
+                var m = parseInt(getComputedStyle(root).getPropertyValue('--oak-margin')) || \(margin);
                 var w = window.innerWidth;
                 var h = window.innerHeight;
-                document.body.style.columnWidth = (w - \(margin * 2)) + 'px';
+                document.body.style.columnWidth = (w - m * 2) + 'px';
                 document.body.style.height = h + 'px';
-            }
-            applyColumns();
-            window.addEventListener('resize', applyColumns);
+            };
+
+            window.__oak_applyDarkOverrides = function() {
+                var ds = document.getElementById('oak-dark-override');
+                if (!ds) return;
+                var isDark = root.getAttribute('data-oak-dark') === 'true';
+                if (isDark) {
+                    ds.textContent = `
+                        * { background-color: transparent !important; }
+                        html, body { background: var(--oak-bg-color) !important; }
+                        body, p, div, span, li, td, th, dt, dd, blockquote, figcaption, cite {
+                            color: var(--oak-text-color) !important;
+                        }
+                        a { color: var(--oak-link-color) !important; }
+                        h1, h2, h3, h4, h5, h6 { color: var(--oak-text-color) !important; }
+                    `;
+                } else {
+                    ds.textContent = '';
+                }
+            };
+
+            window.__oak_applyColumns();
+            window.__oak_applyDarkOverrides();
+            window.addEventListener('resize', function() { window.__oak_applyColumns(); });
         })();
         """
     }
@@ -190,19 +237,19 @@ struct EPUBViewerRepresentable: NSViewRepresentable {
     static func applySettingsJS(fontSize: Int, fontFamily: String, theme: EPUBTheme, margin: Int, lineHeight: Double) -> String {
         """
         (function() {
-            var b = document.body;
-            if (!b) return;
-            b.style.fontSize = '\(fontSize)px';
-            b.style.fontFamily = '"\(fontFamily)", "Georgia", serif';
-            b.style.lineHeight = '\(lineHeight)';
-            b.style.color = '\(theme.textColor)';
-            b.style.background = '\(theme.backgroundColor)';
-            b.style.padding = '\(margin)px \(margin)px';
-            b.style.columnWidth = (window.innerWidth - \(margin * 2)) + 'px';
-            var links = document.querySelectorAll('a');
-            for (var i = 0; i < links.length; i++) {
-                links[i].style.color = '\(theme.linkColor)';
-            }
+            var root = document.documentElement;
+            if (!root || !document.body) return;
+            root.style.setProperty('--oak-font-size', '\(fontSize)px');
+            root.style.setProperty('--oak-font-family', '"\(fontFamily)", "Georgia", serif');
+            root.style.setProperty('--oak-line-height', '\(lineHeight)');
+            root.style.setProperty('--oak-margin', '\(margin)px');
+            root.style.setProperty('--oak-bg-color', '\(theme.backgroundColor)');
+            root.style.setProperty('--oak-text-color', '\(theme.textColor)');
+            root.style.setProperty('--oak-link-color', '\(theme.linkColor)');
+            root.setAttribute('data-oak-theme', '\(theme.rawValue)');
+            root.setAttribute('data-oak-dark', '\(theme.isDark)');
+            if (window.__oak_applyColumns) window.__oak_applyColumns();
+            if (window.__oak_applyDarkOverrides) window.__oak_applyDarkOverrides();
         })();
         """
     }

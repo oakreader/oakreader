@@ -12,6 +12,8 @@ struct EPUBSettingsView: View {
         "Georgia",
         "Iowan Old Style",
         "Athelas",
+        "Charter",
+        "Seravek",
         "Helvetica Neue",
         "Avenir Next",
         "SF Pro Text",
@@ -155,7 +157,7 @@ struct EPUBSettingsView: View {
                                     RoundedRectangle(cornerRadius: 8)
                                         .stroke(isActive ? Color.accentColor : Color.gray.opacity(0.3), lineWidth: isActive ? 2 : 1)
                                 )
-                                .frame(width: 100, height: 70)
+                                .frame(width: 75, height: 55)
 
                             Text(t.label)
                                 .font(.caption)

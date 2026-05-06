@@ -99,7 +99,7 @@ final class Preferences {
             Keys.noteEditorAccentColor: "#0CA69A",
             Keys.epubFontSize: 18,
             Keys.epubFontFamily: "Palatino",
-            Keys.epubTheme: EPUBTheme.light.rawValue,
+            Keys.epubTheme: EPUBTheme.original.rawValue,
             Keys.epubMargin: 60,
             Keys.epubLineHeight: 1.8,
             Keys.agentToolsEnabled: true,
@@ -354,7 +354,7 @@ final class Preferences {
     }
 
     var epubTheme: EPUBTheme {
-        get { EPUBTheme(rawValue: defaults.string(forKey: Keys.epubTheme) ?? "") ?? .light }
+        get { EPUBTheme(rawValue: defaults.string(forKey: Keys.epubTheme) ?? "") ?? .original }
         set { defaults.set(newValue.rawValue, forKey: Keys.epubTheme) }
     }
 

@@ -3,41 +3,58 @@ import PDFKit
 import AppKit
 
 enum EPUBTheme: String, CaseIterable {
-    case light
-    case sepia
-    case dark
+    case original
+    case paper
+    case bold
+    case calm
+    case focus
+    case quiet
 
     var label: String {
         switch self {
-        case .light: return "Light"
-        case .sepia: return "Sepia"
-        case .dark: return "Dark"
+        case .original: return "Original"
+        case .paper: return "Paper"
+        case .bold: return "Bold"
+        case .calm: return "Calm"
+        case .focus: return "Focus"
+        case .quiet: return "Quiet"
         }
     }
 
     var backgroundColor: String {
         switch self {
-        case .light: return "#ffffff"
-        case .sepia: return "#f4ecd8"
-        case .dark: return "#1e1e1e"
+        case .original: return "#ffffff"
+        case .paper: return "#f8f3e8"
+        case .bold: return "#ffffff"
+        case .calm: return "#e8ede8"
+        case .focus: return "#e4e8ec"
+        case .quiet: return "#eeeae5"
         }
     }
 
     var textColor: String {
         switch self {
-        case .light: return "#333333"
-        case .sepia: return "#5b4636"
-        case .dark: return "#d4d4d4"
+        case .original: return "#1d1d1f"
+        case .paper: return "#3b2e1a"
+        case .bold: return "#000000"
+        case .calm: return "#2d3a2d"
+        case .focus: return "#1c2733"
+        case .quiet: return "#3d3832"
         }
     }
 
     var linkColor: String {
         switch self {
-        case .light: return "#0068da"
-        case .sepia: return "#7b5e3f"
-        case .dark: return "#6cb4ee"
+        case .original: return "#007aff"
+        case .paper: return "#8b6914"
+        case .bold: return "#0050d0"
+        case .calm: return "#2e7d32"
+        case .focus: return "#1565c0"
+        case .quiet: return "#6d584a"
         }
     }
+
+    var isDark: Bool { false }
 }
 
 @Observable
@@ -59,7 +76,7 @@ class DocumentState {
     // EPUB Reader Settings (loaded from Preferences on init)
     var epubFontSize: Int = 18
     var epubFontFamily: String = "Palatino"
-    var epubTheme: EPUBTheme = .light
+    var epubTheme: EPUBTheme = .original
     var epubMargin: Int = 60
     var epubLineHeight: Double = 1.8
 
