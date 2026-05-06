@@ -1,7 +1,6 @@
 import Foundation
 import PDFKit
 import AppKit
-import OakGraph
 
 // MARK: - Tab Content
 
@@ -10,7 +9,6 @@ enum TabContent {
     case webSnapshot(WebSnapshotDocument)
     case media(MediaDocument)
     case epub(EPUBDocument)
-    case graph(GraphDocument, URL)
 }
 
 // MARK: - Document Tab
@@ -67,13 +65,6 @@ final class DocumentTab: Identifiable {
         self.storageKey = storageKey
     }
 
-    init(graph: GraphDocument, url: URL) {
-        self.id = UUID()
-        self.content = .graph(graph, url)
-        self.viewModel = DocumentViewModel(standalone: true)
-        self.title = graph.title.isEmpty ? url.deletingPathExtension().lastPathComponent : graph.title
-        self.storageKey = nil
-    }
 }
 
 // MARK: - App State
@@ -135,7 +126,7 @@ final class AppState {
 
     // MARK: - Tab Operations
 
-    /// Open a document from a URL. Dispatches to PDF, web snapshot, EPUB, or OakGraph based on file extension.
+    /// Open a document from a URL. Dispatches to PDF, web snapshot, or EPUB based on file extension.
     func openDocument(url: URL) {
         let ext = url.pathExtension.lowercased()
         if ext == "html" || ext == "htm" {
@@ -146,11 +137,6 @@ final class AppState {
             openEPUBDocument(url: url)
             return
         }
-        if ext == "oakgraph" {
-            openOakGraphDocument(url: url)
-            return
-        }
-
         // Check if already open by URL
         if let existing = openTabs.first(where: { $0.document?.fileURL == url }) {
             switchToTab(existing.id)
@@ -392,35 +378,6 @@ final class AppState {
         } catch {
             Log.error(Log.open, "Failed to open EPUB: \(url.lastPathComponent) — \(error)")
             NSAlert(error: error).runModal()
-        }
-    }
-
-    /// Open a standalone .oakgraph file (read-only, no item association).
-    private func openOakGraphDocument(url: URL) {
-        // Check if already open by URL
-        if let existing = openTabs.first(where: {
-            if case .graph(_, let existingURL) = $0.content { return existingURL == url }
-            return false
-        }) {
-            switchToTab(existing.id)
-            return
-        }
-
-        do {
-            let data = try Data(contentsOf: url)
-            let document = try JSONDecoder().decode(GraphDocument.self, from: data)
-            let tab = DocumentTab(graph: document, url: url)
-            openTabs.append(tab)
-            activeTabID = tab.id
-            updateWindowTitle()
-        } catch {
-            Log.error(Log.open, "Failed to open .oakgraph: \(url.lastPathComponent) — \(error)")
-            let alert = NSAlert()
-            alert.messageText = "Cannot Open Graph"
-            alert.informativeText = "The file \"\(url.lastPathComponent)\" could not be read as a valid OakGraph document."
-            alert.alertStyle = .warning
-            alert.addButton(withTitle: "OK")
-            alert.runModal()
         }
     }
 

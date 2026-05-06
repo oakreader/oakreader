@@ -93,14 +93,6 @@ class DocumentViewModel {
         return vm
     }
 
-    private var _graph: GraphViewModel?
-    var graph: GraphViewModel {
-        if let vm = _graph { return vm }
-        let vm = GraphViewModel(parent: self, storageKey: storageKey)
-        _graph = vm
-        return vm
-    }
-
     private var _media: MediaViewModel?
     var media: MediaViewModel {
         if let vm = _media { return vm }
@@ -217,13 +209,6 @@ class DocumentViewModel {
         state.epubTheme = prefs.epubTheme
         state.epubMargin = prefs.epubMargin
         state.epubLineHeight = prefs.epubLineHeight
-    }
-
-    /// Lightweight init for standalone graph viewing (no document backing).
-    init(standalone: Bool) {
-        self.itemType = .pdf // placeholder — graph tabs bypass ContentView
-        self.state = DocumentState()
-        state.isSidebarVisible = false
     }
 
     // MARK: - Action Handling (called directly by AppState)
