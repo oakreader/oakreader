@@ -206,11 +206,19 @@ struct EPUBViewerRepresentable: NSViewRepresentable {
             document.head.appendChild(darkStyle);
 
             window.__oak_applyColumns = function() {
+                var b = document.body;
                 var m = parseInt(getComputedStyle(root).getPropertyValue('--oak-margin')) || \(margin);
                 var w = window.innerWidth;
                 var h = window.innerHeight;
-                document.body.style.columnWidth = (w - m * 2) + 'px';
-                document.body.style.height = h + 'px';
+                b.style.columnWidth = (w - m * 2) + 'px';
+                b.style.height = h + 'px';
+                // Snap scroll position to nearest page boundary after layout recalculates
+                requestAnimationFrame(function() {
+                    var pw = window.innerWidth;
+                    if (pw > 0) {
+                        b.scrollLeft = Math.round(b.scrollLeft / pw) * pw;
+                    }
+                });
             };
 
             window.__oak_applyDarkOverrides = function() {
