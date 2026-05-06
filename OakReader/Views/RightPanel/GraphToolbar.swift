@@ -2,19 +2,36 @@ import SwiftUI
 import UniformTypeIdentifiers
 import OakGraph
 
-/// Toolbar for graph panel: layout, export, type switching.
+/// Toolbar for graph panel: layout, zoom, export, full-screen.
 struct GraphToolbar: View {
     @Bindable var graphVM: GraphViewModel
 
+    private var zoomPercentage: String {
+        "\(Int(graphVM.interaction.scale * 100))%"
+    }
+
     var body: some View {
         HStack(spacing: 6) {
-            // Graph type picker
-            Picker("Type", selection: graphTypeBinding) {
-                Text("Concept Map").tag(GraphType.conceptMap)
-                Text("Mind Map").tag(GraphType.mindMap)
+            // Zoom controls
+            Button(action: { graphVM.interaction.zoom(by: 0.8) }) {
+                Image(systemName: "minus.magnifyingglass")
             }
-            .pickerStyle(.segmented)
-            .frame(maxWidth: 200)
+            .buttonStyle(.plain)
+            .help("Zoom out")
+
+            Button(action: { graphVM.interaction.resetZoom() }) {
+                Text(zoomPercentage)
+                    .font(.system(size: 11, weight: .medium).monospacedDigit())
+                    .frame(minWidth: 36)
+            }
+            .buttonStyle(.plain)
+            .help("Reset zoom")
+
+            Button(action: { graphVM.interaction.zoom(by: 1.25) }) {
+                Image(systemName: "plus.magnifyingglass")
+            }
+            .buttonStyle(.plain)
+            .help("Zoom in")
 
             Spacer()
 
@@ -22,7 +39,15 @@ struct GraphToolbar: View {
             Button(action: { graphVM.relayout() }) {
                 Image(systemName: "arrow.triangle.2.circlepath")
             }
+            .buttonStyle(.plain)
             .help("Re-layout")
+
+            // Full screen
+            Button(action: { graphVM.isFullScreen = true }) {
+                Image(systemName: "arrow.up.left.and.arrow.down.right")
+            }
+            .buttonStyle(.plain)
+            .help("Full screen")
 
             // Export menu
             Menu {
@@ -36,13 +61,6 @@ struct GraphToolbar: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-    }
-
-    private var graphTypeBinding: Binding<GraphType> {
-        Binding(
-            get: { graphVM.currentDocument?.graphType ?? .conceptMap },
-            set: { graphVM.switchGraphType($0) }
-        )
     }
 
     // MARK: - Export Actions

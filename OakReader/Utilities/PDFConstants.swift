@@ -156,7 +156,8 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
     case notes
     case metadata
     case translation
-    case graphMap
+    case conceptMap
+    case mindMap
 
     var id: String { rawValue }
 
@@ -166,7 +167,8 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
         case .aiChat: return "bubble.left.and.bubble.right"
         case .notes: return "note.text"
         case .translation: return "translate"
-        case .graphMap: return "point.3.connected.trianglepath.dotted"
+        case .conceptMap: return "point.3.connected.trianglepath.dotted"
+        case .mindMap: return "point.3.filled.connected.trianglepath.dotted"
         }
     }
 
@@ -176,7 +178,8 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
         case .aiChat: return "AI Chat"
         case .notes: return "Notes"
         case .translation: return "Translation"
-        case .graphMap: return "Graph Map"
+        case .conceptMap: return "Concept Map"
+        case .mindMap: return "Mind Map"
         }
     }
 }
@@ -184,7 +187,8 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
 enum Plugin: String, CaseIterable, Identifiable {
     case notes
     case translation
-    case graphMap
+    case conceptMap
+    case mindMap
 
     var id: String { rawValue }
 
@@ -192,7 +196,8 @@ enum Plugin: String, CaseIterable, Identifiable {
         switch self {
         case .notes: return "Notes"
         case .translation: return "Translation"
-        case .graphMap: return "Graph Map"
+        case .conceptMap: return "Concept Map"
+        case .mindMap: return "Mind Map"
         }
     }
 
@@ -200,7 +205,8 @@ enum Plugin: String, CaseIterable, Identifiable {
         switch self {
         case .notes: return "Rich markdown notes panel with Mermaid diagrams and image paste."
         case .translation: return "Translate selected text using AI-powered translation."
-        case .graphMap: return "AI-generated concept maps and mind maps from document content."
+        case .conceptMap: return "AI-generated concept maps from document content."
+        case .mindMap: return "AI-generated mind maps from document content."
         }
     }
 
@@ -208,7 +214,8 @@ enum Plugin: String, CaseIterable, Identifiable {
         switch self {
         case .notes: return "note.text"
         case .translation: return "translate"
-        case .graphMap: return "point.3.connected.trianglepath.dotted"
+        case .conceptMap: return "point.3.connected.trianglepath.dotted"
+        case .mindMap: return "point.3.filled.connected.trianglepath.dotted"
         }
     }
 
@@ -216,7 +223,8 @@ enum Plugin: String, CaseIterable, Identifiable {
         switch self {
         case .notes: return [.notes]
         case .translation: return [.translation]
-        case .graphMap: return [.graphMap]
+        case .conceptMap: return [.conceptMap]
+        case .mindMap: return [.mindMap]
         }
     }
 
@@ -224,7 +232,8 @@ enum Plugin: String, CaseIterable, Identifiable {
         switch self {
         case .notes: return true
         case .translation: return true
-        case .graphMap: return true
+        case .conceptMap: return true
+        case .mindMap: return true
         }
     }
 }

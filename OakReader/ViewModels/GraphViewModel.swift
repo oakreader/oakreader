@@ -13,11 +13,16 @@ class GraphViewModel {
     var currentDocument: GraphDocument?
     var interaction = GraphInteractionState()
     var isGenerating: Bool = false
+    var isFullScreen: Bool = false
     var errorMessage: String?
 
     var selectedGraph: GraphMapMeta? {
         guard let id = selectedGraphId else { return nil }
         return graphs.first { $0.id == id }
+    }
+
+    func graphs(ofType type: GraphType) -> [GraphMapMeta] {
+        graphs.filter { $0.graphType == type.rawValue }
     }
 
     // MARK: - Private
@@ -109,15 +114,6 @@ class GraphViewModel {
         scheduleSave()
     }
 
-    func switchGraphType(_ type: GraphType) {
-        guard var doc = currentDocument else { return }
-        doc.graphType = type
-        let engine: LayoutEngine = type == .mindMap ? TreeLayout() : ForceDirectedLayout()
-        engine.layout(&doc)
-        currentDocument = doc
-        scheduleSave()
-    }
-
     // MARK: - AI Generation
 
     func generate(graphType: GraphType = .conceptMap) {
@@ -158,7 +154,7 @@ class GraphViewModel {
                     messages: messages,
                     model: model,
                     systemPrompt: systemPrompt,
-                    maxTokens: 8192
+                    maxTokens: 4096
                 )
 
                 for try await chunk in stream {
@@ -184,6 +180,7 @@ class GraphViewModel {
 
                 var document = try JSONDecoder().decode(GraphDocument.self, from: jsonData)
                 document.sanitizeEdges()
+                GraphStyleTemplate.default.apply(to: &document)
                 document.autoSizeAllNodes()
 
                 // Run layout

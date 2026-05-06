@@ -1,5 +1,6 @@
 import SwiftUI
 import PDFKit
+import OakGraph
 
 struct ContentView: View {
     let viewModel: DocumentViewModel
@@ -34,8 +35,8 @@ struct ContentView: View {
 
                 // Main content column (toolbar + content)
                 VStack(spacing: 0) {
-                    // Inline toolbar (below tab bar) — hidden for embed (video) documents
-                    if viewModel.itemType != .embed {
+                    // Inline toolbar (below tab bar) — hidden for embed and EPUB documents
+                    if viewModel.itemType == .pdf || viewModel.itemType == .webSnapshot {
                         OakReaderToolbarView(viewModel: viewModel)
                         Divider()
                     } else {
@@ -85,6 +86,11 @@ struct ContentView: View {
                 get: { viewModel.state.rightPanelMode },
                 set: { viewModel.state.rightPanelMode = $0 }
             ))
+        }
+        .overlay {
+            if viewModel.graph.isFullScreen, let doc = viewModel.graph.currentDocument {
+                graphFullScreenOverlay(document: doc)
+            }
         }
         .background(OakStyle.Colors.tabBarBackground)
         .alert("Error", isPresented: Binding(
@@ -138,6 +144,92 @@ struct ContentView: View {
     private func adjustSidebarWidthForMediaIfNeeded() {
         guard viewModel.usesMediaSidebar else { return }
         sidebarWidth = max(sidebarWidth, 280)
+    }
+
+    // MARK: - Full Screen Graph Overlay
+
+    @ViewBuilder
+    private func graphFullScreenOverlay(document: GraphDocument) -> some View {
+        ZStack {
+            Color.black.opacity(0.85)
+                .ignoresSafeArea()
+
+            GraphCanvasView(
+                interaction: viewModel.graph.interaction,
+                document: document,
+                onNodeMoved: { nodeId, position in
+                    viewModel.graph.moveNode(nodeId, to: position)
+                },
+                onNodeSelected: { _ in },
+                onEdgeSelected: { _ in },
+                onNodeDoubleTapped: { _ in },
+                onDeleteRequested: {
+                    viewModel.graph.deleteSelected()
+                },
+                onEditCommitted: { nodeId, newLabel in
+                    viewModel.graph.updateNodeLabel(nodeId, label: newLabel)
+                }
+            )
+
+            // Close button (top-right)
+            VStack {
+                HStack {
+                    Spacer()
+                    Button {
+                        viewModel.graph.isFullScreen = false
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundStyle(.white.opacity(0.8))
+                    }
+                    .buttonStyle(.plain)
+                    .help("Close full screen (Esc)")
+                    .padding(16)
+                }
+                Spacer()
+            }
+
+            // Bottom zoom controls
+            VStack {
+                Spacer()
+                HStack(spacing: 12) {
+                    Button {
+                        viewModel.graph.interaction.zoom(by: 0.8)
+                    } label: {
+                        Image(systemName: "minus.magnifyingglass")
+                            .foregroundStyle(.white)
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        viewModel.graph.interaction.resetZoom()
+                    } label: {
+                        Text("\(Int(viewModel.graph.interaction.scale * 100))%")
+                            .font(.system(size: 12, weight: .medium).monospacedDigit())
+                            .foregroundStyle(.white)
+                            .frame(minWidth: 40)
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        viewModel.graph.interaction.zoom(by: 1.25)
+                    } label: {
+                        Image(systemName: "plus.magnifyingglass")
+                            .foregroundStyle(.white)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(.black.opacity(0.6), in: Capsule())
+                .padding(.bottom, 20)
+            }
+        }
+        .onKeyPress(.escape) {
+            viewModel.graph.isFullScreen = false
+            return .handled
+        }
+        .focusable()
     }
 
     // MARK: - Draggable Panel Divider
@@ -205,6 +297,8 @@ struct ContentView: View {
                 viewModel: viewModel,
                 currentSpineIndex: viewModel.state.currentSpineIndex,
                 navigationToken: viewModel.state.epubNavigationToken,
+                navigationFragment: viewModel.state.epubNavigationFragment,
+                navigationLabel: viewModel.state.epubNavigationLabel,
                 fontSize: viewModel.state.epubFontSize,
                 fontFamily: viewModel.state.epubFontFamily,
                 theme: viewModel.state.epubTheme,
