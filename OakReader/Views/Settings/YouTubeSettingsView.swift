@@ -10,7 +10,7 @@ struct YouTubeSettingsView: View {
     @State private var latestVersion: String?
 
     // AI chapter generation state
-    @State private var youtubeProvider: AIProvider
+    @State private var youtubeProviderId: String
     @State private var youtubeModel: String
     @State private var testResult: String?
     @State private var isTesting = false
@@ -27,10 +27,11 @@ struct YouTubeSettingsView: View {
 
     init() {
         let prefs = Preferences.shared
-        _youtubeProvider = State(initialValue: prefs.youtubeAIProvider)
+        let pid = prefs.youtubeAIProviderId
+        _youtubeProviderId = State(initialValue: pid)
         _youtubeModel = State(initialValue: {
             let m = prefs.youtubeAIModel
-            return m.isEmpty ? prefs.youtubeAIProvider.defaultModel : m
+            return m.isEmpty ? (ProviderRegistry.shared.provider(for: pid)?.defaultModelId ?? "") : m
         }())
     }
 
@@ -167,15 +168,15 @@ struct YouTubeSettingsView: View {
                     Text("Provider")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
-                    Picker("Provider", selection: $youtubeProvider) {
-                        ForEach(AIProvider.allCases) { p in
-                            Text(p.displayName).tag(p)
+                    Picker("Provider", selection: $youtubeProviderId) {
+                        ForEach(ProviderRegistry.shared.allProviders) { p in
+                            Text(p.displayName).tag(p.id)
                         }
                     }
                     .labelsHidden()
                     .frame(width: 160)
-                    .onChange(of: youtubeProvider) { _, newValue in
-                        youtubeModel = newValue.defaultModel
+                    .onChange(of: youtubeProviderId) { _, newValue in
+                        youtubeModel = ProviderRegistry.shared.provider(for: newValue)?.defaultModelId ?? ""
                         testResult = nil
                     }
                 }
@@ -185,7 +186,7 @@ struct YouTubeSettingsView: View {
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                     Picker("Model", selection: $youtubeModel) {
-                        ForEach(youtubeProvider.models) { m in
+                        ForEach(ProviderRegistry.shared.provider(for: youtubeProviderId)?.models ?? []) { m in
                             Text(m.name).tag(m.id)
                         }
                     }
@@ -196,7 +197,7 @@ struct YouTubeSettingsView: View {
 
             // API key status
             HStack(spacing: 6) {
-                if let key = KeychainService.apiKey(for: youtubeProvider), !key.isEmpty {
+                if CredentialResolver.hasCredentials(for: youtubeProviderId) {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                     Text("API key configured")
@@ -221,7 +222,7 @@ struct YouTubeSettingsView: View {
                 } else {
                     Button("Test Connection") { testConnection() }
                         .controlSize(.small)
-                        .disabled(KeychainService.apiKey(for: youtubeProvider) == nil)
+                        .disabled(!CredentialResolver.hasCredentials(for: youtubeProviderId))
                 }
 
                 if let result = testResult {
@@ -483,7 +484,7 @@ struct YouTubeSettingsView: View {
 
     private func saveAISettings() {
         let prefs = Preferences.shared
-        prefs.youtubeAIProvider = youtubeProvider
+        prefs.youtubeAIProviderId = youtubeProviderId
         prefs.youtubeAIModel = youtubeModel
     }
 
@@ -495,7 +496,7 @@ struct YouTubeSettingsView: View {
         Task {
             do {
                 let router = ProviderRouter()
-                let config = ProviderConfig(provider: youtubeProvider, model: youtubeModel)
+                let config = ProviderConfig(providerId: youtubeProviderId, model: youtubeModel)
                 let svc = try router.provider(for: config)
                 let messages = [LLMMessage(role: .user, text: "Say 'OK' and nothing else.")]
                 let stream = svc.sendMessage(

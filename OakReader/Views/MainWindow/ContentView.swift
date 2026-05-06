@@ -196,7 +196,6 @@ struct ContentView: View {
                     MediaSnapshotOverlayView(viewModel: viewModel)
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 8))
             .padding(.horizontal, 8)
             .padding(.bottom, 8)
         }

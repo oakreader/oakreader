@@ -5,6 +5,8 @@ import Textual
 struct ChatBubbleView: View {
     let turn: ChatTurn
     var onSaveToNote: ((ChatTurn) -> Bool)?
+    var onApproveToolCall: (() -> Void)?
+    var onDenyToolCall: (() -> Void)?
 
     @State private var isHovered = false
     @State private var isCopyHovered = false
@@ -40,7 +42,11 @@ struct ChatBubbleView: View {
                     // Tool call cards for assistant messages
                     if turn.role == .assistant && !turn.toolUses.isEmpty {
                         ForEach(turn.toolUses) { record in
-                            ToolCallCardView(record: record)
+                            ToolCallCardView(
+                                record: record,
+                                onApprove: record.status == .pending ? onApproveToolCall : nil,
+                                onDeny: record.status == .pending ? onDenyToolCall : nil
+                            )
                         }
                     }
 

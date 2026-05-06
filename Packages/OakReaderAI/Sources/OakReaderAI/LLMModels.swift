@@ -48,6 +48,7 @@ public enum StreamChunk: Sendable {
 public enum StreamEvent: Sendable {
     case delta(String)
     case toolUseStarted(ToolUseRecord)
+    case toolUsePending(ToolUseRecord)
     case toolUseCompleted(ToolUseRecord)
     case finished(ChatTurn)
     case error(Error)

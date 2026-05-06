@@ -36,6 +36,7 @@ extension LLMProviderService {
 
 public enum LLMProviderError: LocalizedError, Sendable {
     case missingAPIKey
+    case unknownProvider(String)
     case invalidResponse(Int)
     case decodingError(String)
     case streamError(String)
@@ -45,6 +46,7 @@ public enum LLMProviderError: LocalizedError, Sendable {
     public var errorDescription: String? {
         switch self {
         case .missingAPIKey: return "API key not configured. Open AI Settings to add your key."
+        case .unknownProvider(let id): return "Unknown provider: \(id). Check AI Settings."
         case .invalidResponse(let code): return "API returned status \(code)"
         case .decodingError(let msg): return "Failed to decode response: \(msg)"
         case .streamError(let msg): return "Stream error: \(msg)"

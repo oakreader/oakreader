@@ -29,7 +29,7 @@ struct CLIChatRunner {
             case .delta(let text):
                 print(text, terminator: "")
                 fflush(stdout)
-            case .toolUseStarted, .toolUseCompleted:
+            case .toolUseStarted, .toolUsePending, .toolUseCompleted:
                 break
             case .finished(let turn):
                 if turn.role == .assistant && turn.content.isEmpty == false {
@@ -93,7 +93,7 @@ struct CLIChatRunner {
                     case .delta(let text):
                         print(text, terminator: "")
                         fflush(stdout)
-                    case .toolUseStarted, .toolUseCompleted:
+                    case .toolUseStarted, .toolUsePending, .toolUseCompleted:
                         break
                     case .finished(let turn):
                         if turn.role == .user {
@@ -115,15 +115,14 @@ struct CLIChatRunner {
     // MARK: - Helpers
 
     private func loadConfig() -> ProviderConfig {
-        // Try to read from UserDefaults (shared with main app)
         let defaults = UserDefaults.standard
-        let providerStr = defaults.string(forKey: "aiProvider") ?? AIProvider.anthropic.rawValue
-        let provider = AIProvider(rawValue: providerStr) ?? .anthropic
-        let model = defaults.string(forKey: "aiModel") ?? provider.defaultModel
+        let providerId = defaults.string(forKey: "aiProvider") ?? "anthropic"
+        let defaultModel = ProviderRegistry.shared.provider(for: providerId)?.defaultModelId ?? ""
+        let model = defaults.string(forKey: "aiModel") ?? defaultModel
 
         return ProviderConfig(
-            provider: provider,
-            model: model.isEmpty ? provider.defaultModel : model
+            providerId: providerId,
+            model: model.isEmpty ? defaultModel : model
         )
     }
 

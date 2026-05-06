@@ -4,8 +4,10 @@ import Security
 public enum KeychainService: Sendable {
     private static let servicePrefix = "com.oakreader.apikey"
 
-    public static func apiKey(for provider: AIProvider) -> String? {
-        let service = "\(servicePrefix).\(provider.rawValue)"
+    // MARK: - String-based API (primary)
+
+    public static func apiKey(forProviderId providerId: String) -> String? {
+        let service = "\(servicePrefix).\(providerId)"
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -19,14 +21,13 @@ public enum KeychainService: Sendable {
     }
 
     @discardableResult
-    public static func setAPIKey(_ key: String, for provider: AIProvider) -> Bool {
-        let service = "\(servicePrefix).\(provider.rawValue)"
+    public static func setAPIKey(_ key: String, forProviderId providerId: String) -> Bool {
+        let service = "\(servicePrefix).\(providerId)"
         let baseQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
         ]
 
-        // Empty key → just delete
         guard !key.isEmpty else {
             SecItemDelete(baseQuery as CFDictionary)
             return true
@@ -34,7 +35,6 @@ public enum KeychainService: Sendable {
 
         let data = key.data(using: .utf8)!
 
-        // Try to update existing item first (non-destructive)
         let updateAttrs: [String: Any] = [
             kSecValueData as String: data,
             kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked,
@@ -42,19 +42,36 @@ public enum KeychainService: Sendable {
         let updateStatus = SecItemUpdate(baseQuery as CFDictionary, updateAttrs as CFDictionary)
         if updateStatus == errSecSuccess { return true }
 
-        // No existing item — add new
         var addQuery = baseQuery
         addQuery[kSecValueData as String] = data
         addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlocked
         return SecItemAdd(addQuery as CFDictionary, nil) == errSecSuccess
     }
 
-    public static func deleteAPIKey(for provider: AIProvider) {
-        let service = "\(servicePrefix).\(provider.rawValue)"
+    public static func deleteAPIKey(forProviderId providerId: String) {
+        let service = "\(servicePrefix).\(providerId)"
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
         ]
         SecItemDelete(query as CFDictionary)
+    }
+
+    // MARK: - Deprecated AIProvider-based API (delegates to string-based)
+
+    @available(*, deprecated, message: "Use apiKey(forProviderId:) instead")
+    public static func apiKey(for provider: AIProvider) -> String? {
+        apiKey(forProviderId: provider.rawValue)
+    }
+
+    @available(*, deprecated, message: "Use setAPIKey(_:forProviderId:) instead")
+    @discardableResult
+    public static func setAPIKey(_ key: String, for provider: AIProvider) -> Bool {
+        setAPIKey(key, forProviderId: provider.rawValue)
+    }
+
+    @available(*, deprecated, message: "Use deleteAPIKey(forProviderId:) instead")
+    public static func deleteAPIKey(for provider: AIProvider) {
+        deleteAPIKey(forProviderId: provider.rawValue)
     }
 }

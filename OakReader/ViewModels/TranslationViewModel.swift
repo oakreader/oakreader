@@ -40,10 +40,10 @@ class TranslationViewModel {
         isTranslating = true
 
         let prefs = Preferences.shared
-        let provider = prefs.translationAIProvider
+        let pid = prefs.translationAIProviderId
         let model: String = {
             let m = prefs.translationAIModel
-            return m.isEmpty ? provider.defaultModel : m
+            return m.isEmpty ? (ProviderRegistry.shared.provider(for: pid)?.defaultModelId ?? "") : m
         }()
 
         let sameLanguage = sourceLang == targetLang && sourceLang != .auto
@@ -59,7 +59,7 @@ class TranslationViewModel {
             userPrompt = "Translate from \(sourceLabel) to \(targetLang.displayName):\n\n\(text)"
         }
 
-        let config = ProviderConfig(provider: provider, model: model)
+        let config = ProviderConfig(providerId: pid, model: model)
         let messages = [LLMMessage(role: .user, text: userPrompt)]
 
         streamTask = Task { @MainActor in

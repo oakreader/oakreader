@@ -1,6 +1,11 @@
 import Foundation
 import OakReaderAI
 
+struct PendingConfirmation {
+    let toolCall: ToolCall
+    let continuation: CheckedContinuation<Bool, Never>
+}
+
 @Observable
 class ChatViewModel {
     weak var parent: DocumentViewModel?
@@ -14,6 +19,7 @@ class ChatViewModel {
     var pendingAttachments: [ChatAttachment] = []
     var showSettings: Bool = false
     var errorMessage: String?
+    var pendingToolConfirmation: PendingConfirmation?
 
     // Session
     var sessionId: UUID = UUID()
@@ -56,9 +62,11 @@ class ChatViewModel {
 
     var config: ProviderConfig {
         let prefs = Preferences.shared
+        let pid = prefs.aiProviderId
+        let defaultModel = ProviderRegistry.shared.provider(for: pid)?.defaultModelId ?? ""
         return ProviderConfig(
-            provider: prefs.aiProvider,
-            model: prefs.aiModel.isEmpty ? prefs.aiProvider.defaultModel : prefs.aiModel
+            providerId: pid,
+            model: prefs.aiModel.isEmpty ? defaultModel : prefs.aiModel
         )
     }
 
@@ -91,9 +99,23 @@ class ChatViewModel {
         let currentConfig = config
         let currentSkill = selectedSkill
 
-        let currentToolExecutor = toolExecutor
+        let prefs = Preferences.shared
+        let currentToolExecutor = prefs.agentToolsEnabled ? toolExecutor : nil
 
-        streamTask = Task { @MainActor in
+        // Build enabled tools list from per-tool preferences
+        let enabledTools: [String]?
+        if currentToolExecutor != nil {
+            var tools: [String] = []
+            if prefs.agentReadFileEnabled { tools.append("read_file") }
+            if prefs.agentWriteFileEnabled { tools.append("write_file") }
+            enabledTools = tools.isEmpty ? nil : tools
+        } else {
+            enabledTools = nil
+        }
+
+        let requireConfirmation = prefs.agentRequireConfirmation
+
+        streamTask = Task { @MainActor [weak self] in
             do {
                 let stream = await engine.send(
                     userContent: text,
@@ -103,7 +125,9 @@ class ChatViewModel {
                     config: currentConfig,
                     skill: currentSkill,
                     pdfContext: pdfContext,
-                    toolExecutor: currentToolExecutor
+                    toolExecutor: currentToolExecutor,
+                    enabledTools: enabledTools,
+                    toolConfirmation: requireConfirmation ? self?.makeToolConfirmation() : nil
                 )
 
                 var assistantTurnId: UUID?
@@ -132,6 +156,17 @@ class ChatViewModel {
                            let idx = turns.lastIndex(where: { $0.id == id })
                         {
                             turns[idx].toolUses.append(record)
+                        }
+
+                    case .toolUsePending(let record):
+                        if let id = assistantTurnId,
+                           let idx = turns.lastIndex(where: { $0.id == id })
+                        {
+                            if let toolIdx = turns[idx].toolUses.firstIndex(where: { $0.id == record.id }) {
+                                turns[idx].toolUses[toolIdx] = record
+                            } else {
+                                turns[idx].toolUses.append(record)
+                            }
                         }
 
                     case .toolUseCompleted(let record):
@@ -184,6 +219,31 @@ class ChatViewModel {
             }
 
             isStreaming = false
+        }
+    }
+
+    // MARK: - Tool Confirmation
+
+    func approveToolCall() {
+        guard let pending = pendingToolConfirmation else { return }
+        pendingToolConfirmation = nil
+        pending.continuation.resume(returning: true)
+    }
+
+    func denyToolCall() {
+        guard let pending = pendingToolConfirmation else { return }
+        pendingToolConfirmation = nil
+        pending.continuation.resume(returning: false)
+    }
+
+    private func makeToolConfirmation() -> @Sendable (ToolCall) async -> Bool {
+        return { [weak self] call in
+            await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+                let pending = PendingConfirmation(toolCall: call, continuation: continuation)
+                DispatchQueue.main.async {
+                    self?.pendingToolConfirmation = pending
+                }
+            }
         }
     }
 

@@ -2,10 +2,13 @@ import Foundation
 
 public struct GoogleProvider: LLMProviderService {
     private let apiKey: String
-    private let baseURL = "https://generativelanguage.googleapis.com/v1beta/models/"
+    private let baseURL: URL
+    private let customHeaders: [String: String]
 
-    public init(apiKey: String) {
+    public init(apiKey: String, baseURL: URL = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/")!, customHeaders: [String: String] = [:]) {
         self.apiKey = apiKey
+        self.baseURL = baseURL
+        self.customHeaders = customHeaders
     }
 
     public func sendMessage(
@@ -27,10 +30,14 @@ public struct GoogleProvider: LLMProviderService {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    let url = URL(string: "\(baseURL)\(model):streamGenerateContent?alt=sse&key=\(apiKey)")!
+                    let url = URL(string: "\(baseURL.absoluteString)\(model):streamGenerateContent?alt=sse&key=\(apiKey)")!
                     var request = URLRequest(url: url)
                     request.httpMethod = "POST"
                     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+                    for (key, value) in customHeaders {
+                        request.setValue(value, forHTTPHeaderField: key)
+                    }
 
                     let body = buildRequestBody(
                         messages: messages, systemPrompt: systemPrompt,
@@ -74,14 +81,12 @@ public struct GoogleProvider: LLMProviderService {
             ] as [String: Any]
         ]
 
-        // System instruction
         if let system = systemPrompt {
             body["systemInstruction"] = [
                 "parts": [["text": system]]
             ] as [String: Any]
         }
 
-        // Tools (function declarations)
         if let tools, !tools.isEmpty {
             body["tools"] = [[
                 "functionDeclarations": tools.map { tool in
@@ -94,7 +99,6 @@ public struct GoogleProvider: LLMProviderService {
             ] as [String: Any]]
         }
 
-        // Convert messages to Gemini format
         var contents: [[String: Any]] = []
         for msg in messages where msg.role != .system {
             let role = msg.role == .user ? "user" : "model"
@@ -155,7 +159,6 @@ public struct GoogleProvider: LLMProviderService {
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
             else { continue }
 
-            // Check for error
             if let error = json["error"] as? [String: Any],
                let message = error["message"] as? String
             {
@@ -163,7 +166,6 @@ public struct GoogleProvider: LLMProviderService {
                 return
             }
 
-            // Extract content from candidates
             if let candidates = json["candidates"] as? [[String: Any]],
                let candidate = candidates.first,
                let content = candidate["content"] as? [String: Any],
@@ -175,7 +177,6 @@ public struct GoogleProvider: LLMProviderService {
                     } else if let functionCall = part["functionCall"] as? [String: Any],
                               let name = functionCall["name"] as? String
                     {
-                        // Gemini doesn't provide call IDs — generate a client-side UUID
                         let callId = UUID().uuidString
                         let args = functionCall["args"] as? [String: Any] ?? [:]
                         var input: [String: String] = [:]
@@ -187,7 +188,6 @@ public struct GoogleProvider: LLMProviderService {
                     }
                 }
 
-                // Check finish reason
                 if let finishReason = candidate["finishReason"] as? String {
                     if finishReason == "STOP" {
                         continuation.yield(.finished(stopReason: finishReason))

@@ -46,6 +46,15 @@ public struct ToolResult: Codable, Sendable {
     }
 }
 
+// MARK: - Tool Use Status
+
+public enum ToolUseStatus: String, Codable, Sendable {
+    case pending = "awaitingConfirmation"
+    case executing
+    case completed
+    case denied
+}
+
 // MARK: - Tool Use Record (persisted in JSONL and rendered in UI)
 
 public struct ToolUseRecord: Identifiable, Codable, Sendable {
@@ -54,13 +63,15 @@ public struct ToolUseRecord: Identifiable, Codable, Sendable {
     public let input: [String: String]
     public var result: String?
     public var isError: Bool
+    public var status: ToolUseStatus
 
-    public init(id: String, name: String, input: [String: String], result: String? = nil, isError: Bool = false) {
+    public init(id: String, name: String, input: [String: String], result: String? = nil, isError: Bool = false, status: ToolUseStatus = .executing) {
         self.id = id
         self.name = name
         self.input = input
         self.result = result
         self.isError = isError
+        self.status = status
     }
 
     public init(from toolCall: ToolCall) {
@@ -69,10 +80,22 @@ public struct ToolUseRecord: Identifiable, Codable, Sendable {
         self.input = toolCall.input
         self.result = nil
         self.isError = false
+        self.status = .executing
+    }
+
+    // Custom Decodable for backward compatibility with old JSONL files without status field
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        input = try container.decode([String: String].self, forKey: .input)
+        result = try container.decodeIfPresent(String.self, forKey: .result)
+        isError = try container.decodeIfPresent(Bool.self, forKey: .isError) ?? false
+        status = try container.decodeIfPresent(ToolUseStatus.self, forKey: .status) ?? (result != nil ? .completed : .executing)
     }
 
     public var isExecuting: Bool {
-        result == nil
+        status == .executing
     }
 
     /// Convenience: extract file path from input for display.

@@ -133,7 +133,9 @@ struct AIChatView: View {
                     ForEach(chatVM.turns) { turn in
                         ChatBubbleView(
                             turn: turn,
-                            onSaveToNote: onSaveAssistantResponse
+                            onSaveToNote: onSaveAssistantResponse,
+                            onApproveToolCall: { chatVM.approveToolCall() },
+                            onDenyToolCall: { chatVM.denyToolCall() }
                         )
                             .id(turn.id)
                     }
@@ -326,11 +328,12 @@ struct AIChatView: View {
 
     private var modelSwitcher: some View {
         let prefs = Preferences.shared
-        let provider = prefs.aiProvider
+        let providerInfo = ProviderRegistry.shared.provider(for: prefs.aiProviderId)
+        let models = providerInfo?.models ?? []
         let currentModel = chatVM.config.model
 
         return Menu {
-            ForEach(provider.models) { model in
+            ForEach(models) { model in
                 Button(action: {
                     prefs.aiModel = model.id
                 }) {

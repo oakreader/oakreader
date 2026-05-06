@@ -52,7 +52,7 @@ final class ChapterGenerationService {
 
         let ytDlpPath = Preferences.shared.ytDlpPath
         let hasYtDlp = !ytDlpPath.isEmpty && FileManager.default.isExecutableFile(atPath: ytDlpPath)
-        let hasAIKey = KeychainService.apiKey(for: Preferences.shared.youtubeAIProvider) != nil
+        let hasAIKey = CredentialResolver.hasCredentials(for: Preferences.shared.youtubeAIProviderId)
 
         // For highlights mode, only AI is relevant
         if mode == .highlights {
@@ -198,9 +198,10 @@ final class ChapterGenerationService {
         }
 
         let prefs = Preferences.shared
+        let pid = prefs.youtubeAIProviderId
         let config = ProviderConfig(
-            provider: prefs.youtubeAIProvider,
-            model: prefs.youtubeAIModel.isEmpty ? prefs.youtubeAIProvider.defaultModel : prefs.youtubeAIModel
+            providerId: pid,
+            model: prefs.youtubeAIModel.isEmpty ? (ProviderRegistry.shared.provider(for: pid)?.defaultModelId ?? "") : prefs.youtubeAIModel
         )
         let router = ProviderRouter()
         guard let provider = try? router.provider(for: config) else { return }
@@ -410,9 +411,10 @@ final class ChapterGenerationService {
 
         // Check for AI API key
         let prefs = Preferences.shared
+        let pid = prefs.youtubeAIProviderId
         let config = ProviderConfig(
-            provider: prefs.youtubeAIProvider,
-            model: prefs.youtubeAIModel.isEmpty ? prefs.youtubeAIProvider.defaultModel : prefs.youtubeAIModel
+            providerId: pid,
+            model: prefs.youtubeAIModel.isEmpty ? (ProviderRegistry.shared.provider(for: pid)?.defaultModelId ?? "") : prefs.youtubeAIModel
         )
 
         let router = ProviderRouter()
@@ -422,7 +424,8 @@ final class ChapterGenerationService {
         }
 
         let label = mode == .chapters ? "sections" : "highlights"
-        Log.info(Log.chapters, "Generating AI \(label) using \(config.provider.displayName) / \(config.model)")
+        let providerName = ProviderRegistry.shared.provider(for: config.providerId)?.displayName ?? config.providerId
+        Log.info(Log.chapters, "Generating AI \(label) using \(providerName) / \(config.model)")
 
         let systemPrompt: String
         switch mode {
