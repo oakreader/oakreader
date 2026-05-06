@@ -9,6 +9,8 @@ struct EPUBReaderSettingsBar: View {
         "Georgia",
         "Iowan Old Style",
         "Athelas",
+        "Charter",
+        "Seravek",
         "Helvetica Neue",
         "Avenir Next",
         "SF Pro Text",
@@ -62,7 +64,7 @@ struct EPUBReaderSettingsBar: View {
             Divider().frame(height: 16)
 
             // Theme
-            HStack(spacing: 6) {
+            HStack(spacing: 4) {
                 ForEach(EPUBTheme.allCases, id: \.self) { theme in
                     let isActive = viewModel.state.epubTheme == theme
                     Button {
@@ -71,7 +73,7 @@ struct EPUBReaderSettingsBar: View {
                         Circle()
                             .fill(Color(hex: theme.backgroundColor) ?? .white)
                             .stroke(isActive ? Color.accentColor : Color.gray.opacity(0.4), lineWidth: isActive ? 2 : 1)
-                            .frame(width: 18, height: 18)
+                            .frame(width: 16, height: 16)
                     }
                     .buttonStyle(.plain)
                     .help(theme.label)
