@@ -5,6 +5,15 @@ import OakGraph
 /// Shows either a graph list or the canvas with toolbar.
 struct GraphPanelView: View {
     @Bindable var graphVM: GraphViewModel
+    let graphType: GraphType
+
+    private var filteredGraphs: [GraphMapMeta] {
+        graphVM.graphs(ofType: graphType)
+    }
+
+    private var headerTitle: String {
+        graphType == .conceptMap ? "Concept Maps" : "Mind Maps"
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -22,22 +31,17 @@ struct GraphPanelView: View {
         VStack(spacing: 0) {
             // Header
             HStack(spacing: 8) {
-                Text("Graph Maps")
+                Text(headerTitle)
                     .font(.system(size: 16, weight: .semibold))
                 Spacer()
 
-                // Generate buttons
-                Menu {
-                    Button("Concept Map") {
-                        graphVM.generate(graphType: .conceptMap)
-                    }
-                    Button("Mind Map") {
-                        graphVM.generate(graphType: .mindMap)
-                    }
+                Button {
+                    graphVM.generate(graphType: graphType)
                 } label: {
                     Image(systemName: "sparkles")
                 }
-                .help("Generate graph from document")
+                .buttonStyle(.plain)
+                .help("Generate \(graphType == .conceptMap ? "concept map" : "mind map") from document")
                 .disabled(graphVM.isGenerating)
             }
             .padding(.horizontal, 12)
@@ -59,15 +63,17 @@ struct GraphPanelView: View {
                     .foregroundStyle(.red)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if graphVM.graphs.isEmpty {
+            } else if filteredGraphs.isEmpty {
                 VStack(spacing: 12) {
-                    Image(systemName: "point.3.connected.trianglepath.dotted")
+                    Image(systemName: graphType == .conceptMap
+                          ? "point.3.connected.trianglepath.dotted"
+                          : "point.3.filled.connected.trianglepath.dotted")
                         .font(.system(size: 32))
                         .foregroundStyle(.secondary)
-                    Text("No graphs yet")
+                    Text("No \(graphType == .conceptMap ? "concept maps" : "mind maps") yet")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                    Text("Generate a concept map or mind map from your document using AI.")
+                    Text("Generate a \(graphType == .conceptMap ? "concept map" : "mind map") from your document using AI.")
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                         .multilineTextAlignment(.center)
@@ -75,7 +81,7 @@ struct GraphPanelView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                List(graphVM.graphs) { graph in
+                List(filteredGraphs) { graph in
                     GraphListRow(graph: graph)
                         .contentShape(Rectangle())
                         .onTapGesture {
