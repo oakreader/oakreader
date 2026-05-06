@@ -78,27 +78,43 @@ struct ItemSidebarPanel: View {
 
     // MARK: - Auto-Extract
 
+    /// Auto-extract reference metadata when opening a document that has none.
+    /// Tries DOI + CrossRef first, falls back to basic document info.
     private func autoExtractIfNeeded() {
         guard !hasTriggeredAutoExtract else { return }
         hasTriggeredAutoExtract = true
 
         guard let item = viewModel.libraryItem,
               item.referenceMetadata == nil,
-              item.itemType == .pdf,
               let refService = viewModel.referenceService,
               let store = viewModel.libraryStore else { return }
 
         Task {
-            let pdfURL = item.fileURL
-            guard let doi = DOIExtractorService.extractDOI(from: pdfURL) else { return }
-            do {
-                let cslItem = try await CrossRefService.fetchMetadata(doi: doi)
-                try refService.saveMetadata(cslItem, forItemId: item.id.uuidString)
-                await MainActor.run {
-                    store.invalidate()
+            // Try DOI extraction for PDFs
+            if item.itemType == .pdf {
+                if let doi = DOIExtractorService.extractDOI(from: item.fileURL) {
+                    do {
+                        let cslItem = try await CrossRefService.fetchMetadata(doi: doi)
+                        try refService.saveMetadata(cslItem, forItemId: item.id.uuidString)
+                        await MainActor.run { store.invalidate() }
+                        return
+                    } catch {
+                        Log.error(Log.importer, "Auto-extract on open failed for DOI \(doi): \(error)")
+                    }
                 }
+            }
+
+            // Fallback: create metadata from document info
+            var csl = CSLItem(type: "document")
+            csl.title = item.title.isEmpty ? nil : item.title
+            if !item.author.isEmpty {
+                csl.author = [CSLName(family: item.author, given: nil)]
+            }
+            do {
+                try refService.saveMetadata(csl, forItemId: item.id.uuidString)
+                await MainActor.run { store.invalidate() }
             } catch {
-                Log.error(Log.importer, "Auto-extract on open failed for DOI \(doi): \(error)")
+                Log.error(Log.importer, "Failed to create fallback reference metadata: \(error)")
             }
         }
     }
