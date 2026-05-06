@@ -177,7 +177,7 @@ struct LibraryTableView: View {
             Divider()
 
             if let sourceURL = item.sourceURL {
-                Button("View Online") {
+                Button("View Source in Browser") {
                     NSWorkspace.shared.open(sourceURL)
                 }
             }
