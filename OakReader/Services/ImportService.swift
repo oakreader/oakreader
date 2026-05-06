@@ -121,7 +121,7 @@ final class ImportService {
 
         // Auto-extract DOI and fetch reference metadata
         Task {
-            await autoExtractReference(itemId: docId.uuidString, pdfURL: destURL)
+            await autoExtractReference(itemId: docId.uuidString, pdfURL: destURL, title: title, author: author)
         }
 
         return item
@@ -325,6 +325,15 @@ final class ImportService {
            let coverData = try? Data(contentsOf: coverURL) {
             store.updateCover(item, imageData: coverData)
         }
+
+        // Auto-create reference metadata from EPUB info
+        var csl = CSLItem(type: "book")
+        csl.title = title.isEmpty ? nil : title
+        if !author.isEmpty {
+            csl.author = [CSLName(family: author, given: nil)]
+        }
+        try? referenceService.saveMetadata(csl, forItemId: docId.uuidString)
+        store.invalidate()
 
         return item
     }
@@ -713,17 +722,30 @@ final class ImportService {
     // MARK: - Reference Extraction
 
     /// Extract DOI from PDF text and fetch metadata from CrossRef.
-    private func autoExtractReference(itemId: String, pdfURL: URL) async {
-        guard let doi = DOIExtractorService.extractDOI(from: pdfURL) else { return }
-
-        do {
-            let cslItem = try await CrossRefService.fetchMetadata(doi: doi)
-            try referenceService.saveMetadata(cslItem, forItemId: itemId)
-            await MainActor.run {
-                store.invalidate()
+    /// Always creates reference metadata — falls back to basic document info if no DOI found.
+    private func autoExtractReference(itemId: String, pdfURL: URL, title: String, author: String) async {
+        if let doi = DOIExtractorService.extractDOI(from: pdfURL) {
+            do {
+                let cslItem = try await CrossRefService.fetchMetadata(doi: doi)
+                try referenceService.saveMetadata(cslItem, forItemId: itemId)
+                await MainActor.run { store.invalidate() }
+                return
+            } catch {
+                Log.error(Log.importer, "CrossRef lookup failed for DOI \(doi): \(error)")
             }
+        }
+
+        // Fallback: create metadata from document info
+        var csl = CSLItem(type: "document")
+        csl.title = title.isEmpty ? nil : title
+        if !author.isEmpty {
+            csl.author = [CSLName(family: author, given: nil)]
+        }
+        do {
+            try referenceService.saveMetadata(csl, forItemId: itemId)
+            await MainActor.run { store.invalidate() }
         } catch {
-            Log.error(Log.importer, "CrossRef lookup failed for DOI \(doi): \(error)")
+            Log.error(Log.importer, "Failed to create fallback reference metadata: \(error)")
         }
     }
 

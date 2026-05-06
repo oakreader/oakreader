@@ -46,62 +46,51 @@ struct ReferenceMetadataView: View {
                 .onAppear { loadFromMetadata() }
                 .onChange(of: item.id) { _, _ in loadFromMetadata() }
         } else {
-            emptyState
+            extractingState
+                .onAppear { autoExtract() }
         }
     }
 
-    // MARK: - Empty State
+    // MARK: - Auto-Extracting State
 
-    private var emptyState: some View {
+    private var extractingState: some View {
         VStack(spacing: 16) {
             Spacer().frame(height: 8)
-            Image(systemName: "text.quote")
-                .font(.system(size: 32, weight: .thin))
-                .foregroundStyle(.quaternary)
-
-            VStack(spacing: 4) {
-                Text("No Reference Data")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.secondary)
-                Text("Extract from the PDF or add manually.")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.tertiary)
-                    .multilineTextAlignment(.center)
-            }
-
-            VStack(spacing: 6) {
-                Button {
-                    extractFromPDF()
-                } label: {
-                    HStack(spacing: 5) {
-                        if isExtracting {
-                            ProgressView().controlSize(.small)
-                        } else {
-                            Image(systemName: "sparkle.magnifyingglass")
-                                .font(.system(size: 12))
-                        }
-                        Text("Extract from PDF")
-                    }
-                    .font(.system(size: 12))
-                    .frame(maxWidth: 180)
-                }
-                .buttonStyle(.borderedProminent)
+            ProgressView()
                 .controlSize(.regular)
-                .disabled(isExtracting || item.itemType != .pdf)
-
-                Button {
-                    createEmptyMetadata()
-                } label: {
-                    Text("Add Manually")
-                        .font(.system(size: 12))
-                        .frame(maxWidth: 180)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.regular)
-            }
+            Text("Extracting metadata…")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.secondary)
             Spacer().frame(height: 8)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private func autoExtract() {
+        guard !isExtracting else { return }
+        isExtracting = true
+        Task {
+            if item.itemType == .pdf {
+                if let foundDOI = DOIExtractorService.extractDOI(from: item.fileURL) {
+                    do {
+                        let cslItem = try await CrossRefService.fetchMetadata(doi: foundDOI)
+                        try referenceService.saveMetadata(cslItem, forItemId: item.id.uuidString)
+                        await MainActor.run {
+                            store.invalidate()
+                            isExtracting = false
+                        }
+                        return
+                    } catch {
+                        Log.error(Log.importer, "CrossRef lookup failed: \(error)")
+                    }
+                }
+            }
+            // Fallback: create metadata from document info
+            await MainActor.run {
+                createEmptyMetadata()
+                isExtracting = false
+            }
+        }
     }
 
     // MARK: - Editable Content (Zotero-style grid)
