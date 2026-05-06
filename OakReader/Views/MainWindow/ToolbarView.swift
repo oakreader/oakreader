@@ -16,7 +16,7 @@ struct OakReaderToolbarView: View {
                 leftSection
                 Spacer()
                 centerSection
-            case .webSnapshot, .embed:
+            case .webSnapshot, .embed, .epub:
                 Spacer()
                 areaToolButton
             }

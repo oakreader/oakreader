@@ -9,11 +9,13 @@ struct SettingsView: View {
         case general
         case library
         case ai
+        case epub
         case plugins
         case youtube
         // Plugin tabs
         case pluginNotes
         case pluginTranslation
+        case pluginGraphMap
 
         var id: String { rawValue }
 
@@ -22,10 +24,12 @@ struct SettingsView: View {
             case .general: return "General"
             case .library: return "Library"
             case .ai: return "AI"
+            case .epub: return "EPUB"
             case .plugins: return "Plugins"
             case .youtube: return "YouTube"
             case .pluginNotes: return Plugin.notes.label
             case .pluginTranslation: return Plugin.translation.label
+            case .pluginGraphMap: return Plugin.graphMap.label
             }
         }
 
@@ -34,10 +38,12 @@ struct SettingsView: View {
             case .general: return "gearshape"
             case .library: return "books.vertical"
             case .ai: return "brain"
+            case .epub: return "book.fill"
             case .plugins: return "puzzlepiece.extension"
             case .youtube: return "play.rectangle"
             case .pluginNotes: return Plugin.notes.systemImage
             case .pluginTranslation: return Plugin.translation.systemImage
+            case .pluginGraphMap: return Plugin.graphMap.systemImage
             }
         }
 
@@ -46,6 +52,7 @@ struct SettingsView: View {
             switch self {
             case .pluginNotes: return .notes
             case .pluginTranslation: return .translation
+            case .pluginGraphMap: return .graphMap
             default: return nil
             }
         }
@@ -54,12 +61,13 @@ struct SettingsView: View {
             switch plugin {
             case .notes: return .pluginNotes
             case .translation: return .pluginTranslation
+            case .graphMap: return .pluginGraphMap
             }
         }
     }
 
     /// Fixed tabs that always appear.
-    private static let fixedTabs: [Tab] = [.general, .library, .ai, .plugins, .youtube]
+    private static let fixedTabs: [Tab] = [.general, .library, .ai, .epub, .plugins, .youtube]
 
     @State private var selectedTab: Tab = .general
     @State private var pluginRefresh = false
@@ -115,6 +123,8 @@ struct SettingsView: View {
             LibrarySettingsView(store: store)
         case .ai:
             AISettingsView()
+        case .epub:
+            EPUBSettingsView()
         case .plugins:
             PluginSettingsView()
         case .youtube:
@@ -123,6 +133,8 @@ struct SettingsView: View {
             NoteSettingsView()
         case .pluginTranslation:
             TranslationSettingsView()
+        case .pluginGraphMap:
+            GraphMapSettingsView()
         }
     }
 }

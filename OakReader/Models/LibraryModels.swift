@@ -28,6 +28,8 @@ struct Attachment: Identifiable, Hashable {
             return dir.appendingPathComponent(fileName)
         case .embed:
             return dir.appendingPathComponent("metadata.json")
+        case .epub:
+            return dir.appendingPathComponent(fileName)
         }
     }
 
