@@ -28,8 +28,6 @@ struct Attachment: Identifiable, Hashable {
             return dir.appendingPathComponent(fileName)
         case .embed:
             return dir.appendingPathComponent("metadata.json")
-        case .epub:
-            return dir.appendingPathComponent(fileName)
         }
     }
 
@@ -40,6 +38,9 @@ struct Attachment: Identifiable, Hashable {
 
     /// Icon name resolved from attachment type and source URL domain.
     var icon: String {
+        if attachmentType == .pdf && sourceURL != nil {
+            return "globe"
+        }
         if attachmentType == .embed, let host = sourceURL?.host?.lowercased() {
             if host.contains("youtube.com") || host.contains("youtu.be") {
                 return "play.rectangle"
