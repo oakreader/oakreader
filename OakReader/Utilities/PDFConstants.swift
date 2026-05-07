@@ -44,7 +44,7 @@ enum SidebarMode: String, CaseIterable, Identifiable {
 
     var systemImage: String {
         switch self {
-        case .thumbnails: return "rectangle.split.3x3"
+        case .thumbnails: return "rectangle.grid.2x2"
         case .outline: return "list.number"
         case .annotations: return "text.bubble"
         case .search: return "magnifyingglass"
@@ -161,10 +161,10 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
 
     var systemImage: String {
         switch self {
-        case .metadata: return "square.grid.2x2"
+        case .metadata: return "tablecells"
         case .aiChat: return "bubble.left.and.bubble.right"
         case .notes: return "note.text"
-        case .translation: return "translate"
+        case .translation: return "character.bubble"
         }
     }
 
@@ -201,7 +201,7 @@ enum Plugin: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .notes: return "note.text"
-        case .translation: return "translate"
+        case .translation: return "character.bubble"
         }
     }
 
@@ -229,7 +229,7 @@ enum LibraryDetailTab: String, CaseIterable, Identifiable {
 
     var systemImage: String {
         switch self {
-        case .metadata: return "square.grid.2x2"
+        case .metadata: return "tablecells"
         case .notes: return "note.text"
         case .chat: return "bubble.left.and.bubble.right"
         }
