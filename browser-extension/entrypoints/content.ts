@@ -1,4 +1,5 @@
 import { defineContentScript } from "wxt/utils/define-content-script";
+import Defuddle, { createMarkdownContent } from "defuddle/full";
 import {
   detectContentKind,
   contentKindToPageType,
@@ -146,6 +147,17 @@ export default defineContentScript({
       if (request.action === "extractLinkMeta") {
         const result = extractLinkMetadata(document, location.href);
         sendResponse(toLegacyPayload(result));
+        return true;
+      }
+
+      if (request.action === "extractMarkdown") {
+        try {
+          const result = new Defuddle(document).parse();
+          const markdown = createMarkdownContent(result.content);
+          sendResponse({ markdown });
+        } catch {
+          sendResponse({ markdown: null });
+        }
         return true;
       }
     });

@@ -543,6 +543,11 @@ final class SnapshotServer {
             let item = self.importService.importPDF(from: tempURL)
             try? FileManager.default.removeItem(at: tempURL)
             if let item {
+                if let markdown = payload.markdown, !markdown.isEmpty {
+                    let mdURL = item.fileURL.deletingLastPathComponent()
+                        .appendingPathComponent("content.md")
+                    try? markdown.write(to: mdURL, atomically: true, encoding: .utf8)
+                }
                 self.assignToCollection(item: item, collectionId: payload.collectionId)
                 self.assignTags(item: item, tagOptionIds: payload.tagOptionIds)
                 self.createAndAssignNewTags(item: item, newTags: payload.newTags)
@@ -681,7 +686,7 @@ struct SnapshotPayload: Codable {
     let title: String?
     let author: String?
     let html: String?           // html only
-    let markdown: String?       // html only — Readability + Turndown extracted text
+    let markdown: String?       // html & pdf — Defuddle/Turndown extracted text
     let videoId: String?        // embed (YouTube) only
     let duration: Int?
     let thumbnailURL: String?
