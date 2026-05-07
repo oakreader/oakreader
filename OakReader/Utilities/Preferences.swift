@@ -59,6 +59,15 @@ final class Preferences {
         static let globalFontFamily = "globalFontFamily"
         static let globalFontSize = "globalFontSize"
         static let noteEditorFontOverridden = "noteEditorFontOverridden"
+        // Voice AI
+        static let voiceSTTModel = "voiceSTTModel"
+        static let voiceTTSModel = "voiceTTSModel"
+        static let voiceVADModel = "voiceVADModel"
+        static let voiceTurnDetectorEnabled = "voiceTurnDetectorEnabled"
+        static let voiceTTSVoice = "voiceTTSVoice"
+        static let voiceReferenceAudioPath = "voiceReferenceAudioPath"
+        static let voiceReferenceText = "voiceReferenceText"
+        static let voiceLLMModel = "voiceLLMModel"
         // External tools
         static let ytDlpPath = "ytDlpPath"
         static let ytDlpCachedVersion = "ytDlpCachedVersion"
@@ -382,6 +391,57 @@ final class Preferences {
     var agentRequireConfirmation: Bool {
         get { defaults.bool(forKey: Keys.agentRequireConfirmation) }
         set { defaults.set(newValue, forKey: Keys.agentRequireConfirmation) }
+    }
+
+    // MARK: - Voice AI Preferences
+
+    var voiceSTTModel: String {
+        get { defaults.string(forKey: Keys.voiceSTTModel) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.voiceSTTModel) }
+    }
+
+    var voiceTTSModel: String {
+        get { defaults.string(forKey: Keys.voiceTTSModel) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.voiceTTSModel) }
+    }
+
+    var voiceVADModel: String {
+        get { defaults.string(forKey: Keys.voiceVADModel) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.voiceVADModel) }
+    }
+
+    var voiceTurnDetectorEnabled: Bool {
+        get { defaults.object(forKey: Keys.voiceTurnDetectorEnabled) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: Keys.voiceTurnDetectorEnabled) }
+    }
+
+    var voiceTTSVoice: String {
+        get { defaults.string(forKey: Keys.voiceTTSVoice) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.voiceTTSVoice) }
+    }
+
+    var voiceReferenceAudioPath: String {
+        get { defaults.string(forKey: Keys.voiceReferenceAudioPath) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.voiceReferenceAudioPath) }
+    }
+
+    /// Transcript of the reference audio clip (required for Qwen3-TTS voice cloning).
+    var voiceReferenceText: String {
+        get { defaults.string(forKey: Keys.voiceReferenceText) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.voiceReferenceText) }
+    }
+
+    /// LLM model override for voice conversations (empty = same as AI Chat).
+    var voiceLLMModel: String {
+        get { defaults.string(forKey: Keys.voiceLLMModel) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.voiceLLMModel) }
+    }
+
+    var voiceReferenceAudioURL: URL? {
+        let path = voiceReferenceAudioPath
+        guard !path.isEmpty else { return nil }
+        let url = URL(fileURLWithPath: path)
+        return FileManager.default.fileExists(atPath: url.path) ? url : nil
     }
 
     // MARK: - External Tools
