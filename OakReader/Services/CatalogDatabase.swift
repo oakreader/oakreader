@@ -311,6 +311,37 @@ final class CatalogDatabase {
             }
         }
 
+        migrator.registerMigration("v4-annotations") { db in
+            try db.create(table: "annotations") { t in
+                t.column("id", .text).primaryKey()
+                t.column("user_id", .text).notNull()
+                t.column("item_id", .text).notNull().references("items", onDelete: .cascade)
+                t.column("attachment_id", .text).notNull().references("attachments", onDelete: .cascade)
+                t.column("key", .text).notNull().unique()
+                t.column("type", .text).notNull()
+                t.column("author_name", .text)
+                t.column("text", .text)
+                t.column("comment", .text)
+                t.column("color", .text).notNull().defaults(to: "#ffd400")
+                t.column("page_label", .text)
+                t.column("sort_index", .text).notNull()
+                t.column("position_kind", .text).notNull()
+                t.column("position_json", .text).notNull()
+                t.column("style_json", .text)
+                t.column("source", .text).notNull().defaults(to: "oakreader")
+                t.column("source_key", .text)
+                t.column("is_external", .integer).notNull().defaults(to: false)
+                t.column("created_at", .text).notNull()
+                t.column("updated_at", .text).notNull()
+                t.column("deleted_at", .text)
+            }
+            try db.create(index: "idx_annotations_attachment_sort", on: "annotations", columns: ["attachment_id", "deleted_at", "sort_index"])
+            try db.create(index: "idx_annotations_item_updated", on: "annotations", columns: ["item_id", "updated_at"])
+            try db.execute(sql: """
+                CREATE UNIQUE INDEX idx_annotations_source ON annotations(source, source_key) WHERE source_key IS NOT NULL
+            """)
+        }
+
         return migrator
     }
 
