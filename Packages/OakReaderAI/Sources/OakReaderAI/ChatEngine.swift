@@ -56,9 +56,10 @@ public actor ChatEngine {
         toolConfirmation: (@Sendable (ToolCall) async -> Bool)? = nil
     ) -> AsyncThrowingStream<StreamEvent, Error> {
         AsyncThrowingStream { continuation in
-            Task {
+            let task = Task {
                 do {
                     // 1. Build user turn
+                    try Task.checkCancellation()
                     let userTurn = ChatTurn(
                         role: .user,
                         content: userContent,
@@ -94,6 +95,8 @@ public actor ChatEngine {
                     // 6. Agentic loop — up to 10 iterations
                     let maxIterations = 10
                     for _ in 0..<maxIterations {
+                        try Task.checkCancellation()
+
                         let stream = provider.sendMessage(
                             messages: llmMessages,
                             model: config.model,
@@ -109,9 +112,10 @@ public actor ChatEngine {
                             skill: skill?.id
                         )
                         var toolCalls: [ToolCall] = []
-                        var stopReason: String?
 
                         for try await chunk in stream {
+                            try Task.checkCancellation()
+
                             switch chunk {
                             case .delta(let text):
                                 assistantTurn.content += text
@@ -119,7 +123,7 @@ public actor ChatEngine {
                             case .toolUse(let toolCall):
                                 toolCalls.append(toolCall)
                             case .finished(let reason):
-                                stopReason = reason
+                                _ = reason
                             case .error(let msg):
                                 assistantTurn.isStreaming = false
                                 assistantTurn.error = msg
@@ -135,6 +139,8 @@ public actor ChatEngine {
                             var toolResults: [ToolResult] = []
 
                             for call in toolCalls {
+                                try Task.checkCancellation()
+
                                 var record = ToolUseRecord(from: call)
 
                                 // If confirmation callback is set, ask for approval
@@ -210,10 +216,15 @@ public actor ChatEngine {
 
                     // Exhausted max iterations
                     continuation.finish()
+                } catch is CancellationError {
+                    continuation.finish()
                 } catch {
                     continuation.yield(.error(error))
                     continuation.finish(throwing: error)
                 }
+            }
+            continuation.onTermination = { @Sendable _ in
+                task.cancel()
             }
         }
     }
