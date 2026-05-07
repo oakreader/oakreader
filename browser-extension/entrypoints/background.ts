@@ -69,6 +69,15 @@ export default defineBackground(() => {
       newTags?: string[];
     }
   ): Promise<{ status: string; message?: string }> {
+    // 0. Extract markdown from the page before attaching debugger
+    let markdown: string | null = null;
+    try {
+      const resp = await chrome.tabs.sendMessage(tabId, { action: "extractMarkdown" });
+      if (resp?.markdown) markdown = resp.markdown;
+    } catch {
+      // Markdown extraction is best-effort; don't block PDF capture
+    }
+
     // 1. Generate PDF via debugger
     const target = { tabId };
     let pdfBase64: string;
@@ -108,6 +117,14 @@ export default defineBackground(() => {
       // Wait for layout to settle after viewport change
       await new Promise((r) => setTimeout(r, 500));
 
+      // Measure full page height so we can render it as one long PDF page
+      const heightResult = (await chrome.debugger.sendCommand(
+        target,
+        "Runtime.evaluate",
+        { expression: "document.documentElement.scrollHeight", returnByValue: true }
+      )) as { result: { value: number } };
+      const pageHeightInches = heightResult.result.value / 96;
+
       const printResult = (await chrome.debugger.sendCommand(
         target,
         "Page.printToPDF",
@@ -115,7 +132,7 @@ export default defineBackground(() => {
           printBackground: true,
           displayHeaderFooter: false,
           paperWidth: A4_WIDTH,
-          paperHeight: A4_HEIGHT,
+          paperHeight: pageHeightInches,
           marginTop: 0,
           marginRight: 0,
           marginBottom: 0,
@@ -147,6 +164,7 @@ export default defineBackground(() => {
       url: payload.url,
       title: payload.title,
       pdfData: pdfBase64,
+      markdown,
     };
     if (payload.collectionId) body.collectionId = payload.collectionId;
     if (payload.tagOptionIds && payload.tagOptionIds.length > 0) body.tagOptionIds = payload.tagOptionIds;
