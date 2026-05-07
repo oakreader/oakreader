@@ -33,7 +33,6 @@ export const genericWebpageTranslator: Translator = {
       author,
       description,
       thumbnailURL,
-      // html/markdown left empty — filled by SingleFile pipeline
       html: "",
       markdown: null,
     };

@@ -1,5 +1,5 @@
 export default defineBackground(() => {
-  const MAX_CONTENT_SIZE = 8 * (1024 * 1024);
+  const SNAPSHOT_URL = "http://127.0.0.1:23119/snapshot";
 
   // ─── PDF Detection via webRequest ──────────────────────────────────────────────
 
@@ -28,7 +28,7 @@ export default defineBackground(() => {
 
   // ─── Message Handlers ─────────────────────────────────────────────────────────
 
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message.method === "isPDFTab") {
       const info = pdfTabs.get(message.tabId);
       sendResponse(info ? { isPDF: true, url: info.url } : { isPDF: false });
@@ -43,115 +43,121 @@ export default defineBackground(() => {
       return true;
     }
 
-    if (message.method === "singlefile.fetch") {
-      handleSingleFileFetch(message, sender)
+    if (message.method === "captureAndSavePDF") {
+      captureAndSavePDF(message.tabId, message.payload)
         .then(sendResponse)
         .catch((error) =>
-          sendResponse({ error: error?.message || String(error) })
+          sendResponse({ status: "error", message: error instanceof Error ? error.message : String(error) })
         );
-      return true;
-    }
-
-    if (message.method === "singlefile.fetchFrame") {
-      chrome.tabs.sendMessage(sender.tab!.id!, message).then(sendResponse);
       return true;
     }
   });
 
-  async function handleSingleFileFetch(
-    message: {
-      url: string;
-      requestId: number;
-      referrer?: string;
-      headers?: Record<string, string>;
-    },
-    sender: chrome.runtime.MessageSender
-  ) {
-    try {
-      const response = await fetchResource(message.url, {
-        referrer: message.referrer,
-        headers: message.headers,
-      });
-      return sendChunkedResponse(
-        sender.tab!.id!,
-        message.requestId,
-        response
-      );
-    } catch (error: unknown) {
-      return sendChunkedResponse(sender.tab!.id!, message.requestId, {
-        error: error instanceof Error ? error.message : String(error),
-        array: [],
-        headers: {},
-        status: 0,
-      });
-    }
-  }
+  // ─── Full-Page PDF via Debugger (Page.printToPDF) → POST to server ─────────────
 
-  async function fetchResource(
-    url: string,
-    options: { referrer?: string; headers?: Record<string, string> }
-  ) {
-    const fetchOptions: RequestInit = {
-      cache: "no-store",
-      credentials: "omit",
-    };
+  // A4 dimensions in inches
+  const A4_WIDTH = 8.27;
+  const A4_HEIGHT = 11.69;
 
-    if (options.referrer) {
-      fetchOptions.referrer = options.referrer;
-      fetchOptions.referrerPolicy = "unsafe-url";
-    }
-
-    if (options.headers) {
-      fetchOptions.headers = options.headers;
-    }
-
-    const response = await fetch(url, fetchOptions);
-    const array = Array.from(new Uint8Array(await response.arrayBuffer()));
-    const headers: Record<string, string> = {
-      "content-type": response.headers.get("content-type") || "",
-    };
-    return {
-      array,
-      headers,
-      status: response.status,
-    };
-  }
-
-  async function sendChunkedResponse(
+  async function captureAndSavePDF(
     tabId: number,
-    requestId: number,
-    response: {
-      array: number[];
-      headers: Record<string, string>;
-      status: number;
-      error?: string;
+    payload: {
+      url: string;
+      title: string | null;
+      collectionId?: string;
+      tagOptionIds?: string[];
+      newTags?: string[];
     }
-  ) {
-    for (
-      let blockIndex = 0;
-      blockIndex * MAX_CONTENT_SIZE <= response.array.length;
-      blockIndex++
-    ) {
-      const message: Record<string, unknown> = {
-        method: "singlefile.fetchResponse",
-        requestId,
-        headers: response.headers,
-        status: response.status,
-        error: response.error,
-      };
-      message.truncated = response.array.length > MAX_CONTENT_SIZE;
-      if (message.truncated) {
-        message.finished =
-          (blockIndex + 1) * MAX_CONTENT_SIZE > response.array.length;
-        message.array = response.array.slice(
-          blockIndex * MAX_CONTENT_SIZE,
-          (blockIndex + 1) * MAX_CONTENT_SIZE
-        );
-      } else {
-        message.array = response.array;
+  ): Promise<{ status: string; message?: string }> {
+    // 1. Generate PDF via debugger
+    const target = { tabId };
+    let pdfBase64: string;
+
+    // Verify the tab is a regular web page (debugger can't attach to extension/chrome pages)
+    try {
+      const tab = await chrome.tabs.get(tabId);
+      if (!tab.url || !tab.url.startsWith("http")) {
+        return { status: "error", message: `Cannot generate PDF for this page (${tab.url?.split(":")[0] ?? "unknown"} URL)` };
       }
-      await chrome.tabs.sendMessage(tabId, message);
+    } catch {
+      return { status: "error", message: "Tab not found" };
     }
-    return {};
+
+    try {
+      await chrome.debugger.attach(target, "1.3");
+    } catch (err) {
+      return { status: "error", message: `Debugger attach failed: ${err instanceof Error ? err.message : String(err)}` };
+    }
+
+    try {
+      // Set emulated media to "screen" so print-specific CSS doesn't alter layout
+      await chrome.debugger.sendCommand(target, "Emulation.setEmulatedMedia", {
+        media: "screen",
+      });
+
+      // Set viewport width to match A4 paper width in pixels
+      const contentWidthPx = Math.round(A4_WIDTH * 96);
+      await chrome.debugger.sendCommand(target, "Emulation.setDeviceMetricsOverride", {
+        width: contentWidthPx,
+        height: 0,
+        deviceScaleFactor: 1,
+        scale: 1,
+        mobile: false,
+      });
+
+      // Wait for layout to settle after viewport change
+      await new Promise((r) => setTimeout(r, 500));
+
+      const printResult = (await chrome.debugger.sendCommand(
+        target,
+        "Page.printToPDF",
+        {
+          printBackground: true,
+          displayHeaderFooter: false,
+          paperWidth: A4_WIDTH,
+          paperHeight: A4_HEIGHT,
+          marginTop: 0,
+          marginRight: 0,
+          marginBottom: 0,
+          marginLeft: 0,
+          scale: 1,
+        }
+      )) as { data: string };
+
+      await chrome.debugger.sendCommand(target, "Emulation.clearDeviceMetricsOverride");
+
+      if (!printResult?.data) {
+        return { status: "error", message: "printToPDF returned empty data" };
+      }
+
+      pdfBase64 = printResult.data;
+    } catch (err) {
+      return { status: "error", message: err instanceof Error ? err.message : String(err) };
+    } finally {
+      try {
+        await chrome.debugger.detach(target);
+      } catch {
+        // Already detached or tab closed
+      }
+    }
+
+    // 2. POST directly to the OakReader server from background
+    const body: Record<string, unknown> = {
+      type: "pdf",
+      url: payload.url,
+      title: payload.title,
+      pdfData: pdfBase64,
+    };
+    if (payload.collectionId) body.collectionId = payload.collectionId;
+    if (payload.tagOptionIds && payload.tagOptionIds.length > 0) body.tagOptionIds = payload.tagOptionIds;
+    if (payload.newTags && payload.newTags.length > 0) body.newTags = payload.newTags;
+
+    const response = await fetch(SNAPSHOT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    return response.json();
   }
 });

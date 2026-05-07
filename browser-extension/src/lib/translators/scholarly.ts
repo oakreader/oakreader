@@ -41,7 +41,6 @@ export const scholarlyTranslator: Translator = {
       description,
       thumbnailURL,
       biblio,
-      // html/markdown left empty — filled by SingleFile pipeline
       html: "",
       markdown: null,
     };
