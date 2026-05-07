@@ -4,8 +4,7 @@ import UniformTypeIdentifiers
 
 struct DragDropCoordinator {
     static let supportedImageTypes: [UTType] = [.jpeg, .png, .tiff, .bmp, .gif, .heic]
-    static let epubType: UTType = UTType("org.idpf.epub-container") ?? UTType(filenameExtension: "epub") ?? .data
-    static let supportedTypes: [UTType] = [.pdf, epubType] + supportedImageTypes
+    static let supportedTypes: [UTType] = [.pdf] + supportedImageTypes
 
     static func canHandle(_ providers: [NSItemProvider]) -> Bool {
         providers.contains { provider in

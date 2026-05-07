@@ -59,12 +59,6 @@ final class Preferences {
         static let globalFontFamily = "globalFontFamily"
         static let globalFontSize = "globalFontSize"
         static let noteEditorFontOverridden = "noteEditorFontOverridden"
-        // EPUB Reader
-        static let epubFontSize = "epubFontSize"
-        static let epubFontFamily = "epubFontFamily"
-        static let epubTheme = "epubTheme"
-        static let epubMargin = "epubMargin"
-        static let epubLineHeight = "epubLineHeight"
         // External tools
         static let ytDlpPath = "ytDlpPath"
         static let ytDlpCachedVersion = "ytDlpCachedVersion"
@@ -105,11 +99,6 @@ final class Preferences {
             Keys.globalFontFamily: "system",
             Keys.globalFontSize: 14.0,
             Keys.noteEditorFontOverridden: false,
-            Keys.epubFontSize: 18,
-            Keys.epubFontFamily: "Palatino",
-            Keys.epubTheme: EPUBTheme.original.rawValue,
-            Keys.epubMargin: 60,
-            Keys.epubLineHeight: 1.8,
             Keys.agentToolsEnabled: true,
             Keys.agentReadFileEnabled: true,
             Keys.agentWriteFileEnabled: true,
@@ -393,33 +382,6 @@ final class Preferences {
     var agentRequireConfirmation: Bool {
         get { defaults.bool(forKey: Keys.agentRequireConfirmation) }
         set { defaults.set(newValue, forKey: Keys.agentRequireConfirmation) }
-    }
-
-    // MARK: - EPUB Reader
-
-    var epubFontSize: Int {
-        get { defaults.integer(forKey: Keys.epubFontSize) }
-        set { defaults.set(newValue, forKey: Keys.epubFontSize) }
-    }
-
-    var epubFontFamily: String {
-        get { defaults.string(forKey: Keys.epubFontFamily) ?? "Palatino" }
-        set { defaults.set(newValue, forKey: Keys.epubFontFamily) }
-    }
-
-    var epubTheme: EPUBTheme {
-        get { EPUBTheme(rawValue: defaults.string(forKey: Keys.epubTheme) ?? "") ?? .original }
-        set { defaults.set(newValue.rawValue, forKey: Keys.epubTheme) }
-    }
-
-    var epubMargin: Int {
-        get { defaults.integer(forKey: Keys.epubMargin) }
-        set { defaults.set(newValue, forKey: Keys.epubMargin) }
-    }
-
-    var epubLineHeight: Double {
-        get { defaults.double(forKey: Keys.epubLineHeight) }
-        set { defaults.set(newValue, forKey: Keys.epubLineHeight) }
     }
 
     // MARK: - External Tools

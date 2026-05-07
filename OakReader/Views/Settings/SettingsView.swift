@@ -9,7 +9,6 @@ struct SettingsView: View {
         case general
         case library
         case ai
-        case epub
         case plugins
         case youtube
         // Plugin tabs
@@ -23,7 +22,6 @@ struct SettingsView: View {
             case .general: return "General"
             case .library: return "Library"
             case .ai: return "AI"
-            case .epub: return "EPUB"
             case .plugins: return "Plugins"
             case .youtube: return "YouTube"
             case .pluginNotes: return Plugin.notes.label
@@ -36,7 +34,6 @@ struct SettingsView: View {
             case .general: return "gearshape"
             case .library: return "books.vertical"
             case .ai: return "brain"
-            case .epub: return "book.fill"
             case .plugins: return "puzzlepiece.extension"
             case .youtube: return "play.rectangle"
             case .pluginNotes: return Plugin.notes.systemImage
@@ -62,7 +59,7 @@ struct SettingsView: View {
     }
 
     /// Fixed tabs that always appear.
-    private static let fixedTabs: [Tab] = [.general, .library, .ai, .epub, .plugins, .youtube]
+    private static let fixedTabs: [Tab] = [.general, .library, .ai, .plugins, .youtube]
 
     @State private var selectedTab: Tab = .general
     @State private var pluginRefresh = false
@@ -118,8 +115,6 @@ struct SettingsView: View {
             LibrarySettingsView(store: store)
         case .ai:
             AISettingsView()
-        case .epub:
-            EPUBSettingsView()
         case .plugins:
             PluginSettingsView()
         case .youtube:
