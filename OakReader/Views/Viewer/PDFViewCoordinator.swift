@@ -225,7 +225,7 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
         viewModel.state.selectedText = selString
     }
 
-    // MARK: - Right-Click Context Menu on Annotations
+    // MARK: - Right-Click Context Menu
 
     private func setupRightClickMonitor(for pdfView: PDFView) {
         removeRightClickMonitor()
@@ -238,29 +238,64 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
             guard pdfView.bounds.contains(locationInPDFView) else { return event }
 
             // Find annotation at click point
-            guard let page = pdfView.page(for: locationInPDFView, nearest: false) else { return event }
-            let pdfPoint = pdfView.convert(locationInPDFView, to: page)
-
-            let annotation = page.annotations.first { ann in
-                ann.bounds.contains(pdfPoint) && ann.type != "Widget"
+            let page = pdfView.page(for: locationInPDFView, nearest: false)
+            var annotation: PDFAnnotation?
+            if let page {
+                let pdfPoint = pdfView.convert(locationInPDFView, to: page)
+                annotation = page.annotations.first { ann in
+                    ann.bounds.contains(pdfPoint) && ann.type != "Widget"
+                }
             }
 
-            guard let annotation else { return event }
+            let menu: NSMenu
+            if let annotation {
+                self.viewModel.state.selectedAnnotation = annotation
+                menu = self.buildAnnotationContextMenu(for: annotation)
+            } else {
+                menu = self.buildGeneralContextMenu()
+            }
 
-            // Select it
-            self.viewModel.state.selectedAnnotation = annotation
-
-            // Build and show context menu
-            let menu = self.buildAnnotationContextMenu(for: annotation)
             NSMenu.popUpContextMenu(menu, with: event, for: pdfView)
             return nil // Consume the event
         }
     }
 
+    // MARK: - General Context Menu (empty area)
+
+    private func buildGeneralContextMenu() -> NSMenu {
+        let menu = NSMenu()
+
+        // Zoom section
+        menu.addItem(makeItem("Zoom In", action: #selector(menuZoomIn), key: ""))
+        menu.addItem(makeItem("Zoom Out", action: #selector(menuZoomOut), key: ""))
+        menu.addItem(makeItem("Zoom to Fit", action: #selector(menuZoomToFit), key: ""))
+        menu.addItem(makeItem("Actual Size", action: #selector(menuActualSize), key: ""))
+
+        menu.addItem(.separator())
+
+        // Page navigation
+        menu.addItem(makeItem("Go to Page\u{2026}", action: #selector(menuGoToPage), key: ""))
+        let prevItem = makeItem("Previous Page", action: #selector(menuPreviousPage), key: "")
+        if viewModel.state.currentPageIndex <= 0 { prevItem.isEnabled = false }
+        menu.addItem(prevItem)
+        let nextItem = makeItem("Next Page", action: #selector(menuNextPage), key: "")
+        if viewModel.state.currentPageIndex >= viewModel.pageCount - 1 { nextItem.isEnabled = false }
+        menu.addItem(nextItem)
+
+        menu.addItem(.separator())
+
+        // Annotation tool toggles + color
+        appendToolItems(to: menu)
+
+        return menu
+    }
+
+    // MARK: - Annotation Context Menu (right-click on annotation)
+
     private func buildAnnotationContextMenu(for annotation: PDFAnnotation) -> NSMenu {
         let menu = NSMenu()
 
-        // Color submenu
+        // Color submenu (for this annotation)
         let colorItem = NSMenuItem(title: "Color", action: nil, keyEquivalent: "")
         let colorMenu = NSMenu()
 
@@ -279,28 +314,13 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
             let item = NSMenuItem(title: name, action: #selector(changeAnnotationColor(_:)), keyEquivalent: "")
             item.target = self
             item.representedObject = AnnotationColorChange(annotation: annotation, color: color)
-
-            // Color swatch
-            let size = NSSize(width: 14, height: 14)
-            let image = NSImage(size: size, flipped: false) { rect in
-                color.setFill()
-                NSBezierPath(roundedRect: rect.insetBy(dx: 1, dy: 1), xRadius: 2, yRadius: 2).fill()
-                return true
-            }
-            item.image = image
-
-            // Checkmark for current color
-            if colorsAreClose(annotation.color, color) {
-                item.state = .on
-            }
-
+            item.image = colorSwatchImage(color)
+            if colorsAreClose(annotation.color, color) { item.state = .on }
             colorMenu.addItem(item)
         }
 
         colorItem.submenu = colorMenu
         menu.addItem(colorItem)
-
-        menu.addItem(.separator())
 
         // Delete
         let deleteItem = NSMenuItem(title: "Delete", action: #selector(deleteAnnotationFromMenu(_:)), keyEquivalent: "")
@@ -308,15 +328,158 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
         deleteItem.representedObject = annotation
         menu.addItem(deleteItem)
 
+        menu.addItem(.separator())
+
+        // Annotation tool toggles + color
+        appendToolItems(to: menu)
+
         return menu
     }
 
+    // MARK: - Shared Tool Items
+
+    /// Appends Highlight / Underline toggles, Annotation Color submenu, and Area Selection toggle.
+    private func appendToolItems(to menu: NSMenu) {
+        let isAnnotateMode = viewModel.state.editorMode == .annotate
+        let currentTool = viewModel.annotation.currentTool
+
+        let highlightItem = makeItem("Highlight", action: #selector(menuToggleHighlight), key: "")
+        if isAnnotateMode && currentTool == .highlight { highlightItem.state = .on }
+        menu.addItem(highlightItem)
+
+        let underlineItem = makeItem("Underline", action: #selector(menuToggleUnderline), key: "")
+        if isAnnotateMode && currentTool == .underline { underlineItem.state = .on }
+        menu.addItem(underlineItem)
+
+        // Annotation Color submenu (tool stroke color)
+        let toolColorItem = NSMenuItem(title: "Annotation Color", action: nil, keyEquivalent: "")
+        let toolColorMenu = NSMenu()
+        for entry in OakStyle.AnnotationColors.allColors {
+            let item = NSMenuItem(title: entry.name, action: #selector(changeToolColor(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = entry.nsColor
+            item.image = colorSwatchImage(entry.nsColor)
+            if colorsAreClose(viewModel.annotation.strokeColor, entry.nsColor) { item.state = .on }
+            toolColorMenu.addItem(item)
+        }
+        toolColorItem.submenu = toolColorMenu
+        menu.addItem(toolColorItem)
+
+        menu.addItem(.separator())
+
+        let areaItem = makeItem("Area Selection", action: #selector(menuToggleAreaSelection), key: "")
+        if viewModel.state.editorMode == .snapshot { areaItem.state = .on }
+        menu.addItem(areaItem)
+    }
+
+    // MARK: - Menu Helpers
+
+    private func makeItem(_ title: String, action: Selector, key: String) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
+        item.target = self
+        return item
+    }
+
+    private func colorSwatchImage(_ color: NSColor) -> NSImage {
+        let size = NSSize(width: 14, height: 14)
+        return NSImage(size: size, flipped: false) { rect in
+            color.setFill()
+            NSBezierPath(roundedRect: rect.insetBy(dx: 1, dy: 1), xRadius: 2, yRadius: 2).fill()
+            return true
+        }
+    }
+
+    // MARK: - Menu Actions: Zoom
+
+    @objc private func menuZoomIn() {
+        viewModel.viewer.zoomIn()
+    }
+
+    @objc private func menuZoomOut() {
+        viewModel.viewer.zoomOut()
+    }
+
+    @objc private func menuZoomToFit() {
+        viewModel.viewer.zoomToFit()
+    }
+
+    @objc private func menuActualSize() {
+        viewModel.viewer.zoomToActualSize()
+    }
+
+    // MARK: - Menu Actions: Page Navigation
+
+    @objc private func menuGoToPage() {
+        guard let window = pdfView?.window else { return }
+
+        let alert = NSAlert()
+        alert.messageText = "Go to Page"
+        alert.informativeText = "Enter a page number (1–\(viewModel.pageCount)):"
+        alert.addButton(withTitle: "Go")
+        alert.addButton(withTitle: "Cancel")
+
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 80, height: 24))
+        field.stringValue = "\(viewModel.state.currentPageIndex + 1)"
+        field.alignment = .center
+        alert.accessoryView = field
+
+        alert.beginSheetModal(for: window) { [weak self] response in
+            guard let self, response == .alertFirstButtonReturn else { return }
+            if let page = Int(field.stringValue) {
+                self.viewModel.viewer.goToPage(page - 1)
+            }
+        }
+        // Focus the text field after sheet appears
+        DispatchQueue.main.async { field.selectText(nil) }
+    }
+
+    @objc private func menuPreviousPage() {
+        viewModel.viewer.goToPage(viewModel.state.currentPageIndex - 1)
+    }
+
+    @objc private func menuNextPage() {
+        viewModel.viewer.goToPage(viewModel.state.currentPageIndex + 1)
+    }
+
+    // MARK: - Menu Actions: Annotation Tools
+
+    @objc private func menuToggleHighlight() {
+        toggleAnnotationTool(.highlight)
+    }
+
+    @objc private func menuToggleUnderline() {
+        toggleAnnotationTool(.underline)
+    }
+
+    private func toggleAnnotationTool(_ tool: AnnotationTool) {
+        let isActive = viewModel.state.editorMode == .annotate && viewModel.annotation.currentTool == tool
+        if isActive {
+            viewModel.annotation.currentTool = .none
+            viewModel.setEditorMode(.viewer)
+        } else {
+            viewModel.annotation.currentTool = tool
+            viewModel.setEditorMode(.annotate)
+        }
+    }
+
+    @objc private func changeToolColor(_ sender: NSMenuItem) {
+        guard let color = sender.representedObject as? NSColor else { return }
+        viewModel.annotation.strokeColor = color
+    }
+
+    @objc private func menuToggleAreaSelection() {
+        if viewModel.state.editorMode == .snapshot {
+            viewModel.setEditorMode(.viewer)
+        } else {
+            viewModel.setEditorMode(.snapshot)
+        }
+    }
+
+    // MARK: - Annotation Actions
+
     @objc private func changeAnnotationColor(_ sender: NSMenuItem) {
         guard let change = sender.representedObject as? AnnotationColorChange else { return }
-        let alpha = change.annotation.color.alphaComponent
-        change.annotation.color = change.color.withAlphaComponent(alpha)
-        viewModel.markDocumentEdited()
-        viewModel.annotation.refreshAnnotationModels()
+        viewModel.annotation.updateAnnotationColor(change.annotation, color: change.color)
     }
 
     @objc private func deleteAnnotationFromMenu(_ sender: NSMenuItem) {

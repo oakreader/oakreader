@@ -20,10 +20,18 @@ struct WebArchiveViewerRepresentable: NSViewRepresentable {
                 var sel = window.getSelection();
                 var text = sel.toString();
                 if (text && sel.rangeCount > 0) {
-                    var rect = sel.getRangeAt(0).getBoundingClientRect();
-                    window.webkit.messageHandlers.textSelected.postMessage({
-                        text: text, x: rect.x + rect.width / 2, y: rect.y + rect.height
-                    });
+                    var rects = sel.getRangeAt(0).getClientRects();
+                    if (rects.length > 0) {
+                        var r = rects[0];
+                        window.webkit.messageHandlers.textSelected.postMessage({
+                            text: text, x: r.x + r.width / 2, y: r.y
+                        });
+                    } else {
+                        var rect = sel.getRangeAt(0).getBoundingClientRect();
+                        window.webkit.messageHandlers.textSelected.postMessage({
+                            text: text, x: rect.x + rect.width / 2, y: rect.y
+                        });
+                    }
                 } else {
                     window.webkit.messageHandlers.textSelected.postMessage({text: '', x: 0, y: 0});
                 }

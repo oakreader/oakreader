@@ -231,3 +231,49 @@ struct CitationRecord: Codable, FetchableRecord, MutablePersistableRecord, Hasha
         case updatedAt = "updated_at"
     }
 }
+
+// MARK: - Annotations
+
+struct AnnotationRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable {
+    static let databaseTableName = "annotations"
+
+    var id: String
+    var userId: String
+    var itemId: String
+    var attachmentId: String
+    var key: String
+    var type: String
+    var authorName: String?
+    var text: String?
+    var comment: String?
+    var color: String
+    var pageLabel: String?
+    var sortIndex: String
+    var positionKind: String
+    var positionJson: String
+    var styleJson: String?
+    var source: String
+    var sourceKey: String?
+    var isExternal: Bool
+    var createdAt: String
+    var updatedAt: String
+    var deletedAt: String?
+
+    enum CodingKeys: String, CodingKey, ColumnExpression {
+        case id, type, text, comment, color, source, key
+        case userId = "user_id"
+        case itemId = "item_id"
+        case attachmentId = "attachment_id"
+        case authorName = "author_name"
+        case pageLabel = "page_label"
+        case sortIndex = "sort_index"
+        case positionKind = "position_kind"
+        case positionJson = "position_json"
+        case styleJson = "style_json"
+        case sourceKey = "source_key"
+        case isExternal = "is_external"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case deletedAt = "deleted_at"
+    }
+}

@@ -102,7 +102,9 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessageH
         // Convert content-relative coords (JS getBoundingClientRect) to screen coords.
         // JS coords are relative to the WKWebView's visible viewport, Y-down.
         // NSView coords are Y-up from the view's bottom.
-        let viewPoint = NSPoint(x: x, y: webView.bounds.height - y)
+        // CSS pixels -> view points (pageZoom scales the CSS coordinate space)
+        let zoom = webView.pageZoom
+        let viewPoint = NSPoint(x: x * zoom, y: webView.bounds.height - y * zoom)
         let windowPoint = webView.convert(viewPoint, to: nil)
         let screenPoint = window.convertPoint(toScreen: windowPoint)
 
@@ -110,6 +112,7 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessageH
             at: screenPoint,
             text: text,
             viewModel: viewModel,
+            webView: webView,
             onDismiss: { [weak self] in
                 self?.removeMouseMonitor()
             }
@@ -122,8 +125,10 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessageH
     private func installMouseMonitor() {
         removeMouseMonitor()
         mouseMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
-            // If the click is on the popup panel itself, let it through
-            if event.window is WebSelectionPopupPanel {
+            // If the click is on the popup panel or its color sub-panel, let it through
+            if let win = event.window,
+               let popup = WebSelectionPopupPanel.current,
+               popup.ownsWindow(win) {
                 return event
             }
             // Otherwise dismiss the popup

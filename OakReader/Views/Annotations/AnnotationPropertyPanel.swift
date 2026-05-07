@@ -26,8 +26,7 @@ struct AnnotationPropertyPanel: View {
                 // Color
                 ColorPickerButton(title: "Color", color: $color)
                     .onChange(of: color) { _, newColor in
-                        annotation.color = newColor
-                        viewModel.markDocumentEdited()
+                        viewModel.annotation.updateAnnotationColor(annotation, color: newColor)
                     }
 
                 // Line width
@@ -36,10 +35,7 @@ struct AnnotationPropertyPanel: View {
                         .font(.caption)
                     Slider(value: $lineWidth, in: 0.5...10, step: 0.5)
                         .onChange(of: lineWidth) { _, newValue in
-                            let border = PDFBorder()
-                            border.lineWidth = newValue
-                            annotation.border = border
-                            viewModel.markDocumentEdited()
+                            viewModel.annotation.updateAnnotationLineWidth(annotation, lineWidth: newValue)
                         }
                 }
 
@@ -49,8 +45,7 @@ struct AnnotationPropertyPanel: View {
                         .font(.caption)
                     Slider(value: $opacity, in: 0.1...1.0, step: 0.1)
                         .onChange(of: opacity) { _, newValue in
-                            annotation.color = annotation.color.withAlphaComponent(newValue)
-                            viewModel.markDocumentEdited()
+                            viewModel.annotation.updateAnnotationOpacity(annotation, opacity: newValue)
                         }
                 }
 
@@ -67,8 +62,7 @@ struct AnnotationPropertyPanel: View {
                         .frame(minHeight: 60, maxHeight: 120)
                         .border(Color.secondary.opacity(0.3))
                         .onChange(of: contents) { _, newValue in
-                            annotation.contents = newValue
-                            viewModel.markDocumentEdited()
+                            viewModel.annotation.updateAnnotationContents(annotation, contents: newValue)
                         }
                 }
 
@@ -76,7 +70,7 @@ struct AnnotationPropertyPanel: View {
 
                 // Delete button
                 Button(role: .destructive) {
-                    deleteAnnotation(annotation)
+                    viewModel.annotation.deleteAnnotation(annotation)
                 } label: {
                     Label("Delete Annotation", systemImage: "trash")
                 }
@@ -95,13 +89,5 @@ struct AnnotationPropertyPanel: View {
         lineWidth = annotation.border?.lineWidth ?? 1.5
         opacity = annotation.color.alphaComponent
         contents = annotation.contents ?? ""
-    }
-
-    private func deleteAnnotation(_ annotation: PDFAnnotation) {
-        if let page = annotation.page {
-            page.removeAnnotation(annotation)
-            viewModel.state.selectedAnnotation = nil
-            viewModel.markDocumentEdited()
-        }
     }
 }
