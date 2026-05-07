@@ -9,16 +9,8 @@ export default defineConfig({
   manifest: {
     name: "OakReader",
     description: "Save web pages, YouTube videos, and podcasts to OakReader",
-    permissions: ["activeTab", "scripting", "tabs", "webRequest", "cookies"],
+    permissions: ["activeTab", "scripting", "tabs", "webRequest", "cookies", "debugger"],
     host_permissions: ["http://localhost:23119/*", "https://*/*", "http://*/*"],
-    content_scripts: [
-      {
-        matches: ["<all_urls>"],
-        js: ["page-hooks.js"],
-        run_at: "document_start",
-        world: "MAIN",
-      },
-    ],
     action: {
       default_icon: {
         "16": "icon-16.png",

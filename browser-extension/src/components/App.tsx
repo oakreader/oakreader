@@ -8,7 +8,7 @@ import { TagInput } from "./TagInput";
 import { SaveButton, type SaveState } from "./SaveButton";
 import { Button } from "./ui/button";
 
-type SaveMode = "snapshot" | "link";
+type SaveMode = "pdf" | "link";
 
 export function App() {
   const { pageMeta, tabId, collections, tags, loading, error } = usePopupData();
@@ -17,7 +17,7 @@ export function App() {
   const [newTags, setNewTags] = useState<string[]>([]);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [errorMessage, setErrorMessage] = useState("");
-  const [saveMode, setSaveMode] = useState<SaveMode>("snapshot");
+  const [saveMode, setSaveMode] = useState<SaveMode>("pdf");
 
   const handleTagToggle = useCallback((id: string) => {
     setSelectedTagIds((prev) => {
@@ -72,7 +72,7 @@ export function App() {
           cookies: cookieResult?.cookies || undefined,
         };
       } else if (saveMode === "link" && pageMeta.type === "html") {
-        // "Save as Link" mode: extract lightweight metadata only (no SingleFile)
+        // "Save as Link" mode: extract lightweight metadata only
         setSaveState("capturing");
 
         try {
@@ -93,70 +93,48 @@ export function App() {
         }
 
         setSaveState("saving");
+      } else if (saveMode === "pdf" && pageMeta.type === "html") {
+        // PDF save mode: background generates PDF via debugger and POSTs directly to server
+        setSaveState("capturing");
+
+        const bgResult = await chrome.runtime.sendMessage({
+          method: "captureAndSavePDF",
+          tabId,
+          payload: {
+            url: pageMeta.url,
+            title: pageMeta.title,
+            collectionId: selectedCollection,
+            tagOptionIds: Array.from(selectedTagIds),
+            newTags,
+          },
+        }) as { status: string; message?: string } | undefined;
+
+        if (!bgResult || bgResult.status === "error") {
+          throw new Error(bgResult?.message || "Failed to generate PDF");
+        }
+
+        // Background already saved — skip postSnapshot below
+        setSaveState("saved");
+        setTimeout(() => window.close(), 2500);
+        return;
       } else {
-        // HTML / embed: capture page content first
+        // Embed types (YouTube, Twitter, etc.): extract metadata via content script
         setSaveState("capturing");
 
         try {
           payload = await Promise.race([
-            chrome.tabs.sendMessage(tabId, { action: "capturePageHTML" }),
+            chrome.tabs.sendMessage(tabId, { action: "extractLinkMeta" }),
             new Promise((_resolve, reject) =>
-              setTimeout(() => reject(new Error("Capture timed out")), 15000)
+              setTimeout(() => reject(new Error("Capture timed out")), 10000)
             ),
           ]) as PageCapture;
         } catch {
-          // Content script not loaded (tab opened before extension install/reload)
-          // Fall back to injecting a capture function directly
-          const [result] = await chrome.scripting.executeScript({
-            target: { tabId },
-            func: () => {
-              const url = location.href;
-              try {
-                const u = new URL(url);
-                if (
-                  (u.hostname === "www.youtube.com" || u.hostname === "youtube.com") &&
-                  u.pathname === "/watch" &&
-                  u.searchParams.has("v")
-                ) {
-                  const videoId = u.searchParams.get("v");
-                  return {
-                    type: "embed" as const,
-                    url,
-                    title: document.title,
-                    videoId,
-                    thumbnailURL: videoId
-                      ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
-                      : null,
-                  };
-                }
-                // Twitter/X fallback
-                if (
-                  (u.hostname === "x.com" || u.hostname === "www.x.com" ||
-                    u.hostname === "twitter.com" || u.hostname === "www.twitter.com" ||
-                    u.hostname === "mobile.twitter.com") &&
-                  /^\/[^/]+\/status\/\d+/.test(u.pathname)
-                ) {
-                  const handle = u.pathname.split("/")[1] || "";
-                  return {
-                    type: "embed" as const,
-                    url,
-                    title: document.title,
-                    author: `@${handle}`,
-                    description: document.querySelector<HTMLMetaElement>('meta[property="og:description"]')?.content ?? null,
-                    thumbnailURL: document.querySelector<HTMLMetaElement>('meta[property="og:image"]')?.content ?? null,
-                    embedType: "twitter" as const,
-                  };
-                }
-              } catch { /* ignore */ }
-              return {
-                type: "html" as const,
-                url,
-                title: document.title || url,
-                html: document.documentElement.outerHTML,
-              };
-            },
-          });
-          payload = result.result as PageCapture;
+          payload = {
+            type: "embed",
+            url: pageMeta.url,
+            title: pageMeta.title,
+            embedType: "link",
+          };
         }
 
         setSaveState("saving");
@@ -226,12 +204,12 @@ export function App() {
           <div className="flex items-center gap-1 rounded-[var(--radius-outer)] bg-grouped p-1"
                style={{ boxShadow: "0 0 0 0.5px rgba(0,0,0,0.06)" }}>
             <Button
-              variant={saveMode === "snapshot" ? "secondary" : "ghost"}
+              variant={saveMode === "pdf" ? "secondary" : "ghost"}
               size="xs"
               className="flex-1"
-              onClick={() => setSaveMode("snapshot")}
+              onClick={() => setSaveMode("pdf")}
             >
-              Snapshot
+              PDF
             </Button>
             <Button
               variant={saveMode === "link" ? "secondary" : "ghost"}
@@ -264,6 +242,7 @@ export function App() {
         <SaveButton
           state={saveState}
           label={`Saving to ${collectionName}\u2026`}
+          capturingLabel={saveMode === "pdf" ? "Generating PDF\u2026" : undefined}
           errorMessage={errorMessage}
           onClick={handleSave}
         />

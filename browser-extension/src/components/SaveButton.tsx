@@ -5,11 +5,12 @@ export type SaveState = "idle" | "capturing" | "saving" | "saved" | "error";
 interface SaveButtonProps {
   state: SaveState;
   label: string;
+  capturingLabel?: string;
   errorMessage?: string;
   onClick: () => void;
 }
 
-export function SaveButton({ state, label, errorMessage, onClick }: SaveButtonProps) {
+export function SaveButton({ state, label, capturingLabel, errorMessage, onClick }: SaveButtonProps) {
   if (state === "saved") {
     return (
       <div className="flex items-center justify-center gap-2 rounded-full bg-success/10 h-9 px-4">
@@ -24,7 +25,7 @@ export function SaveButton({ state, label, errorMessage, onClick }: SaveButtonPr
 
   let buttonLabel: string;
   if (state === "capturing") {
-    buttonLabel = "Capturing page\u2026";
+    buttonLabel = capturingLabel ?? "Capturing page\u2026";
   } else if (state === "saving") {
     buttonLabel = label;
   } else {

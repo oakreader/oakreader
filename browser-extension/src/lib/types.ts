@@ -1,6 +1,6 @@
 import type { BiblioMetadata, ContentKind } from "./translators/types";
 
-/** Lightweight metadata returned instantly by content script (no SingleFile). */
+/** Lightweight metadata returned instantly by content script. */
 export interface PageMeta {
   type: "html" | "embed" | "pdf";
   url: string;
@@ -9,19 +9,17 @@ export interface PageMeta {
   contentKind?: ContentKind;
 }
 
-/** Full page capture including HTML content. */
+/** Full page capture including content data. */
 export interface PageCapture {
-  type: "html" | "embed";
+  type: "html" | "embed" | "pdf";
   url: string;
   title: string | null;
-  html?: string | null;
   author?: string | null;
   videoId?: string | null;
   duration?: number | null;
   thumbnailURL?: string | null;
   transcript?: string | null;
   description?: string | null;
-  markdown?: string | null;
   embedType?: "youtube" | "twitter" | "link";
   biblio?: BiblioMetadata;
 }

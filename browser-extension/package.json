@@ -16,15 +16,11 @@
     "lucide-react": "^1.14.0",
     "react": "^19",
     "react-dom": "^19",
-    "@mozilla/readability": "^0.5.0",
-    "single-file-core": "^1.5.84",
-    "turndown": "^7.2.0",
     "tailwind-merge": "^3.5.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.2.4",
     "@types/react": "^19.2.14",
-    "@types/turndown": "^5.0.5",
     "@types/react-dom": "^19.2.3",
     "@wxt-dev/module-react": "^1.2.2",
     "tailwindcss": "^4.2.4",

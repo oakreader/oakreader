@@ -27,7 +27,6 @@ export interface TranslatorResult {
   transcript?: string | null;
   // Twitter-specific
   handle?: string;
-  // Webpage/scholarly — filled by SingleFile pipeline, NOT the translator
   html?: string;
   markdown?: string | null;
   // Scholarly-specific
