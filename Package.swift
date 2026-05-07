@@ -10,12 +10,11 @@ let package = Package(
         .package(path: "Packages/OakReaderAI"),
         .package(url: "https://github.com/gonzalezreal/textual", from: "0.1.0"),
         .package(url: "https://github.com/groue/GRDB.swift", from: "7.0.0"),
-        .package(path: "../EPUBKit")
     ],
     targets: [
         .executableTarget(
             name: "OakReader",
-            dependencies: ["OakReaderAI", "EPUBKit", .product(name: "Textual", package: "textual"), .product(name: "GRDB", package: "GRDB.swift")],
+            dependencies: ["OakReaderAI", .product(name: "Textual", package: "textual"), .product(name: "GRDB", package: "GRDB.swift")],
             path: "OakReader",
             exclude: ["App/Info.plist", "OakReader.entitlements", "Resources/Assets.xcassets", "Resources/DefaultStamps"],
             resources: [

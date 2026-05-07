@@ -8,7 +8,6 @@ enum TabContent {
     case pdf(OakReaderDocument)
     case webSnapshot(WebSnapshotDocument)
     case media(MediaDocument)
-    case epub(EPUBDocument)
 }
 
 // MARK: - Document Tab
@@ -54,14 +53,6 @@ final class DocumentTab: Identifiable {
         self.content = .media(media)
         self.viewModel = DocumentViewModel(media: media)
         self.title = media.metadata.title
-        self.storageKey = storageKey
-    }
-
-    init(epub: EPUBDocument, storageKey: String? = nil) {
-        self.id = UUID()
-        self.content = .epub(epub)
-        self.viewModel = DocumentViewModel(epub: epub)
-        self.title = epub.title
         self.storageKey = storageKey
     }
 
@@ -126,15 +117,11 @@ final class AppState {
 
     // MARK: - Tab Operations
 
-    /// Open a document from a URL. Dispatches to PDF, web snapshot, or EPUB based on file extension.
+    /// Open a document from a URL. Dispatches to PDF or web snapshot based on file extension.
     func openDocument(url: URL) {
         let ext = url.pathExtension.lowercased()
         if ext == "html" || ext == "htm" {
             openHTMLDocument(url: url)
-            return
-        }
-        if ext == "epub" {
-            openEPUBDocument(url: url)
             return
         }
         // Check if already open by URL
@@ -177,6 +164,7 @@ final class AppState {
         tab.viewModel.referenceService = referenceService
         tab.viewModel.libraryStore = libraryStore
         tab.viewModel.itemStorageKey = storageKey
+        tab.viewModel.attachmentId = item?.primaryAttachment?.id.uuidString
         // Use original filename (not "document.pdf" from managed storage)
         tab.title = item?.fileName ?? url.lastPathComponent
         NSDocumentController.shared.addDocument(doc)
@@ -198,6 +186,7 @@ final class AppState {
             tab.viewModel.referenceService = referenceService
             tab.viewModel.libraryStore = libraryStore
             tab.viewModel.itemStorageKey = storageKey
+            tab.viewModel.attachmentId = item?.primaryAttachment?.id.uuidString
             tab.title = item?.title ?? url.deletingPathExtension().lastPathComponent
             openTabs.append(tab)
             activeTabID = tab.id
@@ -221,8 +210,6 @@ final class AppState {
             openPDFItem(item)
         case .embed:
             openMediaItem(item)
-        case .epub:
-            openEPUBItem(item)
         }
     }
 
@@ -263,6 +250,7 @@ final class AppState {
         tab.viewModel.referenceService = referenceService
         tab.viewModel.libraryStore = libraryStore
         tab.viewModel.itemStorageKey = item.storageKey
+        tab.viewModel.attachmentId = item.primaryAttachment?.id.uuidString
         // Use original filename from library item
         tab.title = item.fileName
         NSDocumentController.shared.addDocument(doc)
@@ -298,6 +286,7 @@ final class AppState {
             tab.viewModel.referenceService = referenceService
             tab.viewModel.libraryStore = libraryStore
             tab.viewModel.itemStorageKey = item.storageKey
+            tab.viewModel.attachmentId = item.primaryAttachment?.id.uuidString
             tab.title = item.title
             openTabs.append(tab)
             activeTabID = tab.id
@@ -338,83 +327,13 @@ final class AppState {
             tab.viewModel.referenceService = referenceService
             tab.viewModel.libraryStore = libraryStore
             tab.viewModel.itemStorageKey = item.storageKey
+            tab.viewModel.attachmentId = item.primaryAttachment?.id.uuidString
             tab.title = item.title
             openTabs.append(tab)
             activeTabID = tab.id
             updateWindowTitle()
         } catch {
             Log.error(Log.open, "Failed to open media item: \(item.title) — \(error)")
-            NSAlert(error: error).runModal()
-        }
-    }
-
-    /// Open an EPUB file from a URL.
-    private func openEPUBDocument(url: URL) {
-        let item = importService.importEPUB(from: url)
-        let epubURL = item?.fileURL ?? url
-        let storageKey = item?.storageKey
-
-        // Check if already open by storage key
-        if let storageKey, let existing = openTabs.first(where: { $0.storageKey == storageKey }) {
-            switchToTab(existing.id)
-            return
-        }
-
-        do {
-            let epub = try EPUBDocument(url: epubURL)
-            let tab = DocumentTab(epub: epub, storageKey: storageKey)
-            tab.viewModel.database = libraryStore.database
-            tab.viewModel.referenceService = referenceService
-            tab.viewModel.libraryStore = libraryStore
-            tab.viewModel.itemStorageKey = storageKey
-            tab.title = item?.title ?? epub.title
-            openTabs.append(tab)
-            activeTabID = tab.id
-            updateWindowTitle()
-
-            if let item {
-                libraryStore.markOpened(item)
-            }
-        } catch {
-            Log.error(Log.open, "Failed to open EPUB: \(url.lastPathComponent) — \(error)")
-            NSAlert(error: error).runModal()
-        }
-    }
-
-    private func openEPUBItem(_ item: LibraryItem) {
-        // Check if already open by storage key
-        if let existing = openTabs.first(where: { $0.storageKey == item.storageKey }) {
-            switchToTab(existing.id)
-            return
-        }
-
-        let epubURL = item.fileURL
-
-        guard FileManager.default.fileExists(atPath: epubURL.path) else {
-            let alert = NSAlert()
-            alert.messageText = "Cannot Open EPUB"
-            alert.informativeText = "The file \"\(item.title)\" could not be found in managed storage."
-            alert.alertStyle = .warning
-            alert.addButton(withTitle: "OK")
-            alert.runModal()
-            return
-        }
-
-        do {
-            let epub = try EPUBDocument(url: epubURL)
-            libraryStore.markOpened(item)
-
-            let tab = DocumentTab(epub: epub, storageKey: item.storageKey)
-            tab.viewModel.database = libraryStore.database
-            tab.viewModel.referenceService = referenceService
-            tab.viewModel.libraryStore = libraryStore
-            tab.viewModel.itemStorageKey = item.storageKey
-            tab.title = item.title
-            openTabs.append(tab)
-            activeTabID = tab.id
-            updateWindowTitle()
-        } catch {
-            Log.error(Log.open, "Failed to open EPUB: \(item.title) — \(error)")
             NSAlert(error: error).runModal()
         }
     }
