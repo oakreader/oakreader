@@ -502,16 +502,26 @@ final class MediaViewModel {
     }
 
     private static func parseTranscriptText(_ text: String) -> [TranscriptEntry] {
-        let pattern = /^\[(?:(\d+):)?(\d+):(\d{2})\]\s+(.+)$/
+        let pattern = #"^\[(?:(\d+):)?(\d+):(\d{2})\]\s+(.+)$"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
         var entries: [TranscriptEntry] = []
 
         for line in text.components(separatedBy: .newlines) {
-            guard let match = line.firstMatch(of: pattern) else { continue }
-            let hours = match.output.1.flatMap { Double($0) } ?? 0
-            let minutes = Double(match.output.2) ?? 0
-            let seconds = Double(match.output.3) ?? 0
+            let nsLine = line as NSString
+            let lineRange = NSRange(location: 0, length: nsLine.length)
+            guard let match = regex.firstMatch(in: line, range: lineRange) else { continue }
+
+            func capture(_ index: Int) -> String? {
+                let range = match.range(at: index)
+                guard range.location != NSNotFound else { return nil }
+                return nsLine.substring(with: range)
+            }
+
+            let hours = capture(1).flatMap(Double.init) ?? 0
+            let minutes = capture(2).flatMap(Double.init) ?? 0
+            let seconds = capture(3).flatMap(Double.init) ?? 0
             let offset = hours * 3600 + minutes * 60 + seconds
-            entries.append(TranscriptEntry(id: entries.count, offset: offset, text: String(match.output.4)))
+            entries.append(TranscriptEntry(id: entries.count, offset: offset, text: capture(4) ?? ""))
         }
 
         return entries
