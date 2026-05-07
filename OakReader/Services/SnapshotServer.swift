@@ -7,7 +7,7 @@ final class SnapshotServer {
     private var listener: NWListener?
     private let importService: ImportService
     private let port: UInt16 = 23119
-    private let maxPayload = 50 * 1024 * 1024 // 50 MB
+    private let maxPayload = 100 * 1024 * 1024 // 100 MB
 
     init(importService: ImportService) {
         self.importService = importService
@@ -71,19 +71,21 @@ final class SnapshotServer {
             var accumulated = buffer
             accumulated.append(data)
 
-            // Check if we have the full request by parsing Content-Length
-            if let raw = String(data: accumulated, encoding: .utf8),
-               let headerEnd = raw.range(of: "\r\n\r\n") {
-                let headerSection = String(raw[raw.startIndex..<headerEnd.lowerBound])
-                let bodyStart = accumulated.count - raw[headerEnd.upperBound...].utf8.count
+            // Check if we have the full request by finding \r\n\r\n at byte level
+            if let headerEndOffset = self.findHeaderEnd(in: accumulated) {
+                let headerData = accumulated[accumulated.startIndex..<(accumulated.startIndex + headerEndOffset)]
+                let bodyStart = headerEndOffset + 4 // skip \r\n\r\n
                 let bodyReceived = accumulated.count - bodyStart
 
-                // Parse Content-Length from headers
-                let contentLength = headerSection
-                    .components(separatedBy: "\r\n")
-                    .first(where: { $0.lowercased().hasPrefix("content-length:") })
-                    .flatMap { Int($0.split(separator: ":").last?.trimmingCharacters(in: .whitespaces) ?? "") }
-                    ?? 0
+                // Parse Content-Length from header bytes
+                var contentLength = 0
+                if let headerString = String(data: headerData, encoding: .utf8) {
+                    contentLength = headerString
+                        .components(separatedBy: "\r\n")
+                        .first(where: { $0.lowercased().hasPrefix("content-length:") })
+                        .flatMap { Int($0.split(separator: ":").last?.trimmingCharacters(in: .whitespaces) ?? "") }
+                        ?? 0
+                }
 
                 if bodyReceived >= contentLength || isComplete {
                     self.processHTTPRequest(data: accumulated, connection: connection)
@@ -105,17 +107,37 @@ final class SnapshotServer {
 
     // MARK: - HTTP Parsing
 
+    /// Find the byte sequence `\r\n\r\n` in Data, returning the range.
+    private func findHeaderEnd(in data: Data) -> Int? {
+        let separator: [UInt8] = [0x0D, 0x0A, 0x0D, 0x0A] // \r\n\r\n
+        guard data.count >= 4 else { return nil }
+        for i in 0...(data.count - 4) {
+            if data[data.startIndex + i] == separator[0] &&
+               data[data.startIndex + i + 1] == separator[1] &&
+               data[data.startIndex + i + 2] == separator[2] &&
+               data[data.startIndex + i + 3] == separator[3] {
+                return i
+            }
+        }
+        return nil
+    }
+
     private func processHTTPRequest(data: Data, connection: NWConnection) {
-        guard let raw = String(data: data, encoding: .utf8) else {
-            sendResponse(connection: connection, status: 400, body: #"{"status":"error","message":"Invalid encoding"}"#)
+        // Find header/body boundary at the byte level (avoid String conversion of entire payload)
+        guard let headerEndOffset = findHeaderEnd(in: data) else {
+            sendResponse(connection: connection, status: 400, body: #"{"status":"error","message":"Malformed request"}"#)
             return
         }
 
-        // Split headers and body
-        let parts = raw.components(separatedBy: "\r\n\r\n")
-        let headerSection = parts[0]
-        let bodyString = parts.count > 1 ? parts.dropFirst().joined(separator: "\r\n\r\n") : ""
-        let headerLines = headerSection.components(separatedBy: "\r\n")
+        let headerData = data[data.startIndex..<(data.startIndex + headerEndOffset)]
+        let bodyData = data[(data.startIndex + headerEndOffset + 4)...] // skip \r\n\r\n
+
+        guard let headerString = String(data: headerData, encoding: .utf8) else {
+            sendResponse(connection: connection, status: 400, body: #"{"status":"error","message":"Invalid header encoding"}"#)
+            return
+        }
+
+        let headerLines = headerString.components(separatedBy: "\r\n")
 
         guard let requestLine = headerLines.first else {
             sendResponse(connection: connection, status: 400, body: #"{"status":"error","message":"No request line"}"#)
@@ -151,13 +173,13 @@ final class SnapshotServer {
 
         // POST /snapshot
         if method == "POST", path == "/snapshot" {
-            guard !bodyString.isEmpty, let bodyData = bodyString.data(using: .utf8) else {
+            guard !bodyData.isEmpty else {
                 sendResponse(connection: connection, status: 400, body: #"{"status":"error","message":"Empty body"}"#)
                 return
             }
 
             do {
-                let payload = try JSONDecoder().decode(SnapshotPayload.self, from: bodyData)
+                let payload = try JSONDecoder().decode(SnapshotPayload.self, from: Data(bodyData))
                 handlePayload(payload) { result in
                     switch result {
                     case .success:
@@ -422,6 +444,17 @@ final class SnapshotServer {
     // MARK: - PDF Snapshot
 
     private func handlePDFSnapshot(_ payload: SnapshotPayload, completion: @escaping (Result<Void, Error>) -> Void) {
+        Log.info(Log.server, "handlePDFSnapshot: url=\(payload.url), pdfData=\(payload.pdfData != nil ? "\(payload.pdfData!.count) chars" : "nil"), cookies=\(payload.cookies != nil ? "yes" : "nil")")
+
+        // Inline PDF data from Page.printToPDF (base64-encoded PDF bytes)
+        if let pdfDataString = payload.pdfData, !pdfDataString.isEmpty {
+            handleInlinePDF(payload, pdfBase64: pdfDataString, completion: completion)
+            return
+        }
+
+        Log.info(Log.server, "No pdfData — falling back to URL download: \(payload.url)")
+
+        // URL-based PDF: download the PDF file directly
         guard let pdfURL = URL(string: payload.url) else {
             completion(.failure(OakReaderError.serverError("Invalid PDF URL")))
             return
@@ -485,6 +518,39 @@ final class SnapshotServer {
                 }
             }
         }.resume()
+    }
+
+    /// Import a base64-encoded PDF received directly from the extension's Page.printToPDF.
+    private func handleInlinePDF(_ payload: SnapshotPayload, pdfBase64: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let pdfData = Data(base64Encoded: pdfBase64) else {
+            completion(.failure(OakReaderError.serverError("Invalid base64 PDF data")))
+            return
+        }
+
+        let filename = sanitizeFileName(payload.title ?? "snapshot") + ".pdf"
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString + "_" + filename)
+
+        do {
+            try pdfData.write(to: tempURL)
+        } catch {
+            completion(.failure(error))
+            return
+        }
+
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            let item = self.importService.importPDF(from: tempURL)
+            try? FileManager.default.removeItem(at: tempURL)
+            if let item {
+                self.assignToCollection(item: item, collectionId: payload.collectionId)
+                self.assignTags(item: item, tagOptionIds: payload.tagOptionIds)
+                self.createAndAssignNewTags(item: item, newTags: payload.newTags)
+                completion(.success(()))
+            } else {
+                completion(.failure(OakReaderError.serverError("PDF import failed")))
+            }
+        }
     }
 
     // MARK: - Collection Assignment
@@ -622,6 +688,7 @@ struct SnapshotPayload: Codable {
     let transcript: String?
     let description: String?
     let cookies: String?        // pdf only — forwarded cookies for authenticated downloads
+    let pdfData: String?         // pdf only — base64-encoded PDF from Page.printToPDF
     let collectionId: String?   // optional — target collection, nil = unsorted
     let tagOptionIds: [String]? // optional — tag option UUIDs to assign
     let newTags: [String]?      // optional — tag names to create and assign
