@@ -13,6 +13,9 @@ class AreaSelectionPopupPanel: NSPanel {
     private let annotationColor: NSColor
     private let onDismiss: (() -> Void)?
 
+    // Color sub-panel
+    private var colorSubPanel: NSPanel?
+
     static func show(
         at screenPoint: NSPoint,
         pdfRect: CGRect,
@@ -34,6 +37,11 @@ class AreaSelectionPopupPanel: NSPanel {
             onDismiss: onDismiss
         )
         current = panel
+    }
+
+    /// Returns true if the given window belongs to this popup or its color sub-panel.
+    func ownsWindow(_ window: NSWindow) -> Bool {
+        return window === self || window === colorSubPanel
     }
 
     private init(
@@ -96,90 +104,175 @@ class AreaSelectionPopupPanel: NSPanel {
         (NSColor(red: 0.67, green: 0.67, blue: 0.67, alpha: 1.0), "Gray"),       // #aaaaaa
     ]
 
+    // MARK: - Content View (horizontal toolbar)
+
     private func buildContentView() -> NSView {
-        let stack = NSStackView()
-        stack.orientation = .vertical
-        stack.spacing = 0
-        stack.edgeInsets = NSEdgeInsets(top: 6, left: 6, bottom: 6, right: 6)
+        let mainStack = NSStackView()
+        mainStack.orientation = .horizontal
+        mainStack.spacing = 2
+        mainStack.edgeInsets = NSEdgeInsets(top: 4, left: 6, bottom: 4, right: 6)
+        mainStack.alignment = .centerY
 
-        // Row 1: Color dots — click to instantly add area annotation in that color
-        let colorRow = NSStackView()
-        colorRow.orientation = .horizontal
-        colorRow.spacing = 10
-        colorRow.edgeInsets = NSEdgeInsets(top: 4, left: 8, bottom: 4, right: 8)
-
-        for (color, name) in Self.annotationColors {
-            let dot = AreaColorDotView(color: color, size: 20) { [weak self] in
-                self?.addAreaAnnotation(color: color)
-            }
-            dot.toolTip = name
-            colorRow.addArrangedSubview(dot)
+        // Group 1: Area annotation split button
+        let areaSplit = AreaSplitButton(color: annotationColor) { [weak self] in
+            guard let self else { return }
+            self.addAreaAnnotation(color: self.annotationColor)
+        } onChevronClick: { [weak self] in
+            self?.toggleColorSubPanel()
         }
-        stack.addArrangedSubview(colorRow)
+        mainStack.addArrangedSubview(areaSplit)
 
-        // Separator
-        let sep1 = NSBox()
-        sep1.boxType = .separator
-        sep1.translatesAutoresizingMaskIntoConstraints = false
-        stack.addArrangedSubview(sep1)
+        // Separator 1
+        mainStack.addArrangedSubview(makeVerticalSeparator())
 
-        // Row 2: Add to Chat (full width)
-        let chatBtn = AreaPopupActionButton(
+        // Group 2: Actions (chat + note)
+        let chatBtn = PopupIconButton(
             systemImage: "bubble.left",
-            title: "Add to Chat"
+            accessibilityLabel: "Add to Chat"
         ) { [weak self] in
             self?.addToChat()
         }
-        stack.addArrangedSubview(chatBtn)
-        chatBtn.leadingAnchor.constraint(equalTo: stack.leadingAnchor, constant: 6).isActive = true
-        chatBtn.trailingAnchor.constraint(equalTo: stack.trailingAnchor, constant: -6).isActive = true
+        mainStack.addArrangedSubview(chatBtn)
 
-        // Row 3: Add to Note (full width)
-        let noteBtn = AreaPopupActionButton(
-            systemImage: "note.text.badge.plus",
-            title: "Add to Note"
-        ) { [weak self] in
-            self?.addToNote()
+        if Preferences.shared.isPluginEnabled(.notes) {
+            let noteBtn = PopupIconButton(
+                systemImage: "note.text.badge.plus",
+                accessibilityLabel: "Add to Note"
+            ) { [weak self] in
+                self?.addToNote()
+            }
+            mainStack.addArrangedSubview(noteBtn)
         }
-        stack.addArrangedSubview(noteBtn)
-        noteBtn.leadingAnchor.constraint(equalTo: stack.leadingAnchor, constant: 6).isActive = true
-        noteBtn.trailingAnchor.constraint(equalTo: stack.trailingAnchor, constant: -6).isActive = true
 
-        // Separator
-        let sep2 = NSBox()
-        sep2.boxType = .separator
-        sep2.translatesAutoresizingMaskIntoConstraints = false
-        stack.addArrangedSubview(sep2)
+        // Separator 2
+        mainStack.addArrangedSubview(makeVerticalSeparator())
 
-        // Row 4: Copy Image (full width)
-        let copyBtn = AreaPopupActionButton(
+        // Group 3: Clipboard (copy image)
+        let copyBtn = PopupIconButton(
             systemImage: "doc.on.doc",
-            title: "Copy Image"
+            accessibilityLabel: "Copy Image"
         ) { [weak self] in
             self?.copyImage()
         }
-        stack.addArrangedSubview(copyBtn)
-        copyBtn.leadingAnchor.constraint(equalTo: stack.leadingAnchor, constant: 6).isActive = true
-        copyBtn.trailingAnchor.constraint(equalTo: stack.trailingAnchor, constant: -6).isActive = true
+        mainStack.addArrangedSubview(copyBtn)
 
-        // Background
+        // Background container
         let container = NSVisualEffectView()
         container.material = .popover
         container.state = .active
         container.wantsLayer = true
-        container.layer?.cornerRadius = 6
+        container.layer?.cornerRadius = 8
 
-        container.addSubview(stack)
-        stack.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(mainStack)
+        mainStack.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: container.topAnchor),
-            stack.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-            stack.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            mainStack.topAnchor.constraint(equalTo: container.topAnchor),
+            mainStack.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            mainStack.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            mainStack.trailingAnchor.constraint(equalTo: container.trailingAnchor),
         ])
 
         return container
     }
+
+    private func makeVerticalSeparator() -> NSView {
+        let sep = NSBox()
+        sep.boxType = .separator
+        sep.translatesAutoresizingMaskIntoConstraints = false
+        let wrapper = NSView()
+        wrapper.translatesAutoresizingMaskIntoConstraints = false
+        wrapper.addSubview(sep)
+        NSLayoutConstraint.activate([
+            wrapper.widthAnchor.constraint(equalToConstant: 1),
+            wrapper.heightAnchor.constraint(equalToConstant: 20),
+            sep.centerXAnchor.constraint(equalTo: wrapper.centerXAnchor),
+            sep.topAnchor.constraint(equalTo: wrapper.topAnchor),
+            sep.bottomAnchor.constraint(equalTo: wrapper.bottomAnchor),
+            sep.widthAnchor.constraint(equalToConstant: 1),
+        ])
+        return wrapper
+    }
+
+    // MARK: - Color Sub-Panel
+
+    private func toggleColorSubPanel() {
+        if let panel = colorSubPanel {
+            panel.orderOut(nil)
+            colorSubPanel = nil
+            return
+        }
+        showColorSubPanel()
+    }
+
+    private func showColorSubPanel() {
+        let colorStack = NSStackView()
+        colorStack.orientation = .horizontal
+        colorStack.spacing = 8
+        colorStack.edgeInsets = NSEdgeInsets(top: 6, left: 8, bottom: 6, right: 8)
+
+        for (color, name) in Self.annotationColors {
+            let dot = ColorDotView(color: color, size: 14) { [weak self] in
+                self?.addAreaAnnotation(color: color)
+            }
+            dot.toolTip = name
+            colorStack.addArrangedSubview(dot)
+        }
+
+        let container = NSVisualEffectView()
+        container.material = .popover
+        container.state = .active
+        container.wantsLayer = true
+        container.layer?.cornerRadius = 8
+
+        container.addSubview(colorStack)
+        colorStack.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            colorStack.topAnchor.constraint(equalTo: container.topAnchor),
+            colorStack.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            colorStack.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            colorStack.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+        ])
+
+        let panel = NSPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 10, height: 10),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: true
+        )
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.level = .floating
+        panel.hasShadow = true
+        panel.ignoresMouseEvents = false
+        panel.contentView = container
+
+        let contentSize = container.fittingSize
+        panel.setContentSize(contentSize)
+
+        colorSubPanel = panel
+        repositionColorSubPanel()
+        panel.orderFront(nil)
+
+        panel.alphaValue = 0
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.10
+            panel.animator().alphaValue = 1
+        }
+    }
+
+    private func repositionColorSubPanel() {
+        guard let panel = colorSubPanel else { return }
+        let mainFrame = self.frame
+        let panelSize = panel.frame.size
+
+        // Position below the main toolbar, left-aligned with split button
+        let splitOffset: CGFloat = 6 // matches mainStack leading edge inset
+        let x = mainFrame.origin.x + splitOffset
+        let y = mainFrame.origin.y - panelSize.height - 2
+        panel.setFrameOrigin(NSPoint(x: x, y: y))
+    }
+
+    // MARK: - Actions
 
     private func addToChat() {
         guard let pngData = renderAreaAsPNG() else {
@@ -226,16 +319,7 @@ class AreaSelectionPopupPanel: NSPanel {
     }
 
     private func addAreaAnnotation(color: NSColor) {
-        // Create a square (rectangle) annotation with colored border, no fill — like OakReader
-        let annotation = PDFAnnotation.rectangle(
-            bounds: pdfRect,
-            color: color,
-            fillColor: nil,
-            lineWidth: 3.0
-        )
-        page.addAnnotation(annotation)
-        viewModel.markDocumentEdited()
-        viewModel.annotation.refreshAnnotationModels()
+        viewModel.annotation.addAreaAnnotation(bounds: pdfRect, page: page, pageIndex: pageIndex, color: color)
         dismiss()
     }
 
@@ -298,6 +382,9 @@ class AreaSelectionPopupPanel: NSPanel {
     }
 
     func dismiss() {
+        colorSubPanel?.orderOut(nil)
+        colorSubPanel = nil
+
         let callback = onDismiss
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = 0.08
@@ -312,104 +399,165 @@ class AreaSelectionPopupPanel: NSPanel {
     }
 }
 
-// MARK: - Color Dot (OakReader-style round swatch for area popup)
+// MARK: - Area Split Button (rectangle.dashed icon + color bar + chevron)
 
-private class AreaColorDotView: NSView {
-    private let color: NSColor
-    private let onClick: () -> Void
-    private var isHovered = false
+private class AreaSplitButton: NSView {
+    private var currentColor: NSColor
+    private let onAreaClick: () -> Void
+    private let onChevronClick: () -> Void
+
+    private var iconHovered = false
+    private var chevronHovered = false
     private var trackingArea: NSTrackingArea?
+    private let colorBar = NSView()
+    private let iconView = NSImageView()
+    private let chevronView = NSImageView()
 
-    init(color: NSColor, size: CGFloat, onClick: @escaping () -> Void) {
-        self.color = color
-        self.onClick = onClick
-        super.init(frame: NSRect(x: 0, y: 0, width: size, height: size))
+    private let iconWidth: CGFloat = 28
+    private let chevronWidth: CGFloat = 16
+    private let totalHeight: CGFloat = 32
+
+    init(color: NSColor, onAreaClick: @escaping () -> Void, onChevronClick: @escaping () -> Void) {
+        self.currentColor = color
+        self.onAreaClick = onAreaClick
+        self.onChevronClick = onChevronClick
+        super.init(frame: NSRect(x: 0, y: 0, width: 44, height: 32))
+
         wantsLayer = true
+        layer?.cornerRadius = 6
         translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            widthAnchor.constraint(equalToConstant: size),
-            heightAnchor.constraint(equalToConstant: size),
+            widthAnchor.constraint(equalToConstant: iconWidth + chevronWidth),
+            heightAnchor.constraint(equalToConstant: totalHeight),
         ])
+
+        setupIcon()
+        setupChevron()
+        setupColorBar()
+
+        toolTip = "Area Annotation"
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    private func setupIcon() {
+        if let img = NSImage(systemSymbolName: "rectangle.dashed", accessibilityDescription: "Area Annotation") {
+            let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
+            iconView.image = img.withSymbolConfiguration(config)
+        }
+        iconView.contentTintColor = .secondaryLabelColor
+        iconView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(iconView)
+        NSLayoutConstraint.activate([
+            iconView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 5),
+            iconView.centerYAnchor.constraint(equalTo: centerYAnchor, constant: -2),
+            iconView.widthAnchor.constraint(equalToConstant: 18),
+            iconView.heightAnchor.constraint(equalToConstant: 18),
+        ])
+    }
+
+    private func setupChevron() {
+        if let img = NSImage(systemSymbolName: "chevron.down", accessibilityDescription: "Color picker") {
+            let config = NSImage.SymbolConfiguration(pointSize: 8, weight: .semibold)
+            chevronView.image = img.withSymbolConfiguration(config)
+        }
+        chevronView.contentTintColor = .tertiaryLabelColor
+        chevronView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(chevronView)
+        NSLayoutConstraint.activate([
+            chevronView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -2),
+            chevronView.centerYAnchor.constraint(equalTo: centerYAnchor),
+            chevronView.widthAnchor.constraint(equalToConstant: 12),
+            chevronView.heightAnchor.constraint(equalToConstant: 12),
+        ])
+    }
+
+    private func setupColorBar() {
+        colorBar.wantsLayer = true
+        colorBar.layer?.backgroundColor = currentColor.cgColor
+        colorBar.layer?.cornerRadius = 1.5
+        colorBar.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(colorBar)
+        NSLayoutConstraint.activate([
+            colorBar.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 5),
+            colorBar.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -3),
+            colorBar.widthAnchor.constraint(equalToConstant: 18),
+            colorBar.heightAnchor.constraint(equalToConstant: 3),
+        ])
+    }
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         if let ta = trackingArea { removeTrackingArea(ta) }
         trackingArea = NSTrackingArea(
-            rect: bounds, options: [.mouseEnteredAndExited, .activeAlways], owner: self
+            rect: bounds,
+            options: [.mouseEnteredAndExited, .mouseMoved, .activeAlways],
+            owner: self
         )
         addTrackingArea(trackingArea!)
     }
 
-    override func draw(_ dirtyRect: NSRect) {
-        let inset: CGFloat = isHovered ? 0.5 : 1.0
-        let rect = bounds.insetBy(dx: inset, dy: inset)
-        let path = NSBezierPath(ovalIn: rect)
-        color.setFill()
-        path.fill()
-
-        if isHovered {
-            NSColor.controlTextColor.withAlphaComponent(0.4).setStroke()
-            path.lineWidth = 1.5
-            path.stroke()
-        }
+    private func isInIconRegion(_ point: NSPoint) -> Bool {
+        return point.x < iconWidth
     }
 
-    override func mouseDown(with event: NSEvent) {
-        // visual feedback
-    }
-
-    override func mouseUp(with event: NSEvent) {
+    override func mouseMoved(with event: NSEvent) {
         let pt = convert(event.locationInWindow, from: nil)
-        if bounds.contains(pt) {
-            onClick()
+        let wasIconHovered = iconHovered
+        let wasChevronHovered = chevronHovered
+
+        iconHovered = bounds.contains(pt) && isInIconRegion(pt)
+        chevronHovered = bounds.contains(pt) && !isInIconRegion(pt)
+
+        if iconHovered != wasIconHovered || chevronHovered != wasChevronHovered {
+            updateAppearance()
         }
     }
 
     override func mouseEntered(with event: NSEvent) {
-        isHovered = true
-        needsDisplay = true
+        let pt = convert(event.locationInWindow, from: nil)
+        iconHovered = isInIconRegion(pt)
+        chevronHovered = !isInIconRegion(pt)
+        updateAppearance()
     }
 
     override func mouseExited(with event: NSEvent) {
-        isHovered = false
-        needsDisplay = true
+        iconHovered = false
+        chevronHovered = false
+        updateAppearance()
     }
-}
 
-// MARK: - Popup Action Button for Area Popup (icon + label, OakReader-style)
-
-private class AreaPopupActionButton: NSButton {
-    private let onClick: () -> Void
-
-    init(systemImage: String, title: String, onClick: @escaping () -> Void) {
-        self.onClick = onClick
-        super.init(frame: .zero)
-
-        self.title = title
-        isBordered = true
-        bezelStyle = .rounded
-        setButtonType(.momentaryPushIn)
-        font = NSFont.systemFont(ofSize: 11, weight: .regular)
-        contentTintColor = .labelColor
-
-        if let img = NSImage(systemSymbolName: systemImage, accessibilityDescription: title) {
-            let config = NSImage.SymbolConfiguration(pointSize: 11, weight: .medium)
-            self.image = img.withSymbolConfiguration(config)
+    override func mouseDown(with event: NSEvent) {
+        let pt = convert(event.locationInWindow, from: nil)
+        if bounds.contains(pt) {
+            layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.18).cgColor
         }
-        imagePosition = .imageLeading
-        imageHugsTitle = true
-
-        translatesAutoresizingMaskIntoConstraints = false
-        heightAnchor.constraint(equalToConstant: 28).isActive = true
-
-        target = self
-        action = #selector(clicked)
     }
 
-    required init?(coder: NSCoder) { fatalError() }
+    override func mouseUp(with event: NSEvent) {
+        let pt = convert(event.locationInWindow, from: nil)
+        guard bounds.contains(pt) else {
+            updateAppearance()
+            return
+        }
 
-    @objc private func clicked() { onClick() }
+        if isInIconRegion(pt) {
+            onAreaClick()
+        } else {
+            onChevronClick()
+        }
+        updateAppearance()
+    }
+
+    private func updateAppearance() {
+        if iconHovered || chevronHovered {
+            layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.10).cgColor
+            iconView.contentTintColor = .labelColor
+            chevronView.contentTintColor = .secondaryLabelColor
+        } else {
+            layer?.backgroundColor = nil
+            iconView.contentTintColor = .secondaryLabelColor
+            chevronView.contentTintColor = .tertiaryLabelColor
+        }
+    }
 }
