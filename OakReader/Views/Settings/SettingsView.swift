@@ -33,7 +33,7 @@ struct SettingsView: View {
             switch self {
             case .general: return "gearshape"
             case .library: return "books.vertical"
-            case .ai: return "brain"
+            case .ai: return "sparkles.2"
             case .plugins: return "puzzlepiece.extension"
             case .youtube: return "play.rectangle"
             case .pluginNotes: return Plugin.notes.systemImage

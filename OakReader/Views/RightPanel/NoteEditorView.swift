@@ -9,7 +9,7 @@ enum NoteEditorMode: String, CaseIterable {
 
     var icon: String {
         switch self {
-        case .edit: return "pencil"
+        case .edit: return "square.and.pencil"
         case .preview: return "eye"
         case .split: return "rectangle.split.1x2"
         }

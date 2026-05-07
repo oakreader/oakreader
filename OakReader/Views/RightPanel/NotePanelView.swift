@@ -25,7 +25,7 @@ struct NotePanelView: View {
                 Spacer()
 
                 Button(action: { notesVM.createNote() }) {
-                    Image(systemName: "square.and.pencil")
+                    Image(systemName: "text.pad.header.badge.plus")
                         .font(.system(size: OakStyle.Font.icon))
                 }
                 .buttonStyle(.plain)

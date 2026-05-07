@@ -144,7 +144,7 @@ struct ToolCallCardView: View {
     private var toolIcon: String {
         switch record.name {
         case "read_file": return "doc.text"
-        case "write_file": return "pencil.line"
+        case "write_file": return "square.and.pencil"
         default: return "wrench"
         }
     }
