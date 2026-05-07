@@ -84,6 +84,14 @@ class DocumentViewModel {
         return vm
     }
 
+    private var _voice: VoiceViewModel?
+    var voice: VoiceViewModel {
+        if let vm = _voice { return vm }
+        let vm = VoiceViewModel()
+        _voice = vm
+        return vm
+    }
+
     private var _translation: TranslationViewModel?
     var translation: TranslationViewModel {
         if let vm = _translation { return vm }

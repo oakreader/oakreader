@@ -16,6 +16,8 @@ struct RightPanelContentView: View {
                         chatVM: viewModel.chat,
                         onSaveAssistantResponse: saveAssistantResponseAction
                     )
+                case .voiceChat:
+                    VoiceChatView(voiceVM: viewModel.voice)
                 case .notes:
                     if Preferences.shared.isPluginEnabled(.notes) {
                         NotePanelView(notesVM: viewModel.notes)

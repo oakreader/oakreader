@@ -86,6 +86,14 @@ final class AppState {
         return vm
     }
 
+    private var _libraryVoiceVM: VoiceViewModel?
+    var libraryVoiceVM: VoiceViewModel {
+        if let vm = _libraryVoiceVM { return vm }
+        let vm = VoiceViewModel()
+        _libraryVoiceVM = vm
+        return vm
+    }
+
     private var autosaveTimer: Timer?
 
     var isLibraryActive: Bool {
