@@ -9,6 +9,7 @@ public actor MLXTTSProvider: TTSService {
     private let repoId: String
     private let manager: ModelManager?
     private let defaultSampleRate: Double
+    private let language: String?
 
     /// Cached reference audio MLXArray, loaded once from a URL.
     private var cachedRefAudio: MLXArray?
@@ -26,10 +27,12 @@ public actor MLXTTSProvider: TTSService {
     public init(
         repoId: String = KnownModels.tts[0].repo,
         defaultSampleRate: Double = 24000,
+        language: String? = nil,
         manager: ModelManager? = nil
     ) {
         self.repoId = repoId
         self.defaultSampleRate = defaultSampleRate
+        self.language = language
         self.manager = manager
     }
 
@@ -76,7 +79,7 @@ public actor MLXTTSProvider: TTSService {
             voice: safeVoice,
             refAudio: refAudio,
             refText: safeRefText,
-            language: nil,
+            language: language,
             generationParameters: model.defaultGenerationParameters
         )
         let samples = audio.asArray(Float.self)
@@ -116,7 +119,7 @@ public actor MLXTTSProvider: TTSService {
                             voice: safeVoice,
                             refAudio: refAudio,
                             refText: safeRefText,
-                            language: nil,
+                            language: self.language,
                             generationParameters: model.defaultGenerationParameters
                         )
                     }
@@ -165,7 +168,7 @@ public actor MLXTTSProvider: TTSService {
         let conditioning = try model.prepareReferenceConditioning(
             refAudio: refAudio,
             refText: refText,
-            language: nil
+            language: language
         )
         cachedConditioning = conditioning
         cachedConditioningKey = key
