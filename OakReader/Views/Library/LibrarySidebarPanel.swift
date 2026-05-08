@@ -57,18 +57,18 @@ struct LibrarySidebarPanel: View {
     private var infoTabContent: some View {
         coverSection
 
-        metadataSection
-
-        sectionView(title: "File", icon: "doc.fill", iconColor: Color(hex: "8E8E93")) {
-            infoGrid
-        }
-
         sectionView(title: "Properties", icon: "tag.fill", iconColor: Color(hex: "E5A540")) {
             propertiesContent
         }
 
         sectionView(title: "Collections", icon: "folder.fill", iconColor: Color(hex: "59ADC4")) {
             collectionsContent
+        }
+
+        metadataSection
+
+        sectionView(title: "File", icon: "doc.fill", iconColor: Color(hex: "8E8E93")) {
+            infoGrid
         }
 
         actionsSection
@@ -258,19 +258,12 @@ struct LibrarySidebarPanel: View {
 
                         // Add option button
                         Menu {
-                            let assignedOptionIds = Set(assignedValues.compactMap { $0.option?.id })
-                            ForEach(property.options.filter { !assignedOptionIds.contains($0.id) }) { option in
-                                Button {
-                                    store.setItemSelectValue(item: item, property: property, option: option)
-                                } label: {
-                                    HStack {
-                                        RoundedRectangle(cornerRadius: 2)
-                                            .fill(Color(hex: option.colorHex))
-                                            .frame(width: 10, height: 10)
-                                        Text(option.name)
-                                    }
-                                }
-                            }
+                            PropertyOptionAssignmentMenuItems(
+                                item: item,
+                                property: property,
+                                store: store,
+                                mode: .addUnassigned
+                            )
                         } label: {
                             HStack(spacing: 2) {
                                 Image(systemName: "plus")
@@ -349,5 +342,127 @@ struct LibrarySidebarPanel: View {
             .controlSize(.small)
         }
         .padding(.horizontal, 8)
+    }
+}
+
+enum PropertyOptionAssignmentMenuMode {
+    case addUnassigned
+    case toggleAssigned
+}
+
+struct PropertyOptionAssignmentMenuItems: View {
+    let item: LibraryItem
+    let property: PropertyDefinition
+    let store: LibraryStore
+    var mode: PropertyOptionAssignmentMenuMode = .toggleAssigned
+
+    private var assignedOptionIds: Set<UUID> {
+        Set(item.propertyValues.compactMap { propertyValue in
+            propertyValue.propertyId == property.id ? propertyValue.option?.id : nil
+        })
+    }
+
+    private var optionNodes: [TagNode] {
+        let options: [PropertyOption]
+        switch mode {
+        case .addUnassigned:
+            options = property.options.filter { !assignedOptionIds.contains($0.id) }
+        case .toggleAssigned:
+            options = property.options
+        }
+
+        let pairs = options.map { (option: $0, count: 0) }
+        return TagNode.buildHierarchy(from: pairs)
+    }
+
+    var body: some View {
+        ForEach(optionNodes) { node in
+            PropertyOptionAssignmentMenuNodeView(
+                node: node,
+                item: item,
+                property: property,
+                store: store,
+                assignedOptionIds: assignedOptionIds,
+                mode: mode
+            )
+        }
+    }
+}
+
+private struct PropertyOptionAssignmentMenuNodeView: View {
+    let node: TagNode
+    let item: LibraryItem
+    let property: PropertyDefinition
+    let store: LibraryStore
+    let assignedOptionIds: Set<UUID>
+    let mode: PropertyOptionAssignmentMenuMode
+
+    private var colorHex: String {
+        node.option?.colorHex ?? firstChildColorHex(in: node) ?? "90A4AE"
+    }
+
+    var body: some View {
+        if node.children.isEmpty {
+            if let option = node.option {
+                optionButton(option, title: node.name)
+            }
+        } else {
+            Menu {
+                if let option = node.option {
+                    optionButton(option, title: node.name)
+                    Divider()
+                }
+
+                ForEach(node.children) { child in
+                    PropertyOptionAssignmentMenuNodeView(
+                        node: child,
+                        item: item,
+                        property: property,
+                        store: store,
+                        assignedOptionIds: assignedOptionIds,
+                        mode: mode
+                    )
+                }
+            } label: {
+                optionLabel(title: node.name, isAssigned: false)
+            }
+            .tint(Color(hex: colorHex))
+        }
+    }
+
+    private func optionButton(_ option: PropertyOption, title: String) -> some View {
+        let isAssigned = assignedOptionIds.contains(option.id)
+
+        return Button {
+            switch mode {
+            case .addUnassigned:
+                store.setItemSelectValue(item: item, property: property, option: option)
+            case .toggleAssigned:
+                if isAssigned {
+                    store.removeItemSelectValue(item: item, property: property, option: option)
+                } else {
+                    store.setItemSelectValue(item: item, property: property, option: option)
+                }
+            }
+        } label: {
+            optionLabel(title: title, isAssigned: isAssigned)
+        }
+        .tint(Color(hex: option.colorHex))
+    }
+
+    private func optionLabel(title: String, isAssigned: Bool) -> some View {
+        Label(title, systemImage: isAssigned ? "checkmark.circle.fill" : "circle.fill")
+    }
+
+    private func firstChildColorHex(in node: TagNode) -> String? {
+        for child in node.children {
+            if let color = child.option?.colorHex {
+                return color
+            }
+            if let color = firstChildColorHex(in: child) {
+                return color
+            }
+        }
+        return nil
     }
 }
