@@ -1,5 +1,17 @@
 import Foundation
 
+/// Latency breakdown for a single voice turn (speech-end → first audio out).
+public struct TurnLatencyMetrics: Sendable {
+    /// Time from speech-end to STT transcript ready (seconds).
+    public let sttLatency: Double
+    /// Time from STT complete to first LLM token (seconds).
+    public let llmLatency: Double
+    /// Time from first LLM token to first TTS audio buffer (seconds).
+    public let ttsLatency: Double
+    /// Total time from speech-end to first TTS audio buffer (seconds).
+    public let totalLatency: Double
+}
+
 /// Events emitted by the voice pipeline for UI observation.
 public enum PipelineEvent: Sendable {
     case stateChanged(AgentState)
@@ -14,6 +26,7 @@ public enum PipelineEvent: Sendable {
     case agentInterrupted
     case turnCompleted(VoiceTurn)
     case audioLevel(Float)
+    case latencyMetrics(TurnLatencyMetrics)
     case error(VoiceAgentError)
 }
 

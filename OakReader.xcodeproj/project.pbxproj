@@ -104,6 +104,7 @@
 		6A9B45CB67160400C30F813B /* WebSnapshotDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = E619D163110C86F5906E9DD1 /* WebSnapshotDocument.swift */; };
 		6B7943692C35CBD68E2E8E3C /* BookmarkSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4B69107E3E492061A5CADE5 /* BookmarkSidebarView.swift */; };
 		6EB17E48EFDF2EFCB2F8DDFA /* TsangerJinKai02-W04.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 912AD36ADFACA2448194EBB7 /* TsangerJinKai02-W04.ttf */; };
+		A1B2C3D4E5F60718A9B0C1D2 /* grant_voice.wav in Resources */ = {isa = PBXBuildFile; fileRef = D2C1B0A9180F6E5D4C3B2A19 /* grant_voice.wav */; };
 		6F07540DDB092DF115E1F8EC /* PageNavigationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00C73F9EEB44740568DAFD2A /* PageNavigationView.swift */; };
 		6FCAAEBAA086AE6572A7170E /* PrintService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 607ACCA3465C1ED0CC1DA6C9 /* PrintService.swift */; };
 		72FFBBCEF5CDB8829ECB25DB /* ImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F1698F5AB44279251965023 /* ImportService.swift */; };
@@ -378,6 +379,7 @@
 		8BA004BD76C17A3C38A67CED /* DropZoneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DropZoneView.swift; sourceTree = "<group>"; };
 		8F738341643EF3BE5A70CB44 /* ReferenceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReferenceService.swift; sourceTree = "<group>"; };
 		912AD36ADFACA2448194EBB7 /* TsangerJinKai02-W04.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "TsangerJinKai02-W04.ttf"; sourceTree = "<group>"; };
+		D2C1B0A9180F6E5D4C3B2A19 /* grant_voice.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = grant_voice.wav; sourceTree = "<group>"; };
 		936AA0D7A9E66908D29318BA /* AnnotationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationStore.swift; sourceTree = "<group>"; };
 		93C99C7591916F9811A0E20C /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		9430D8AD0D92F2EA45E73BDA /* OakReaderDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OakReaderDocument.swift; sourceTree = "<group>"; };
@@ -657,6 +659,7 @@
 				20E82F65BA5D5C20EC3CD588 /* Fonts */,
 				CF758B038910E7989807B7E1 /* Assets.xcassets */,
 				B13F3C4D671B00C4C56C6096 /* Preview.bundle */,
+				D2C1B0A9180F6E5D4C3B2A19 /* grant_voice.wav */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -1112,6 +1115,7 @@
 				FFE10D25C8CCA1B1A5982951 /* Assets.xcassets in Resources */,
 				CF1FE06115DEFE39C67CE511 /* Preview.bundle in Resources */,
 				6EB17E48EFDF2EFCB2F8DDFA /* TsangerJinKai02-W04.ttf in Resources */,
+				A1B2C3D4E5F60718A9B0C1D2 /* grant_voice.wav in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

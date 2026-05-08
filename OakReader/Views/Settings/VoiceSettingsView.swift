@@ -8,7 +8,6 @@ struct VoiceSettingsView: View {
     @State private var sttModel: String
     @State private var ttsModel: String
     @State private var vadModel: String
-    @State private var turnDetectorEnabled: Bool
     @State private var ttsVoice: String
     @State private var referenceAudioPath: String
     @State private var referenceText: String
@@ -16,6 +15,7 @@ struct VoiceSettingsView: View {
     @State private var showAudioFilePicker = false
     @State private var voiceLLMModel: String
     @State private var voiceLanguage: String
+    @State private var liveTranscription: Bool
 
     // Audio device selection
     @State private var inputDeviceUID: String
@@ -41,12 +41,12 @@ struct VoiceSettingsView: View {
         _sttModel = State(initialValue: prefs.voiceSTTModel.isEmpty ? defaultSTT : prefs.voiceSTTModel)
         _ttsModel = State(initialValue: prefs.voiceTTSModel.isEmpty ? defaultTTS : prefs.voiceTTSModel)
         _vadModel = State(initialValue: prefs.voiceVADModel.isEmpty ? defaultVAD : prefs.voiceVADModel)
-        _turnDetectorEnabled = State(initialValue: prefs.voiceTurnDetectorEnabled)
         _ttsVoice = State(initialValue: prefs.voiceTTSVoice)
         _referenceAudioPath = State(initialValue: prefs.voiceReferenceAudioPath)
         _referenceText = State(initialValue: prefs.voiceReferenceText)
         _voiceLLMModel = State(initialValue: prefs.voiceLLMModel)
         _voiceLanguage = State(initialValue: prefs.voiceLanguage)
+        _liveTranscription = State(initialValue: prefs.voiceLiveTranscription)
         _inputDeviceUID = State(initialValue: prefs.voiceInputDeviceUID)
         _outputDeviceUID = State(initialValue: prefs.voiceOutputDeviceUID)
     }
@@ -57,6 +57,7 @@ struct VoiceSettingsView: View {
             languageSection
             llmSection
             sttSection
+            liveTranscriptionSection
             ttsSection
             vadSection
             downloadAllSection
@@ -196,6 +197,22 @@ struct VoiceSettingsView: View {
         }
     }
 
+    private var liveTranscriptionSection: some View {
+        Section("Live Transcription") {
+            Toggle("Show words as you speak", isOn: $liveTranscription)
+
+            if liveTranscription {
+                if let repo = KnownModels.liveSTT.first?.repo {
+                    Text("Uses Parakeet 120M (~150 MB) for real-time display. Final transcript still uses the STT model above for accuracy. Supports English and European languages.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    modelStatusRow(repo: repo)
+                }
+            }
+        }
+    }
+
     private var ttsSection: some View {
         Section("Text-to-Speech") {
             Picker("Model", selection: $ttsModel) {
@@ -278,17 +295,6 @@ struct VoiceSettingsView: View {
             }
 
             modelStatusRow(repo: vadModel)
-
-            Divider()
-
-            Toggle("SmartTurn Endpoint Detection", isOn: $turnDetectorEnabled)
-
-            if turnDetectorEnabled, let turnRepo = KnownModels.turnDetector.first?.repo {
-                Text("Uses SmartTurn to distinguish intentional pauses from end-of-turn, reducing false triggers.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                modelStatusRow(repo: turnRepo)
-            }
         }
     }
 
@@ -299,8 +305,7 @@ struct VoiceSettingsView: View {
                     let config = VoiceModelConfig(
                         sttModel: sttModel,
                         ttsModel: ttsModel,
-                        vadModel: vadModel,
-                        turnDetectorModel: turnDetectorEnabled ? KnownModels.turnDetector.first?.repo : nil
+                        vadModel: vadModel
                     )
                     try? await modelManager.downloadAll(config)
                 }
@@ -389,8 +394,8 @@ struct VoiceSettingsView: View {
 
     private var requiredRepos: [String] {
         var repos = [sttModel, ttsModel, vadModel]
-        if turnDetectorEnabled, let td = KnownModels.turnDetector.first?.repo {
-            repos.append(td)
+        if liveTranscription, let liveRepo = KnownModels.liveSTT.first?.repo {
+            repos.append(liveRepo)
         }
         return repos
     }
@@ -541,11 +546,11 @@ struct VoiceSettingsView: View {
         prefs.voiceSTTModel = sttModel
         prefs.voiceTTSModel = ttsModel
         prefs.voiceVADModel = vadModel
-        prefs.voiceTurnDetectorEnabled = turnDetectorEnabled
         prefs.voiceTTSVoice = ttsVoice
         prefs.voiceReferenceAudioPath = referenceAudioPath
         prefs.voiceReferenceText = referenceText
         prefs.voiceLanguage = voiceLanguage
+        prefs.voiceLiveTranscription = liveTranscription
         prefs.voiceInputDeviceUID = inputDeviceUID
         prefs.voiceOutputDeviceUID = outputDeviceUID
     }

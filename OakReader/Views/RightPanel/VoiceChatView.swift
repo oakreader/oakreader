@@ -48,19 +48,6 @@ struct VoiceChatView: View {
                 .font(.system(size: 16, weight: .semibold))
 
             Spacer()
-
-            Button {
-                if let url = URL(string: "oakreader://settings/voice") {
-                    NSWorkspace.shared.open(url)
-                }
-            } label: {
-                Image(systemName: "gearshape")
-                    .font(.system(size: OakStyle.Font.icon))
-                    .frame(width: OakStyle.Size.buttonStandard, height: OakStyle.Size.buttonStandard)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .help("Voice Settings")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)

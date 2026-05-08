@@ -1,9 +1,8 @@
 import AVFoundation
-import MLX
-import MLXAudioSTT
-import MLXAudioCore
+import Qwen3ASR
+import AudioCommon
 
-/// STTService implementation using MLX Audio STT (Qwen3-ASR).
+/// STTService implementation using speech-swift's Qwen3-ASR.
 public actor MLXSTTProvider: STTService {
     private var model: Qwen3ASRModel?
     private let repoId: String
@@ -19,14 +18,14 @@ public actor MLXSTTProvider: STTService {
 
     public func transcribe(audio: AVAudioPCMBuffer) async throws -> TranscriptionResult {
         let model = try await ensureModel()
-        let audioArray = try pcmBufferToMLXArray(audio)
+        let samples = pcmBufferToFloats(audio)
 
-        let output = model.generate(audio: audioArray)
+        let text = model.transcribe(audio: samples, sampleRate: 16000)
 
         return TranscriptionResult(
-            text: output.text.trimmingCharacters(in: .whitespacesAndNewlines),
+            text: text.trimmingCharacters(in: .whitespacesAndNewlines),
             isFinal: true,
-            language: output.language,
+            language: nil,
             confidence: nil
         )
     }
@@ -37,7 +36,7 @@ public actor MLXSTTProvider: STTService {
         AsyncThrowingStream { continuation in
             Task {
                 do {
-                    // Accumulate audio buffers into a single array for batch transcription
+                    // Accumulate all audio buffers into a single sample array
                     var allSamples: [Float] = []
                     for await buffer in audioStream {
                         guard let floatData = buffer.floatChannelData else { continue }
@@ -52,29 +51,14 @@ public actor MLXSTTProvider: STTService {
                     }
 
                     let model = try await self.ensureModel()
-                    let audioArray = MLXArray(allSamples)
+                    let text = model.transcribe(audio: allSamples, sampleRate: 16000)
 
-                    let stream = model.generateStream(audio: audioArray)
-
-                    var accumulatedText = ""
-                    for try await event in stream {
-                        switch event {
-                        case .token(let token):
-                            accumulatedText += token
-                            continuation.yield(TranscriptionResult(
-                                text: accumulatedText,
-                                isFinal: false
-                            ))
-                        case .result(let output):
-                            continuation.yield(TranscriptionResult(
-                                text: output.text.trimmingCharacters(in: .whitespacesAndNewlines),
-                                isFinal: true,
-                                language: output.language
-                            ))
-                        case .info:
-                            break
-                        }
-                    }
+                    continuation.yield(TranscriptionResult(
+                        text: text.trimmingCharacters(in: .whitespacesAndNewlines),
+                        isFinal: true,
+                        language: nil,
+                        confidence: nil
+                    ))
 
                     continuation.finish()
                 } catch {
@@ -89,7 +73,7 @@ public actor MLXSTTProvider: STTService {
 
         await manager?.setLoading(repoId)
         do {
-            let loaded = try await Qwen3ASRModel.fromPretrained(repoId)
+            let loaded = try await Qwen3ASRModel.fromPretrained(modelId: repoId)
             self.model = loaded
             await manager?.setReady(repoId)
             return loaded
@@ -102,12 +86,9 @@ public actor MLXSTTProvider: STTService {
 
 // MARK: - Helpers
 
-/// Convert an AVAudioPCMBuffer to an MLXArray of Float32 samples.
-func pcmBufferToMLXArray(_ buffer: AVAudioPCMBuffer) throws -> MLXArray {
-    guard let floatData = buffer.floatChannelData else {
-        throw VoiceAgentError.sttFailed("Audio buffer has no float channel data")
-    }
+/// Convert an AVAudioPCMBuffer to a [Float] sample array.
+func pcmBufferToFloats(_ buffer: AVAudioPCMBuffer) -> [Float] {
+    guard let floatData = buffer.floatChannelData else { return [] }
     let count = Int(buffer.frameLength)
-    let samples = Array(UnsafeBufferPointer(start: floatData[0], count: count))
-    return MLXArray(samples)
+    return Array(UnsafeBufferPointer(start: floatData[0], count: count))
 }
