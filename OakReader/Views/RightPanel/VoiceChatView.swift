@@ -5,6 +5,18 @@ import VoiceAgentKit
 struct VoiceChatView: View {
     let voiceVM: VoiceViewModel
 
+    private var orbColor: Color {
+        guard voiceVM.isRunning else { return .accentColor }
+        switch voiceVM.agentState {
+        case .idle: return .accentColor
+        case .listening: return .green
+        case .userSpeaking: return .blue
+        case .thinking: return .purple
+        case .speaking: return .orange
+        case .interrupted: return .red
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -20,6 +32,11 @@ struct VoiceChatView: View {
             }
 
             voiceControls
+        }
+        .background {
+            if voiceVM.isRunning {
+                AmbientGlow(color: orbColor, audioLevel: CGFloat(voiceVM.audioLevel))
+            }
         }
     }
 
@@ -131,7 +148,7 @@ struct VoiceChatView: View {
                     Task { await voiceVM.start() }
                 }
             } label: {
-                VoiceOrb(agentState: voiceVM.agentState, isRunning: voiceVM.isRunning)
+                VoiceOrb(agentState: voiceVM.agentState, isRunning: voiceVM.isRunning, audioLevel: CGFloat(voiceVM.audioLevel))
             }
             .buttonStyle(.plain)
             .help(voiceVM.isRunning ? "Stop voice conversation" : "Start voice conversation")
@@ -181,6 +198,7 @@ struct VoiceChatView: View {
 private struct VoiceOrb: View {
     let agentState: AgentState
     let isRunning: Bool
+    var audioLevel: CGFloat = 0
 
     private let coreSize: CGFloat = 56
 
@@ -243,27 +261,31 @@ private struct VoiceOrb: View {
     private func ring(index i: Int, time t: Double) -> some View {
         let phase = Double(i) * 0.7
         let multiplier = 1.5 + Double(i) * 0.5
-        let scale = 1.0 + sin(t * speed + phase) * intensity * multiplier
+        let audioBoost = Double(audioLevel) * (0.08 + Double(i) * 0.04)
+        let scale = 1.0 + sin(t * speed + phase) * intensity * multiplier + audioBoost
         let ringSize = coreSize + CGFloat(i + 1) * 14
         let baseOpacity = isRunning ? max(0.06 - Double(i) * 0.015, 0.02) : (i == 0 ? 0.04 : 0.0)
-        let blurRadius = CGFloat(i + 1) * 3.5
+        let opacityBoost = Double(audioLevel) * 0.04
+        let blurRadius = CGFloat(i + 1) * 3.5 + audioLevel * CGFloat(i) * 1.0
 
         return Circle()
-            .fill(color.opacity(baseOpacity))
+            .fill(color.opacity(baseOpacity + opacityBoost))
             .frame(width: ringSize, height: ringSize)
             .scaleEffect(scale)
             .blur(radius: blurRadius)
     }
 
     private func core(time t: Double) -> some View {
-        let coreScale = 1.0 + sin(t * speed) * intensity * 0.5
+        let audioBoost = Double(audioLevel) * 0.06
+        let coreScale = 1.0 + sin(t * speed) * intensity * 0.5 + audioBoost
+        let innerOpacityBoost = Double(audioLevel) * 0.1
 
         return Circle()
             .fill(
                 RadialGradient(
                     colors: [
-                        color.opacity(isRunning ? 0.3 : 0.18),
-                        color.opacity(isRunning ? 0.1 : 0.06),
+                        color.opacity((isRunning ? 0.3 : 0.18) + innerOpacityBoost),
+                        color.opacity((isRunning ? 0.1 : 0.06) + innerOpacityBoost * 0.5),
                     ],
                     center: .center,
                     startRadius: 0,
@@ -330,6 +352,46 @@ private struct VoiceTurnRow: View {
             VoiceBubble(text: turn.userText, role: .user)
             VoiceBubble(text: turn.assistantText, role: .assistant)
         }
+    }
+}
+
+// MARK: - Ambient Glow
+
+private struct AmbientGlow: View {
+    let color: Color
+    let audioLevel: CGFloat
+
+    var body: some View {
+        ZStack {
+            // Bottom edge — strongest glow
+            LinearGradient(
+                colors: [color.opacity(0.08 * audioLevel), .clear],
+                startPoint: .bottom,
+                endPoint: .top
+            )
+            .frame(height: 120)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+
+            // Left edge
+            LinearGradient(
+                colors: [color.opacity(0.04 * audioLevel), .clear],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            .frame(width: 60)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+
+            // Right edge
+            LinearGradient(
+                colors: [color.opacity(0.04 * audioLevel), .clear],
+                startPoint: .trailing,
+                endPoint: .leading
+            )
+            .frame(width: 60)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+        }
+        .allowsHitTesting(false)
+        .ignoresSafeArea()
     }
 }
 

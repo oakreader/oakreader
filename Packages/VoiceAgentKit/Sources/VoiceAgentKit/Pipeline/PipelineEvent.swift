@@ -13,6 +13,7 @@ public enum PipelineEvent: Sendable {
     case agentSpeechEnded
     case agentInterrupted
     case turnCompleted(VoiceTurn)
+    case audioLevel(Float)
     case error(VoiceAgentError)
 }
 

@@ -168,6 +168,11 @@ public actor VoicePipeline {
 
                 let vadEvent = try await vad.process(chunk: chunk)
 
+                // Compute RMS once per chunk — reused by echo calibration,
+                // energy fallback, and emitted for UI audio level visualization.
+                let chunkEnergy = Self.rms(of: chunk)
+                emit(.audioLevel(chunkEnergy))
+
                 // Maintain pre-roll ring buffer while not capturing speech
                 if state == .listening || state == .idle {
                     preRoll.append(chunk)
@@ -180,10 +185,9 @@ public actor VoicePipeline {
                 // first ~0.5s of chunks, then only count interrupt frames when
                 // the chunk energy significantly exceeds the baseline.
                 if state == .speaking {
-                    let energy = Self.rms(of: chunk)
                     if echoBaselineCount < Self.echoCalibrationChunks {
                         // Still calibrating — accumulate baseline, ignore all VAD
-                        echoBaseline = (echoBaseline * Float(echoBaselineCount) + energy)
+                        echoBaseline = (echoBaseline * Float(echoBaselineCount) + chunkEnergy)
                             / Float(echoBaselineCount + 1)
                         echoBaselineCount += 1
                         continue // skip VAD event processing entirely
@@ -193,8 +197,7 @@ public actor VoicePipeline {
                 // Energy-based fallback: force end-of-speech when actual audio
                 // energy is low but the VAD is confused by background noise.
                 if state == .userSpeaking {
-                    let energy = Self.rms(of: chunk)
-                    if energy < Self.speechEnergyFloor {
+                    if chunkEnergy < Self.speechEnergyFloor {
                         lowEnergyFrames += 1
                     } else {
                         lowEnergyFrames = 0
@@ -240,9 +243,8 @@ public actor VoicePipeline {
                     endpointTask = nil
                     if state == .speaking {
                         // Energy must exceed echo baseline significantly to count
-                        let energy = Self.rms(of: chunk)
                         let threshold = max(echoBaseline * 3.0, 0.02)
-                        if energy > threshold {
+                        if chunkEnergy > threshold {
                             interruptSpeechFrames = 1
                             speechBuffers = [chunk]
                         }
@@ -283,9 +285,8 @@ public actor VoicePipeline {
                     if state == .speaking {
                         // Only count frames with energy above echo baseline
                         if interruptSpeechFrames > 0 {
-                            let energy = Self.rms(of: chunk)
                             let threshold = max(echoBaseline * 3.0, 0.02)
-                            if energy > threshold {
+                            if chunkEnergy > threshold {
                                 interruptSpeechFrames += 1
                                 speechBuffers.append(chunk)
                             } else {
