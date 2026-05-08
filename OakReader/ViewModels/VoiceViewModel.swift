@@ -48,10 +48,6 @@ class VoiceViewModel {
             }
         }
 
-        let stt = MLXSTTProvider(repoId: sttRepo, manager: modelManager)
-        let tts = MLXTTSProvider(repoId: ttsRepo, manager: modelManager)
-        let vad = MLXVADProvider(repoId: vadRepo, manager: modelManager)
-
         // Build LLM bridge using shared ChatEngine + provider config.
         // Use the voice-specific LLM model if set, otherwise fall back to AI Chat model.
         let chatEngine = ChatEngine()
@@ -69,6 +65,8 @@ class VoiceViewModel {
             ? KnownModels.turnDetector.first?.repo
             : nil
 
+        let language = prefs.voiceLanguage
+
         var pipelineConfig = PipelineConfig()
         pipelineConfig.models = VoiceModelConfig(
             sttModel: sttRepo,
@@ -77,9 +75,33 @@ class VoiceViewModel {
             turnDetectorModel: turnDetectorRepo,
             ttsVoice: voice
         )
-        pipelineConfig.systemPrompt = "You are a friendly voice assistant for a reading app called OakReader. Talk like a close friend — casual, warm, and natural. Use short sentences. Avoid formal language or lists. React naturally to what the user says."
+        let languageInstruction: String
+        if language == "en" {
+            languageInstruction = "Respond in English."
+        } else {
+            let displayName = VoiceLanguage(rawValue: language)?.displayName ?? language
+            languageInstruction = "Respond in \(displayName). The user is speaking \(displayName)."
+        }
+        pipelineConfig.systemPrompt = """
+        You are a friendly voice assistant for a reading app called OakReader. \
+        Talk like a close friend — casual, warm, and natural. Use short sentences. \
+        Avoid formal language or lists. React naturally to what the user says.
+
+        \(languageInstruction)
+
+        IMPORTANT: The user's messages come from automatic speech recognition (ASR), \
+        which may contain transcription errors, misheard words, or missing punctuation. \
+        Interpret the user's intent from context rather than taking every word literally. \
+        If something seems like a transcription mistake, infer the most likely meaning \
+        and respond accordingly. Do not point out ASR errors unless the meaning is truly ambiguous.
+        """
+        pipelineConfig.language = language
         pipelineConfig.referenceAudioURL = prefs.voiceReferenceAudioURL
         pipelineConfig.referenceText = prefs.voiceReferenceText.isEmpty ? nil : prefs.voiceReferenceText
+
+        let stt = MLXSTTProvider(repoId: sttRepo, manager: modelManager)
+        let tts = MLXTTSProvider(repoId: ttsRepo, language: language, manager: modelManager)
+        let vad = MLXVADProvider(repoId: vadRepo, threshold: pipelineConfig.vadThreshold, manager: modelManager)
 
         let newPipeline = VoicePipeline(
             stt: stt,
@@ -165,7 +187,22 @@ class VoiceViewModel {
             break
 
         case .agentInterrupted:
-            break
+            // Save the interrupted turn so conversation history is preserved.
+            // When the user interrupts during thinking/speaking, the in-flight
+            // response task is cancelled before .turnCompleted fires — the turn
+            // data would otherwise be lost when .userSpeechStarted clears the
+            // live transcript fields.
+            if !userTranscript.isEmpty {
+                let partialTurn = VoiceTurn(
+                    userText: userTranscript,
+                    assistantText: assistantText,
+                    startedAt: Date(),
+                    completedAt: Date()
+                )
+                turns.append(partialTurn)
+                userTranscript = ""
+                assistantText = ""
+            }
 
         case .turnCompleted(let turn):
             turns.append(turn)

@@ -40,6 +40,10 @@ public actor VoicePipeline {
     /// Active LLM+TTS response task — cancelled on interruption.
     private var responseTask: Task<Void, Never>?
 
+    /// Detached SmartTurn endpoint detection task — cancelled (bounced) when
+    /// the user resumes speaking before inference completes.
+    private var endpointTask: Task<Void, Never>?
+
     /// Counts consecutive high-energy speech chunks during agent speaking (echo filtering).
     private var interruptSpeechFrames: Int = 0
 
@@ -47,8 +51,20 @@ public actor VoicePipeline {
     /// If this exceeds the timeout threshold, force the turn to complete
     /// (prevents getting stuck when SmartTurn incorrectly says "not done").
     private var userSpeakingSilenceFrames: Int = 0
-    /// ~2 seconds of silence in `.userSpeaking` triggers forced turn completion.
-    private static let userSpeakingSilenceTimeout = 90
+    /// ~1 second of silence in `.userSpeaking` triggers forced turn completion.
+    /// The VAD already debounces 500ms of silence before firing speechEnd,
+    /// so this 1s fallback is on top of that (total ~1.5s from actual silence).
+    private static let userSpeakingSilenceTimeout = 45
+
+    /// Energy-based fallback: counts consecutive low-energy chunks during
+    /// `.userSpeaking`. If the VAD fails to fire `.speechEnd` (e.g. background
+    /// noise keeps probability above threshold), this catches actual silence
+    /// by checking RMS energy directly.
+    private var lowEnergyFrames: Int = 0
+    /// RMS energy below which a chunk is considered silence for the fallback.
+    private static let speechEnergyFloor: Float = 0.01
+    /// ~1 second of low-energy audio forces speech end.
+    private static let lowEnergyTimeout = 45
 
     // MARK: - Echo filtering state
 
@@ -112,6 +128,8 @@ public actor VoicePipeline {
         pipelineTask = nil
         responseTask?.cancel()
         responseTask = nil
+        endpointTask?.cancel()
+        endpointTask = nil
         playback.stop()
         capture.stopCapture()
         transition(to: .idle)
@@ -172,9 +190,54 @@ public actor VoicePipeline {
                     }
                 }
 
+                // Energy-based fallback: force end-of-speech when actual audio
+                // energy is low but the VAD is confused by background noise.
+                if state == .userSpeaking {
+                    let energy = Self.rms(of: chunk)
+                    if energy < Self.speechEnergyFloor {
+                        lowEnergyFrames += 1
+                    } else {
+                        lowEnergyFrames = 0
+                    }
+
+                    if lowEnergyFrames >= Self.lowEnergyTimeout {
+                        lowEnergyFrames = 0
+                        endpointTask?.cancel()
+                        endpointTask = nil
+
+                        // Accumulate remaining speech
+                        turnBuffers.append(contentsOf: speechBuffers)
+                        speechBuffers = []
+
+                        let totalFrames = turnBuffers.reduce(0) { $0 + Int($1.frameLength) }
+                        let minFrames = Int(config.captureSampleRate * 0.5)
+                        if totalFrames >= minFrames {
+                            // Reset VAD — its LSTM state is confused
+                            await vad.reset()
+                            userSpeakingSilenceFrames = 0
+                            emit(.userSpeechEnded)
+                            let capturedBuffers = turnBuffers
+                            turnBuffers = []
+                            await startResponse(speechBuffers: capturedBuffers)
+                        } else {
+                            turnBuffers = []
+                            userSpeakingSilenceFrames = 0
+                            transition(to: .listening)
+                        }
+                        continue
+                    }
+                }
+
                 switch vadEvent {
                 case .speechStart:
-                    userSpeakingSilenceFrames = 0
+                    lowEnergyFrames = 0
+                    // Only reset for a new turn; brief noise during .userSpeaking
+                    // must not restart the silence timeout counter.
+                    if state != .userSpeaking {
+                        userSpeakingSilenceFrames = 0
+                    }
+                    endpointTask?.cancel()
+                    endpointTask = nil
                     if state == .speaking {
                         // Energy must exceed echo baseline significantly to count
                         let energy = Self.rms(of: chunk)
@@ -184,15 +247,14 @@ public actor VoicePipeline {
                             speechBuffers = [chunk]
                         }
                     } else if state == .thinking {
-                        // No speaker echo while thinking — interrupt immediately
-                        interruptResponse()
+                        // Continuation, not interruption — cancel the premature
+                        // response but keep turnBuffers so previous + new audio
+                        // are transcribed together. No .userSpeechStarted event.
+                        cancelPendingResponse()
                         interruptSpeechFrames = 0
-                        // Prepend pre-roll to recover clipped onset
                         speechBuffers = preRoll + [chunk]
                         preRoll = []
-                        turnBuffers = []
                         transition(to: .userSpeaking)
-                        emit(.userSpeechStarted)
                     } else {
                         // Prepend pre-roll to recover audio consumed by VAD
                         speechBuffers = preRoll + [chunk]
@@ -208,7 +270,16 @@ public actor VoicePipeline {
                     }
 
                 case .speechContinuing:
-                    userSpeakingSilenceFrames = 0
+                    // Require ≥5 buffered frames (~100ms) before resetting the
+                    // silence counter — filters out brief noise blips that would
+                    // otherwise prevent the timeout from ever firing.
+                    if state == .userSpeaking {
+                        if speechBuffers.count >= 5 {
+                            userSpeakingSilenceFrames = 0
+                        }
+                    } else {
+                        userSpeakingSilenceFrames = 0
+                    }
                     if state == .speaking {
                         // Only count frames with energy above echo baseline
                         if interruptSpeechFrames > 0 {
@@ -264,21 +335,24 @@ public actor VoicePipeline {
                         continue
                     }
 
-                    // SmartTurn endpoint verification: is the user done speaking?
-                    if let endpointResult = await checkEndpoint(speechBuffers: turnBuffers) {
-                        if !endpointResult {
-                            // SmartTurn says user is just pausing — stay in
-                            // .userSpeaking and keep turnBuffers for next phrase.
-                            continue
-                        }
+                    // Run SmartTurn and STT in parallel. By the time SmartTurn
+                    // confirms the endpoint, the transcript is already ready —
+                    // saving 1-3s of sequential STT processing from the critical path.
+                    // If the user resumes speaking, both are cancelled (bounced).
+                    let buffersForEndpoint = turnBuffers
+                    endpointTask?.cancel()
+                    endpointTask = Task { [weak self] in
+                        guard let self else { return }
+                        async let smartTurnResult = self.checkEndpoint(speechBuffers: buffersForEndpoint)
+                        async let sttResult = self.transcribeSpeech(buffersForEndpoint)
+                        let (endpointResult, transcript) = await (smartTurnResult, sttResult)
+                        guard !Task.isCancelled else { return }
+                        await self.completeEndpoint(
+                            result: endpointResult,
+                            transcript: transcript,
+                            speechBuffers: buffersForEndpoint
+                        )
                     }
-
-                    emit(.userSpeechEnded)
-
-                    // Transcribe and respond with the full turn audio
-                    let capturedBuffers = turnBuffers
-                    turnBuffers = []
-                    await startResponse(speechBuffers: capturedBuffers)
 
                 case .silence:
                     if interruptSpeechFrames > 0 {
@@ -295,6 +369,9 @@ public actor VoicePipeline {
                         if userSpeakingSilenceFrames >= Self.userSpeakingSilenceTimeout,
                            !turnBuffers.isEmpty {
                             userSpeakingSilenceFrames = 0
+                            // Cancel pending SmartTurn — silence timeout takes over
+                            endpointTask?.cancel()
+                            endpointTask = nil
                             emit(.userSpeechEnded)
                             let capturedBuffers = turnBuffers
                             turnBuffers = []
@@ -311,9 +388,11 @@ public actor VoicePipeline {
             }
         }
 
-        // Cancel any in-flight response
+        // Cancel any in-flight response and pending endpoint check
         responseTask?.cancel()
         responseTask = nil
+        endpointTask?.cancel()
+        endpointTask = nil
 
         transition(to: .idle)
         eventContinuation?.finish()
@@ -341,8 +420,11 @@ public actor VoicePipeline {
             // TTS — use a short real word; empty string triggers a precondition
             // failure inside Qwen3TTSModel.prepareGenerationInputs.
             group.addTask { _ = try? await self.tts.synthesize(text: ".", voice: self.config.voice, referenceAudioURL: nil) }
-            // VAD
-            group.addTask { _ = try? await self.vad.process(chunk: self.makeSilentBuffer()); await self.vad.reset() }
+            // VAD is NOT warmed up here. The silent buffer would race with
+            // live audio in the LSTM, corrupting the streaming state at an
+            // unpredictable time. The VAD loads lazily on the first real
+            // audio chunk via ensureModel() — adds ~100ms to the first
+            // call but eliminates the race condition.
         }
     }
 
@@ -357,6 +439,37 @@ public actor VoicePipeline {
         buffer.frameLength = 512
         // Zero-filled by default
         return buffer
+    }
+
+    /// Speculatively transcribe speech audio. Runs in parallel with SmartTurn
+    /// so the transcript is ready by the time the endpoint is confirmed.
+    /// Emits `.userTranscript` events for live UI updates.
+    /// Returns the final transcript text, or nil if STT failed/was cancelled.
+    private func transcribeSpeech(_ buffers: [AVAudioPCMBuffer]) async -> String? {
+        let audioStream = AsyncStream<AVAudioPCMBuffer> { continuation in
+            for buffer in buffers { continuation.yield(buffer) }
+            continuation.finish()
+        }
+
+        var finalText: String?
+        var lastPartialText: String?
+        do {
+            let transcriptStream = stt.transcribeStream(audioStream: audioStream)
+            for try await partial in transcriptStream {
+                guard !Task.isCancelled else { return nil }
+                if partial.isFinal {
+                    finalText = partial.text
+                    emit(.userTranscript(text: partial.text, isFinal: true))
+                } else {
+                    lastPartialText = partial.text
+                    emit(.userTranscript(text: partial.text, isFinal: false))
+                }
+            }
+        } catch {
+            // STT failed — caller will fall back to normal STT in runFullResponse
+            return nil
+        }
+        return finalText ?? lastPartialText
     }
 
     /// Check if the user has finished their turn using SmartTurn.
@@ -385,11 +498,33 @@ public actor VoicePipeline {
         }
     }
 
+    /// Handle the result of an async SmartTurn endpoint check.
+    /// Guards against double-fire if the silence timeout already handled the turn.
+    private func completeEndpoint(
+        result: Bool?,
+        transcript: String? = nil,
+        speechBuffers: [AVAudioPCMBuffer]
+    ) async {
+        // Another path (silence timeout, bounce, or interruption) may have
+        // already handled this turn — only proceed if still in userSpeaking.
+        guard state == .userSpeaking else { return }
+        if let endpointResult = result, !endpointResult {
+            // SmartTurn says user is just pausing — do nothing,
+            // wait for more speech or silence timeout.
+            return
+        }
+        // Endpoint confirmed (or SmartTurn unavailable) — respond
+        emit(.userSpeechEnded)
+        await startResponse(speechBuffers: speechBuffers, transcript: transcript)
+    }
+
     // MARK: - Response lifecycle
 
     /// Kick off transcription → LLM → TTS entirely in a background task.
     /// The audio loop returns immediately so VAD keeps processing for interruption.
-    private func startResponse(speechBuffers: [AVAudioPCMBuffer]) async {
+    /// - Parameter transcript: Pre-computed STT transcript (from parallel speculative STT).
+    ///   When provided, `runFullResponse` skips the STT phase entirely.
+    private func startResponse(speechBuffers: [AVAudioPCMBuffer], transcript: String? = nil) async {
         // Cancel any prior response still running
         responseTask?.cancel()
         responseTask = nil
@@ -397,50 +532,67 @@ public actor VoicePipeline {
         transition(to: .thinking)
         emit(.agentThinking)
 
-        // Reset VAD state so Silero streaming context doesn't leak across turns
-        await vad.reset()
+        // Do NOT reset VAD here. The LSTM hidden state needs to stay warm
+        // across turns — resetting it creates a ~0.5s cold-start window
+        // where speechStart never fires. LiveKit agents never reset VAD
+        // during the audio loop, only on session shutdown.
 
         // Everything runs in the response task — audio loop stays free
+        let capturedTranscript = transcript
         responseTask = Task {
-            await self.runFullResponse(speechBuffers: speechBuffers)
+            await self.runFullResponse(speechBuffers: speechBuffers, precomputedTranscript: capturedTranscript)
         }
     }
 
     /// Full STT → LLM → TTS pipeline, running concurrently with the audio loop.
-    private func runFullResponse(speechBuffers: [AVAudioPCMBuffer]) async {
+    /// - Parameter precomputedTranscript: If provided (from speculative STT that ran
+    ///   in parallel with SmartTurn), the STT phase is skipped entirely — saving
+    ///   1-3 seconds of sequential processing.
+    private func runFullResponse(speechBuffers: [AVAudioPCMBuffer], precomputedTranscript: String? = nil) async {
         let turnStarted = Date()
 
         // --- STT phase ---
-        let audioStream = AsyncStream<AVAudioPCMBuffer> { continuation in
-            for buffer in speechBuffers { continuation.yield(buffer) }
-            continuation.finish()
-        }
+        let transcriptionText: String?
 
-        var finalText: String?
-        var lastPartialText: String?
-        do {
-            let transcriptStream = stt.transcribeStream(audioStream: audioStream)
-            for try await partial in transcriptStream {
-                guard !Task.isCancelled else { return }
-                if partial.isFinal {
-                    finalText = partial.text
-                    emit(.userTranscript(text: partial.text, isFinal: true))
-                } else {
-                    lastPartialText = partial.text
-                    emit(.userTranscript(text: partial.text, isFinal: false))
+        if let precomputed = precomputedTranscript?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !precomputed.isEmpty {
+            // Transcript was computed in parallel with SmartTurn — skip STT.
+            // Transcript events were already emitted during speculative STT.
+            transcriptionText = precomputed
+        } else {
+            // No pre-computed transcript — run STT normally
+            let audioStream = AsyncStream<AVAudioPCMBuffer> { continuation in
+                for buffer in speechBuffers { continuation.yield(buffer) }
+                continuation.finish()
+            }
+
+            var finalText: String?
+            var lastPartialText: String?
+            do {
+                let transcriptStream = stt.transcribeStream(audioStream: audioStream)
+                for try await partial in transcriptStream {
+                    guard !Task.isCancelled else { return }
+                    if partial.isFinal {
+                        finalText = partial.text
+                        emit(.userTranscript(text: partial.text, isFinal: true))
+                    } else {
+                        lastPartialText = partial.text
+                        emit(.userTranscript(text: partial.text, isFinal: false))
+                    }
                 }
+            } catch {
+                if !Task.isCancelled {
+                    emit(.error(VoiceAgentError.sttFailed(error.localizedDescription)))
+                    transition(to: .listening)
+                }
+                return
             }
-        } catch {
-            if !Task.isCancelled {
-                emit(.error(VoiceAgentError.sttFailed(error.localizedDescription)))
-                transition(to: .listening)
-            }
-            return
+
+            guard !Task.isCancelled else { return }
+            transcriptionText = finalText ?? lastPartialText
         }
 
-        guard !Task.isCancelled else { return }
-
-        guard let transcriptionText = finalText ?? lastPartialText else {
+        guard let transcriptionText else {
             transition(to: .listening)
             return
         }
@@ -481,10 +633,18 @@ public actor VoicePipeline {
         }
     }
 
-    /// Interrupt an in-flight response (user started speaking).
-    private func interruptResponse() {
+    /// Cancel pending response/endpoint tasks without emitting interruption events.
+    /// Used when the user resumes speaking during `.thinking` (continuation, not interruption).
+    private func cancelPendingResponse() {
         responseTask?.cancel()
         responseTask = nil
+        endpointTask?.cancel()
+        endpointTask = nil
+    }
+
+    /// Interrupt an in-flight response (user started speaking during playback).
+    private func interruptResponse() {
+        cancelPendingResponse()
         playback.stop()
         transition(to: .interrupted)
         emit(.agentInterrupted)
