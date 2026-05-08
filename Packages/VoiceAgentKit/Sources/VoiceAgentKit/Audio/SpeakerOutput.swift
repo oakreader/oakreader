@@ -1,4 +1,5 @@
 import AVFoundation
+import CoreAudio
 
 /// Plays audio buffers through the system speakers using AVAudioEngine.
 public final class SpeakerOutput: AudioPlaybackService, @unchecked Sendable {
@@ -10,12 +11,14 @@ public final class SpeakerOutput: AudioPlaybackService, @unchecked Sendable {
     private let engine = AVAudioEngine()
     private let playerNode = AVAudioPlayerNode()
     private let playbackState = LockedState(PlaybackState())
+    private let deviceUID: String?
 
     public var isPlaying: Bool {
         playbackState.value.isPlaying
     }
 
-    public init() {
+    public init(deviceUID: String? = nil) {
+        self.deviceUID = deviceUID
         engine.attach(playerNode)
     }
 
@@ -40,6 +43,10 @@ public final class SpeakerOutput: AudioPlaybackService, @unchecked Sendable {
                 format = buffer.format
                 engine.connect(playerNode, to: engine.mainMixerNode, format: format)
                 engine.prepare()
+                if let uid = deviceUID, !uid.isEmpty,
+                   let deviceID = AudioDeviceManager.resolveDeviceID(uid: uid) {
+                    try engine.outputNode.auAudioUnit.setDeviceID(deviceID)
+                }
                 try engine.start()
                 playerNode.play()
                 started = true

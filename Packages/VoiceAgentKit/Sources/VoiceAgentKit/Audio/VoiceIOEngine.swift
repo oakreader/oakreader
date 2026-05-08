@@ -1,4 +1,5 @@
 import AVFoundation
+import CoreAudio
 
 /// Unified audio I/O engine that shares a single `AVAudioEngine` for both
 /// microphone capture and speaker playback. This enables Apple's Voice
@@ -36,9 +37,14 @@ public final class VoiceIOEngine: AudioCaptureService, AudioPlaybackService, @un
         return _playback.isPlaying
     }
 
+    private let inputDeviceUID: String?
+    private let outputDeviceUID: String?
+
     // MARK: - Init
 
-    public init() {
+    public init(inputDeviceUID: String? = nil, outputDeviceUID: String? = nil) {
+        self.inputDeviceUID = inputDeviceUID
+        self.outputDeviceUID = outputDeviceUID
         engine.attach(playerNode)
     }
 
@@ -48,6 +54,12 @@ public final class VoiceIOEngine: AudioCaptureService, AudioPlaybackService, @un
         stopCapture()
 
         let inputNode = engine.inputNode
+
+        // Set custom input device before enabling VP (VP queries the device).
+        if let uid = inputDeviceUID, !uid.isEmpty,
+           let deviceID = AudioDeviceManager.resolveDeviceID(uid: uid) {
+            try inputNode.auAudioUnit.setDeviceID(deviceID)
+        }
 
         // Enable Voice Processing IO — the shared engine carries both input
         // and output so VP can use the playback signal as an echo-cancellation
@@ -124,6 +136,13 @@ public final class VoiceIOEngine: AudioCaptureService, AudioPlaybackService, @un
         }
 
         engine.prepare()
+
+        // Set custom output device before starting the engine.
+        if let uid = outputDeviceUID, !uid.isEmpty,
+           let deviceID = AudioDeviceManager.resolveDeviceID(uid: uid) {
+            try engine.outputNode.auAudioUnit.setDeviceID(deviceID)
+        }
+
         try engine.start()
 
         return stream

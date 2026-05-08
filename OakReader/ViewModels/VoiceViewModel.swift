@@ -10,8 +10,18 @@ class VoiceViewModel {
     var turns: [VoiceTurn] = []
     var error: String?
 
+    /// Smoothed audio level for UI visualization (0.0–1.0).
+    var audioLevel: Float = 0
+
     private var pipeline: VoicePipeline?
     private var eventTask: Task<Void, Never>?
+
+    // MARK: - Audio level smoothing state
+
+    /// Raw EMA-smoothed RMS value (before normalization).
+    private var rawSmoothedLevel: Float = 0
+    /// Counter for throttling audio level updates (~15Hz from ~45Hz input).
+    private var levelUpdateCounter: Int = 0
 
     // MARK: - Lifecycle
 
@@ -89,11 +99,19 @@ class VoiceViewModel {
 
         \(languageInstruction)
 
-        IMPORTANT: The user's messages come from automatic speech recognition (ASR), \
-        which may contain transcription errors, misheard words, or missing punctuation. \
-        Interpret the user's intent from context rather than taking every word literally. \
-        If something seems like a transcription mistake, infer the most likely meaning \
-        and respond accordingly. Do not point out ASR errors unless the meaning is truly ambiguous.
+        Your response will be read aloud by a text-to-speech engine. Follow these rules strictly:
+        - Never use emojis, emoticons, or special symbols.
+        - Never use markdown formatting (no **, *, #, -, bullet points, or numbered lists).
+        - Write plain, speakable text only. Avoid abbreviations that sound unnatural when spoken aloud.
+        - Keep responses concise — one to three short sentences is ideal.
+        - When the response covers multiple points or is longer than two sentences, \
+        insert a blank line between logical groups so the listener gets a natural pause.
+
+        The user's messages come from automatic speech recognition (ASR), which may contain \
+        transcription errors, misheard words, or missing punctuation. Interpret the user's intent \
+        from context rather than taking every word literally. If something seems like a transcription \
+        mistake, infer the most likely meaning and respond accordingly. Do not point out ASR errors \
+        unless the meaning is truly ambiguous.
         """
         pipelineConfig.language = language
         pipelineConfig.referenceAudioURL = prefs.voiceReferenceAudioURL
@@ -103,11 +121,19 @@ class VoiceViewModel {
         let tts = MLXTTSProvider(repoId: ttsRepo, language: language, manager: modelManager)
         let vad = MLXVADProvider(repoId: vadRepo, threshold: pipelineConfig.vadThreshold, manager: modelManager)
 
+        // Audio device selection — empty UID means system default
+        let inputUID = prefs.voiceInputDeviceUID.isEmpty ? nil : prefs.voiceInputDeviceUID
+        let outputUID = prefs.voiceOutputDeviceUID.isEmpty ? nil : prefs.voiceOutputDeviceUID
+        let mic = MicrophoneCapture(deviceUID: inputUID)
+        let speaker = SpeakerOutput(deviceUID: outputUID)
+
         let newPipeline = VoicePipeline(
             stt: stt,
             tts: tts,
             vad: vad,
             llm: llm,
+            capture: mic,
+            playback: speaker,
             config: pipelineConfig,
             session: VoiceSession()
         )
@@ -147,6 +173,9 @@ class VoiceViewModel {
         eventTask = nil
         agentState = .idle
         error = nil
+        audioLevel = 0
+        rawSmoothedLevel = 0
+        levelUpdateCounter = 0
         Task { await p.stop() }
     }
 
@@ -216,9 +245,36 @@ class VoiceViewModel {
             userTranscript = ""
             assistantText = ""
 
+        case .audioLevel(let rms):
+            updateAudioLevel(rms: rms)
+
         case .error(let voiceError):
             error = voiceError.localizedDescription
         }
+    }
+
+    /// Asymmetric EMA smoothing + power-curve normalization, throttled to ~15Hz.
+    @MainActor
+    private func updateAudioLevel(rms: Float) {
+        // During thinking, no meaningful audio — decay toward 0
+        if agentState == .thinking {
+            rawSmoothedLevel *= 0.9
+            audioLevel = rawSmoothedLevel < 0.001 ? 0 : audioLevel * 0.9
+            return
+        }
+
+        // Asymmetric EMA: fast attack (α=0.4), slow decay (α=0.15)
+        let alpha: Float = rms > rawSmoothedLevel ? 0.4 : 0.15
+        rawSmoothedLevel += alpha * (rms - rawSmoothedLevel)
+
+        // Throttle UI updates: publish every 3rd sample (~15Hz from ~45Hz)
+        levelUpdateCounter += 1
+        guard levelUpdateCounter >= 3 else { return }
+        levelUpdateCounter = 0
+
+        // Power-curve normalization: map [0, 0.25] → [0, 1] with toe compression
+        let normalized = min(rawSmoothedLevel / 0.25, 1.0)
+        audioLevel = pow(normalized, 0.6)
     }
 
     /// Called when the event stream ends — pipeline has stopped or crashed.
@@ -227,5 +283,8 @@ class VoiceViewModel {
         pipeline = nil
         eventTask = nil
         agentState = .idle
+        audioLevel = 0
+        rawSmoothedLevel = 0
+        levelUpdateCounter = 0
     }
 }

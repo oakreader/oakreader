@@ -1,4 +1,5 @@
 import AVFoundation
+import CoreAudio
 
 /// Captures audio from the system microphone using AVAudioEngine.
 ///
@@ -9,13 +10,22 @@ public final class MicrophoneCapture: AudioCaptureService, @unchecked Sendable {
     private var continuation: AsyncStream<AVAudioPCMBuffer>.Continuation?
     private var tapInstalled = false
     private let lock = NSLock()
+    private let deviceUID: String?
 
-    public init() {}
+    public init(deviceUID: String? = nil) {
+        self.deviceUID = deviceUID
+    }
 
     public func startCapture(sampleRate: Double) throws -> AsyncStream<AVAudioPCMBuffer> {
         stopCapture()
 
         let inputNode = engine.inputNode
+
+        // Set custom input device if specified (must happen before prepare/start)
+        if let uid = deviceUID, !uid.isEmpty,
+           let deviceID = AudioDeviceManager.resolveDeviceID(uid: uid) {
+            try inputNode.auAudioUnit.setDeviceID(deviceID)
+        }
 
         // NOTE: Voice Processing IO (setVoiceProcessingEnabled) is NOT used here
         // because MicrophoneCapture and SpeakerOutput run on separate AVAudioEngine

@@ -68,6 +68,9 @@ final class Preferences {
         static let voiceReferenceAudioPath = "voiceReferenceAudioPath"
         static let voiceReferenceText = "voiceReferenceText"
         static let voiceLLMModel = "voiceLLMModel"
+        static let voiceLanguage = "voiceLanguage"
+        static let voiceInputDeviceUID = "voiceInputDeviceUID"
+        static let voiceOutputDeviceUID = "voiceOutputDeviceUID"
         // External tools
         static let ytDlpPath = "ytDlpPath"
         static let ytDlpCachedVersion = "ytDlpCachedVersion"
@@ -435,6 +438,24 @@ final class Preferences {
     var voiceLLMModel: String {
         get { defaults.string(forKey: Keys.voiceLLMModel) ?? "" }
         set { defaults.set(newValue, forKey: Keys.voiceLLMModel) }
+    }
+
+    /// Language code for voice STT/TTS (e.g. "en", "zh", "ja"). Defaults to English.
+    var voiceLanguage: String {
+        get { defaults.string(forKey: Keys.voiceLanguage) ?? "en" }
+        set { defaults.set(newValue, forKey: Keys.voiceLanguage) }
+    }
+
+    /// Persistent UID of the selected input (microphone) device. Empty = system default.
+    var voiceInputDeviceUID: String {
+        get { defaults.string(forKey: Keys.voiceInputDeviceUID) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.voiceInputDeviceUID) }
+    }
+
+    /// Persistent UID of the selected output (speaker) device. Empty = system default.
+    var voiceOutputDeviceUID: String {
+        get { defaults.string(forKey: Keys.voiceOutputDeviceUID) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.voiceOutputDeviceUID) }
     }
 
     var voiceReferenceAudioURL: URL? {
