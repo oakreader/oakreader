@@ -29,6 +29,16 @@ public struct PipelineConfig: Sendable {
     /// Transcript of the reference audio clip. Required by Qwen3-TTS for voice cloning.
     public var referenceText: String?
 
+    /// Language code for STT/TTS (e.g. "en", "zh", "ja", "ko").
+    /// Defaults to English. Passed to TTS for correct pronunciation and prosody.
+    public var language: String
+
+    /// VAD speech activation threshold (0.0–1.0). Speech starts when probability
+    /// exceeds this value. Silero/LiveKit/OpenAI all default to 0.5. A hysteresis
+    /// gap of 0.15 is applied internally (deactivation at threshold − 0.15) to
+    /// prevent rapid toggling near the boundary.
+    public var vadThreshold: Float
+
     public init(
         models: VoiceModelConfig = VoiceModelConfig(),
         systemPrompt: String = "You are a helpful voice assistant. Keep your responses concise and conversational.",
@@ -37,7 +47,9 @@ public struct PipelineConfig: Sendable {
         minSentenceLength: Int = 10,
         minFirstSentenceLength: Int = 1,
         referenceAudioURL: URL? = nil,
-        referenceText: String? = nil
+        referenceText: String? = nil,
+        language: String = "en",
+        vadThreshold: Float = 0.5
     ) {
         self.models = models
         self.systemPrompt = systemPrompt
@@ -47,6 +59,8 @@ public struct PipelineConfig: Sendable {
         self.minFirstSentenceLength = minFirstSentenceLength
         self.referenceAudioURL = referenceAudioURL
         self.referenceText = referenceText
+        self.language = language
+        self.vadThreshold = vadThreshold
     }
 
     /// TTS voice (shorthand for `models.ttsVoice`).
