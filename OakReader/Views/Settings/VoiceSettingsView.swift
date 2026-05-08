@@ -1,3 +1,4 @@
+import AVFoundation
 import OakReaderAI
 import SwiftUI
 import UniformTypeIdentifiers
@@ -14,10 +15,22 @@ struct VoiceSettingsView: View {
     @State private var referenceAudioImportError: String?
     @State private var showAudioFilePicker = false
     @State private var voiceLLMModel: String
+    @State private var voiceLanguage: String
+
+    // Audio device selection
+    @State private var inputDeviceUID: String
+    @State private var outputDeviceUID: String
+    @State private var isMicTesting = false
+    @State private var micTestLevel: Float = 0
+    @State private var isSpeakerTesting = false
+    @State private var micTestTask: Task<Void, Never>?
+    @State private var micTestCapture: MicrophoneCapture?
+    @State private var speakerTestTask: Task<Void, Never>?
 
     @State private var modelStates: [String: ModelManager.ModelState] = [:]
     @State private var stateTask: Task<Void, Never>?
 
+    private var deviceManager: AudioDeviceManager { AudioDeviceManager.shared }
     private var modelManager: ModelManager { ModelManager.shared }
 
     init() {
@@ -33,10 +46,15 @@ struct VoiceSettingsView: View {
         _referenceAudioPath = State(initialValue: prefs.voiceReferenceAudioPath)
         _referenceText = State(initialValue: prefs.voiceReferenceText)
         _voiceLLMModel = State(initialValue: prefs.voiceLLMModel)
+        _voiceLanguage = State(initialValue: prefs.voiceLanguage)
+        _inputDeviceUID = State(initialValue: prefs.voiceInputDeviceUID)
+        _outputDeviceUID = State(initialValue: prefs.voiceOutputDeviceUID)
     }
 
     var body: some View {
         Form {
+            audioDeviceSection
+            languageSection
             llmSection
             sttSection
             ttsSection
@@ -46,6 +64,8 @@ struct VoiceSettingsView: View {
         .formStyle(.grouped)
         .onAppear { startObserving() }
         .onDisappear {
+            stopMicTest()
+            stopSpeakerTest()
             stateTask?.cancel()
             save()
         }
@@ -54,7 +74,89 @@ struct VoiceSettingsView: View {
         }
     }
 
+    // MARK: - Audio Device Section
+
+    private var audioDeviceSection: some View {
+        Section("Audio Devices") {
+            // Microphone picker
+            Picker("Microphone", selection: $inputDeviceUID) {
+                Text("System Default").tag("")
+                ForEach(deviceManager.inputDevices) { device in
+                    Text(device.name).tag(device.uniqueID)
+                }
+            }
+            .onChange(of: deviceManager.inputDevices) { _, devices in
+                if !inputDeviceUID.isEmpty,
+                   !devices.contains(where: { $0.uniqueID == inputDeviceUID }) {
+                    inputDeviceUID = ""
+                }
+            }
+
+            // Mic test
+            HStack {
+                Button(isMicTesting ? "Stop Test" : "Test Microphone") {
+                    if isMicTesting {
+                        stopMicTest()
+                    } else {
+                        startMicTest()
+                    }
+                }
+                .controlSize(.small)
+
+                if isMicTesting {
+                    AudioLevelMeter(level: micTestLevel)
+                        .frame(maxWidth: 160, maxHeight: 8)
+                }
+            }
+
+            Divider()
+
+            // Speaker picker
+            Picker("Speaker", selection: $outputDeviceUID) {
+                Text("System Default").tag("")
+                ForEach(deviceManager.outputDevices) { device in
+                    Text(device.name).tag(device.uniqueID)
+                }
+            }
+            .onChange(of: deviceManager.outputDevices) { _, devices in
+                if !outputDeviceUID.isEmpty,
+                   !devices.contains(where: { $0.uniqueID == outputDeviceUID }) {
+                    outputDeviceUID = ""
+                }
+            }
+
+            // Speaker test
+            HStack {
+                Button(isSpeakerTesting ? "Playing..." : "Test Speaker") {
+                    if !isSpeakerTesting {
+                        startSpeakerTest()
+                    }
+                }
+                .controlSize(.small)
+                .disabled(isSpeakerTesting)
+            }
+
+            Text("Select the audio devices for voice conversations.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
     // MARK: - Sections
+
+    private var languageSection: some View {
+        Section("Language") {
+            Picker("Language", selection: $voiceLanguage) {
+                ForEach(VoiceLanguage.allCases) { lang in
+                    Text(lang.displayName).tag(lang.code)
+                }
+            }
+
+            Text("Select the language for speech recognition and synthesis. The STT model auto-detects language, but TTS uses this setting for correct pronunciation.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
 
     private var llmSection: some View {
         Section("Language Model") {
@@ -358,6 +460,81 @@ struct VoiceSettingsView: View {
         return destination
     }
 
+    // MARK: - Mic Test
+
+    private func startMicTest() {
+        stopMicTest()
+        isMicTesting = true
+        micTestLevel = 0
+
+        let uid = inputDeviceUID.isEmpty ? nil : inputDeviceUID
+        let capture = MicrophoneCapture(deviceUID: uid)
+        micTestCapture = capture
+
+        micTestTask = Task {
+            do {
+                let stream = try capture.startCapture(sampleRate: 16000)
+                for await buffer in stream {
+                    if Task.isCancelled { break }
+                    let rms = AudioDeviceManager.rms(of: buffer)
+                    await MainActor.run {
+                        // Simple smoothing
+                        micTestLevel += 0.3 * (rms - micTestLevel)
+                    }
+                }
+            } catch {
+                // Capture failed — stop silently
+            }
+            await MainActor.run {
+                isMicTesting = false
+                micTestLevel = 0
+            }
+        }
+    }
+
+    private func stopMicTest() {
+        micTestTask?.cancel()
+        micTestTask = nil
+        micTestCapture?.stopCapture()
+        micTestCapture = nil
+        isMicTesting = false
+        micTestLevel = 0
+    }
+
+    // MARK: - Speaker Test
+
+    private func startSpeakerTest() {
+        stopSpeakerTest()
+        isSpeakerTesting = true
+
+        let uid = outputDeviceUID.isEmpty ? nil : outputDeviceUID
+
+        speakerTestTask = Task {
+            do {
+                let speaker = SpeakerOutput(deviceUID: uid)
+                guard let toneBuffer = AudioDeviceManager.generateTestTone() else {
+                    await MainActor.run { isSpeakerTesting = false }
+                    return
+                }
+
+                let stream = AsyncThrowingStream<AVAudioPCMBuffer, Error> { continuation in
+                    continuation.yield(toneBuffer)
+                    continuation.finish()
+                }
+                try await speaker.play(buffers: stream)
+            } catch {
+                // Playback failed — stop silently
+            }
+            await MainActor.run { isSpeakerTesting = false }
+        }
+    }
+
+    private func stopSpeakerTest() {
+        speakerTestTask?.cancel()
+        speakerTestTask = nil
+        isSpeakerTesting = false
+    }
+
     private func save() {
         let prefs = Preferences.shared
         prefs.voiceLLMModel = voiceLLMModel
@@ -368,5 +545,73 @@ struct VoiceSettingsView: View {
         prefs.voiceTTSVoice = ttsVoice
         prefs.voiceReferenceAudioPath = referenceAudioPath
         prefs.voiceReferenceText = referenceText
+        prefs.voiceLanguage = voiceLanguage
+        prefs.voiceInputDeviceUID = inputDeviceUID
+        prefs.voiceOutputDeviceUID = outputDeviceUID
+    }
+}
+
+// MARK: - Audio Level Meter
+
+private struct AudioLevelMeter: View {
+    let level: Float
+
+    var body: some View {
+        GeometryReader { geo in
+            let fraction = CGFloat(min(max(level / 0.15, 0), 1))
+            let width = geo.size.width * fraction
+            ZStack(alignment: .leading) {
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(Color.secondary.opacity(0.15))
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(meterColor(fraction: fraction))
+                    .frame(width: width)
+                    .animation(.linear(duration: 0.08), value: fraction)
+            }
+        }
+    }
+
+    private func meterColor(fraction: CGFloat) -> Color {
+        if fraction < 0.6 {
+            return .green
+        } else if fraction < 0.85 {
+            return .yellow
+        } else {
+            return .red
+        }
+    }
+}
+
+// MARK: - Voice Language
+
+enum VoiceLanguage: String, CaseIterable, Identifiable {
+    case en
+    case zh
+    case ja
+    case ko
+    case fr
+    case de
+    case es
+    case ru
+    case ar
+    case pt
+
+    var id: String { rawValue }
+
+    var code: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .en: "English"
+        case .zh: "Chinese (中文)"
+        case .ja: "Japanese (日本語)"
+        case .ko: "Korean (한국어)"
+        case .fr: "French (Français)"
+        case .de: "German (Deutsch)"
+        case .es: "Spanish (Español)"
+        case .ru: "Russian (Русский)"
+        case .ar: "Arabic (العربية)"
+        case .pt: "Portuguese (Português)"
+        }
     }
 }
