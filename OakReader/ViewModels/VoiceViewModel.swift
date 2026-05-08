@@ -161,6 +161,13 @@ class VoiceViewModel {
         switch event {
         case .stateChanged(let state):
             agentState = state
+            // Clear stale live transcript when returning to listening — the
+            // speculative STT emits .userTranscript before .turnCompleted,
+            // so any late or missed cleanup leaves a duplicate bubble.
+            if state == .listening {
+                userTranscript = ""
+                assistantText = ""
+            }
 
         case .userSpeechStarted:
             userTranscript = ""
