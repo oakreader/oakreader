@@ -69,6 +69,7 @@ final class Preferences {
         static let voiceReferenceText = "voiceReferenceText"
         static let voiceLLMModel = "voiceLLMModel"
         static let voiceLanguage = "voiceLanguage"
+        static let voiceLiveTranscription = "voiceLiveTranscription"
         static let voiceInputDeviceUID = "voiceInputDeviceUID"
         static let voiceOutputDeviceUID = "voiceOutputDeviceUID"
         // External tools
@@ -446,6 +447,12 @@ final class Preferences {
         set { defaults.set(newValue, forKey: Keys.voiceLanguage) }
     }
 
+    /// Enable live (streaming) transcription during speech. Defaults to true.
+    var voiceLiveTranscription: Bool {
+        get { defaults.object(forKey: Keys.voiceLiveTranscription) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: Keys.voiceLiveTranscription) }
+    }
+
     /// Persistent UID of the selected input (microphone) device. Empty = system default.
     var voiceInputDeviceUID: String {
         get { defaults.string(forKey: Keys.voiceInputDeviceUID) ?? "" }
@@ -460,9 +467,12 @@ final class Preferences {
 
     var voiceReferenceAudioURL: URL? {
         let path = voiceReferenceAudioPath
-        guard !path.isEmpty else { return nil }
-        let url = URL(fileURLWithPath: path)
-        return FileManager.default.fileExists(atPath: url.path) ? url : nil
+        if !path.isEmpty {
+            let url = URL(fileURLWithPath: path)
+            if FileManager.default.fileExists(atPath: url.path) { return url }
+        }
+        // Fall back to bundled default voice
+        return Bundle.main.url(forResource: "grant_voice", withExtension: "wav")
     }
 
     // MARK: - External Tools

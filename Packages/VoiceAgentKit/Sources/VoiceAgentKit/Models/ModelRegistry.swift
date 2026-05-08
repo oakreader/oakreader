@@ -1,6 +1,5 @@
 import Foundation
-import HuggingFace
-import MLXAudioCore
+import AudioCommon
 
 // MARK: - Model Configuration
 
@@ -12,25 +11,30 @@ public struct VoiceModelConfig: Sendable, Codable {
     /// Optional turn-detector model (e.g. SmartTurn). Nil disables endpoint verification.
     public var turnDetectorModel: String?
     public var ttsVoice: String?
+    /// Optional live STT model (Parakeet streaming). Nil disables live transcription.
+    public var liveSTTModel: String?
 
     public init(
         sttModel: String = KnownModels.stt[0].repo,
         ttsModel: String = KnownModels.tts[0].repo,
         vadModel: String = KnownModels.vad[0].repo,
-        turnDetectorModel: String? = KnownModels.turnDetector.first?.repo,
-        ttsVoice: String? = nil
+        turnDetectorModel: String? = nil,
+        ttsVoice: String? = nil,
+        liveSTTModel: String? = KnownModels.liveSTT.first?.repo
     ) {
         self.sttModel = sttModel
         self.ttsModel = ttsModel
         self.vadModel = vadModel
         self.turnDetectorModel = turnDetectorModel
         self.ttsVoice = ttsVoice
+        self.liveSTTModel = liveSTTModel
     }
 
     /// All model repos referenced by this config.
     public var allRepos: [String] {
         var repos = [sttModel, ttsModel, vadModel]
         if let td = turnDetectorModel { repos.append(td) }
+        if let live = liveSTTModel { repos.append(live) }
         return repos
     }
 }
@@ -60,37 +64,35 @@ public enum ModelComponent: String, Sendable, Codable {
     case tts
     case vad
     case turnDetector
+    case liveSTT
 }
 
 /// Catalog of known/tested models for each component.
 public enum KnownModels {
     public static let stt: [ModelOption] = [
-        ModelOption(repo: "mlx-community/Qwen3-ASR-0.6B-4bit", name: "Qwen3-ASR 0.6B (4-bit)", sizeLabel: "~300 MB", component: .stt),
-        ModelOption(repo: "mlx-community/Qwen3-ASR-0.6B-8bit", name: "Qwen3-ASR 0.6B (8-bit)", sizeLabel: "~400 MB", component: .stt),
-        ModelOption(repo: "mlx-community/Qwen3-ASR-1.7B-4bit", name: "Qwen3-ASR 1.7B (4-bit)", sizeLabel: "~600 MB", component: .stt),
-        ModelOption(repo: "mlx-community/Qwen3-ASR-1.7B-8bit", name: "Qwen3-ASR 1.7B (8-bit)", sizeLabel: "~1 GB", component: .stt),
+        ModelOption(repo: "aufklarer/Qwen3-ASR-0.6B-MLX-4bit", name: "Qwen3-ASR 0.6B (4-bit)", sizeLabel: "~300 MB", component: .stt),
+        ModelOption(repo: "aufklarer/Qwen3-ASR-0.6B-MLX-8bit", name: "Qwen3-ASR 0.6B (8-bit)", sizeLabel: "~400 MB", component: .stt),
     ]
 
     public static let tts: [ModelOption] = [
-        ModelOption(repo: "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-4bit", name: "Qwen3-TTS 0.6B Base (4-bit)", sizeLabel: "~400 MB", component: .tts),
-        ModelOption(repo: "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit", name: "Qwen3-TTS 0.6B Base (8-bit)", sizeLabel: "~700 MB", component: .tts),
-        ModelOption(repo: "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit", name: "Qwen3-TTS 1.7B Base (8-bit)", sizeLabel: "~2 GB", component: .tts),
-        ModelOption(repo: "mlx-community/Kokoro-82M-bf16", name: "Kokoro 82M (bf16)", sizeLabel: "~165 MB", component: .tts),
-        ModelOption(repo: "mlx-community/Kokoro-82M-4bit", name: "Kokoro 82M (4-bit)", sizeLabel: "~40 MB", component: .tts),
-        ModelOption(repo: "mlx-community/chatterbox-turbo-fp16", name: "Chatterbox Turbo (voice clone)", sizeLabel: "~700 MB", component: .tts),
-        ModelOption(repo: "mlx-community/Chatterbox-TTS-fp16", name: "Chatterbox Regular (voice clone)", sizeLabel: "~1 GB", component: .tts),
+        ModelOption(repo: "aufklarer/CosyVoice3-0.5B-MLX-4bit", name: "CosyVoice3 0.5B (4-bit)", sizeLabel: "~400 MB", component: .tts),
+        ModelOption(repo: "aufklarer/Qwen3-TTS-12Hz-0.6B-Base-MLX-4bit", name: "Qwen3-TTS 0.6B Base (4-bit)", sizeLabel: "~400 MB", component: .tts),
+        ModelOption(repo: "aufklarer/Qwen3-TTS-12Hz-0.6B-Base-MLX-8bit", name: "Qwen3-TTS 0.6B Base (8-bit)", sizeLabel: "~700 MB", component: .tts),
+        ModelOption(repo: "aufklarer/Kokoro-82M-CoreML", name: "Kokoro 82M (CoreML)", sizeLabel: "~165 MB", component: .tts),
     ]
 
     public static let vad: [ModelOption] = [
-        ModelOption(repo: "mlx-community/silero-vad", name: "Silero VAD", sizeLabel: "~2 MB", component: .vad),
+        ModelOption(repo: "aufklarer/Silero-VAD-v5-MLX", name: "Silero VAD v5", sizeLabel: "~2 MB", component: .vad),
     ]
 
-    public static let turnDetector: [ModelOption] = [
-        ModelOption(repo: "mlx-community/smart-turn-v3", name: "SmartTurn v3 (endpoint)", sizeLabel: "~30 MB", component: .turnDetector),
+    public static let turnDetector: [ModelOption] = []
+
+    public static let liveSTT: [ModelOption] = [
+        ModelOption(repo: "aufklarer/Parakeet-EOU-120M-CoreML-INT8", name: "Parakeet EOU 120M (INT8)", sizeLabel: "~150 MB", component: .liveSTT),
     ]
 
     /// All known models across all components.
-    public static var all: [ModelOption] { stt + tts + vad + turnDetector }
+    public static var all: [ModelOption] { stt + tts + vad + turnDetector + liveSTT }
 
     /// Look up models for a given component.
     public static func models(for component: ModelComponent) -> [ModelOption] {
@@ -99,6 +101,7 @@ public enum KnownModels {
         case .tts: return tts
         case .vad: return vad
         case .turnDetector: return turnDetector
+        case .liveSTT: return liveSTT
         }
     }
 }
@@ -145,67 +148,23 @@ public actor ModelManager {
     }
 
     /// Check whether a model is already cached locally.
-    /// Checks both the mlx-audio cache dir and the Hub repo snapshot dir.
     public func isDownloaded(_ repo: String) -> Bool {
-        // Check mlx-audio cache directory
-        let cache = HubCache.default
-        let modelSubdir = repo.replacingOccurrences(of: "/", with: "_")
-        let mlxAudioDir = cache.cacheDirectory
-            .appendingPathComponent("mlx-audio")
-            .appendingPathComponent(modelSubdir)
-
-        if hasSafetensors(in: mlxAudioDir) { return true }
-
-        // Check Hub repo snapshot directory
-        if let repoID = Repo.ID(rawValue: repo) {
-            let hubDir = cache.repoDirectory(repo: repoID, kind: .model)
-            // Snapshots are in subdirectories
-            if let snapshots = try? FileManager.default.contentsOfDirectory(
-                at: hubDir.appendingPathComponent("snapshots"),
-                includingPropertiesForKeys: nil
-            ) {
-                for snapshotDir in snapshots {
-                    if hasSafetensors(in: snapshotDir) { return true }
-                }
-            }
-            // Also check the repo dir itself (flat layout)
-            if hasSafetensors(in: hubDir) { return true }
+        guard let cacheDir = try? HuggingFaceDownloader.getCacheDirectory(for: repo) else {
+            return false
         }
-
-        return false
-    }
-
-    private func hasSafetensors(in directory: URL) -> Bool {
-        guard FileManager.default.fileExists(atPath: directory.path) else { return false }
-        let files = try? FileManager.default.contentsOfDirectory(
-            at: directory, includingPropertiesForKeys: [.fileSizeKey]
-        )
-        return files?.contains { file in
-            guard file.pathExtension == "safetensors" else { return false }
-            let size = (try? file.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
-            return size > 0
-        } ?? false
+        return HuggingFaceDownloader.weightsExist(in: cacheDir)
     }
 
     /// Download a single model with progress tracking.
     public func download(_ repo: String) async throws {
-        guard let repoID = Repo.ID(rawValue: repo) else {
-            throw VoiceAgentError.modelNotLoaded("Invalid repository ID: \(repo)")
-        }
-
         setState(repo, .downloading(fractionCompleted: 0))
 
         do {
-            let client = HubClient(cache: .default)
-            _ = try await ModelUtils.resolveOrDownloadModel(
-                client: client,
-                cache: .default,
-                repoID: repoID,
-                requiredExtension: "safetensors",
-                progressHandler: { [weak self] progress in
-                    let fraction = progress.fractionCompleted
-                    // Update both the internal dictionary and the stream
-                    // so any path (stream observer or state query) sees current progress.
+            let cacheDir = try HuggingFaceDownloader.getCacheDirectory(for: repo)
+            try await HuggingFaceDownloader.downloadWeights(
+                modelId: repo,
+                to: cacheDir,
+                progressHandler: { [weak self] fraction in
                     Task { await self?.setState(repo, .downloading(fractionCompleted: fraction)) }
                 }
             )
@@ -230,18 +189,8 @@ public actor ModelManager {
 
     /// Delete a cached model.
     public func delete(_ repo: String) {
-        let cache = HubCache.default
-        let modelSubdir = repo.replacingOccurrences(of: "/", with: "_")
-        let modelDir = cache.cacheDirectory
-            .appendingPathComponent("mlx-audio")
-            .appendingPathComponent(modelSubdir)
-        try? FileManager.default.removeItem(at: modelDir)
-
-        if let repoID = Repo.ID(rawValue: repo) {
-            let hubRepoDir = cache.repoDirectory(repo: repoID, kind: .model)
-            try? FileManager.default.removeItem(at: hubRepoDir)
-        }
-
+        guard let cacheDir = try? HuggingFaceDownloader.getCacheDirectory(for: repo) else { return }
+        try? FileManager.default.removeItem(at: cacheDir)
         setState(repo, .notDownloaded)
     }
 

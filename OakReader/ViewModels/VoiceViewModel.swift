@@ -1,6 +1,9 @@
 import Foundation
+import os
 import VoiceAgentKit
 import OakReaderAI
+
+private let voiceLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.oakreader.OakReader", category: "voice")
 
 @Observable
 class VoiceViewModel {
@@ -71,10 +74,6 @@ class VoiceViewModel {
         )
         let llm = ChatEngineBridge(chatEngine: chatEngine, config: config)
 
-        let turnDetectorRepo: String? = prefs.voiceTurnDetectorEnabled
-            ? KnownModels.turnDetector.first?.repo
-            : nil
-
         let language = prefs.voiceLanguage
 
         var pipelineConfig = PipelineConfig()
@@ -82,9 +81,10 @@ class VoiceViewModel {
             sttModel: sttRepo,
             ttsModel: ttsRepo,
             vadModel: vadRepo,
-            turnDetectorModel: turnDetectorRepo,
-            ttsVoice: voice
+            ttsVoice: voice,
+            liveSTTModel: KnownModels.liveSTT.first?.repo
         )
+        pipelineConfig.enableLiveTranscription = prefs.voiceLiveTranscription
         let languageInstruction: String
         if language == "en" {
             languageInstruction = "Respond in English."
@@ -247,6 +247,12 @@ class VoiceViewModel {
 
         case .audioLevel(let rms):
             updateAudioLevel(rms: rms)
+
+        case .latencyMetrics(let metrics):
+            let fmt = { (s: Double) in String(format: "%.0f", s * 1000) }
+            voiceLog.info(
+                "[VoicePipeline] Latency: STT=\(fmt(metrics.sttLatency))ms LLM=\(fmt(metrics.llmLatency))ms TTS=\(fmt(metrics.ttsLatency))ms Total=\(fmt(metrics.totalLatency))ms"
+            )
 
         case .error(let voiceError):
             error = voiceError.localizedDescription

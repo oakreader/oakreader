@@ -14,6 +14,11 @@ public struct PipelineConfig: Sendable {
     /// Characters that delimit sentence boundaries for streaming TTS.
     public var sentenceDelimiters: Set<Character>
 
+    /// Delimiters used for the *first* sentence of each response.
+    /// Includes comma and colon so phrases like "Sure, I can help." trigger
+    /// TTS at "Sure," instead of waiting for the period — reducing perceived latency.
+    public var firstSentenceDelimiters: Set<Character>
+
     /// Minimum number of characters to buffer before sending to TTS.
     public var minSentenceLength: Int
 
@@ -33,6 +38,11 @@ public struct PipelineConfig: Sendable {
     /// Defaults to English. Passed to TTS for correct pronunciation and prosody.
     public var language: String
 
+    /// Enable live (streaming) transcription during speech using Parakeet.
+    /// When true and a liveSTT model is configured, partial transcripts appear
+    /// in real-time while the user speaks. Qwen3-ASR still produces the final transcript.
+    public var enableLiveTranscription: Bool
+
     /// VAD speech activation threshold (0.0–1.0). Speech starts when probability
     /// exceeds this value. Silero/LiveKit/OpenAI all default to 0.5. A hysteresis
     /// gap of 0.15 is applied internally (deactivation at threshold − 0.15) to
@@ -44,22 +54,26 @@ public struct PipelineConfig: Sendable {
         systemPrompt: String = "You are a helpful voice assistant. Keep your responses concise and conversational.",
         captureSampleRate: Double = 16000,
         sentenceDelimiters: Set<Character> = [".", "!", "?", ";", "\n"],
+        firstSentenceDelimiters: Set<Character> = [".", "!", "?", ";", ",", ":", "\n"],
         minSentenceLength: Int = 10,
         minFirstSentenceLength: Int = 1,
         referenceAudioURL: URL? = nil,
         referenceText: String? = nil,
         language: String = "en",
+        enableLiveTranscription: Bool = true,
         vadThreshold: Float = 0.5
     ) {
         self.models = models
         self.systemPrompt = systemPrompt
         self.captureSampleRate = captureSampleRate
         self.sentenceDelimiters = sentenceDelimiters
+        self.firstSentenceDelimiters = firstSentenceDelimiters
         self.minSentenceLength = minSentenceLength
         self.minFirstSentenceLength = minFirstSentenceLength
         self.referenceAudioURL = referenceAudioURL
         self.referenceText = referenceText
         self.language = language
+        self.enableLiveTranscription = enableLiveTranscription
         self.vadThreshold = vadThreshold
     }
 
