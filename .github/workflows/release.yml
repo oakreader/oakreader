@@ -1,0 +1,237 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  APP_NAME: OakReader
+  SCHEME: OakReader
+  XCODE_VERSION: "16.0"
+
+jobs:
+  release:
+    runs-on: macos-15
+    timeout-minutes: 60
+
+    steps:
+      # ── Checkout ──────────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history for commit count & appcast
+
+      # ── Setup Xcode ──────────────────────────────────────────
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app
+
+      # ── Read version from Info.plist ─────────────────────────
+      - name: Read version
+        id: version
+        run: |
+          VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" OakReader/App/Info.plist)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      # ── Skip if already released ─────────────────────────────
+      - name: Check if tag exists
+        id: check_tag
+        run: |
+          if git rev-parse "refs/tags/${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip if already released
+        if: steps.check_tag.outputs.exists == 'true'
+        run: |
+          echo "::notice::Version ${{ steps.version.outputs.version }} already released, skipping."
+          exit 0
+
+      # ── Build Number = git commit count ──────────────────────
+      - name: Set build number
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          BUILD_NUMBER=$(git rev-list --count HEAD)
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" OakReader/App/Info.plist
+          echo "Build number: $BUILD_NUMBER"
+
+      # ── Install certificates & provisioning ──────────────────
+      - name: Install certificates
+        if: steps.check_tag.outputs.exists == 'false'
+        env:
+          CERTIFICATE_P12: ${{ secrets.CERTIFICATE_P12 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          CERTIFICATE_PATH=$RUNNER_TEMP/certificate.p12
+          KEYCHAIN_PATH=$RUNNER_TEMP/build.keychain-db
+
+          echo "$CERTIFICATE_P12" | base64 --decode > "$CERTIFICATE_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain
+
+      # ── Generate Xcode project ───────────────────────────────
+      - name: Install XcodeGen
+        if: steps.check_tag.outputs.exists == 'false'
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        if: steps.check_tag.outputs.exists == 'false'
+        run: xcodegen generate
+
+      # ── Resolve packages ─────────────────────────────────────
+      - name: Resolve packages
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project ${{ env.APP_NAME }}.xcodeproj \
+            -scheme ${{ env.SCHEME }}
+
+      # ── Archive ──────────────────────────────────────────────
+      - name: Archive
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          xcodebuild archive \
+            -project ${{ env.APP_NAME }}.xcodeproj \
+            -scheme ${{ env.SCHEME }} \
+            -configuration Release \
+            -archivePath $RUNNER_TEMP/${{ env.APP_NAME }}.xcarchive \
+            CODE_SIGN_IDENTITY="Developer ID Application" \
+            DEVELOPMENT_TEAM="${{ secrets.TEAM_ID }}" \
+            SPARKLE_PUBLIC_ED_KEY="${{ secrets.SPARKLE_PUBLIC_ED_KEY }}" \
+            OTHER_CODE_SIGN_FLAGS="--timestamp" \
+            -skipPackagePluginValidation \
+            -skipMacroValidation
+
+      # ── Export ───────────────────────────────────────────────
+      - name: Export
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          # Replace team ID placeholder in ExportOptions
+          sed -i '' "s/\$(TEAM_ID)/${{ secrets.TEAM_ID }}/" ExportOptions.plist
+
+          xcodebuild -exportArchive \
+            -archivePath $RUNNER_TEMP/${{ env.APP_NAME }}.xcarchive \
+            -exportPath $RUNNER_TEMP/export \
+            -exportOptionsPlist ExportOptions.plist
+
+      # ── Notarize ─────────────────────────────────────────────
+      - name: Notarize
+        if: steps.check_tag.outputs.exists == 'false'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.TEAM_ID }}
+        run: |
+          APP_PATH="$RUNNER_TEMP/export/${{ env.APP_NAME }}.app"
+
+          # Create zip for notarization
+          ditto -c -k --keepParent "$APP_PATH" "$RUNNER_TEMP/${{ env.APP_NAME }}.zip"
+
+          xcrun notarytool submit "$RUNNER_TEMP/${{ env.APP_NAME }}.zip" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+
+          # Staple the app
+          xcrun stapler staple "$APP_PATH"
+
+      # ── Create DMG ───────────────────────────────────────────
+      - name: Install create-dmg
+        if: steps.check_tag.outputs.exists == 'false'
+        run: brew install create-dmg
+
+      - name: Create DMG
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          DMG_NAME="${{ env.APP_NAME }}-${{ steps.version.outputs.version }}.dmg"
+
+          create-dmg \
+            --volname "${{ env.APP_NAME }}" \
+            --window-pos 200 120 \
+            --window-size 660 400 \
+            --icon-size 160 \
+            --icon "${{ env.APP_NAME }}.app" 180 170 \
+            --hide-extension "${{ env.APP_NAME }}.app" \
+            --app-drop-link 480 170 \
+            --no-internet-enable \
+            "$RUNNER_TEMP/$DMG_NAME" \
+            "$RUNNER_TEMP/export/${{ env.APP_NAME }}.app"
+
+          echo "DMG_PATH=$RUNNER_TEMP/$DMG_NAME" >> "$GITHUB_ENV"
+          echo "DMG_NAME=$DMG_NAME" >> "$GITHUB_ENV"
+
+      # ── Sparkle sign & appcast ───────────────────────────────
+      - name: Sparkle sign & generate appcast
+        if: steps.check_tag.outputs.exists == 'false'
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          # Find Sparkle tools from resolved SPM packages
+          SPARKLE_BIN=$(find ~/Library/Developer/Xcode/DerivedData -path "*/Sparkle/bin" -type d 2>/dev/null | head -1)
+          if [ -z "$SPARKLE_BIN" ]; then
+            # Fallback: download Sparkle tools
+            SPARKLE_VERSION="2.6.4"
+            curl -sL "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.xz" \
+              | tar -xJ -C "$RUNNER_TEMP"
+            SPARKLE_BIN="$RUNNER_TEMP/bin"
+          fi
+
+          # Sign the DMG
+          SIGNATURE=$("$SPARKLE_BIN/sign_update" "$DMG_PATH" --ed-key-file <(echo "$SPARKLE_PRIVATE_KEY") 2>&1)
+          echo "Sparkle signature: $SIGNATURE"
+
+          # Prepare appcast directory
+          mkdir -p appcast_output
+          cp "$DMG_PATH" appcast_output/
+
+          # Generate appcast
+          "$SPARKLE_BIN/generate_appcast" appcast_output \
+            --ed-key-file <(echo "$SPARKLE_PRIVATE_KEY") \
+            --download-url-prefix "https://github.com/oakreader/oakreader/releases/download/${{ steps.version.outputs.tag }}/"
+
+      # ── Create GitHub Release ────────────────────────────────
+      - name: Create tag
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          git tag "${{ steps.version.outputs.tag }}"
+          git push origin "${{ steps.version.outputs.tag }}"
+
+      - name: Create GitHub Release
+        if: steps.check_tag.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.version.outputs.tag }}" \
+            "$DMG_PATH" \
+            --title "${{ env.APP_NAME }} ${{ steps.version.outputs.version }}" \
+            --generate-notes
+
+      # ── Deploy appcast to GitHub Pages ───────────────────────
+      - name: Deploy appcast
+        if: steps.check_tag.outputs.exists == 'false'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./appcast_output
+          destination_dir: .
+          keep_files: true
+          commit_message: "Update appcast for ${{ steps.version.outputs.tag }}"
+
+      # ── Cleanup ──────────────────────────────────────────────
+      - name: Cleanup keychain
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/build.keychain-db" 2>/dev/null || true
