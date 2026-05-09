@@ -31,14 +31,9 @@ public actor ChatEngine {
     private let router = ProviderRouter()
     private let store: ChatSessionStore
 
-    /// Initialize with a per-document storage path for session files.
-    public init(documentStoragePath: URL) {
-        self.store = ChatSessionStore(documentStoragePath: documentStoragePath)
-    }
-
-    /// Initialize with default centralized storage (fallback).
-    public init() {
-        self.store = ChatSessionStore()
+    /// Initialize with a centralized chats directory.
+    public init(chatsDirectory: URL) {
+        self.store = ChatSessionStore(baseDirectory: chatsDirectory)
     }
 
     // MARK: - Send message
