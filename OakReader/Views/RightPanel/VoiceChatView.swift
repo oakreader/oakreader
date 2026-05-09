@@ -4,6 +4,8 @@ import VoiceAgentKit
 
 struct VoiceChatView: View {
     let voiceVM: VoiceViewModel
+    var onBack: (() -> Void)?
+    var speakerName: String?
 
     private var orbColor: Color {
         guard voiceVM.isRunning else { return .accentColor }
@@ -44,7 +46,18 @@ struct VoiceChatView: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            Text("Voice AI")
+            if let onBack {
+                Button {
+                    onBack()
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+
+            Text(speakerName ?? "Voice AI")
                 .font(.system(size: 16, weight: .semibold))
 
             Spacer()

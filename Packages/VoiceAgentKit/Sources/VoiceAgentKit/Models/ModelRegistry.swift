@@ -187,6 +187,10 @@ public actor ModelManager {
         } ?? false
     }
 
+    /// Custom HuggingFace endpoint (e.g. "https://hf-mirror.com").
+    /// Set this before downloading to use a mirror. Nil = default (huggingface.co).
+    public var endpointURL: URL?
+
     /// Download a single model with progress tracking.
     public func download(_ repo: String) async throws {
         guard let repoID = Repo.ID(rawValue: repo) else {
@@ -196,7 +200,12 @@ public actor ModelManager {
         setState(repo, .downloading(fractionCompleted: 0))
 
         do {
-            let client = HubClient(cache: .default)
+            let client: HubClient
+            if let endpoint = endpointURL {
+                client = HubClient(host: endpoint, cache: .default)
+            } else {
+                client = HubClient(cache: .default)
+            }
             _ = try await ModelUtils.resolveOrDownloadModel(
                 client: client,
                 cache: .default,

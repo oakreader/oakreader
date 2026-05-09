@@ -16,6 +16,7 @@ struct VoiceSettingsView: View {
     @State private var voiceLLMModel: String
     @State private var voiceLanguage: String
     @State private var liveTranscription: Bool
+    @State private var hfEndpoint: String
 
     // Audio device selection
     @State private var inputDeviceUID: String
@@ -49,6 +50,7 @@ struct VoiceSettingsView: View {
         _liveTranscription = State(initialValue: prefs.voiceLiveTranscription)
         _inputDeviceUID = State(initialValue: prefs.voiceInputDeviceUID)
         _outputDeviceUID = State(initialValue: prefs.voiceOutputDeviceUID)
+        _hfEndpoint = State(initialValue: prefs.hfEndpoint)
     }
 
     var body: some View {
@@ -63,7 +65,10 @@ struct VoiceSettingsView: View {
             downloadAllSection
         }
         .formStyle(.grouped)
-        .onAppear { startObserving() }
+        .onAppear {
+            startObserving()
+            applyHFEndpoint(hfEndpoint)
+        }
         .onDisappear {
             stopMicTest()
             stopSpeakerTest()
@@ -296,8 +301,19 @@ struct VoiceSettingsView: View {
 
     private var downloadAllSection: some View {
         Section("Download All") {
+            TextField("HuggingFace Endpoint (optional)", text: $hfEndpoint)
+                .textFieldStyle(.roundedBorder)
+                .onChange(of: hfEndpoint) { _, newValue in
+                    applyHFEndpoint(newValue)
+                }
+
+            Text("Leave empty for default (huggingface.co). Use https://hf-mirror.com if downloads fail due to network restrictions.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
             Button("Download All Models") {
                 Task {
+                    applyHFEndpoint(hfEndpoint)
                     let config = VoiceModelConfig(
                         sttModel: sttModel,
                         ttsModel: ttsModel,
@@ -316,6 +332,12 @@ struct VoiceSettingsView: View {
         }
     }
 
+    private func applyHFEndpoint(_ value: String) {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        let url = trimmed.isEmpty ? nil : URL(string: trimmed)
+        Task { await modelManager.endpointURL = url }
+    }
+
     // MARK: - Model Status Row
 
     @ViewBuilder
@@ -331,7 +353,10 @@ struct VoiceSettingsView: View {
                     .foregroundStyle(.secondary)
                 Spacer()
                 Button("Download") {
-                    Task { try? await modelManager.download(repo) }
+                    Task {
+                        applyHFEndpoint(hfEndpoint)
+                        try? await modelManager.download(repo)
+                    }
                 }
                 .controlSize(.small)
 
@@ -379,7 +404,10 @@ struct VoiceSettingsView: View {
                     .lineLimit(2)
                 Spacer()
                 Button("Retry") {
-                    Task { try? await modelManager.download(repo) }
+                    Task {
+                        applyHFEndpoint(hfEndpoint)
+                        try? await modelManager.download(repo)
+                    }
                 }
                 .controlSize(.small)
             }
@@ -547,6 +575,7 @@ struct VoiceSettingsView: View {
         prefs.voiceLiveTranscription = liveTranscription
         prefs.voiceInputDeviceUID = inputDeviceUID
         prefs.voiceOutputDeviceUID = outputDeviceUID
+        prefs.hfEndpoint = hfEndpoint
     }
 }
 

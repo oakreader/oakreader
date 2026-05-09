@@ -144,6 +144,13 @@ class PopupIconButton: NSView {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    func updateImage(systemImage: String) {
+        if let img = NSImage(systemSymbolName: systemImage, accessibilityDescription: nil) {
+            let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
+            iconView.image = img.withSymbolConfiguration(config)
+        }
+    }
+
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         if let ta = trackingArea { removeTrackingArea(ta) }
