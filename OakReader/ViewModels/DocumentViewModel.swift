@@ -9,6 +9,9 @@ class DocumentViewModel {
     weak var document: OakReaderDocument?
     var webSnapshot: WebSnapshotDocument?
     var mediaDocument: MediaDocument?
+    var markdownDocument: MarkdownDocument?
+    /// Observable markdown content for reactive outline updates.
+    var markdownContent: String = ""
     var itemType: ItemType
     var state: DocumentState
     /// Database reference, set by AppState when the tab is created.
@@ -17,6 +20,8 @@ class DocumentViewModel {
     var referenceService: ReferenceService?
     /// Library store, set by AppState when the tab is created.
     var libraryStore: LibraryStore?
+    /// App state reference for navigation, set when the tab is created.
+    weak var appState: AppState?
 
     // MARK: - Child ViewModels (lazy)
 
@@ -139,6 +144,7 @@ class DocumentViewModel {
         case .pdf: return pdfDocument?.pageCount ?? 0
         case .webSnapshot: return 1
         case .embed: return 1
+        case .markdown: return 1
         }
     }
 
@@ -147,6 +153,7 @@ class DocumentViewModel {
         case .pdf: return pdfDocument != nil
         case .webSnapshot: return webSnapshot != nil
         case .embed: return mediaDocument != nil
+        case .markdown: return markdownDocument != nil
         }
     }
 
@@ -162,6 +169,8 @@ class DocumentViewModel {
             return webSnapshot?.htmlURL.deletingPathExtension().lastPathComponent ?? "Untitled"
         case .embed:
             return mediaDocument?.metadata.title ?? "Untitled"
+        case .markdown:
+            return markdownDocument?.fileURL.deletingPathExtension().lastPathComponent ?? "Untitled"
         }
     }
 
@@ -206,6 +215,13 @@ class DocumentViewModel {
         self.state = DocumentState()
         state.isSidebarVisible = media.metadata.resolvedEmbedType == .youtube
         state.mediaSidebarMode = .outline
+    }
+
+    init(markdown: MarkdownDocument) {
+        self.markdownDocument = markdown
+        self.itemType = .markdown
+        self.state = DocumentState()
+        state.isSidebarVisible = true
     }
 
     // MARK: - Action Handling (called directly by AppState)

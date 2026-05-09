@@ -18,6 +18,8 @@ struct PDFContextProvider {
             return webSnapshotSnapshot(from: viewModel, contextMode: contextMode)
         case .embed:
             return mediaSnapshot(from: viewModel, contextMode: contextMode)
+        case .markdown:
+            return markdownSnapshot(from: viewModel, contextMode: contextMode)
         }
     }
 
@@ -95,6 +97,25 @@ struct PDFContextProvider {
 
         return PDFContextSnapshot(
             fileName: media.metadata.title,
+            pageCount: 1,
+            currentPageIndex: 0,
+            currentPageText: truncated,
+            fullDocumentText: contextMode == .fullDocument ? truncated : nil,
+            selectedText: viewModel.state.selectedText
+        )
+    }
+
+    // MARK: - Markdown
+
+    private func markdownSnapshot(
+        from viewModel: DocumentViewModel,
+        contextMode: ContextMode
+    ) -> PDFContextSnapshot? {
+        guard let mdDoc = viewModel.markdownDocument else { return nil }
+        let truncated = String(mdDoc.content.prefix(32_000))
+
+        return PDFContextSnapshot(
+            fileName: viewModel.fileName,
             pageCount: 1,
             currentPageIndex: 0,
             currentPageText: truncated,
