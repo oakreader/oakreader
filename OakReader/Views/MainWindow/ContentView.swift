@@ -17,74 +17,78 @@ struct ContentView: View {
     @State private var sidebarWidth: CGFloat = 240  // idealWidth
 
     var body: some View {
-        HStack(spacing: 0) {
-            // Sidebar + Content wrapped together for unified corner radius
+        GeometryReader { geometry in
+            let maxRightPanel = geometry.size.width * 0.6
+
             HStack(spacing: 0) {
-                // Left sidebar — full height
-                if viewModel.state.isSidebarVisible {
-                    sidebarContentView
-                        .frame(width: effectiveSidebarWidth)
-                        .background(Color(nsColor: .controlBackgroundColor))
+                // Sidebar + Content wrapped together for unified corner radius
+                HStack(spacing: 0) {
+                    // Left sidebar — full height
+                    if viewModel.state.isSidebarVisible {
+                        sidebarContentView
+                            .frame(width: effectiveSidebarWidth)
+                            .background(Color(nsColor: .controlBackgroundColor))
 
-                    panelDivider { delta in
-                        let range = sidebarWidthRange
-                        sidebarWidth = min(max(effectiveSidebarWidth + delta, range.lowerBound), range.upperBound)
-                    }
-                }
-
-                // Main content column (toolbar + content)
-                VStack(spacing: 0) {
-                    // Inline toolbar (below tab bar) — only for webSnapshot
-                    if viewModel.itemType == .webSnapshot {
-                        OakReaderToolbarView(viewModel: viewModel)
-                        Divider()
-                    } else if viewModel.itemType == .embed {
-                        Spacer().frame(height: 8)
-                    }
-
-                    // Main content area
-                    ZStack {
-                        if viewModel.hasDocument {
-                            mainContentView
-                        } else {
-                            emptyStateView
-                        }
-
-                        // Loading overlay
-                        if viewModel.state.isLoading {
-                            ProgressOverlay(message: "Processing...")
+                        panelDivider { delta in
+                            let range = sidebarWidthRange
+                            sidebarWidth = min(max(effectiveSidebarWidth + delta, range.lowerBound), range.upperBound)
                         }
                     }
-                    .frame(minWidth: 300)
-                    .frame(maxWidth: .infinity)
-                }
-                .background(OakStyle.Colors.contentBackground)
 
-                // Right panel — draggable divider (full height under tab bar)
-                if viewModel.state.rightPanelMode != nil {
-                    panelDivider { delta in
-                        rightPanelWidth = min(max(rightPanelWidth - delta, 320), 720)
+                    // Main content column (toolbar + content)
+                    VStack(spacing: 0) {
+                        // Inline toolbar (below tab bar) — only for webSnapshot
+                        if viewModel.itemType == .webSnapshot {
+                            OakReaderToolbarView(viewModel: viewModel)
+                            Divider()
+                        } else if viewModel.itemType == .embed {
+                            Spacer().frame(height: 8)
+                        }
+
+                        // Main content area
+                        ZStack {
+                            if viewModel.hasDocument {
+                                mainContentView
+                            } else {
+                                emptyStateView
+                            }
+
+                            // Loading overlay
+                            if viewModel.state.isLoading {
+                                ProgressOverlay(message: "Processing...")
+                            }
+                        }
+                        .frame(minWidth: 300)
+                        .frame(maxWidth: .infinity)
                     }
+                    .background(OakStyle.Colors.contentBackground)
 
-                    RightPanelContentView(viewModel: viewModel)
-                        .frame(width: rightPanelWidth)
-                        .background(Color(nsColor: .controlBackgroundColor))
+                    // Right panel — draggable divider (full height under tab bar)
+                    if viewModel.state.rightPanelMode != nil {
+                        panelDivider { delta in
+                            rightPanelWidth = min(max(rightPanelWidth - delta, 320), maxRightPanel)
+                        }
+
+                        RightPanelContentView(viewModel: viewModel)
+                            .frame(width: min(rightPanelWidth, maxRightPanel))
+                            .background(Color(nsColor: .controlBackgroundColor))
+                    }
                 }
-            }
-            .clipShape(
-                UnevenRoundedRectangle(
-                    topLeadingRadius: 2,
-                    bottomLeadingRadius: 0,
-                    bottomTrailingRadius: 0,
-                    topTrailingRadius: OakStyle.Radius.standard
+                .clipShape(
+                    UnevenRoundedRectangle(
+                        topLeadingRadius: 2,
+                        bottomLeadingRadius: 0,
+                        bottomTrailingRadius: 0,
+                        topTrailingRadius: OakStyle.Radius.standard
+                    )
                 )
-            )
 
-            // Side navigation strip — spans full height (toolbar + content)
-            SideNavView(rightPanelMode: Binding(
-                get: { viewModel.state.rightPanelMode },
-                set: { viewModel.state.rightPanelMode = $0 }
-            ))
+                // Side navigation strip — spans full height (toolbar + content)
+                SideNavView(rightPanelMode: Binding(
+                    get: { viewModel.state.rightPanelMode },
+                    set: { viewModel.state.rightPanelMode = $0 }
+                ))
+            }
         }
         .background(OakStyle.Colors.tabBarBackground)
         .alert("Error", isPresented: Binding(
@@ -126,7 +130,9 @@ struct ContentView: View {
 
     @ViewBuilder
     private var sidebarContentView: some View {
-        if viewModel.usesMediaSidebar {
+        if viewModel.itemType == .markdown {
+            MarkdownOutlineSidebarView(viewModel: viewModel)
+        } else if viewModel.usesMediaSidebar {
             MediaSidebarView(viewModel: viewModel)
         } else {
             SidebarView(viewModel: viewModel)
@@ -198,6 +204,8 @@ struct ContentView: View {
             }
             .padding(.horizontal, 8)
             .padding(.bottom, 8)
+        case .markdown:
+            MarkdownViewerView(viewModel: viewModel)
         }
     }
 
