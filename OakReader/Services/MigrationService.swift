@@ -101,8 +101,6 @@ final class MigrationService {
         do {
             try FileManager.default.createDirectory(at: docDir, withIntermediateDirectories: true)
             try FileManager.default.createDirectory(at: attDir, withIntermediateDirectories: true)
-            let sessionsDir = CatalogDatabase.documentSessionsDirectory(storageKey: itemStorageKey)
-            try FileManager.default.createDirectory(at: sessionsDir, withIntermediateDirectories: true)
             try FileManager.default.copyItem(at: sourceURL, to: destURL)
         } catch {
             Log.error(Log.migration, "Failed to copy \(item.title): \(error)")
