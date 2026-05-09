@@ -2,8 +2,8 @@
 
 /* Base Container */
 #write {
-  margin: 0;
-  max-width: 100%;
+  margin: 0 auto;
+  max-width: 720px;
   padding: 0 28px 80px;
   box-sizing: border-box;
 }
