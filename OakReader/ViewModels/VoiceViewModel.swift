@@ -16,6 +16,9 @@ class VoiceViewModel {
     /// Smoothed audio level for UI visualization (0.0–1.0).
     var audioLevel: Float = 0
 
+    /// Whether standalone TTS playback is active (separate from full voice pipeline).
+    var isSpeaking: Bool = false
+
     private var pipeline: VoicePipeline?
     private var eventTask: Task<Void, Never>?
 
@@ -25,6 +28,12 @@ class VoiceViewModel {
     private var rawSmoothedLevel: Float = 0
     /// Counter for throttling audio level updates (~15Hz from ~45Hz input).
     private var levelUpdateCounter: Int = 0
+
+    // MARK: - Standalone TTS state
+    private var ttsProvider: MLXTTSProvider?
+    private var ttsProviderRepo: String?
+    private var speakerOutput: SpeakerOutput?
+    private var ttsPlaybackTask: Task<Void, Never>?
 
     // MARK: - Lifecycle
 
@@ -81,10 +90,8 @@ class VoiceViewModel {
             sttModel: sttRepo,
             ttsModel: ttsRepo,
             vadModel: vadRepo,
-            ttsVoice: voice,
-            liveSTTModel: KnownModels.liveSTT.first?.repo
+            ttsVoice: voice
         )
-        pipelineConfig.enableLiveTranscription = prefs.voiceLiveTranscription
         let languageInstruction: String
         if language == "en" {
             languageInstruction = "Respond in English."
@@ -181,6 +188,64 @@ class VoiceViewModel {
 
     var isRunning: Bool {
         pipeline != nil
+    }
+
+    // MARK: - Standalone TTS Playback
+
+    @MainActor
+    func speakText(_ text: String) {
+        guard !isRunning else { return }
+        stopSpeaking()
+        isSpeaking = true
+
+        let prefs = Preferences.shared
+        let defaultTTS = KnownModels.tts.first?.repo ?? ""
+        let ttsRepo = prefs.voiceTTSModel.isEmpty ? defaultTTS : prefs.voiceTTSModel
+        let voice = prefs.voiceTTSVoice.isEmpty ? nil : prefs.voiceTTSVoice
+        let language = prefs.voiceLanguage
+        let refAudioURL = prefs.voiceReferenceAudioURL
+        let refText = prefs.voiceReferenceText.isEmpty ? nil : prefs.voiceReferenceText
+        let outputUID = prefs.voiceOutputDeviceUID.isEmpty ? nil : prefs.voiceOutputDeviceUID
+
+        // Reuse TTS provider if same repo, otherwise create new one
+        if ttsProvider == nil || ttsProviderRepo != ttsRepo {
+            ttsProvider = MLXTTSProvider(repoId: ttsRepo, language: language, manager: ModelManager.shared)
+            ttsProviderRepo = ttsRepo
+        }
+
+        let provider = ttsProvider!
+        let speaker = SpeakerOutput(deviceUID: outputUID)
+        speakerOutput = speaker
+
+        let stream = provider.synthesizeStream(
+            text: text,
+            voice: voice,
+            referenceAudioURL: refAudioURL,
+            referenceText: refText
+        )
+
+        ttsPlaybackTask = Task { [weak self] in
+            do {
+                try await speaker.play(buffers: stream)
+            } catch {
+                if !Task.isCancelled {
+                    voiceLog.error("TTS playback failed: \(error.localizedDescription)")
+                }
+            }
+            await MainActor.run {
+                self?.isSpeaking = false
+                self?.speakerOutput = nil
+            }
+        }
+    }
+
+    @MainActor
+    func stopSpeaking() {
+        ttsPlaybackTask?.cancel()
+        ttsPlaybackTask = nil
+        speakerOutput?.stop()
+        speakerOutput = nil
+        isSpeaking = false
     }
 
     // MARK: - Event Handling
