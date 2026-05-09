@@ -19,7 +19,10 @@ struct TagNode: Identifiable {
         var root: [TagNode] = []
 
         for (option, count) in pairs {
-            let segments = option.name.split(separator: "/").map(String.init)
+            let segments = option.name
+                .split(separator: "/", omittingEmptySubsequences: true)
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
             guard !segments.isEmpty else { continue }
             insertInto(nodes: &root, segments: segments, index: 0, option: option, count: count)
         }
@@ -30,7 +33,7 @@ struct TagNode: Identifiable {
 
     private static func insertInto(nodes: inout [TagNode], segments: [String], index: Int, option: PropertyOption, count: Int) {
         let segment = segments[index]
-        let pathSoFar = segments[0...index].joined(separator: "/")
+        let pathSoFar = segments[0 ... index].joined(separator: "/")
         let isLeaf = index == segments.count - 1
 
         if let existing = nodes.firstIndex(where: { $0.name == segment }) {
@@ -74,9 +77,27 @@ struct TagNode: Identifiable {
     }
 
     private static func sortByCount(_ nodes: inout [TagNode]) {
-        nodes.sort { $0.totalCount() > $1.totalCount() }
+        nodes.sort { lhs, rhs in
+            let lhsCount = lhs.totalCount()
+            let rhsCount = rhs.totalCount()
+            if lhsCount != rhsCount {
+                return lhsCount > rhsCount
+            }
+
+            let lhsPosition = lhs.sortPosition()
+            let rhsPosition = rhs.sortPosition()
+            if lhsPosition != rhsPosition {
+                return lhsPosition < rhsPosition
+            }
+
+            return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+        }
         for i in nodes.indices {
             sortByCount(&nodes[i].children)
         }
+    }
+
+    private func sortPosition() -> Int {
+        option?.position ?? children.map { $0.sortPosition() }.min() ?? Int.max
     }
 }

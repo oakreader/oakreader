@@ -59,6 +59,27 @@ final class Preferences {
         static let globalFontFamily = "globalFontFamily"
         static let globalFontSize = "globalFontSize"
         static let noteEditorFontOverridden = "noteEditorFontOverridden"
+        // Voice AI
+        static let voiceSTTModel = "voiceSTTModel"
+        static let voiceTTSModel = "voiceTTSModel"
+        static let voiceVADModel = "voiceVADModel"
+        static let voiceTurnDetectorEnabled = "voiceTurnDetectorEnabled"
+        static let voiceTTSVoice = "voiceTTSVoice"
+        static let voiceReferenceAudioPath = "voiceReferenceAudioPath"
+        static let voiceReferenceText = "voiceReferenceText"
+        static let voiceLLMModel = "voiceLLMModel"
+        static let voiceLanguage = "voiceLanguage"
+        static let voiceLiveTranscription = "voiceLiveTranscription"
+        static let voiceInputDeviceUID = "voiceInputDeviceUID"
+        static let voiceOutputDeviceUID = "voiceOutputDeviceUID"
+        static let hfEndpoint = "hfEndpoint"
+        // ElevenLabs cloud providers
+        static let voiceSTTProvider = "voiceSTTProvider"
+        static let voiceTTSProvider = "voiceTTSProvider"
+        static let elevenLabsAPIKey = "elevenLabsAPIKey"
+        static let elevenLabsVoiceId = "elevenLabsVoiceId"
+        static let elevenLabsTTSModelId = "elevenLabsTTSModelId"
+        static let elevenLabsSTTModelId = "elevenLabsSTTModelId"
         // External tools
         static let ytDlpPath = "ytDlpPath"
         static let ytDlpCachedVersion = "ytDlpCachedVersion"
@@ -382,6 +403,129 @@ final class Preferences {
     var agentRequireConfirmation: Bool {
         get { defaults.bool(forKey: Keys.agentRequireConfirmation) }
         set { defaults.set(newValue, forKey: Keys.agentRequireConfirmation) }
+    }
+
+    // MARK: - Voice AI Preferences
+
+    var voiceSTTModel: String {
+        get { defaults.string(forKey: Keys.voiceSTTModel) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.voiceSTTModel) }
+    }
+
+    var voiceTTSModel: String {
+        get { defaults.string(forKey: Keys.voiceTTSModel) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.voiceTTSModel) }
+    }
+
+    var voiceVADModel: String {
+        get { defaults.string(forKey: Keys.voiceVADModel) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.voiceVADModel) }
+    }
+
+    var voiceTurnDetectorEnabled: Bool {
+        get { defaults.object(forKey: Keys.voiceTurnDetectorEnabled) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: Keys.voiceTurnDetectorEnabled) }
+    }
+
+    var voiceTTSVoice: String {
+        get { defaults.string(forKey: Keys.voiceTTSVoice) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.voiceTTSVoice) }
+    }
+
+    var voiceReferenceAudioPath: String {
+        get { defaults.string(forKey: Keys.voiceReferenceAudioPath) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.voiceReferenceAudioPath) }
+    }
+
+    /// Transcript of the reference audio clip (required for Qwen3-TTS voice cloning).
+    var voiceReferenceText: String {
+        get { defaults.string(forKey: Keys.voiceReferenceText) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.voiceReferenceText) }
+    }
+
+    /// LLM model override for voice conversations (empty = same as AI Chat).
+    var voiceLLMModel: String {
+        get { defaults.string(forKey: Keys.voiceLLMModel) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.voiceLLMModel) }
+    }
+
+    /// Language code for voice STT/TTS (e.g. "en", "zh", "ja"). Defaults to English.
+    var voiceLanguage: String {
+        get { defaults.string(forKey: Keys.voiceLanguage) ?? "en" }
+        set { defaults.set(newValue, forKey: Keys.voiceLanguage) }
+    }
+
+    /// Enable live (streaming) transcription during speech. Defaults to true.
+    var voiceLiveTranscription: Bool {
+        get { defaults.object(forKey: Keys.voiceLiveTranscription) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: Keys.voiceLiveTranscription) }
+    }
+
+    /// Persistent UID of the selected input (microphone) device. Empty = system default.
+    var voiceInputDeviceUID: String {
+        get { defaults.string(forKey: Keys.voiceInputDeviceUID) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.voiceInputDeviceUID) }
+    }
+
+    /// Persistent UID of the selected output (speaker) device. Empty = system default.
+    var voiceOutputDeviceUID: String {
+        get { defaults.string(forKey: Keys.voiceOutputDeviceUID) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.voiceOutputDeviceUID) }
+    }
+
+    /// Custom HuggingFace endpoint URL (e.g. "https://hf-mirror.com" for China).
+    /// Empty string means default (https://huggingface.co).
+    var hfEndpoint: String {
+        get { defaults.string(forKey: Keys.hfEndpoint) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.hfEndpoint) }
+    }
+
+    // MARK: - ElevenLabs Cloud Provider Preferences
+
+    /// STT provider type: "on_device" or "elevenlabs".
+    var voiceSTTProvider: String {
+        get { defaults.string(forKey: Keys.voiceSTTProvider) ?? "on_device" }
+        set { defaults.set(newValue, forKey: Keys.voiceSTTProvider) }
+    }
+
+    /// TTS provider type: "on_device" or "elevenlabs".
+    var voiceTTSProvider: String {
+        get { defaults.string(forKey: Keys.voiceTTSProvider) ?? "on_device" }
+        set { defaults.set(newValue, forKey: Keys.voiceTTSProvider) }
+    }
+
+    /// ElevenLabs API key (shared by STT and TTS).
+    var elevenLabsAPIKey: String {
+        get { defaults.string(forKey: Keys.elevenLabsAPIKey) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.elevenLabsAPIKey) }
+    }
+
+    /// ElevenLabs voice ID for TTS.
+    var elevenLabsVoiceId: String {
+        get { defaults.string(forKey: Keys.elevenLabsVoiceId) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.elevenLabsVoiceId) }
+    }
+
+    /// ElevenLabs TTS model ID.
+    var elevenLabsTTSModelId: String {
+        get { defaults.string(forKey: Keys.elevenLabsTTSModelId) ?? "eleven_turbo_v2_5" }
+        set { defaults.set(newValue, forKey: Keys.elevenLabsTTSModelId) }
+    }
+
+    /// ElevenLabs STT model ID.
+    var elevenLabsSTTModelId: String {
+        get { defaults.string(forKey: Keys.elevenLabsSTTModelId) ?? "scribe_v2_realtime" }
+        set { defaults.set(newValue, forKey: Keys.elevenLabsSTTModelId) }
+    }
+
+    var voiceReferenceAudioURL: URL? {
+        let path = voiceReferenceAudioPath
+        if !path.isEmpty {
+            let url = URL(fileURLWithPath: path)
+            if FileManager.default.fileExists(atPath: url.path) { return url }
+        }
+        // Fall back to bundled default voice
+        return Bundle.main.url(forResource: "grant_voice", withExtension: "wav")
     }
 
     // MARK: - External Tools

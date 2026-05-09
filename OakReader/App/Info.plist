@@ -61,5 +61,7 @@
 	<false/>
 	<key>ATSApplicationFontsPath</key>
 	<string>.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>OakReader needs microphone access for Voice AI conversations.</string>
 </dict>
 </plist>

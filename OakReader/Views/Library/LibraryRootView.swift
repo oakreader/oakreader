@@ -107,6 +107,12 @@ struct LibraryRootView: View {
                                 onSaveAssistantResponse: librarySaveAssistantResponseAction
                             )
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else if appState.libraryDetailTab == .voiceChat {
+                            VoicePanelContainerView(
+                                speakerListVM: appState.speakerListVM,
+                                voiceVM: appState.libraryVoiceVM
+                            )
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
                         } else if let item = selectedItemInCurrentFilter {
                             LibrarySidebarPanel(item: item, appState: appState)
                         } else {
@@ -187,7 +193,7 @@ private struct LibraryCollectionSidebarPanel: View {
                 title: contextTitle,
                 items: items
             )
-        case .chat:
+        case .chat, .voiceChat:
             EmptyView()
         }
     }

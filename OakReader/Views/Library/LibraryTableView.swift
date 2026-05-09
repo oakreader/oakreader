@@ -146,19 +146,12 @@ struct LibraryTableView: View {
             if !selectProperties.isEmpty {
                 ForEach(selectProperties) { property in
                     Menu(property.name) {
-                        ForEach(property.options) { option in
-                            let isAssigned = item.propertyValues.contains { $0.option?.id == option.id }
-                            Button {
-                                if isAssigned {
-                                    store.removeItemSelectValue(item: item, property: property, option: option)
-                                } else {
-                                    store.setItemSelectValue(item: item, property: property, option: option)
-                                }
-                            } label: {
-                                Label(option.name, systemImage: isAssigned ? "checkmark.circle.fill" : "circle.fill")
-                            }
-                            .tint(Color(hex: option.colorHex))
-                        }
+                        PropertyOptionAssignmentMenuItems(
+                            item: item,
+                            property: property,
+                            store: store,
+                            mode: .toggleAssigned
+                        )
                     }
                 }
             }

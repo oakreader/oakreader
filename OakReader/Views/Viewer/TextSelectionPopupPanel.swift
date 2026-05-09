@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import PDFKit
 import AppKit
 
@@ -24,6 +25,9 @@ class TextSelectionPopupPanel: NSPanel {
     // Color sub-panel
     private var colorSubPanel: NSPanel?
     private weak var splitButton: HighlightSplitButton?
+
+    // Speak button
+    private weak var speakButton: PopupIconButton?
 
     static let annotationColors: [(NSColor, String)] = [
         (NSColor(red: 1.0, green: 0.83, blue: 0.0, alpha: 1.0), "Yellow"),
@@ -189,6 +193,15 @@ class TextSelectionPopupPanel: NSPanel {
             mainStack.addArrangedSubview(translateBtn)
         }
 
+        let speakBtn = PopupIconButton(
+            systemImage: "speaker.wave.2",
+            accessibilityLabel: "Play Sound"
+        ) { [weak self] in
+            self?.speakSelection()
+        }
+        self.speakButton = speakBtn
+        mainStack.addArrangedSubview(speakBtn)
+
         // Separator 2
         mainStack.addArrangedSubview(makeVerticalSeparator())
 
@@ -346,6 +359,35 @@ class TextSelectionPopupPanel: NSPanel {
         dismissWithAction()
     }
 
+    private func speakSelection() {
+        let voice = viewModel.voice
+        if voice.isSpeaking {
+            voice.stopSpeaking()
+            speakButton?.updateImage(systemImage: "speaker.wave.2")
+            return
+        }
+
+        guard let text = selection.string, !text.isEmpty else { return }
+        voice.speakText(text)
+        speakButton?.updateImage(systemImage: "stop.fill")
+        observeSpeakingState()
+    }
+
+    private func observeSpeakingState() {
+        withObservationTracking {
+            _ = self.viewModel.voice.isSpeaking
+        } onChange: { [weak self] in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                if self.viewModel.voice.isSpeaking {
+                    self.observeSpeakingState()
+                } else {
+                    self.speakButton?.updateImage(systemImage: "speaker.wave.2")
+                }
+            }
+        }
+    }
+
     private func applyHighlight(color: NSColor) {
         viewModel.annotation.strokeColor = color
         viewModel.annotation.addHighlight(for: selection)
@@ -378,6 +420,9 @@ class TextSelectionPopupPanel: NSPanel {
             NotificationCenter.default.removeObserver(observer)
             scrollObserver = nil
         }
+
+        // Stop TTS playback if active
+        viewModel.voice.stopSpeaking()
 
         // Dismiss color sub-panel
         colorSubPanel?.orderOut(nil)

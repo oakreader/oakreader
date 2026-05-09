@@ -11,6 +11,8 @@ options:
 packages:
   OakReaderAI:
     path: Packages/OakReaderAI
+  VoiceAgentKit:
+    path: Packages/VoiceAgentKit
   Textual:
     url: https://github.com/gonzalezreal/textual
     from: "0.1.0"
@@ -47,6 +49,7 @@ targets:
           - "**/*.entitlements"
     dependencies:
       - package: OakReaderAI
+      - package: VoiceAgentKit
       - package: Textual
       - package: GRDB
         product: GRDB
