@@ -16,6 +16,7 @@ enum Log {
     static let cover     = Logger(subsystem: subsystem, category: "cover")
     static let ui        = Logger(subsystem: subsystem, category: "ui")
     static let chapters  = Logger(subsystem: subsystem, category: "chapters")
+    static let zotero   = Logger(subsystem: subsystem, category: "zotero")
 
     private static let subsystem = Bundle.main.bundleIdentifier ?? "com.oakreader.OakReader"
 
@@ -70,6 +71,7 @@ private extension Logger {
         case Log.cover:     return "cover"
         case Log.ui:        return "ui"
         case Log.chapters:  return "chapters"
+        case Log.zotero:    return "zotero"
         default:            return "unknown"
         }
     }
