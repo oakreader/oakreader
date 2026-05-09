@@ -51,6 +51,9 @@ browser-extension/node_modules/
 browser-extension/.output/
 browser-extension/.wxt/
 
+# TTS samples
+tts_samples/
+
 # Keys and secrets
 *.pem
 *.p12

@@ -342,6 +342,41 @@ final class CatalogDatabase {
             """)
         }
 
+        migrator.registerMigration("v5-voice-speakers") { db in
+            try db.create(table: "speakers") { t in
+                t.column("id", .text).primaryKey()
+                t.column("user_id", .text).notNull()
+                t.column("name", .text).notNull()
+                t.column("avatar_color_hex", .text).notNull().defaults(to: "#5FB236")
+                t.column("tts_voice", .text).notNull().defaults(to: "")
+                t.column("reference_audio_path", .text).notNull().defaults(to: "")
+                t.column("reference_text", .text).notNull().defaults(to: "")
+                t.column("language", .text).notNull().defaults(to: "en")
+                t.column("llm_model", .text).notNull().defaults(to: "")
+                t.column("sort_order", .integer).notNull().defaults(to: 0)
+                t.column("created_at", .text).notNull()
+                t.column("updated_at", .text).notNull()
+            }
+
+            try db.create(table: "voice_calls") { t in
+                t.column("id", .text).primaryKey()
+                t.column("speaker_id", .text).notNull().references("speakers", onDelete: .cascade)
+                t.column("title", .text).notNull().defaults(to: "")
+                t.column("turn_count", .integer).notNull().defaults(to: 0)
+                t.column("duration_seconds", .double).notNull().defaults(to: 0)
+                t.column("created_at", .text).notNull()
+                t.column("updated_at", .text).notNull()
+            }
+            try db.create(index: "idx_voice_calls_speaker_id", on: "voice_calls", columns: ["speaker_id"])
+
+            // Seed default speaker
+            let now = Date().iso8601String
+            try db.execute(sql: """
+                INSERT INTO speakers (id, user_id, name, avatar_color_hex, tts_voice, reference_audio_path, reference_text, language, llm_model, sort_order, created_at, updated_at)
+                VALUES (?, ?, 'Oak', '#5FB236', '', '', '', 'en', '', 0, ?, ?)
+            """, arguments: [UUID().uuidString, localUserId, now, now])
+        }
+
         return migrator
     }
 

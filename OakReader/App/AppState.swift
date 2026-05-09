@@ -86,6 +86,23 @@ final class AppState {
         return vm
     }
 
+    private var _libraryVoiceVM: VoiceViewModel?
+    var libraryVoiceVM: VoiceViewModel {
+        if let vm = _libraryVoiceVM { return vm }
+        let vm = VoiceViewModel()
+        _libraryVoiceVM = vm
+        return vm
+    }
+
+    private var _speakerListVM: SpeakerListViewModel?
+    var speakerListVM: SpeakerListViewModel {
+        if let vm = _speakerListVM { return vm }
+        let service = VoiceSpeakerService(database: libraryStore.database)
+        let vm = SpeakerListViewModel(service: service)
+        _speakerListVM = vm
+        return vm
+    }
+
     private var autosaveTimer: Timer?
 
     var isLibraryActive: Bool {
@@ -165,6 +182,7 @@ final class AppState {
         tab.viewModel.libraryStore = libraryStore
         tab.viewModel.itemStorageKey = storageKey
         tab.viewModel.attachmentId = item?.primaryAttachment?.id.uuidString
+        tab.viewModel.speakerListVM = speakerListVM
         // Use original filename (not "document.pdf" from managed storage)
         tab.title = item?.fileName ?? url.lastPathComponent
         NSDocumentController.shared.addDocument(doc)
@@ -187,6 +205,7 @@ final class AppState {
             tab.viewModel.libraryStore = libraryStore
             tab.viewModel.itemStorageKey = storageKey
             tab.viewModel.attachmentId = item?.primaryAttachment?.id.uuidString
+        tab.viewModel.speakerListVM = speakerListVM
             tab.title = item?.title ?? url.deletingPathExtension().lastPathComponent
             openTabs.append(tab)
             activeTabID = tab.id
@@ -251,6 +270,7 @@ final class AppState {
         tab.viewModel.libraryStore = libraryStore
         tab.viewModel.itemStorageKey = item.storageKey
         tab.viewModel.attachmentId = item.primaryAttachment?.id.uuidString
+        tab.viewModel.speakerListVM = speakerListVM
         // Use original filename from library item
         tab.title = item.fileName
         NSDocumentController.shared.addDocument(doc)
@@ -287,6 +307,7 @@ final class AppState {
             tab.viewModel.libraryStore = libraryStore
             tab.viewModel.itemStorageKey = item.storageKey
             tab.viewModel.attachmentId = item.primaryAttachment?.id.uuidString
+        tab.viewModel.speakerListVM = speakerListVM
             tab.title = item.title
             openTabs.append(tab)
             activeTabID = tab.id
@@ -328,6 +349,7 @@ final class AppState {
             tab.viewModel.libraryStore = libraryStore
             tab.viewModel.itemStorageKey = item.storageKey
             tab.viewModel.attachmentId = item.primaryAttachment?.id.uuidString
+        tab.viewModel.speakerListVM = speakerListVM
             tab.title = item.title
             openTabs.append(tab)
             activeTabID = tab.id
