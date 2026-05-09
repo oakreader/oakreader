@@ -71,9 +71,9 @@ class NotesViewModel {
     // MARK: - Create
 
     func createNote() {
-        guard let itemId, let storageKey, let noteService else { return }
+        guard let itemId, let noteService else { return }
         do {
-            let note = try noteService.createNote(itemId: itemId, storageKey: storageKey)
+            let note = try noteService.createNote(itemId: itemId)
             notes.insert(note, at: 0)
             selectNote(note)
         } catch {
@@ -89,8 +89,8 @@ class NotesViewModel {
 
         selectedNoteId = note.id
         // Load content from .md file
-        if let storageKey, let noteService {
-            editorContent = noteService.loadContent(noteId: note.id, storageKey: storageKey)
+        if let noteService {
+            editorContent = noteService.loadContent(noteId: note.id)
         } else {
             editorContent = ""
         }
@@ -123,7 +123,6 @@ class NotesViewModel {
 
     private func saveCurrentNoteIfNeeded() {
         guard let noteId = selectedNoteId,
-              let storageKey,
               let noteService,
               editorContent != lastSavedContent else { return }
 
@@ -133,7 +132,6 @@ class NotesViewModel {
         do {
             try noteService.saveContent(
                 noteId: noteId,
-                storageKey: storageKey,
                 title: title,
                 content: content
             )
@@ -162,9 +160,9 @@ class NotesViewModel {
     // MARK: - Delete
 
     func deleteNote(_ note: Note) {
-        guard let storageKey, let noteService else { return }
+        guard let noteService else { return }
         do {
-            try noteService.deleteNote(id: note.id, storageKey: storageKey)
+            try noteService.deleteNote(id: note.id)
             notes.removeAll { $0.id == note.id }
             if selectedNoteId == note.id {
                 selectedNoteId = nil
@@ -202,14 +200,14 @@ class NotesViewModel {
 
     /// Save image data and return the relative markdown path.
     func saveImage(_ data: Data, fileExtension: String = "png") -> String? {
-        guard let storageKey, let noteService else { return nil }
-        return try? noteService.saveImage(data: data, storageKey: storageKey, fileExtension: fileExtension)
+        guard let noteService, let noteId = selectedNoteId else { return nil }
+        return try? noteService.saveImage(noteId: noteId, data: data, fileExtension: fileExtension)
     }
 
     /// Absolute URL of the notes directory (for WKWebView base URL).
     var notesDirectoryURL: URL? {
-        guard let storageKey, let noteService else { return nil }
-        return noteService.notesDirectoryURL(storageKey: storageKey)
+        guard let noteService else { return nil }
+        return noteService.notesDirectoryURL
     }
 
     // MARK: - Add Content from Selection

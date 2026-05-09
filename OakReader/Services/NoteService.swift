@@ -3,7 +3,7 @@ import GRDB
 
 /// Stateless service for note CRUD operations.
 /// Metadata lives in the GRDB `notes` table; content lives as `.md` files on disk.
-/// Storage layout: ~/OakReader/storage/{storageKey}/notes/{noteId}.md
+/// Storage layout: ~/OakReader/notes/{noteId}.md
 struct NoteService {
     let database: CatalogDatabase
 
@@ -26,18 +26,15 @@ struct NoteService {
     // MARK: - Content (filesystem)
 
     /// Load note content from the .md file on disk.
-    func loadContent(noteId: UUID, storageKey: String) -> String {
-        let url = noteFileURL(noteId: noteId, storageKey: storageKey)
+    func loadContent(noteId: UUID) -> String {
+        let url = CatalogDatabase.noteFileURL(noteId: noteId)
         guard FileManager.default.fileExists(atPath: url.path) else { return "" }
         return (try? String(contentsOf: url, encoding: .utf8)) ?? ""
     }
 
     /// Save note content to the .md file and update metadata in the database.
-    func saveContent(noteId: UUID, storageKey: String, title: String, content: String) throws {
-        let notesDir = CatalogDatabase.documentNotesDirectory(storageKey: storageKey)
-        try FileManager.default.createDirectory(at: notesDir, withIntermediateDirectories: true)
-
-        let url = noteFileURL(noteId: noteId, storageKey: storageKey)
+    func saveContent(noteId: UUID, title: String, content: String) throws {
+        let url = CatalogDatabase.noteFileURL(noteId: noteId)
         try content.write(to: url, atomically: true, encoding: .utf8)
 
         let now = Date().iso8601String
@@ -52,7 +49,7 @@ struct NoteService {
     // MARK: - Create
 
     @discardableResult
-    func createNote(itemId: String, storageKey: String) throws -> Note {
+    func createNote(itemId: String) throws -> Note {
         let noteId = UUID()
         let now = Date().iso8601String
 
@@ -70,9 +67,7 @@ struct NoteService {
         }
 
         // Create the empty .md file
-        let notesDir = CatalogDatabase.documentNotesDirectory(storageKey: storageKey)
-        try FileManager.default.createDirectory(at: notesDir, withIntermediateDirectories: true)
-        let url = noteFileURL(noteId: noteId, storageKey: storageKey)
+        let url = CatalogDatabase.noteFileURL(noteId: noteId)
         try "".write(to: url, atomically: true, encoding: .utf8)
 
         return Note(record: record)
@@ -92,39 +87,32 @@ struct NoteService {
 
     // MARK: - Delete
 
-    func deleteNote(id: UUID, storageKey: String) throws {
+    func deleteNote(id: UUID) throws {
         try database.dbQueue.write { db in
             try db.execute(sql: "DELETE FROM notes WHERE id = ?", arguments: [id.uuidString])
         }
-        // Remove the .md file
-        let url = noteFileURL(noteId: id, storageKey: storageKey)
+        let url = CatalogDatabase.noteFileURL(noteId: id)
         try? FileManager.default.removeItem(at: url)
+        try? FileManager.default.removeItem(at: CatalogDatabase.noteAttachmentDirectory(noteId: id))
     }
 
     // MARK: - Image attachment
 
     /// Save image data to the notes attachments directory.
-    /// Returns the relative path suitable for markdown insertion (e.g., "attachments/uuid.png").
-    func saveImage(data: Data, storageKey: String, fileExtension: String = "png") throws -> String {
-        let attachDir = CatalogDatabase.documentNotesAttachmentsDirectory(storageKey: storageKey)
+    /// Returns the relative path suitable for markdown insertion (e.g., "attachments/{noteId}/uuid.png").
+    func saveImage(noteId: UUID, data: Data, fileExtension: String = "png") throws -> String {
+        let attachDir = CatalogDatabase.noteAttachmentDirectory(noteId: noteId)
         try FileManager.default.createDirectory(at: attachDir, withIntermediateDirectories: true)
 
         let fileName = "\(UUID().uuidString).\(fileExtension)"
         let url = attachDir.appendingPathComponent(fileName)
         try data.write(to: url)
 
-        return "attachments/\(fileName)"
+        return "attachments/\(noteId.uuidString)/\(fileName)"
     }
 
     /// Absolute URL for the notes directory (for WKWebView base URL).
-    func notesDirectoryURL(storageKey: String) -> URL {
-        CatalogDatabase.documentNotesDirectory(storageKey: storageKey)
-    }
-
-    // MARK: - Private
-
-    private func noteFileURL(noteId: UUID, storageKey: String) -> URL {
-        CatalogDatabase.documentNotesDirectory(storageKey: storageKey)
-            .appendingPathComponent("\(noteId.uuidString).md")
+    var notesDirectoryURL: URL {
+        CatalogDatabase.notesDirectory
     }
 }
