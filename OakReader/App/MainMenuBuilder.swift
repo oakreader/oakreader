@@ -1,11 +1,12 @@
 import Cocoa
+import Sparkle
 
 enum MainMenuBuilder {
     static func build(target: AppDelegate) -> NSMenu {
         let mainMenu = NSMenu()
 
         // App menu
-        mainMenu.addItem(buildAppMenu())
+        mainMenu.addItem(buildAppMenu(updaterController: target.updaterController))
 
         // File menu
         mainMenu.addItem(buildFileMenu(target: target))
@@ -37,9 +38,13 @@ enum MainMenuBuilder {
 
     // MARK: - App Menu
 
-    private static func buildAppMenu() -> NSMenuItem {
+    private static func buildAppMenu(updaterController: SPUStandardUpdaterController) -> NSMenuItem {
         let appMenu = NSMenu()
         appMenu.addItem(NSMenuItem(title: "About OakReader", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: ""))
+        appMenu.addItem(.separator())
+        let checkForUpdatesItem = NSMenuItem(title: "Check for Updates...", action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)), keyEquivalent: "")
+        checkForUpdatesItem.target = updaterController
+        appMenu.addItem(checkForUpdatesItem)
         appMenu.addItem(.separator())
         appMenu.addItem(NSMenuItem(title: "Settings...", action: Selector(("showSettingsWindow:")), keyEquivalent: ","))
         appMenu.addItem(.separator())
@@ -78,6 +83,12 @@ enum MainMenuBuilder {
         let openRecentItem = NSMenuItem(title: "Open Recent", action: nil, keyEquivalent: "")
         openRecentItem.submenu = openRecentMenu
         fileMenu.addItem(openRecentItem)
+
+        fileMenu.addItem(.separator())
+
+        let zoteroItem = NSMenuItem(title: "Import from Zotero...", action: #selector(AppDelegate.importFromZotero(_:)), keyEquivalent: "")
+        zoteroItem.target = target
+        fileMenu.addItem(zoteroItem)
 
         fileMenu.addItem(.separator())
 

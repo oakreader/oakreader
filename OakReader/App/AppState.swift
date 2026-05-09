@@ -8,6 +8,7 @@ enum TabContent {
     case pdf(OakReaderDocument)
     case webSnapshot(WebSnapshotDocument)
     case media(MediaDocument)
+    case markdown(MarkdownDocument)
 }
 
 // MARK: - Document Tab
@@ -56,6 +57,14 @@ final class DocumentTab: Identifiable {
         self.storageKey = storageKey
     }
 
+    init(markdown: MarkdownDocument, storageKey: String? = nil) {
+        self.id = UUID()
+        self.content = .markdown(markdown)
+        self.viewModel = DocumentViewModel(markdown: markdown)
+        self.title = markdown.fileURL.deletingPathExtension().lastPathComponent
+        self.storageKey = storageKey
+    }
+
 }
 
 // MARK: - App State
@@ -74,6 +83,8 @@ final class AppState {
     var window: NSWindow?
     var selectedLibraryItemIDs: Set<UUID> = []
     var showSettings: Bool = false
+    var showZoteroImport: Bool = false
+    var zoteroImportDataDir: URL?
     var isLibrarySidebarVisible: Bool = true
     var libraryDetailTab: LibraryDetailTab = .chat
 
@@ -134,11 +145,17 @@ final class AppState {
 
     // MARK: - Tab Operations
 
-    /// Open a document from a URL. Dispatches to PDF or web snapshot based on file extension.
+    /// Open a document from a URL. Dispatches to PDF, web snapshot, or markdown based on file extension.
     func openDocument(url: URL) {
         let ext = url.pathExtension.lowercased()
         if ext == "html" || ext == "htm" {
             openHTMLDocument(url: url)
+            return
+        }
+        if ext == "md" || ext == "markdown" {
+            if let item = importService.importMarkdown(from: url) {
+                openMarkdownItem(item)
+            }
             return
         }
         // Check if already open by URL
@@ -180,6 +197,7 @@ final class AppState {
         tab.viewModel.database = libraryStore.database
         tab.viewModel.referenceService = referenceService
         tab.viewModel.libraryStore = libraryStore
+        tab.viewModel.appState = self
         tab.viewModel.itemStorageKey = storageKey
         tab.viewModel.attachmentId = item?.primaryAttachment?.id.uuidString
         tab.viewModel.speakerListVM = speakerListVM
@@ -203,6 +221,7 @@ final class AppState {
             tab.viewModel.database = libraryStore.database
             tab.viewModel.referenceService = referenceService
             tab.viewModel.libraryStore = libraryStore
+            tab.viewModel.appState = self
             tab.viewModel.itemStorageKey = storageKey
             tab.viewModel.attachmentId = item?.primaryAttachment?.id.uuidString
         tab.viewModel.speakerListVM = speakerListVM
@@ -229,6 +248,8 @@ final class AppState {
             openPDFItem(item)
         case .embed:
             openMediaItem(item)
+        case .markdown:
+            openMarkdownItem(item)
         }
     }
 
@@ -268,6 +289,7 @@ final class AppState {
         tab.viewModel.database = libraryStore.database
         tab.viewModel.referenceService = referenceService
         tab.viewModel.libraryStore = libraryStore
+        tab.viewModel.appState = self
         tab.viewModel.itemStorageKey = item.storageKey
         tab.viewModel.attachmentId = item.primaryAttachment?.id.uuidString
         tab.viewModel.speakerListVM = speakerListVM
@@ -305,6 +327,7 @@ final class AppState {
             tab.viewModel.database = libraryStore.database
             tab.viewModel.referenceService = referenceService
             tab.viewModel.libraryStore = libraryStore
+            tab.viewModel.appState = self
             tab.viewModel.itemStorageKey = item.storageKey
             tab.viewModel.attachmentId = item.primaryAttachment?.id.uuidString
         tab.viewModel.speakerListVM = speakerListVM
@@ -347,6 +370,7 @@ final class AppState {
             tab.viewModel.database = libraryStore.database
             tab.viewModel.referenceService = referenceService
             tab.viewModel.libraryStore = libraryStore
+            tab.viewModel.appState = self
             tab.viewModel.itemStorageKey = item.storageKey
             tab.viewModel.attachmentId = item.primaryAttachment?.id.uuidString
         tab.viewModel.speakerListVM = speakerListVM
@@ -356,6 +380,46 @@ final class AppState {
             updateWindowTitle()
         } catch {
             Log.error(Log.open, "Failed to open media item: \(item.title) — \(error)")
+            NSAlert(error: error).runModal()
+        }
+    }
+
+    private func openMarkdownItem(_ item: LibraryItem) {
+        // Check if already open by storage key
+        if let existing = openTabs.first(where: { $0.storageKey == item.storageKey }) {
+            switchToTab(existing.id)
+            return
+        }
+
+        let mdURL = item.fileURL
+        guard FileManager.default.fileExists(atPath: mdURL.path) else {
+            let alert = NSAlert()
+            alert.messageText = "Cannot Open Note"
+            alert.informativeText = "The file \"\(item.title)\" could not be found in managed storage."
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
+            return
+        }
+
+        do {
+            let mdDoc = try MarkdownDocument(fileURL: mdURL)
+            libraryStore.markOpened(item)
+
+            let tab = DocumentTab(markdown: mdDoc, storageKey: item.storageKey)
+            tab.viewModel.database = libraryStore.database
+            tab.viewModel.referenceService = referenceService
+            tab.viewModel.libraryStore = libraryStore
+            tab.viewModel.appState = self
+            tab.viewModel.itemStorageKey = item.storageKey
+            tab.viewModel.attachmentId = item.primaryAttachment?.id.uuidString
+            tab.viewModel.speakerListVM = speakerListVM
+            tab.title = item.title
+            openTabs.append(tab)
+            activeTabID = tab.id
+            updateWindowTitle()
+        } catch {
+            Log.error(Log.open, "Failed to open markdown: \(item.title) — \(error)")
             NSAlert(error: error).runModal()
         }
     }
