@@ -1,11 +1,13 @@
 import Cocoa
 import PDFKit
+import Sparkle
 import UniformTypeIdentifiers
 import SwiftUI
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     let documentController = PDFDocumentController()
     let appState = AppState()
+    let updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
     private var mainWindow: NSWindow?
     private var snapshotServer: SnapshotServer?
 
@@ -226,6 +228,58 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             guard response == .OK, let destURL = panel.url else { return }
             try? FileManager.default.copyItem(at: logURL, to: destURL)
         }
+    }
+
+    // MARK: - Zotero Import
+
+    @objc func importFromZotero(_ sender: Any?) {
+        let migrationService = ZoteroMigrationService(
+            store: appState.libraryStore,
+            coverService: appState.coverService,
+            referenceService: appState.referenceService
+        )
+
+        var dataDir = migrationService.detectZoteroDataDirectory()
+
+        if dataDir == nil {
+            // No auto-detected directory — ask user to select
+            let panel = NSOpenPanel()
+            panel.message = "Select your Zotero data directory (contains zotero.sqlite)"
+            panel.prompt = "Select"
+            panel.canChooseFiles = false
+            panel.canChooseDirectories = true
+            panel.allowsMultipleSelection = false
+            let response = panel.runModal()
+            guard response == .OK, let selectedURL = panel.url else { return }
+            dataDir = selectedURL
+        }
+
+        guard let dir = dataDir else { return }
+
+        let dbFile = dir.appendingPathComponent("zotero.sqlite")
+        guard FileManager.default.fileExists(atPath: dbFile.path) else {
+            let alert = NSAlert()
+            alert.messageText = "Zotero Database Not Found"
+            alert.informativeText = "No zotero.sqlite file was found in the selected directory."
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
+            return
+        }
+
+        // Confirmation alert
+        let alert = NSAlert()
+        alert.messageText = "Import from Zotero"
+        alert.informativeText = "This will import your Zotero library into OakReader.\n\nZotero data directory:\n\(dir.path)\n\nYour Zotero library will not be modified."
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Import")
+        alert.addButton(withTitle: "Cancel")
+
+        let response = alert.runModal()
+        guard response == .alertFirstButtonReturn else { return }
+
+        appState.zoteroImportDataDir = dir
+        appState.showZoteroImport = true
     }
 
     // MARK: - Menu Action Dispatch
