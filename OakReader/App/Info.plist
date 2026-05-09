@@ -63,5 +63,11 @@
 	<string>.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>OakReader needs microphone access for Voice AI conversations.</string>
+	<key>SUFeedURL</key>
+	<string>https://oakreader.github.io/oakreader/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>$(SPARKLE_PUBLIC_ED_KEY)</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
 </dict>
 </plist>

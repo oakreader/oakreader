@@ -15,6 +15,7 @@ let package = Package(
         .package(url: "https://github.com/stackotter/swift-cmark-gfm", from: "1.0.2"),
         .package(url: "https://github.com/SvenTiigi/YouTubePlayerKit.git", from: "2.0.0"),
         .package(url: "https://github.com/skainguyen1412/swift-youtube-transcript.git", from: "1.0.0"),
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.0"),
     ],
     targets: [
         .executableTarget(
@@ -28,6 +29,7 @@ let package = Package(
                 .product(name: "CMarkGFM", package: "swift-cmark-gfm"),
                 .product(name: "YouTubePlayerKit", package: "YouTubePlayerKit"),
                 .product(name: "YoutubeTranscript", package: "swift-youtube-transcript"),
+                .product(name: "Sparkle", package: "Sparkle"),
             ],
             path: "OakReader",
             exclude: ["App/Info.plist", "OakReader.entitlements", "Resources/Assets.xcassets", "Resources/DefaultStamps"],

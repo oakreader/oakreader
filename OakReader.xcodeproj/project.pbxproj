@@ -38,6 +38,7 @@
 		27926C8DE8B6E9E53CF5553D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35C3D7C67DA37CE045FCE96F /* ContentView.swift */; };
 		292A1C4192568BEACFE65E88 /* DatabaseRecords.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2E4089D54ED9BD0D3F84946 /* DatabaseRecords.swift */; };
 		2992D570C1123621D4A04619 /* WebSelectionPopupPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A619B8999705C80396D94D5 /* WebSelectionPopupPanel.swift */; };
+		29A3D571C1123621D4A04620 /* MarkdownSelectionPopupPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A619B8999705C80396D94D6 /* MarkdownSelectionPopupPanel.swift */; };
 		2A8E9CDB4D8AEECDC62B3196 /* AudioPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F62FA62E452AE2C6D5F47C62 /* AudioPlayerView.swift */; };
 		2BEB2B630AF8E575DE9FE809 /* LibraryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6E956A0342EDE33F8AC2ACB /* LibraryStore.swift */; };
 		2C7A8913E8D1A3D022686066 /* FlowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31E4F106C2F0C64B0191320B /* FlowLayout.swift */; };
@@ -102,6 +103,9 @@
 		68C759913CA34CE2423602F4 /* NotePreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FF26392F8BE88816E86DC83 /* NotePreviewView.swift */; };
 		69646E7C83625923A7D82316 /* OakReaderAI in Frameworks */ = {isa = PBXBuildFile; productRef = B0FA5FDF627CF3003240BE67 /* OakReaderAI */; };
 		6A9B45CB67160400C30F813B /* WebSnapshotDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = E619D163110C86F5906E9DD1 /* WebSnapshotDocument.swift */; };
+		KK34W24VYHJN2W067CIHO9AC /* MarkdownDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = YH30DH1L8BU64RG372LXUYRA /* MarkdownDocument.swift */; };
+		27YI3VNWP1F03CIYH00WLBFH /* MarkdownViewerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = V73DSS6Z6BPJKI7KK2PE0N97 /* MarkdownViewerView.swift */; };
+		M0DOUTLINE7SIDEBAR8BUILD1 /* MarkdownOutlineSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = M0DOUTLINE7SIDEBAR8FREF01 /* MarkdownOutlineSidebarView.swift */; };
 		6B7943692C35CBD68E2E8E3C /* BookmarkSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4B69107E3E492061A5CADE5 /* BookmarkSidebarView.swift */; };
 		6EB17E48EFDF2EFCB2F8DDFA /* TsangerJinKai02-W04.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 912AD36ADFACA2448194EBB7 /* TsangerJinKai02-W04.ttf */; };
 		A1B2C3D4E5F60718A9B0C1D2 /* grant_voice.wav in Resources */ = {isa = PBXBuildFile; fileRef = D2C1B0A9180F6E5D4C3B2A19 /* grant_voice.wav */; };
@@ -245,6 +249,9 @@
 		81A8F76FD0C861C5D2A5E953 /* VoicePanelContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D643B81FA426A590AEBA505 /* VoicePanelContainerView.swift */; };
 		9514F526E549F234F8372839 /* SpeakerListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F18D5F982A3B8E5F14318CB /* SpeakerListView.swift */; };
 		21661F69A61E6CE45DCE1B33 /* CallHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 735D35E2BF573452351F0F1B /* CallHistoryView.swift */; };
+		66BA2943E729F67BE9F634C2 /* ZoteroFieldMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73199DC61923B7DE5316B4C4 /* ZoteroFieldMapping.swift */; };
+		558F209086F3946223BE9440 /* ZoteroMigrationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09C9C57975ABCB0594302600 /* ZoteroMigrationService.swift */; };
+		A60968DA48179F613B0CCC07 /* ZoteroImportProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9621AFCD42245931DC1FEDF0 /* ZoteroImportProgressView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -256,6 +263,7 @@
 		0724C6AE2119D33624CEADB2 /* ImageConversionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageConversionService.swift; sourceTree = "<group>"; };
 		0900EBB862D12D5EE4CCFBC5 /* ContentInsertionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentInsertionView.swift; sourceTree = "<group>"; };
 		0A619B8999705C80396D94D5 /* WebSelectionPopupPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSelectionPopupPanel.swift; sourceTree = "<group>"; };
+		0A619B8999705C80396D94D6 /* MarkdownSelectionPopupPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownSelectionPopupPanel.swift; sourceTree = "<group>"; };
 		0ADD810035D275B765C748C2 /* HeaderFooterViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeaderFooterViewModel.swift; sourceTree = "<group>"; };
 		0C0812413BD57A2054D10A83 /* RedactionBurnInSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RedactionBurnInSheet.swift; sourceTree = "<group>"; };
 		0E778748A8896A1883FEAAC7 /* LibraryTableToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryTableToolbar.swift; sourceTree = "<group>"; };
@@ -274,6 +282,7 @@
 		1840016B0F1A816F6BBC95D2 /* SnapshotServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapshotServer.swift; sourceTree = "<group>"; };
 		1BFBC7945B80E28C4BDE8F12 /* PermissionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsView.swift; sourceTree = "<group>"; };
 		1C68328C9891BD05075C4993 /* MediaViewerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaViewerView.swift; sourceTree = "<group>"; };
+		V73DSS6Z6BPJKI7KK2PE0N97 /* MarkdownViewerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownViewerView.swift; sourceTree = "<group>"; };
 		1E55DE9B5224B2F68AF785CF /* AnnotationListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationListView.swift; sourceTree = "<group>"; };
 		1F1698F5AB44279251965023 /* ImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportService.swift; sourceTree = "<group>"; };
 		1F34E33BC423BCAA3C052D4D /* ExportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSheet.swift; sourceTree = "<group>"; };
@@ -407,6 +416,7 @@
 		A26EF5ADB699BB87E190D08D /* LibrarySidebarPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibrarySidebarPanel.swift; sourceTree = "<group>"; };
 		A304EA4B774CA7D0A5E8F053 /* NoteSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteSettingsView.swift; sourceTree = "<group>"; };
 		A4B69107E3E492061A5CADE5 /* BookmarkSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarkSidebarView.swift; sourceTree = "<group>"; };
+		M0DOUTLINE7SIDEBAR8FREF01 /* MarkdownOutlineSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownOutlineSidebarView.swift; sourceTree = "<group>"; };
 		A546785A0819A73463325E1D /* CompareSetupSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompareSetupSheet.swift; sourceTree = "<group>"; };
 		A6FBF2AB294757A782CCEA5D /* ChapterModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChapterModel.swift; sourceTree = "<group>"; };
 		A7081777BA67ED922BD4F2B0 /* ItemSidebarPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItemSidebarPanel.swift; sourceTree = "<group>"; };
@@ -462,6 +472,7 @@
 		E2E4089D54ED9BD0D3F84946 /* DatabaseRecords.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseRecords.swift; sourceTree = "<group>"; };
 		E405D8C8E484EDAAA451C5D6 /* NoteModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteModel.swift; sourceTree = "<group>"; };
 		E619D163110C86F5906E9DD1 /* WebSnapshotDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSnapshotDocument.swift; sourceTree = "<group>"; };
+		YH30DH1L8BU64RG372LXUYRA /* MarkdownDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownDocument.swift; sourceTree = "<group>"; };
 		E7CB0C597FBB0F0023496A41 /* CGPDFDocument+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CGPDFDocument+Extensions.swift"; sourceTree = "<group>"; };
 		E7DE8679D5490E12A4B04B7D /* DifferenceOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DifferenceOverlayView.swift; sourceTree = "<group>"; };
 		E80DA21B8D814A91B51028B3 /* OakReaderAI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = OakReaderAI; path = Packages/OakReaderAI; sourceTree = SOURCE_ROOT; };
@@ -481,6 +492,9 @@
 		9D643B81FA426A590AEBA505 /* VoicePanelContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoicePanelContainerView.swift; sourceTree = "<group>"; };
 		3F18D5F982A3B8E5F14318CB /* SpeakerListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeakerListView.swift; sourceTree = "<group>"; };
 		735D35E2BF573452351F0F1B /* CallHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallHistoryView.swift; sourceTree = "<group>"; };
+		73199DC61923B7DE5316B4C4 /* ZoteroFieldMapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoteroFieldMapping.swift; sourceTree = "<group>"; };
+		09C9C57975ABCB0594302600 /* ZoteroMigrationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoteroMigrationService.swift; sourceTree = "<group>"; };
+		9621AFCD42245931DC1FEDF0 /* ZoteroImportProgressView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoteroImportProgressView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -529,6 +543,7 @@
 				F5774A9B5D3E174F15767DBD /* EmbedCardView.swift */,
 				C893DD12AC4437684DB48663 /* MediaSnapshotOverlayView.swift */,
 				1C68328C9891BD05075C4993 /* MediaViewerView.swift */,
+				V73DSS6Z6BPJKI7KK2PE0N97 /* MarkdownViewerView.swift */,
 				00C73F9EEB44740568DAFD2A /* PageNavigationView.swift */,
 				6D46DC9842C708EE4F886379 /* PDFViewCoordinator.swift */,
 				B26DDB8ABAE032A0D1F7C5F5 /* PDFViewerRepresentable.swift */,
@@ -537,6 +552,7 @@
 				983CA3B831B97DF57EDBE332 /* TextSelectionPopupPanel.swift */,
 				483CDA5E1E5701530D93478F /* TimelineZoomGestureView.swift */,
 				FBBE6D49F98D1B1167564D4E /* WebArchiveViewerRepresentable.swift */,
+				0A619B8999705C80396D94D6 /* MarkdownSelectionPopupPanel.swift */,
 				0A619B8999705C80396D94D5 /* WebSelectionPopupPanel.swift */,
 				4F16D08935F95BBDC6BF7AF8 /* WebSnapshotOverlayView.swift */,
 				2486F65CDA1E590C45426A94 /* WebViewCoordinator.swift */,
@@ -581,6 +597,7 @@
 				9430D8AD0D92F2EA45E73BDA /* OakReaderDocument.swift */,
 				468D80F75322A949B8272648 /* PDFDocumentController.swift */,
 				E619D163110C86F5906E9DD1 /* WebSnapshotDocument.swift */,
+				YH30DH1L8BU64RG372LXUYRA /* MarkdownDocument.swift */,
 			);
 			path = Document;
 			sourceTree = "<group>";
@@ -728,6 +745,8 @@
 				46A468F7943DDEA20CA97FB1 /* SplitService.swift */,
 				67A7297F5A3894E12796E73F /* TextExtractionService.swift */,
 				7A9D3622F2AF740C7B4DE15B /* WatermarkService.swift */,
+				73199DC61923B7DE5316B4C4 /* ZoteroFieldMapping.swift */,
+				09C9C57975ABCB0594302600 /* ZoteroMigrationService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -892,6 +911,7 @@
 			children = (
 				1E55DE9B5224B2F68AF785CF /* AnnotationListView.swift */,
 				A4B69107E3E492061A5CADE5 /* BookmarkSidebarView.swift */,
+				M0DOUTLINE7SIDEBAR8FREF01 /* MarkdownOutlineSidebarView.swift */,
 				10FB6CFF764763D1ABDF7A20 /* SearchResultsView.swift */,
 				02CC2D250D2F0DC2A519B204 /* SidebarView.swift */,
 				DA49E08B6834E788FECFB25E /* ThumbnailSidebarView.swift */,
@@ -1010,6 +1030,7 @@
 				98FD6BCEA76BE5D32DED6B9E /* LibraryToolbarContent.swift */,
 				C9ECEF7734548F19CC7579D7 /* ReferenceMetadataView.swift */,
 				9F2452181C93824A747B28F8 /* SmartCollectionEditorSheet.swift */,
+				9621AFCD42245931DC1FEDF0 /* ZoteroImportProgressView.swift */,
 			);
 			path = Library;
 			sourceTree = "<group>";
@@ -1384,12 +1405,19 @@
 				059BF7FC91BAB435A586F83D /* WatermarkSheet.swift in Sources */,
 				59D7DE87653A5CDB741C1E0B /* WatermarkViewModel.swift in Sources */,
 				0BAFFCEDCC8975845177B571 /* WebArchiveViewerRepresentable.swift in Sources */,
+				29A3D571C1123621D4A04620 /* MarkdownSelectionPopupPanel.swift in Sources */,
 				2992D570C1123621D4A04619 /* WebSelectionPopupPanel.swift in Sources */,
 				6A9B45CB67160400C30F813B /* WebSnapshotDocument.swift in Sources */,
+				KK34W24VYHJN2W067CIHO9AC /* MarkdownDocument.swift in Sources */,
+				27YI3VNWP1F03CIYH00WLBFH /* MarkdownViewerView.swift in Sources */,
+				M0DOUTLINE7SIDEBAR8BUILD1 /* MarkdownOutlineSidebarView.swift in Sources */,
 				B7331903124CC13A52A4FCEE /* WebSnapshotOverlayView.swift in Sources */,
 				F5D77E842407DAEF697F4E0F /* WebViewCoordinator.swift in Sources */,
 				0633FC713F0937758EBE1E0C /* YouTubeSettingsView.swift in Sources */,
 				B66283FFD28542ADD53A5CE8 /* ZoomableChapterTimelineView.swift in Sources */,
+				66BA2943E729F67BE9F634C2 /* ZoteroFieldMapping.swift in Sources */,
+				558F209086F3946223BE9440 /* ZoteroMigrationService.swift in Sources */,
+				A60968DA48179F613B0CCC07 /* ZoteroImportProgressView.swift in Sources */,
 				3CDCD47693C52BAE40D233F5 /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
