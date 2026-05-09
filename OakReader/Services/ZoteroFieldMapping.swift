@@ -1,0 +1,143 @@
+import Foundation
+
+/// Static mapping tables from Zotero's internal schema to CSL JSON fields.
+/// Reference: https://aurimasv.github.io/z2csl/typeMap.xml
+enum ZoteroFieldMapping {
+
+    // MARK: - Item Type Mapping (Zotero typeName -> CSL type)
+
+    static let itemTypeToCSL: [String: String] = [
+        "journalArticle":       "article-journal",
+        "book":                 "book",
+        "bookSection":          "chapter",
+        "conferencePaper":      "paper-conference",
+        "thesis":               "thesis",
+        "report":               "report",
+        "webpage":              "webpage",
+        "newspaperArticle":     "article-newspaper",
+        "magazineArticle":      "article-magazine",
+        "patent":               "patent",
+        "film":                 "motion_picture",
+        "artwork":              "graphic",
+        "document":             "document",
+        "letter":               "personal_communication",
+        "manuscript":           "manuscript",
+        "interview":            "interview",
+        "presentation":         "speech",
+        "map":                  "map",
+        "statute":              "legislation",
+        "bill":                 "bill",
+        "case":                 "legal_case",
+        "hearing":              "hearing",
+        "encyclopediaArticle":  "entry-encyclopedia",
+        "dictionaryEntry":      "entry-dictionary",
+        "blogPost":             "post-weblog",
+        "forumPost":            "post",
+        "email":                "personal_communication",
+        "computerProgram":      "software",
+        "audioRecording":       "song",
+        "videoRecording":       "motion_picture",
+        "tvBroadcast":          "broadcast",
+        "radioBroadcast":       "broadcast",
+        "podcast":              "song",
+        "instantMessage":       "personal_communication",
+        "preprint":             "article",
+        "standard":             "standard",
+    ]
+
+    // MARK: - Field Mapping (Zotero fieldName -> CSL field)
+
+    static let fieldToCSL: [String: String] = [
+        "title":                "title",
+        "abstractNote":         "abstract",
+        "publicationTitle":     "container-title",
+        "bookTitle":            "container-title",
+        "proceedingsTitle":     "container-title",
+        "encyclopediaTitle":    "container-title",
+        "dictionaryTitle":      "container-title",
+        "websiteTitle":         "container-title",
+        "forumTitle":           "container-title",
+        "blogTitle":            "container-title",
+        "seriesTitle":          "collection-title",
+        "series":               "collection-title",
+        "volume":               "volume",
+        "issue":                "issue",
+        "pages":                "page",
+        "edition":              "edition",
+        "publisher":            "publisher",
+        "place":                "publisher-place",
+        "date":                 "issued",
+        "accessDate":           "accessed",
+        "DOI":                  "DOI",
+        "ISBN":                 "ISBN",
+        "ISSN":                 "ISSN",
+        "url":                  "URL",
+        "language":             "language",
+        "shortTitle":           "short-title",
+        "journalAbbreviation":  "journal-abbreviation",
+        "numPages":             "number-of-pages",
+        "numberOfVolumes":      "number-of-volumes",
+        "section":              "section",
+        "thesisType":           "genre",
+        "reportType":           "genre",
+        "letterType":           "genre",
+        "manuscriptType":       "genre",
+        "mapType":              "genre",
+        "presentationType":     "genre",
+        "artworkMedium":        "medium",
+        "reportNumber":         "number",
+        "patentNumber":         "number",
+        "billNumber":           "number",
+        "codeNumber":           "number",
+        "publicLawNumber":      "number",
+        "documentNumber":       "number",
+        "applicationNumber":    "number",
+        "archiveLocation":      "archive_location",
+        "archive":              "archive",
+        "callNumber":           "call-number",
+        "rights":               "note",
+        "extra":                "note",
+    ]
+
+    // MARK: - Creator Type Mapping (Zotero creatorType -> CSL role)
+
+    static let creatorTypeToCSL: [String: String] = [
+        "author":               "author",
+        "editor":               "editor",
+        "translator":           "translator",
+        "seriesEditor":         "collection-editor",
+        "bookAuthor":           "container-author",
+        "contributor":          "author",
+        "reviewedAuthor":       "reviewed-author",
+        "inventor":             "author",
+        "counsel":              "author",
+        "programmer":           "author",
+        "artist":               "author",
+        "cartographer":         "author",
+        "composer":             "author",
+        "director":             "director",
+        "interviewee":          "author",
+        "interviewer":          "interviewer",
+        "performer":            "author",
+        "presenter":            "author",
+        "producer":             "author",
+        "recipient":            "recipient",
+        "scriptwriter":         "author",
+        "sponsor":              "author",
+        "cosponsor":            "author",
+        "castMember":           "author",
+        "commenter":            "author",
+        "guest":                "author",
+        "podcaster":            "author",
+        "wordsBy":              "author",
+    ]
+
+    // MARK: - Tag Color Palette
+
+    /// A set of muted colors for auto-assigning to imported tags.
+    static let tagColors: [String] = [
+        "5FB236", "2EA8E5", "FF8C19", "A28AE5",
+        "FF6666", "E5A02E", "36B5A0", "E56B9E",
+        "7B9E3A", "3A7B9E", "9E3A7B", "B5A036",
+    ]
+}
