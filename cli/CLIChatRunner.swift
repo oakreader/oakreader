@@ -3,7 +3,11 @@ import OakReaderAI
 import PDFKit
 
 struct CLIChatRunner {
-    private let engine = ChatEngine()
+    private let engine = ChatEngine(chatsDirectory: {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("OakReader", isDirectory: true)
+            .appendingPathComponent("chats", isDirectory: true)
+    }())
     private let sessionId = UUID()
 
     // MARK: - One-shot mode

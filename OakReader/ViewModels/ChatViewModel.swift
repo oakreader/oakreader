@@ -44,18 +44,16 @@ class ChatViewModel {
 
     init(parent: DocumentViewModel, documentStoragePath: URL? = nil) {
         self.parent = parent
+        self.engine = ChatEngine(chatsDirectory: CatalogDatabase.chatsDirectory)
         if let path = documentStoragePath {
-            self.engine = ChatEngine(documentStoragePath: path)
             // Sandbox tool access to the document storage directory
             self.toolExecutor = ToolExecutor(allowedPaths: [path])
-        } else {
-            self.engine = ChatEngine()
         }
     }
 
     init() {
         self.parent = nil
-        self.engine = ChatEngine()
+        self.engine = ChatEngine(chatsDirectory: CatalogDatabase.chatsDirectory)
     }
 
     // MARK: - Configuration
