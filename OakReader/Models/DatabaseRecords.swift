@@ -277,3 +277,56 @@ struct AnnotationRecord: Codable, FetchableRecord, MutablePersistableRecord, Has
         case deletedAt = "deleted_at"
     }
 }
+
+// MARK: - Voice Speakers
+
+struct SpeakerRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable {
+    static let databaseTableName = "speakers"
+
+    var id: String
+    var userId: String
+    var name: String
+    var avatarColorHex: String
+    var ttsVoice: String
+    var referenceAudioPath: String
+    var referenceText: String
+    var language: String
+    var llmModel: String
+    var sortOrder: Int
+    var createdAt: String
+    var updatedAt: String
+
+    enum CodingKeys: String, CodingKey, ColumnExpression {
+        case id, name, language
+        case userId = "user_id"
+        case avatarColorHex = "avatar_color_hex"
+        case ttsVoice = "tts_voice"
+        case referenceAudioPath = "reference_audio_path"
+        case referenceText = "reference_text"
+        case llmModel = "llm_model"
+        case sortOrder = "sort_order"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+}
+
+struct VoiceCallRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable {
+    static let databaseTableName = "voice_calls"
+
+    var id: String
+    var speakerId: String
+    var title: String
+    var turnCount: Int
+    var durationSeconds: Double
+    var createdAt: String
+    var updatedAt: String
+
+    enum CodingKeys: String, CodingKey, ColumnExpression {
+        case id, title
+        case speakerId = "speaker_id"
+        case turnCount = "turn_count"
+        case durationSeconds = "duration_seconds"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+}

@@ -72,6 +72,7 @@ final class Preferences {
         static let voiceLiveTranscription = "voiceLiveTranscription"
         static let voiceInputDeviceUID = "voiceInputDeviceUID"
         static let voiceOutputDeviceUID = "voiceOutputDeviceUID"
+        static let hfEndpoint = "hfEndpoint"
         // External tools
         static let ytDlpPath = "ytDlpPath"
         static let ytDlpCachedVersion = "ytDlpCachedVersion"
@@ -463,6 +464,13 @@ final class Preferences {
     var voiceOutputDeviceUID: String {
         get { defaults.string(forKey: Keys.voiceOutputDeviceUID) ?? "" }
         set { defaults.set(newValue, forKey: Keys.voiceOutputDeviceUID) }
+    }
+
+    /// Custom HuggingFace endpoint URL (e.g. "https://hf-mirror.com" for China).
+    /// Empty string means default (https://huggingface.co).
+    var hfEndpoint: String {
+        get { defaults.string(forKey: Keys.hfEndpoint) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.hfEndpoint) }
     }
 
     var voiceReferenceAudioURL: URL? {

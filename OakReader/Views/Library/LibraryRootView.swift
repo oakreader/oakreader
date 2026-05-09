@@ -108,7 +108,10 @@ struct LibraryRootView: View {
                             )
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                         } else if appState.libraryDetailTab == .voiceChat {
-                            VoiceChatView(voiceVM: appState.libraryVoiceVM)
+                            VoicePanelContainerView(
+                                speakerListVM: appState.speakerListVM,
+                                voiceVM: appState.libraryVoiceVM
+                            )
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                         } else if let item = selectedItemInCurrentFilter {
                             LibrarySidebarPanel(item: item, appState: appState)

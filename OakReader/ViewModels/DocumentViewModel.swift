@@ -108,6 +108,9 @@ class DocumentViewModel {
         return vm
     }
 
+    /// Shared speaker list view model, set externally by AppState when creating the tab.
+    var speakerListVM: SpeakerListViewModel?
+
     /// The item-level storage key, set externally by AppState when creating the tab.
     var itemStorageKey: String?
 

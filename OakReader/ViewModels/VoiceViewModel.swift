@@ -22,6 +22,12 @@ class VoiceViewModel {
     private var pipeline: VoicePipeline?
     private var eventTask: Task<Void, Never>?
 
+    // MARK: - Transcript persistence
+
+    private let transcriptStore = VoiceCallTranscriptStore()
+    private var currentCallId: String?
+    private var turnIndex: Int = 0
+
     // MARK: - Audio level smoothing state
 
     /// Raw EMA-smoothed RMS value (before normalization).
@@ -38,11 +44,13 @@ class VoiceViewModel {
     // MARK: - Lifecycle
 
     @MainActor
-    func start() async {
+    func start(speaker: Speaker? = nil, callId: String? = nil) async {
         guard pipeline == nil else { return }
         error = nil
         userTranscript = ""
         assistantText = ""
+        currentCallId = callId
+        turnIndex = 0
 
         let prefs = Preferences.shared
         let defaultSTT = KnownModels.stt.first?.repo ?? ""
@@ -52,7 +60,12 @@ class VoiceViewModel {
         let sttRepo = prefs.voiceSTTModel.isEmpty ? defaultSTT : prefs.voiceSTTModel
         let ttsRepo = prefs.voiceTTSModel.isEmpty ? defaultTTS : prefs.voiceTTSModel
         let vadRepo = prefs.voiceVADModel.isEmpty ? defaultVAD : prefs.voiceVADModel
-        let voice = prefs.voiceTTSVoice.isEmpty ? nil : prefs.voiceTTSVoice
+
+        // Speaker-specific voice overrides global preference
+        let voice: String? = {
+            if let s = speaker, !s.ttsVoice.isEmpty { return s.ttsVoice }
+            return prefs.voiceTTSVoice.isEmpty ? nil : prefs.voiceTTSVoice
+        }()
 
         let modelManager = ModelManager.shared
 
@@ -76,14 +89,24 @@ class VoiceViewModel {
         let pid = prefs.aiProviderId
         let defaultModel = ProviderRegistry.shared.provider(for: pid)?.defaultModelId ?? ""
         let chatModel = prefs.aiModel.isEmpty ? defaultModel : prefs.aiModel
-        let voiceModel = prefs.voiceLLMModel.isEmpty ? chatModel : prefs.voiceLLMModel
+
+        // Speaker-specific LLM model overrides global preference
+        let voiceModel: String = {
+            if let s = speaker, !s.llmModel.isEmpty { return s.llmModel }
+            return prefs.voiceLLMModel.isEmpty ? chatModel : prefs.voiceLLMModel
+        }()
+
         let config = ProviderConfig(
             providerId: pid,
             model: voiceModel
         )
         let llm = ChatEngineBridge(chatEngine: chatEngine, config: config)
 
-        let language = prefs.voiceLanguage
+        // Speaker-specific language overrides global preference
+        let language: String = {
+            if let s = speaker, !s.language.isEmpty { return s.language }
+            return prefs.voiceLanguage
+        }()
 
         var pipelineConfig = PipelineConfig()
         pipelineConfig.models = VoiceModelConfig(
@@ -121,8 +144,16 @@ class VoiceViewModel {
         unless the meaning is truly ambiguous.
         """
         pipelineConfig.language = language
-        pipelineConfig.referenceAudioURL = prefs.voiceReferenceAudioURL
-        pipelineConfig.referenceText = prefs.voiceReferenceText.isEmpty ? nil : prefs.voiceReferenceText
+
+        // Speaker-specific reference audio overrides global preference
+        pipelineConfig.referenceAudioURL = {
+            if let s = speaker, let url = s.referenceAudioURL { return url }
+            return prefs.voiceReferenceAudioURL
+        }()
+        pipelineConfig.referenceText = {
+            if let s = speaker, !s.referenceText.isEmpty { return s.referenceText }
+            return prefs.voiceReferenceText.isEmpty ? nil : prefs.voiceReferenceText
+        }()
 
         let stt = MLXSTTProvider(repoId: sttRepo, manager: modelManager)
         let tts = MLXTTSProvider(repoId: ttsRepo, language: language, manager: modelManager)
@@ -134,6 +165,11 @@ class VoiceViewModel {
         let mic = MicrophoneCapture(deviceUID: inputUID)
         let speaker = SpeakerOutput(deviceUID: outputUID)
 
+        // Create audio recorder if we have a call ID
+        let recorder: AudioRecorder? = callId.map { id in
+            AudioRecorder(callDirectory: VoiceCallTranscriptStore.callDirectory(callId: id))
+        }
+
         let newPipeline = VoicePipeline(
             stt: stt,
             tts: tts,
@@ -142,7 +178,8 @@ class VoiceViewModel {
             capture: mic,
             playback: speaker,
             config: pipelineConfig,
-            session: VoiceSession()
+            session: VoiceSession(),
+            audioRecorder: recorder
         )
         pipeline = newPipeline
 
@@ -183,6 +220,8 @@ class VoiceViewModel {
         audioLevel = 0
         rawSmoothedLevel = 0
         levelUpdateCounter = 0
+        currentCallId = nil
+        turnIndex = 0
         Task { await p.stop() }
     }
 
@@ -301,12 +340,14 @@ class VoiceViewModel {
                     completedAt: Date()
                 )
                 turns.append(partialTurn)
+                persistTurn(partialTurn, wasInterrupted: true)
                 userTranscript = ""
                 assistantText = ""
             }
 
         case .turnCompleted(let turn):
             turns.append(turn)
+            persistTurn(turn, wasInterrupted: false)
             userTranscript = ""
             assistantText = ""
 
@@ -321,6 +362,23 @@ class VoiceViewModel {
 
         case .error(let voiceError):
             error = voiceError.localizedDescription
+        }
+    }
+
+    /// Persist a completed or interrupted turn to the JSONL transcript file.
+    @MainActor
+    private func persistTurn(_ turn: VoiceTurn, wasInterrupted: Bool) {
+        guard let callId = currentCallId else { return }
+        let callTurn = VoiceCallTurn(
+            turn: turn,
+            turnIndex: turnIndex,
+            wasInterrupted: wasInterrupted
+        )
+        turnIndex += 1
+        do {
+            try transcriptStore.appendTurn(callTurn, callId: callId)
+        } catch {
+            voiceLog.error("Failed to persist voice turn: \(error.localizedDescription)")
         }
     }
 

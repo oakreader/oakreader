@@ -20,6 +20,7 @@ public actor VoicePipeline {
     private let llm: any LLMService
     private let capture: any AudioCaptureService
     private let playback: any AudioPlaybackService
+    private let audioRecorder: AudioRecorder?
 
     // MARK: - Configuration
 
@@ -95,6 +96,11 @@ public actor VoicePipeline {
     /// Shared between LLM and TTS tasks via actor serialization.
     private var didStartSpeech = false
 
+    /// Zero-based counter tracking the current turn number within the call.
+    /// Incremented after each `.turnCompleted` event. Used to name per-turn
+    /// audio files (`turn-0-user.caf`, `turn-1-agent.caf`, etc.).
+    private var turnIndex: Int = 0
+
     /// Stream of pipeline events for UI observation.
     public let events: AsyncStream<PipelineEvent>
 
@@ -108,7 +114,8 @@ public actor VoicePipeline {
         capture: any AudioCaptureService = MicrophoneCapture(),
         playback: any AudioPlaybackService = SpeakerOutput(),
         config: PipelineConfig = PipelineConfig(),
-        session: VoiceSession = VoiceSession()
+        session: VoiceSession = VoiceSession(),
+        audioRecorder: AudioRecorder? = nil
     ) {
         self.stt = stt
         self.tts = tts
@@ -118,6 +125,7 @@ public actor VoicePipeline {
         self.playback = playback
         self.config = config
         self.session = session
+        self.audioRecorder = audioRecorder
         self.smartTurnRepo = config.models.turnDetectorModel
 
         var continuation: AsyncStream<PipelineEvent>.Continuation!
@@ -138,7 +146,7 @@ public actor VoicePipeline {
     }
 
     /// Stop the voice pipeline and release resources.
-    public func stop() {
+    public func stop() async {
         pipelineTask?.cancel()
         pipelineTask = nil
         responseTask?.cancel()
@@ -147,6 +155,7 @@ public actor VoicePipeline {
         endpointTask = nil
         playback.stop()
         capture.stopCapture()
+        await audioRecorder?.finalize()
         transition(to: .idle)
         eventContinuation?.finish()
         eventContinuation = nil
@@ -580,6 +589,12 @@ public actor VoicePipeline {
     ///   1-3 seconds of sequential processing.
     private func runFullResponse(speechBuffers: [AVAudioPCMBuffer], precomputedTranscript: String? = nil) async {
         let turnStarted = Date()
+        let currentTurnIndex = turnIndex
+
+        // Record user audio for this turn (non-blocking — errors are ignored)
+        if let recorder = audioRecorder {
+            try? await recorder.writeUserAudio(turnIndex: currentTurnIndex, buffers: speechBuffers)
+        }
 
         // --- STT phase ---
         let transcriptionText: String?
@@ -641,7 +656,7 @@ public actor VoicePipeline {
 
         // --- LLM + TTS phase ---
         do {
-            let fullResponse = try await processLLMResponse(userText: userText)
+            let fullResponse = try await processLLMResponse(userText: userText, currentTurnIndex: currentTurnIndex)
 
             guard !Task.isCancelled else { return }
 
@@ -668,6 +683,7 @@ public actor VoicePipeline {
             )
             session.addTurn(turn)
             emit(.turnCompleted(turn))
+            turnIndex += 1
             transition(to: .listening)
         } catch {
             if !Task.isCancelled {
@@ -704,7 +720,7 @@ public actor VoicePipeline {
     /// the LLM can accumulate sentence N+1.
     ///
     /// Returns the full response text.
-    private func processLLMResponse(userText: String) async throws -> String {
+    private func processLLMResponse(userText: String, currentTurnIndex: Int) async throws -> String {
         let llmStream = llm.respond(
             userMessage: userText,
             history: session.messages,
@@ -749,6 +765,11 @@ public actor VoicePipeline {
                         didStartSpeech = true
                     }
                     ttsContinuation.yield(buffer)
+
+                    // Record agent TTS audio (non-blocking — errors are ignored)
+                    if let recorder = self.audioRecorder {
+                        try? await recorder.appendAgentAudio(turnIndex: currentTurnIndex, buffer: buffer)
+                    }
                 }
             }
         }
