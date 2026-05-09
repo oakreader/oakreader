@@ -57,6 +57,10 @@ final class MarkdownHighlighter: NSObject, NSTextStorageDelegate {
             : NSColor(red: 0.95, green: 0.95, blue: 0.96, alpha: 1.0)
     }
 
+    /// When set, `applyAttributes` skips any range that overlaps with this range
+    /// to prevent destroying diff styling applied by the text view.
+    var activeDiffRange: NSRange?
+
     private var isHighlighting = false
 
     init(baseFont: NSFont, lineHeight: CGFloat = 1.3, lineSpacing: CGFloat = 3.0, letterSpacing: CGFloat = 0.5) {
@@ -121,6 +125,31 @@ final class MarkdownHighlighter: NSObject, NSTextStorageDelegate {
     private func applyAttributes(_ range: NSRange, in ts: NSTextStorage) {
         let total = (ts.string as NSString).length
         let safe = NSIntersectionRange(range, NSRange(location: 0, length: total))
+        guard safe.length > 0 else { return }
+
+        // Skip ranges that overlap with the active diff to preserve diff styling
+        if let diffRange = activeDiffRange {
+            let overlap = NSIntersectionRange(safe, diffRange)
+            if overlap.length > 0 {
+                // Apply only to non-overlapping portions
+                let beforeEnd = diffRange.location
+                let afterStart = NSMaxRange(diffRange)
+                if safe.location < beforeEnd {
+                    let beforeRange = NSRange(location: safe.location, length: beforeEnd - safe.location)
+                    applyAttributesUnchecked(beforeRange, in: ts)
+                }
+                if NSMaxRange(safe) > afterStart {
+                    let afterRange = NSRange(location: afterStart, length: NSMaxRange(safe) - afterStart)
+                    applyAttributesUnchecked(afterRange, in: ts)
+                }
+                return
+            }
+        }
+
+        applyAttributesUnchecked(safe, in: ts)
+    }
+
+    private func applyAttributesUnchecked(_ safe: NSRange, in ts: NSTextStorage) {
         guard safe.length > 0 else { return }
 
         let ps = MarkdownTextView.paragraphStyle(font: baseFont, lineHeight: lineHeight, lineSpacing: lineSpacing)
