@@ -36,6 +36,10 @@ public actor MLXTTSProvider: TTSService {
         self.manager = manager
     }
 
+    /// Default Qwen3-TTS instruction for natural-sounding speech when no
+    /// voice/instruction is explicitly set by the user.
+    private static let defaultQwen3Instruction = "Speak naturally with a warm, friendly, conversational tone. Use moderate pacing with natural pauses."
+
     /// Sanitize voice parameter: empty/whitespace-only strings become nil
     /// to prevent models from crashing on invalid voice name lookups.
     private static func sanitizeVoice(_ voice: String?) -> String? {
@@ -72,11 +76,13 @@ public actor MLXTTSProvider: TTSService {
             return try samplesToBuffer(samples, sampleRate: Double(model.sampleRate))
         }
 
-        // Fallback: generic protocol path
+        // Fallback: generic protocol path.
+        // For Qwen3-TTS, `voice` maps to `instruct` (speaking style).
+        let effectiveVoice = safeVoice ?? (model is Qwen3TTSModel ? Self.defaultQwen3Instruction : nil)
         let refAudio = try loadReferenceAudio(url: referenceAudioURL)
         let audio = try await model.generate(
             text: text,
-            voice: safeVoice,
+            voice: effectiveVoice,
             refAudio: refAudio,
             refText: safeRefText,
             language: language,
@@ -112,11 +118,14 @@ public actor MLXTTSProvider: TTSService {
                             generationParameters: model.defaultGenerationParameters
                         )
                     } else {
-                        // Fallback: generic protocol path
+                        // Fallback: generic protocol path.
+                        // For Qwen3-TTS, `voice` maps to `instruct` (speaking style).
+                        // Provide a default instruction when none is set.
+                        let effectiveVoice = safeVoice ?? (model is Qwen3TTSModel ? Self.defaultQwen3Instruction : nil)
                         let refAudio = try await self.loadReferenceAudio(url: referenceAudioURL)
                         stream = model.generateStream(
                             text: text,
-                            voice: safeVoice,
+                            voice: effectiveVoice,
                             refAudio: refAudio,
                             refText: safeRefText,
                             language: self.language,
