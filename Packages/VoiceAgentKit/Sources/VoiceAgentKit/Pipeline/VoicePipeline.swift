@@ -1,11 +1,16 @@
 import AVFoundation
-import ParakeetStreamingASR
+import MLX
+import MLXAudioVAD
 
 /// Main orchestrator for the STT → LLM → TTS voice pipeline.
 ///
 /// The pipeline captures microphone audio, detects speech via VAD,
 /// transcribes with STT, generates a response via LLM (with sentence-level streaming),
 /// synthesizes speech via TTS, and plays it back — all while supporting interruption.
+///
+/// Uses a hybrid VAD approach:
+/// - **Silero VAD**: real-time frame-level speech detection (streaming)
+/// - **SmartTurn**: end-of-turn verification after speech ends (non-streaming)
 public actor VoicePipeline {
     // MARK: - Services
 
@@ -21,34 +26,10 @@ public actor VoicePipeline {
     private let config: PipelineConfig
     private let session: VoiceSession
 
-    // MARK: - Live transcription (Parakeet)
+    // MARK: - SmartTurn endpoint detection
 
-    /// The loaded Parakeet model (lazy, loaded in preWarmModels).
-    private var parakeetModel: ParakeetStreamingASRModel?
-
-    /// Active Parakeet streaming session for the current speech turn.
-    /// Created on speechStart, finalized on speechEnd.
-    private var parakeetSession: StreamingSession?
-
-    /// Whether live transcription is active for this pipeline instance.
-    private var liveTranscriptionEnabled: Bool = false
-
-    /// Last emitted live partial text — used to suppress duplicate emissions.
-    private var lastLivePartialText: String = ""
-
-    /// Accumulated finalized Parakeet segments (EOU-confirmed text).
-    private var parakeetFinalizedSegments: String = ""
-
-    /// Full accumulated Parakeet transcript (finalized + current partial).
-    /// Used as the primary STT result for Parakeet-supported languages.
-    private var parakeetAccumulatedText: String = ""
-
-    /// Languages supported by Parakeet for live transcription.
-    private static let parakeetSupportedLanguages: Set<String> = [
-        "en", "de", "fr", "es", "it", "pt", "nl", "pl", "sv",
-        "da", "no", "fi", "hu", "cs", "sk", "ro", "bg", "hr",
-        "sr", "sl", "et", "lv", "lt", "el", "tr", "uk", "ru",
-    ]
+    private var smartTurnModel: SmartTurnModel?
+    private let smartTurnRepo: String?
 
     // MARK: - State
 
@@ -137,11 +118,7 @@ public actor VoicePipeline {
         self.playback = playback
         self.config = config
         self.session = session
-
-        // Determine if live transcription should be enabled
-        self.liveTranscriptionEnabled = config.enableLiveTranscription
-            && config.models.liveSTTModel != nil
-            && Self.parakeetSupportedLanguages.contains(config.language)
+        self.smartTurnRepo = config.models.turnDetectorModel
 
         var continuation: AsyncStream<PipelineEvent>.Continuation!
         self.events = AsyncStream { continuation = $0 }
@@ -245,7 +222,6 @@ public actor VoicePipeline {
                         lowEnergyFrames = 0
                         endpointTask?.cancel()
                         endpointTask = nil
-                        finalizeLiveTranscription()
                         speechEndTimestamp = CFAbsoluteTimeGetCurrent()
 
                         // Accumulate remaining speech
@@ -259,18 +235,9 @@ public actor VoicePipeline {
                             await vad.reset()
                             userSpeakingSilenceFrames = 0
                             emit(.userSpeechEnded)
-
-                            // Parakeet fast path
-                            let parakeetText = parakeetAccumulatedText.trimmingCharacters(in: .whitespacesAndNewlines)
-                            if !parakeetText.isEmpty {
-                                emit(.userTranscript(text: parakeetText, isFinal: true))
-                                turnBuffers = []
-                                await startResponse(transcript: parakeetText)
-                            } else {
-                                let capturedBuffers = turnBuffers
-                                turnBuffers = []
-                                await startResponse(speechBuffers: capturedBuffers)
-                            }
+                            let capturedBuffers = turnBuffers
+                            turnBuffers = []
+                            await startResponse(speechBuffers: capturedBuffers)
                         } else {
                             turnBuffers = []
                             userSpeakingSilenceFrames = 0
@@ -306,24 +273,16 @@ public actor VoicePipeline {
                         speechBuffers = preRoll + [chunk]
                         preRoll = []
                         transition(to: .userSpeaking)
-                        startLiveTranscriptionSession()
                     } else {
                         // Prepend pre-roll to recover audio consumed by VAD
                         speechBuffers = preRoll + [chunk]
-                        let capturedPreRoll = preRoll
                         preRoll = []
                         if state != .userSpeaking {
                             // New turn — first phrase
                             turnBuffers = []
                             transition(to: .userSpeaking)
                             emit(.userSpeechStarted)
-                            startLiveTranscriptionSession()
                         }
-                        // Feed pre-roll + current chunk to live transcription
-                        for preRollChunk in capturedPreRoll {
-                            feedLiveTranscription(chunk: preRollChunk)
-                        }
-                        feedLiveTranscription(chunk: chunk)
                         // If already .userSpeaking (resuming after SmartTurn pause),
                         // just start a new phrase within the same turn.
                     }
@@ -360,12 +319,10 @@ public actor VoicePipeline {
                                 speechBuffers = []
                                 transition(to: .userSpeaking)
                                 emit(.userSpeechStarted)
-                                startLiveTranscriptionSession()
                             }
                         }
                     } else if state == .userSpeaking {
                         speechBuffers.append(chunk)
-                        feedLiveTranscription(chunk: chunk)
                     }
 
                 case .speechEnd:
@@ -376,9 +333,12 @@ public actor VoicePipeline {
                         continue
                     }
 
-                    if state == .userSpeaking {
-                        speechBuffers.append(chunk)
-                    }
+                    // Only process speech end when actually capturing speech.
+                    // Spurious speechEnd from echo/noise after playback would
+                    // otherwise re-transcribe stale turnBuffers.
+                    guard state == .userSpeaking else { continue }
+
+                    speechBuffers.append(chunk)
 
                     // Accumulate this phrase into the turn-level buffer
                     turnBuffers.append(contentsOf: speechBuffers)
@@ -389,40 +349,23 @@ public actor VoicePipeline {
                     let minFrames = Int(config.captureSampleRate * 0.5)
                     guard totalFrames >= minFrames else {
                         turnBuffers = []
-                        if state == .userSpeaking {
-                            transition(to: .listening)
-                        }
+                        transition(to: .listening)
                         continue
                     }
 
-                    // Flush live transcription before deciding STT path
-                    finalizeLiveTranscription()
                     speechEndTimestamp = CFAbsoluteTimeGetCurrent()
 
-                    // Capture Parakeet transcript (if available) before creating the
-                    // endpointTask. The task still goes through completeEndpoint's
-                    // state guard, so if the user resumes speaking, the task is
-                    // cancelled safely without starting a premature response.
-                    let parakeetTranscript = parakeetAccumulatedText.trimmingCharacters(in: .whitespacesAndNewlines)
+                    // Run SmartTurn and STT in parallel. By the time SmartTurn
+                    // confirms the endpoint, the transcript is already ready —
+                    // saving 1-3s of sequential STT processing from the critical path.
+                    // If the user resumes speaking, both are cancelled (bounced).
                     let buffersForEndpoint = turnBuffers
                     endpointTask?.cancel()
                     endpointTask = Task { [weak self] in
                         guard let self else { return }
-
-                        let endpointResult: Bool?
-                        let transcript: String?
-
-                        if !parakeetTranscript.isEmpty {
-                            // Parakeet already has a transcript — skip batch STT (saves 1-3s)
-                            endpointResult = await self.checkEndpoint(speechBuffers: buffersForEndpoint)
-                            transcript = parakeetTranscript
-                        } else {
-                            // Fallback: run SmartTurn and batch STT in parallel
-                            async let smartTurnResult = self.checkEndpoint(speechBuffers: buffersForEndpoint)
-                            async let sttResult = self.transcribeSpeech(buffersForEndpoint)
-                            (endpointResult, transcript) = await (smartTurnResult, sttResult)
-                        }
-
+                        async let smartTurnResult = self.checkEndpoint(speechBuffers: buffersForEndpoint)
+                        async let sttResult = self.transcribeSpeech(buffersForEndpoint)
+                        let (endpointResult, transcript) = await (smartTurnResult, sttResult)
                         guard !Task.isCancelled else { return }
                         await self.completeEndpoint(
                             result: endpointResult,
@@ -446,23 +389,14 @@ public actor VoicePipeline {
                         if userSpeakingSilenceFrames >= Self.userSpeakingSilenceTimeout,
                            !turnBuffers.isEmpty {
                             userSpeakingSilenceFrames = 0
+                            // Cancel pending SmartTurn — silence timeout takes over
                             endpointTask?.cancel()
                             endpointTask = nil
-                            finalizeLiveTranscription()
                             speechEndTimestamp = CFAbsoluteTimeGetCurrent()
                             emit(.userSpeechEnded)
-
-                            // Parakeet fast path
-                            let parakeetText = parakeetAccumulatedText.trimmingCharacters(in: .whitespacesAndNewlines)
-                            if !parakeetText.isEmpty {
-                                emit(.userTranscript(text: parakeetText, isFinal: true))
-                                turnBuffers = []
-                                await startResponse(transcript: parakeetText)
-                            } else {
-                                let capturedBuffers = turnBuffers
-                                turnBuffers = []
-                                await startResponse(speechBuffers: capturedBuffers)
-                            }
+                            let capturedBuffers = turnBuffers
+                            turnBuffers = []
+                            await startResponse(speechBuffers: capturedBuffers)
                         }
                     } else {
                         userSpeakingSilenceFrames = 0
@@ -491,22 +425,30 @@ public actor VoicePipeline {
     /// Pre-load all models in parallel so the first turn has no cold-start delay.
     private func preWarmModels() async {
         await withTaskGroup(of: Void.self) { group in
+            // SmartTurn (optional)
+            if let repo = smartTurnRepo {
+                group.addTask {
+                    do {
+                        let model = try await SmartTurnModel.fromPretrained(repo)
+                        await self.setSmartTurnModel(model)
+                    } catch {
+                        // SmartTurn is optional — continue without it
+                    }
+                }
+            }
             // STT — trigger ensureModel via a no-op protocol method
             group.addTask { _ = try? await self.stt.transcribe(audio: self.makeSilentBuffer()) }
             // TTS — use a short real word; empty string triggers a precondition
             // failure inside Qwen3TTSModel.prepareGenerationInputs.
-            group.addTask { _ = try? await self.tts.synthesize(text: ".", voice: self.config.voice, referenceAudioURL: nil) }
-            // Parakeet live STT (optional)
-            if self.liveTranscriptionEnabled, let repo = self.config.models.liveSTTModel {
-                group.addTask {
-                    do {
-                        let model = try await ParakeetStreamingASRModel.fromPretrained(modelId: repo)
-                        await self.setParakeetModel(model)
-                    } catch {
-                        // Live transcription is optional — continue without it
-                        await self.disableLiveTranscription()
-                    }
-                }
+            // Pass referenceAudioURL + referenceText so the voice conditioning
+            // is prepared and cached during warmup, not on the first real sentence.
+            group.addTask {
+                _ = try? await self.tts.synthesize(
+                    text: ".",
+                    voice: self.config.voice,
+                    referenceAudioURL: self.config.referenceAudioURL,
+                    referenceText: self.config.referenceText
+                )
             }
             // VAD is NOT warmed up here. The silent buffer would race with
             // live audio in the LSTM, corrupting the streaming state at an
@@ -516,12 +458,8 @@ public actor VoicePipeline {
         }
     }
 
-    private func setParakeetModel(_ model: ParakeetStreamingASRModel) {
-        self.parakeetModel = model
-    }
-
-    private func disableLiveTranscription() {
-        self.liveTranscriptionEnabled = false
+    private func setSmartTurnModel(_ model: SmartTurnModel) {
+        self.smartTurnModel = model
     }
 
     /// Create a minimal silent buffer for model pre-warming.
@@ -564,11 +502,30 @@ public actor VoicePipeline {
         return finalText ?? lastPartialText
     }
 
-    /// Check if the user has finished their turn.
-    /// SmartTurn is not available in this build — always returns nil,
-    /// which causes completeEndpoint to proceed immediately.
+    /// Check if the user has finished their turn using SmartTurn.
+    /// Returns true if endpoint confirmed, false if just a pause, nil if SmartTurn unavailable.
     private func checkEndpoint(speechBuffers: [AVAudioPCMBuffer]) async -> Bool? {
-        return nil
+        guard let model = smartTurnModel else { return nil }
+
+        // Extract raw samples from buffers
+        var allSamples: [Float] = []
+        for buffer in speechBuffers {
+            guard let floatData = buffer.floatChannelData else { continue }
+            let count = Int(buffer.frameLength)
+            let samples = Array(UnsafeBufferPointer(start: floatData[0], count: count))
+            allSamples.append(contentsOf: samples)
+        }
+
+        guard !allSamples.isEmpty else { return nil }
+
+        do {
+            let audio = MLXArray(allSamples)
+            let result = try model.predictEndpoint(audio, sampleRate: Int(config.captureSampleRate))
+            return result.prediction == 1
+        } catch {
+            // SmartTurn failed — fall through to proceed without it
+            return nil
+        }
     }
 
     /// Handle the result of an async SmartTurn endpoint check.
@@ -591,83 +548,7 @@ public actor VoicePipeline {
         await startResponse(speechBuffers: speechBuffers, transcript: transcript)
     }
 
-    // MARK: - Live transcription (Parakeet)
-
-    /// Start a new Parakeet streaming session for live transcription.
-    private func startLiveTranscriptionSession() {
-        guard liveTranscriptionEnabled, let model = parakeetModel else { return }
-        do {
-            parakeetSession = try model.createSession()
-            lastLivePartialText = ""
-            parakeetFinalizedSegments = ""
-            parakeetAccumulatedText = ""
-        } catch {
-            parakeetSession = nil
-        }
-    }
-
-    /// Feed an audio chunk to the Parakeet streaming session and emit any partials.
-    /// Accumulates text across segments so `parakeetAccumulatedText` always contains
-    /// the full transcript seen so far (finalized segments + current partial).
-    private func feedLiveTranscription(chunk: AVAudioPCMBuffer) {
-        guard let session = parakeetSession,
-              let floatData = chunk.floatChannelData else { return }
-
-        let count = Int(chunk.frameLength)
-        let samples = Array(UnsafeBufferPointer(start: floatData[0], count: count))
-
-        do {
-            let partials = try session.pushAudio(samples)
-            for partial in partials where !partial.text.isEmpty {
-                if partial.isFinal {
-                    // EOU detected — this segment is confirmed
-                    parakeetFinalizedSegments += partial.text
-                    parakeetAccumulatedText = parakeetFinalizedSegments
-                } else {
-                    // In-progress segment — append to finalized prefix
-                    parakeetAccumulatedText = parakeetFinalizedSegments + partial.text
-                }
-                if parakeetAccumulatedText != lastLivePartialText {
-                    lastLivePartialText = parakeetAccumulatedText
-                    emit(.userTranscript(text: parakeetAccumulatedText, isFinal: false))
-                }
-            }
-        } catch {
-            parakeetSession = nil
-        }
-    }
-
-    /// Finalize the Parakeet session and update accumulated text with any remaining partial.
-    private func finalizeLiveTranscription() {
-        guard let session = parakeetSession else { return }
-        do {
-            let finals = try session.finalize()
-            for partial in finals where !partial.text.isEmpty {
-                // finalize() returns remaining text since the last EOU — which may
-                // be shorter than the full accumulated text if no EOU was detected.
-                // Only update if the new text extends beyond what we already have.
-                let candidate = parakeetFinalizedSegments + partial.text
-                if candidate.count > parakeetAccumulatedText.count {
-                    parakeetAccumulatedText = candidate
-                    if parakeetAccumulatedText != lastLivePartialText {
-                        lastLivePartialText = parakeetAccumulatedText
-                        emit(.userTranscript(text: parakeetAccumulatedText, isFinal: false))
-                    }
-                }
-            }
-        } catch {
-            // Non-fatal
-        }
-        parakeetSession = nil
-    }
-
     // MARK: - Response lifecycle
-
-    /// Convenience: kick off a response with a pre-computed transcript (Parakeet fast path).
-    /// No speech buffers needed since STT is already done.
-    private func startResponse(transcript: String) async {
-        await startResponse(speechBuffers: [], transcript: transcript)
-    }
 
     /// Kick off transcription → LLM → TTS entirely in a background task.
     /// The audio loop returns immediately so VAD keeps processing for interruption.
@@ -695,8 +576,8 @@ public actor VoicePipeline {
 
     /// Full STT → LLM → TTS pipeline, running concurrently with the audio loop.
     /// - Parameter precomputedTranscript: If provided (from speculative STT that ran
-    ///   in parallel with SmartTurn, or from Parakeet fast path), the STT phase is
-    ///   skipped entirely — saving 1-3 seconds of sequential processing.
+    ///   in parallel with SmartTurn), the STT phase is skipped entirely — saving
+    ///   1-3 seconds of sequential processing.
     private func runFullResponse(speechBuffers: [AVAudioPCMBuffer], precomputedTranscript: String? = nil) async {
         let turnStarted = Date()
 
@@ -705,9 +586,9 @@ public actor VoicePipeline {
 
         if let precomputed = precomputedTranscript?.trimmingCharacters(in: .whitespacesAndNewlines),
            !precomputed.isEmpty {
-            // Transcript was computed in parallel with SmartTurn or by Parakeet — skip STT.
+            // Transcript was computed in parallel with SmartTurn — skip STT.
+            // Transcript events were already emitted during speculative STT.
             transcriptionText = precomputed
-            emit(.userTranscript(text: precomputed, isFinal: true))
             sttCompleteTimestamp = CFAbsoluteTimeGetCurrent()
         } else {
             // No pre-computed transcript — run STT normally
@@ -808,7 +689,6 @@ public actor VoicePipeline {
     /// Interrupt an in-flight response (user started speaking during playback).
     private func interruptResponse() {
         cancelPendingResponse()
-        finalizeLiveTranscription()
         playback.stop()
         transition(to: .interrupted)
         emit(.agentInterrupted)
@@ -833,7 +713,7 @@ public actor VoicePipeline {
 
         var fullText = ""
         var sentenceBuffer = ""
-        var isFirstSentence = true
+        var sentenceIndex = 0
         didStartSpeech = false
 
         // Create a passthrough stream for TTS buffers that we can feed into playback
@@ -851,7 +731,6 @@ public actor VoicePipeline {
 
         // TTS task: consumes sentences from the channel, synthesizes, yields audio buffers.
         // Runs on the same actor — interleaves with the LLM loop at suspension points.
-        // No [weak self] — processLLMResponse awaits this task, so the actor stays alive.
         let ttsTask = Task {
             for await sentence in sentenceStream {
                 try Task.checkCancellation()
@@ -896,16 +775,23 @@ public actor VoicePipeline {
                 sentenceBuffer += delta
                 emit(.agentResponseText(delta: delta))
 
-                // Check for sentence boundary — use broader delimiters (including
-                // comma, colon) for the first sentence to reduce time-to-first-audio.
-                let delimiters = isFirstSentence ? config.firstSentenceDelimiters : config.sentenceDelimiters
-                let threshold = isFirstSentence ? config.minFirstSentenceLength : config.minSentenceLength
+                // Progressive sentence length: all sentences split at natural
+                // boundaries (period, !, ?, newline). First sentence uses a lower
+                // minimum to reduce time-to-first-audio; later sentences are longer
+                // so TTS has enough context for natural prosody.
+                let delimiters = config.sentenceDelimiters
+                let threshold: Int
+                switch sentenceIndex {
+                case 0:  threshold = config.minFirstSentenceLength   // 1 — first natural sentence
+                case 1:  threshold = 40
+                default: threshold = min(40 + sentenceIndex * 30, 200) // grow up to ~200 chars
+                }
                 if let lastChar = sentenceBuffer.last,
                    delimiters.contains(lastChar),
                    sentenceBuffer.count >= threshold {
                     let sentence = sentenceBuffer
                     sentenceBuffer = ""
-                    isFirstSentence = false
+                    sentenceIndex += 1
 
                     // Yield sentence to TTS task (non-blocking)
                     sentenceContinuation.yield(sentence)

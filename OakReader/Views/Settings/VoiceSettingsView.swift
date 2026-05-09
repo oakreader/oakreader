@@ -202,13 +202,9 @@ struct VoiceSettingsView: View {
             Toggle("Show words as you speak", isOn: $liveTranscription)
 
             if liveTranscription {
-                if let repo = KnownModels.liveSTT.first?.repo {
-                    Text("Uses Parakeet 120M (~150 MB) for real-time display. Final transcript still uses the STT model above for accuracy. Supports English and European languages.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    modelStatusRow(repo: repo)
-                }
+                Text("Live transcription requires Parakeet model (not available with current TTS library).")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -394,9 +390,7 @@ struct VoiceSettingsView: View {
 
     private var requiredRepos: [String] {
         var repos = [sttModel, ttsModel, vadModel]
-        if liveTranscription, let liveRepo = KnownModels.liveSTT.first?.repo {
-            repos.append(liveRepo)
-        }
+        // Parakeet live STT not available with current TTS library
         return repos
     }
 
