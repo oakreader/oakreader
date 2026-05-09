@@ -26,99 +26,53 @@ struct LibraryTableView: View {
     var body: some View {
         let items = store.filteredItems
 
-        if items.isEmpty {
-            emptyState
-        } else {
-            Table(of: LibraryItem.self, selection: $selection) {
-                TableColumn("Title") { item in
-                    HStack(spacing: 7) {
-                        Image(systemName: item.primaryAttachment?.icon ?? "doc")
-                            .foregroundStyle(Color.primary.opacity(0.4))
-                            .font(.system(size: 14))
-                            .accessibilityLabel(item.primaryAttachment?.attachmentType.label ?? "Document")
+        Table(of: LibraryItem.self, selection: $selection) {
+            TableColumn("Title") { item in
+                HStack(spacing: 7) {
+                    Image(systemName: item.primaryAttachment?.icon ?? "doc")
+                        .foregroundStyle(Color.primary.opacity(0.4))
+                        .font(.system(size: 14))
+                        .accessibilityLabel(item.primaryAttachment?.attachmentType.label ?? "Document")
 
-                        Text(item.title)
-                            .font(.system(size: 14))
-                            .lineLimit(1)
-
-                    }
-                }
-                .width(min: 150, ideal: 300)
-
-                TableColumn("Author") { item in
-                    Text(item.author)
-                        .font(.system(size: 13))
+                    Text(item.title)
+                        .font(.system(size: 14))
                         .lineLimit(1)
-                        .foregroundStyle(Color.primary.opacity(0.55))
-                }
-                .width(min: 80, ideal: 150)
 
-                TableColumn(dateColumnTitle) { item in
-                    Text(dateColumnValue(for: item), style: .date)
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color.primary.opacity(0.55))
-                }
-                .width(min: 80, ideal: 120)
-
-            } rows: {
-                ForEach(items, id: \.id) { item in
-                    TableRow(item)
                 }
             }
-            .tableStyle(.inset(alternatesRowBackgrounds: true))
-            .contextMenu(forSelectionType: UUID.self) { ids in
-                contextMenuItems(for: ids)
-            } primaryAction: { ids in
-                openItems(ids)
+            .width(min: 150, ideal: 300)
+
+            TableColumn("Author") { item in
+                Text(item.author)
+                    .font(.system(size: 13))
+                    .lineLimit(1)
+                    .foregroundStyle(Color.primary.opacity(0.55))
             }
-            .onDrop(of: [.pdf, .html], isTargeted: nil) { providers in
-                handleDrop(providers)
-                return true
+            .width(min: 80, ideal: 150)
+
+            TableColumn(dateColumnTitle) { item in
+                Text(dateColumnValue(for: item), style: .date)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.primary.opacity(0.55))
+            }
+            .width(min: 80, ideal: 120)
+
+        } rows: {
+            ForEach(items, id: \.id) { item in
+                TableRow(item)
+                    .draggable(item.id.uuidString)
             }
         }
-    }
-
-    // MARK: - Empty State
-
-    private var emptyState: some View {
-        VStack(spacing: 16) {
-            if store.selectedTagOptionId != nil {
-                Image(systemName: "tag")
-                    .font(.system(size: 48))
-                    .foregroundStyle(Color.primary.opacity(0.15))
-                    .accessibilityHidden(true)
-
-                Text("No Items with This Tag")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Color.primary.opacity(0.55))
-
-                Text("Assign this tag to items from their properties panel.")
-                    .font(.system(size: 13))
-                    .foregroundStyle(Color.primary.opacity(0.25))
-                    .multilineTextAlignment(.center)
-            } else {
-                Image(systemName: "books.vertical")
-                    .font(.system(size: 48))
-                    .foregroundStyle(Color.primary.opacity(0.15))
-                    .accessibilityHidden(true)
-
-                Text("Your Library is Empty")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Color.primary.opacity(0.55))
-
-                Text("Drag PDF files here or click + to add them.")
-                    .font(.system(size: 13))
-                    .foregroundStyle(Color.primary.opacity(0.25))
-                    .multilineTextAlignment(.center)
-
-                Button("Add PDFs...") {
-                    importPDFs()
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.regular)
-            }
+        .tableStyle(.inset(alternatesRowBackgrounds: true))
+        .contextMenu(forSelectionType: UUID.self) { ids in
+            contextMenuItems(for: ids)
+        } primaryAction: { ids in
+            openItems(ids)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onDrop(of: [.pdf, .html, .plainText], isTargeted: nil) { providers in
+            handleDrop(providers)
+            return true
+        }
     }
 
     // MARK: - Context Menu
@@ -183,6 +137,17 @@ struct LibraryTableView: View {
 
             Button("Remove from Library", role: .destructive) {
                 store.removeItem(item)
+            }
+        } else if selectedItems.isEmpty {
+            Button {
+                createNewNote()
+            } label: {
+                Label("Add Note", systemImage: "doc.text")
+            }
+            Button {
+                importPDFs()
+            } label: {
+                Label("Import File...", systemImage: "square.and.arrow.down")
             }
         } else if selectedItems.count > 1 {
             Button("Open \(selectedItems.count) Items") {
@@ -253,10 +218,14 @@ struct LibraryTableView: View {
     }
 
     private func importPDFs() {
+        var contentTypes: [UTType] = [.pdf, .html]
+        if let mdType = UTType(filenameExtension: "md") {
+            contentTypes.append(mdType)
+        }
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.pdf, .html]
+        panel.allowedContentTypes = contentTypes
         panel.allowsMultipleSelection = true
-        panel.message = "Select PDF or HTML files to add to your library"
+        panel.message = "Select PDF, HTML, or Markdown files to add to your library"
         panel.begin { response in
             guard response == .OK else { return }
             for url in panel.urls {
@@ -264,6 +233,8 @@ struct LibraryTableView: View {
                 let item: LibraryItem?
                 if ext == "html" || ext == "htm" {
                     item = appState.importService.importWebSnapshot(from: url)
+                } else if ext == "md" || ext == "markdown" {
+                    item = appState.importService.importMarkdown(from: url)
                 } else {
                     item = appState.importService.importPDF(from: url)
                 }
@@ -302,8 +273,8 @@ struct LibraryTableView: View {
 
     private func handleDrop(_ providers: [NSItemProvider]) {
         for provider in providers {
-            // Try PDF first, then HTML
-            let types = [UTType.pdf.identifier, UTType.html.identifier]
+            // Try PDF first, then HTML, then plain text (for .md files)
+            let types = [UTType.pdf.identifier, UTType.html.identifier, UTType.fileURL.identifier]
             for typeId in types {
                 if provider.hasItemConformingToTypeIdentifier(typeId) {
                     provider.loadItem(forTypeIdentifier: typeId, options: nil) { data, _ in
@@ -313,8 +284,12 @@ struct LibraryTableView: View {
                             let item: LibraryItem?
                             if ext == "html" || ext == "htm" {
                                 item = appState.importService.importWebSnapshot(from: url)
-                            } else {
+                            } else if ext == "md" || ext == "markdown" {
+                                item = appState.importService.importMarkdown(from: url)
+                            } else if ext == "pdf" {
                                 item = appState.importService.importPDF(from: url)
+                            } else {
+                                item = nil
                             }
                             if let item, let collection = store.selectedCollection, !collection.isSmart {
                                 store.addItem(item, to: collection)
@@ -324,6 +299,15 @@ struct LibraryTableView: View {
                     break
                 }
             }
+        }
+    }
+
+    private func createNewNote() {
+        if let item = appState.importService.createStandaloneNote() {
+            if let collection = store.selectedCollection, !collection.isSmart {
+                store.addItem(item, to: collection)
+            }
+            appState.openLibraryItem(item)
         }
     }
 }

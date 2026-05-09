@@ -269,6 +269,8 @@ private struct CollectionRowView: View {
     @Binding var newSubcollectionParent: PDFCollection?
     @Binding var editingSmartCollection: PDFCollection?
 
+    @State private var isDropTargeted = false
+
     private var isSelected: Bool {
         store.selectedCollectionId == collection.id && store.selectedTagOptionId == nil && appState.isLibraryActive
     }
@@ -326,12 +328,29 @@ private struct CollectionRowView: View {
                 .padding(.vertical, 5)
                 .background(
                     RoundedRectangle(cornerRadius: 6)
-                        .fill(isSelected ? Color.primary.opacity(0.08) : Color.clear)
+                        .fill(isDropTargeted ? Color.accentColor.opacity(0.18) :
+                              isSelected ? Color.primary.opacity(0.08) : Color.clear)
+                        .padding(.horizontal, 12)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .strokeBorder(isDropTargeted ? Color.accentColor.opacity(0.5) : Color.clear, lineWidth: 1.5)
                         .padding(.horizontal, 12)
                 )
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .dropDestination(for: String.self) { droppedIDs, _ in
+                guard !collection.isSmart else { return false }
+                for idString in droppedIDs {
+                    guard let uuid = UUID(uuidString: idString),
+                          let item = store.items.first(where: { $0.id == uuid }) else { continue }
+                    store.addItem(item, to: collection)
+                }
+                return !droppedIDs.isEmpty
+            } isTargeted: { targeted in
+                isDropTargeted = targeted && !collection.isSmart
+            }
             .contextMenu {
                 if collection.isSmart && !collection.isSystem {
                     Button("Edit Smart Collection...") {

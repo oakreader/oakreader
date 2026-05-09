@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct LibraryToolbarContent: ToolbarContent {
     let appState: AppState
@@ -12,7 +13,7 @@ struct LibraryToolbarContent: ToolbarContent {
             } label: {
                 Image(systemName: "plus")
             }
-            .help("Add PDFs to Library")
+            .help("Add Files to Library")
         }
 
         ToolbarItem(placement: .primaryAction) {
@@ -42,17 +43,28 @@ struct LibraryToolbarContent: ToolbarContent {
     }
 
     private func importPDFs() {
+        var contentTypes: [UTType] = [.pdf, .html]
+        if let mdType = UTType(filenameExtension: "md") {
+            contentTypes.append(mdType)
+        }
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.pdf]
+        panel.allowedContentTypes = contentTypes
         panel.allowsMultipleSelection = true
-        panel.message = "Select PDF files to add to your library"
+        panel.message = "Select PDF, HTML, or Markdown files to add to your library"
         panel.begin { response in
             guard response == .OK else { return }
             for url in panel.urls {
-                if let item = appState.importService.importPDF(from: url) {
-                    if let collection = store.selectedCollection, !collection.isSmart {
-                        store.addItem(item, to: collection)
-                    }
+                let ext = url.pathExtension.lowercased()
+                let item: LibraryItem?
+                if ext == "html" || ext == "htm" {
+                    item = appState.importService.importWebSnapshot(from: url)
+                } else if ext == "md" || ext == "markdown" {
+                    item = appState.importService.importMarkdown(from: url)
+                } else {
+                    item = appState.importService.importPDF(from: url)
+                }
+                if let item, let collection = store.selectedCollection, !collection.isSmart {
+                    store.addItem(item, to: collection)
                 }
             }
         }
