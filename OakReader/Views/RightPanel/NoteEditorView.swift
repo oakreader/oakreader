@@ -10,8 +10,8 @@ enum NoteEditorMode: String, CaseIterable {
     var icon: String {
         switch self {
         case .edit: return "square.and.pencil"
-        case .preview: return "eye"
-        case .split: return "rectangle.split.1x2"
+        case .preview: return "book"
+        case .split: return "rectangle.split.2x1"
         }
     }
 
@@ -151,7 +151,16 @@ struct NoteEditorView: View {
             letterSpacing: CGFloat(letterSpacing),
             accentColorHex: accentColorHex,
             onReferenceClick: handleReferenceClick,
-            onImagePaste: { data in notesVM.saveImage(data) }
+            onImagePaste: { data in notesVM.saveImage(data) },
+            onSelectionPopup: { screenPoint, text, range, textView in
+                MarkdownSelectionPopupPanel.show(
+                    at: screenPoint,
+                    text: text,
+                    range: range,
+                    textView: textView,
+                    viewModel: notesVM.parent
+                )
+            }
         )
     }
 
