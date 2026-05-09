@@ -31,6 +31,9 @@ packages:
   YoutubeTranscript:
     url: https://github.com/skainguyen1412/swift-youtube-transcript.git
     from: "1.0.0"
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: "2.6.0"
 
 settings:
   base:
@@ -57,6 +60,7 @@ targets:
       - package: CMarkGFM
       - package: YouTubePlayerKit
       - package: YoutubeTranscript
+      - package: Sparkle
     postCompileScripts:
       - script: |
           if which swiftlint > /dev/null; then
