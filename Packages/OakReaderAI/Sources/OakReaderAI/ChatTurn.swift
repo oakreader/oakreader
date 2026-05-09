@@ -62,7 +62,7 @@ public struct ChatAttachment: Identifiable, Codable, Sendable {
     public let label: String
     public let textContent: String?
     /// Relative file path for image attachments (stored on disk, not inline).
-    /// Path is relative to the session's attachments directory.
+    /// Path is relative to `chats/attachments/{sessionId}/`.
     public let filePath: String?
     /// Inline image data — used only for in-memory/pending attachments, not persisted in JSONL.
     public let imageData: Data?
