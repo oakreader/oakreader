@@ -334,12 +334,38 @@ final class LibraryStore {
 
     func removeItem(_ item: LibraryItem) {
         do {
+            // Collect note IDs before deleting (cascade will remove DB records)
+            let noteIds = try database.dbQueue.read { db in
+                try Row.fetchAll(db, sql: "SELECT id FROM notes WHERE item_id = ?", arguments: [item.id.uuidString])
+                    .compactMap { UUID(uuidString: $0["id"] as String) }
+            }
+            // Collect conversation IDs
+            let convIds = try database.dbQueue.read { db in
+                try Row.fetchAll(db, sql: "SELECT id FROM conversations WHERE item_id = ?", arguments: [item.id.uuidString])
+                    .compactMap { UUID(uuidString: $0["id"] as String) }
+            }
+
+            // Delete from DB (cascades to notes, conversations records)
             try database.dbQueue.write { db in
                 try db.execute(sql: "DELETE FROM items WHERE id = ?", arguments: [item.id.uuidString])
             }
-            // Remove storage directory
+
+            // Remove note files
+            for noteId in noteIds {
+                let url = CatalogDatabase.noteFileURL(noteId: noteId)
+                try? FileManager.default.removeItem(at: url)
+                try? FileManager.default.removeItem(at: CatalogDatabase.noteAttachmentDirectory(noteId: noteId))
+            }
+            // Remove chat files
+            for convId in convIds {
+                let url = CatalogDatabase.chatFileURL(sessionId: convId)
+                try? FileManager.default.removeItem(at: url)
+                try? FileManager.default.removeItem(at: CatalogDatabase.chatAttachmentDirectory(sessionId: convId))
+            }
+            // Remove storage directory (PDFs, covers, etc.)
             let dir = CatalogDatabase.documentDirectory(storageKey: item.storageKey)
             try? FileManager.default.removeItem(at: dir)
+
             revision += 1
         } catch {
             Log.error(Log.store, "removeItem failed: \(error)")
@@ -358,6 +384,21 @@ final class LibraryStore {
             revision += 1
         } catch {
             Log.error(Log.store, "markOpened failed: \(error)")
+        }
+    }
+
+    func updateTitle(_ item: LibraryItem, title: String) {
+        let now = Date().iso8601String
+        do {
+            try database.dbQueue.write { db in
+                try db.execute(
+                    sql: "UPDATE items SET title = ?, updated_at = ? WHERE id = ?",
+                    arguments: [title, now, item.id.uuidString]
+                )
+            }
+            revision += 1
+        } catch {
+            Log.error(Log.store, "updateTitle failed: \(error)")
         }
     }
 
@@ -633,7 +674,7 @@ final class LibraryStore {
             options: [.skipsHiddenFiles]
         ) else { return 0 }
 
-        let supportedExtensions: Set<String> = ["pdf", "html", "htm"]
+        let supportedExtensions: Set<String> = ["pdf", "html", "htm", "md", "markdown"]
         var count = 0
         for case let fileURL as URL in enumerator {
             let ext = fileURL.pathExtension.lowercased()
@@ -642,6 +683,8 @@ final class LibraryStore {
             let item: LibraryItem?
             if ext == "html" || ext == "htm" {
                 item = importService.importWebSnapshot(from: fileURL)
+            } else if ext == "md" || ext == "markdown" {
+                item = importService.importMarkdown(from: fileURL)
             } else {
                 item = importService.importPDF(from: fileURL)
             }
