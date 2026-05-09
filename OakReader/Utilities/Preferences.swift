@@ -73,6 +73,13 @@ final class Preferences {
         static let voiceInputDeviceUID = "voiceInputDeviceUID"
         static let voiceOutputDeviceUID = "voiceOutputDeviceUID"
         static let hfEndpoint = "hfEndpoint"
+        // ElevenLabs cloud providers
+        static let voiceSTTProvider = "voiceSTTProvider"
+        static let voiceTTSProvider = "voiceTTSProvider"
+        static let elevenLabsAPIKey = "elevenLabsAPIKey"
+        static let elevenLabsVoiceId = "elevenLabsVoiceId"
+        static let elevenLabsTTSModelId = "elevenLabsTTSModelId"
+        static let elevenLabsSTTModelId = "elevenLabsSTTModelId"
         // External tools
         static let ytDlpPath = "ytDlpPath"
         static let ytDlpCachedVersion = "ytDlpCachedVersion"
@@ -471,6 +478,44 @@ final class Preferences {
     var hfEndpoint: String {
         get { defaults.string(forKey: Keys.hfEndpoint) ?? "" }
         set { defaults.set(newValue, forKey: Keys.hfEndpoint) }
+    }
+
+    // MARK: - ElevenLabs Cloud Provider Preferences
+
+    /// STT provider type: "on_device" or "elevenlabs".
+    var voiceSTTProvider: String {
+        get { defaults.string(forKey: Keys.voiceSTTProvider) ?? "on_device" }
+        set { defaults.set(newValue, forKey: Keys.voiceSTTProvider) }
+    }
+
+    /// TTS provider type: "on_device" or "elevenlabs".
+    var voiceTTSProvider: String {
+        get { defaults.string(forKey: Keys.voiceTTSProvider) ?? "on_device" }
+        set { defaults.set(newValue, forKey: Keys.voiceTTSProvider) }
+    }
+
+    /// ElevenLabs API key (shared by STT and TTS).
+    var elevenLabsAPIKey: String {
+        get { defaults.string(forKey: Keys.elevenLabsAPIKey) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.elevenLabsAPIKey) }
+    }
+
+    /// ElevenLabs voice ID for TTS.
+    var elevenLabsVoiceId: String {
+        get { defaults.string(forKey: Keys.elevenLabsVoiceId) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.elevenLabsVoiceId) }
+    }
+
+    /// ElevenLabs TTS model ID.
+    var elevenLabsTTSModelId: String {
+        get { defaults.string(forKey: Keys.elevenLabsTTSModelId) ?? "eleven_turbo_v2_5" }
+        set { defaults.set(newValue, forKey: Keys.elevenLabsTTSModelId) }
+    }
+
+    /// ElevenLabs STT model ID.
+    var elevenLabsSTTModelId: String {
+        get { defaults.string(forKey: Keys.elevenLabsSTTModelId) ?? "scribe_v2_realtime" }
+        set { defaults.set(newValue, forKey: Keys.elevenLabsSTTModelId) }
     }
 
     var voiceReferenceAudioURL: URL? {

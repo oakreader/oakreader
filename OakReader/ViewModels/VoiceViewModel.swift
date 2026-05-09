@@ -36,10 +36,14 @@ class VoiceViewModel {
     private var levelUpdateCounter: Int = 0
 
     // MARK: - Standalone TTS state
-    private var ttsProvider: MLXTTSProvider?
-    private var ttsProviderRepo: String?
+    private var standaloneTTSProvider: (any TTSService)?
+    private var standaloneTTSKey: String? // cache key to avoid re-creating
     private var speakerOutput: SpeakerOutput?
     private var ttsPlaybackTask: Task<Void, Never>?
+
+    // MARK: - Cloud provider references (for disconnect on stop)
+    private var cloudSTTProvider: ElevenLabsSTTProvider?
+    private var cloudTTSProvider: ElevenLabsTTSProvider?
 
     // MARK: - Lifecycle
 
@@ -61,6 +65,10 @@ class VoiceViewModel {
         let ttsRepo = prefs.voiceTTSModel.isEmpty ? defaultTTS : prefs.voiceTTSModel
         let vadRepo = prefs.voiceVADModel.isEmpty ? defaultVAD : prefs.voiceVADModel
 
+        // Determine provider types
+        let sttProviderType = VoiceProviderType(rawValue: prefs.voiceSTTProvider) ?? .onDevice
+        let ttsProviderType = VoiceProviderType(rawValue: prefs.voiceTTSProvider) ?? .onDevice
+
         // Speaker-specific voice overrides global preference
         let voice: String? = {
             if let s = speaker, !s.ttsVoice.isEmpty { return s.ttsVoice }
@@ -69,18 +77,29 @@ class VoiceViewModel {
 
         let modelManager = ModelManager.shared
 
-        // Pre-flight: verify required models are downloaded
-        let requiredModels = [
-            ("STT", sttRepo),
-            ("TTS", ttsRepo),
-            ("VAD", vadRepo),
-        ]
+        // Pre-flight: verify required on-device models are downloaded
+        // Cloud providers don't need model downloads — validate API key instead.
+        var requiredModels: [(String, String)] = [("VAD", vadRepo)] // VAD is always on-device
+        if sttProviderType == .onDevice { requiredModels.append(("STT", sttRepo)) }
+        if ttsProviderType == .onDevice { requiredModels.append(("TTS", ttsRepo)) }
         for (label, repo) in requiredModels {
             let downloaded = await modelManager.isDownloaded(repo)
             if !downloaded {
                 self.error = "\(label) model not downloaded: \(repo). Please download it from Settings → Voice first."
                 return
             }
+        }
+
+        // Validate ElevenLabs API key if any cloud provider is selected
+        if sttProviderType == .elevenLabs || ttsProviderType == .elevenLabs {
+            if prefs.elevenLabsAPIKey.isEmpty {
+                self.error = "ElevenLabs API key is required. Please set it in Settings → Voice."
+                return
+            }
+        }
+        if ttsProviderType == .elevenLabs && prefs.elevenLabsVoiceId.isEmpty {
+            self.error = "ElevenLabs Voice ID is required. Please set it in Settings → Voice."
+            return
         }
 
         // Build LLM bridge using shared ChatEngine + provider config.
@@ -113,7 +132,9 @@ class VoiceViewModel {
             sttModel: sttRepo,
             ttsModel: ttsRepo,
             vadModel: vadRepo,
-            ttsVoice: voice
+            ttsVoice: voice,
+            sttProvider: sttProviderType,
+            ttsProvider: ttsProviderType
         )
         let languageInstruction: String
         if language == "en" {
@@ -155,8 +176,40 @@ class VoiceViewModel {
             return prefs.voiceReferenceText.isEmpty ? nil : prefs.voiceReferenceText
         }()
 
-        let stt = MLXSTTProvider(repoId: sttRepo, manager: modelManager)
-        let tts = MLXTTSProvider(repoId: ttsRepo, language: language, manager: modelManager)
+        // Create STT provider based on setting
+        let stt: any STTService
+        switch sttProviderType {
+        case .onDevice:
+            stt = MLXSTTProvider(repoId: sttRepo, manager: modelManager)
+            cloudSTTProvider = nil
+        case .elevenLabs:
+            let sttConfig = ElevenLabsSTTConfig(
+                apiKey: prefs.elevenLabsAPIKey,
+                modelId: prefs.elevenLabsSTTModelId,
+                languageCode: language
+            )
+            let provider = ElevenLabsSTTProvider(config: sttConfig)
+            stt = provider
+            cloudSTTProvider = provider
+        }
+
+        // Create TTS provider based on setting
+        let tts: any TTSService
+        switch ttsProviderType {
+        case .onDevice:
+            tts = MLXTTSProvider(repoId: ttsRepo, language: language, manager: modelManager)
+            cloudTTSProvider = nil
+        case .elevenLabs:
+            let ttsConfig = ElevenLabsTTSConfig(
+                apiKey: prefs.elevenLabsAPIKey,
+                voiceId: prefs.elevenLabsVoiceId,
+                modelId: prefs.elevenLabsTTSModelId
+            )
+            let provider = ElevenLabsTTSProvider(config: ttsConfig)
+            tts = provider
+            cloudTTSProvider = provider
+        }
+
         let vad = MLXVADProvider(repoId: vadRepo, threshold: pipelineConfig.vadThreshold, manager: modelManager)
 
         // Audio device selection — empty UID means system default
@@ -212,7 +265,11 @@ class VoiceViewModel {
     func stop() {
         guard let pipeline else { return }
         let p = pipeline
+        let sttCloud = cloudSTTProvider
+        let ttsCloud = cloudTTSProvider
         self.pipeline = nil
+        self.cloudSTTProvider = nil
+        self.cloudTTSProvider = nil
         eventTask?.cancel()
         eventTask = nil
         agentState = .idle
@@ -222,7 +279,11 @@ class VoiceViewModel {
         levelUpdateCounter = 0
         currentCallId = nil
         turnIndex = 0
-        Task { await p.stop() }
+        Task {
+            await p.stop()
+            await sttCloud?.disconnect()
+            await ttsCloud?.disconnect()
+        }
     }
 
     var isRunning: Bool {
@@ -238,6 +299,7 @@ class VoiceViewModel {
         isSpeaking = true
 
         let prefs = Preferences.shared
+        let ttsProviderType = VoiceProviderType(rawValue: prefs.voiceTTSProvider) ?? .onDevice
         let defaultTTS = KnownModels.tts.first?.repo ?? ""
         let ttsRepo = prefs.voiceTTSModel.isEmpty ? defaultTTS : prefs.voiceTTSModel
         let voice = prefs.voiceTTSVoice.isEmpty ? nil : prefs.voiceTTSVoice
@@ -246,13 +308,37 @@ class VoiceViewModel {
         let refText = prefs.voiceReferenceText.isEmpty ? nil : prefs.voiceReferenceText
         let outputUID = prefs.voiceOutputDeviceUID.isEmpty ? nil : prefs.voiceOutputDeviceUID
 
-        // Reuse TTS provider if same repo, otherwise create new one
-        if ttsProvider == nil || ttsProviderRepo != ttsRepo {
-            ttsProvider = MLXTTSProvider(repoId: ttsRepo, language: language, manager: ModelManager.shared)
-            ttsProviderRepo = ttsRepo
+        // Build a cache key to avoid re-creating the provider unnecessarily
+        let cacheKey: String
+        switch ttsProviderType {
+        case .onDevice:
+            cacheKey = "ondevice:\(ttsRepo)"
+        case .elevenLabs:
+            cacheKey = "elevenlabs:\(prefs.elevenLabsVoiceId):\(prefs.elevenLabsTTSModelId)"
         }
 
-        let provider = ttsProvider!
+        // Reuse TTS provider if same config, otherwise create new one
+        if standaloneTTSProvider == nil || standaloneTTSKey != cacheKey {
+            switch ttsProviderType {
+            case .onDevice:
+                standaloneTTSProvider = MLXTTSProvider(repoId: ttsRepo, language: language, manager: ModelManager.shared)
+            case .elevenLabs:
+                guard !prefs.elevenLabsAPIKey.isEmpty, !prefs.elevenLabsVoiceId.isEmpty else {
+                    self.error = "ElevenLabs API key and Voice ID are required."
+                    isSpeaking = false
+                    return
+                }
+                let ttsConfig = ElevenLabsTTSConfig(
+                    apiKey: prefs.elevenLabsAPIKey,
+                    voiceId: prefs.elevenLabsVoiceId,
+                    modelId: prefs.elevenLabsTTSModelId
+                )
+                standaloneTTSProvider = ElevenLabsTTSProvider(config: ttsConfig)
+            }
+            standaloneTTSKey = cacheKey
+        }
+
+        let provider = standaloneTTSProvider!
         let speaker = SpeakerOutput(deviceUID: outputUID)
         speakerOutput = speaker
 

@@ -18,6 +18,13 @@ struct VoiceSettingsView: View {
     @State private var liveTranscription: Bool
     @State private var hfEndpoint: String
 
+    // Provider selection
+    @State private var sttProvider: String
+    @State private var ttsProvider: String
+    @State private var elevenLabsAPIKey: String
+    @State private var elevenLabsVoiceId: String
+    @State private var elevenLabsTTSModelId: String
+
     // Audio device selection
     @State private var inputDeviceUID: String
     @State private var outputDeviceUID: String
@@ -51,18 +58,37 @@ struct VoiceSettingsView: View {
         _inputDeviceUID = State(initialValue: prefs.voiceInputDeviceUID)
         _outputDeviceUID = State(initialValue: prefs.voiceOutputDeviceUID)
         _hfEndpoint = State(initialValue: prefs.hfEndpoint)
+        _sttProvider = State(initialValue: prefs.voiceSTTProvider)
+        _ttsProvider = State(initialValue: prefs.voiceTTSProvider)
+        _elevenLabsAPIKey = State(initialValue: prefs.elevenLabsAPIKey)
+        _elevenLabsVoiceId = State(initialValue: prefs.elevenLabsVoiceId)
+        _elevenLabsTTSModelId = State(initialValue: prefs.elevenLabsTTSModelId)
     }
+
+    private var isSTTCloud: Bool { sttProvider == VoiceProviderType.elevenLabs.rawValue }
+    private var isTTSCloud: Bool { ttsProvider == VoiceProviderType.elevenLabs.rawValue }
+    private var needsElevenLabs: Bool { isSTTCloud || isTTSCloud }
 
     var body: some View {
         Form {
             audioDeviceSection
             languageSection
+            providerSection
+            if needsElevenLabs {
+                elevenLabsSection
+            }
             llmSection
-            sttSection
+            if !isSTTCloud {
+                sttSection
+            }
             liveTranscriptionSection
-            ttsSection
+            if !isTTSCloud {
+                ttsSection
+            }
             vadSection
-            downloadAllSection
+            if !isSTTCloud || !isTTSCloud {
+                downloadAllSection
+            }
         }
         .formStyle(.grouped)
         .onAppear {
@@ -159,6 +185,48 @@ struct VoiceSettingsView: View {
             }
 
             Text("Select the language for speech recognition and synthesis. The STT model auto-detects language, but TTS uses this setting for correct pronunciation.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var providerSection: some View {
+        Section("Provider") {
+            Picker("Speech-to-Text", selection: $sttProvider) {
+                ForEach(VoiceProviderType.allCases, id: \.rawValue) { type in
+                    Text(type.displayName).tag(type.rawValue)
+                }
+            }
+
+            Picker("Text-to-Speech", selection: $ttsProvider) {
+                ForEach(VoiceProviderType.allCases, id: \.rawValue) { type in
+                    Text(type.displayName).tag(type.rawValue)
+                }
+            }
+
+            Text("On-Device uses local MLX models (no internet required). ElevenLabs Cloud uses streaming WebSocket APIs for lower latency.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var elevenLabsSection: some View {
+        Section("ElevenLabs") {
+            SecureField("API Key", text: $elevenLabsAPIKey)
+                .textFieldStyle(.roundedBorder)
+
+            if isTTSCloud {
+                TextField("Voice ID", text: $elevenLabsVoiceId)
+                    .textFieldStyle(.roundedBorder)
+
+                Picker("TTS Model", selection: $elevenLabsTTSModelId) {
+                    Text("Turbo v2.5 (fastest)").tag("eleven_turbo_v2_5")
+                    Text("Flash v2.5 (fast)").tag("eleven_flash_v2_5")
+                    Text("Multilingual v2 (quality)").tag("eleven_multilingual_v2")
+                }
+            }
+
+            Text("Get your API key and Voice ID from elevenlabs.io. Voice IDs look like \"pNInz6obpgDQGcFmaJgB\".")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -417,8 +485,9 @@ struct VoiceSettingsView: View {
     // MARK: - Helpers
 
     private var requiredRepos: [String] {
-        var repos = [sttModel, ttsModel, vadModel]
-        // Parakeet live STT not available with current TTS library
+        var repos = [vadModel] // VAD is always on-device
+        if !isSTTCloud { repos.append(sttModel) }
+        if !isTTSCloud { repos.append(ttsModel) }
         return repos
     }
 
@@ -576,6 +645,11 @@ struct VoiceSettingsView: View {
         prefs.voiceInputDeviceUID = inputDeviceUID
         prefs.voiceOutputDeviceUID = outputDeviceUID
         prefs.hfEndpoint = hfEndpoint
+        prefs.voiceSTTProvider = sttProvider
+        prefs.voiceTTSProvider = ttsProvider
+        prefs.elevenLabsAPIKey = elevenLabsAPIKey
+        prefs.elevenLabsVoiceId = elevenLabsVoiceId
+        prefs.elevenLabsTTSModelId = elevenLabsTTSModelId
     }
 }
 

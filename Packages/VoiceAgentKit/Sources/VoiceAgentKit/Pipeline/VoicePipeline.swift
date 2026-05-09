@@ -800,7 +800,7 @@ public actor VoicePipeline {
                 // boundaries (period, !, ?, newline). First sentence uses a lower
                 // minimum to reduce time-to-first-audio; later sentences are longer
                 // so TTS has enough context for natural prosody.
-                let delimiters = config.sentenceDelimiters
+                let delimiters = sentenceIndex == 0 ? config.firstSentenceDelimiters : config.sentenceDelimiters
                 let threshold: Int
                 switch sentenceIndex {
                 case 0:  threshold = config.minFirstSentenceLength   // 1 — first natural sentence
