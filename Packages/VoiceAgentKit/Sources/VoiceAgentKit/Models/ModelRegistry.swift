@@ -2,6 +2,21 @@ import Foundation
 import HuggingFace
 import MLXAudioCore
 
+// MARK: - Voice Provider Type
+
+/// Whether a pipeline component uses on-device MLX models or a cloud provider.
+public enum VoiceProviderType: String, Sendable, Codable, CaseIterable {
+    case onDevice = "on_device"
+    case elevenLabs = "elevenlabs"
+
+    public var displayName: String {
+        switch self {
+        case .onDevice: return "On-Device"
+        case .elevenLabs: return "ElevenLabs Cloud"
+        }
+    }
+}
+
 // MARK: - Model Configuration
 
 /// User-facing configuration for which models to use in the voice pipeline.
@@ -12,24 +27,35 @@ public struct VoiceModelConfig: Sendable, Codable {
     /// Optional turn-detector model (e.g. SmartTurn). Nil disables endpoint verification.
     public var turnDetectorModel: String?
     public var ttsVoice: String?
+    /// Which provider to use for STT (on-device MLX or cloud).
+    public var sttProvider: VoiceProviderType
+    /// Which provider to use for TTS (on-device MLX or cloud).
+    public var ttsProvider: VoiceProviderType
 
     public init(
         sttModel: String = KnownModels.stt[0].repo,
         ttsModel: String = KnownModels.tts[0].repo,
         vadModel: String = KnownModels.vad[0].repo,
         turnDetectorModel: String? = KnownModels.turnDetector.first?.repo,
-        ttsVoice: String? = nil
+        ttsVoice: String? = nil,
+        sttProvider: VoiceProviderType = .onDevice,
+        ttsProvider: VoiceProviderType = .onDevice
     ) {
         self.sttModel = sttModel
         self.ttsModel = ttsModel
         self.vadModel = vadModel
         self.turnDetectorModel = turnDetectorModel
         self.ttsVoice = ttsVoice
+        self.sttProvider = sttProvider
+        self.ttsProvider = ttsProvider
     }
 
-    /// All model repos referenced by this config.
+    /// All on-device model repos referenced by this config (excludes cloud providers).
     public var allRepos: [String] {
-        var repos = [sttModel, ttsModel, vadModel]
+        var repos = [String]()
+        if sttProvider == .onDevice { repos.append(sttModel) }
+        if ttsProvider == .onDevice { repos.append(ttsModel) }
+        repos.append(vadModel) // VAD is always on-device
         if let td = turnDetectorModel { repos.append(td) }
         return repos
     }
