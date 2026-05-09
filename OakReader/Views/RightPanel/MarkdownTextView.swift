@@ -13,6 +13,7 @@ struct MarkdownTextView: NSViewRepresentable {
     var accentColorHex: String
     var onReferenceClick: ((String) -> Void)?
     var onImagePaste: ((Data) -> String?)?
+    var onSelectionPopup: ((NSPoint, String, NSRange, MarkdownNSTextView) -> Void)?
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -46,6 +47,7 @@ struct MarkdownTextView: NSViewRepresentable {
         textView.delegate = context.coordinator
         textView.onReferenceClick = onReferenceClick
         textView.onImagePaste = onImagePaste
+        textView.onSelectionPopup = onSelectionPopup
 
         let ps = Self.paragraphStyle(font: font, lineHeight: lineHeight, lineSpacing: lineSpacing)
         textView.defaultParagraphStyle = ps
@@ -120,6 +122,7 @@ struct MarkdownTextView: NSViewRepresentable {
 
         textView.onReferenceClick = onReferenceClick
         textView.onImagePaste = onImagePaste
+        textView.onSelectionPopup = onSelectionPopup
     }
 
     /// TextKit 2 compatible paragraph style: lineSpacing only.
@@ -167,6 +170,37 @@ struct MarkdownTextView: NSViewRepresentable {
 final class MarkdownNSTextView: NSTextView {
     var onReferenceClick: ((String) -> Void)?
     var onImagePaste: ((Data) -> String?)?
+    var onSelectionPopup: ((NSPoint, String, NSRange, MarkdownNSTextView) -> Void)?
+
+    /// Maximum content width for readable line length (Notion-style centering).
+    private let maxContentWidth: CGFloat = 720
+
+    /// Recalculate horizontal insets to center text within maxContentWidth.
+    private func updateContentInsets() {
+        let horizontalInset = max(20, (bounds.width - maxContentWidth) / 2)
+        let current = textContainerInset
+        if abs(current.width - horizontalInset) > 1 {
+            textContainerInset = NSSize(width: horizontalInset, height: current.height)
+        }
+    }
+
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        updateContentInsets()
+    }
+
+    override func viewDidMoveToSuperview() {
+        super.viewDidMoveToSuperview()
+        updateContentInsets()
+    }
+
+    /// Inline diff state for AI writing tools
+    struct DiffState {
+        let originalText: String    // for reject
+        let diffRange: NSRange      // range of the diff-styled text
+        let resolvedText: String    // clean new text (for accept)
+    }
+    var diffState: DiffState?
 
     /// Slash-command state
     private var slashPanel: SlashCommandPanel?
@@ -266,6 +300,7 @@ final class MarkdownNSTextView: NSTextView {
     }
 
     override func mouseDown(with event: NSEvent) {
+        MarkdownSelectionPopupPanel.dismissCurrent()
         dismissSlashPanel()
         if event.clickCount == 1 {
             let point = convert(event.locationInWindow, from: nil)
@@ -275,7 +310,171 @@ final class MarkdownNSTextView: NSTextView {
                 return
             }
         }
+        // super.mouseDown runs an internal tracking loop that blocks until
+        // the mouse is released. When it returns, the selection is finalized.
         super.mouseDown(with: event)
+        showSelectionPopupIfNeeded()
+    }
+
+    /// Check for a non-empty text selection and show the popup above it.
+    private func showSelectionPopupIfNeeded() {
+        let range = selectedRange()
+        guard range.length > 0 else { return }
+        guard let lm = layoutManager, let tc = textContainer else { return }
+
+        let selectedText = (string as NSString).substring(with: range)
+
+        let glyphRange = lm.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+        let rect = lm.boundingRect(forGlyphRange: glyphRange, in: tc)
+        let origin = NSPoint(
+            x: rect.midX + textContainerInset.width,
+            y: rect.origin.y + textContainerInset.height
+        )
+        let viewPt = convert(origin, to: nil)
+        guard let screenPt = window?.convertPoint(toScreen: viewPt) else { return }
+
+        onSelectionPopup?(screenPt, selectedText, range, self)
+    }
+
+    // MARK: - Inline Diff
+
+    /// Notify the highlighter to protect/unprotect the diff range.
+    private func setHighlighterDiffRange(_ range: NSRange?) {
+        guard let ts = textStorage, let highlighter = ts.delegate as? MarkdownHighlighter else { return }
+        highlighter.activeDiffRange = range
+    }
+
+    /// Apply word-level inline diff: replace selected range with diff-styled attributed string.
+    func showInlineDiff(originalRange: NSRange, newText: String) {
+        guard let ts = textStorage else { return }
+
+        let originalText = (string as NSString).substring(with: originalRange)
+
+        // If AI returned identical text, skip diff
+        if originalText == newText {
+            diffState = nil
+            return
+        }
+
+        let diffResults = String.wordDiff(originalText, newText)
+
+        // Build the diff attributed string
+        let diffAttr = NSMutableAttributedString()
+        let baseFont = self.font ?? NSFont.systemFont(ofSize: 14)
+        var resolvedText = ""
+
+        for result in diffResults {
+            switch result {
+            case .unchanged(let text):
+                let attrs: [NSAttributedString.Key: Any] = [
+                    .font: baseFont,
+                    .foregroundColor: NSColor.labelColor,
+                ]
+                diffAttr.append(NSAttributedString(string: text, attributes: attrs))
+                resolvedText += text
+
+            case .removed(let text):
+                let attrs: [NSAttributedString.Key: Any] = [
+                    .font: baseFont,
+                    .foregroundColor: NSColor.systemRed.withAlphaComponent(0.5),
+                    .strikethroughStyle: NSUnderlineStyle.single.rawValue,
+                    .strikethroughColor: NSColor.systemRed.withAlphaComponent(0.7),
+                ]
+                diffAttr.append(NSAttributedString(string: text, attributes: attrs))
+
+            case .added(let text):
+                let attrs: [NSAttributedString.Key: Any] = [
+                    .font: baseFont,
+                    .foregroundColor: NSColor.labelColor,
+                    .underlineStyle: NSUnderlineStyle.single.rawValue,
+                    .underlineColor: NSColor.systemTeal,
+                    .backgroundColor: NSColor.systemGreen.withAlphaComponent(0.08),
+                ]
+                diffAttr.append(NSAttributedString(string: text, attributes: attrs))
+                resolvedText += text
+            }
+        }
+
+        undoManager?.beginUndoGrouping()
+        ts.replaceCharacters(in: originalRange, with: diffAttr)
+        undoManager?.endUndoGrouping()
+
+        let diffRange = NSRange(location: originalRange.location, length: diffAttr.length)
+        diffState = DiffState(
+            originalText: originalText,
+            diffRange: diffRange,
+            resolvedText: resolvedText
+        )
+
+        // Protect diff range from highlighter
+        setHighlighterDiffRange(diffRange)
+
+        // Clear selection
+        setSelectedRange(NSRange(location: diffRange.location + diffRange.length, length: 0))
+
+        // Flash yellow highlight then fade to diff colors
+        flashDiffHighlight(range: diffRange)
+    }
+
+    /// Brief yellow flash animation over the diff range.
+    private func flashDiffHighlight(range: NSRange) {
+        guard let ts = textStorage else { return }
+        ts.addAttribute(.backgroundColor, value: NSColor.systemYellow.withAlphaComponent(0.25), range: range)
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            guard let self, let ts = self.textStorage, let state = self.diffState else { return }
+            // Restore proper diff colors
+            let diffResults = String.wordDiff(state.originalText, state.resolvedText)
+            var offset = state.diffRange.location
+            for result in diffResults {
+                let len = (result.text as NSString).length
+                let r = NSRange(location: offset, length: len)
+                guard NSMaxRange(r) <= (ts.string as NSString).length else { break }
+                switch result {
+                case .unchanged:
+                    ts.removeAttribute(.backgroundColor, range: r)
+                case .removed:
+                    ts.removeAttribute(.backgroundColor, range: r)
+                case .added:
+                    ts.addAttribute(.backgroundColor, value: NSColor.systemGreen.withAlphaComponent(0.08), range: r)
+                }
+                offset += len
+            }
+        }
+    }
+
+    /// Accept diff: replace diff range with clean resolved text.
+    func acceptDiff() {
+        guard let state = diffState, let ts = textStorage else { return }
+
+        setHighlighterDiffRange(nil)
+
+        undoManager?.beginUndoGrouping()
+        let resolvedAttr = NSAttributedString(string: state.resolvedText, attributes: [
+            .font: font ?? NSFont.systemFont(ofSize: 14),
+            .foregroundColor: NSColor.labelColor,
+        ])
+        ts.replaceCharacters(in: state.diffRange, with: resolvedAttr)
+        undoManager?.endUndoGrouping()
+
+        diffState = nil
+    }
+
+    /// Reject diff: replace diff range with original text.
+    func rejectDiff() {
+        guard let state = diffState, let ts = textStorage else { return }
+
+        setHighlighterDiffRange(nil)
+
+        undoManager?.beginUndoGrouping()
+        let originalAttr = NSAttributedString(string: state.originalText, attributes: [
+            .font: font ?? NSFont.systemFont(ofSize: 14),
+            .foregroundColor: NSColor.labelColor,
+        ])
+        ts.replaceCharacters(in: state.diffRange, with: originalAttr)
+        undoManager?.endUndoGrouping()
+
+        diffState = nil
     }
 
     // MARK: - Markdown Shortcuts
