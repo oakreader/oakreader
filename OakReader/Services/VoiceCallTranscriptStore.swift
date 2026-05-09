@@ -5,7 +5,7 @@ import VoiceAgentKit
 ///
 /// Storage layout:
 /// ```
-/// ~/OakReader/voice-calls/
+/// ~/OakReader/calls/
 ///   {callId}/
 ///     transcript.jsonl
 ///     audio/
@@ -29,21 +29,19 @@ struct VoiceCallTranscriptStore {
     // MARK: - Paths
 
     static var baseDirectory: URL {
-        CatalogDatabase.dataDirectory.appendingPathComponent("voice-calls", isDirectory: true)
+        CatalogDatabase.callsDirectory
     }
 
     static func callDirectory(callId: String) -> URL {
-        baseDirectory.appendingPathComponent(callId, isDirectory: true)
+        CatalogDatabase.callDirectory(callId: callId)
     }
 
     static func transcriptURL(callId: String) -> URL {
-        callDirectory(callId: callId).appendingPathComponent("transcript.jsonl")
+        CatalogDatabase.callTranscriptURL(callId: callId)
     }
 
     static func audioURL(callId: String, turnIndex: Int, role: String) -> URL {
-        callDirectory(callId: callId)
-            .appendingPathComponent("audio", isDirectory: true)
-            .appendingPathComponent("turn-\(turnIndex)-\(role).caf")
+        CatalogDatabase.callAudioURL(callId: callId, turnIndex: turnIndex, role: role)
     }
 
     // MARK: - Write
