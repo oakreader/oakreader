@@ -8,20 +8,17 @@ let package = Package(
         .library(name: "VoiceAgentKit", targets: ["VoiceAgentKit"])
     ],
     dependencies: [
-        .package(url: "https://github.com/soniqo/speech-swift", branch: "main"),
+        .package(url: "https://github.com/Blaizzy/mlx-audio-swift", branch: "main"),
         .package(path: "../OakReaderAI"),
     ],
     targets: [
         .target(
             name: "VoiceAgentKit",
             dependencies: [
-                .product(name: "Qwen3ASR", package: "speech-swift"),
-                .product(name: "Qwen3TTS", package: "speech-swift"),
-                .product(name: "CosyVoiceTTS", package: "speech-swift"),
-                .product(name: "KokoroTTS", package: "speech-swift"),
-                .product(name: "SpeechVAD", package: "speech-swift"),
-                .product(name: "ParakeetStreamingASR", package: "speech-swift"),
-                .product(name: "AudioCommon", package: "speech-swift"),
+                .product(name: "MLXAudioSTT", package: "mlx-audio-swift"),
+                .product(name: "MLXAudioTTS", package: "mlx-audio-swift"),
+                .product(name: "MLXAudioVAD", package: "mlx-audio-swift"),
+                .product(name: "MLXAudioCore", package: "mlx-audio-swift"),
                 "OakReaderAI",
             ],
             path: "Sources/VoiceAgentKit"

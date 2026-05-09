@@ -189,6 +189,14 @@ class TextSelectionPopupPanel: NSPanel {
             mainStack.addArrangedSubview(translateBtn)
         }
 
+        let speakBtn = PopupIconButton(
+            systemImage: "speaker.wave.2",
+            accessibilityLabel: "Play Sound"
+        ) { [weak self] in
+            self?.speakSelection()
+        }
+        mainStack.addArrangedSubview(speakBtn)
+
         // Separator 2
         mainStack.addArrangedSubview(makeVerticalSeparator())
 
@@ -342,6 +350,13 @@ class TextSelectionPopupPanel: NSPanel {
         guard let text = selection.string, !text.isEmpty else { return }
         viewModel.translation.setSourceText(text)
         viewModel.state.rightPanelMode = .translation
+        pdfView?.clearSelection()
+        dismissWithAction()
+    }
+
+    private func speakSelection() {
+        guard let text = selection.string, !text.isEmpty else { return }
+        viewModel.voice.speakText(text)
         pdfView?.clearSelection()
         dismissWithAction()
     }

@@ -1,7 +1,8 @@
 import AVFoundation
-import SpeechVAD
+import MLX
+import MLXAudioVAD
 
-/// VADService implementation using speech-swift's Silero VAD.
+/// VADService implementation using Silero VAD from mlx-audio-swift.
 ///
 /// Silero VAD requires fixed-size chunks (512 samples at 16 kHz).
 /// This provider accumulates incoming audio frames and processes
@@ -11,9 +12,11 @@ import SpeechVAD
 /// - **Hysteresis**: activation threshold (default 0.5) is higher than
 ///   deactivation (default 0.35), preventing rapid toggling near the boundary.
 /// - **Silence debounce**: `speechEnd` only fires after sustained silence
-///   (~500ms at 16kHz), not on the first below-threshold frame.
+///   (~500ms at 16kHz), not on the first below-threshold frame. This prevents
+///   mid-sentence pauses from fragmenting the utterance.
 public actor MLXVADProvider: VADService {
-    private var model: SileroVADModel?
+    private var model: SileroVAD?
+    private var streamingState: SileroVADStreamingState?
     private let repoId: String
     private let threshold: Float
     private let negThreshold: Float
@@ -32,6 +35,16 @@ public actor MLXVADProvider: VADService {
     /// Silero VAD requires exactly this many samples per feed at 16 kHz.
     private static let vadWindowSize = 512
 
+    /// - Parameters:
+    ///   - repoId: HuggingFace repo for the Silero VAD model.
+    ///   - threshold: Activation threshold — speech starts when probability ≥ this value.
+    ///     LiveKit, OpenAI, and Silero all default to 0.5.
+    ///   - negThreshold: Deactivation threshold — speech continues while probability ≥ this
+    ///     value and ends when it drops below. Defaults to `threshold − 0.15` (LiveKit convention).
+    ///   - minSilenceWindows: Number of consecutive below-threshold VAD windows required
+    ///     before firing `speechEnd`. At 16 kHz / 512 samples per window (32ms each),
+    ///     16 windows ≈ 500ms — matching LiveKit (550ms) and OpenAI (500ms) defaults.
+    ///   - manager: Optional model manager for loading state reporting.
     public init(
         repoId: String = KnownModels.vad[0].repo,
         threshold: Float = 0.5,
@@ -57,9 +70,16 @@ public actor MLXVADProvider: VADService {
         let newSamples = Array(UnsafeBufferPointer(start: floatData[0], count: frameCount))
         sampleAccumulator.append(contentsOf: newSamples)
 
+        let sampleRate = Int(chunk.format.sampleRate)
+
+        if streamingState == nil {
+            streamingState = try model.initialState(batchSize: 1, sampleRate: sampleRate)
+        }
+
         // Process all complete windows.
         // Edge transitions (speechStart / speechEnd) take priority over
-        // steady-state events (speechContinuing / silence).
+        // steady-state events (speechContinuing / silence) to avoid
+        // losing critical events when multiple windows are processed.
         var priorityEvent: VADEvent?
         var steadyEvent: VADEvent = wasSpeaking ? .speechContinuing : .silence
 
@@ -67,27 +87,42 @@ public actor MLXVADProvider: VADService {
             let window = Array(sampleAccumulator.prefix(Self.vadWindowSize))
             sampleAccumulator.removeFirst(Self.vadWindowSize)
 
-            let prob = model.processChunk(window)
+            let audioArray = MLXArray(window)
+            let (probability, newState) = try model.feed(
+                chunk: audioArray,
+                state: streamingState,
+                sampleRate: sampleRate
+            )
+            streamingState = newState
 
+            let prob = probability.item(Float.self)
             // Hysteresis: use higher threshold to START speech, lower to STOP.
             let effectiveThreshold = wasSpeaking ? negThreshold : threshold
             let isSpeaking = prob >= effectiveThreshold
 
             if isSpeaking && !wasSpeaking {
+                // Edge: silence → speech. Return immediately — don't process
+                // more windows so the pipeline can start buffering audio.
                 silenceWindowCount = 0
                 wasSpeaking = true
                 return .speechStart
             } else if !isSpeaking && wasSpeaking {
+                // Potential speech → silence. Debounce: require sustained silence
+                // before confirming speechEnd (~500ms at 16kHz default).
                 silenceWindowCount += 1
                 if silenceWindowCount >= minSilenceWindows {
+                    // Confirmed end — enough sustained silence
                     priorityEvent = .speechEnd
                     steadyEvent = .silence
                     wasSpeaking = false
                     silenceWindowCount = 0
                 } else {
+                    // Still debouncing — report as continuing (speech hasn't
+                    // officially ended yet, this may be a mid-sentence pause)
                     steadyEvent = .speechContinuing
                 }
             } else if isSpeaking {
+                // Speech continuing — reset silence debounce counter
                 silenceWindowCount = 0
                 if priorityEvent == .speechEnd {
                     priorityEvent = nil
@@ -96,24 +131,26 @@ public actor MLXVADProvider: VADService {
             } else {
                 steadyEvent = .silence
             }
+            // Note: wasSpeaking is managed explicitly in each branch above
+            // (set true in speechStart, set false in confirmed speechEnd).
         }
 
         return priorityEvent ?? steadyEvent
     }
 
     public func reset() async {
-        model?.resetState()
+        streamingState = nil
         wasSpeaking = false
         sampleAccumulator = []
         silenceWindowCount = 0
     }
 
-    private func ensureModel() async throws -> SileroVADModel {
+    private func ensureModel() async throws -> SileroVAD {
         if let model { return model }
 
         await manager?.setLoading(repoId)
         do {
-            let loaded = try await SileroVADModel.fromPretrained(modelId: repoId)
+            let loaded = try await SileroVAD.fromPretrained(repoId)
             self.model = loaded
             await manager?.setReady(repoId)
             return loaded
