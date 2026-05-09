@@ -27,5 +27,22 @@ struct RootView: View {
         )) {
             SettingsView(store: appState.libraryStore)
         }
+        .sheet(isPresented: Binding(
+            get: { appState.showZoteroImport },
+            set: { appState.showZoteroImport = $0 }
+        )) {
+            if let dataDir = appState.zoteroImportDataDir {
+                ZoteroImportProgressView(
+                    dataDirectory: dataDir,
+                    store: appState.libraryStore,
+                    coverService: appState.coverService,
+                    referenceService: appState.referenceService,
+                    onDismiss: {
+                        appState.showZoteroImport = false
+                        appState.zoteroImportDataDir = nil
+                    }
+                )
+            }
+        }
     }
 }
