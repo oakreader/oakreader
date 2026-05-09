@@ -22,11 +22,91 @@ final class CatalogDatabase {
         dataDirectory.appendingPathComponent("logs", isDirectory: true)
     }
 
+    /// ~/OakReader/notes/
+    static var notesDirectory: URL {
+        dataDirectory.appendingPathComponent("notes", isDirectory: true)
+    }
+
+    /// ~/OakReader/notes/attachments/
+    static var notesAttachmentsDirectory: URL {
+        notesDirectory.appendingPathComponent("attachments", isDirectory: true)
+    }
+
+    /// Centralized note file: ~/OakReader/notes/{noteId}.md
+    static func noteFileURL(noteId: UUID) -> URL {
+        notesDirectory.appendingPathComponent("\(noteId.uuidString).md")
+    }
+
+    /// ~/OakReader/notes/attachments/{noteId}/
+    static func noteAttachmentDirectory(noteId: UUID) -> URL {
+        notesAttachmentsDirectory.appendingPathComponent(noteId.uuidString, isDirectory: true)
+    }
+
+    /// ~/OakReader/notes/attachments/{noteId}/{fileName}
+    static func noteAttachmentURL(noteId: UUID, fileName: String) -> URL {
+        noteAttachmentDirectory(noteId: noteId).appendingPathComponent(fileName)
+    }
+
+    /// ~/OakReader/chats/
+    static var chatsDirectory: URL {
+        dataDirectory.appendingPathComponent("chats", isDirectory: true)
+    }
+
+    /// ~/OakReader/chats/attachments/
+    static var chatAttachmentsDirectory: URL {
+        chatsDirectory.appendingPathComponent("attachments", isDirectory: true)
+    }
+
+    /// ~/OakReader/chats/{sessionId}.jsonl
+    static func chatFileURL(sessionId: UUID) -> URL {
+        chatsDirectory.appendingPathComponent("\(sessionId.uuidString).jsonl")
+    }
+
+    /// ~/OakReader/chats/attachments/{sessionId}/
+    static func chatAttachmentDirectory(sessionId: UUID) -> URL {
+        chatAttachmentsDirectory.appendingPathComponent(sessionId.uuidString, isDirectory: true)
+    }
+
+    /// ~/OakReader/chats/attachments/{sessionId}/{fileName}
+    static func chatAttachmentURL(sessionId: UUID, fileName: String) -> URL {
+        chatAttachmentDirectory(sessionId: sessionId).appendingPathComponent(fileName)
+    }
+
+    /// ~/OakReader/calls/
+    static var callsDirectory: URL {
+        dataDirectory.appendingPathComponent("calls", isDirectory: true)
+    }
+
+    /// ~/OakReader/calls/{callId}/
+    static func callDirectory(callId: String) -> URL {
+        callsDirectory.appendingPathComponent(callId, isDirectory: true)
+    }
+
+    /// ~/OakReader/calls/{callId}/transcript.jsonl
+    static func callTranscriptURL(callId: String) -> URL {
+        callDirectory(callId: callId).appendingPathComponent("transcript.jsonl")
+    }
+
+    /// ~/OakReader/calls/{callId}/audio/
+    static func callAudioDirectory(callId: String) -> URL {
+        callDirectory(callId: callId).appendingPathComponent("audio", isDirectory: true)
+    }
+
+    /// ~/OakReader/calls/{callId}/audio/turn-{turnIndex}-{role}.caf
+    static func callAudioURL(callId: String, turnIndex: Int, role: String) -> URL {
+        callAudioDirectory(callId: callId).appendingPathComponent("turn-\(turnIndex)-\(role).caf")
+    }
+
     init() throws {
         let dataDir = Self.dataDirectory
         try FileManager.default.createDirectory(at: dataDir, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: Self.storageDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: Self.logsDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: Self.notesDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: Self.notesAttachmentsDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: Self.chatsDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: Self.chatAttachmentsDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: Self.callsDirectory, withIntermediateDirectories: true)
 
         let dbPath = dataDir.appendingPathComponent("library.sqlite").path
 
@@ -377,6 +457,15 @@ final class CatalogDatabase {
             """, arguments: [UUID().uuidString, localUserId, now, now])
         }
 
+        migrator.registerMigration("v6-markdown-notes") { db in
+            let now = Date().iso8601String
+            let rules = #"{"match":"all","conditions":[{"field":"item_type","op":"eq","value":"markdown"}]}"#
+            try db.execute(sql: """
+                INSERT OR IGNORE INTO collections (id, user_id, name, icon, sort_order, parent_id, is_smart, is_system, filter_rules, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, NULL, 1, 1, ?, ?, ?)
+            """, arguments: [SystemCollectionID.notes.uuidString, localUserId, "Notes", "doc.text", 6, rules, now, now])
+        }
+
         return migrator
     }
 
@@ -395,20 +484,6 @@ final class CatalogDatabase {
         storageDirectory.appendingPathComponent(storageKey, isDirectory: true)
     }
 
-    /// Sessions directory for an item: storage/{itemKey}/sessions/
-    static func documentSessionsDirectory(storageKey: String) -> URL {
-        documentDirectory(storageKey: storageKey).appendingPathComponent("sessions", isDirectory: true)
-    }
-
-    /// Notes directory for an item: storage/{itemKey}/notes/
-    static func documentNotesDirectory(storageKey: String) -> URL {
-        documentDirectory(storageKey: storageKey).appendingPathComponent("notes", isDirectory: true)
-    }
-
-    /// Notes attachments directory for an item: storage/{itemKey}/notes/attachments/
-    static func documentNotesAttachmentsDirectory(storageKey: String) -> URL {
-        documentNotesDirectory(storageKey: storageKey).appendingPathComponent("attachments", isDirectory: true)
-    }
 
     // MARK: - Attachment-Level Helpers
 
