@@ -2,8 +2,6 @@ import SwiftUI
 
 struct CharacterListView: View {
     let viewModel: CharacterListViewModel
-    @State private var showAddCharacter = false
-
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -22,16 +20,6 @@ struct CharacterListView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
             }
-
-            Divider()
-
-            addCharacterButton
-        }
-        .popover(isPresented: $showAddCharacter) {
-            AddCharacterPopover { name, language in
-                viewModel.addCharacter(name: name, language: language)
-                showAddCharacter = false
-            }
         }
     }
 
@@ -45,24 +33,6 @@ struct CharacterListView: View {
         .padding(.vertical, 8)
     }
 
-    private var addCharacterButton: some View {
-        Button {
-            showAddCharacter = true
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "plus.circle.fill")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.green)
-                Text("Add a new Character")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.primary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-        }
-        .buttonStyle(.plain)
-    }
 }
 
 // MARK: - Character Row
@@ -132,41 +102,3 @@ private struct CharacterRow: View {
     }
 }
 
-// MARK: - Add Character Popover
-
-private struct AddCharacterPopover: View {
-    let onAdd: (String, String) -> Void
-    @State private var name = ""
-    @State private var language = "en"
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("New Character")
-                .font(.system(size: 14, weight: .semibold))
-
-            TextField("Name", text: $name)
-                .textFieldStyle(.roundedBorder)
-
-            Picker("Language", selection: $language) {
-                ForEach(VoiceLanguage.allCases) { lang in
-                    Text(lang.displayName).tag(lang.rawValue)
-                }
-            }
-
-            HStack {
-                Spacer()
-                Button("Cancel") {
-                    onAdd("", "")
-                }
-                Button("Add") {
-                    guard !name.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-                    onAdd(name.trimmingCharacters(in: .whitespaces), language)
-                }
-                .keyboardShortcut(.defaultAction)
-                .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
-            }
-        }
-        .padding(16)
-        .frame(width: 260)
-    }
-}
