@@ -121,7 +121,9 @@ private struct OutlineTreeRow: View {
             }
             .onTapGesture { onTap(item) }
             .contextMenu {
-                Button("Go to Page") { onTap(item) }
+                Button { onTap(item) } label: {
+                    Label("Go to Page", systemImage: "arrow.right.doc.on.clipboard")
+                }
             }
 
             // Children

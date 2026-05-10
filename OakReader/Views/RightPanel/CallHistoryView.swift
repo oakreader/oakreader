@@ -60,8 +60,10 @@ struct CallHistoryView: View {
                 ForEach(viewModel.callHistory) { call in
                     CallHistoryRow(call: call)
                         .contextMenu {
-                            Button("Delete", role: .destructive) {
+                            Button(role: .destructive) {
                                 viewModel.deleteCallFromHistory(call)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
                             }
                         }
                     Divider()

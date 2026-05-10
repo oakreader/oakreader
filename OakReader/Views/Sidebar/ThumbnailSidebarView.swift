@@ -119,10 +119,16 @@ private struct ThumbnailItemView: View {
         .shadow(color: .black.opacity(0.12), radius: 3, x: 0, y: 1)
         .padding(.vertical, 4)
         .contextMenu {
-            Button("Rotate Right") {}
-            Button("Rotate Left") {}
+            Button { } label: {
+                Label("Rotate Right", systemImage: "rotate.right")
+            }
+            Button { } label: {
+                Label("Rotate Left", systemImage: "rotate.left")
+            }
             Divider()
-            Button("Delete Page", role: .destructive) {}
+            Button(role: .destructive) { } label: {
+                Label("Delete Page", systemImage: "trash")
+            }
         }
     }
 }
