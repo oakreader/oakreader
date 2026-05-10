@@ -69,11 +69,12 @@ struct AudioSettingsView: View {
                             isSpeakerTesting ? "Stop" : "Test Speaker",
                             systemImage: isSpeakerTesting ? "stop.fill" : "play.fill"
                         )
+                        .frame(width: 130, alignment: .leading)
                     }
-                    .controlSize(.small)
+                    .buttonStyle(.bordered)
 
                     SegmentedLevelMeter(level: speakerTestLevel)
-                        .frame(height: 6)
+                        .frame(height: 8)
                 }
 
                 HStack(spacing: 8) {
@@ -124,11 +125,12 @@ struct AudioSettingsView: View {
                             micTestButtonLabel,
                             systemImage: micTestPhase == .idle ? "mic.fill" : "stop.fill"
                         )
+                        .frame(width: 130, alignment: .leading)
                     }
-                    .controlSize(.small)
+                    .buttonStyle(.bordered)
 
                     SegmentedLevelMeter(level: micTestLevel)
-                        .frame(height: 6)
+                        .frame(height: 8)
                 }
 
                 if micTestPhase == .recording {
@@ -183,7 +185,7 @@ struct AudioSettingsView: View {
 
     private var micTestButtonLabel: String {
         switch micTestPhase {
-        case .idle: "Test Mic"
+        case .idle: "Test Microphone"
         case .recording: "Recording..."
         case .playingBack: "Stop"
         }
