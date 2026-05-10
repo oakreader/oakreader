@@ -9,13 +9,6 @@ struct CharacterSettingsView: View {
     @State private var liveTranscription: Bool
     @State private var voiceLLMModel: String
 
-    private var service: VoiceCharacterService {
-        guard let db = try? CatalogDatabase() else {
-            fatalError("Failed to access database for CharacterSettingsView")
-        }
-        return VoiceCharacterService(database: db)
-    }
-
     init() {
         let prefs = Preferences.shared
         _voiceLanguage = State(initialValue: prefs.voiceLanguage)
@@ -88,21 +81,10 @@ struct CharacterSettingsView: View {
 
             ForEach(characters) { character in
                 Button {
-                    if selectedCharacterId == character.id {
-                        selectedCharacterId = nil
-                    } else {
-                        selectedCharacterId = character.id
-                    }
+                    selectedCharacterId = selectedCharacterId == character.id ? nil : character.id
                 } label: {
                     HStack(spacing: 10) {
-                        ZStack {
-                            Circle()
-                                .fill(Color(hex: character.avatarColorHex))
-                            Text(character.initials)
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(.white)
-                        }
-                        .frame(width: 30, height: 30)
+                        CharacterAvatarView(avatar: character.avatar, initials: character.initials, size: 30)
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text(character.name)
@@ -117,13 +99,8 @@ struct CharacterSettingsView: View {
 
                         Spacer()
 
-                        if selectedCharacterId == character.id {
-                            Image(systemName: "chevron.down")
-                                .foregroundStyle(.secondary)
-                        } else {
-                            Image(systemName: "chevron.right")
-                                .foregroundStyle(.tertiary)
-                        }
+                        Image(systemName: selectedCharacterId == character.id ? "chevron.down" : "chevron.right")
+                            .foregroundStyle(selectedCharacterId == character.id ? .secondary : .tertiary)
                     }
                     .contentShape(Rectangle())
                 }
@@ -214,17 +191,61 @@ struct CharacterSettingsView: View {
     }
 }
 
+// MARK: - Character Avatar View
+
+struct CharacterAvatarView: View {
+    let avatar: CharacterAvatar
+    let initials: String
+    let size: CGFloat
+
+    var body: some View {
+        switch avatar.type {
+        case .color:
+            ZStack {
+                Circle()
+                    .fill(Color(hex: avatar.colorHex))
+                Text(initials)
+                    .font(.system(size: size * 0.4, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+            .frame(width: size, height: size)
+
+        case .icon:
+            ZStack {
+                Circle()
+                    .fill(Color(hex: avatar.colorHex))
+                Image(systemName: avatar.icon ?? "person.fill")
+                    .font(.system(size: size * 0.45))
+                    .foregroundStyle(.white)
+            }
+            .frame(width: size, height: size)
+
+        case .image:
+            if let path = avatar.imagePath, let nsImage = NSImage(contentsOfFile: path) {
+                Image(nsImage: nsImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: size, height: size)
+                    .clipShape(Circle())
+            } else {
+                ZStack {
+                    Circle()
+                        .fill(Color.secondary.opacity(0.3))
+                    Image(systemName: "photo")
+                        .font(.system(size: size * 0.4))
+                        .foregroundStyle(.secondary)
+                }
+                .frame(width: size, height: size)
+            }
+        }
+    }
+}
+
 // MARK: - Character Detail Editor
 
 private struct CharacterDetailEditor: View {
     @State private var name: String
-    @State private var avatarColorHex: String
-    @State private var systemPrompt: String
-    @State private var language: String
-    @State private var llmModel: String
-    @State private var ttsVoice: String
-    @State private var referenceAudioPath: String
-    @State private var referenceText: String
+    @State private var config: CharacterConfig
     @State private var showAudioFilePicker = false
     @State private var referenceAudioImportError: String?
 
@@ -237,20 +258,14 @@ private struct CharacterDetailEditor: View {
         self.onSave = onSave
         self.onDelete = onDelete
         _name = State(initialValue: character.name)
-        _avatarColorHex = State(initialValue: character.avatarColorHex)
-        _systemPrompt = State(initialValue: character.systemPrompt)
-        _language = State(initialValue: character.language)
-        _llmModel = State(initialValue: character.llmModel)
-        _ttsVoice = State(initialValue: character.ttsVoice)
-        _referenceAudioPath = State(initialValue: character.referenceAudioPath)
-        _referenceText = State(initialValue: character.referenceText)
+        _config = State(initialValue: character.config)
     }
 
     var body: some View {
         TextField("Name", text: $name)
             .textFieldStyle(.roundedBorder)
 
-        Picker("Language", selection: $language) {
+        Picker("Language", selection: $config.language) {
             ForEach(VoiceLanguage.allCases) { lang in
                 Text(lang.displayName).tag(lang.code)
             }
@@ -258,7 +273,7 @@ private struct CharacterDetailEditor: View {
 
         let pid = Preferences.shared.aiProviderId
         let models = ProviderRegistry.shared.provider(for: pid)?.models ?? []
-        Picker("LLM Model", selection: $llmModel) {
+        Picker("LLM Model", selection: $config.llmModel) {
             Text("Same as default").tag("")
             ForEach(models) { m in
                 Text(m.name).tag(m.id)
@@ -269,30 +284,38 @@ private struct CharacterDetailEditor: View {
             Text("System Prompt")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            TextEditor(text: $systemPrompt)
+            TextEditor(text: $config.systemPrompt)
                 .font(.system(size: 12))
                 .frame(minHeight: 80)
                 .border(Color.secondary.opacity(0.2), width: 1)
         }
 
-        TextField("TTS Voice", text: $ttsVoice)
+        // TTS Voice
+        TextField("TTS Voice ID", text: $config.ttsVoice.voiceId)
             .textFieldStyle(.roundedBorder)
 
+        TextField("TTS Provider", text: $config.ttsVoice.provider)
+            .textFieldStyle(.roundedBorder)
+
+        TextField("TTS Model ID", text: $config.ttsVoice.modelId)
+            .textFieldStyle(.roundedBorder)
+
+        // Reference audio
         HStack {
-            if referenceAudioPath.isEmpty {
+            if config.referenceAudio.path.isEmpty {
                 Text("No reference audio")
                     .foregroundStyle(.secondary)
             } else {
-                Text(URL(fileURLWithPath: referenceAudioPath).lastPathComponent)
+                Text(URL(fileURLWithPath: config.referenceAudio.path).lastPathComponent)
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
             Spacer()
             Button("Choose...") { showAudioFilePicker = true }
                 .controlSize(.small)
-            if !referenceAudioPath.isEmpty {
+            if !config.referenceAudio.path.isEmpty {
                 Button("Clear") {
-                    referenceAudioPath = ""
+                    config.referenceAudio.path = ""
                     referenceAudioImportError = nil
                 }
                 .controlSize(.small)
@@ -314,8 +337,8 @@ private struct CharacterDetailEditor: View {
                 .foregroundStyle(.red)
         }
 
-        if !referenceAudioPath.isEmpty {
-            TextField("Reference Text", text: $referenceText, axis: .vertical)
+        if !config.referenceAudio.path.isEmpty {
+            TextField("Reference Text", text: $config.referenceAudio.text, axis: .vertical)
                 .textFieldStyle(.roundedBorder)
                 .lineLimit(2...4)
         }
@@ -324,13 +347,7 @@ private struct CharacterDetailEditor: View {
             Button("Save") {
                 var updated = character
                 updated.name = name
-                updated.avatarColorHex = avatarColorHex
-                updated.systemPrompt = systemPrompt
-                updated.language = language
-                updated.llmModel = llmModel
-                updated.ttsVoice = ttsVoice
-                updated.referenceAudioPath = referenceAudioPath
-                updated.referenceText = referenceText
+                updated.config = config
                 onSave(updated)
             }
             .keyboardShortcut(.defaultAction)
@@ -351,14 +368,16 @@ private struct CharacterDetailEditor: View {
 
         do {
             let fm = FileManager.default
-            let directory = CatalogDatabase.dataDirectory
-                .appendingPathComponent("voice-reference-audio", isDirectory: true)
+            let directory = CatalogDatabase.characterAssetsDirectory(characterId: character.id)
             try fm.createDirectory(at: directory, withIntermediateDirectories: true)
 
             let fileName = url.lastPathComponent.isEmpty ? "reference-audio.wav" : url.lastPathComponent
-            let destination = directory.appendingPathComponent("\(UUID().uuidString)-\(fileName)")
+            let destination = directory.appendingPathComponent(fileName)
+            if fm.fileExists(atPath: destination.path) {
+                try fm.removeItem(at: destination)
+            }
             try fm.copyItem(at: url, to: destination)
-            referenceAudioPath = destination.path
+            config.referenceAudio.path = destination.path
             referenceAudioImportError = nil
         } catch {
             referenceAudioImportError = "Could not import reference audio: \(error.localizedDescription)"

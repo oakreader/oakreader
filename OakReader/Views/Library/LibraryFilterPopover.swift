@@ -29,11 +29,11 @@ struct LibraryFilterPopover: View {
 
                 // Filter rows
                 VStack(spacing: 6) {
-                    ForEach(store.activeFilters.indices, id: \.self) { index in
+                    ForEach($store.activeFilters) { $filter in
                         FilterRowView(
-                            condition: $store.activeFilters[index],
+                            condition: $filter,
                             store: store,
-                            onRemove: { store.activeFilters.remove(at: index) }
+                            onRemove: { store.activeFilters.removeAll { $0.id == filter.id } }
                         )
                     }
                 }

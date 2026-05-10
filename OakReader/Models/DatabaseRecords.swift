@@ -286,26 +286,13 @@ struct CharacterRecord: Codable, FetchableRecord, MutablePersistableRecord, Hash
     var id: String
     var userId: String
     var name: String
-    var avatarColorHex: String
-    var ttsVoice: String
-    var referenceAudioPath: String
-    var referenceText: String
-    var language: String
-    var llmModel: String
-    var systemPrompt: String
     var sortOrder: Int
     var createdAt: String
     var updatedAt: String
 
     enum CodingKeys: String, CodingKey, ColumnExpression {
-        case id, name, language
+        case id, name
         case userId = "user_id"
-        case avatarColorHex = "avatar_color_hex"
-        case ttsVoice = "tts_voice"
-        case referenceAudioPath = "reference_audio_path"
-        case referenceText = "reference_text"
-        case llmModel = "llm_model"
-        case systemPrompt = "system_prompt"
         case sortOrder = "sort_order"
         case createdAt = "created_at"
         case updatedAt = "updated_at"

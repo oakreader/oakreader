@@ -75,15 +75,7 @@ private struct CharacterRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            // Avatar circle
-            ZStack {
-                Circle()
-                    .fill(Color(hex: character.avatarColorHex))
-                Text(character.initials)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white)
-            }
-            .frame(width: 40, height: 40)
+            CharacterAvatarView(avatar: character.avatar, initials: character.initials, size: 40)
 
             // Name + subtitle
             VStack(alignment: .leading, spacing: 2) {

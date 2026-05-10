@@ -71,7 +71,7 @@ class VoiceViewModel {
 
         // Character-specific voice overrides global preference
         let voice: String? = {
-            if let c = character, !c.ttsVoice.isEmpty { return c.ttsVoice }
+            if let c = character, !c.ttsVoice.isEmpty { return c.ttsVoiceId }
             return prefs.voiceTTSVoice.isEmpty ? nil : prefs.voiceTTSVoice
         }()
 
@@ -172,7 +172,7 @@ class VoiceViewModel {
             return prefs.voiceReferenceAudioURL
         }()
         pipelineConfig.referenceText = {
-            if let c = character, !c.referenceText.isEmpty { return c.referenceText }
+            if let c = character, !c.referenceAudio.text.isEmpty { return c.referenceAudio.text }
             return prefs.voiceReferenceText.isEmpty ? nil : prefs.voiceReferenceText
         }()
 

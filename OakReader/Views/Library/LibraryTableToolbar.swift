@@ -117,11 +117,11 @@ struct LibraryTableToolbar: View {
                 Divider()
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
-                        ForEach(store.activeFilters.indices, id: \.self) { index in
+                        ForEach(store.activeFilters) { filter in
                             FilterPillView(
-                                label: store.activeFilters[index].displayLabel(store: store)
+                                label: filter.displayLabel(store: store)
                             ) {
-                                store.activeFilters.remove(at: index)
+                                store.activeFilters.removeAll { $0.id == filter.id }
                             }
                         }
                     }
