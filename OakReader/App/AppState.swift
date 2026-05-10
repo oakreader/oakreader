@@ -86,7 +86,7 @@ final class AppState {
     var showZoteroImport: Bool = false
     var zoteroImportDataDir: URL?
     var isLibrarySidebarVisible: Bool = true
-    var libraryDetailTab: LibraryDetailTab = .chat
+    var libraryDetailTab: LibraryDetailTab? = .chat
 
     private var _libraryChatVM: ChatViewModel?
     var libraryChatVM: ChatViewModel {

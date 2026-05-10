@@ -1,13 +1,17 @@
 import SwiftUI
 
 struct LibrarySideNavView: View {
-    @Binding var tab: LibraryDetailTab
+    @Binding var tab: LibraryDetailTab?
 
     var body: some View {
         VStack(spacing: 2) {
             ForEach(LibraryDetailTab.allCases) { mode in
                 Button {
-                    tab = mode
+                    if tab == mode {
+                        tab = nil
+                    } else {
+                        tab = mode
+                    }
                 } label: {
                     Image(systemName: mode.systemImage)
                         .font(.system(size: mode == .chat ? 14 : OakStyle.Font.icon))

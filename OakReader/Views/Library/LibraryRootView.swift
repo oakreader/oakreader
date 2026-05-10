@@ -69,7 +69,7 @@ struct LibraryRootView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            // Left pane: Sidebar (no right divider)
+            // Left pane: Sidebar
             if appState.isLibrarySidebarVisible {
                 LibrarySidebarView(appState: appState)
                     .frame(width: 280)
@@ -97,46 +97,51 @@ struct LibraryRootView: View {
                         .fill(Color(nsColor: .separatorColor))
                 )
 
-                // Right pane: sidenav always visible + conditional content
-                HStack(spacing: 0) {
-                    // Content panel with rounded top-right corner
-                    VStack(spacing: 0) {
-                        if appState.libraryDetailTab == .chat {
-                            AIChatView(
-                                chatVM: appState.libraryChatVM,
-                                onSaveAssistantResponse: librarySaveAssistantResponseAction
-                            )
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        } else if appState.libraryDetailTab == .voiceChat {
-                            VoicePanelContainerView(
-                                characterListVM: appState.characterListVM,
-                                voiceVM: appState.libraryVoiceVM
-                            )
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        } else if let item = selectedItemInCurrentFilter {
-                            LibrarySidebarPanel(item: item, appState: appState)
-                        } else {
-                            LibraryCollectionSidebarPanel(appState: appState)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color(nsColor: .textBackgroundColor))
-                    .clipShape(UnevenRoundedRectangle(
-                        topLeadingRadius: 0,
-                        bottomLeadingRadius: 0,
-                        bottomTrailingRadius: 0,
-                        topTrailingRadius: OakStyle.Radius.standard
-                    ))
-                    .overlay(
-                        TopRightBorderFill(radius: OakStyle.Radius.standard, thickness: 1)
-                            .fill(Color(nsColor: .separatorColor))
-                    )
-
-                    LibrarySideNavView(tab: $appState.libraryDetailTab)
+                // Detail content panel (only when a tab is selected)
+                if appState.libraryDetailTab != nil {
+                    detailContentPanel
+                        .frame(minWidth: 200, idealWidth: 358, maxWidth: 800)
                 }
-                .frame(minWidth: 200, idealWidth: 358, maxWidth: 800)
+            }
+
+            // Side navigation strip — always visible, outside HSplitView
+            LibrarySideNavView(tab: $appState.libraryDetailTab)
+        }
+    }
+
+    @ViewBuilder
+    private var detailContentPanel: some View {
+        VStack(spacing: 0) {
+            if appState.libraryDetailTab == .chat {
+                AIChatView(
+                    chatVM: appState.libraryChatVM,
+                    onSaveAssistantResponse: librarySaveAssistantResponseAction
+                )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if appState.libraryDetailTab == .voiceChat {
+                VoicePanelContainerView(
+                    characterListVM: appState.characterListVM,
+                    voiceVM: appState.libraryVoiceVM
+                )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let item = selectedItemInCurrentFilter {
+                LibrarySidebarPanel(item: item, appState: appState)
+            } else {
+                LibraryCollectionSidebarPanel(appState: appState)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(UnevenRoundedRectangle(
+            topLeadingRadius: 0,
+            bottomLeadingRadius: 0,
+            bottomTrailingRadius: 0,
+            topTrailingRadius: OakStyle.Radius.standard
+        ))
+        .overlay(
+            TopRightBorderFill(radius: OakStyle.Radius.standard, thickness: 1)
+                .fill(Color(nsColor: .separatorColor))
+        )
     }
 
     private var librarySaveAssistantResponseAction: ((ChatTurn) -> Bool)? {
@@ -193,7 +198,7 @@ private struct LibraryCollectionSidebarPanel: View {
                 title: contextTitle,
                 items: items
             )
-        case .chat, .voiceChat:
+        case .chat, .voiceChat, nil:
             EmptyView()
         }
     }
