@@ -1,8 +1,5 @@
 import AVFoundation
 import Foundation
-import os
-
-private let ttsLog = Logger(subsystem: "VoiceAgentKit", category: "ElevenLabsTTS")
 
 // MARK: - Configuration
 
@@ -165,7 +162,7 @@ public actor ElevenLabsTTSProvider: TTSService {
             } catch {
                 lastError = error
                 let delay = UInt64(500_000_000) * UInt64(1 << attempt)
-                ttsLog.warning("TTS WebSocket connect attempt \(attempt + 1) failed: \(error.localizedDescription), retrying...")
+                VoiceAgentLog.ttsWarning("TTS WebSocket connect attempt \(attempt + 1) failed: \(error.localizedDescription), retrying...")
                 try? await Task.sleep(nanoseconds: delay)
             }
         }
@@ -210,7 +207,7 @@ public actor ElevenLabsTTSProvider: TTSService {
         startReceiveLoop()
         startKeepalive()
 
-        ttsLog.info("TTS WebSocket connected for voice \(self.config.voiceId)")
+        VoiceAgentLog.ttsInfo("TTS WebSocket connected for voice \(self.config.voiceId)")
     }
 
     /// Disconnect and clean up all resources.
@@ -239,7 +236,7 @@ public actor ElevenLabsTTSProvider: TTSService {
         webSocket = nil
         urlSession?.invalidateAndCancel()
         urlSession = nil
-        ttsLog.info("TTS WebSocket disconnected")
+        VoiceAgentLog.ttsInfo("TTS WebSocket disconnected")
     }
 
     // MARK: - Receive loop
@@ -254,7 +251,7 @@ public actor ElevenLabsTTSProvider: TTSService {
                     self.handleMessage(message)
                 } catch {
                     if !Task.isCancelled {
-                        ttsLog.error("TTS receive error: \(error.localizedDescription)")
+                        VoiceAgentLog.ttsError("TTS receive error: \(error.localizedDescription)")
                         self.handleDisconnect()
                     }
                     break
@@ -293,7 +290,7 @@ public actor ElevenLabsTTSProvider: TTSService {
 
         // Handle errors
         if let errorMsg = json["error"] as? String {
-            ttsLog.error("TTS server error: \(errorMsg)")
+            VoiceAgentLog.ttsError("TTS server error: \(errorMsg)")
             if let ctxId = contextId {
                 activeContexts[ctxId]?.finish(throwing: VoiceAgentError.ttsFailed(errorMsg))
                 activeContexts.removeValue(forKey: ctxId)

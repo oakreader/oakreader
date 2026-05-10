@@ -1,9 +1,6 @@
 import Foundation
-import os
 import VoiceAgentKit
 import OakReaderAI
-
-private let voiceLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.oakreader.OakReader", category: "voice")
 
 @Observable
 class VoiceViewModel {
@@ -354,7 +351,7 @@ class VoiceViewModel {
                 try await speaker.play(buffers: stream)
             } catch {
                 if !Task.isCancelled {
-                    voiceLog.error("TTS playback failed: \(error.localizedDescription)")
+                    Log.error(Log.voice,"TTS playback failed: \(error.localizedDescription)")
                 }
             }
             await MainActor.run {
@@ -442,7 +439,7 @@ class VoiceViewModel {
 
         case .latencyMetrics(let metrics):
             let fmt = { (s: Double) in String(format: "%.0f", s * 1000) }
-            voiceLog.info(
+            Log.info(Log.voice,
                 "[VoicePipeline] Latency: STT=\(fmt(metrics.sttLatency))ms LLM=\(fmt(metrics.llmLatency))ms TTS=\(fmt(metrics.ttsLatency))ms Total=\(fmt(metrics.totalLatency))ms"
             )
 
@@ -464,7 +461,7 @@ class VoiceViewModel {
         do {
             try transcriptStore.appendTurn(callTurn, callId: callId)
         } catch {
-            voiceLog.error("Failed to persist voice turn: \(error.localizedDescription)")
+            Log.error(Log.voice,"Failed to persist voice turn: \(error.localizedDescription)")
         }
     }
 

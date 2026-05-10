@@ -3,6 +3,7 @@ import PDFKit
 import Sparkle
 import UniformTypeIdentifiers
 import SwiftUI
+import VoiceAgentKit
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     let documentController = PDFDocumentController()
@@ -17,6 +18,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Forward VoiceAgentKit logs to the shared log file
+        VoiceAgentLog.sink = { level, category, message in
+            LogFileWriter.shared.write(level: level, category: category, message: message)
+        }
+
         // Run one-time migration from old SwiftData storage
         let migration = MigrationService(store: appState.libraryStore, coverService: appState.coverService)
         migration.migrateIfNeeded()

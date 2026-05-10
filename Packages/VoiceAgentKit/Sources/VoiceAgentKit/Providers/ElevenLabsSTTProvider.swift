@@ -1,8 +1,5 @@
 import AVFoundation
 import Foundation
-import os
-
-private let sttLog = Logger(subsystem: "VoiceAgentKit", category: "ElevenLabsSTT")
 
 // MARK: - Configuration
 
@@ -181,7 +178,7 @@ public actor ElevenLabsSTTProvider: STTService {
             } catch {
                 lastError = error
                 let delay = UInt64(500_000_000) * UInt64(1 << attempt) // 500ms, 1s, 2s
-                sttLog.warning("STT connect attempt \(attempt + 1) failed: \(error.localizedDescription)")
+                VoiceAgentLog.sttWarning("STT connect attempt \(attempt + 1) failed: \(error.localizedDescription)")
                 try? await Task.sleep(nanoseconds: delay)
             }
         }
@@ -219,7 +216,7 @@ public actor ElevenLabsSTTProvider: STTService {
         startReceiveLoop()
         startKeepalive()
 
-        sttLog.info("STT WebSocket connecting to \(self.config.baseURL)")
+        VoiceAgentLog.sttInfo("STT WebSocket connecting to \(self.config.baseURL)")
     }
 
     private func cleanupConnection() {
@@ -239,7 +236,7 @@ public actor ElevenLabsSTTProvider: STTService {
     public func disconnect() {
         cancelInflight()
         cleanupConnection()
-        sttLog.info("STT WebSocket disconnected")
+        VoiceAgentLog.sttInfo("STT WebSocket disconnected")
     }
 
     // MARK: - Receive loop
@@ -254,7 +251,7 @@ public actor ElevenLabsSTTProvider: STTService {
                     self.handleMessage(message)
                 } catch {
                     if !Task.isCancelled {
-                        sttLog.error("STT receive error: \(error.localizedDescription)")
+                        VoiceAgentLog.sttError("STT receive error: \(error.localizedDescription)")
                         self.handleDisconnect()
                     }
                     break
@@ -272,7 +269,7 @@ public actor ElevenLabsSTTProvider: STTService {
 
         switch messageType {
         case "session_started":
-            sttLog.info("STT session started")
+            VoiceAgentLog.sttInfo("STT session started")
             sessionStarted = true
             sessionWaiter?.resume()
             sessionWaiter = nil
@@ -301,7 +298,7 @@ public actor ElevenLabsSTTProvider: STTService {
              "transcriber_error", "session_time_limit_exceeded",
              "resource_exhausted", "queue_overflow":
             let errorMsg = json["error"] as? String ?? "ElevenLabs STT error: \(messageType)"
-            sttLog.error("STT server error [\(messageType)]: \(errorMsg)")
+            VoiceAgentLog.sttError("STT server error [\(messageType)]: \(errorMsg)")
             let sttError = VoiceAgentError.sttFailed(errorMsg)
             resultContinuation?.finish(throwing: sttError)
             resultContinuation = nil

@@ -1,7 +1,4 @@
 import Foundation
-import os
-
-private let characterLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.oakreader.OakReader", category: "characters")
 
 enum VoicePanelScreen: Equatable {
     case characterList
@@ -37,7 +34,7 @@ class CharacterListViewModel {
             }
             characters = loaded
         } catch {
-            characterLog.error("Failed to load characters: \(error.localizedDescription)")
+            Log.error(Log.characters,"Failed to load characters: \(error.localizedDescription)")
         }
     }
 
@@ -50,7 +47,7 @@ class CharacterListViewModel {
             callStartTime = Date()
             screen = .inCall(character)
         } catch {
-            characterLog.error("Failed to create call: \(error.localizedDescription)")
+            Log.error(Log.characters,"Failed to create call: \(error.localizedDescription)")
         }
     }
 
@@ -59,7 +56,7 @@ class CharacterListViewModel {
             callHistory = try service.fetchCalls(forCharacterId: character.id)
             screen = .callHistory(character)
         } catch {
-            characterLog.error("Failed to load call history: \(error.localizedDescription)")
+            Log.error(Log.characters,"Failed to load call history: \(error.localizedDescription)")
         }
     }
 
@@ -84,7 +81,7 @@ class CharacterListViewModel {
                 durationSeconds: duration
             )
         } catch {
-            characterLog.error("Failed to finalize call: \(error.localizedDescription)")
+            Log.error(Log.characters,"Failed to finalize call: \(error.localizedDescription)")
         }
         activeCall = nil
         callStartTime = nil
@@ -101,7 +98,7 @@ class CharacterListViewModel {
             loadCharacters()
             return character
         } catch {
-            characterLog.error("Failed to add character: \(error.localizedDescription)")
+            Log.error(Log.characters,"Failed to add character: \(error.localizedDescription)")
             return nil
         }
     }
@@ -111,7 +108,7 @@ class CharacterListViewModel {
             try service.deleteCharacter(id: character.id)
             loadCharacters()
         } catch {
-            characterLog.error("Failed to delete character: \(error.localizedDescription)")
+            Log.error(Log.characters,"Failed to delete character: \(error.localizedDescription)")
         }
     }
 
@@ -120,7 +117,7 @@ class CharacterListViewModel {
             try service.updateCharacter(character)
             loadCharacters()
         } catch {
-            characterLog.error("Failed to update character: \(error.localizedDescription)")
+            Log.error(Log.characters,"Failed to update character: \(error.localizedDescription)")
         }
     }
 
@@ -131,7 +128,7 @@ class CharacterListViewModel {
             try service.deleteCall(id: call.id)
             callHistory.removeAll { $0.id == call.id }
         } catch {
-            characterLog.error("Failed to delete call: \(error.localizedDescription)")
+            Log.error(Log.characters,"Failed to delete call: \(error.localizedDescription)")
         }
     }
 }

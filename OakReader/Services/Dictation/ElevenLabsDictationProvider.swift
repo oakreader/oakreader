@@ -1,8 +1,5 @@
 import AVFoundation
-import os
 import VoiceAgentKit
-
-private let log = Logger(subsystem: "OakReader", category: "ElevenLabsDictation")
 
 /// Dictation provider that wraps ``ElevenLabsSTTProvider`` from VoiceAgentKit.
 ///
@@ -37,7 +34,7 @@ struct ElevenLabsDictationProvider: DictationProvider {
                     continuation.finish()
                 } catch {
                     if !Task.isCancelled {
-                        log.error("ElevenLabs dictation error: \(error.localizedDescription)")
+                        Log.error(Log.dictation, "ElevenLabs dictation error: \(error.localizedDescription)")
                         continuation.yield(.error(error.localizedDescription))
                     }
                     continuation.finish()

@@ -42,7 +42,6 @@ struct NoteEditorView: View {
     @AppStorage("globalFontSize") private var globalFontSize: Double = 14.0
 
     @State private var editorCoordinator: MarkdownTextView.Coordinator?
-    @State private var dictationService = DictationService()
 
     private var currentMode: NoteEditorMode {
         NoteEditorMode(rawValue: currentModeRaw) ?? .edit
@@ -67,71 +66,16 @@ struct NoteEditorView: View {
         VStack(spacing: 0) {
             toolbar
 
-            ZStack(alignment: .top) {
-                switch currentMode {
-                case .edit:
-                    editorPane
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                case .preview:
-                    previewPane
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                case .split:
-                    splitPane
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
-
-                // Dictation recording indicator
-                if dictationService.isDictating {
-                    DictationOverlayView(onStop: { dictationService.stop() })
-                        .padding(.top, 8)
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                }
-            }
-            .animation(.easeInOut(duration: 0.2), value: dictationService.isDictating)
-        }
-        .onAppear(perform: setupDictationEventHandler)
-        .onDisappear { dictationService.stop() }
-        .background(DictationKeyMonitor(onToggle: { toggleDictation() }))
-        .alert(
-            "Dictation Not Available",
-            isPresented: Binding(
-                get: { dictationService.errorMessage != nil },
-                set: { if !$0 { dictationService.errorMessage = nil } }
-            )
-        ) {
-            Button("Open Voice Settings") {
-                dictationService.errorMessage = nil
-                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-            }
-            Button("Cancel", role: .cancel) {
-                dictationService.errorMessage = nil
-            }
-        } message: {
-            Text(dictationService.errorMessage ?? "")
-        }
-    }
-
-    /// Toggle dictation on/off. Only works in edit or split mode.
-    private func toggleDictation() {
-        print("[Dictation] toggleDictation() called, mode=\(currentMode), isDictating=\(dictationService.isDictating)")
-        guard currentMode == .edit || currentMode == .split else {
-            print("[Dictation] ⚠ Blocked — not in edit/split mode")
-            return
-        }
-        dictationService.toggle()
-    }
-
-    /// Wire dictation events to the text view's insertion methods.
-    private func setupDictationEventHandler() {
-        dictationService.onDictationEvent = { (event: DictationEvent) in
-            guard let textView = editorCoordinator?.textView else { return }
-            switch event {
-            case .partial(let text):
-                textView.insertDictationPartial(text)
-            case .final(let text):
-                textView.commitDictationFinal(text)
-            case .error:
-                textView.clearDictationPartial()
+            switch currentMode {
+            case .edit:
+                editorPane
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            case .preview:
+                previewPane
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            case .split:
+                splitPane
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
     }
@@ -162,15 +106,6 @@ struct NoteEditorView: View {
                     style: currentMode == mode ? .primary : .tertiary,
                     help: mode.label
                 ) { currentModeRaw = mode.rawValue }
-            }
-
-            // Dictation toggle button
-            if currentMode == .edit || currentMode == .split {
-                toolbarButton(
-                    icon: dictationService.isDictating ? "mic.fill" : "mic",
-                    style: dictationService.isDictating ? .primary : .tertiary,
-                    help: dictationService.isDictating ? "Stop dictation (⌥Space)" : "Start dictation (⌥Space)"
-                ) { toggleDictation() }
             }
 
             // More menu (delete, pin)
@@ -228,8 +163,7 @@ struct NoteEditorView: View {
             },
             onCoordinatorReady: { coordinator in
                 editorCoordinator = coordinator
-            },
-            onDictationToggle: { toggleDictation() }
+            }
         )
     }
 
@@ -297,52 +231,4 @@ struct NoteEditorView: View {
         }
     }
 
-}
-
-// MARK: - Option+Space Key Monitor
-
-/// Invisible NSViewRepresentable that installs an NSEvent local monitor for Option+Space.
-private struct DictationKeyMonitor: NSViewRepresentable {
-    let onToggle: () -> Void
-
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        let coordinator = context.coordinator
-        coordinator.onToggle = onToggle
-        coordinator.monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak coordinator] event in
-            if event.isDictationToggleShortcut {
-                if event.window?.firstResponder is MarkdownNSTextView {
-                    return event
-                }
-                coordinator?.onToggle?()
-                return nil  // consume the event
-            }
-            return event
-        }
-        return view
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {
-        context.coordinator.onToggle = onToggle
-    }
-
-    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
-        coordinator.removeMonitor()
-    }
-
-    func makeCoordinator() -> Coordinator { Coordinator() }
-
-    class Coordinator {
-        var monitor: Any?
-        var onToggle: (() -> Void)?
-
-        func removeMonitor() {
-            if let monitor {
-                NSEvent.removeMonitor(monitor)
-                self.monitor = nil
-            }
-        }
-
-        deinit { removeMonitor() }
-    }
 }
