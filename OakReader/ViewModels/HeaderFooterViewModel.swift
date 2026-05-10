@@ -113,7 +113,11 @@ class HeaderFooterViewModel {
                     context.drawText(hLeft, at: CGPoint(x: localConfig.margins.left, y: headerY), font: font, color: localConfig.color)
                 }
                 if !hCenter.isEmpty {
-                    context.drawCenteredText(hCenter, in: CGRect(x: 0, y: headerY - localConfig.fontSize, width: pageRect.width, height: localConfig.fontSize * 1.5), font: font, color: localConfig.color)
+                    let hCenterRect = CGRect(
+                        x: 0, y: headerY - localConfig.fontSize,
+                        width: pageRect.width, height: localConfig.fontSize * 1.5
+                    )
+                    context.drawCenteredText(hCenter, in: hCenterRect, font: font, color: localConfig.color)
                 }
                 if !hRight.isEmpty {
                     let attrs: [NSAttributedString.Key: Any] = [.font: font]
@@ -130,7 +134,11 @@ class HeaderFooterViewModel {
                     context.drawText(fLeft, at: CGPoint(x: localConfig.margins.left, y: footerY), font: font, color: localConfig.color)
                 }
                 if !fCenter.isEmpty {
-                    context.drawCenteredText(fCenter, in: CGRect(x: 0, y: footerY - localConfig.fontSize / 2, width: pageRect.width, height: localConfig.fontSize * 1.5), font: font, color: localConfig.color)
+                    let fCenterRect = CGRect(
+                        x: 0, y: footerY - localConfig.fontSize / 2,
+                        width: pageRect.width, height: localConfig.fontSize * 1.5
+                    )
+                    context.drawCenteredText(fCenter, in: fCenterRect, font: font, color: localConfig.color)
                 }
                 if !fRight.isEmpty {
                     let attrs: [NSAttributedString.Key: Any] = [.font: font]
@@ -187,7 +195,11 @@ class HeaderFooterViewModel {
             context.drawText(hLeft, at: CGPoint(x: config.margins.left, y: headerY), font: font, color: config.color)
         }
         if !hCenter.isEmpty {
-            context.drawCenteredText(hCenter, in: CGRect(x: 0, y: headerY - config.fontSize, width: pageRect.width, height: config.fontSize * 1.5), font: font, color: config.color)
+            let hCenterRect = CGRect(
+                x: 0, y: headerY - config.fontSize,
+                width: pageRect.width, height: config.fontSize * 1.5
+            )
+            context.drawCenteredText(hCenter, in: hCenterRect, font: font, color: config.color)
         }
         if !hRight.isEmpty {
             let attrs: [NSAttributedString.Key: Any] = [.font: font]

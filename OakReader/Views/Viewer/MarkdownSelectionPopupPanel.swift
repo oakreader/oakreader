@@ -300,10 +300,13 @@ class MarkdownSelectionPopupPanel: NSPanel {
 
         switch mode {
         case .improveWriting:
-            systemPrompt = "You are a writing assistant. Improve the given text for clarity, conciseness, and readability while preserving the original meaning and tone. Output ONLY the improved text, nothing else."
+            systemPrompt = "You are a writing assistant. Improve the given text for clarity, conciseness, "
+                + "and readability while preserving the original meaning and tone. "
+                + "Output ONLY the improved text, nothing else."
             userPrompt = "Improve the following text:\n\n\(selectedText)"
         case .fixGrammar:
-            systemPrompt = "You are a grammar correction engine. Fix all grammar, spelling, and punctuation errors in the given text. Output ONLY the corrected text, nothing else."
+            systemPrompt = "You are a grammar correction engine. Fix all grammar, spelling, "
+                + "and punctuation errors in the given text. Output ONLY the corrected text, nothing else."
             userPrompt = "Fix the grammar in the following text:\n\n\(selectedText)"
         }
 

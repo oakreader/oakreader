@@ -152,6 +152,7 @@ while offset < pcmData.count {
         "audio_base_64": base64,
         "commit": false,
     ]
+    // swiftlint:disable:next force_try
     let jsonData = try! JSONSerialization.data(withJSONObject: msg)
     let jsonStr = String(data: jsonData, encoding: .utf8)!
     ws.send(.string(jsonStr)) { error in
@@ -174,6 +175,7 @@ let commitMsg: [String: Any] = [
     "audio_base_64": "",
     "commit": true,
 ]
+// swiftlint:disable:next force_try
 let commitData = try! JSONSerialization.data(withJSONObject: commitMsg)
 let commitStr = String(data: commitData, encoding: .utf8)!
 ws.send(.string(commitStr)) { error in
