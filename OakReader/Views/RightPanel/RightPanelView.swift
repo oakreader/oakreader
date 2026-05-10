@@ -17,9 +17,9 @@ struct RightPanelContentView: View {
                         onSaveAssistantResponse: saveAssistantResponseAction
                     )
                 case .voiceChat:
-                    if let speakerListVM = viewModel.speakerListVM {
+                    if let characterListVM = viewModel.characterListVM {
                         VoicePanelContainerView(
-                            speakerListVM: speakerListVM,
+                            characterListVM: characterListVM,
                             voiceVM: viewModel.voice
                         )
                     } else {

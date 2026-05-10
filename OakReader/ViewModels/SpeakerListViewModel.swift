@@ -1,18 +1,18 @@
 import Foundation
 import os
 
-private let speakerLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.oakreader.OakReader", category: "speakers")
+private let characterLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.oakreader.OakReader", category: "characters")
 
 enum VoicePanelScreen: Equatable {
-    case speakerList
-    case inCall(Speaker)
-    case callHistory(Speaker)
+    case characterList
+    case inCall(Character)
+    case callHistory(Character)
 }
 
 @Observable
-class SpeakerListViewModel {
-    var speakers: [Speaker] = []
-    var screen: VoicePanelScreen = .speakerList
+class CharacterListViewModel {
+    var characters: [Character] = []
+    var screen: VoicePanelScreen = .characterList
     var callHistory: [VoiceCall] = []
 
     /// The active call record, created when entering a call and finalized on exit.
@@ -20,54 +20,54 @@ class SpeakerListViewModel {
     /// Timestamp when the current call started, for duration tracking.
     var callStartTime: Date?
 
-    private let service: VoiceSpeakerService
+    private let service: VoiceCharacterService
 
-    init(service: VoiceSpeakerService) {
+    init(service: VoiceCharacterService) {
         self.service = service
-        loadSpeakers()
+        loadCharacters()
     }
 
     // MARK: - Load
 
-    func loadSpeakers() {
+    func loadCharacters() {
         do {
-            var loaded = try service.fetchAllSpeakers()
+            var loaded = try service.fetchAllCharacters()
             for i in loaded.indices {
-                loaded[i].lastCall = try service.fetchLastCall(forSpeakerId: loaded[i].id)
+                loaded[i].lastCall = try service.fetchLastCall(forCharacterId: loaded[i].id)
             }
-            speakers = loaded
+            characters = loaded
         } catch {
-            speakerLog.error("Failed to load speakers: \(error.localizedDescription)")
+            characterLog.error("Failed to load characters: \(error.localizedDescription)")
         }
     }
 
     // MARK: - Navigation
 
-    func startCall(speaker: Speaker) {
+    func startCall(character: Character) {
         do {
-            let call = try service.createCall(speakerId: speaker.id)
+            let call = try service.createCall(characterId: character.id)
             activeCall = call
             callStartTime = Date()
-            screen = .inCall(speaker)
+            screen = .inCall(character)
         } catch {
-            speakerLog.error("Failed to create call: \(error.localizedDescription)")
+            characterLog.error("Failed to create call: \(error.localizedDescription)")
         }
     }
 
-    func showCallHistory(speaker: Speaker) {
+    func showCallHistory(character: Character) {
         do {
-            callHistory = try service.fetchCalls(forSpeakerId: speaker.id)
-            screen = .callHistory(speaker)
+            callHistory = try service.fetchCalls(forCharacterId: character.id)
+            screen = .callHistory(character)
         } catch {
-            speakerLog.error("Failed to load call history: \(error.localizedDescription)")
+            characterLog.error("Failed to load call history: \(error.localizedDescription)")
         }
     }
 
     func backToList() {
-        screen = .speakerList
+        screen = .characterList
         activeCall = nil
         callStartTime = nil
-        loadSpeakers()
+        loadCharacters()
     }
 
     // MARK: - Call Lifecycle
@@ -75,7 +75,6 @@ class SpeakerListViewModel {
     func finalizeCall(turnCount: Int) {
         guard let call = activeCall else { return }
         let duration = callStartTime.map { Date().timeIntervalSince($0) } ?? 0
-        // Generate title from turn count
         let title = turnCount > 0 ? "Call with \(turnCount) turns" : ""
         do {
             try service.updateCall(
@@ -85,43 +84,43 @@ class SpeakerListViewModel {
                 durationSeconds: duration
             )
         } catch {
-            speakerLog.error("Failed to finalize call: \(error.localizedDescription)")
+            characterLog.error("Failed to finalize call: \(error.localizedDescription)")
         }
         activeCall = nil
         callStartTime = nil
     }
 
-    // MARK: - Speaker CRUD
+    // MARK: - Character CRUD
 
     @discardableResult
-    func addSpeaker(name: String, language: String) -> Speaker? {
+    func addCharacter(name: String, language: String) -> Character? {
         let colors = ["#5FB236", "#2EA8E5", "#FF8C19", "#A28AE5", "#FF6666", "#E5A02E", "#36B5A0"]
-        let color = colors[speakers.count % colors.count]
+        let color = colors[characters.count % colors.count]
         do {
-            let speaker = try service.createSpeaker(name: name, colorHex: color, language: language)
-            loadSpeakers()
-            return speaker
+            let character = try service.createCharacter(name: name, colorHex: color, language: language)
+            loadCharacters()
+            return character
         } catch {
-            speakerLog.error("Failed to add speaker: \(error.localizedDescription)")
+            characterLog.error("Failed to add character: \(error.localizedDescription)")
             return nil
         }
     }
 
-    func deleteSpeaker(_ speaker: Speaker) {
+    func deleteCharacter(_ character: Character) {
         do {
-            try service.deleteSpeaker(id: speaker.id)
-            loadSpeakers()
+            try service.deleteCharacter(id: character.id)
+            loadCharacters()
         } catch {
-            speakerLog.error("Failed to delete speaker: \(error.localizedDescription)")
+            characterLog.error("Failed to delete character: \(error.localizedDescription)")
         }
     }
 
-    func updateSpeaker(_ speaker: Speaker) {
+    func updateCharacter(_ character: Character) {
         do {
-            try service.updateSpeaker(speaker)
-            loadSpeakers()
+            try service.updateCharacter(character)
+            loadCharacters()
         } catch {
-            speakerLog.error("Failed to update speaker: \(error.localizedDescription)")
+            characterLog.error("Failed to update character: \(error.localizedDescription)")
         }
     }
 
@@ -132,7 +131,7 @@ class SpeakerListViewModel {
             try service.deleteCall(id: call.id)
             callHistory.removeAll { $0.id == call.id }
         } catch {
-            speakerLog.error("Failed to delete call: \(error.localizedDescription)")
+            characterLog.error("Failed to delete call: \(error.localizedDescription)")
         }
     }
 }

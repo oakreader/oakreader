@@ -1,8 +1,8 @@
 import SwiftUI
 
-struct SpeakerListView: View {
-    let viewModel: SpeakerListViewModel
-    @State private var showAddSpeaker = false
+struct CharacterListView: View {
+    let viewModel: CharacterListViewModel
+    @State private var showAddCharacter = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -10,12 +10,12 @@ struct SpeakerListView: View {
 
             ScrollView {
                 LazyVStack(spacing: 8) {
-                    ForEach(viewModel.speakers) { speaker in
-                        SpeakerRow(
-                            speaker: speaker,
-                            onCall: { viewModel.startCall(speaker: speaker) },
-                            onHistory: { viewModel.showCallHistory(speaker: speaker) },
-                            onDelete: { viewModel.deleteSpeaker(speaker) }
+                    ForEach(viewModel.characters) { character in
+                        CharacterRow(
+                            character: character,
+                            onCall: { viewModel.startCall(character: character) },
+                            onHistory: { viewModel.showCallHistory(character: character) },
+                            onDelete: { viewModel.deleteCharacter(character) }
                         )
                     }
                 }
@@ -25,12 +25,12 @@ struct SpeakerListView: View {
 
             Divider()
 
-            addSpeakerButton
+            addCharacterButton
         }
-        .popover(isPresented: $showAddSpeaker) {
-            AddSpeakerPopover { name, language in
-                viewModel.addSpeaker(name: name, language: language)
-                showAddSpeaker = false
+        .popover(isPresented: $showAddCharacter) {
+            AddCharacterPopover { name, language in
+                viewModel.addCharacter(name: name, language: language)
+                showAddCharacter = false
             }
         }
     }
@@ -45,15 +45,15 @@ struct SpeakerListView: View {
         .padding(.vertical, 8)
     }
 
-    private var addSpeakerButton: some View {
+    private var addCharacterButton: some View {
         Button {
-            showAddSpeaker = true
+            showAddCharacter = true
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: "plus.circle.fill")
                     .font(.system(size: 14))
                     .foregroundStyle(.green)
-                Text("Add a new Speaker")
+                Text("Add a new Character")
                     .font(.system(size: 13))
                     .foregroundStyle(.primary)
             }
@@ -65,10 +65,10 @@ struct SpeakerListView: View {
     }
 }
 
-// MARK: - Speaker Row
+// MARK: - Character Row
 
-private struct SpeakerRow: View {
-    let speaker: Speaker
+private struct CharacterRow: View {
+    let character: Character
     let onCall: () -> Void
     let onHistory: () -> Void
     let onDelete: () -> Void
@@ -78,8 +78,8 @@ private struct SpeakerRow: View {
             // Avatar circle
             ZStack {
                 Circle()
-                    .fill(Color(hex: speaker.avatarColorHex))
-                Text(speaker.initials)
+                    .fill(Color(hex: character.avatarColorHex))
+                Text(character.initials)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.white)
             }
@@ -87,10 +87,10 @@ private struct SpeakerRow: View {
 
             // Name + subtitle
             VStack(alignment: .leading, spacing: 2) {
-                Text(speaker.name)
+                Text(character.name)
                     .font(.system(size: 13, weight: .semibold))
                     .lineLimit(1)
-                if let lastCall = speaker.lastCall {
+                if let lastCall = character.lastCall {
                     Text("\(lastCall.displayTitle) \u{2022} \(lastCall.formattedDuration)")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
@@ -138,16 +138,16 @@ private struct SpeakerRow: View {
     }
 }
 
-// MARK: - Add Speaker Popover
+// MARK: - Add Character Popover
 
-private struct AddSpeakerPopover: View {
+private struct AddCharacterPopover: View {
     let onAdd: (String, String) -> Void
     @State private var name = ""
     @State private var language = "en"
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("New Speaker")
+            Text("New Character")
                 .font(.system(size: 14, weight: .semibold))
 
             TextField("Name", text: $name)
@@ -162,7 +162,6 @@ private struct AddSpeakerPopover: View {
             HStack {
                 Spacer()
                 Button("Cancel") {
-                    // Popover will be dismissed by parent
                     onAdd("", "")
                 }
                 Button("Add") {
@@ -177,4 +176,3 @@ private struct AddSpeakerPopover: View {
         .frame(width: 260)
     }
 }
-
