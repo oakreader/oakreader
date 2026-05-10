@@ -4,11 +4,21 @@ struct GeneralSettingsView: View {
     @State private var dataDirectory: String = ""
     @State private var autoSave: Bool = Preferences.shared.autoSave
     @State private var showStatusBar: Bool = Preferences.shared.showStatusBar
+    @AppStorage("appearanceMode") private var appearanceMode: String = "system"
     @AppStorage("globalFontFamily") private var fontFamily: String = "system"
     @AppStorage("globalFontSize") private var fontSize: Double = 14.0
 
     var body: some View {
         Form {
+            Section("Appearance") {
+                Picker("Mode", selection: $appearanceMode) {
+                    ForEach(AppearanceMode.allCases) { mode in
+                        Text(mode.displayName).tag(mode.rawValue)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+
             Section("Data Directory") {
                 LabeledContent("Location") {
                     HStack(spacing: 4) {

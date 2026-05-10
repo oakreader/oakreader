@@ -37,14 +37,30 @@ enum FontFamily: String, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - Appearance Mode
+
+enum AppearanceMode: String, CaseIterable, Identifiable {
+    case system, light, dark
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .system: return "System"
+        case .light: return "Light"
+        case .dark: return "Dark"
+        }
+    }
+}
+
 enum OakStyle {
     // MARK: - Colors
     // Uses opacity-based tints for better light/dark mode adaptability.
 
     enum Colors {
         // Backgrounds (Dia gray scale: #F8F8F8 → #F2F2F2 → #EDEDED)
-        static let tabBarBackground = Color(hex: "F5F5F5")
-        static let sidebarBackground = Color(hex: "F5F5F5")
+        static let tabBarBackground = Color(nsColor: .windowBackgroundColor)
+        static let sidebarBackground = Color(nsColor: .windowBackgroundColor)
         static let activeTabBackground = Color(nsColor: .textBackgroundColor)  // white — merges with content
         static let contentBackground = Color(nsColor: .textBackgroundColor)
 

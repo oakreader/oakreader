@@ -80,6 +80,8 @@ final class Preferences {
         static let elevenLabsVoiceId = "elevenLabsVoiceId"
         static let elevenLabsTTSModelId = "elevenLabsTTSModelId"
         static let elevenLabsSTTModelId = "elevenLabsSTTModelId"
+        // Appearance
+        static let appearanceMode = "appearanceMode"
         // External tools
         static let ytDlpPath = "ytDlpPath"
         static let ytDlpCachedVersion = "ytDlpCachedVersion"
@@ -124,6 +126,7 @@ final class Preferences {
             Keys.agentReadFileEnabled: true,
             Keys.agentWriteFileEnabled: true,
             Keys.agentRequireConfirmation: true,
+            Keys.appearanceMode: "system",
         ])
     }
 
@@ -216,6 +219,13 @@ final class Preferences {
         if currentFont != ".AppleSystemUIFont" || (currentSize != 0 && currentSize != 16.0) {
             defaults.set(true, forKey: Keys.noteEditorFontOverridden)
         }
+    }
+
+    // MARK: - Appearance
+
+    var appearanceMode: String {
+        get { defaults.string(forKey: Keys.appearanceMode) ?? "system" }
+        set { defaults.set(newValue, forKey: Keys.appearanceMode) }
     }
 
     // MARK: - Library Preferences
