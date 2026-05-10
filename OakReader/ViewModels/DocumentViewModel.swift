@@ -113,8 +113,14 @@ class DocumentViewModel {
         return vm
     }
 
-    /// Shared speaker list view model, set externally by AppState when creating the tab.
-    var speakerListVM: SpeakerListViewModel?
+    /// Shared character list view model, set externally by AppState when creating the tab.
+    var characterListVM: CharacterListViewModel?
+
+    /// Backwards compatibility alias.
+    var speakerListVM: CharacterListViewModel? {
+        get { characterListVM }
+        set { characterListVM = newValue }
+    }
 
     /// The item-level storage key, set externally by AppState when creating the tab.
     var itemStorageKey: String?
@@ -127,7 +133,7 @@ class DocumentViewModel {
         itemStorageKey
     }
 
-    /// Returns the document's item-level storage directory (for sessions, notes).
+    /// Returns the document's item-level storage directory.
     private var documentStoragePath: URL? {
         guard let key = itemStorageKey else { return nil }
         return CatalogDatabase.documentDirectory(storageKey: key)

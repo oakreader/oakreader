@@ -1,7 +1,7 @@
 import Foundation
 
 /// Conversation metadata — stored in SQLite via GRDB.
-/// The actual chat turns are stored as JSONL files in the document's sessions/ directory.
+/// The actual chat turns are stored as JSONL files in ~/OakReader/chats/.
 struct ConversationMeta: Identifiable, Hashable {
     let id: UUID
     var title: String

@@ -114,7 +114,7 @@ struct LibraryItem: Identifiable, Hashable {
         primaryAttachment?.fileURL ?? CatalogDatabase.documentDirectory(storageKey: storageKey)
     }
 
-    /// Item-level directory within managed storage (notes, sessions live here).
+    /// Item-level directory within managed storage.
     var documentDirectory: URL {
         CatalogDatabase.documentDirectory(storageKey: storageKey)
     }
