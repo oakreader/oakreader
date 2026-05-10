@@ -353,37 +353,39 @@ private struct CollectionRowView: View {
             }
             .contextMenu {
                 if collection.isSmart && !collection.isSystem {
-                    Button("Edit Smart Collection...") {
-                        editingSmartCollection = collection
+                    Button { editingSmartCollection = collection } label: {
+                        Label("Edit Smart Collection...", systemImage: "slider.horizontal.3")
                     }
                 }
                 if !collection.isSystem {
-                    Button("Rename...") {
-                        renameCollection(collection)
+                    Button { renameCollection(collection) } label: {
+                        Label("Rename...", systemImage: "pencil")
                     }
                 }
                 if !collection.isSmart {
-                    Button("New Subcollection") {
-                        newSubcollectionParent = collection
+                    Button { newSubcollectionParent = collection } label: {
+                        Label("New Subcollection", systemImage: "folder.badge.plus")
                     }
                     Divider()
                     if collection.parentId != nil {
-                        Button("Move to Root") {
-                            store.moveCollection(collection, toParent: nil)
+                        Button { store.moveCollection(collection, toParent: nil) } label: {
+                            Label("Move to Root", systemImage: "arrow.up.to.line")
                         }
                     }
-                    Menu("Move to...") {
+                    Menu {
                         ForEach(store.rootCollections.filter { $0.id != collection.id }) { target in
                             Button(target.name) {
                                 store.moveCollection(collection, toParent: target)
                             }
                         }
+                    } label: {
+                        Label("Move to...", systemImage: "folder.badge.gearshape")
                     }
                 }
                 if !collection.isSystem {
                     Divider()
-                    Button("Delete", role: .destructive) {
-                        store.deleteCollection(collection)
+                    Button(role: .destructive) { store.deleteCollection(collection) } label: {
+                        Label("Delete", systemImage: "trash")
                     }
                 }
             }
@@ -532,10 +534,10 @@ private struct TagNodeRowView: View {
             .buttonStyle(.plain)
             .contextMenu {
                 if let option = node.option {
-                    Button("Rename...") {
-                        renameTag(option)
+                    Button { renameTag(option) } label: {
+                        Label("Rename...", systemImage: "pencil")
                     }
-                    Menu("Change Color") {
+                    Menu {
                         ForEach(tagColorPalette, id: \.hex) { entry in
                             Button {
                                 store.updatePropertyOptionColor(option, colorHex: entry.hex)
@@ -544,10 +546,12 @@ private struct TagNodeRowView: View {
                             }
                             .tint(Color(hex: entry.hex))
                         }
+                    } label: {
+                        Label("Change Color", systemImage: "paintpalette")
                     }
                     Divider()
-                    Button("Delete", role: .destructive) {
-                        store.removePropertyOption(option)
+                    Button(role: .destructive) { store.removePropertyOption(option) } label: {
+                        Label("Delete", systemImage: "trash")
                     }
                 }
             }

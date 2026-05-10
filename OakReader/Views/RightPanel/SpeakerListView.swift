@@ -125,7 +125,9 @@ private struct CharacterRow: View {
                 .fill(Color(nsColor: .controlBackgroundColor))
         )
         .contextMenu {
-            Button("Delete", role: .destructive) { onDelete() }
+            Button(role: .destructive) { onDelete() } label: {
+                Label("Delete", systemImage: "trash")
+            }
         }
     }
 }

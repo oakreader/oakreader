@@ -82,16 +82,20 @@ struct LibraryTableView: View {
         let selectedItems = store.filteredItems.filter { ids.contains($0.id) }
 
         if selectedItems.count == 1, let item = selectedItems.first {
-            Button("Open") { openItem(item) }
+            Button { openItem(item) } label: {
+                Label("Open", systemImage: "doc.richtext")
+            }
 
             Divider()
 
             let rootCollections = store.rootCollections.sorted(by: { $0.sortOrder < $1.sortOrder })
             if !rootCollections.isEmpty {
-                Menu("Add to Collection") {
+                Menu {
                     ForEach(rootCollections) { collection in
                         collectionMenuItem(for: item, collection: collection)
                     }
+                } label: {
+                    Label("Add to Collection", systemImage: "folder.badge.plus")
                 }
             }
 
@@ -99,44 +103,48 @@ struct LibraryTableView: View {
             let selectProperties = store.properties.filter { $0.type == .multiSelect || $0.type == .singleSelect }
             if !selectProperties.isEmpty {
                 ForEach(selectProperties) { property in
-                    Menu(property.name) {
+                    Menu {
                         PropertyOptionAssignmentMenuItems(
                             item: item,
                             property: property,
                             store: store,
                             mode: .toggleAssigned
                         )
+                    } label: {
+                        Label(property.name, systemImage: "tag")
                     }
                 }
             }
 
             // Citation
             if item.referenceMetadata != nil {
-                Menu("Copy Citation") {
+                Menu {
                     ForEach(CitationStyle.allCases) { style in
                         Button(style.displayName) {
                             store.copyCitation(item, style: style)
                         }
                     }
+                } label: {
+                    Label("Copy Citation", systemImage: "quote.opening")
                 }
             }
 
             Divider()
 
             if let sourceURL = item.sourceURL {
-                Button("View Source in Browser") {
-                    NSWorkspace.shared.open(sourceURL)
+                Button { NSWorkspace.shared.open(sourceURL) } label: {
+                    Label("View Source in Browser", systemImage: "safari")
                 }
             }
 
-            Button("Reveal in Finder") {
-                NSWorkspace.shared.activateFileViewerSelecting([item.fileURL])
+            Button { NSWorkspace.shared.activateFileViewerSelecting([item.fileURL]) } label: {
+                Label("Reveal in Finder", systemImage: "folder")
             }
 
             Divider()
 
-            Button("Remove from Library", role: .destructive) {
-                store.removeItem(item)
+            Button(role: .destructive) { store.removeItem(item) } label: {
+                Label("Remove from Library", systemImage: "trash")
             }
         } else if selectedItems.isEmpty {
             Button {
@@ -147,27 +155,29 @@ struct LibraryTableView: View {
             Button {
                 importPDFs()
             } label: {
-                Label("Import File...", systemImage: "square.and.arrow.down")
+                Label("Import File...", systemImage: "doc.badge.plus")
             }
         } else if selectedItems.count > 1 {
-            Button("Open \(selectedItems.count) Items") {
-                for item in selectedItems { openItem(item) }
+            Button { for item in selectedItems { openItem(item) } } label: {
+                Label("Open \(selectedItems.count) Items", systemImage: "doc.richtext")
             }
 
             // Export citations for multi-select
             let itemsWithRefs = selectedItems.filter { $0.referenceMetadata != nil }
             if !itemsWithRefs.isEmpty {
-                Menu("Export Citations") {
+                Menu {
                     Button("BibTeX") { exportCitations(itemsWithRefs, format: .bibtex) }
                     Button("RIS") { exportCitations(itemsWithRefs, format: .ris) }
                     Button("CSL JSON") { exportCitations(itemsWithRefs, format: .cslJson) }
+                } label: {
+                    Label("Export Citations", systemImage: "quote.opening")
                 }
             }
 
             Divider()
 
-            Button("Remove \(selectedItems.count) Items", role: .destructive) {
-                for item in selectedItems { store.removeItem(item) }
+            Button(role: .destructive) { for item in selectedItems { store.removeItem(item) } } label: {
+                Label("Remove \(selectedItems.count) Items", systemImage: "trash")
             }
         }
     }
