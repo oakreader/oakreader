@@ -105,14 +105,15 @@ final class AppState {
         return vm
     }
 
-    private var _speakerListVM: SpeakerListViewModel?
-    var speakerListVM: SpeakerListViewModel {
-        if let vm = _speakerListVM { return vm }
-        let service = VoiceSpeakerService(database: libraryStore.database)
-        let vm = SpeakerListViewModel(service: service)
-        _speakerListVM = vm
+    private var _characterListVM: CharacterListViewModel?
+    var characterListVM: CharacterListViewModel {
+        if let vm = _characterListVM { return vm }
+        let service = VoiceCharacterService(database: libraryStore.database)
+        let vm = CharacterListViewModel(service: service)
+        _characterListVM = vm
         return vm
     }
+
 
     private var autosaveTimer: Timer?
 
@@ -200,7 +201,7 @@ final class AppState {
         tab.viewModel.appState = self
         tab.viewModel.itemStorageKey = storageKey
         tab.viewModel.attachmentId = item?.primaryAttachment?.id.uuidString
-        tab.viewModel.speakerListVM = speakerListVM
+        tab.viewModel.characterListVM = characterListVM
         // Use original filename (not "document.pdf" from managed storage)
         tab.title = item?.fileName ?? url.lastPathComponent
         NSDocumentController.shared.addDocument(doc)
@@ -224,7 +225,7 @@ final class AppState {
             tab.viewModel.appState = self
             tab.viewModel.itemStorageKey = storageKey
             tab.viewModel.attachmentId = item?.primaryAttachment?.id.uuidString
-        tab.viewModel.speakerListVM = speakerListVM
+        tab.viewModel.characterListVM = characterListVM
             tab.title = item?.title ?? url.deletingPathExtension().lastPathComponent
             openTabs.append(tab)
             activeTabID = tab.id
@@ -292,7 +293,7 @@ final class AppState {
         tab.viewModel.appState = self
         tab.viewModel.itemStorageKey = item.storageKey
         tab.viewModel.attachmentId = item.primaryAttachment?.id.uuidString
-        tab.viewModel.speakerListVM = speakerListVM
+        tab.viewModel.characterListVM = characterListVM
         // Use original filename from library item
         tab.title = item.fileName
         NSDocumentController.shared.addDocument(doc)
@@ -330,7 +331,7 @@ final class AppState {
             tab.viewModel.appState = self
             tab.viewModel.itemStorageKey = item.storageKey
             tab.viewModel.attachmentId = item.primaryAttachment?.id.uuidString
-        tab.viewModel.speakerListVM = speakerListVM
+        tab.viewModel.characterListVM = characterListVM
             tab.title = item.title
             openTabs.append(tab)
             activeTabID = tab.id
@@ -373,7 +374,7 @@ final class AppState {
             tab.viewModel.appState = self
             tab.viewModel.itemStorageKey = item.storageKey
             tab.viewModel.attachmentId = item.primaryAttachment?.id.uuidString
-        tab.viewModel.speakerListVM = speakerListVM
+        tab.viewModel.characterListVM = characterListVM
             tab.title = item.title
             openTabs.append(tab)
             activeTabID = tab.id
@@ -413,7 +414,7 @@ final class AppState {
             tab.viewModel.appState = self
             tab.viewModel.itemStorageKey = item.storageKey
             tab.viewModel.attachmentId = item.primaryAttachment?.id.uuidString
-            tab.viewModel.speakerListVM = speakerListVM
+            tab.viewModel.characterListVM = characterListVM
             tab.title = item.title
             openTabs.append(tab)
             activeTabID = tab.id

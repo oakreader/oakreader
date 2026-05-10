@@ -109,7 +109,7 @@ struct LibraryRootView: View {
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                         } else if appState.libraryDetailTab == .voiceChat {
                             VoicePanelContainerView(
-                                speakerListVM: appState.speakerListVM,
+                                characterListVM: appState.characterListVM,
                                 voiceVM: appState.libraryVoiceVM
                             )
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)

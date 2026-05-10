@@ -48,7 +48,7 @@ class VoiceViewModel {
     // MARK: - Lifecycle
 
     @MainActor
-    func start(speaker: Speaker? = nil, callId: String? = nil) async {
+    func start(character: Character? = nil, callId: String? = nil) async {
         guard pipeline == nil else { return }
         error = nil
         userTranscript = ""
@@ -69,9 +69,9 @@ class VoiceViewModel {
         let sttProviderType = VoiceProviderType(rawValue: prefs.voiceSTTProvider) ?? .onDevice
         let ttsProviderType = VoiceProviderType(rawValue: prefs.voiceTTSProvider) ?? .onDevice
 
-        // Speaker-specific voice overrides global preference
+        // Character-specific voice overrides global preference
         let voice: String? = {
-            if let s = speaker, !s.ttsVoice.isEmpty { return s.ttsVoice }
+            if let c = character, !c.ttsVoice.isEmpty { return c.ttsVoice }
             return prefs.voiceTTSVoice.isEmpty ? nil : prefs.voiceTTSVoice
         }()
 
@@ -109,9 +109,9 @@ class VoiceViewModel {
         let defaultModel = ProviderRegistry.shared.provider(for: pid)?.defaultModelId ?? ""
         let chatModel = prefs.aiModel.isEmpty ? defaultModel : prefs.aiModel
 
-        // Speaker-specific LLM model overrides global preference
+        // Character-specific LLM model overrides global preference
         let voiceModel: String = {
-            if let s = speaker, !s.llmModel.isEmpty { return s.llmModel }
+            if let c = character, !c.llmModel.isEmpty { return c.llmModel }
             return prefs.voiceLLMModel.isEmpty ? chatModel : prefs.voiceLLMModel
         }()
 
@@ -121,9 +121,9 @@ class VoiceViewModel {
         )
         let llm = ChatEngineBridge(chatEngine: chatEngine, config: config)
 
-        // Speaker-specific language overrides global preference
+        // Character-specific language overrides global preference
         let language: String = {
-            if let s = speaker, !s.language.isEmpty { return s.language }
+            if let c = character, !c.language.isEmpty { return c.language }
             return prefs.voiceLanguage
         }()
 
@@ -166,13 +166,13 @@ class VoiceViewModel {
         """
         pipelineConfig.language = language
 
-        // Speaker-specific reference audio overrides global preference
+        // Character-specific reference audio overrides global preference
         pipelineConfig.referenceAudioURL = {
-            if let s = speaker, let url = s.referenceAudioURL { return url }
+            if let c = character, let url = c.referenceAudioURL { return url }
             return prefs.voiceReferenceAudioURL
         }()
         pipelineConfig.referenceText = {
-            if let s = speaker, !s.referenceText.isEmpty { return s.referenceText }
+            if let c = character, !c.referenceText.isEmpty { return c.referenceText }
             return prefs.voiceReferenceText.isEmpty ? nil : prefs.voiceReferenceText
         }()
 

@@ -1,42 +1,42 @@
 import SwiftUI
 
 struct VoicePanelContainerView: View {
-    let speakerListVM: SpeakerListViewModel
+    let characterListVM: CharacterListViewModel
     let voiceVM: VoiceViewModel
 
     var body: some View {
         Group {
-            switch speakerListVM.screen {
-            case .speakerList:
-                SpeakerListView(viewModel: speakerListVM)
+            switch characterListVM.screen {
+            case .characterList:
+                CharacterListView(viewModel: characterListVM)
 
-            case .inCall(let speaker):
+            case .inCall(let character):
                 VoiceChatView(
                     voiceVM: voiceVM,
                     onBack: {
                         voiceVM.stop()
-                        speakerListVM.finalizeCall(turnCount: voiceVM.turns.count)
+                        characterListVM.finalizeCall(turnCount: voiceVM.turns.count)
                         voiceVM.turns.removeAll()
-                        speakerListVM.backToList()
+                        characterListVM.backToList()
                     },
-                    speakerName: speaker.name
+                    characterName: character.name
                 )
                 .onAppear {
                     Task {
                         await voiceVM.start(
-                            speaker: speaker,
-                            callId: speakerListVM.activeCall?.id.uuidString
+                            character: character,
+                            callId: characterListVM.activeCall?.id.uuidString
                         )
                     }
                 }
 
-            case .callHistory(let speaker):
+            case .callHistory(let character):
                 CallHistoryView(
-                    viewModel: speakerListVM,
-                    speaker: speaker
+                    viewModel: characterListVM,
+                    character: character
                 )
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: speakerListVM.screen)
+        .animation(.easeInOut(duration: 0.2), value: characterListVM.screen)
     }
 }

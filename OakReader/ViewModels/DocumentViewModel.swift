@@ -116,12 +116,6 @@ class DocumentViewModel {
     /// Shared character list view model, set externally by AppState when creating the tab.
     var characterListVM: CharacterListViewModel?
 
-    /// Backwards compatibility alias.
-    var speakerListVM: CharacterListViewModel? {
-        get { characterListVM }
-        set { characterListVM = newValue }
-    }
-
     /// The item-level storage key, set externally by AppState when creating the tab.
     var itemStorageKey: String?
 

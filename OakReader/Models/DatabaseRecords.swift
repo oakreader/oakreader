@@ -278,10 +278,10 @@ struct AnnotationRecord: Codable, FetchableRecord, MutablePersistableRecord, Has
     }
 }
 
-// MARK: - Voice Speakers
+// MARK: - Characters
 
-struct SpeakerRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable {
-    static let databaseTableName = "speakers"
+struct CharacterRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable {
+    static let databaseTableName = "characters"
 
     var id: String
     var userId: String
@@ -292,6 +292,7 @@ struct SpeakerRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashab
     var referenceText: String
     var language: String
     var llmModel: String
+    var systemPrompt: String
     var sortOrder: Int
     var createdAt: String
     var updatedAt: String
@@ -304,6 +305,7 @@ struct SpeakerRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashab
         case referenceAudioPath = "reference_audio_path"
         case referenceText = "reference_text"
         case llmModel = "llm_model"
+        case systemPrompt = "system_prompt"
         case sortOrder = "sort_order"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
@@ -314,7 +316,7 @@ struct VoiceCallRecord: Codable, FetchableRecord, MutablePersistableRecord, Hash
     static let databaseTableName = "voice_calls"
 
     var id: String
-    var speakerId: String
+    var characterId: String
     var title: String
     var turnCount: Int
     var durationSeconds: Double
@@ -323,7 +325,7 @@ struct VoiceCallRecord: Codable, FetchableRecord, MutablePersistableRecord, Hash
 
     enum CodingKeys: String, CodingKey, ColumnExpression {
         case id, title
-        case speakerId = "speaker_id"
+        case characterId = "character_id"
         case turnCount = "turn_count"
         case durationSeconds = "duration_seconds"
         case createdAt = "created_at"

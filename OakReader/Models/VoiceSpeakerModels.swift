@@ -1,8 +1,8 @@
 import Foundation
 
-// MARK: - Speaker
+// MARK: - Character
 
-struct Speaker: Identifiable, Hashable {
+struct Character: Identifiable, Hashable {
     let id: UUID
     let userId: String
     var name: String
@@ -12,6 +12,7 @@ struct Speaker: Identifiable, Hashable {
     var referenceText: String
     var language: String
     var llmModel: String
+    var systemPrompt: String
     var sortOrder: Int
     let createdAt: Date
     var updatedAt: Date
@@ -19,7 +20,7 @@ struct Speaker: Identifiable, Hashable {
     /// Most recent call, populated by the view model.
     var lastCall: VoiceCall?
 
-    init(record: SpeakerRecord) {
+    init(record: CharacterRecord) {
         self.id = UUID(uuidString: record.id) ?? UUID()
         self.userId = record.userId
         self.name = record.name
@@ -29,6 +30,7 @@ struct Speaker: Identifiable, Hashable {
         self.referenceText = record.referenceText
         self.language = record.language
         self.llmModel = record.llmModel
+        self.systemPrompt = record.systemPrompt
         self.sortOrder = record.sortOrder
         self.createdAt = Date(iso8601String: record.createdAt) ?? Date()
         self.updatedAt = Date(iso8601String: record.updatedAt) ?? Date()
@@ -46,7 +48,7 @@ struct Speaker: Identifiable, Hashable {
     }
 
     // Hashable — exclude lastCall (optional associated data)
-    static func == (lhs: Speaker, rhs: Speaker) -> Bool {
+    static func == (lhs: Character, rhs: Character) -> Bool {
         lhs.id == rhs.id
     }
 
@@ -59,7 +61,7 @@ struct Speaker: Identifiable, Hashable {
 
 struct VoiceCall: Identifiable, Hashable {
     let id: UUID
-    let speakerId: UUID
+    let characterId: UUID
     var title: String
     var turnCount: Int
     var durationSeconds: Double
@@ -68,7 +70,7 @@ struct VoiceCall: Identifiable, Hashable {
 
     init(record: VoiceCallRecord) {
         self.id = UUID(uuidString: record.id) ?? UUID()
-        self.speakerId = UUID(uuidString: record.speakerId) ?? UUID()
+        self.characterId = UUID(uuidString: record.characterId) ?? UUID()
         self.title = record.title
         self.turnCount = record.turnCount
         self.durationSeconds = record.durationSeconds
@@ -85,5 +87,39 @@ struct VoiceCall: Identifiable, Hashable {
         let minutes = totalSeconds / 60
         let seconds = totalSeconds % 60
         return String(format: "%d:%02d", minutes, seconds)
+    }
+}
+
+// MARK: - Voice Language
+
+enum VoiceLanguage: String, CaseIterable, Identifiable {
+    case en
+    case zh
+    case ja
+    case ko
+    case fr
+    case de
+    case es
+    case ru
+    case ar
+    case pt
+
+    var id: String { rawValue }
+
+    var code: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .en: "English"
+        case .zh: "Chinese (中文)"
+        case .ja: "Japanese (日本語)"
+        case .ko: "Korean (한국어)"
+        case .fr: "French (Français)"
+        case .de: "German (Deutsch)"
+        case .es: "Spanish (Español)"
+        case .ru: "Russian (Русский)"
+        case .ar: "Arabic (العربية)"
+        case .pt: "Portuguese (Português)"
+        }
     }
 }

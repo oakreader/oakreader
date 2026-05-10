@@ -1,8 +1,8 @@
 import SwiftUI
 
 struct CallHistoryView: View {
-    let viewModel: SpeakerListViewModel
-    let speaker: Speaker
+    let viewModel: CharacterListViewModel
+    let character: Character
 
     var body: some View {
         VStack(spacing: 0) {
@@ -45,7 +45,7 @@ struct CallHistoryView: View {
             Text("No calls yet")
                 .font(.system(size: 13))
                 .foregroundStyle(.tertiary)
-            Text("Start a call with \(speaker.name)\nto see the history here.")
+            Text("Start a call with \(character.name)\nto see the history here.")
                 .font(.system(size: 12))
                 .foregroundStyle(.quaternary)
                 .multilineTextAlignment(.center)

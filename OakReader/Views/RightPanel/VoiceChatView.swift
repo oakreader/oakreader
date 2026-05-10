@@ -5,7 +5,7 @@ import VoiceAgentKit
 struct VoiceChatView: View {
     let voiceVM: VoiceViewModel
     var onBack: (() -> Void)?
-    var speakerName: String?
+    var characterName: String?
 
     private var orbColor: Color {
         guard voiceVM.isRunning else { return .accentColor }
@@ -57,7 +57,7 @@ struct VoiceChatView: View {
                 .buttonStyle(.plain)
             }
 
-            Text(speakerName ?? "Voice AI")
+            Text(characterName ?? "Voice AI")
                 .font(.system(size: 16, weight: .semibold))
 
             Spacer()
