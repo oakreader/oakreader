@@ -11,6 +11,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
     private var mainWindow: NSWindow?
     private var snapshotServer: SnapshotServer?
+    private var appearanceObserver: NSObjectProtocol?
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         documentController.appState = appState
@@ -85,7 +86,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.titlebarSeparatorStyle = .none
-        window.backgroundColor = NSColor(srgbRed: 242/255, green: 242/255, blue: 242/255, alpha: 1)
+        window.backgroundColor = .windowBackgroundColor
         window.styleMask.insert(.fullSizeContentView)
         window.collectionBehavior.insert(.fullScreenPrimary)
         window.minSize = NSSize(width: 800, height: 500)
@@ -108,6 +109,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         self.mainWindow = window
         appState.window = window
 
+        // Apply saved appearance mode
+        applyAppearanceMode()
+
+        // Observe appearance preference changes
+        appearanceObserver = NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.applyAppearanceMode()
+        }
+
         // Center traffic lights vertically with the tab bar
         centerTrafficLights()
         NotificationCenter.default.addObserver(
@@ -122,6 +135,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             name: NSWindow.didEndLiveResizeNotification,
             object: window
         )
+    }
+
+    // MARK: - Appearance
+
+    private func applyAppearanceMode() {
+        guard let window = mainWindow else { return }
+        let mode = Preferences.shared.appearanceMode
+        switch mode {
+        case "light":
+            window.appearance = NSAppearance(named: .aqua)
+        case "dark":
+            window.appearance = NSAppearance(named: .darkAqua)
+        default:
+            window.appearance = nil
+        }
     }
 
     // MARK: - Traffic Light Positioning
