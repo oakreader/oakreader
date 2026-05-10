@@ -98,8 +98,8 @@ struct MarkdownOutlineSidebarView: View {
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 2) {
-                        ForEach(headings) { heading in
-                            headingRow(heading)
+                        ForEach(Array(headings.enumerated()), id: \.element.id) { index, heading in
+                            headingRow(heading, index: index)
                         }
                     }
                     .padding(.vertical, 6)
@@ -109,11 +109,11 @@ struct MarkdownOutlineSidebarView: View {
         }
     }
 
-    private func headingRow(_ heading: MarkdownHeading) -> some View {
+    private func headingRow(_ heading: MarkdownHeading, index: Int) -> some View {
         Button {
             NotificationCenter.default.post(
                 name: .markdownScrollToLine,
-                object: heading.lineIndex
+                object: index
             )
         } label: {
             HStack(spacing: 0) {
