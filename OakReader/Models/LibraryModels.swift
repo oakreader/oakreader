@@ -129,6 +129,7 @@ struct LibraryItem: Identifiable, Hashable {
 
     // MARK: - Record conversion
 
+    // swiftlint:disable:next line_length
     init(record: ItemRecord, attachments: [Attachment] = [], propertyValues: [PropertyValue] = [], collections: [PDFCollection] = [], coverImageData: Data? = nil, referenceMetadata: ReferenceMetadata? = nil) {
         self.id = UUID(uuidString: record.id) ?? UUID()
         self.storageKey = record.storageKey

@@ -150,6 +150,7 @@ struct DigitalSignatureSheet: View {
             certificates = items.compactMap { item in
                 let name = item[kSecAttrLabel as String] as? String ?? "Unknown"
                 let issuer = item[kSecAttrIssuer as String] as? String ?? "Unknown Issuer"
+                // swiftlint:disable:next force_cast
                 let identity = item[kSecValueRef as String].map { $0 as! SecIdentity }
 
                 return CertificateInfo(

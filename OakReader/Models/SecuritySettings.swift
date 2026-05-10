@@ -13,15 +13,15 @@ struct SecuritySettings: Equatable {
 
     // RC4 intentionally excluded — cryptographically broken (RFC 7465)
     enum EncryptionKeyLength: Int, CaseIterable, Identifiable {
-        case aes_128 = 128
-        case aes_256 = 256
+        case aes128 = 128
+        case aes256 = 256
 
         var id: Int { rawValue }
 
         var label: String {
             switch self {
-            case .aes_128: return "128-bit AES"
-            case .aes_256: return "256-bit AES (Recommended)"
+            case .aes128: return "128-bit AES"
+            case .aes256: return "256-bit AES (Recommended)"
             }
         }
 
@@ -35,7 +35,7 @@ struct SecuritySettings: Equatable {
         self.allowCopying = true
         self.allowEditing = true
         self.allowAnnotations = true
-        self.encryptionKeyLength = .aes_256
+        self.encryptionKeyLength = .aes256
         self.isEncrypted = false
     }
 

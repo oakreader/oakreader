@@ -7,7 +7,7 @@ struct PermissionsView: View {
     @State private var allowCopying = true
     @State private var allowEditing = true
     @State private var allowAnnotations = true
-    @State private var encryptionKeyLength: SecuritySettings.EncryptionKeyLength = .aes_256
+    @State private var encryptionKeyLength: SecuritySettings.EncryptionKeyLength = .aes256
 
     var body: some View {
         GroupBox {
