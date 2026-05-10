@@ -148,6 +148,44 @@ final class ChatNSTextView: NSTextView {
     override var acceptsFirstResponder: Bool { true }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
+    // MARK: - Context Menu
+
+    override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
+        let removeTitles: Set<String> = ["Services", "Substitutions", "Transformations",
+                                         "Speech", "Layout Orientation", "AutoFill",
+                                         "Spelling and Grammar"]
+        menu.items.removeAll { item in
+            if let submenuTitle = item.submenu?.title, removeTitles.contains(submenuTitle) {
+                return true
+            }
+            if removeTitles.contains(item.title) { return true }
+            if item.title.hasPrefix("Search With") { return true }
+            if item.title.contains("Unlearn Spelling") { return true }
+            return false
+        }
+
+        for item in menu.items where item.image == nil {
+            switch item.title {
+            case "Cut":
+                item.image = NSImage(systemSymbolName: "scissors", accessibilityDescription: nil)
+            case "Copy":
+                item.image = NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: nil)
+            case "Paste":
+                item.image = NSImage(systemSymbolName: "clipboard", accessibilityDescription: nil)
+            case "Select All":
+                item.image = NSImage(systemSymbolName: "selection.pin.in.out", accessibilityDescription: nil)
+            case let t where t.hasPrefix("Look Up"):
+                item.image = NSImage(systemSymbolName: "magnifyingglass", accessibilityDescription: nil)
+            case "Translate":
+                item.image = NSImage(systemSymbolName: "translate", accessibilityDescription: nil)
+            default:
+                break
+            }
+        }
+
+        super.willOpenMenu(menu, with: event)
+    }
+
     override func keyDown(with event: NSEvent) {
         let isReturn = event.keyCode == 36
         let hasCommand = event.modifierFlags.contains(.command)
