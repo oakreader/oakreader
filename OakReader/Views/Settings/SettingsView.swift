@@ -105,7 +105,7 @@ struct SettingsView: View {
                     }
                 }
         }
-        .frame(width: 780, height: 580)
+        .frame(width: 900, height: 620)
         .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in
             // If current tab's plugin was disabled, fall back to .plugins
             if let plugin = selectedTab.plugin, !Preferences.shared.isPluginEnabled(plugin) {
