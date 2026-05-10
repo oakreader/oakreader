@@ -148,6 +148,11 @@ final class ChatNSTextView: NSTextView {
     override var acceptsFirstResponder: Bool { true }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        insertionPointColor = .labelColor
+    }
+
     // MARK: - Context Menu
 
     override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
