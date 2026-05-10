@@ -21,6 +21,8 @@ struct PDFViewerRepresentable: NSViewRepresentable {
         PDFViewCoordinator(viewModel: viewModel)
     }
 
+    @AppStorage("appearanceMode") private var appearanceMode: String = "system"
+
     func makeNSView(context: Context) -> PDFView {
         let pdfView = OakReaderView()
         pdfView.autoScales = true
@@ -30,6 +32,7 @@ struct PDFViewerRepresentable: NSViewRepresentable {
         pdfView.backgroundColor = NSColor.controlBackgroundColor
         pdfView.delegate = context.coordinator
         pdfView.isInMarkupMode = false
+        applyDarkAppearanceContent(to: pdfView)
 
         pdfView.document = viewModel.pdfDocument
         pdfView.displayMode = viewModel.state.displayMode
@@ -52,6 +55,9 @@ struct PDFViewerRepresentable: NSViewRepresentable {
 
         // Suppress native markup toolbar
         pdfView.isInMarkupMode = false
+
+        // Update dark appearance content based on preference
+        applyDarkAppearanceContent(to: pdfView)
 
         // Update document if changed
         if pdfView.document !== viewModel.pdfDocument {
@@ -97,5 +103,25 @@ struct PDFViewerRepresentable: NSViewRepresentable {
                 pdfView.go(to: selection.bounds(for: page), on: page)
             }
         }
+    }
+
+    // MARK: - Dark Appearance
+
+    private func applyDarkAppearanceContent(to pdfView: PDFView) {
+        let sel = NSSelectorFromString("setAllowsDarkAppearanceContent:")
+        guard pdfView.responds(to: sel) else { return }
+
+        let shouldEnable: Bool
+        switch appearanceMode {
+        case "dark":
+            shouldEnable = true
+        case "light":
+            shouldEnable = false
+        default:
+            // "system" — follow the effective appearance
+            shouldEnable = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        }
+
+        pdfView.setValue(shouldEnable, forKey: "allowsDarkAppearanceContent")
     }
 }

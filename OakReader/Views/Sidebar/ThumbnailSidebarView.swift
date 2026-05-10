@@ -58,8 +58,19 @@ private struct ThumbnailItemView: View {
     let thumbWidth: CGFloat
     let thumbHeight: CGFloat
 
+    @AppStorage("appearanceMode") private var appearanceMode: String = "system"
+    @Environment(\.colorScheme) private var colorScheme
+
     private let borderWidth: CGFloat = 3
     private let cardPadding: CGFloat = 6
+
+    private var shouldInvert: Bool {
+        switch appearanceMode {
+        case "dark": return true
+        case "light": return false
+        default: return colorScheme == .dark
+        }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -68,11 +79,16 @@ private struct ThumbnailItemView: View {
                 if let page = pdfDocument?.page(at: pageIndex) {
                     let renderSize = max(thumbWidth, thumbHeight)
                     let thumbnail = page.thumbnail(maxDimension: renderSize)
-                    Image(nsImage: thumbnail)
+                    let imageView = Image(nsImage: thumbnail)
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(maxWidth: thumbWidth - cardPadding * 2 - borderWidth * 2,
                                maxHeight: thumbHeight - cardPadding * 2 - borderWidth * 2 - 28)
+                    if shouldInvert {
+                        imageView.colorInvert()
+                    } else {
+                        imageView
+                    }
                 } else {
                     Rectangle()
                         .fill(Color.secondary.opacity(0.1))
@@ -91,12 +107,12 @@ private struct ThumbnailItemView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 4)
         }
-        .background(Color.white)
+        .background(Color(nsColor: .textBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .overlay(
             RoundedRectangle(cornerRadius: 6)
                 .strokeBorder(
-                    isSelected ? Color.primary.opacity(0.25) : Color.black.opacity(0.08),
+                    isSelected ? Color.primary.opacity(0.25) : Color.primary.opacity(0.08),
                     lineWidth: isSelected ? borderWidth : 1
                 )
         )
