@@ -237,6 +237,59 @@ final class MarkdownNSTextView: NSTextView {
         super.setNeedsDisplay(r, avoidAdditionalLayout: flag)
     }
 
+    // MARK: - Context Menu
+
+    override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
+        // Remove unwanted system menu items
+        let removeTitles: Set<String> = ["Services", "Substitutions", "Transformations",
+                                         "Speech", "Layout Orientation", "AutoFill",
+                                         "Spelling and Grammar"]
+        menu.items.removeAll { item in
+            if let submenuTitle = item.submenu?.title, removeTitles.contains(submenuTitle) {
+                return true
+            }
+            if removeTitles.contains(item.title) {
+                return true
+            }
+            // Remove "Search With ..." items (e.g. Baidu, Google from system services)
+            if item.title.hasPrefix("Search With") {
+                return true
+            }
+            // Remove "Unlearn Spelling"
+            if item.title.contains("Unlearn Spelling") {
+                return true
+            }
+            return false
+        }
+
+        // Add icons to standard items
+        for item in menu.items {
+            let title = item.title
+            if item.image == nil {
+                switch title {
+                case "Cut":
+                    item.image = NSImage(systemSymbolName: "scissors", accessibilityDescription: nil)
+                case "Copy":
+                    item.image = NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: nil)
+                case "Paste":
+                    item.image = NSImage(systemSymbolName: "clipboard", accessibilityDescription: nil)
+                case "Select All":
+                    item.image = NSImage(systemSymbolName: "selection.pin.in.out", accessibilityDescription: nil)
+                case let t where t.hasPrefix("Look Up"):
+                    item.image = NSImage(systemSymbolName: "magnifyingglass", accessibilityDescription: nil)
+                case "Translate":
+                    item.image = NSImage(systemSymbolName: "translate", accessibilityDescription: nil)
+                case let t where t.contains("Find"):
+                    item.image = NSImage(systemSymbolName: "doc.text.magnifyingglass", accessibilityDescription: nil)
+                default:
+                    break
+                }
+            }
+        }
+
+        super.willOpenMenu(menu, with: event)
+    }
+
     override func paste(_ sender: Any?) {
         let pb = NSPasteboard.general
 
