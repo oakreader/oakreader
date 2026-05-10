@@ -35,13 +35,9 @@ struct ContentView: View {
                         }
                     }
 
-                    // Main content column (toolbar + content)
+                    // Main content column
                     VStack(spacing: 0) {
-                        // Inline toolbar (below tab bar) — only for webSnapshot
-                        if viewModel.itemType == .webSnapshot {
-                            OakReaderToolbarView(viewModel: viewModel)
-                            Divider()
-                        } else if viewModel.itemType == .embed {
+                        if viewModel.itemType == .embed {
                             Spacer().frame(height: 8)
                         }
 

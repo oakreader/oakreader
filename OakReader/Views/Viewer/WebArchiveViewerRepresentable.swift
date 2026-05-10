@@ -1,6 +1,41 @@
 import SwiftUI
 import WebKit
 
+// MARK: - Custom WKWebView with context menu
+
+/// WKWebView subclass that adds an "Area Selection" toggle to the right-click context menu.
+final class OakWebView: WKWebView {
+    weak var coordinator: WebViewCoordinator?
+
+    override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
+        super.willOpenMenu(menu, with: event)
+
+        menu.addItem(.separator())
+
+        let isAreaMode = coordinator?.viewModel.state.editorMode == .snapshot
+        let areaItem = NSMenuItem(
+            title: "Area Selection",
+            action: #selector(toggleAreaSelection),
+            keyEquivalent: ""
+        )
+        areaItem.target = self
+        areaItem.image = NSImage(systemSymbolName: "rectangle.dashed", accessibilityDescription: nil)
+        areaItem.state = isAreaMode ? .on : .off
+        menu.addItem(areaItem)
+    }
+
+    @objc private func toggleAreaSelection() {
+        guard let vm = coordinator?.viewModel else { return }
+        if vm.state.editorMode == .snapshot {
+            vm.setEditorMode(.viewer)
+        } else {
+            vm.setEditorMode(.snapshot)
+        }
+    }
+}
+
+// MARK: - NSViewRepresentable
+
 /// NSViewRepresentable wrapper around WKWebView for rendering web snapshots.
 /// Security: blocks all external HTTP/HTTPS requests, scopes file access to storage directory only.
 struct WebArchiveViewerRepresentable: NSViewRepresentable {
@@ -10,7 +45,7 @@ struct WebArchiveViewerRepresentable: NSViewRepresentable {
         WebViewCoordinator(viewModel: viewModel)
     }
 
-    func makeNSView(context: Context) -> WKWebView {
+    func makeNSView(context: Context) -> OakWebView {
         let config = WKWebViewConfiguration()
 
         // Register text selection handler — sends text + bounding rect for popup positioning
@@ -43,9 +78,10 @@ struct WebArchiveViewerRepresentable: NSViewRepresentable {
         config.userContentController.addUserScript(selectionScript)
         config.userContentController.add(context.coordinator, name: "textSelected")
 
-        let webView = WKWebView(frame: .zero, configuration: config)
+        let webView = OakWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
         webView.allowsMagnification = true
+        webView.coordinator = context.coordinator
         context.coordinator.webView = webView
         context.coordinator.setupScrollMonitor()
 
@@ -72,7 +108,7 @@ struct WebArchiveViewerRepresentable: NSViewRepresentable {
         return webView
     }
 
-    func updateNSView(_ webView: WKWebView, context: Context) {
+    func updateNSView(_ webView: OakWebView, context: Context) {
         context.coordinator.viewModel = viewModel
 
         // Sync zoom level from toolbar controls
