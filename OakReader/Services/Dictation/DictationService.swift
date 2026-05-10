@@ -1,8 +1,5 @@
 import AVFoundation
-import os
 import VoiceAgentKit
-
-private let log = Logger(subsystem: "OakReader", category: "DictationService")
 
 /// Orchestrates real-time dictation: mic capture → STT provider → dictation events.
 ///
@@ -29,7 +26,7 @@ final class DictationService {
 
     /// Toggle dictation on/off.
     func toggle() {
-        print("[Dictation] toggle() isDictating=\(isDictating)")
+        Log.debug(Log.dictation, "toggle() isDictating=\(isDictating)")
         if isDictating {
             stop()
         } else {
@@ -40,22 +37,22 @@ final class DictationService {
     /// Start dictation: create mic capture, provider, and begin streaming.
     func start() {
         guard !isDictating else {
-            print("[Dictation] start() skipped — already dictating")
+            Log.debug(Log.dictation, "start() skipped — already dictating")
             return
         }
 
         let prefs = Preferences.shared
-        print("[Dictation] STT provider='\(prefs.voiceSTTProvider)', apiKey empty=\(prefs.elevenLabsAPIKey.isEmpty)")
+        Log.debug(Log.dictation, "STT provider='\(prefs.voiceSTTProvider)', apiKey empty=\(prefs.elevenLabsAPIKey.isEmpty)")
         let provider = makeProvider(prefs: prefs)
 
         guard let provider else {
-            print("[Dictation] ⚠ No provider — showing error alert")
-            log.error("No dictation provider available — check STT provider settings and API key")
+            Log.debug(Log.dictation, "No provider — showing error alert")
+            Log.error(Log.dictation, "No dictation provider available — check STT provider settings and API key")
             errorMessage = "Dictation requires an ElevenLabs API key. Configure it in Settings → Voice → ElevenLabs."
             return
         }
 
-        print("[Dictation] ✓ Provider created, starting mic capture...")
+        Log.debug(Log.dictation, "Provider created, starting mic capture")
         isDictating = true
         partialText = ""
 
@@ -68,19 +65,18 @@ final class DictationService {
 
             do {
                 let audioStream = try mic.startCapture(sampleRate: 16000)
-                print("[Dictation] ✓ Mic capture started, connecting to STT...")
+                Log.debug(Log.dictation, "Mic capture started, connecting to STT")
                 let eventStream = provider.startDictation(audioStream: audioStream)
 
                 for await event in eventStream {
                     if Task.isCancelled { break }
-                    print("[Dictation] Event: \(event)")
+                    Log.debug(Log.dictation, "Event: \(event)")
                     self.handleEvent(event)
                 }
-                print("[Dictation] Event stream ended")
+                Log.debug(Log.dictation, "Event stream ended")
             } catch {
                 if !Task.isCancelled {
-                    print("[Dictation] ✗ Capture error: \(error)")
-                    log.error("Dictation capture error: \(error.localizedDescription)")
+                    Log.error(Log.dictation, "Dictation capture error: \(error.localizedDescription)")
                     self.handleEvent(.error(error.localizedDescription))
                 }
             }
@@ -131,7 +127,7 @@ final class DictationService {
         case "elevenlabs":
             let apiKey = prefs.elevenLabsAPIKey
             guard !apiKey.isEmpty else {
-                log.warning("ElevenLabs API key is empty")
+                Log.warning(Log.dictation, "ElevenLabs API key is empty")
                 return nil
             }
             return ElevenLabsDictationProvider(

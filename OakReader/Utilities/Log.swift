@@ -16,7 +16,12 @@ enum Log {
     static let cover     = Logger(subsystem: subsystem, category: "cover")
     static let ui        = Logger(subsystem: subsystem, category: "ui")
     static let chapters  = Logger(subsystem: subsystem, category: "chapters")
-    static let zotero   = Logger(subsystem: subsystem, category: "zotero")
+    static let zotero     = Logger(subsystem: subsystem, category: "zotero")
+    static let dictation  = Logger(subsystem: subsystem, category: "dictation")
+    static let voice      = Logger(subsystem: subsystem, category: "voice")
+    static let characters = Logger(subsystem: subsystem, category: "characters")
+    static let stt        = Logger(subsystem: subsystem, category: "stt")
+    static let tts        = Logger(subsystem: subsystem, category: "tts")
 
     private static let subsystem = Bundle.main.bundleIdentifier ?? "com.oakreader.OakReader"
 
@@ -37,6 +42,12 @@ enum Log {
     static func notice(_ logger: Logger, _ message: String) {
         logger.notice("\(message)")
         LogFileWriter.shared.write(level: "notice", category: logger.category, message: message)
+    }
+
+    /// Warning-level: os.Logger + file.
+    static func warning(_ logger: Logger, _ message: String) {
+        logger.warning("\(message)")
+        LogFileWriter.shared.write(level: "warning", category: logger.category, message: message)
     }
 
     /// Error-level: os.Logger + file.
@@ -71,8 +82,13 @@ private extension Logger {
         case Log.cover:     return "cover"
         case Log.ui:        return "ui"
         case Log.chapters:  return "chapters"
-        case Log.zotero:    return "zotero"
-        default:            return "unknown"
+        case Log.zotero:     return "zotero"
+        case Log.dictation:  return "dictation"
+        case Log.voice:      return "voice"
+        case Log.characters: return "characters"
+        case Log.stt:        return "stt"
+        case Log.tts:        return "tts"
+        default:             return "unknown"
         }
     }
 }
