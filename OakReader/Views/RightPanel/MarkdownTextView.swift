@@ -1,6 +1,18 @@
 import SwiftUI
 import AppKit
 
+extension NSEvent {
+    var isDictationToggleShortcut: Bool {
+        guard keyCode == 49 else { return false }
+
+        let flags = modifierFlags.intersection(.deviceIndependentFlagsMask)
+        return flags.contains(.option)
+            && !flags.contains(.command)
+            && !flags.contains(.control)
+            && !flags.contains(.shift)
+    }
+}
+
 /// NSTextView wrapper for plain-text markdown editing.
 /// Uses MiaoYan's paragraph style (min/max line height + lineSpacing)
 /// with a custom drawInsertionPoint to keep the cursor properly sized.
@@ -14,6 +26,8 @@ struct MarkdownTextView: NSViewRepresentable {
     var onReferenceClick: ((String) -> Void)?
     var onImagePaste: ((Data) -> String?)?
     var onSelectionPopup: ((NSPoint, String, NSRange, MarkdownNSTextView) -> Void)?
+    var onCoordinatorReady: ((Coordinator) -> Void)?
+    var onDictationToggle: (() -> Void)?
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -48,6 +62,7 @@ struct MarkdownTextView: NSViewRepresentable {
         textView.onReferenceClick = onReferenceClick
         textView.onImagePaste = onImagePaste
         textView.onSelectionPopup = onSelectionPopup
+        textView.onDictationToggle = onDictationToggle
 
         let ps = Self.paragraphStyle(font: font, lineHeight: lineHeight, lineSpacing: lineSpacing)
         textView.defaultParagraphStyle = ps
@@ -75,6 +90,11 @@ struct MarkdownTextView: NSViewRepresentable {
 
         DispatchQueue.main.async {
             highlighter.highlightAll(in: textView.textStorage!)
+        }
+
+        // Notify parent that the coordinator is ready
+        DispatchQueue.main.async {
+            onCoordinatorReady?(context.coordinator)
         }
 
         return scrollView
@@ -123,6 +143,7 @@ struct MarkdownTextView: NSViewRepresentable {
         textView.onReferenceClick = onReferenceClick
         textView.onImagePaste = onImagePaste
         textView.onSelectionPopup = onSelectionPopup
+        textView.onDictationToggle = onDictationToggle
     }
 
     /// TextKit 2 compatible paragraph style: lineSpacing only.
@@ -171,6 +192,7 @@ final class MarkdownNSTextView: NSTextView {
     var onReferenceClick: ((String) -> Void)?
     var onImagePaste: ((Data) -> String?)?
     var onSelectionPopup: ((NSPoint, String, NSRange, MarkdownNSTextView) -> Void)?
+    var onDictationToggle: (() -> Void)?
 
     /// Maximum content width for readable line length (Notion-style centering).
     private let maxContentWidth: CGFloat = 720
@@ -272,6 +294,14 @@ final class MarkdownNSTextView: NSTextView {
     }
 
     override func keyDown(with event: NSEvent) {
+        if event.isDictationToggleShortcut {
+            print("[Dictation] ⌥Space detected in keyDown, onDictationToggle=\(onDictationToggle != nil)")
+            if let onDictationToggle {
+                onDictationToggle()
+                return
+            }
+        }
+
         let hasCommand = event.modifierFlags.contains(.command)
 
         if hasCommand {
@@ -580,6 +610,101 @@ final class MarkdownNSTextView: NSTextView {
         if cmd.cursorBack > 0 {
             setSelectedRange(NSRange(location: loc + cmd.text.count - cmd.cursorBack, length: 0))
         }
+    }
+
+    // MARK: - Dictation Insertion
+
+    /// Range of the current partial (interim) dictation text in the text storage.
+    private var dictationPartialRange: NSRange?
+
+    private func dictationAttributes(foregroundColor: NSColor) -> [NSAttributedString.Key: Any] {
+        var attrs = typingAttributes
+        attrs[.foregroundColor] = foregroundColor
+        attrs[.font] = font ?? typingAttributes[.font] ?? NSFont.systemFont(ofSize: 14)
+        return attrs
+    }
+
+    private func performWithoutUndo(_ work: () -> Void) {
+        let manager = undoManager
+        manager?.disableUndoRegistration()
+        defer { manager?.enableUndoRegistration() }
+        work()
+    }
+
+    /// Insert or replace interim dictation text at the cursor position.
+    /// Partial text is shown in placeholder color so it's visually distinct.
+    func insertDictationPartial(_ text: String) {
+        guard let ts = textStorage else { return }
+        guard !text.isEmpty else {
+            clearDictationPartial()
+            return
+        }
+
+        let attrs = dictationAttributes(foregroundColor: NSColor.placeholderTextColor)
+        let newLength = (text as NSString).length
+        var updatedRange: NSRange?
+
+        performWithoutUndo {
+            if let range = dictationPartialRange,
+               NSMaxRange(range) <= (ts.string as NSString).length {
+                ts.replaceCharacters(in: range, with: NSAttributedString(string: text, attributes: attrs))
+                updatedRange = NSRange(location: range.location, length: newLength)
+            } else {
+                let loc = selectedRange().location
+                ts.insert(NSAttributedString(string: text, attributes: attrs), at: loc)
+                updatedRange = NSRange(location: loc, length: newLength)
+            }
+        }
+
+        if let updatedRange {
+            dictationPartialRange = updatedRange
+            performWithoutUndo {
+                ts.addAttribute(.foregroundColor, value: NSColor.placeholderTextColor, range: updatedRange)
+            }
+        }
+    }
+
+    /// Commit final dictation text, replacing any existing partial.
+    /// The text is inserted with normal styling and the cursor advances past it.
+    func commitDictationFinal(_ text: String) {
+        guard let ts = textStorage else { return }
+        guard !text.isEmpty else {
+            clearDictationPartial()
+            return
+        }
+
+        undoManager?.beginUndoGrouping()
+        if let range = dictationPartialRange,
+           NSMaxRange(range) <= (ts.string as NSString).length {
+            let insertionLocation = range.location
+            performWithoutUndo {
+                ts.replaceCharacters(in: range, with: "")
+            }
+            setSelectedRange(NSRange(location: insertionLocation, length: 0))
+            insertText(text, replacementRange: selectedRange())
+        } else {
+            insertText(text, replacementRange: selectedRange())
+        }
+        dictationPartialRange = nil
+        undoManager?.endUndoGrouping()
+
+        // Trigger text change notification so the binding updates
+        didChangeText()
+    }
+
+    /// Remove any existing partial dictation text without committing.
+    func clearDictationPartial() {
+        guard let ts = textStorage, let range = dictationPartialRange,
+              NSMaxRange(range) <= (ts.string as NSString).length else {
+            dictationPartialRange = nil
+            return
+        }
+        performWithoutUndo {
+            ts.replaceCharacters(in: range, with: "")
+        }
+        setSelectedRange(NSRange(location: range.location, length: 0))
+        dictationPartialRange = nil
+        didChangeText()
     }
 
     // MARK: - Reference Extraction
