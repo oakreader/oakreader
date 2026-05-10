@@ -9,7 +9,9 @@ struct SettingsView: View {
         case general
         case library
         case ai
-        case voice
+        case localModels
+        case audio
+        case characters
         case plugins
         case youtube
         // Plugin tabs
@@ -22,8 +24,10 @@ struct SettingsView: View {
             switch self {
             case .general: return "General"
             case .library: return "Library"
-            case .ai: return "AI"
-            case .voice: return "Voice"
+            case .ai: return "AI Providers"
+            case .localModels: return "Local Models"
+            case .audio: return "Audio"
+            case .characters: return "Characters"
             case .plugins: return "Plugins"
             case .youtube: return "YouTube"
             case .pluginNotes: return Plugin.notes.label
@@ -36,7 +40,9 @@ struct SettingsView: View {
             case .general: return "gearshape"
             case .library: return "books.vertical"
             case .ai: return "sparkles.2"
-            case .voice: return "waveform"
+            case .localModels: return "arrow.down.circle"
+            case .audio: return "speaker.wave.2"
+            case .characters: return "person.2"
             case .plugins: return "puzzlepiece.extension"
             case .youtube: return "play.rectangle"
             case .pluginNotes: return Plugin.notes.systemImage
@@ -62,7 +68,7 @@ struct SettingsView: View {
     }
 
     /// Fixed tabs that always appear.
-    private static let fixedTabs: [Tab] = [.general, .library, .ai, .voice, .plugins, .youtube]
+    private static let fixedTabs: [Tab] = [.general, .library, .ai, .localModels, .audio, .characters, .plugins, .youtube]
 
     @State private var selectedTab: Tab = .general
     @State private var pluginRefresh = false
@@ -117,9 +123,13 @@ struct SettingsView: View {
         case .library:
             LibrarySettingsView(store: store)
         case .ai:
-            AISettingsView()
-        case .voice:
-            VoiceSettingsView()
+            AIProvidersSettingsView()
+        case .localModels:
+            LocalModelsSettingsView()
+        case .audio:
+            AudioSettingsView()
+        case .characters:
+            CharacterSettingsView()
         case .plugins:
             PluginSettingsView()
         case .youtube:

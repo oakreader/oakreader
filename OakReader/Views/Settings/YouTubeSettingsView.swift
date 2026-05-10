@@ -169,7 +169,7 @@ struct YouTubeSettingsView: View {
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                     Picker("Provider", selection: $youtubeProviderId) {
-                        ForEach(ProviderRegistry.shared.allProviders) { p in
+                        ForEach(ConfiguredProviderStore.shared.configuredLLMProviders) { p in
                             Text(p.displayName).tag(p.id)
                         }
                     }
@@ -195,24 +195,7 @@ struct YouTubeSettingsView: View {
                 }
             }
 
-            // API key status
             HStack(spacing: 6) {
-                if CredentialResolver.hasCredentials(for: youtubeProviderId) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                    Text("API key configured")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                } else {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
-                    Text("Configure API key in AI settings")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer().frame(width: 8)
-
                 if isTesting {
                     ProgressView()
                         .controlSize(.small)
