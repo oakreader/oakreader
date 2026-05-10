@@ -4,6 +4,12 @@ import GRDB
 struct VoiceCharacterService {
     let database: CatalogDatabase
 
+    private static let encoder: JSONEncoder = {
+        let e = JSONEncoder()
+        e.outputFormatting = [.prettyPrinted, .sortedKeys]
+        return e
+    }()
+
     // MARK: - Voice Calls Directory
 
     static var voiceCallsDirectory: URL {
@@ -14,14 +20,44 @@ struct VoiceCharacterService {
         VoiceCallTranscriptStore.transcriptURL(callId: callId)
     }
 
+    // MARK: - Config File I/O
+
+    private func loadConfig(characterId: UUID) -> CharacterConfig {
+        let url = CatalogDatabase.characterConfigURL(characterId: characterId)
+        guard let data = try? Data(contentsOf: url),
+              let config = try? JSONDecoder().decode(CharacterConfig.self, from: data) else {
+            return .default
+        }
+        return config
+    }
+
+    private func saveConfig(_ config: CharacterConfig, characterId: UUID) throws {
+        let url = CatalogDatabase.characterConfigURL(characterId: characterId)
+        let dir = url.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let data = try Self.encoder.encode(config)
+        try data.write(to: url, options: .atomic)
+    }
+
+    private func deleteConfig(characterId: UUID) {
+        let configURL = CatalogDatabase.characterConfigURL(characterId: characterId)
+        try? FileManager.default.removeItem(at: configURL)
+        let assetsDir = CatalogDatabase.characterAssetsDirectory(characterId: characterId)
+        try? FileManager.default.removeItem(at: assetsDir)
+    }
+
     // MARK: - Characters
 
     func fetchAllCharacters() throws -> [Character] {
-        try database.dbQueue.read { db in
-            let records = try CharacterRecord
+        let records = try database.dbQueue.read { db in
+            try CharacterRecord
                 .order(CharacterRecord.CodingKeys.sortOrder.asc)
                 .fetchAll(db)
-            return records.map { Character(record: $0) }
+        }
+        return records.map { record in
+            let uuid = UUID(uuidString: record.id) ?? UUID()
+            let config = loadConfig(characterId: uuid)
+            return Character(record: record, config: config)
         }
     }
 
@@ -35,13 +71,6 @@ struct VoiceCharacterService {
             id: UUID().uuidString,
             userId: localUserId,
             name: name,
-            avatarColorHex: colorHex,
-            ttsVoice: "",
-            referenceAudioPath: "",
-            referenceText: "",
-            language: language,
-            llmModel: "",
-            systemPrompt: "",
             sortOrder: maxOrder + 1,
             createdAt: now,
             updatedAt: now
@@ -49,7 +78,12 @@ struct VoiceCharacterService {
         try database.dbQueue.write { db in
             try record.insert(db)
         }
-        return Character(record: record)
+        let uuid = UUID(uuidString: record.id) ?? UUID()
+        var config = CharacterConfig.default
+        config.avatar = CharacterAvatar(colorHex: colorHex)
+        config.language = language
+        try saveConfig(config, characterId: uuid)
+        return Character(record: record, config: config)
     }
 
     func updateCharacter(_ character: Character) throws {
@@ -57,19 +91,13 @@ struct VoiceCharacterService {
         try database.dbQueue.write { db in
             try db.execute(
                 sql: """
-                    UPDATE characters SET name = ?, avatar_color_hex = ?, tts_voice = ?,
-                    reference_audio_path = ?, reference_text = ?, language = ?,
-                    llm_model = ?, system_prompt = ?, sort_order = ?, updated_at = ?
+                    UPDATE characters SET name = ?, sort_order = ?, updated_at = ?
                     WHERE id = ?
                 """,
-                arguments: [
-                    character.name, character.avatarColorHex, character.ttsVoice,
-                    character.referenceAudioPath, character.referenceText, character.language,
-                    character.llmModel, character.systemPrompt, character.sortOrder, now,
-                    character.id.uuidString
-                ]
+                arguments: [character.name, character.sortOrder, now, character.id.uuidString]
             )
         }
+        try saveConfig(character.config, characterId: character.id)
     }
 
     func deleteCharacter(id: UUID) throws {
@@ -81,6 +109,7 @@ struct VoiceCharacterService {
         try database.dbQueue.write { db in
             try db.execute(sql: "DELETE FROM characters WHERE id = ?", arguments: [id.uuidString])
         }
+        deleteConfig(characterId: id)
     }
 
     // MARK: - Calls

@@ -92,6 +92,21 @@ extension CatalogDatabase {
         callAudioDirectory(callId: callId).appendingPathComponent("turn-\(turnIndex)-\(role).caf")
     }
 
+    /// ~/OakReader/characters/
+    static var charactersDirectory: URL {
+        dataDirectory.appendingPathComponent("characters", isDirectory: true)
+    }
+
+    /// ~/OakReader/characters/{characterId}.json
+    static func characterConfigURL(characterId: UUID) -> URL {
+        charactersDirectory.appendingPathComponent("\(characterId.uuidString).json")
+    }
+
+    /// ~/OakReader/characters/{characterId}/  (for avatar images, reference audio, etc.)
+    static func characterAssetsDirectory(characterId: UUID) -> URL {
+        charactersDirectory.appendingPathComponent(characterId.uuidString, isDirectory: true)
+    }
+
     static func createBaseDirectories() throws {
         try FileManager.default.createDirectory(at: dataDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: storageDirectory, withIntermediateDirectories: true)
@@ -101,6 +116,7 @@ extension CatalogDatabase {
         try FileManager.default.createDirectory(at: chatsDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: chatAttachmentsDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: callsDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: charactersDirectory, withIntermediateDirectories: true)
     }
 
     // MARK: - Storage Key Generation

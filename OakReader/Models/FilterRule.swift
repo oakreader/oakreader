@@ -12,7 +12,8 @@ struct FilterRuleSet: Codable, Hashable {
     }
 }
 
-struct FilterCondition: Codable, Hashable {
+struct FilterCondition: Codable, Hashable, Identifiable {
+    var id = UUID()
     var field: FilterField
     var op: FilterOperator
     var value: String

@@ -313,13 +313,6 @@ extension CatalogDatabase {
                 t.column("id", .text).primaryKey()
                 t.column("user_id", .text).notNull()
                 t.column("name", .text).notNull()
-                t.column("avatar_color_hex", .text).notNull().defaults(to: "#5FB236")
-                t.column("tts_voice", .text).notNull().defaults(to: "")
-                t.column("reference_audio_path", .text).notNull().defaults(to: "")
-                t.column("reference_text", .text).notNull().defaults(to: "")
-                t.column("language", .text).notNull().defaults(to: "en")
-                t.column("llm_model", .text).notNull().defaults(to: "")
-                t.column("system_prompt", .text).notNull().defaults(to: "")
                 t.column("sort_order", .integer).notNull().defaults(to: 0)
                 t.column("created_at", .text).notNull()
                 t.column("updated_at", .text).notNull()
@@ -336,12 +329,25 @@ extension CatalogDatabase {
             }
             try db.create(index: "idx_voice_calls_character_id", on: "voice_calls", columns: ["character_id"])
 
-            // Seed default character
+            // Seed default character (DB row + JSON config file)
+            let characterId = UUID().uuidString
             let now = Date().iso8601String
             try db.execute(sql: """
-                INSERT INTO characters (id, user_id, name, avatar_color_hex, tts_voice, reference_audio_path, reference_text, language, llm_model, system_prompt, sort_order, created_at, updated_at)
-                VALUES (?, ?, 'Oak', '#5FB236', '', '', '', 'en', '', '', 0, ?, ?)
-            """, arguments: [UUID().uuidString, localUserId, now, now])
+                INSERT INTO characters (id, user_id, name, sort_order, created_at, updated_at)
+                VALUES (?, ?, 'Oak', 0, ?, ?)
+            """, arguments: [characterId, localUserId, now, now])
+
+            // Write default config JSON
+            if let uuid = UUID(uuidString: characterId) {
+                let configURL = CatalogDatabase.characterConfigURL(characterId: uuid)
+                let fm = FileManager.default
+                try fm.createDirectory(at: configURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+                let config = CharacterConfig.default
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+                let data = try encoder.encode(config)
+                try data.write(to: configURL)
+            }
         }
 
         migrator.registerMigration("v6-markdown-notes") { db in
