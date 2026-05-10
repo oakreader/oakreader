@@ -507,18 +507,17 @@ private struct ProviderDetailView: View {
                 await MainActor.run {
                     if gotDelta {
                         testResult = "Success!"
-                        store.refresh()
                     } else {
                         testResult = "No response received"
-                        KeychainService.deleteAPIKey(forProviderId: provider.id)
                     }
+                    store.refresh()
                     isTesting = false
                 }
             } catch {
                 await MainActor.run {
                     testResult = "Error: \(error.localizedDescription)"
                     isTesting = false
-                    KeychainService.deleteAPIKey(forProviderId: provider.id)
+                    store.refresh()
                 }
             }
         }
