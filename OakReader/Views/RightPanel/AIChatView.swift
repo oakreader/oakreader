@@ -303,10 +303,6 @@ struct AIChatView: View {
             .padding(.horizontal, 10)
             .padding(.bottom, 6)
         }
-        .contentShape(RoundedRectangle(cornerRadius: 16))
-        .onTapGesture {
-            inputFocusRef.focus()
-        }
         .background(
             RoundedRectangle(cornerRadius: 16)
                 .fill(Color(nsColor: .textBackgroundColor))

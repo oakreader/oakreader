@@ -181,6 +181,11 @@ final class MarkdownNSTextView: NSTextView {
     /// Maximum content width for readable line length (Notion-style centering).
     private let maxContentWidth: CGFloat = 720
 
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        insertionPointColor = .labelColor
+    }
+
     /// Recalculate horizontal insets to center text within maxContentWidth.
     private func updateContentInsets() {
         let horizontalInset = max(20, (bounds.width - maxContentWidth) / 2)
