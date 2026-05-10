@@ -36,7 +36,6 @@
 		142C5FD3DCD265AD5C4315DF /* FormFieldOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49648117F5861D90E9E1FE53 /* FormFieldOverlay.swift */; };
 		1594C417D3246E27D360CA68 /* FormEditorViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8F15DB052AD5748299E47EA /* FormEditorViewModel.swift */; };
 		168216A10A2C6111B746F63B /* VoiceChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C400ED74A219453CE82442BC /* VoiceChatView.swift */; };
-		169247B966279CAEC982237D /* DictationOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 712AEBFEA97A0C36BE3AB024 /* DictationOverlayView.swift */; };
 		19BF05E149357FDA5327599F /* LibraryCollectionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 412451D7D488F2DCEF2F1CF2 /* LibraryCollectionStore.swift */; };
 		1B3F3326B81994E9CC8AC3DA /* TagEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23FF5D2923FB73BB4FDA4652 /* TagEditorView.swift */; };
 		1C1463F40053DC9120B4720E /* CompressionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACEBA28EA4CB1D91190356B4 /* CompressionService.swift */; };
@@ -99,7 +98,6 @@
 		525DDC055DEF4B7A827759D7 /* RedactionBurnInSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C0812413BD57A2054D10A83 /* RedactionBurnInSheet.swift */; };
 		53561F934267B72C8D1035F7 /* RedactionRegion.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8D3F1C30CD4202DFA8C64B4 /* RedactionRegion.swift */; };
 		55575EB6016D9FA1F38818E5 /* ConversationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1428432F0FC92A5486EAF1E /* ConversationService.swift */; };
-		55D7835D1213ACAD7877D811 /* DictationProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFC12EB1294780E3CDD8C37E /* DictationProvider.swift */; };
 		5849AC3E10669255D452F102 /* ComparisonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32A5CD58F142D8232ABD0B34 /* ComparisonView.swift */; };
 		58DFACB7DB1AF310CEA7A4CD /* ZoteroMigrationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E682F4A12F66C8D3B12A14F /* ZoteroMigrationService.swift */; };
 		5967878A95FEAB1001C9CD7B /* AccessibilityCheckerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA017F31D0A69846D78444B1 /* AccessibilityCheckerView.swift */; };
@@ -148,7 +146,6 @@
 		8A6AE1F4BD3EF2D8AEEB8D1F /* PageRangeSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 775D74C4CCC80BE808BFC226 /* PageRangeSelector.swift */; };
 		8AE932BDAB9DE295267B69AB /* CallHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 406A8F1972161BD045918DA1 /* CallHistoryView.swift */; };
 		8B2875617706938CE893A311 /* VoiceAgentKit in Frameworks */ = {isa = PBXBuildFile; productRef = E55E25C56437E023A1A9295D /* VoiceAgentKit */; };
-		8C6BDAD28CA25DDCBC286FDA /* DictationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C9DBF0FE781AD1C7D6BD20E /* DictationService.swift */; };
 		8CC885D349D23FF2A8E6FB53 /* BatchOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23C25D15A76CFA4B81EACCAD /* BatchOperation.swift */; };
 		8E0D65B4CEC11F7C678C6682 /* OakReaderAI in Frameworks */ = {isa = PBXBuildFile; productRef = 1AAB9B991897293EA090569E /* OakReaderAI */; };
 		8E48000C86108C02A86F07C5 /* PDFViewCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D46DC9842C708EE4F886379 /* PDFViewCoordinator.swift */; };
@@ -164,7 +161,6 @@
 		9B9542A26B0276BDB55E969C /* LibraryEnums.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A68874A493BE4FAA33E42A1 /* LibraryEnums.swift */; };
 		A0495C3C885D372E5BAE80A0 /* PageOrganizeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5537282A4D7A0B175F9FEB8D /* PageOrganizeViewModel.swift */; };
 		A0C4D70D2AE85D621DF074A0 /* TranslationPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FE618D781B9927D23075AF8 /* TranslationPanelView.swift */; };
-		A0ECEA5D54987B285E86EC6E /* ElevenLabsDictationProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AB5E8C280302CA8165B9CD5 /* ElevenLabsDictationProvider.swift */; };
 		A0F345EB9B3741DCFE741698 /* ViewerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AD6637B27FCDCEE2807929C /* ViewerViewModel.swift */; };
 		A11D9E56DCAEA0A563A18512 /* CitationFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 321349C45AEC61F2E40F34B9 /* CitationFormatter.swift */; };
 		A12889391EE13C7989B99C1D /* Preferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5535AEEAC468A3F63565D187 /* Preferences.swift */; };
@@ -387,7 +383,6 @@
 		59FB3A6F3A3AEC3676C0F0F6 /* DocumentTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentTabView.swift; sourceTree = "<group>"; };
 		5ADEB81E2037E219F10BD1AD /* TagNode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagNode.swift; sourceTree = "<group>"; };
 		5B1412A04CA324A15BF891F4 /* UndoCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UndoCoordinator.swift; sourceTree = "<group>"; };
-		5C9DBF0FE781AD1C7D6BD20E /* DictationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictationService.swift; sourceTree = "<group>"; };
 		5F08A21C55E4718377512E18 /* PopupComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopupComponents.swift; sourceTree = "<group>"; };
 		5FE613E96213AA2CB75C0600 /* CGContext+PDFDrawing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CGContext+PDFDrawing.swift"; sourceTree = "<group>"; };
 		607ACCA3465C1ED0CC1DA6C9 /* PrintService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrintService.swift; sourceTree = "<group>"; };
@@ -402,7 +397,6 @@
 		699913DA93CBA7649507A450 /* LibraryPropertyStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryPropertyStore.swift; sourceTree = "<group>"; };
 		6A3019C71FD938084B3328D5 /* AnnotationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationViewModel.swift; sourceTree = "<group>"; };
 		6A92000415AEF2F5CE2FC86F /* BatchFileListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchFileListView.swift; sourceTree = "<group>"; };
-		6AB5E8C280302CA8165B9CD5 /* ElevenLabsDictationProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElevenLabsDictationProvider.swift; sourceTree = "<group>"; };
 		6BC5B006B91985952010BF6E /* PDFAnnotation+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PDFAnnotation+Extensions.swift"; sourceTree = "<group>"; };
 		6BCAD1385B34DBC5A6F33CD9 /* CatalogMigrations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogMigrations.swift; sourceTree = "<group>"; };
 		6D293D3946B771FF63A06649 /* RedactionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RedactionService.swift; sourceTree = "<group>"; };
@@ -412,7 +406,6 @@
 		6F1E73B68CE5C3BAB49180CE /* ImportService+PDF.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ImportService+PDF.swift"; sourceTree = "<group>"; };
 		70574590CAC57776B1952EA3 /* WatermarkPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatermarkPreviewView.swift; sourceTree = "<group>"; };
 		70F27CA12B49E652BF19FDC0 /* AnnotationColorDropdown.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationColorDropdown.swift; sourceTree = "<group>"; };
-		712AEBFEA97A0C36BE3AB024 /* DictationOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictationOverlayView.swift; sourceTree = "<group>"; };
 		7419080B5C9432797252C2AC /* MarkdownSelectionPopupPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownSelectionPopupPanel.swift; sourceTree = "<group>"; };
 		768812F9F5CBE99CA8F70112 /* AnnotationPropertyPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationPropertyPanel.swift; sourceTree = "<group>"; };
 		775D74C4CCC80BE808BFC226 /* PageRangeSelector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageRangeSelector.swift; sourceTree = "<group>"; };
@@ -523,7 +516,6 @@
 		E7DE8679D5490E12A4B04B7D /* DifferenceOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DifferenceOverlayView.swift; sourceTree = "<group>"; };
 		E80DA21B8D814A91B51028B3 /* OakReaderAI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = OakReaderAI; path = Packages/OakReaderAI; sourceTree = SOURCE_ROOT; };
 		EF7AB1761714E874C581C32A /* VoicePanelContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoicePanelContainerView.swift; sourceTree = "<group>"; };
-		EFC12EB1294780E3CDD8C37E /* DictationProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictationProvider.swift; sourceTree = "<group>"; };
 		F02C8B8FC0791BE4586D323C /* AccessibilityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityService.swift; sourceTree = "<group>"; };
 		F2B8FACC1596E748A3B8955B /* FormFieldToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormFieldToolbar.swift; sourceTree = "<group>"; };
 		F4C58CEC604F626E69F05535 /* FilterRule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterRule.swift; sourceTree = "<group>"; };
@@ -698,16 +690,6 @@
 			path = Views;
 			sourceTree = "<group>";
 		};
-		4AD04F110B8F17EE615F1B8B /* Dictation */ = {
-			isa = PBXGroup;
-			children = (
-				EFC12EB1294780E3CDD8C37E /* DictationProvider.swift */,
-				5C9DBF0FE781AD1C7D6BD20E /* DictationService.swift */,
-				6AB5E8C280302CA8165B9CD5 /* ElevenLabsDictationProvider.swift */,
-			);
-			path = Dictation;
-			sourceTree = "<group>";
-		};
 		4C31D42C6F27A5F6CC61D210 /* OakReader */ = {
 			isa = PBXGroup;
 			children = (
@@ -760,7 +742,6 @@
 			isa = PBXGroup;
 			children = (
 				67F1728C98D705DA07BF53F6 /* AI */,
-				4AD04F110B8F17EE615F1B8B /* Dictation */,
 				F02C8B8FC0791BE4586D323C /* AccessibilityService.swift */,
 				936AA0D7A9E66908D29318BA /* AnnotationStore.swift */,
 				3365106A06C3516BB125705C /* BatchProcessingService.swift */,
@@ -993,7 +974,6 @@
 				6540F0E88807D8C1B673F4C3 /* ChatBubbleView.swift */,
 				203FB2B8AAC61EDD2FD22B9A /* ChatHistoryDrawer.swift */,
 				79CDDA518E696E683F924E68 /* ChatInputTextView.swift */,
-				712AEBFEA97A0C36BE3AB024 /* DictationOverlayView.swift */,
 				B9C644594425945C7B78ACFD /* FannedAttachmentStack.swift */,
 				A7081777BA67ED922BD4F2B0 /* ItemSidebarPanel.swift */,
 				DB9CF7C482836F666885A51A /* MarkdownHighlighter.swift */,
@@ -1324,9 +1304,6 @@
 				E34316C8E51F20146DE42438 /* CrossRefService.swift in Sources */,
 				4D10ED40C7D686DF9A214BA6 /* DOIExtractorService.swift in Sources */,
 				292A1C4192568BEACFE65E88 /* DatabaseRecords.swift in Sources */,
-				169247B966279CAEC982237D /* DictationOverlayView.swift in Sources */,
-				55D7835D1213ACAD7877D811 /* DictationProvider.swift in Sources */,
-				8C6BDAD28CA25DDCBC286FDA /* DictationService.swift in Sources */,
 				E2AA701876538B2AFC80A494 /* DifferenceOverlayView.swift in Sources */,
 				D116E9A9B10E4559868E4E49 /* DigitalSignatureService.swift in Sources */,
 				77DADB7F1FB366E675048377 /* DigitalSignatureSheet.swift in Sources */,
@@ -1337,7 +1314,6 @@
 				7AC812D52B938CA16B55F7C4 /* DragDropCoordinator.swift in Sources */,
 				926F2E2181E20990E83C4098 /* DropZoneView.swift in Sources */,
 				3424178F2DF8ADAC0260162F /* EditViewModel.swift in Sources */,
-				A0ECEA5D54987B285E86EC6E /* ElevenLabsDictationProvider.swift in Sources */,
 				EC42417B1ED4691CCDC2EE6C /* EmbedCardView.swift in Sources */,
 				73F33DF74FFF620D5410EDF9 /* ErrorTypes.swift in Sources */,
 				43693926CE4F9E9AD7C05497 /* ExportSheet.swift in Sources */,

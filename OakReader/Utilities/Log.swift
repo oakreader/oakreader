@@ -17,7 +17,6 @@ enum Log {
     static let ui        = Logger(subsystem: subsystem, category: "ui")
     static let chapters  = Logger(subsystem: subsystem, category: "chapters")
     static let zotero     = Logger(subsystem: subsystem, category: "zotero")
-    static let dictation  = Logger(subsystem: subsystem, category: "dictation")
     static let voice      = Logger(subsystem: subsystem, category: "voice")
     static let characters = Logger(subsystem: subsystem, category: "characters")
     static let stt        = Logger(subsystem: subsystem, category: "stt")
@@ -83,7 +82,6 @@ private extension Logger {
         case Log.ui:        return "ui"
         case Log.chapters:  return "chapters"
         case Log.zotero:     return "zotero"
-        case Log.dictation:  return "dictation"
         case Log.voice:      return "voice"
         case Log.characters: return "characters"
         case Log.stt:        return "stt"
