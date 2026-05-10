@@ -90,7 +90,6 @@ enum OakStyle {
 
     enum Size {
         static let buttonStandard: CGFloat = 28
-        static let toolbarHeight: CGFloat = 40
         static let tabHeight: CGFloat = 40
         static let tabBarHeight: CGFloat = 40
         static let closeButton: CGFloat = 18
