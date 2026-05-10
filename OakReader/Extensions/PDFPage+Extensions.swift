@@ -85,10 +85,14 @@ extension PDFPage {
             return thumbnail(of: displaySize, for: .mediaBox)
         }
 
+        // Force light appearance so thumbnails always render with original page colors
+        let savedAppearance = NSAppearance.current
+        NSAppearance.current = NSAppearance(named: .aqua)
         context.setFillColor(NSColor.white.cgColor)
         context.fill(CGRect(x: 0, y: 0, width: pixelWidth, height: pixelHeight))
         context.scaleBy(x: fitScale * pixelScale, y: fitScale * pixelScale)
         draw(with: .mediaBox, to: context)
+        NSAppearance.current = savedAppearance
 
         guard let cgImage = context.makeImage() else {
             return thumbnail(of: displaySize, for: .mediaBox)
