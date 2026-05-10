@@ -9,7 +9,7 @@
 /* Begin PBXBuildFile section */
 		7EF29E96D9334369A132B1D8 /* ConfiguredProviderStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB2511470B7B4DB4BF0B7B1C /* ConfiguredProviderStore.swift */; };
 		D097FF2E15564C5488FCE435 /* AIProvidersSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 335C720830184E51AFF7C9B1 /* AIProvidersSettingsView.swift */; };
-		5BA641AA762B412F8CDB979C /* AddProviderSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AF4A514D8214C9A8D2C33D0 /* AddProviderSheet.swift */; };
+		5BA641AA762B412F8CDB979C /* AIProviderConfigView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AF4A514D8214C9A8D2C33D0 /* AIProviderConfigView.swift */; };
 		32E8C90321554791ADF37D0C /* LocalModelsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3C36F25ECD433EB8419118 /* LocalModelsSettingsView.swift */; };
 		0507672C7B314509885A5B5E /* AudioSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18EE916B542E452FA37AB8FE /* AudioSettingsView.swift */; };
 		631B870F9B8A48C58F433306 /* CharacterSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90227E13874544EC8AD4A769 /* CharacterSettingsView.swift */; };
@@ -273,7 +273,7 @@
 /* Begin PBXFileReference section */
 		FB2511470B7B4DB4BF0B7B1C /* ConfiguredProviderStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfiguredProviderStore.swift; sourceTree = "<group>"; };
 		335C720830184E51AFF7C9B1 /* AIProvidersSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIProvidersSettingsView.swift; sourceTree = "<group>"; };
-		3AF4A514D8214C9A8D2C33D0 /* AddProviderSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddProviderSheet.swift; sourceTree = "<group>"; };
+		3AF4A514D8214C9A8D2C33D0 /* AIProviderConfigView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIProviderConfigView.swift; sourceTree = "<group>"; };
 		BC3C36F25ECD433EB8419118 /* LocalModelsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalModelsSettingsView.swift; sourceTree = "<group>"; };
 		18EE916B542E452FA37AB8FE /* AudioSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSettingsView.swift; sourceTree = "<group>"; };
 		90227E13874544EC8AD4A769 /* CharacterSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CharacterSettingsView.swift; sourceTree = "<group>"; };
@@ -869,7 +869,7 @@
 			children = (
 				C5078B5988D5C8EEA78A023A /* GeneralSettingsView.swift */,
 				335C720830184E51AFF7C9B1 /* AIProvidersSettingsView.swift */,
-				3AF4A514D8214C9A8D2C33D0 /* AddProviderSheet.swift */,
+				3AF4A514D8214C9A8D2C33D0 /* AIProviderConfigView.swift */,
 				BC3C36F25ECD433EB8419118 /* LocalModelsSettingsView.swift */,
 				18EE916B542E452FA37AB8FE /* AudioSettingsView.swift */,
 				90227E13874544EC8AD4A769 /* CharacterSettingsView.swift */,
@@ -1274,7 +1274,7 @@
 				7F60BAD7F556331F47CFB0DA /* ChapterGenerationService.swift in Sources */,
 				7EF29E96D9334369A132B1D8 /* ConfiguredProviderStore.swift in Sources */,
 				D097FF2E15564C5488FCE435 /* AIProvidersSettingsView.swift in Sources */,
-				5BA641AA762B412F8CDB979C /* AddProviderSheet.swift in Sources */,
+				5BA641AA762B412F8CDB979C /* AIProviderConfigView.swift in Sources */,
 				32E8C90321554791ADF37D0C /* LocalModelsSettingsView.swift in Sources */,
 				0507672C7B314509885A5B5E /* AudioSettingsView.swift in Sources */,
 				631B870F9B8A48C58F433306 /* CharacterSettingsView.swift in Sources */,

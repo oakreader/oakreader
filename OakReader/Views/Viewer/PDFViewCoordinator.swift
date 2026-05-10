@@ -266,19 +266,19 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
         let menu = NSMenu()
 
         // Zoom section
-        menu.addItem(makeItem("Zoom In", action: #selector(menuZoomIn), key: ""))
-        menu.addItem(makeItem("Zoom Out", action: #selector(menuZoomOut), key: ""))
-        menu.addItem(makeItem("Zoom to Fit", action: #selector(menuZoomToFit), key: ""))
-        menu.addItem(makeItem("Actual Size", action: #selector(menuActualSize), key: ""))
+        menu.addItem(makeItem("Zoom In", action: #selector(menuZoomIn), key: "", icon: "plus.magnifyingglass"))
+        menu.addItem(makeItem("Zoom Out", action: #selector(menuZoomOut), key: "", icon: "minus.magnifyingglass"))
+        menu.addItem(makeItem("Zoom to Fit", action: #selector(menuZoomToFit), key: "", icon: "arrow.up.left.and.arrow.down.right.magnifyingglass"))
+        menu.addItem(makeItem("Actual Size", action: #selector(menuActualSize), key: "", icon: "1.magnifyingglass"))
 
         menu.addItem(.separator())
 
         // Page navigation
-        menu.addItem(makeItem("Go to Page\u{2026}", action: #selector(menuGoToPage), key: ""))
-        let prevItem = makeItem("Previous Page", action: #selector(menuPreviousPage), key: "")
+        menu.addItem(makeItem("Go to Page\u{2026}", action: #selector(menuGoToPage), key: "", icon: "doc.text.magnifyingglass"))
+        let prevItem = makeItem("Previous Page", action: #selector(menuPreviousPage), key: "", icon: "chevron.left")
         if viewModel.state.currentPageIndex <= 0 { prevItem.isEnabled = false }
         menu.addItem(prevItem)
-        let nextItem = makeItem("Next Page", action: #selector(menuNextPage), key: "")
+        let nextItem = makeItem("Next Page", action: #selector(menuNextPage), key: "", icon: "chevron.right")
         if viewModel.state.currentPageIndex >= viewModel.pageCount - 1 { nextItem.isEnabled = false }
         menu.addItem(nextItem)
 
@@ -297,6 +297,7 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
 
         // Color submenu (for this annotation)
         let colorItem = NSMenuItem(title: "Color", action: nil, keyEquivalent: "")
+        colorItem.image = NSImage(systemSymbolName: "paintpalette", accessibilityDescription: nil)
         let colorMenu = NSMenu()
 
         let colors: [(String, NSColor)] = [
@@ -326,6 +327,7 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
         let deleteItem = NSMenuItem(title: "Delete", action: #selector(deleteAnnotationFromMenu(_:)), keyEquivalent: "")
         deleteItem.target = self
         deleteItem.representedObject = annotation
+        deleteItem.image = NSImage(systemSymbolName: "trash", accessibilityDescription: nil)
         menu.addItem(deleteItem)
 
         menu.addItem(.separator())
@@ -343,16 +345,17 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
         let isAnnotateMode = viewModel.state.editorMode == .annotate
         let currentTool = viewModel.annotation.currentTool
 
-        let highlightItem = makeItem("Highlight", action: #selector(menuToggleHighlight), key: "")
+        let highlightItem = makeItem("Highlight", action: #selector(menuToggleHighlight), key: "", icon: "highlighter")
         if isAnnotateMode && currentTool == .highlight { highlightItem.state = .on }
         menu.addItem(highlightItem)
 
-        let underlineItem = makeItem("Underline", action: #selector(menuToggleUnderline), key: "")
+        let underlineItem = makeItem("Underline", action: #selector(menuToggleUnderline), key: "", icon: "underline")
         if isAnnotateMode && currentTool == .underline { underlineItem.state = .on }
         menu.addItem(underlineItem)
 
         // Annotation Color submenu (tool stroke color)
         let toolColorItem = NSMenuItem(title: "Annotation Color", action: nil, keyEquivalent: "")
+        toolColorItem.image = NSImage(systemSymbolName: "paintpalette", accessibilityDescription: nil)
         let toolColorMenu = NSMenu()
         for entry in OakStyle.AnnotationColors.allColors {
             let item = NSMenuItem(title: entry.name, action: #selector(changeToolColor(_:)), keyEquivalent: "")
@@ -367,16 +370,19 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
 
         menu.addItem(.separator())
 
-        let areaItem = makeItem("Area Selection", action: #selector(menuToggleAreaSelection), key: "")
+        let areaItem = makeItem("Area Selection", action: #selector(menuToggleAreaSelection), key: "", icon: "rectangle.dashed")
         if viewModel.state.editorMode == .snapshot { areaItem.state = .on }
         menu.addItem(areaItem)
     }
 
     // MARK: - Menu Helpers
 
-    private func makeItem(_ title: String, action: Selector, key: String) -> NSMenuItem {
+    private func makeItem(_ title: String, action: Selector, key: String, icon: String? = nil) -> NSMenuItem {
         let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
         item.target = self
+        if let icon {
+            item.image = NSImage(systemSymbolName: icon, accessibilityDescription: nil)
+        }
         return item
     }
 
