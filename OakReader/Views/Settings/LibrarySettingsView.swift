@@ -5,7 +5,6 @@ struct LibrarySettingsView: View {
 
     private let systemCollections: [(id: UUID, name: String, icon: String)] = [
         (SystemCollectionID.allItems, "All Items", "books.vertical"),
-        (SystemCollectionID.recent, "Recently Added", "clock"),
         (SystemCollectionID.recentlyRead, "Recently Read", "book"),
         (SystemCollectionID.pdfs, "PDFs", "doc.fill"),
         (SystemCollectionID.webSnapshots, "Web", "globe"),
