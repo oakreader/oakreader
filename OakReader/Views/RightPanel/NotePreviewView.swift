@@ -135,9 +135,34 @@ struct NotePreviewView: NSViewRepresentable {
         var onReferenceClick: ((String) -> Void)?
         var lastContentHash: String = ""
         weak var webView: WKWebView?
+        private var scrollObserver: NSObjectProtocol?
 
         init(onReferenceClick: ((String) -> Void)?) {
             self.onReferenceClick = onReferenceClick
+            super.init()
+            scrollObserver = NotificationCenter.default.addObserver(
+                forName: .markdownScrollToLine,
+                object: nil,
+                queue: .main
+            ) { [weak self] notification in
+                guard let index = notification.object as? Int,
+                      let webView = self?.webView else { return }
+                let js = """
+                (function() {
+                    var headings = document.querySelectorAll('h1,h2,h3,h4,h5,h6');
+                    if (headings.length > \(index)) {
+                        headings[\(index)].scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                })();
+                """
+                webView.evaluateJavaScript(js, completionHandler: nil)
+            }
+        }
+
+        deinit {
+            if let observer = scrollObserver {
+                NotificationCenter.default.removeObserver(observer)
+            }
         }
 
         // MARK: - WKScriptMessageHandler
