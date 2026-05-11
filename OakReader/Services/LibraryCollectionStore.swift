@@ -10,6 +10,10 @@ extension LibraryStore {
         return (try? fetchAllCollections()) ?? []
     }
 
+    func findCollection(bySource source: String, sourceKey: String) -> PDFCollection? {
+        collections.first { $0.source == source && $0.sourceKey == sourceKey }
+    }
+
     /// System smart collections (All Items, Recently Added, etc.).
     var systemSmartCollections: [PDFCollection] {
         collections.filter { $0.isSystem && $0.isSmart }
@@ -59,7 +63,7 @@ extension LibraryStore {
     }
 
     @discardableResult
-    func createCollection(name: String, icon: String = "folder.fill") -> PDFCollection {
+    func createCollection(name: String, icon: String = "folder.fill", source: String? = nil, sourceKey: String? = nil) -> PDFCollection {
         let now = Date().iso8601String
         let record = CollectionRecord(
             id: UUID().uuidString,
@@ -72,7 +76,9 @@ extension LibraryStore {
             isSystem: false,
             filterRules: nil,
             createdAt: now,
-            updatedAt: now
+            updatedAt: now,
+            source: source,
+            sourceKey: sourceKey
         )
         do {
             try database.dbQueue.write { db in
@@ -132,7 +138,7 @@ extension LibraryStore {
     }
 
     @discardableResult
-    func createSubcollection(name: String, icon: String = "folder.fill", parent: PDFCollection) -> PDFCollection {
+    func createSubcollection(name: String, icon: String = "folder.fill", parent: PDFCollection, source: String? = nil, sourceKey: String? = nil) -> PDFCollection {
         let now = Date().iso8601String
         let record = CollectionRecord(
             id: UUID().uuidString,
@@ -145,7 +151,9 @@ extension LibraryStore {
             isSystem: false,
             filterRules: nil,
             createdAt: now,
-            updatedAt: now
+            updatedAt: now,
+            source: source,
+            sourceKey: sourceKey
         )
         do {
             try database.dbQueue.write { db in

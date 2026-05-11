@@ -29,7 +29,7 @@ struct LibraryTableView: View {
         Table(of: LibraryItem.self, selection: $selection) {
             TableColumn("Title") { item in
                 HStack(spacing: 7) {
-                    Image(systemName: item.primaryAttachment?.icon ?? "doc")
+                    Image(systemName: item.displayIcon)
                         .foregroundStyle(Color.primary.opacity(0.4))
                         .font(.system(size: 14))
                         .accessibilityLabel(item.primaryAttachment?.attachmentType.label ?? "Document")

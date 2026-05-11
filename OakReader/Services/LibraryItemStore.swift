@@ -137,6 +137,12 @@ extension LibraryStore {
         items.first { $0.storageKey == key }
     }
 
+    func findItem(bySource source: String, sourceKey: String) -> LibraryItem? {
+        items.first { item in
+            item.source == source && item.sourceKey == sourceKey
+        }
+    }
+
     func findItem(byFileName fileName: String) -> LibraryItem? {
         items.first { item in
             item.attachments.contains { $0.fileName == fileName }
