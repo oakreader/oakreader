@@ -33,6 +33,10 @@ struct RootView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .ignoresSafeArea(.container, edges: .top)
+        .onChange(of: appState.activeTabID) { _, _ in
+            // Reset cursor when switching tabs to prevent leaks from PDF/Web viewer cursor rects
+            NSCursor.arrow.set()
+        }
         .sheet(isPresented: Binding(
             get: { appState.showSettings },
             set: { appState.showSettings = $0 }

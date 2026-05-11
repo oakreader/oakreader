@@ -28,6 +28,7 @@ struct ContentView: View {
                         sidebarContentView
                             .frame(width: effectiveSidebarWidth)
                             .background(Color(nsColor: .controlBackgroundColor))
+                            .onHover { inside in if inside { NSCursor.arrow.set() } }
 
                         panelDivider { delta in
                             let range = sidebarWidthRange
@@ -68,6 +69,7 @@ struct ContentView: View {
                         RightPanelContentView(viewModel: viewModel)
                             .frame(width: min(rightPanelWidth, maxRightPanel))
                             .background(Color(nsColor: .controlBackgroundColor))
+                            .onHover { inside in if inside { NSCursor.arrow.set() } }
                     }
                 }
                 .clipShape(
