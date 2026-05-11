@@ -12,6 +12,17 @@ interface PopupData {
   error: string | null;
 }
 
+/** Race a promise against AbortSignal.timeout. */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  const signal = AbortSignal.timeout(ms);
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => {
+      signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+    }),
+  ]);
+}
+
 export function usePopupData(): PopupData {
   const [pageMeta, setPageMeta] = useState<PageMeta | null>(null);
   const [tabId, setTabId] = useState<number | null>(null);
@@ -21,6 +32,8 @@ export function usePopupData(): PopupData {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const serverSignal = AbortSignal.timeout(5000);
+
     async function load() {
       try {
         const [tab] = await chrome.tabs.query({
@@ -37,16 +50,22 @@ export function usePopupData(): PopupData {
         setTabId(tab.id);
 
         // Check if this tab is a PDF (detected via webRequest in background)
-        const pdfCheck = await chrome.runtime.sendMessage({
-          method: "isPDFTab",
-          tabId: tab.id,
-        });
+        // Timeout: background may not respond if extension context was invalidated
+        let pdfCheck: { isPDF: boolean; url?: string } | undefined;
+        try {
+          pdfCheck = await withTimeout(
+            chrome.runtime.sendMessage({ method: "isPDFTab", tabId: tab.id }),
+            2000
+          );
+        } catch {
+          pdfCheck = { isPDF: false };
+        }
 
         // Fetch collections/tags in parallel with page meta
         const pageMetaPromise = pdfCheck?.isPDF
           ? Promise.resolve({
               type: "pdf" as const,
-              url: pdfCheck.url,
+              url: pdfCheck.url!,
               title: tab.title?.replace(/\.pdf$/i, "") || null,
               favicon: null,
             })
@@ -57,10 +76,11 @@ export function usePopupData(): PopupData {
               ),
             ]);
 
+        // Pass AbortSignal directly to fetch — cancels the request on timeout
         const [collectionsResult, tagsResult, metaResult] =
           await Promise.allSettled([
-            fetchCollections(),
-            fetchTags(),
+            fetchCollections(serverSignal),
+            fetchTags(serverSignal),
             pageMetaPromise,
           ]);
 

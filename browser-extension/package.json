@@ -4,9 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "wxt",
-    "build": "wxt build",
-    "zip": "wxt zip",
+    "build:singlefile": "rollup -c rollup.singlefile.config.js",
+    "dev": "pnpm run build:singlefile && wxt",
+    "build": "pnpm run build:singlefile && wxt build",
+    "zip": "pnpm run build:singlefile && wxt zip",
     "prepare": "wxt prepare"
   },
   "dependencies": {
@@ -17,13 +18,17 @@
     "lucide-react": "^1.14.0",
     "react": "^19",
     "react-dom": "^19",
+    "single-file-core": "^1.5.84",
     "tailwind-merge": "^3.5.0"
   },
   "devDependencies": {
+    "@rollup/plugin-node-resolve": "^16.0.0",
+    "@rollup/plugin-terser": "^0.4.0",
     "@tailwindcss/vite": "^4.2.4",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@wxt-dev/module-react": "^1.2.2",
+    "rollup": "^4.0.0",
     "tailwindcss": "^4.2.4",
     "typescript": "^5.7.0",
     "wxt": "^0.20.0"

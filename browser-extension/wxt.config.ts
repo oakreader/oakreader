@@ -23,5 +23,16 @@ export default defineConfig({
       "48": "icon-48.png",
       "128": "icon-128.png",
     },
+    web_accessible_resources: [
+      {
+        resources: [
+          "lib/single-file.js",
+          "lib/single-file-frames.js",
+          "lib/single-file-bootstrap.js",
+          "lib/single-file-hooks-frames.js",
+        ],
+        matches: ["<all_urls>"],
+      },
+    ],
   },
 });

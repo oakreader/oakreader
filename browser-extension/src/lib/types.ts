@@ -34,6 +34,18 @@ export interface PDFSavePayload {
   tagOptionIds?: string[];
 }
 
+/** Payload for saving an HTML snapshot (SingleFile capture). */
+export interface HTMLSnapshotPayload {
+  type: "html";
+  url: string;
+  title: string | null;
+  html: string;
+  markdown?: string | null;
+  collectionId?: string;
+  tagOptionIds?: string[];
+  newTags?: string[];
+}
+
 /** @deprecated Use PageCapture for full data or PageMeta for lightweight detection. */
 export type PageData = PageCapture;
 

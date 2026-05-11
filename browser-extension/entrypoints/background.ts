@@ -28,7 +28,7 @@ export default defineBackground(() => {
 
   // ─── Message Handlers ─────────────────────────────────────────────────────────
 
-  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.method === "isPDFTab") {
       const info = pdfTabs.get(message.tabId);
       sendResponse(info ? { isPDF: true, url: info.url } : { isPDF: false });
@@ -51,7 +51,165 @@ export default defineBackground(() => {
         );
       return true;
     }
+
+    if (message.method === "captureAndSaveHTML") {
+      captureAndSaveHTML(message.tabId, message.payload)
+        .then(sendResponse)
+        .catch((error) =>
+          sendResponse({ status: "error", message: error instanceof Error ? error.message : String(error) })
+        );
+      return true;
+    }
+
+    // ─── SingleFile fetch proxy ─────────────────────────────────────────────────
+    // Content script proxies cross-origin resource fetches through the background
+    // service worker, which has broader network access via host_permissions.
+
+    if (message.method === "singlefile.fetch") {
+      handleSingleFileFetch(message, sender.tab?.id)
+        .then(sendResponse)
+        .catch((error) =>
+          sendResponse({ error: error instanceof Error ? error.message : String(error) })
+        );
+      return true;
+    }
+
+    // Progress events from content script → popup receives directly via onMessage
+    if (message.method === "singlefile.progress") {
+      return false;
+    }
   });
+
+  // ─── SingleFile Fetch Proxy ───────────────────────────────────────────────────
+
+  async function handleSingleFileFetch(
+    message: { url: string; referrer?: string; headers?: Record<string, string> },
+    _tabId?: number
+  ) {
+    const response = await fetch(message.url, {
+      headers: message.headers,
+      referrer: message.referrer,
+    });
+    const arrayBuffer = await response.arrayBuffer();
+    const headers: Record<string, string> = {};
+    response.headers.forEach((value, key) => {
+      headers[key] = value;
+    });
+    return {
+      status: response.status,
+      headers,
+      array: Array.from(new Uint8Array(arrayBuffer)),
+    };
+  }
+
+  // ─── SingleFile Script Injection ──────────────────────────────────────────────
+
+  async function injectSingleFileScripts(tabId: number): Promise<void> {
+    // 1. Hooks → all frames, MAIN world (intercepts lazy-load: IntersectionObserver, etc.)
+    //    Must run BEFORE page resources are loaded, so inject first.
+    await chrome.scripting.executeScript({
+      target: { tabId, allFrames: true },
+      files: ["lib/single-file-hooks-frames.js"],
+      ...({ world: "MAIN" } as any),
+    });
+    // 2. Main engine → main frame, ISOLATED world
+    //    This is the only script needed for getPageData(). It's self-contained (834KB).
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ["lib/single-file.js"],
+    });
+  }
+
+  function getSingleFileOptions() {
+    return {
+      removeHiddenElements: true,
+      removeUnusedStyles: true,
+      removeUnusedFonts: true,
+      removeFrames: true,
+      compressHTML: true,
+      loadDeferredImages: false,
+      filenameTemplate: "{page-title}",
+      infobarContent: "",
+      includeInfobar: false,
+      insertMetaCSP: true,
+      blockScripts: true,
+      blockVideos: false,
+      blockAudios: false,
+    };
+  }
+
+  // ─── HTML Snapshot via SingleFile → POST to server ────────────────────────────
+
+  async function captureAndSaveHTML(
+    tabId: number,
+    payload: {
+      url: string;
+      title: string | null;
+      collectionId?: string;
+      tagOptionIds?: string[];
+      newTags?: string[];
+    }
+  ): Promise<{ status: string; message?: string }> {
+    // 0. Extract markdown (best-effort)
+    let markdown: string | null = null;
+    try {
+      const resp = await chrome.tabs.sendMessage(tabId, { action: "extractMarkdown" });
+      if (resp?.markdown) markdown = resp.markdown;
+    } catch {
+      // Markdown extraction is best-effort
+    }
+
+    // 1. Inject SingleFile scripts into the page
+    try {
+      await injectSingleFileScripts(tabId);
+    } catch (err) {
+      return {
+        status: "error",
+        message: `Script injection failed: ${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
+
+    // 2. Request HTML capture from content script
+    let html: string;
+    try {
+      const result = await chrome.tabs.sendMessage(tabId, {
+        action: "captureHTML",
+        options: getSingleFileOptions(),
+      });
+      if (result === undefined) {
+        return { status: "error", message: "Content script did not respond. Please refresh the page and try again." };
+      }
+      if (!result?.html) {
+        return { status: "error", message: result?.error || "HTML capture returned empty content" };
+      }
+      html = result.html;
+    } catch (err) {
+      return {
+        status: "error",
+        message: `HTML capture failed: ${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
+
+    // 3. POST to OakReader server
+    const body: Record<string, unknown> = {
+      type: "html",
+      url: payload.url,
+      title: payload.title,
+      html,
+      markdown,
+    };
+    if (payload.collectionId) body.collectionId = payload.collectionId;
+    if (payload.tagOptionIds && payload.tagOptionIds.length > 0) body.tagOptionIds = payload.tagOptionIds;
+    if (payload.newTags && payload.newTags.length > 0) body.newTags = payload.newTags;
+
+    const response = await fetch(SNAPSHOT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    return response.json();
+  }
 
   // ─── Full-Page PDF via Debugger (Page.printToPDF) → POST to server ─────────────
 

@@ -5,13 +5,13 @@ const SNAPSHOT_URL = `${SERVER_BASE}/snapshot`;
 const COLLECTIONS_URL = `${SERVER_BASE}/collections`;
 const TAGS_URL = `${SERVER_BASE}/tags`;
 
-export async function fetchCollections(): Promise<CollectionInfo[]> {
-  const response = await fetch(COLLECTIONS_URL);
+export async function fetchCollections(signal?: AbortSignal): Promise<CollectionInfo[]> {
+  const response = await fetch(COLLECTIONS_URL, { signal });
   return response.json();
 }
 
-export async function fetchTags(): Promise<TagNodeInfo[]> {
-  const response = await fetch(TAGS_URL);
+export async function fetchTags(signal?: AbortSignal): Promise<TagNodeInfo[]> {
+  const response = await fetch(TAGS_URL, { signal });
   return response.json();
 }
 
