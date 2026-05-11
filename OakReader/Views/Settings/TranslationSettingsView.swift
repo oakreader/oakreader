@@ -119,7 +119,7 @@ struct TranslationSettingsView: View {
                         .foregroundStyle(.secondary)
                     Picker("Source", selection: $sourceLang) {
                         ForEach(TranslationLanguage.allCases) { lang in
-                            Text(lang.displayName).tag(lang)
+                            Text(lang.nativeName).tag(lang)
                         }
                     }
                     .labelsHidden()
@@ -132,7 +132,7 @@ struct TranslationSettingsView: View {
                         .foregroundStyle(.secondary)
                     Picker("Target", selection: $targetLang) {
                         ForEach(TranslationLanguage.targetCases) { lang in
-                            Text(lang.displayName).tag(lang)
+                            Text(lang.nativeName).tag(lang)
                         }
                     }
                     .labelsHidden()
