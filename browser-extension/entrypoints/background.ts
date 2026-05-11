@@ -6,7 +6,7 @@ export default defineBackground(() => {
   const pdfTabs = new Map<number, { url: string }>();
 
   chrome.webRequest.onHeadersReceived.addListener(
-    (details) => {
+    (details): chrome.webRequest.BlockingResponse | undefined => {
       if (details.type !== "main_frame") return;
       const ct = details.responseHeaders?.find(
         (h) => h.name.toLowerCase() === "content-type"
@@ -275,14 +275,6 @@ export default defineBackground(() => {
       // Wait for layout to settle after viewport change
       await new Promise((r) => setTimeout(r, 500));
 
-      // Measure full page height so we can render it as one long PDF page
-      const heightResult = (await chrome.debugger.sendCommand(
-        target,
-        "Runtime.evaluate",
-        { expression: "document.documentElement.scrollHeight", returnByValue: true }
-      )) as { result: { value: number } };
-      const pageHeightInches = heightResult.result.value / 96;
-
       const printResult = (await chrome.debugger.sendCommand(
         target,
         "Page.printToPDF",
@@ -290,7 +282,7 @@ export default defineBackground(() => {
           printBackground: true,
           displayHeaderFooter: false,
           paperWidth: A4_WIDTH,
-          paperHeight: pageHeightInches,
+          paperHeight: A4_HEIGHT,
           marginTop: 0,
           marginRight: 0,
           marginBottom: 0,
