@@ -227,7 +227,7 @@ private extension LibrarySidebarView {
     var collectionsScrollView: some View {
         ScrollView {
             VStack(spacing: 1) {
-                ForEach(store.rootCollections.sorted(by: { $0.sortOrder < $1.sortOrder })) { collection in
+                ForEach(store.rootCollections.sorted(by: { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending })) { collection in
                     CollectionRowView(
                         collection: collection,
                         depth: 0,
@@ -392,7 +392,7 @@ private struct CollectionRowView: View {
 
             // Subcollections (recursive)
             if hasChildren && isExpanded {
-                ForEach(collection.subcollections.sorted(by: { $0.sortOrder < $1.sortOrder })) { child in
+                ForEach(collection.subcollections.sorted(by: { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending })) { child in
                     CollectionRowView(
                         collection: child,
                         depth: depth + 1,

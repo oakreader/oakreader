@@ -27,7 +27,7 @@ struct TagNode: Identifiable {
             insertInto(nodes: &root, segments: segments, index: 0, option: option, count: count)
         }
 
-        sortByCount(&root)
+        sortAlphabetically(&root)
         return root
     }
 
@@ -76,28 +76,12 @@ struct TagNode: Identifiable {
         }
     }
 
-    private static func sortByCount(_ nodes: inout [TagNode]) {
+    private static func sortAlphabetically(_ nodes: inout [TagNode]) {
         nodes.sort { lhs, rhs in
-            let lhsCount = lhs.totalCount()
-            let rhsCount = rhs.totalCount()
-            if lhsCount != rhsCount {
-                return lhsCount > rhsCount
-            }
-
-            let lhsPosition = lhs.sortPosition()
-            let rhsPosition = rhs.sortPosition()
-            if lhsPosition != rhsPosition {
-                return lhsPosition < rhsPosition
-            }
-
-            return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+            lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
         }
         for i in nodes.indices {
-            sortByCount(&nodes[i].children)
+            sortAlphabetically(&nodes[i].children)
         }
-    }
-
-    private func sortPosition() -> Int {
-        option?.position ?? children.map { $0.sortPosition() }.min() ?? Int.max
     }
 }
