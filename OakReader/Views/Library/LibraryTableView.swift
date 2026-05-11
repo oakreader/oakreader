@@ -73,6 +73,9 @@ struct LibraryTableView: View {
             handleDrop(providers)
             return true
         }
+        .onHover { inside in
+            if inside { NSCursor.arrow.set() }
+        }
     }
 
     // MARK: - Context Menu

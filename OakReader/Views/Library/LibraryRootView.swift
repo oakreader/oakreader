@@ -107,6 +107,7 @@ struct LibraryRootView: View {
             // Side navigation strip — always visible, outside HSplitView
             LibrarySideNavView(tab: $appState.libraryDetailTab)
         }
+        .onHover { inside in if inside { NSCursor.arrow.set() } }
     }
 
     @ViewBuilder
