@@ -308,6 +308,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         alert.alertStyle = .informational
         alert.addButton(withTitle: "Import")
         alert.addButton(withTitle: "Cancel")
+        let spacer = NSView(frame: NSRect(x: 0, y: 0, width: 400, height: 0))
+        alert.accessoryView = spacer
 
         let response = alert.runModal()
         guard response == .alertFirstButtonReturn else { return }

@@ -30,7 +30,7 @@ struct ZoteroImportProgressView: View {
             }
         }
         .padding(32)
-        .frame(width: 420)
+        .frame(width: 500)
         .task {
             guard !isRunning else { return }
             isRunning = true
@@ -95,9 +95,13 @@ struct ZoteroImportProgressView: View {
             VStack(spacing: 6) {
                 statRow("Items", count: result.itemCount)
                 statRow("PDFs copied", count: result.pdfCount)
+                statRow("Web snapshots", count: result.webSnapshotCount)
                 statRow("Collections", count: result.collectionCount)
                 statRow("Tags", count: result.tagCount)
                 statRow("Notes", count: result.noteCount)
+                if result.skippedDuplicates > 0 {
+                    statRow("Skipped (already imported)", count: result.skippedDuplicates)
+                }
                 if hasErrors {
                     statRow("Errors", count: result.errors.count, isError: true)
                 }
@@ -137,11 +141,11 @@ struct ZoteroImportProgressView: View {
     private func statRow(_ label: String, count: Int, isError: Bool = false) -> some View {
         HStack {
             Text(label)
-                .font(.subheadline)
+                .font(.body)
                 .foregroundStyle(.secondary)
             Spacer()
             Text("\(count)")
-                .font(.subheadline)
+                .font(.body)
                 .fontWeight(.medium)
                 .foregroundStyle(isError ? .red : .primary)
                 .monospacedDigit()

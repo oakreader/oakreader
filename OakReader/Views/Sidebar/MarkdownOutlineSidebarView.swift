@@ -241,7 +241,7 @@ struct MarkdownOutlineSidebarView: View {
             viewModel.appState?.openLibraryItem(item)
         } label: {
             HStack(spacing: 7) {
-                Image(systemName: item.itemType.icon)
+                Image(systemName: item.displayIcon)
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .frame(width: 16)

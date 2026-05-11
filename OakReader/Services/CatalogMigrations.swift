@@ -633,6 +633,26 @@ extension CatalogDatabase {
             }
         }
 
+        migrator.registerMigration("v9-import-source") { db in
+            try db.alter(table: "items") { t in
+                t.add(column: "source", .text)
+                t.add(column: "source_key", .text)
+            }
+            try db.execute(sql: """
+                CREATE UNIQUE INDEX idx_items_source ON items(source, source_key)
+                WHERE source IS NOT NULL AND source_key IS NOT NULL
+            """)
+
+            try db.alter(table: "collections") { t in
+                t.add(column: "source", .text)
+                t.add(column: "source_key", .text)
+            }
+            try db.execute(sql: """
+                CREATE UNIQUE INDEX idx_collections_source ON collections(source, source_key)
+                WHERE source IS NOT NULL AND source_key IS NOT NULL
+            """)
+        }
+
         return migrator
     }
 

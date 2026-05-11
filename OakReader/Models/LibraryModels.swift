@@ -87,6 +87,8 @@ struct LibraryItem: Identifiable, Hashable {
     var syncStatus: SyncStatus
     var citeKey: String?
     var lastPosition: Double?
+    var source: String?
+    var sourceKey: String?
 
     // Attachments (files belonging to this item)
     var attachments: [Attachment]
@@ -104,6 +106,12 @@ struct LibraryItem: Identifiable, Hashable {
     }
 
     var itemType: ItemType { primaryAttachment?.attachmentType ?? .pdf }
+
+    /// Icon based on reference metadata CSL type when available, falling back to attachment type icon.
+    var displayIcon: String {
+        referenceMetadata?.displayType?.icon ?? itemType.icon
+    }
+
     var fileName: String { primaryAttachment?.fileName ?? "" }
     var fileSize: Int64 { primaryAttachment?.fileSize ?? 0 }
     var pageCount: Int { primaryAttachment?.pageCount ?? 0 }
@@ -140,6 +148,8 @@ struct LibraryItem: Identifiable, Hashable {
         self.syncStatus = SyncStatus(rawValue: record.syncStatus) ?? .local
         self.citeKey = record.citeKey
         self.lastPosition = record.lastPosition
+        self.source = record.source
+        self.sourceKey = record.sourceKey
         self.attachments = attachments
         self.propertyValues = propertyValues
         self.collections = collections
@@ -158,6 +168,8 @@ struct PDFCollection: Identifiable, Hashable {
     var isSmart: Bool
     var isSystem: Bool
     var filterRules: FilterRuleSet?
+    var source: String?
+    var sourceKey: String?
 
     // Populated by the store
     var subcollections: [PDFCollection]
@@ -188,6 +200,8 @@ struct PDFCollection: Identifiable, Hashable {
         self.parentId = record.parentId.flatMap { UUID(uuidString: $0) }
         self.isSmart = record.isSmart
         self.isSystem = record.isSystem
+        self.source = record.source
+        self.sourceKey = record.sourceKey
         if let json = record.filterRules, let data = json.data(using: .utf8) {
             self.filterRules = try? JSONDecoder().decode(FilterRuleSet.self, from: data)
         } else {

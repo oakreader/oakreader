@@ -8,7 +8,7 @@ enum ZoteroMigrationPhase: String {
     case reading = "Reading Zotero database..."
     case collections = "Creating collections..."
     case items = "Importing items..."
-    case attachments = "Copying PDFs..."
+    case attachments = "Copying files..."
     case tags = "Importing tags..."
     case notes = "Importing notes..."
     case collectionAssignments = "Assigning items to collections..."
@@ -25,6 +25,7 @@ struct ZoteroMigrationProgress {
 struct ZoteroMigrationResult {
     var itemCount: Int = 0
     var pdfCount: Int = 0
+    var webSnapshotCount: Int = 0
     var collectionCount: Int = 0
     var tagCount: Int = 0
     var noteCount: Int = 0
@@ -214,7 +215,7 @@ private class ZoteroSQLiteReader {
             SELECT ia.itemID, ia.parentItemID, i.key, ia.path, ia.contentType
             FROM itemAttachments ia
             JOIN items i ON ia.itemID = i.itemID
-            WHERE ia.contentType = 'application/pdf'
+            WHERE ia.contentType IN ('application/pdf', 'text/html', 'application/xhtml+xml')
               AND ia.parentItemID IS NOT NULL
               AND i.itemID NOT IN (SELECT itemID FROM deletedItems)
         """
@@ -332,7 +333,7 @@ final class ZoteroMigrationService {
         let zAttachments = reader.fetchAttachments()
         let zNotes = reader.fetchNotes()
 
-        Log.info(Log.zotero, "Read \(zItems.count) items, \(zCollections.count) collections, \(zTags.count) tags, \(zAttachments.count) PDF attachments, \(zNotes.count) notes")
+        Log.info(Log.zotero, "Read \(zItems.count) items, \(zCollections.count) collections, \(zTags.count) tags, \(zAttachments.count) attachments, \(zNotes.count) notes")
 
         // Build lookup maps
         let fieldsByItem = Dictionary(grouping: zFields, by: \.itemID)
@@ -359,11 +360,23 @@ final class ZoteroMigrationService {
             prog.currentItemTitle = zColl.name
             progress(prog)
 
+            // Reuse existing collection if already imported from Zotero
+            if let existing = store.findCollection(bySource: "zotero", sourceKey: zColl.key) {
+                collectionMap[zColl.collectionID] = existing
+                continue
+            }
+
             if let parentID = zColl.parentCollectionID, let parentColl = collectionMap[parentID] {
-                let oakColl = store.createSubcollection(name: zColl.name, icon: "folder.fill", parent: parentColl)
+                let oakColl = store.createSubcollection(
+                    name: zColl.name, icon: "folder.fill", parent: parentColl,
+                    source: "zotero", sourceKey: zColl.key
+                )
                 collectionMap[zColl.collectionID] = oakColl
             } else {
-                let oakColl = store.createCollection(name: zColl.name, icon: "folder.fill")
+                let oakColl = store.createCollection(
+                    name: zColl.name, icon: "folder.fill",
+                    source: "zotero", sourceKey: zColl.key
+                )
                 collectionMap[zColl.collectionID] = oakColl
             }
             result.collectionCount += 1
@@ -386,6 +399,16 @@ final class ZoteroMigrationService {
             let title = fields.first(where: { $0.fieldName == "title" })?.value ?? "Untitled"
             prog.currentItemTitle = title
             progress(prog)
+
+            // Skip items that were already imported from Zotero
+            if itemExistsForSource("zotero", key: zItem.key) {
+                result.skippedDuplicates += 1
+                if let existingItem = store.findItem(bySource: "zotero", sourceKey: zItem.key) {
+                    itemMap[zItem.itemID] = existingItem.id.uuidString
+                    libraryItemMap[zItem.itemID] = existingItem
+                }
+                continue
+            }
 
             // Build CSL item
             let cslType = ZoteroFieldMapping.itemTypeToCSL[zItem.typeName] ?? "document"
@@ -447,37 +470,50 @@ final class ZoteroMigrationService {
                 continue
             }
 
-            // Check for PDF attachment
-            let pdfs = attachmentsByParent[zItem.itemID] ?? []
-            let primaryPDF = pdfs.first
-            var pdfFileName = "document.pdf"
-            var pdfFileSize: Int64 = 0
-            var pdfPageCount = 0
-            var pdfCopied = false
+            // Find attachment — prefer PDF over HTML when multiple exist
+            let allAttachments = (attachmentsByParent[zItem.itemID] ?? [])
+                .sorted { a, _ in a.contentType == "application/pdf" ? true : false }
+            let primaryAtt = allAttachments.first
+            let attachmentType = oakItemType(for: primaryAtt?.contentType)
+            var attFileName = attachmentType == .pdf ? "document.pdf" : "index.html"
+            var attFileSize: Int64 = 0
+            var attPageCount = 0
+            var fileCopied = false
 
-            if let pdf = primaryPDF {
-                let pdfSourceURL = resolvePDFPath(pdf, dataDirectory: dataDirectory)
-                if let srcURL = pdfSourceURL, FileManager.default.fileExists(atPath: srcURL.path) {
-                    pdfFileName = srcURL.lastPathComponent
+            if let att = primaryAtt {
+                let sourceURL = resolveAttachmentPath(att, dataDirectory: dataDirectory)
+                if let srcURL = sourceURL, FileManager.default.fileExists(atPath: srcURL.path) {
+                    attFileName = srcURL.lastPathComponent
                     let destURL = CatalogDatabase.attachmentFileURL(
                         itemStorageKey: itemStorageKey,
                         attachmentStorageKey: attStorageKey,
-                        fileName: pdfFileName
+                        fileName: attFileName
                     )
                     do {
                         try FileManager.default.copyItem(at: srcURL, to: destURL)
-                        pdfCopied = true
+                        fileCopied = true
 
                         if let attrs = try? FileManager.default.attributesOfItem(atPath: destURL.path),
                            let size = attrs[.size] as? Int64 {
-                            pdfFileSize = size
+                            attFileSize = size
                         }
-                        if let pdfDoc = PDFDocument(url: destURL) {
-                            pdfPageCount = pdfDoc.pageCount
+
+                        if attachmentType == .pdf {
+                            if let pdfDoc = PDFDocument(url: destURL) {
+                                attPageCount = pdfDoc.pageCount
+                            }
+                        } else {
+                            attPageCount = 1
+                            // Copy sibling files (images, CSS, JS) for web snapshots
+                            copyDirectoryContents(
+                                from: srcURL.deletingLastPathComponent(),
+                                to: attDir,
+                                excluding: attFileName
+                            )
                         }
                     } catch {
-                        Log.error(Log.zotero, "Failed to copy PDF for '\(title)': \(error)")
-                        result.errors.append("PDF copy failed: \(title)")
+                        Log.error(Log.zotero, "Failed to copy attachment for '\(title)': \(error)")
+                        result.errors.append("File copy failed: \(title)")
                     }
                 }
             }
@@ -491,18 +527,20 @@ final class ZoteroMigrationService {
                 lastOpenedAt: nil,
                 syncStatus: SyncStatus.local.rawValue,
                 createdAt: now,
-                updatedAt: now
+                updatedAt: now,
+                source: "zotero",
+                sourceKey: zItem.key
             )
 
             let attRecord = AttachmentRecord(
                 id: UUID().uuidString,
                 itemId: docId.uuidString,
                 storageKey: attStorageKey,
-                fileName: pdfFileName,
-                attachmentType: ItemType.pdf.rawValue,
+                fileName: attFileName,
+                attachmentType: attachmentType.rawValue,
                 sourceURL: cslItem.URL,
-                fileSize: pdfFileSize,
-                pageCount: pdfPageCount,
+                fileSize: attFileSize,
+                pageCount: attPageCount,
                 isPrimary: true,
                 createdAt: now,
                 updatedAt: now
@@ -522,21 +560,45 @@ final class ZoteroMigrationService {
                 Log.error(Log.zotero, "Failed to save citation for '\(title)': \(error)")
             }
 
-            itemMap[zItem.itemID] = docId.uuidString
-            libraryItemMap[zItem.itemID] = libraryItem
-            result.itemCount += 1
-            if pdfCopied { result.pdfCount += 1 }
-
-            // Generate cover asynchronously for copied PDFs
-            if pdfCopied {
+            // Enrich web snapshot metadata from HTML meta tags
+            if attachmentType == .webSnapshot && fileCopied {
                 let destURL = CatalogDatabase.attachmentFileURL(
                     itemStorageKey: itemStorageKey,
                     attachmentStorageKey: attStorageKey,
-                    fileName: pdfFileName
+                    fileName: attFileName
+                )
+                enrichWebSnapshotMetadata(htmlURL: destURL, itemId: docId.uuidString)
+            }
+
+            itemMap[zItem.itemID] = docId.uuidString
+            libraryItemMap[zItem.itemID] = libraryItem
+            result.itemCount += 1
+            if fileCopied {
+                switch attachmentType {
+                case .pdf: result.pdfCount += 1
+                case .webSnapshot: result.webSnapshotCount += 1
+                default: break
+                }
+            }
+
+            // Generate cover asynchronously for copied files
+            if fileCopied {
+                let destURL = CatalogDatabase.attachmentFileURL(
+                    itemStorageKey: itemStorageKey,
+                    attachmentStorageKey: attStorageKey,
+                    fileName: attFileName
                 )
                 let capturedItem = libraryItem
+                let capturedType = attachmentType
                 Task {
-                    if let coverData = await coverService.generateCover(for: destURL) {
+                    let coverData: Data?
+                    switch capturedType {
+                    case .webSnapshot:
+                        coverData = await coverService.generateWebSnapshotCover(for: destURL)
+                    default:
+                        coverData = await coverService.generateCover(for: destURL)
+                    }
+                    if let coverData {
                         await MainActor.run {
                             store.updateCover(capturedItem, imageData: coverData)
                         }
@@ -673,14 +735,144 @@ final class ZoteroMigrationService {
         store.invalidate()
 
         Log.info(Log.zotero, "Migration complete: \(result.itemCount) items, \(result.pdfCount) PDFs, " +
-            "\(result.collectionCount) collections, \(result.tagCount) tags, " +
-            "\(result.noteCount) notes, \(result.errors.count) errors")
+            "\(result.webSnapshotCount) web snapshots, \(result.collectionCount) collections, " +
+            "\(result.tagCount) tags, \(result.noteCount) notes, \(result.errors.count) errors")
         return result
     }
 
-    /// Resolve the PDF file path from a Zotero attachment entry.
-    /// Zotero stores paths as "storage:filename.pdf" for linked files.
-    private func resolvePDFPath(_ att: ZoteroAttachment, dataDirectory: URL) -> URL? {
+    /// Check whether an item with the given source and key already exists in the database.
+    private func itemExistsForSource(_ source: String, key: String) -> Bool {
+        let count = try? store.database.dbQueue.read { db in
+            try Int.fetchOne(db, sql: """
+                SELECT COUNT(*) FROM items WHERE source = ? AND source_key = ?
+            """, arguments: [source, key])
+        }
+        return (count ?? 0) ?? 0 > 0
+    }
+
+    /// Determine the OakReader item type from a Zotero attachment content type.
+    private func oakItemType(for contentType: String?) -> ItemType {
+        switch contentType {
+        case "text/html", "application/xhtml+xml":
+            return .webSnapshot
+        default:
+            return .pdf
+        }
+    }
+
+    /// Copy all sibling files from a Zotero storage directory to the OakReader attachment directory.
+    /// This preserves relative links in web snapshots (images, CSS, JS referenced by the HTML).
+    private func copyDirectoryContents(from sourceDir: URL, to destDir: URL, excluding fileName: String) {
+        guard let contents = try? FileManager.default.contentsOfDirectory(
+            at: sourceDir,
+            includingPropertiesForKeys: nil
+        ) else { return }
+
+        for fileURL in contents {
+            if fileURL.lastPathComponent == fileName { continue }
+            let dest = destDir.appendingPathComponent(fileURL.lastPathComponent)
+            if !FileManager.default.fileExists(atPath: dest.path) {
+                try? FileManager.default.copyItem(at: fileURL, to: dest)
+            }
+        }
+    }
+
+    /// Supplement already-saved Zotero CSL data with HTML meta tags for web snapshots.
+    /// Only fills in fields that are empty in the existing metadata.
+    private func enrichWebSnapshotMetadata(htmlURL: URL, itemId: String) {
+        guard let htmlString = try? String(contentsOf: htmlURL, encoding: .utf8) else { return }
+
+        // Load existing metadata saved from Zotero fields
+        guard let existing = referenceService.fetchMetadata(forItemId: itemId) else {
+            return
+        }
+        var csl = existing.cslItem
+
+        var changed = false
+
+        // og:site_name → containerTitle
+        if (csl.containerTitle ?? "").isEmpty,
+           let siteName = extractHTMLMetaContent(htmlString, property: "og:site_name") {
+            csl.containerTitle = siteName
+            changed = true
+        }
+
+        // author from HTML meta
+        if (csl.author ?? []).isEmpty,
+           let authorName = extractHTMLMetaContent(htmlString, name: "author")
+            ?? extractHTMLMetaContent(htmlString, property: "article:author") {
+            csl.author = [CSLName(family: authorName, given: nil, literal: authorName)]
+            changed = true
+        }
+
+        // article:published_time → issued
+        if csl.issued == nil,
+           let pubTime = extractHTMLMetaContent(htmlString, property: "article:published_time") {
+            let parts = pubTime.prefix(10).split(separator: "-").compactMap { Int($0) }
+            if let year = parts.first {
+                csl.issued = CSLDate(
+                    year: year,
+                    month: parts.count > 1 ? parts[1] : nil,
+                    day: parts.count > 2 ? parts[2] : nil
+                )
+                changed = true
+            }
+        }
+
+        // og:description / description → abstract
+        if (csl.abstract ?? "").isEmpty,
+           let desc = extractHTMLMetaContent(htmlString, property: "og:description")
+            ?? extractHTMLMetaContent(htmlString, name: "description") {
+            csl.abstract = desc
+            changed = true
+        }
+
+        if changed {
+            do {
+                try referenceService.saveMetadata(csl, forItemId: itemId)
+            } catch {
+                Log.error(Log.zotero, "Failed to enrich web snapshot metadata: \(error)")
+            }
+        }
+    }
+
+    /// Extract content from `<meta property="..." content="...">` tags.
+    private func extractHTMLMetaContent(_ html: String, property: String) -> String? {
+        let patterns = [
+            "<meta[^>]+property=[\"']\(NSRegularExpression.escapedPattern(for: property))[\"'][^>]+content=[\"']([^\"']*)[\"']",
+            "<meta[^>]+content=[\"']([^\"']*)[\"'][^>]+property=[\"']\(NSRegularExpression.escapedPattern(for: property))[\"']",
+        ]
+        for pattern in patterns {
+            if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
+               let match = regex.firstMatch(in: html, range: NSRange(html.startIndex..., in: html)),
+               let range = Range(match.range(at: 1), in: html) {
+                let value = String(html[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+                if !value.isEmpty { return value }
+            }
+        }
+        return nil
+    }
+
+    /// Extract content from `<meta name="..." content="...">` tags.
+    private func extractHTMLMetaContent(_ html: String, name: String) -> String? {
+        let patterns = [
+            "<meta[^>]+name=[\"']\(NSRegularExpression.escapedPattern(for: name))[\"'][^>]+content=[\"']([^\"']*)[\"']",
+            "<meta[^>]+content=[\"']([^\"']*)[\"'][^>]+name=[\"']\(NSRegularExpression.escapedPattern(for: name))[\"']",
+        ]
+        for pattern in patterns {
+            if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
+               let match = regex.firstMatch(in: html, range: NSRange(html.startIndex..., in: html)),
+               let range = Range(match.range(at: 1), in: html) {
+                let value = String(html[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+                if !value.isEmpty { return value }
+            }
+        }
+        return nil
+    }
+
+    /// Resolve the file path from a Zotero attachment entry.
+    /// Zotero stores paths as "storage:filename" for stored files.
+    private func resolveAttachmentPath(_ att: ZoteroAttachment, dataDirectory: URL) -> URL? {
         guard let path = att.path else { return nil }
 
         if path.hasPrefix("storage:") {

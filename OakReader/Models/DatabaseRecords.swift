@@ -17,6 +17,8 @@ struct ItemRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable 
     var updatedAt: String
     var citeKey: String?
     var lastPosition: Double?
+    var source: String?
+    var sourceKey: String?
 
     enum CodingKeys: String, CodingKey, ColumnExpression {
         case id
@@ -29,6 +31,8 @@ struct ItemRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable 
         case updatedAt = "updated_at"
         case citeKey = "cite_key"
         case lastPosition = "last_position"
+        case source
+        case sourceKey = "source_key"
     }
 }
 
@@ -76,6 +80,8 @@ struct CollectionRecord: Codable, FetchableRecord, MutablePersistableRecord, Has
     var filterRules: String?
     var createdAt: String
     var updatedAt: String
+    var source: String?
+    var sourceKey: String?
 
     enum CodingKeys: String, CodingKey, ColumnExpression {
         case id
@@ -88,6 +94,8 @@ struct CollectionRecord: Codable, FetchableRecord, MutablePersistableRecord, Has
         case filterRules = "filter_rules"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+        case source
+        case sourceKey = "source_key"
     }
 }
 
