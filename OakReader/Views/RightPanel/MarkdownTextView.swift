@@ -90,18 +90,22 @@ struct MarkdownTextView: NSViewRepresentable {
         guard let textView = scrollView.documentView as? MarkdownNSTextView else { return }
         let coordinator = context.coordinator
 
+        // Track whether a re-highlight is needed (batch multiple reasons into one pass)
+        var needsRehighlight = false
+
         // Check if accent color changed
         let currentAccent = coordinator.highlighter?.accentColor.hexString
         if currentAccent != accentColorHex,
            let newColor = NSColor(hex: accentColorHex) {
             coordinator.highlighter?.accentColor = newColor
-            coordinator.highlighter?.highlightAll(in: textView.textStorage!)
+            needsRehighlight = true
         }
 
-        let needsUpdate = textView.font != font
+        // Check if font or line metrics changed
+        let fontChanged = textView.font != font
             || coordinator.highlighter?.lineSpacing != lineSpacing
             || coordinator.highlighter?.lineHeight != lineHeight
-        if needsUpdate {
+        if fontChanged {
             let ps = Self.paragraphStyle(font: font, lineHeight: lineHeight, lineSpacing: lineSpacing)
             textView.font = font
             textView.defaultParagraphStyle = ps
@@ -115,15 +119,21 @@ struct MarkdownTextView: NSViewRepresentable {
             coordinator.highlighter?.lineHeight = lineHeight
             coordinator.highlighter?.lineSpacing = lineSpacing
             coordinator.highlighter?.letterSpacing = letterSpacing
-            coordinator.highlighter?.highlightAll(in: textView.textStorage!)
+            needsRehighlight = true
         }
 
+        // Check if text content changed externally (e.g. switching notes)
         if text != coordinator.lastKnownText && !coordinator.isUpdating {
             coordinator.isUpdating = true
             textView.string = text
             coordinator.lastKnownText = text
-            coordinator.highlighter?.highlightAll(in: textView.textStorage!)
             coordinator.isUpdating = false
+            needsRehighlight = true
+        }
+
+        // Single re-highlight pass for all accumulated changes
+        if needsRehighlight {
+            coordinator.highlighter?.highlightAll(in: textView.textStorage!)
         }
 
         textView.onReferenceClick = onReferenceClick

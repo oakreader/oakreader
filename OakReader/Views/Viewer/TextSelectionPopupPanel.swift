@@ -5,7 +5,7 @@ import AppKit
 
 // MARK: - Text Selection Popup Panel (horizontal toolbar above selection)
 
-class TextSelectionPopupPanel: NSPanel {
+class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
     private let viewModel: DocumentViewModel
     private let selection: PDFSelection
     private weak var pdfView: PDFView?
@@ -21,10 +21,10 @@ class TextSelectionPopupPanel: NSPanel {
     private let anchorPage: PDFPage
     private let anchorPoint: NSPoint // PDF page coords: midX of selection, maxY (top)
     private var scrollObserver: NSObjectProtocol?
+    var resignObserver: NSObjectProtocol?
 
     // Color sub-panel
     private var colorSubPanel: NSPanel?
-    private weak var splitButton: HighlightSplitButton?
 
     // Speak button
     private weak var speakButton: PopupIconButton?
@@ -89,6 +89,7 @@ class TextSelectionPopupPanel: NSPanel {
         }
 
         observeScroll()
+        observeAppResign()
     }
 
     private func observeScroll() {
@@ -135,21 +136,20 @@ class TextSelectionPopupPanel: NSPanel {
         let mainStack = NSStackView()
         mainStack.orientation = .horizontal
         mainStack.spacing = 2
-        mainStack.edgeInsets = NSEdgeInsets(top: 4, left: 6, bottom: 4, right: 6)
+        mainStack.edgeInsets = NSEdgeInsets(top: 8, left: 10, bottom: 8, right: 10)
         mainStack.alignment = .centerY
 
-        // Group 1: Markup (highlight split + underline)
-        let currentColor = viewModel.annotation.strokeColor
-            ?? NSColor(red: 1.0, green: 0.83, blue: 0.0, alpha: 1.0)
-        let highlightSplit = HighlightSplitButton(color: currentColor) { [weak self] in
+        // Group 1: Markup (highlight + underline + color picker)
+        let highlightBtn = PopupIconButton(
+            systemImage: "highlighter",
+            accessibilityLabel: "Highlight"
+        ) { [weak self] in
             self?.applyHighlight(
                 color: self?.viewModel.annotation.strokeColor
                     ?? NSColor(red: 1.0, green: 0.83, blue: 0.0, alpha: 1.0)
             )
-        } onChevronClick: { [weak self] in
-            self?.toggleColorSubPanel()
         }
-        self.splitButton = highlightSplit
+        mainStack.addArrangedSubview(highlightBtn)
 
         let underlineBtn = PopupIconButton(
             systemImage: "underline",
@@ -157,9 +157,15 @@ class TextSelectionPopupPanel: NSPanel {
         ) { [weak self] in
             self?.applyUnderline()
         }
-
-        mainStack.addArrangedSubview(highlightSplit)
         mainStack.addArrangedSubview(underlineBtn)
+
+        let colorBtn = PopupIconButton(
+            systemImage: "paintpalette",
+            accessibilityLabel: "Annotation Color"
+        ) { [weak self] in
+            self?.toggleColorSubPanel()
+        }
+        mainStack.addArrangedSubview(colorBtn)
 
         // Separator 1
         mainStack.addArrangedSubview(makeVerticalSeparator())
@@ -215,22 +221,7 @@ class TextSelectionPopupPanel: NSPanel {
         mainStack.addArrangedSubview(copyBtn)
 
         // Background container
-        let container = NSVisualEffectView()
-        container.material = .popover
-        container.state = .active
-        container.wantsLayer = true
-        container.layer?.cornerRadius = 8
-
-        container.addSubview(mainStack)
-        mainStack.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            mainStack.topAnchor.constraint(equalTo: container.topAnchor),
-            mainStack.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-            mainStack.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            mainStack.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-        ])
-
-        return container
+        return makePopupGlassContainer(content: mainStack)
     }
 
     private func makeVerticalSeparator() -> NSView {
@@ -267,30 +258,17 @@ class TextSelectionPopupPanel: NSPanel {
         let colorStack = NSStackView()
         colorStack.orientation = .horizontal
         colorStack.spacing = 8
-        colorStack.edgeInsets = NSEdgeInsets(top: 6, left: 8, bottom: 6, right: 8)
+        colorStack.edgeInsets = NSEdgeInsets(top: 14, left: 10, bottom: 14, right: 10)
 
         for (color, name) in Self.annotationColors {
-            let dot = ColorDotView(color: color, size: 14) { [weak self] in
+            let dot = ColorDotView(color: color, size: 20) { [weak self] in
                 self?.applyHighlight(color: color)
             }
             dot.toolTip = name
             colorStack.addArrangedSubview(dot)
         }
 
-        let container = NSVisualEffectView()
-        container.material = .popover
-        container.state = .active
-        container.wantsLayer = true
-        container.layer?.cornerRadius = 8
-
-        container.addSubview(colorStack)
-        colorStack.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            colorStack.topAnchor.constraint(equalTo: container.topAnchor),
-            colorStack.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-            colorStack.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            colorStack.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-        ])
+        let container = makePopupGlassContainer(content: colorStack)
 
         let panel = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: 10, height: 10),
@@ -324,8 +302,8 @@ class TextSelectionPopupPanel: NSPanel {
         let mainFrame = self.frame
         let panelSize = panel.frame.size
 
-        // Position below the main toolbar, left-aligned with split button
-        let splitOffset: CGFloat = 6 // matches mainStack leading edge inset
+        // Position below the main toolbar, left-aligned
+        let splitOffset: CGFloat = 6
         let x = mainFrame.origin.x + splitOffset
         let y = mainFrame.origin.y - panelSize.height - 2
         panel.setFrameOrigin(NSPoint(x: x, y: y))
@@ -420,6 +398,7 @@ class TextSelectionPopupPanel: NSPanel {
             NotificationCenter.default.removeObserver(observer)
             scrollObserver = nil
         }
+        removeAppResignObserver()
 
         // Stop TTS playback if active
         viewModel.voice.stopSpeaking()
@@ -441,169 +420,6 @@ class TextSelectionPopupPanel: NSPanel {
             self?.orderOut(nil)
             self?.onDismiss()
         })
-    }
-}
-
-// MARK: - Highlight Split Button
-
-private class HighlightSplitButton: NSView {
-    private var currentColor: NSColor
-    private let onHighlightClick: () -> Void
-    private let onChevronClick: () -> Void
-
-    private var iconHovered = false
-    private var chevronHovered = false
-    private var trackingArea: NSTrackingArea?
-    private let colorBar = NSView()
-    private let iconView = NSImageView()
-    private let chevronView = NSImageView()
-
-    private let iconWidth: CGFloat = 28
-    private let chevronWidth: CGFloat = 16
-    private let totalHeight: CGFloat = 32
-
-    init(color: NSColor, onHighlightClick: @escaping () -> Void, onChevronClick: @escaping () -> Void) {
-        self.currentColor = color
-        self.onHighlightClick = onHighlightClick
-        self.onChevronClick = onChevronClick
-        super.init(frame: NSRect(x: 0, y: 0, width: 44, height: 32))
-
-        wantsLayer = true
-        layer?.cornerRadius = 6
-        translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            widthAnchor.constraint(equalToConstant: iconWidth + chevronWidth),
-            heightAnchor.constraint(equalToConstant: totalHeight),
-        ])
-
-        setupIcon()
-        setupChevron()
-        setupColorBar()
-
-        toolTip = "Highlight"
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-
-    private func setupIcon() {
-        if let img = NSImage(systemSymbolName: "highlighter", accessibilityDescription: "Highlight") {
-            let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
-            iconView.image = img.withSymbolConfiguration(config)
-        }
-        iconView.contentTintColor = .secondaryLabelColor
-        iconView.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(iconView)
-        NSLayoutConstraint.activate([
-            iconView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 5),
-            iconView.centerYAnchor.constraint(equalTo: centerYAnchor, constant: -2),
-            iconView.widthAnchor.constraint(equalToConstant: 18),
-            iconView.heightAnchor.constraint(equalToConstant: 18),
-        ])
-    }
-
-    private func setupChevron() {
-        if let img = NSImage(systemSymbolName: "chevron.down", accessibilityDescription: "Color picker") {
-            let config = NSImage.SymbolConfiguration(pointSize: 8, weight: .semibold)
-            chevronView.image = img.withSymbolConfiguration(config)
-        }
-        chevronView.contentTintColor = .tertiaryLabelColor
-        chevronView.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(chevronView)
-        NSLayoutConstraint.activate([
-            chevronView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -2),
-            chevronView.centerYAnchor.constraint(equalTo: centerYAnchor),
-            chevronView.widthAnchor.constraint(equalToConstant: 12),
-            chevronView.heightAnchor.constraint(equalToConstant: 12),
-        ])
-    }
-
-    private func setupColorBar() {
-        colorBar.wantsLayer = true
-        colorBar.layer?.backgroundColor = currentColor.cgColor
-        colorBar.layer?.cornerRadius = 1.5
-        colorBar.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(colorBar)
-        NSLayoutConstraint.activate([
-            colorBar.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 5),
-            colorBar.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -3),
-            colorBar.widthAnchor.constraint(equalToConstant: 18),
-            colorBar.heightAnchor.constraint(equalToConstant: 3),
-        ])
-    }
-
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        if let ta = trackingArea { removeTrackingArea(ta) }
-        trackingArea = NSTrackingArea(
-            rect: bounds,
-            options: [.mouseEnteredAndExited, .mouseMoved, .activeAlways],
-            owner: self
-        )
-        addTrackingArea(trackingArea!)
-    }
-
-    private func isInIconRegion(_ point: NSPoint) -> Bool {
-        return point.x < iconWidth
-    }
-
-    override func mouseMoved(with event: NSEvent) {
-        let pt = convert(event.locationInWindow, from: nil)
-        let wasIconHovered = iconHovered
-        let wasChevronHovered = chevronHovered
-
-        iconHovered = bounds.contains(pt) && isInIconRegion(pt)
-        chevronHovered = bounds.contains(pt) && !isInIconRegion(pt)
-
-        if iconHovered != wasIconHovered || chevronHovered != wasChevronHovered {
-            updateAppearance()
-        }
-    }
-
-    override func mouseEntered(with event: NSEvent) {
-        let pt = convert(event.locationInWindow, from: nil)
-        iconHovered = isInIconRegion(pt)
-        chevronHovered = !isInIconRegion(pt)
-        updateAppearance()
-    }
-
-    override func mouseExited(with event: NSEvent) {
-        iconHovered = false
-        chevronHovered = false
-        updateAppearance()
-    }
-
-    override func mouseDown(with event: NSEvent) {
-        let pt = convert(event.locationInWindow, from: nil)
-        if bounds.contains(pt) {
-            layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.18).cgColor
-        }
-    }
-
-    override func mouseUp(with event: NSEvent) {
-        let pt = convert(event.locationInWindow, from: nil)
-        guard bounds.contains(pt) else {
-            updateAppearance()
-            return
-        }
-
-        if isInIconRegion(pt) {
-            onHighlightClick()
-        } else {
-            onChevronClick()
-        }
-        updateAppearance()
-    }
-
-    private func updateAppearance() {
-        if iconHovered || chevronHovered {
-            layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.10).cgColor
-            iconView.contentTintColor = .labelColor
-            chevronView.contentTintColor = .secondaryLabelColor
-        } else {
-            layer?.backgroundColor = nil
-            iconView.contentTintColor = .secondaryLabelColor
-            chevronView.contentTintColor = .tertiaryLabelColor
-        }
     }
 }
 

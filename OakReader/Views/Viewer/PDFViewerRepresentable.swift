@@ -3,6 +3,14 @@ import PDFKit
 
 // Custom PDFView subclass that suppresses the native selection markup toolbar
 class OakReaderView: PDFView {
+    override func resetCursorRects() {
+        addCursorRect(bounds, cursor: .arrow)
+    }
+
+    override func cursorUpdate(with event: NSEvent) {
+        NSCursor.arrow.set()
+    }
+
     override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
         // Remove PDFKit's built-in markup/annotation items and Services submenu from context menu
         menu.items.removeAll { item in
@@ -17,6 +25,7 @@ class OakReaderView: PDFView {
 
 struct PDFViewerRepresentable: NSViewRepresentable {
     let viewModel: DocumentViewModel
+    var isActive: Bool = true
 
     func makeCoordinator() -> PDFViewCoordinator {
         PDFViewCoordinator(viewModel: viewModel)
@@ -53,6 +62,9 @@ struct PDFViewerRepresentable: NSViewRepresentable {
     func updateNSView(_ pdfView: PDFView, context: Context) {
         context.coordinator.viewModel = viewModel
         context.coordinator.pdfView = pdfView
+
+        // Install/remove global event monitors when tab becomes active/inactive
+        context.coordinator.setActive(isActive)
 
         // Suppress native markup toolbar
         pdfView.isInMarkupMode = false

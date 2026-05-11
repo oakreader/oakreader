@@ -1,6 +1,8 @@
 import Cocoa
 import Sparkle
 
+// swiftlint:disable function_body_length
+
 enum MainMenuBuilder {
     static func build(target: AppDelegate) -> NSMenu {
         let mainMenu = NSMenu()
@@ -20,9 +22,6 @@ enum MainMenuBuilder {
         // Go menu
         mainMenu.addItem(buildGoMenu(target: target))
 
-        // Tools menu
-        mainMenu.addItem(buildToolsMenu(target: target))
-
         // Window menu
         let (windowMenuItem, windowMenu) = buildWindowMenu(target: target)
         mainMenu.addItem(windowMenuItem)
@@ -38,15 +37,29 @@ enum MainMenuBuilder {
 
     // MARK: - App Menu
 
-    private static func buildAppMenu(updaterController: SPUStandardUpdaterController) -> NSMenuItem {
+    private static func buildAppMenu(
+        updaterController: SPUStandardUpdaterController
+    ) -> NSMenuItem {
         let appMenu = NSMenu()
-        appMenu.addItem(NSMenuItem(title: "About OakReader", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: ""))
+        appMenu.addItem(NSMenuItem(
+            title: "About OakReader",
+            action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)),
+            keyEquivalent: ""
+        ))
         appMenu.addItem(.separator())
-        let checkForUpdatesItem = NSMenuItem(title: "Check for Updates...", action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)), keyEquivalent: "")
+        let checkForUpdatesItem = NSMenuItem(
+            title: "Check for Updates...",
+            action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)),
+            keyEquivalent: ""
+        )
         checkForUpdatesItem.target = updaterController
         appMenu.addItem(checkForUpdatesItem)
         appMenu.addItem(.separator())
-        appMenu.addItem(NSMenuItem(title: "Settings...", action: Selector(("showSettingsWindow:")), keyEquivalent: ","))
+        appMenu.addItem(NSMenuItem(
+            title: "Settings...",
+            action: Selector(("showSettingsWindow:")),
+            keyEquivalent: ","
+        ))
         appMenu.addItem(.separator())
         let servicesMenu = NSMenu(title: "Services")
         let servicesItem = NSMenuItem(title: "Services", action: nil, keyEquivalent: "")
@@ -54,13 +67,29 @@ enum MainMenuBuilder {
         appMenu.addItem(servicesItem)
         NSApp.servicesMenu = servicesMenu
         appMenu.addItem(.separator())
-        appMenu.addItem(NSMenuItem(title: "Hide OakReader", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h"))
-        let hideOthersItem = NSMenuItem(title: "Hide Others", action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
+        appMenu.addItem(NSMenuItem(
+            title: "Hide OakReader",
+            action: #selector(NSApplication.hide(_:)),
+            keyEquivalent: "h"
+        ))
+        let hideOthersItem = NSMenuItem(
+            title: "Hide Others",
+            action: #selector(NSApplication.hideOtherApplications(_:)),
+            keyEquivalent: "h"
+        )
         hideOthersItem.keyEquivalentModifierMask = [.command, .option]
         appMenu.addItem(hideOthersItem)
-        appMenu.addItem(NSMenuItem(title: "Show All", action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: ""))
+        appMenu.addItem(NSMenuItem(
+            title: "Show All",
+            action: #selector(NSApplication.unhideAllApplications(_:)),
+            keyEquivalent: ""
+        ))
         appMenu.addItem(.separator())
-        appMenu.addItem(NSMenuItem(title: "Quit OakReader", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        appMenu.addItem(NSMenuItem(
+            title: "Quit OakReader",
+            action: #selector(NSApplication.terminate(_:)),
+            keyEquivalent: "q"
+        ))
 
         let appMenuItem = NSMenuItem()
         appMenuItem.submenu = appMenu
@@ -72,61 +101,113 @@ enum MainMenuBuilder {
     private static func buildFileMenu(target: AppDelegate) -> NSMenuItem {
         let fileMenu = NSMenu(title: "File")
 
-        let openItem = NSMenuItem(title: "Open...", action: #selector(AppDelegate.openDocument(_:)), keyEquivalent: "o")
+        let openItem = NSMenuItem(
+            title: "Open...",
+            action: #selector(AppDelegate.openDocument(_:)),
+            keyEquivalent: "o"
+        )
         openItem.target = target
+        openItem.image = icon("folder")
         fileMenu.addItem(openItem)
 
         // Open Recent
         let openRecentMenu = NSMenu(title: "Open Recent")
-        let clearRecentItem = NSMenuItem(title: "Clear Menu", action: #selector(NSDocumentController.clearRecentDocuments(_:)), keyEquivalent: "")
-        openRecentMenu.addItem(clearRecentItem)
+        openRecentMenu.addItem(NSMenuItem(
+            title: "Clear Menu",
+            action: #selector(NSDocumentController.clearRecentDocuments(_:)),
+            keyEquivalent: ""
+        ))
         let openRecentItem = NSMenuItem(title: "Open Recent", action: nil, keyEquivalent: "")
         openRecentItem.submenu = openRecentMenu
+        openRecentItem.image = icon("clock.arrow.circlepath")
         fileMenu.addItem(openRecentItem)
 
         fileMenu.addItem(.separator())
 
-        let zoteroItem = NSMenuItem(title: "Import from Zotero...", action: #selector(AppDelegate.importFromZotero(_:)), keyEquivalent: "")
+        let zoteroItem = NSMenuItem(
+            title: "Import from Zotero...",
+            action: #selector(AppDelegate.importFromZotero(_:)),
+            keyEquivalent: ""
+        )
         zoteroItem.target = target
+        zoteroItem.image = icon("tray.and.arrow.down")
         fileMenu.addItem(zoteroItem)
 
         fileMenu.addItem(.separator())
 
-        let closeItem = NSMenuItem(title: "Close Tab", action: #selector(AppDelegate.closeTab(_:)), keyEquivalent: "w")
+        let closeItem = NSMenuItem(
+            title: "Close Tab",
+            action: #selector(AppDelegate.closeTab(_:)),
+            keyEquivalent: "w"
+        )
         closeItem.target = target
+        closeItem.image = icon("xmark")
         fileMenu.addItem(closeItem)
 
-        let saveItem = NSMenuItem(title: "Save", action: #selector(AppDelegate.saveDocument(_:)), keyEquivalent: "s")
+        let saveItem = NSMenuItem(
+            title: "Save",
+            action: #selector(AppDelegate.saveDocument(_:)),
+            keyEquivalent: "s"
+        )
         saveItem.target = target
+        saveItem.image = icon("square.and.arrow.down")
         fileMenu.addItem(saveItem)
 
-        let saveAsItem = NSMenuItem(title: "Save As...", action: #selector(AppDelegate.saveDocumentAs(_:)), keyEquivalent: "S")
+        let saveAsItem = NSMenuItem(
+            title: "Save As...",
+            action: #selector(AppDelegate.saveDocumentAs(_:)),
+            keyEquivalent: "S"
+        )
         saveAsItem.target = target
+        saveAsItem.image = icon("square.and.arrow.down.on.square")
         fileMenu.addItem(saveAsItem)
 
-        let revertItem = NSMenuItem(title: "Revert to Saved", action: #selector(AppDelegate.revertDocument(_:)), keyEquivalent: "")
+        let revertItem = NSMenuItem(
+            title: "Revert to Saved",
+            action: #selector(AppDelegate.revertDocument(_:)),
+            keyEquivalent: ""
+        )
         revertItem.target = target
+        revertItem.image = icon("arrow.counterclockwise")
         fileMenu.addItem(revertItem)
 
         fileMenu.addItem(.separator())
 
         // Export As submenu
         let exportMenu = NSMenu(title: "Export As")
-        let expImgItem = NSMenuItem(title: "Images (JPEG, PNG, TIFF)...", action: #selector(AppDelegate.exportAsImages(_:)), keyEquivalent: "e")
+        let expImgItem = NSMenuItem(
+            title: "Images (JPEG, PNG, TIFF)...",
+            action: #selector(AppDelegate.exportAsImages(_:)),
+            keyEquivalent: "e"
+        )
         expImgItem.keyEquivalentModifierMask = [.command, .shift]
         expImgItem.target = target
+        expImgItem.image = icon("photo")
         exportMenu.addItem(expImgItem)
-        let expTxtItem = NSMenuItem(title: "Plain Text...", action: #selector(AppDelegate.exportAsText(_:)), keyEquivalent: "")
+
+        let expTxtItem = NSMenuItem(
+            title: "Plain Text...",
+            action: #selector(AppDelegate.exportAsText(_:)),
+            keyEquivalent: ""
+        )
         expTxtItem.target = target
+        expTxtItem.image = icon("doc.plaintext")
         exportMenu.addItem(expTxtItem)
+
         let exportSubItem = NSMenuItem(title: "Export As", action: nil, keyEquivalent: "")
         exportSubItem.submenu = exportMenu
+        exportSubItem.image = icon("square.and.arrow.up")
         fileMenu.addItem(exportSubItem)
 
         fileMenu.addItem(.separator())
 
-        let printItem = NSMenuItem(title: "Print...", action: #selector(AppDelegate.printDocument(_:)), keyEquivalent: "p")
+        let printItem = NSMenuItem(
+            title: "Print...",
+            action: #selector(AppDelegate.printDocument(_:)),
+            keyEquivalent: "p"
+        )
         printItem.target = target
+        printItem.image = icon("printer")
         fileMenu.addItem(printItem)
 
         let fileMenuItem = NSMenuItem(title: "File", action: nil, keyEquivalent: "")
@@ -138,16 +219,44 @@ enum MainMenuBuilder {
 
     private static func buildEditMenu(target: AppDelegate) -> NSMenuItem {
         let editMenu = NSMenu(title: "Edit")
-        editMenu.addItem(NSMenuItem(title: "Undo", action: Selector(("undo:")), keyEquivalent: "z"))
-        editMenu.addItem(NSMenuItem(title: "Redo", action: Selector(("redo:")), keyEquivalent: "Z"))
+
+        let undoItem = NSMenuItem(title: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
+        undoItem.image = icon("arrow.uturn.backward")
+        editMenu.addItem(undoItem)
+
+        let redoItem = NSMenuItem(title: "Redo", action: Selector(("redo:")), keyEquivalent: "Z")
+        redoItem.image = icon("arrow.uturn.forward")
+        editMenu.addItem(redoItem)
+
         editMenu.addItem(.separator())
-        editMenu.addItem(NSMenuItem(title: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x"))
-        editMenu.addItem(NSMenuItem(title: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c"))
-        editMenu.addItem(NSMenuItem(title: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v"))
-        editMenu.addItem(NSMenuItem(title: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a"))
+
+        let cutItem = NSMenuItem(title: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        cutItem.image = icon("scissors")
+        editMenu.addItem(cutItem)
+
+        let copyItem = NSMenuItem(
+            title: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c"
+        )
+        copyItem.image = icon("doc.on.doc")
+        editMenu.addItem(copyItem)
+
+        let pasteItem = NSMenuItem(
+            title: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v"
+        )
+        pasteItem.image = icon("doc.on.clipboard")
+        editMenu.addItem(pasteItem)
+
+        let selectAllItem = NSMenuItem(
+            title: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a"
+        )
+        selectAllItem.image = icon("checkmark.circle")
+        editMenu.addItem(selectAllItem)
+
         editMenu.addItem(.separator())
-        let findItem = actionMenuItem("Find in Document...", action: .find, key: "f", target: target)
-        editMenu.addItem(findItem)
+        editMenu.addItem(actionItem(
+            "Find in Document...", action: .find,
+            key: "f", icon: "magnifyingglass", target: target
+        ))
 
         let editMenuItem = NSMenuItem(title: "Edit", action: nil, keyEquivalent: "")
         editMenuItem.submenu = editMenu
@@ -159,23 +268,62 @@ enum MainMenuBuilder {
     private static func buildViewMenu(target: AppDelegate) -> NSMenuItem {
         let viewMenu = NSMenu(title: "View")
 
-        let libraryItem = NSMenuItem(title: "Show Library", action: #selector(AppDelegate.showLibrary(_:)), keyEquivalent: "L")
+        let libraryItem = NSMenuItem(
+            title: "Show Library",
+            action: #selector(AppDelegate.showLibrary(_:)),
+            keyEquivalent: "L"
+        )
         libraryItem.keyEquivalentModifierMask = [.command, .shift]
         libraryItem.target = target
+        libraryItem.image = icon("books.vertical")
         viewMenu.addItem(libraryItem)
 
         viewMenu.addItem(.separator())
-        viewMenu.addItem(actionMenuItem("Toggle Sidebar", action: .toggleSidebar, key: "s", modifiers: [.command, .option], target: target))
-        viewMenu.addItem(actionMenuItem("Toggle Inspector", action: .toggleInspector, key: "i", modifiers: [.command, .option], target: target))
+        viewMenu.addItem(actionItem(
+            "Toggle Sidebar", action: .toggleSidebar,
+            key: "s", modifiers: [.command, .option], icon: "sidebar.left", target: target
+        ))
+        viewMenu.addItem(actionItem(
+            "Toggle Inspector", action: .toggleInspector,
+            key: "i", modifiers: [.command, .option], icon: "sidebar.right", target: target
+        ))
         viewMenu.addItem(.separator())
-        viewMenu.addItem(actionMenuItem("Zoom In", action: .zoomIn, key: "=", modifiers: [.command], target: target))
-        viewMenu.addItem(actionMenuItem("Zoom Out", action: .zoomOut, key: "-", modifiers: [.command], target: target))
-        viewMenu.addItem(actionMenuItem("Zoom to Fit", action: .zoomToFit, key: "0", modifiers: [.command], target: target))
+        viewMenu.addItem(actionItem(
+            "Zoom In", action: .zoomIn,
+            key: "=", icon: "plus.magnifyingglass", target: target
+        ))
+        viewMenu.addItem(actionItem(
+            "Zoom Out", action: .zoomOut,
+            key: "-", icon: "minus.magnifyingglass", target: target
+        ))
+        viewMenu.addItem(actionItem(
+            "Zoom to Fit", action: .zoomToFit,
+            key: "0", icon: "arrow.up.left.and.arrow.down.right", target: target
+        ))
         viewMenu.addItem(.separator())
-        viewMenu.addItem(actionMenuItem("Single Page", action: .displaySingle, target: target))
-        viewMenu.addItem(actionMenuItem("Single Page Continuous", action: .displaySingleContinuous, target: target))
-        viewMenu.addItem(actionMenuItem("Two Pages", action: .displayTwoUp, target: target))
-        viewMenu.addItem(actionMenuItem("Two Pages Continuous", action: .displayTwoUpContinuous, target: target))
+        viewMenu.addItem(actionItem(
+            "Single Page", action: .displaySingle, icon: "doc", target: target
+        ))
+        viewMenu.addItem(actionItem(
+            "Single Page Continuous", action: .displaySingleContinuous,
+            icon: "doc.text", target: target
+        ))
+        viewMenu.addItem(actionItem(
+            "Two Pages", action: .displayTwoUp, icon: "book.closed", target: target
+        ))
+        viewMenu.addItem(actionItem(
+            "Two Pages Continuous", action: .displayTwoUpContinuous,
+            icon: "book", target: target
+        ))
+        viewMenu.addItem(.separator())
+        viewMenu.addItem(actionItem(
+            "Rotate Clockwise", action: .rotateRight,
+            key: "]", icon: "rotate.right", target: target
+        ))
+        viewMenu.addItem(actionItem(
+            "Rotate Counter-Clockwise", action: .rotateLeft,
+            key: "[", icon: "rotate.left", target: target
+        ))
 
         let viewMenuItem = NSMenuItem(title: "View", action: nil, keyEquivalent: "")
         viewMenuItem.submenu = viewMenu
@@ -186,53 +334,92 @@ enum MainMenuBuilder {
 
     private static func buildGoMenu(target: AppDelegate) -> NSMenuItem {
         let goMenu = NSMenu(title: "Go")
-        goMenu.addItem(actionMenuItem("Back", action: .navigateBack, key: "[", modifiers: [.command, .option], target: target))
+
+        let upKey = String(UnicodeScalar(NSUpArrowFunctionKey)!)
+        let downKey = String(UnicodeScalar(NSDownArrowFunctionKey)!)
+        let homeKey = String(UnicodeScalar(NSHomeFunctionKey)!)
+        let endKey = String(UnicodeScalar(NSEndFunctionKey)!)
+
+        goMenu.addItem(actionItem(
+            "Back", action: .navigateBack,
+            key: "[", modifiers: [.command, .option], icon: "chevron.backward", target: target
+        ))
         goMenu.addItem(.separator())
-        goMenu.addItem(actionMenuItem("Previous Page", action: .previousPage, key: String(UnicodeScalar(NSUpArrowFunctionKey)!), modifiers: [.command], target: target))
-        goMenu.addItem(actionMenuItem("Next Page", action: .nextPage, key: String(UnicodeScalar(NSDownArrowFunctionKey)!), modifiers: [.command], target: target))
+        goMenu.addItem(actionItem(
+            "Previous Page", action: .previousPage,
+            key: upKey, icon: "chevron.up", target: target
+        ))
+        goMenu.addItem(actionItem(
+            "Next Page", action: .nextPage,
+            key: downKey, icon: "chevron.down", target: target
+        ))
         goMenu.addItem(.separator())
-        goMenu.addItem(actionMenuItem("First Page", action: .firstPage, key: String(UnicodeScalar(NSHomeFunctionKey)!), modifiers: [.command], target: target))
-        goMenu.addItem(actionMenuItem("Last Page", action: .lastPage, key: String(UnicodeScalar(NSEndFunctionKey)!), modifiers: [.command], target: target))
+        goMenu.addItem(actionItem(
+            "First Page", action: .firstPage,
+            key: homeKey, icon: "arrow.up.to.line", target: target
+        ))
+        goMenu.addItem(actionItem(
+            "Last Page", action: .lastPage,
+            key: endKey, icon: "arrow.down.to.line", target: target
+        ))
 
         let goMenuItem = NSMenuItem(title: "Go", action: nil, keyEquivalent: "")
         goMenuItem.submenu = goMenu
         return goMenuItem
     }
 
-    // MARK: - Tools Menu
-
-    private static func buildToolsMenu(target: AppDelegate) -> NSMenuItem {
-        let toolsMenu = NSMenu(title: "Tools")
-        toolsMenu.addItem(actionMenuItem("Rotate Clockwise", action: .rotateRight, key: "]", modifiers: [.command], target: target))
-        toolsMenu.addItem(actionMenuItem("Rotate Counter-Clockwise", action: .rotateLeft, key: "[", modifiers: [.command], target: target))
-        toolsMenu.addItem(.separator())
-        toolsMenu.addItem(actionMenuItem("Accessibility Check...", action: .accessibilityCheck, target: target))
-
-        let toolsMenuItem = NSMenuItem(title: "Tools", action: nil, keyEquivalent: "")
-        toolsMenuItem.submenu = toolsMenu
-        return toolsMenuItem
-    }
-
     // MARK: - Window Menu
 
     private static func buildWindowMenu(target: AppDelegate) -> (NSMenuItem, NSMenu) {
         let windowMenu = NSMenu(title: "Window")
-        windowMenu.addItem(NSMenuItem(title: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m"))
-        windowMenu.addItem(NSMenuItem(title: "Zoom", action: #selector(NSWindow.performZoom(_:)), keyEquivalent: ""))
+
+        let minimizeItem = NSMenuItem(
+            title: "Minimize",
+            action: #selector(NSWindow.performMiniaturize(_:)),
+            keyEquivalent: "m"
+        )
+        minimizeItem.image = icon("minus.square")
+        windowMenu.addItem(minimizeItem)
+
+        let zoomItem = NSMenuItem(
+            title: "Zoom",
+            action: #selector(NSWindow.performZoom(_:)),
+            keyEquivalent: ""
+        )
+        zoomItem.image = icon("macwindow")
+        windowMenu.addItem(zoomItem)
+
         windowMenu.addItem(.separator())
 
-        let nextTabItem = NSMenuItem(title: "Show Next Tab", action: #selector(AppDelegate.nextTab(_:)), keyEquivalent: "\t")
+        let nextTabItem = NSMenuItem(
+            title: "Show Next Tab",
+            action: #selector(AppDelegate.nextTab(_:)),
+            keyEquivalent: "\t"
+        )
         nextTabItem.keyEquivalentModifierMask = [.control]
         nextTabItem.target = target
+        nextTabItem.image = icon("chevron.right")
         windowMenu.addItem(nextTabItem)
 
-        let prevTabItem = NSMenuItem(title: "Show Previous Tab", action: #selector(AppDelegate.previousTab(_:)), keyEquivalent: "\t")
+        let prevTabItem = NSMenuItem(
+            title: "Show Previous Tab",
+            action: #selector(AppDelegate.previousTab(_:)),
+            keyEquivalent: "\t"
+        )
         prevTabItem.keyEquivalentModifierMask = [.control, .shift]
         prevTabItem.target = target
+        prevTabItem.image = icon("chevron.left")
         windowMenu.addItem(prevTabItem)
 
         windowMenu.addItem(.separator())
-        windowMenu.addItem(NSMenuItem(title: "Bring All to Front", action: #selector(NSApplication.arrangeInFront(_:)), keyEquivalent: ""))
+
+        let bringAllItem = NSMenuItem(
+            title: "Bring All to Front",
+            action: #selector(NSApplication.arrangeInFront(_:)),
+            keyEquivalent: ""
+        )
+        bringAllItem.image = icon("rectangle.stack")
+        windowMenu.addItem(bringAllItem)
 
         let windowMenuItem = NSMenuItem(title: "Window", action: nil, keyEquivalent: "")
         windowMenuItem.submenu = windowMenu
@@ -244,8 +431,19 @@ enum MainMenuBuilder {
     private static func buildHelpMenu(target: AppDelegate) -> (NSMenuItem, NSMenu) {
         let helpMenu = NSMenu(title: "Help")
 
-        let exportLogsItem = NSMenuItem(title: "Export Logs...", action: #selector(AppDelegate.exportLogs(_:)), keyEquivalent: "")
+        helpMenu.addItem(actionItem(
+            "Accessibility Check...", action: .accessibilityCheck,
+            icon: "accessibility", target: target
+        ))
+        helpMenu.addItem(.separator())
+
+        let exportLogsItem = NSMenuItem(
+            title: "Export Logs...",
+            action: #selector(AppDelegate.exportLogs(_:)),
+            keyEquivalent: ""
+        )
         exportLogsItem.target = target
+        exportLogsItem.image = icon("doc.text")
         helpMenu.addItem(exportLogsItem)
 
         let helpMenuItem = NSMenuItem(title: "Help", action: nil, keyEquivalent: "")
@@ -253,13 +451,30 @@ enum MainMenuBuilder {
         return (helpMenuItem, helpMenu)
     }
 
-    // MARK: - Action Menu Item Helper
+    // MARK: - Helpers
 
-    static func actionMenuItem(_ title: String, action: DocumentAction, key: String = "", modifiers: NSEvent.ModifierFlags = [], target: AppDelegate) -> NSMenuItem {
-        let item = NSMenuItem(title: title, action: #selector(AppDelegate.menuAction(_:)), keyEquivalent: key)
+    private static func icon(_ name: String) -> NSImage? {
+        NSImage(systemSymbolName: name, accessibilityDescription: nil)
+    }
+
+    static func actionItem(
+        _ title: String, action: DocumentAction,
+        key: String = "", modifiers: NSEvent.ModifierFlags = [],
+        icon symbolName: String = "", target: AppDelegate
+    ) -> NSMenuItem {
+        let item = NSMenuItem(
+            title: title,
+            action: #selector(AppDelegate.menuAction(_:)),
+            keyEquivalent: key
+        )
         item.keyEquivalentModifierMask = modifiers
         item.representedObject = action.rawValue
         item.target = target
+        if !symbolName.isEmpty {
+            item.image = icon(symbolName)
+        }
         return item
     }
 }
+
+// swiftlint:enable function_body_length

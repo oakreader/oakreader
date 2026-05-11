@@ -3,7 +3,7 @@ import PDFKit
 
 // MARK: - Area Selection Popup
 
-class AreaSelectionPopupPanel: NSPanel {
+class AreaSelectionPopupPanel: NSPanel, AppResignDismissable {
     private static var current: AreaSelectionPopupPanel?
 
     private let viewModel: DocumentViewModel
@@ -15,6 +15,7 @@ class AreaSelectionPopupPanel: NSPanel {
 
     // Color sub-panel
     private var colorSubPanel: NSPanel?
+    var resignObserver: NSObjectProtocol?
 
     static func show(
         at screenPoint: NSPoint,
@@ -91,6 +92,8 @@ class AreaSelectionPopupPanel: NSPanel {
             ctx.duration = 0.12
             self.animator().alphaValue = 1
         }
+
+        observeAppResign()
     }
 
     private static let annotationColors: [(NSColor, String)] = [
@@ -110,7 +113,7 @@ class AreaSelectionPopupPanel: NSPanel {
         let mainStack = NSStackView()
         mainStack.orientation = .horizontal
         mainStack.spacing = 2
-        mainStack.edgeInsets = NSEdgeInsets(top: 4, left: 6, bottom: 4, right: 6)
+        mainStack.edgeInsets = NSEdgeInsets(top: 8, left: 10, bottom: 8, right: 10)
         mainStack.alignment = .centerY
 
         // Group 1: Area annotation split button
@@ -157,22 +160,7 @@ class AreaSelectionPopupPanel: NSPanel {
         mainStack.addArrangedSubview(copyBtn)
 
         // Background container
-        let container = NSVisualEffectView()
-        container.material = .popover
-        container.state = .active
-        container.wantsLayer = true
-        container.layer?.cornerRadius = 8
-
-        container.addSubview(mainStack)
-        mainStack.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            mainStack.topAnchor.constraint(equalTo: container.topAnchor),
-            mainStack.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-            mainStack.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            mainStack.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-        ])
-
-        return container
+        return makePopupGlassContainer(content: mainStack)
     }
 
     private func makeVerticalSeparator() -> NSView {
@@ -208,30 +196,17 @@ class AreaSelectionPopupPanel: NSPanel {
         let colorStack = NSStackView()
         colorStack.orientation = .horizontal
         colorStack.spacing = 8
-        colorStack.edgeInsets = NSEdgeInsets(top: 6, left: 8, bottom: 6, right: 8)
+        colorStack.edgeInsets = NSEdgeInsets(top: 14, left: 10, bottom: 14, right: 10)
 
         for (color, name) in Self.annotationColors {
-            let dot = ColorDotView(color: color, size: 14) { [weak self] in
+            let dot = ColorDotView(color: color, size: 20) { [weak self] in
                 self?.addAreaAnnotation(color: color)
             }
             dot.toolTip = name
             colorStack.addArrangedSubview(dot)
         }
 
-        let container = NSVisualEffectView()
-        container.material = .popover
-        container.state = .active
-        container.wantsLayer = true
-        container.layer?.cornerRadius = 8
-
-        container.addSubview(colorStack)
-        colorStack.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            colorStack.topAnchor.constraint(equalTo: container.topAnchor),
-            colorStack.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-            colorStack.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            colorStack.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-        ])
+        let container = makePopupGlassContainer(content: colorStack)
 
         let panel = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: 10, height: 10),
@@ -382,6 +357,8 @@ class AreaSelectionPopupPanel: NSPanel {
     }
 
     func dismiss() {
+        removeAppResignObserver()
+
         colorSubPanel?.orderOut(nil)
         colorSubPanel = nil
 

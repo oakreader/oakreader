@@ -5,6 +5,7 @@ import SwiftUI
 /// to drive timeline zoom without interfering with the parent ScrollView.
 struct TimelineZoomGestureView: NSViewRepresentable {
     @Binding var zoomLevel: CGFloat
+    var isActive: Bool = true
 
     func makeNSView(context: Context) -> ZoomGestureNSView {
         let view = ZoomGestureNSView()
@@ -20,20 +21,32 @@ struct TimelineZoomGestureView: NSViewRepresentable {
             let newZoom = zoomLevel * (1.0 + delta)
             zoomLevel = min(max(newZoom, 1.0), 20.0)
         }
+        nsView.setActive(isActive)
     }
 }
 
 final class ZoomGestureNSView: NSView {
     var onZoomDelta: ((CGFloat) -> Void)?
+    private var monitorsActive = false
 
     private var scrollMonitor: Any?
     private var magnifyMonitor: Any?
 
+    /// Install or remove global event monitors when the tab becomes active/inactive.
+    func setActive(_ active: Bool) {
+        monitorsActive = active
+        if active && window != nil {
+            installMonitors()
+        } else if !active {
+            removeMonitors()
+        }
+    }
+
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        if window != nil {
+        if window != nil && monitorsActive {
             installMonitors()
-        } else {
+        } else if window == nil {
             removeMonitors()
         }
     }

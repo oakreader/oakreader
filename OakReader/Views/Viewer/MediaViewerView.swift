@@ -631,6 +631,7 @@ struct MediaChapterTimelineView: View {
 /// Viewer for embed documents (YouTube).
 struct MediaViewerView: View {
     let viewModel: DocumentViewModel
+    var isActive: Bool = true
 
     @State private var youtubePlayer: YouTubePlayer?
     @State private var contextMenuHandler: MediaContextMenuHandler?
@@ -684,6 +685,13 @@ struct MediaViewerView: View {
                 let handler = MediaContextMenuHandler(viewModel: viewModel)
                 handler.install()
                 contextMenuHandler = handler
+            }
+            .onChange(of: isActive) { _, active in
+                if active {
+                    contextMenuHandler?.install()
+                } else {
+                    contextMenuHandler?.remove()
+                }
             }
             .onDisappear {
                 contextMenuHandler?.remove()
@@ -808,7 +816,8 @@ struct MediaViewerView: View {
                     duration: media.metadata.duration.map(Double.init) ?? 0,
                     currentTime: model.currentPlaybackTime,
                     activeChapterID: model.activeHighlightID,
-                    onSeek: { seconds in seekTo(seconds: seconds) }
+                    onSeek: { seconds in seekTo(seconds: seconds) },
+                    isActive: isActive
                 )
 
                 ScrollViewReader { proxy in

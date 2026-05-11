@@ -7,6 +7,14 @@ import WebKit
 final class OakWebView: WKWebView {
     weak var coordinator: WebViewCoordinator?
 
+    override func resetCursorRects() {
+        addCursorRect(bounds, cursor: .arrow)
+    }
+
+    override func cursorUpdate(with event: NSEvent) {
+        NSCursor.arrow.set()
+    }
+
     override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
         super.willOpenMenu(menu, with: event)
 
@@ -40,6 +48,7 @@ final class OakWebView: WKWebView {
 /// Security: blocks all external HTTP/HTTPS requests, scopes file access to storage directory only.
 struct WebArchiveViewerRepresentable: NSViewRepresentable {
     let viewModel: DocumentViewModel
+    var isActive: Bool = true
 
     func makeCoordinator() -> WebViewCoordinator {
         WebViewCoordinator(viewModel: viewModel)
@@ -166,6 +175,9 @@ struct WebArchiveViewerRepresentable: NSViewRepresentable {
 
     func updateNSView(_ webView: OakWebView, context: Context) {
         context.coordinator.viewModel = viewModel
+
+        // Install/remove global event monitors when tab becomes active/inactive
+        context.coordinator.setActive(isActive)
 
         // Sync zoom level from toolbar controls
         let targetZoom = viewModel.state.zoomLevel
