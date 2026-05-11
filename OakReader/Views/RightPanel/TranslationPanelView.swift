@@ -41,41 +41,69 @@ struct TranslationPanelView: View {
     // MARK: - Language Bar
 
     private var languageBar: some View {
-        HStack(spacing: 0) {
-            Picker("Source", selection: $translationVM.sourceLang) {
-                ForEach(TranslationLanguage.allCases) { lang in
-                    Text(lang.displayName).tag(lang)
-                }
-            }
-            .labelsHidden()
-            .frame(maxWidth: .infinity)
-            .onChange(of: translationVM.sourceLang) { _, _ in
-                translationVM.onLanguageChange()
-            }
+        HStack(spacing: 8) {
+            languageMenu(
+                selection: $translationVM.sourceLang,
+                languages: TranslationLanguage.allCases.map { $0 }
+            )
 
             Button {
                 translationVM.swapLanguages()
             } label: {
                 Image(systemName: "arrow.left.arrow.right")
+                    .font(.system(size: 12))
             }
             .buttonStyle(.borderless)
             .disabled(translationVM.sourceLang == .auto)
             .help("Swap languages")
-            .padding(.horizontal, 4)
 
-            Picker("Target", selection: $translationVM.targetLang) {
-                ForEach(TranslationLanguage.targetCases) { lang in
-                    Text(lang.displayName).tag(lang)
-                }
-            }
-            .labelsHidden()
-            .frame(maxWidth: .infinity)
-            .onChange(of: translationVM.targetLang) { _, _ in
-                translationVM.onLanguageChange()
-            }
+            languageMenu(
+                selection: $translationVM.targetLang,
+                languages: TranslationLanguage.targetCases
+            )
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.bottom, 4)
+    }
+
+    private func languageMenu(
+        selection: Binding<TranslationLanguage>,
+        languages: [TranslationLanguage]
+    ) -> some View {
+        Menu {
+            ForEach(languages) { lang in
+                Button {
+                    selection.wrappedValue = lang
+                    translationVM.onLanguageChange()
+                } label: {
+                    if selection.wrappedValue == lang {
+                        Label(lang.nativeName, systemImage: "checkmark")
+                    } else {
+                        Text(lang.nativeName)
+                    }
+                }
+            }
+        } label: {
+            HStack {
+                Text(selection.wrappedValue.nativeName)
+                    .font(.system(size: 13))
+                Spacer()
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.primary.opacity(0.03))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+            )
+        }
+        .menuStyle(.borderlessButton)
     }
 
     // MARK: - Source Section
@@ -100,21 +128,9 @@ struct TranslationPanelView: View {
                     RoundedRectangle(cornerRadius: 6)
                         .stroke(Color.primary.opacity(0.08), lineWidth: 1)
                 )
-
-            Button {
-                translationVM.translate()
-            } label: {
-                HStack(spacing: 4) {
-                    if translationVM.isTranslating {
-                        ProgressView()
-                            .controlSize(.small)
-                    }
-                    Text("Translate")
-                        .frame(maxWidth: .infinity)
+                .onChange(of: translationVM.sourceText) { _, _ in
+                    translationVM.debouncedTranslate()
                 }
-            }
-            .disabled(translationVM.sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || translationVM.isTranslating)
-            .controlSize(.large)
         }
     }
 
@@ -154,7 +170,7 @@ struct TranslationPanelView: View {
             Text(translationVM.translatedText.isEmpty ? " " : translationVM.translatedText)
                 .font(.system(size: 13))
                 .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity, minHeight: 80, alignment: .topLeading)
                 .padding(8)
                 .background(
                     RoundedRectangle(cornerRadius: 6)

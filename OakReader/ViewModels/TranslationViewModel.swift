@@ -13,6 +13,8 @@ class TranslationViewModel {
     var errorMessage: String?
 
     private var streamTask: Task<Void, Never>?
+    private var debounceTask: Task<Void, Never>?
+    private var skipNextDebounce = false
     private let router = ProviderRouter()
 
     init(parent: DocumentViewModel) {
@@ -26,8 +28,30 @@ class TranslationViewModel {
 
     /// Called from text selection popup — sets source text and auto-triggers translation.
     func setSourceText(_ text: String) {
+        skipNextDebounce = true
         sourceText = text
         translate()
+    }
+
+    /// Called when the user types in the source text editor (debounced).
+    func debouncedTranslate() {
+        if skipNextDebounce {
+            skipNextDebounce = false
+            return
+        }
+        debounceTask?.cancel()
+        let text = sourceText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if text.isEmpty {
+            stopTranslation()
+            translatedText = ""
+            errorMessage = nil
+            return
+        }
+        debounceTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled else { return }
+            translate()
+        }
     }
 
     func translate() {
@@ -94,6 +118,7 @@ class TranslationViewModel {
     }
 
     func stopTranslation() {
+        debounceTask?.cancel()
         streamTask?.cancel()
         streamTask = nil
         isTranslating = false
