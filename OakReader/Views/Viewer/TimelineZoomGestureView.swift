@@ -5,7 +5,8 @@ import SwiftUI
 /// to drive timeline zoom without interfering with the parent ScrollView.
 struct TimelineZoomGestureView: NSViewRepresentable {
     @Binding var zoomLevel: CGFloat
-    var isActive: Bool = true
+
+    @Environment(\.isTabActive) private var isTabActive
 
     func makeNSView(context: Context) -> ZoomGestureNSView {
         let view = ZoomGestureNSView()
@@ -21,7 +22,7 @@ struct TimelineZoomGestureView: NSViewRepresentable {
             let newZoom = zoomLevel * (1.0 + delta)
             zoomLevel = min(max(newZoom, 1.0), 20.0)
         }
-        nsView.setActive(isActive)
+        nsView.setActive(isTabActive)
     }
 }
 

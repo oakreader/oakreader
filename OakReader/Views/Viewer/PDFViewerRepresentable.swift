@@ -25,12 +25,12 @@ class OakReaderView: PDFView {
 
 struct PDFViewerRepresentable: NSViewRepresentable {
     let viewModel: DocumentViewModel
-    var isActive: Bool = true
 
     func makeCoordinator() -> PDFViewCoordinator {
         PDFViewCoordinator(viewModel: viewModel)
     }
 
+    @Environment(\.isTabActive) private var isTabActive
     @AppStorage("appearanceMode") private var appearanceMode: String = "system"
 
     func makeNSView(context: Context) -> PDFView {
@@ -64,7 +64,7 @@ struct PDFViewerRepresentable: NSViewRepresentable {
         context.coordinator.pdfView = pdfView
 
         // Install/remove global event monitors when tab becomes active/inactive
-        context.coordinator.setActive(isActive)
+        context.coordinator.setActive(isTabActive)
 
         // Suppress native markup toolbar
         pdfView.isInMarkupMode = false

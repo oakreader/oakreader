@@ -48,7 +48,8 @@ final class OakWebView: WKWebView {
 /// Security: blocks all external HTTP/HTTPS requests, scopes file access to storage directory only.
 struct WebArchiveViewerRepresentable: NSViewRepresentable {
     let viewModel: DocumentViewModel
-    var isActive: Bool = true
+
+    @Environment(\.isTabActive) private var isTabActive
 
     func makeCoordinator() -> WebViewCoordinator {
         WebViewCoordinator(viewModel: viewModel)
@@ -177,7 +178,7 @@ struct WebArchiveViewerRepresentable: NSViewRepresentable {
         context.coordinator.viewModel = viewModel
 
         // Install/remove global event monitors when tab becomes active/inactive
-        context.coordinator.setActive(isActive)
+        context.coordinator.setActive(isTabActive)
 
         // Sync zoom level from toolbar controls
         let targetZoom = viewModel.state.zoomLevel

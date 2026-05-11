@@ -1,6 +1,23 @@
 import SwiftUI
 import AppKit
 
+// MARK: - Tab Active Environment
+
+/// Whether the enclosing document tab is the currently active (visible) tab.
+/// Set once in `RootView` via `.environment(\.isTabActive, …)` and read by any
+/// descendant that manages global `NSEvent` monitors or other resources that
+/// should only be active when the tab is on-screen.
+private struct IsTabActiveKey: EnvironmentKey {
+    static let defaultValue = true
+}
+
+extension EnvironmentValues {
+    var isTabActive: Bool {
+        get { self[IsTabActiveKey.self] }
+        set { self[IsTabActiveKey.self] = newValue }
+    }
+}
+
 // MARK: - Font Family
 
 enum FontFamily: String, CaseIterable, Identifiable {
