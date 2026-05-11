@@ -153,12 +153,12 @@ struct LibraryTableView: View {
             Button {
                 createNewNote()
             } label: {
-                Label("Add Note", systemImage: "doc.text")
+                Label("Add Note", systemImage: "note.text.badge.plus")
             }
             Button {
                 importPDFs()
             } label: {
-                Label("Import File...", systemImage: "doc.badge.plus")
+                Label("Import File...", systemImage: "square.and.arrow.down")
             }
         } else if selectedItems.count > 1 {
             Button { for item in selectedItems { openItem(item) } } label: {
