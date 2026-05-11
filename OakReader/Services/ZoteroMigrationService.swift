@@ -392,28 +392,10 @@ final class ZoteroMigrationService {
             var cslItem = CSLItem(type: cslType)
 
             for field in fields {
-                let cslField = ZoteroFieldMapping.fieldToCSL[field.fieldName]
+                guard let cslField = ZoteroFieldMapping.fieldToCSL[field.fieldName] else { continue }
                 switch cslField {
-                case "title":              cslItem.title = field.value
-                case "abstract":           cslItem.abstract = field.value
-                case "container-title":    cslItem.containerTitle = field.value
-                case "publisher":          cslItem.publisher = field.value
-                case "publisher-place":    cslItem.publisherPlace = field.value
-                case "volume":             cslItem.volume = field.value
-                case "issue":              cslItem.issue = field.value
-                case "page":               cslItem.page = field.value
-                case "edition":            cslItem.edition = field.value
-                case "DOI":                cslItem.DOI = field.value
-                case "ISBN":               cslItem.ISBN = field.value
-                case "ISSN":               cslItem.ISSN = field.value
-                case "URL":                cslItem.URL = field.value
-                case "language":           cslItem.language = field.value
-                case "short-title":        cslItem.shortTitle = field.value
-                case "journal-abbreviation": cslItem.journalAbbreviation = field.value
-                case "number":             cslItem.number = field.value
-                case "section":            cslItem.section = field.value
-                case "genre":              cslItem.genre = field.value
                 case "note":
+                    // Append multiple note-mapped fields (rights, extra)
                     if let existing = cslItem.note, !existing.isEmpty {
                         cslItem.note = existing + "\n" + field.value
                     } else {
@@ -424,32 +406,24 @@ final class ZoteroMigrationService {
                 case "accessed":
                     cslItem.accessed = parseZoteroDate(field.value)
                 default:
-                    break
+                    // All other fields: set by CSL JSON key directly
+                    cslItem[jsonKey: cslField] = field.value
                 }
             }
 
-            // Creators
+            // Creators — route to specific CSL role arrays
             let creators = creatorsByItem[zItem.itemID] ?? []
-            var authorNames: [CSLName] = []
-            var editorNames: [CSLName] = []
-            var translatorNames: [CSLName] = []
-            var collectionEditorNames: [CSLName] = []
+            var creatorsByRole: [String: [CSLName]] = [:]
 
             for creator in creators.sorted(by: { $0.orderIndex < $1.orderIndex }) {
                 let name = CSLName(family: creator.lastName, given: creator.firstName)
                 let cslRole = ZoteroFieldMapping.creatorTypeToCSL[creator.creatorType] ?? "author"
-                switch cslRole {
-                case "editor":              editorNames.append(name)
-                case "translator":          translatorNames.append(name)
-                case "collection-editor":   collectionEditorNames.append(name)
-                default:                    authorNames.append(name)
-                }
+                creatorsByRole[cslRole, default: []].append(name)
             }
 
-            if !authorNames.isEmpty { cslItem.author = authorNames }
-            if !editorNames.isEmpty { cslItem.editor = editorNames }
-            if !translatorNames.isEmpty { cslItem.translator = translatorNames }
-            if !collectionEditorNames.isEmpty { cslItem.collectionEditor = collectionEditorNames }
+            for (role, names) in creatorsByRole {
+                cslItem.setCreators(role: role, names: names)
+            }
 
             // Build author display string
             let authorDisplay = (cslItem.author ?? [])

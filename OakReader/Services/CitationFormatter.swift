@@ -159,6 +159,15 @@ enum CitationFormatter {
         if let authors = csl.author, !authors.isEmpty {
             fields.append(("author", authors.map { bibTeXName($0) }.joined(separator: " and ")))
         }
+        if let editors = csl.editor, !editors.isEmpty {
+            fields.append(("editor", editors.map { bibTeXName($0) }.joined(separator: " and ")))
+        }
+        if let translators = csl.translator, !translators.isEmpty {
+            fields.append(("translator", translators.map { bibTeXName($0) }.joined(separator: " and ")))
+        }
+        if let directors = csl.director, !directors.isEmpty {
+            fields.append(("director", directors.map { bibTeXName($0) }.joined(separator: " and ")))
+        }
         if let title = csl.title { fields.append(("title", "{\(title)}")) }
         if let container = csl.containerTitle { fields.append(("journal", container)) }
         if let year = csl.issued?.year { fields.append(("year", "\(year)")) }
@@ -166,10 +175,16 @@ enum CitationFormatter {
         if let issue = csl.issue { fields.append(("number", issue)) }
         if let page = csl.page { fields.append(("pages", page.replacingOccurrences(of: "-", with: "--"))) }
         if let publisher = csl.publisher { fields.append(("publisher", publisher)) }
+        if let place = csl.publisherPlace { fields.append(("address", place)) }
+        if let ed = csl.edition { fields.append(("edition", ed)) }
+        if let series = csl.collectionTitle { fields.append(("series", series)) }
         if let doi = csl.DOI { fields.append(("doi", doi)) }
         if let isbn = csl.ISBN { fields.append(("isbn", isbn)) }
         if let issn = csl.ISSN { fields.append(("issn", issn)) }
         if let url = csl.URL { fields.append(("url", url)) }
+        if let lang = csl.language { fields.append(("language", lang)) }
+        if let numPages = csl.numberOfPages { fields.append(("numpages", numPages)) }
+        if let note = csl.note { fields.append(("note", "{\(note)}")) }
         if let abstract = csl.abstract { fields.append(("abstract", "{\(abstract)}")) }
 
         let fieldLines = fields.map { "  \($0.0) = {\($0.1)}" }.joined(separator: ",\n")
@@ -189,7 +204,11 @@ enum CitationFormatter {
         for editor in csl.editor ?? [] {
             lines.append("ED  - \(risName(editor))")
         }
+        for translator in csl.translator ?? [] {
+            lines.append("A4  - \(risName(translator))")
+        }
         if let container = csl.containerTitle { lines.append("JO  - \(container)") }
+        if let series = csl.collectionTitle { lines.append("T3  - \(series)") }
         if let year = csl.issued?.year { lines.append("PY  - \(year)") }
         if let vol = csl.volume { lines.append("VL  - \(vol)") }
         if let issue = csl.issue { lines.append("IS  - \(issue)") }
@@ -203,12 +222,15 @@ enum CitationFormatter {
             }
         }
         if let publisher = csl.publisher { lines.append("PB  - \(publisher)") }
+        if let place = csl.publisherPlace { lines.append("CY  - \(place)") }
+        if let ed = csl.edition { lines.append("ET  - \(ed)") }
         if let doi = csl.DOI { lines.append("DO  - \(doi)") }
         if let url = csl.URL { lines.append("UR  - \(url)") }
         if let isbn = csl.ISBN { lines.append("SN  - \(isbn)") }
         if let issn = csl.ISSN { lines.append("SN  - \(issn)") }
         if let abstract = csl.abstract { lines.append("AB  - \(abstract)") }
         if let language = csl.language { lines.append("LA  - \(language)") }
+        if let note = csl.note { lines.append("N1  - \(note)") }
 
         lines.append("ER  -")
         lines.append("")
@@ -251,14 +273,19 @@ enum CitationFormatter {
             csl.title = fields["title"]
             csl.containerTitle = fields["journal"] ?? fields["booktitle"]
             csl.publisher = fields["publisher"]
+            csl.publisherPlace = fields["address"]
             csl.volume = fields["volume"]
             csl.issue = fields["number"]
             csl.page = fields["pages"]?.replacingOccurrences(of: "--", with: "-")
+            csl.edition = fields["edition"]
+            csl.collectionTitle = fields["series"]
             csl.DOI = fields["doi"]
             csl.ISBN = fields["isbn"]
             csl.ISSN = fields["issn"]
             csl.URL = fields["url"]
             csl.abstract = fields["abstract"]
+            csl.language = fields["language"]
+            csl.note = fields["note"]
 
             if let yearStr = fields["year"], let year = Int(yearStr) {
                 csl.issued = CSLDate(year: year)
@@ -308,6 +335,8 @@ enum CitationFormatter {
                 currentEditors.append(parseRISName(value))
             case "JO", "JF", "T2":
                 current?.containerTitle = value
+            case "T3":
+                current?.collectionTitle = value
             case "PY", "Y1":
                 if let year = Int(value.prefix(4)) {
                     current?.issued = CSLDate(year: year)
@@ -322,6 +351,10 @@ enum CitationFormatter {
                 endPage = value
             case "PB":
                 current?.publisher = value
+            case "CY":
+                current?.publisherPlace = value
+            case "ET":
+                current?.edition = value
             case "DO":
                 current?.DOI = value
             case "UR":
@@ -337,6 +370,8 @@ enum CitationFormatter {
                 current?.abstract = value
             case "LA":
                 current?.language = value
+            case "N1":
+                current?.note = value
             case "ER":
                 if var item = current {
                     if !currentAuthors.isEmpty { item.author = currentAuthors }
@@ -430,6 +465,29 @@ enum CitationFormatter {
         case "paper-conference": return "inproceedings"
         case "thesis": return "phdthesis"
         case "report": return "techreport"
+        case "article-newspaper", "article-magazine": return "article"
+        case "article": return "unpublished"
+        case "webpage", "post-weblog", "post": return "misc"
+        case "patent": return "misc"
+        case "motion_picture": return "misc"
+        case "software": return "software"
+        case "graphic": return "misc"
+        case "speech": return "inproceedings"
+        case "interview": return "misc"
+        case "personal_communication": return "misc"
+        case "manuscript": return "unpublished"
+        case "map": return "misc"
+        case "legislation", "regulation": return "misc"
+        case "bill": return "misc"
+        case "legal_case": return "misc"
+        case "hearing": return "misc"
+        case "entry-encyclopedia", "entry-dictionary": return "inbook"
+        case "broadcast": return "misc"
+        case "song": return "misc"
+        case "dataset": return "misc"
+        case "standard": return "techreport"
+        case "review": return "article"
+        case "treaty": return "misc"
         default: return "misc"
         }
     }
@@ -443,6 +501,30 @@ enum CitationFormatter {
         case "thesis": return "THES"
         case "report": return "RPRT"
         case "webpage": return "ELEC"
+        case "article-newspaper": return "NEWS"
+        case "article-magazine": return "MGZN"
+        case "patent": return "PAT"
+        case "motion_picture": return "MPCT"
+        case "article": return "JOUR"
+        case "software": return "COMP"
+        case "graphic": return "ART"
+        case "speech": return "CONF"
+        case "interview": return "GEN"
+        case "personal_communication": return "PCOMM"
+        case "manuscript": return "UNPB"
+        case "map": return "MAP"
+        case "legislation", "regulation": return "STAT"
+        case "bill": return "BILL"
+        case "legal_case": return "CASE"
+        case "hearing": return "HEAR"
+        case "entry-encyclopedia", "entry-dictionary": return "ENCYC"
+        case "post-weblog", "post": return "ELEC"
+        case "broadcast": return "MPCT"
+        case "song": return "SOUND"
+        case "dataset": return "DATA"
+        case "standard": return "STAND"
+        case "review": return "JOUR"
+        case "treaty": return "GEN"
         default: return "GEN"
         }
     }
@@ -473,6 +555,9 @@ enum CitationFormatter {
         case "inproceedings", "conference": return "paper-conference"
         case "phdthesis", "mastersthesis": return "thesis"
         case "techreport": return "report"
+        case "unpublished": return "manuscript"
+        case "software": return "software"
+        case "misc": return "document"
         default: return "document"
         }
     }
@@ -486,6 +571,23 @@ enum CitationFormatter {
         case "THES": return "thesis"
         case "RPRT": return "report"
         case "ELEC": return "webpage"
+        case "NEWS": return "article-newspaper"
+        case "MGZN": return "article-magazine"
+        case "PAT": return "patent"
+        case "MPCT": return "motion_picture"
+        case "COMP": return "software"
+        case "ART": return "graphic"
+        case "PCOMM": return "personal_communication"
+        case "UNPB": return "manuscript"
+        case "MAP": return "map"
+        case "STAT": return "legislation"
+        case "BILL": return "bill"
+        case "CASE": return "legal_case"
+        case "HEAR": return "hearing"
+        case "ENCYC": return "entry-encyclopedia"
+        case "SOUND": return "song"
+        case "DATA": return "dataset"
+        case "STAND": return "standard"
         default: return "document"
         }
     }

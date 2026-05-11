@@ -88,6 +88,14 @@ extension ImportService {
             return nil
         }
 
+        // Auto-create reference metadata from HTML meta tags
+        createWebSnapshotMetadata(
+            htmlURL: destURL,
+            itemId: docId.uuidString,
+            resolvedTitle: resolvedTitle,
+            originalPageURL: originalPageURL
+        )
+
         // Generate cover thumbnail asynchronously
         Task {
             if let coverData = await coverService.generateWebSnapshotCover(for: destURL) {
@@ -98,6 +106,122 @@ extension ImportService {
         }
 
         return item
+    }
+
+    // MARK: - Web Snapshot Metadata Extraction
+
+    private func createWebSnapshotMetadata(
+        htmlURL: URL,
+        itemId: String,
+        resolvedTitle: String,
+        originalPageURL: URL?
+    ) {
+        guard let htmlString = try? String(contentsOf: htmlURL, encoding: .utf8) else { return }
+
+        var csl = CSLItem(type: "webpage")
+        csl.title = resolvedTitle
+
+        // og:site_name → containerTitle
+        if let siteName = extractHTMLMetaContent(htmlString, property: "og:site_name") {
+            csl.containerTitle = siteName
+        }
+
+        // author / article:author → author
+        if let authorName = extractHTMLMetaContent(htmlString, name: "author")
+            ?? extractHTMLMetaContent(htmlString, property: "article:author") {
+            csl.author = [CSLName(family: authorName, given: nil, literal: authorName)]
+        }
+
+        // article:published_time → issued
+        if let pubTime = extractHTMLMetaContent(htmlString, property: "article:published_time") {
+            let parts = pubTime.prefix(10).split(separator: "-").compactMap { Int($0) }
+            if let year = parts.first {
+                csl.issued = CSLDate(
+                    year: year,
+                    month: parts.count > 1 ? parts[1] : nil,
+                    day: parts.count > 2 ? parts[2] : nil
+                )
+            }
+        }
+
+        // og:description / description → abstract
+        if let desc = extractHTMLMetaContent(htmlString, property: "og:description")
+            ?? extractHTMLMetaContent(htmlString, name: "description") {
+            csl.abstract = desc
+        }
+
+        // original page URL
+        if let pageURL = originalPageURL {
+            csl.URL = pageURL.absoluteString
+        }
+
+        // og:type — detect "article" to potentially refine type
+        if let ogType = extractHTMLMetaContent(htmlString, property: "og:type"),
+           ogType.lowercased() == "article" {
+            csl.type = "webpage" // still webpage, but could be used for heuristics
+        }
+
+        // Fallback issued date to now
+        if csl.issued == nil {
+            let cal = Calendar.current
+            let now = Date()
+            csl.issued = CSLDate(
+                year: cal.component(.year, from: now),
+                month: cal.component(.month, from: now),
+                day: cal.component(.day, from: now)
+            )
+        }
+
+        csl.accessed = {
+            let cal = Calendar.current
+            let now = Date()
+            return CSLDate(
+                year: cal.component(.year, from: now),
+                month: cal.component(.month, from: now),
+                day: cal.component(.day, from: now)
+            )
+        }()
+
+        do {
+            try referenceService.saveMetadata(csl, forItemId: itemId)
+        } catch {
+            Log.error(Log.importer, "Failed to save web snapshot reference metadata: \(error)")
+        }
+    }
+
+    /// Extract content from `<meta property="..." content="...">` tags.
+    func extractHTMLMetaContent(_ html: String, property: String) -> String? {
+        // Match <meta property="og:..." content="..."> or <meta content="..." property="og:...">
+        let patterns = [
+            "<meta[^>]+property=[\"']\(NSRegularExpression.escapedPattern(for: property))[\"'][^>]+content=[\"']([^\"']*)[\"']",
+            "<meta[^>]+content=[\"']([^\"']*)[\"'][^>]+property=[\"']\(NSRegularExpression.escapedPattern(for: property))[\"']",
+        ]
+        for pattern in patterns {
+            if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
+               let match = regex.firstMatch(in: html, range: NSRange(html.startIndex..., in: html)),
+               let range = Range(match.range(at: 1), in: html) {
+                let value = String(html[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+                if !value.isEmpty { return value }
+            }
+        }
+        return nil
+    }
+
+    /// Extract content from `<meta name="..." content="...">` tags.
+    func extractHTMLMetaContent(_ html: String, name: String) -> String? {
+        let patterns = [
+            "<meta[^>]+name=[\"']\(NSRegularExpression.escapedPattern(for: name))[\"'][^>]+content=[\"']([^\"']*)[\"']",
+            "<meta[^>]+content=[\"']([^\"']*)[\"'][^>]+name=[\"']\(NSRegularExpression.escapedPattern(for: name))[\"']",
+        ]
+        for pattern in patterns {
+            if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
+               let match = regex.firstMatch(in: html, range: NSRange(html.startIndex..., in: html)),
+               let range = Range(match.range(at: 1), in: html) {
+                let value = String(html[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+                if !value.isEmpty { return value }
+            }
+        }
+        return nil
     }
 
 }
