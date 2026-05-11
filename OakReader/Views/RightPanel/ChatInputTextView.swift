@@ -105,8 +105,8 @@ struct ChatInputTextView: NSViewRepresentable {
             guard let textView else { return }
             textView.layoutManager?.ensureLayout(for: textView.textContainer!)
             let usedRect = textView.layoutManager?.usedRect(for: textView.textContainer!) ?? .zero
-            let lineHeight = textView.font?.pointSize ?? 14
-            let newHeight = max(usedRect.height + 2, (lineHeight + 4) * 2)
+            let singleLineHeight = (textView.font?.boundingRectForFont.height ?? 20).rounded(.up)
+            let newHeight = max(usedRect.height + 2, singleLineHeight * 3)
             DispatchQueue.main.async {
                 self.parent.contentHeight = min(newHeight, 120)
             }
@@ -116,7 +116,7 @@ struct ChatInputTextView: NSViewRepresentable {
             guard let textView else { return }
             if textView.string.isEmpty {
                 if placeholderView == nil {
-                    let label = NSTextField(labelWithString: parent.placeholder)
+                    let label = PassthroughTextField(labelWithString: parent.placeholder)
                     label.textColor = .placeholderTextColor
                     label.font = textView.font
                     label.isEditable = false
@@ -137,6 +137,14 @@ struct ChatInputTextView: NSViewRepresentable {
             }
         }
     }
+}
+
+// MARK: - Click-through placeholder label
+
+/// An NSTextField that ignores all mouse events so clicks pass through
+/// to the NSTextView underneath.
+private final class PassthroughTextField: NSTextField {
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
 // MARK: - Custom NSTextView
