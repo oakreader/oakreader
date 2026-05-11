@@ -62,6 +62,16 @@ struct TranslationPanelView: View {
                 languages: TranslationLanguage.targetCases
             )
         }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.primary.opacity(0.03))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+        )
         .padding(.horizontal, 12)
         .padding(.bottom, 4)
     }
