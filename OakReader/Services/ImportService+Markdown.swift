@@ -96,6 +96,22 @@ extension ImportService {
             return nil
         }
 
+        // Auto-create reference metadata
+        var csl = CSLItem(type: "document")
+        csl.title = title
+        let cal = Calendar.current
+        let today = Date()
+        csl.issued = CSLDate(
+            year: cal.component(.year, from: today),
+            month: cal.component(.month, from: today),
+            day: cal.component(.day, from: today)
+        )
+        do {
+            try referenceService.saveMetadata(csl, forItemId: docId.uuidString)
+        } catch {
+            Log.error(Log.importer, "Failed to save markdown reference metadata: \(error)")
+        }
+
         return item
     }
 
@@ -154,6 +170,22 @@ extension ImportService {
         guard let item = store.insertItem(itemRecord, attachment: attRecord) else {
             try? FileManager.default.removeItem(at: docDir)
             return nil
+        }
+
+        // Auto-create reference metadata for standalone note
+        var csl = CSLItem(type: "manuscript")
+        csl.title = title
+        let cal = Calendar.current
+        let now2 = Date()
+        csl.issued = CSLDate(
+            year: cal.component(.year, from: now2),
+            month: cal.component(.month, from: now2),
+            day: cal.component(.day, from: now2)
+        )
+        do {
+            try referenceService.saveMetadata(csl, forItemId: docId.uuidString)
+        } catch {
+            Log.error(Log.importer, "Failed to save standalone note reference metadata: \(error)")
         }
 
         return item

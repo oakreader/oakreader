@@ -45,6 +45,8 @@ struct CrossRefService {
         csl.URL = msg.URL
         csl.language = msg.language
         csl.abstract = msg.abstract
+        csl.edition = msg.edition
+        csl.source = "CrossRef"
 
         // Map authors
         csl.author = msg.author?.map { person in
@@ -56,6 +58,11 @@ struct CrossRefService {
             CSLName(family: person.family, given: person.given, literal: nil)
         }
 
+        // Map translators
+        csl.translator = msg.translator?.map { person in
+            CSLName(family: person.family, given: person.given, literal: nil)
+        }
+
         // Map date
         if let issued = msg.issued, let parts = issued.dateParts?.first {
             csl.issued = CSLDate(dateParts: [parts])
@@ -63,6 +70,24 @@ struct CrossRefService {
 
         csl.shortTitle = msg.shortTitle?.first
         csl.journalAbbreviation = msg.shortContainerTitle?.first
+
+        // Funder info → note
+        if let funders = msg.funder, !funders.isEmpty {
+            let funderNames = funders.compactMap { $0.name }.joined(separator: "; ")
+            if !funderNames.isEmpty {
+                csl.note = "Funders: \(funderNames)"
+            }
+        }
+
+        // Subject → note (append)
+        if let subjects = msg.subject, !subjects.isEmpty {
+            let subjectStr = "Subjects: \(subjects.joined(separator: "; "))"
+            if let existing = csl.note, !existing.isEmpty {
+                csl.note = existing + "\n" + subjectStr
+            } else {
+                csl.note = subjectStr
+            }
+        }
 
         return csl
     }
@@ -119,15 +144,20 @@ private struct CrossRefMessage: Decodable {
     let URL: String?
     let language: String?
     let abstract: String?
+    let edition: String?
     let author: [CrossRefPerson]?
     let editor: [CrossRefPerson]?
+    let translator: [CrossRefPerson]?
     let issued: CrossRefDate?
     let shortTitle: [String]?
     let shortContainerTitle: [String]?
+    let funder: [CrossRefFunder]?
+    let subject: [String]?
 
     enum CodingKeys: String, CodingKey {
         case type, title, publisher, volume, issue, page, DOI, ISSN, ISBN, URL
-        case language, abstract, author, editor, issued
+        case language, abstract, edition, author, editor, translator, issued
+        case funder, subject
         case containerTitle = "container-title"
         case shortTitle = "short-title"
         case shortContainerTitle = "short-container-title"
@@ -137,6 +167,10 @@ private struct CrossRefMessage: Decodable {
 private struct CrossRefPerson: Decodable {
     let given: String?
     let family: String?
+}
+
+private struct CrossRefFunder: Decodable {
+    let name: String?
 }
 
 private struct CrossRefDate: Decodable {

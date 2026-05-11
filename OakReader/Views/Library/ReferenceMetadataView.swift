@@ -2,27 +2,17 @@ import SwiftUI
 
 /// Reference metadata view — Zotero-style two-column grid.
 /// Labels right-aligned on the left, values left-aligned on the right.
+/// Dynamically renders fields based on CSLTypeFieldRegistry for the selected item type.
 struct ReferenceMetadataView: View {
     let item: LibraryItem
     let store: LibraryStore
     let referenceService: ReferenceService
 
-    @State private var cslType: String = "document"
-    @State private var doi: String = ""
-    @State private var title: String = ""
-    @State private var containerTitle: String = ""
-    @State private var yearString: String = ""
-    @State private var volume: String = ""
-    @State private var issue: String = ""
-    @State private var page: String = ""
-    @State private var publisher: String = ""
-    @State private var publisherPlace: String = ""
-    @State private var isbn: String = ""
-    @State private var issn: String = ""
-    @State private var url: String = ""
-    @State private var abstract: String = ""
-    @State private var authors: [CSLName] = []
-    @State private var editors: [CSLName] = []
+    @State private var cslType: CSLItemType = .document
+    @State private var fieldValues: [String: String] = [:]
+    @State private var creatorValues: [String: [CSLName]] = [:]
+    @State private var dateString: String = ""
+    @State private var accessedString: String = ""
     @State private var citeKeyText: String = ""
     @State private var citeKeyError: String?
 
@@ -33,9 +23,10 @@ struct ReferenceMetadataView: View {
 
     private enum Field: Hashable {
         case citeKey
-        case doi, title, containerTitle, year, volume, issue, page
-        case publisher, publisherPlace, isbn, issn, url, abstract
-        case authorFamily(Int), authorGiven(Int)
+        case field(String)
+        case date, accessed
+        case creatorFamily(String, Int)
+        case creatorGiven(String, Int)
     }
 
     private let labelWidth: CGFloat = 80
@@ -97,12 +88,14 @@ struct ReferenceMetadataView: View {
 
     @ViewBuilder
     private var editableContent: some View {
+        let spec = CSLTypeFieldRegistry.spec(for: cslType)
+
         VStack(alignment: .leading, spacing: 0) {
             // Item Type — full width picker
             gridRow("Item Type") {
                 Picker("", selection: $cslType) {
                     ForEach(CSLItemType.allCases) { type in
-                        Text(type.displayName).tag(type.rawValue)
+                        Text(type.displayName).tag(type)
                     }
                 }
                 .labelsHidden()
@@ -131,122 +124,36 @@ struct ReferenceMetadataView: View {
                 }
             }
 
-            // Title
-            textRow("Title", text: $title, field: .title)
-
-            // Authors
-            ForEach(authors.indices, id: \.self) { i in
-                authorGridRow(
-                    label: i == 0 ? "Author" : "",
-                    index: i,
-                    isLast: i == authors.count - 1
-                )
-            }
-
-            // If no authors, show empty row with add button
-            if authors.isEmpty {
-                gridRow("Author") {
-                    HStack(spacing: 4) {
-                        Text("(last)")
-                            .foregroundStyle(.quaternary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        Text(",")
-                            .foregroundStyle(.quaternary)
-                        Text("(first)")
-                            .foregroundStyle(.quaternary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        circleButton("plus") {
-                            authors.append(CSLName(family: "", given: ""))
-                        }
-                    }
+            // Dynamic fields from type spec (excluding special-cased ones)
+            ForEach(spec.fields, id: \.self) { fieldSpec in
+                if fieldSpec.key == "DOI" {
+                    doiRow(label: fieldSpec.label)
+                } else if fieldSpec.key == "URL" {
+                    urlRow(label: fieldSpec.label)
+                } else if fieldSpec.isMultiline {
+                    multilineRow(fieldSpec)
+                } else {
+                    dynamicTextRow(fieldSpec)
                 }
             }
 
-            // Journal / Container
-            textRow("Journal", text: $containerTitle, field: .containerTitle)
+            // Date (issued)
+            textRowBinding("Date", text: Binding(
+                get: { dateString },
+                set: { dateString = $0 }
+            ), field: .date)
 
-            // Date / Year
-            textRow("Date", text: $yearString, field: .year)
-
-            // Volume
-            textRow("Volume", text: $volume, field: .volume)
-
-            // Issue
-            textRow("Issue", text: $issue, field: .issue)
-
-            // Pages
-            textRow("Pages", text: $page, field: .page)
-
-            // Publisher
-            textRow("Publisher", text: $publisher, field: .publisher)
-
-            // Place
-            textRow("Place", text: $publisherPlace, field: .publisherPlace)
-
-            // DOI
-            gridRow("DOI") {
-                HStack(spacing: 4) {
-                    underlinedField {
-                        TextField("", text: $doi)
-                            .textFieldStyle(.plain)
-                            .foregroundStyle(doi.isEmpty ? .primary : Color.accentColor)
-                            .focused($focusedField, equals: .doi)
-                            .onSubmit { saveDebounced() }
-                            .onChange(of: focusedField) { old, new in
-                                if old == .doi && new != .doi { saveDebounced() }
-                            }
-                    }
-                    if !doi.isEmpty {
-                        Button {
-                            lookupDOI()
-                        } label: {
-                            if isLookingUp {
-                                ProgressView().controlSize(.mini)
-                            } else {
-                                Image(systemName: "arrow.clockwise")
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(Color.accentColor)
-                            }
-                        }
-                        .buttonStyle(.borderless)
-                        .disabled(isLookingUp)
-                        .help("Refresh metadata from CrossRef")
-                    }
-                }
+            // Accessed date (only for certain types)
+            if cslType == .webpage || cslType == .postWeblog || cslType == .post {
+                textRowBinding("Accessed", text: Binding(
+                    get: { accessedString },
+                    set: { accessedString = $0 }
+                ), field: .accessed)
             }
 
-            // ISBN
-            textRow("ISBN", text: $isbn, field: .isbn)
-
-            // ISSN
-            textRow("ISSN", text: $issn, field: .issn)
-
-            // URL
-            gridRow("URL") {
-                underlinedField {
-                    TextField("", text: $url)
-                        .textFieldStyle(.plain)
-                        .foregroundStyle(url.isEmpty ? .primary : Color.accentColor)
-                        .focused($focusedField, equals: .url)
-                        .onSubmit { saveDebounced() }
-                        .onChange(of: focusedField) { old, new in
-                            if old == .url && new != .url { saveDebounced() }
-                        }
-                }
-            }
-
-            // Abstract
-            gridRow("Abstract") {
-                underlinedField {
-                    TextField("", text: $abstract, axis: .vertical)
-                        .textFieldStyle(.plain)
-                        .lineLimit(1...6)
-                        .focused($focusedField, equals: .abstract)
-                        .onSubmit { saveDebounced() }
-                        .onChange(of: focusedField) { old, new in
-                            if old == .abstract && new != .abstract { saveDebounced() }
-                        }
-                }
+            // Dynamic creator sections from type spec
+            ForEach(spec.creators, id: \.self) { creatorSpec in
+                creatorSection(spec: creatorSpec)
             }
 
             Spacer().frame(height: 8)
@@ -281,9 +188,180 @@ struct ReferenceMetadataView: View {
         .font(.system(size: 13))
     }
 
+    // MARK: - Dynamic Field Rows
+
+    private func dynamicTextRow(_ spec: CSLFieldSpec) -> some View {
+        gridRow(spec.label) {
+            underlinedField {
+                TextField("", text: Binding(
+                    get: { fieldValues[spec.key] ?? "" },
+                    set: { fieldValues[spec.key] = $0 }
+                ))
+                .textFieldStyle(.plain)
+                .focused($focusedField, equals: .field(spec.key))
+                .onSubmit { saveDebounced() }
+                .onChange(of: focusedField) { old, new in
+                    if old == .field(spec.key) && new != .field(spec.key) { saveDebounced() }
+                }
+            }
+        }
+    }
+
+    private func multilineRow(_ spec: CSLFieldSpec) -> some View {
+        gridRow(spec.label) {
+            underlinedField {
+                TextField("", text: Binding(
+                    get: { fieldValues[spec.key] ?? "" },
+                    set: { fieldValues[spec.key] = $0 }
+                ), axis: .vertical)
+                .textFieldStyle(.plain)
+                .lineLimit(1...6)
+                .focused($focusedField, equals: .field(spec.key))
+                .onSubmit { saveDebounced() }
+                .onChange(of: focusedField) { old, new in
+                    if old == .field(spec.key) && new != .field(spec.key) { saveDebounced() }
+                }
+            }
+        }
+    }
+
+    private func doiRow(label: String) -> some View {
+        gridRow(label) {
+            HStack(spacing: 4) {
+                underlinedField {
+                    TextField("", text: Binding(
+                        get: { fieldValues["DOI"] ?? "" },
+                        set: { fieldValues["DOI"] = $0 }
+                    ))
+                    .textFieldStyle(.plain)
+                    .foregroundStyle((fieldValues["DOI"] ?? "").isEmpty ? .primary : Color.accentColor)
+                    .focused($focusedField, equals: .field("DOI"))
+                    .onSubmit { saveDebounced() }
+                    .onChange(of: focusedField) { old, new in
+                        if old == .field("DOI") && new != .field("DOI") { saveDebounced() }
+                    }
+                }
+                if !(fieldValues["DOI"] ?? "").isEmpty {
+                    Button {
+                        lookupDOI()
+                    } label: {
+                        if isLookingUp {
+                            ProgressView().controlSize(.mini)
+                        } else {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 10))
+                                .foregroundStyle(Color.accentColor)
+                        }
+                    }
+                    .buttonStyle(.borderless)
+                    .disabled(isLookingUp)
+                    .help("Refresh metadata from CrossRef")
+                }
+            }
+        }
+    }
+
+    private func urlRow(label: String) -> some View {
+        gridRow(label) {
+            underlinedField {
+                TextField("", text: Binding(
+                    get: { fieldValues["URL"] ?? "" },
+                    set: { fieldValues["URL"] = $0 }
+                ))
+                .textFieldStyle(.plain)
+                .foregroundStyle((fieldValues["URL"] ?? "").isEmpty ? .primary : Color.accentColor)
+                .focused($focusedField, equals: .field("URL"))
+                .onSubmit { saveDebounced() }
+                .onChange(of: focusedField) { old, new in
+                    if old == .field("URL") && new != .field("URL") { saveDebounced() }
+                }
+            }
+        }
+    }
+
+    // MARK: - Creator Sections
+
+    @ViewBuilder
+    private func creatorSection(spec creatorSpec: CSLCreatorSpec) -> some View {
+        let names = creatorValues[creatorSpec.role] ?? []
+
+        if names.isEmpty {
+            // Empty row with add button
+            gridRow(creatorSpec.label) {
+                HStack(spacing: 4) {
+                    Text("(last)")
+                        .foregroundStyle(.quaternary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Text(",")
+                        .foregroundStyle(.quaternary)
+                    Text("(first)")
+                        .foregroundStyle(.quaternary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    circleButton("plus") {
+                        creatorValues[creatorSpec.role] = [CSLName(family: "", given: "")]
+                    }
+                }
+            }
+        } else {
+            ForEach(names.indices, id: \.self) { i in
+                creatorGridRow(
+                    label: i == 0 ? creatorSpec.label : "",
+                    role: creatorSpec.role,
+                    index: i,
+                    isLast: i == names.count - 1
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func creatorGridRow(label: String, role: String, index: Int, isLast: Bool) -> some View {
+        gridRow(label) {
+            HStack(spacing: 4) {
+                underlinedField {
+                    TextField("(last)", text: Binding(
+                        get: { creatorValues[role]?[safe: index]?.family ?? "" },
+                        set: { creatorValues[role]?[index].family = $0 }
+                    ))
+                    .textFieldStyle(.plain)
+                    .focused($focusedField, equals: .creatorFamily(role, index))
+                    .onSubmit { saveDebounced() }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Text(",")
+                    .foregroundStyle(.tertiary)
+
+                underlinedField {
+                    TextField("(first)", text: Binding(
+                        get: { creatorValues[role]?[safe: index]?.given ?? "" },
+                        set: { creatorValues[role]?[index].given = $0 }
+                    ))
+                    .textFieldStyle(.plain)
+                    .focused($focusedField, equals: .creatorGiven(role, index))
+                    .onSubmit { saveDebounced() }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                circleButton("minus") {
+                    creatorValues[role]?.remove(at: index)
+                    if creatorValues[role]?.isEmpty == true {
+                        creatorValues[role] = nil
+                    }
+                    saveDebounced()
+                }
+
+                if isLast {
+                    circleButton("plus") {
+                        creatorValues[role, default: []].append(CSLName(family: "", given: ""))
+                    }
+                }
+            }
+        }
+    }
+
     // MARK: - Grid Row Components
 
-    /// Generic grid row: right-aligned label, left-aligned content.
     @ViewBuilder
     private func gridRow<Content: View>(
         _ label: String,
@@ -303,8 +381,7 @@ struct ReferenceMetadataView: View {
         .padding(.horizontal, 4)
     }
 
-    /// Text field grid row with underline.
-    private func textRow(
+    private func textRowBinding(
         _ label: String,
         text: Binding<String>,
         field: Field
@@ -322,7 +399,6 @@ struct ReferenceMetadataView: View {
         }
     }
 
-    /// Wraps content with a subtle bottom underline to indicate editability.
     @ViewBuilder
     private func underlinedField<Content: View>(
         @ViewBuilder content: () -> Content
@@ -334,50 +410,6 @@ struct ReferenceMetadataView: View {
                     .fill(Color.primary.opacity(0.08))
                     .frame(height: 1)
             }
-    }
-
-    /// Author row with fixed proportional columns: [last] , [first] [−] [+]
-    @ViewBuilder
-    private func authorGridRow(label: String, index: Int, isLast: Bool) -> some View {
-        gridRow(label) {
-            HStack(spacing: 4) {
-                underlinedField {
-                    TextField("(last)", text: Binding(
-                        get: { authors[index].family ?? "" },
-                        set: { authors[index].family = $0 }
-                    ))
-                    .textFieldStyle(.plain)
-                    .focused($focusedField, equals: .authorFamily(index))
-                    .onSubmit { saveDebounced() }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                Text(",")
-                    .foregroundStyle(.tertiary)
-
-                underlinedField {
-                    TextField("(first)", text: Binding(
-                        get: { authors[index].given ?? "" },
-                        set: { authors[index].given = $0 }
-                    ))
-                    .textFieldStyle(.plain)
-                    .focused($focusedField, equals: .authorGiven(index))
-                    .onSubmit { saveDebounced() }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                circleButton("minus") {
-                    authors.remove(at: index)
-                    saveDebounced()
-                }
-
-                if isLast {
-                    circleButton("plus") {
-                        authors.append(CSLName(family: "", given: ""))
-                    }
-                }
-            }
-        }
     }
 
     private func circleButton(_ icon: String, action: @escaping () -> Void) -> some View {
@@ -398,45 +430,55 @@ struct ReferenceMetadataView: View {
         citeKeyText = item.citeKey ?? ""
         citeKeyError = nil
         let csl = meta.cslItem
-        cslType = csl.type
-        doi = csl.DOI ?? ""
-        title = csl.title ?? ""
-        containerTitle = csl.containerTitle ?? ""
-        yearString = csl.issued?.year.map { "\($0)" } ?? ""
-        volume = csl.volume ?? ""
-        issue = csl.issue ?? ""
-        page = csl.page ?? ""
-        publisher = csl.publisher ?? ""
-        publisherPlace = csl.publisherPlace ?? ""
-        isbn = csl.ISBN ?? ""
-        issn = csl.ISSN ?? ""
-        url = csl.URL ?? ""
-        abstract = csl.abstract ?? ""
-        authors = csl.author ?? []
-        editors = csl.editor ?? []
+
+        // Set type
+        cslType = CSLItemType(rawValue: csl.type) ?? .document
+
+        // Load all string fields into dictionary
+        let spec = CSLTypeFieldRegistry.spec(for: cslType)
+        fieldValues = [:]
+        for fieldSpec in spec.fields {
+            if let val = csl.getField(fieldSpec.key), !val.isEmpty {
+                fieldValues[fieldSpec.key] = val
+            }
+        }
+
+        // Date
+        dateString = csl.issued?.year.map { "\($0)" } ?? ""
+        accessedString = csl.accessed?.year.map { "\($0)" } ?? ""
+
+        // Load all creator arrays
+        creatorValues = [:]
+        for creatorSpec in spec.creators {
+            if let names = csl.getCreators(role: creatorSpec.role), !names.isEmpty {
+                creatorValues[creatorSpec.role] = names
+            }
+        }
     }
 
     private func buildCSLItem() -> CSLItem {
-        var csl = CSLItem(type: cslType)
-        csl.title = title.isEmpty ? nil : title
-        csl.DOI = doi.isEmpty ? nil : doi
-        csl.containerTitle = containerTitle.isEmpty ? nil : containerTitle
-        csl.volume = volume.isEmpty ? nil : volume
-        csl.issue = issue.isEmpty ? nil : issue
-        csl.page = page.isEmpty ? nil : page
-        csl.publisher = publisher.isEmpty ? nil : publisher
-        csl.publisherPlace = publisherPlace.isEmpty ? nil : publisherPlace
-        csl.ISBN = isbn.isEmpty ? nil : isbn
-        csl.ISSN = issn.isEmpty ? nil : issn
-        csl.URL = url.isEmpty ? nil : url
-        csl.abstract = abstract.isEmpty ? nil : abstract
-        if let year = Int(yearString) {
+        var csl = CSLItem(type: cslType.rawValue)
+
+        // Set all field values
+        for (key, value) in fieldValues {
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            csl.setField(key, value: trimmed.isEmpty ? nil : trimmed)
+        }
+
+        // Date
+        if let year = Int(dateString) {
             csl.issued = CSLDate(year: year)
         }
-        let filteredAuthors = authors.filter { !($0.family ?? "").isEmpty || !($0.given ?? "").isEmpty }
-        csl.author = filteredAuthors.isEmpty ? nil : filteredAuthors
-        let filteredEditors = editors.filter { !($0.family ?? "").isEmpty || !($0.given ?? "").isEmpty }
-        csl.editor = filteredEditors.isEmpty ? nil : filteredEditors
+        if let year = Int(accessedString) {
+            csl.accessed = CSLDate(year: year)
+        }
+
+        // Set all creator arrays
+        for (role, names) in creatorValues {
+            let filtered = names.filter { !($0.family ?? "").isEmpty || !($0.given ?? "").isEmpty }
+            csl.setCreators(role: role, names: filtered.isEmpty ? nil : filtered)
+        }
+
         return csl
     }
 
@@ -463,32 +505,8 @@ struct ReferenceMetadataView: View {
         }
     }
 
-    private func extractFromPDF() {
-        isExtracting = true
-        Task {
-            let pdfURL = item.fileURL
-            if let foundDOI = DOIExtractorService.extractDOI(from: pdfURL) {
-                doi = foundDOI
-                do {
-                    let cslItem = try await CrossRefService.fetchMetadata(doi: foundDOI)
-                    try referenceService.saveMetadata(cslItem, forItemId: item.id.uuidString)
-                    await MainActor.run {
-                        store.invalidate()
-                        isExtracting = false
-                    }
-                    return
-                } catch {
-                    Log.error(Log.importer, "CrossRef lookup failed: \(error)")
-                }
-            }
-            await MainActor.run {
-                createEmptyMetadata()
-                isExtracting = false
-            }
-        }
-    }
-
     private func lookupDOI() {
+        let doi = fieldValues["DOI"] ?? ""
         guard !doi.isEmpty else { return }
         isLookingUp = true
         Task {
@@ -518,5 +536,13 @@ struct ReferenceMetadataView: View {
         } catch {
             Log.error(Log.store, "Failed to create empty reference metadata: \(error)")
         }
+    }
+}
+
+// MARK: - Safe Array Access
+
+private extension Array {
+    subscript(safe index: Index) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }
