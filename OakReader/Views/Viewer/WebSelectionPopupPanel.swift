@@ -5,7 +5,7 @@ import WebKit
 
 /// Horizontal toolbar popup for text selected in web snapshot viewers.
 /// Matches the PDF text selection popup style with highlight, chat, note, translate, copy.
-class WebSelectionPopupPanel: NSPanel {
+class WebSelectionPopupPanel: NSPanel, AppResignDismissable {
     private(set) static var current: WebSelectionPopupPanel?
 
     private let viewModel: DocumentViewModel
@@ -15,6 +15,7 @@ class WebSelectionPopupPanel: NSPanel {
 
     // Color sub-panel
     private var colorSubPanel: NSPanel?
+    var resignObserver: NSObjectProtocol?
 
     static let highlightColors: [(NSColor, String, String)] = [
         (NSColor(red: 1.0, green: 0.83, blue: 0.0, alpha: 1.0), "Yellow", "rgba(255,212,0,0.35)"),
@@ -28,7 +29,8 @@ class WebSelectionPopupPanel: NSPanel {
     ]
 
     static func show(
-        at screenPoint: NSPoint,
+        atTop topScreenPoint: NSPoint,
+        atBottom bottomScreenPoint: NSPoint,
         text: String,
         viewModel: DocumentViewModel,
         webView: WKWebView?,
@@ -37,7 +39,8 @@ class WebSelectionPopupPanel: NSPanel {
         current?.dismiss()
 
         let panel = WebSelectionPopupPanel(
-            at: screenPoint,
+            atTop: topScreenPoint,
+            atBottom: bottomScreenPoint,
             text: text,
             viewModel: viewModel,
             webView: webView,
@@ -55,8 +58,34 @@ class WebSelectionPopupPanel: NSPanel {
         return window === self || window === colorSubPanel
     }
 
+    /// Reposition the popup to follow scroll.
+    func reposition(atTop topScreenPoint: NSPoint, atBottom bottomScreenPoint: NSPoint) {
+        let panelSize = self.frame.size
+        let x = topScreenPoint.x - panelSize.width / 2
+        var y = topScreenPoint.y + 6
+
+        if let screen = NSScreen.main {
+            let screenTop = screen.visibleFrame.maxY
+            if y + panelSize.height > screenTop {
+                y = bottomScreenPoint.y - panelSize.height - 6
+            }
+        }
+
+        self.setFrameOrigin(NSPoint(x: x, y: y))
+
+        // Reposition color sub-panel if visible
+        if let panel = colorSubPanel {
+            let mainFrame = self.frame
+            let cpSize = panel.frame.size
+            let cpX = mainFrame.origin.x + 6
+            let cpY = mainFrame.origin.y - cpSize.height - 2
+            panel.setFrameOrigin(NSPoint(x: cpX, y: cpY))
+        }
+    }
+
     private init(
-        at screenPoint: NSPoint,
+        atTop topScreenPoint: NSPoint,
+        atBottom bottomScreenPoint: NSPoint,
         text: String,
         viewModel: DocumentViewModel,
         webView: WKWebView?,
@@ -86,15 +115,15 @@ class WebSelectionPopupPanel: NSPanel {
         let contentSize = content.fittingSize
         setContentSize(contentSize)
 
-        // Position: centered above selection (matching PDF popup)
-        let x = screenPoint.x - contentSize.width / 2
-        var y = screenPoint.y + 6
+        // Position: centered above selection top
+        let x = topScreenPoint.x - contentSize.width / 2
+        var y = topScreenPoint.y + 6
 
-        // Fallback: if panel top edge exceeds screen top, position below
+        // Fallback: if panel top edge exceeds screen top, position below selection bottom
         if let screen = NSScreen.main {
             let screenTop = screen.visibleFrame.maxY
             if y + contentSize.height > screenTop {
-                y = screenPoint.y - contentSize.height - 6
+                y = bottomScreenPoint.y - contentSize.height - 6
             }
         }
 
@@ -106,6 +135,8 @@ class WebSelectionPopupPanel: NSPanel {
             ctx.duration = 0.12
             self.animator().alphaValue = 1
         }
+
+        observeAppResign()
     }
 
     // MARK: - Content View (horizontal toolbar)
@@ -114,10 +145,10 @@ class WebSelectionPopupPanel: NSPanel {
         let mainStack = NSStackView()
         mainStack.orientation = .horizontal
         mainStack.spacing = 2
-        mainStack.edgeInsets = NSEdgeInsets(top: 4, left: 6, bottom: 4, right: 6)
+        mainStack.edgeInsets = NSEdgeInsets(top: 8, left: 10, bottom: 8, right: 10)
         mainStack.alignment = .centerY
 
-        // Group 1: Highlight
+        // Group 1: Markup (highlight + underline + color picker)
         let highlightBtn = PopupIconButton(
             systemImage: "highlighter",
             accessibilityLabel: "Highlight"
@@ -126,20 +157,21 @@ class WebSelectionPopupPanel: NSPanel {
         }
         mainStack.addArrangedSubview(highlightBtn)
 
-        let colorChevron = PopupIconButton(
-            systemImage: "chevron.down",
+        let underlineBtn = PopupIconButton(
+            systemImage: "underline",
+            accessibilityLabel: "Underline"
+        ) { [weak self] in
+            self?.applyUnderline()
+        }
+        mainStack.addArrangedSubview(underlineBtn)
+
+        let colorBtn = PopupIconButton(
+            systemImage: "paintpalette",
             accessibilityLabel: "Highlight Color"
         ) { [weak self] in
             self?.toggleColorSubPanel()
         }
-        // Make chevron smaller
-        colorChevron.removeConstraints(colorChevron.constraints)
-        colorChevron.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            colorChevron.widthAnchor.constraint(equalToConstant: 20),
-            colorChevron.heightAnchor.constraint(equalToConstant: 32),
-        ])
-        mainStack.addArrangedSubview(colorChevron)
+        mainStack.addArrangedSubview(colorBtn)
 
         // Separator 1
         mainStack.addArrangedSubview(makeVerticalSeparator())
@@ -186,22 +218,7 @@ class WebSelectionPopupPanel: NSPanel {
         mainStack.addArrangedSubview(copyBtn)
 
         // Background container
-        let container = NSVisualEffectView()
-        container.material = .popover
-        container.state = .active
-        container.wantsLayer = true
-        container.layer?.cornerRadius = 8
-
-        container.addSubview(mainStack)
-        mainStack.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            mainStack.topAnchor.constraint(equalTo: container.topAnchor),
-            mainStack.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-            mainStack.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            mainStack.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-        ])
-
-        return container
+        return makePopupGlassContainer(content: mainStack)
     }
 
     private func makeVerticalSeparator() -> NSView {
@@ -237,30 +254,17 @@ class WebSelectionPopupPanel: NSPanel {
         let colorStack = NSStackView()
         colorStack.orientation = .horizontal
         colorStack.spacing = 8
-        colorStack.edgeInsets = NSEdgeInsets(top: 6, left: 8, bottom: 6, right: 8)
+        colorStack.edgeInsets = NSEdgeInsets(top: 14, left: 10, bottom: 14, right: 10)
 
         for (index, (color, name, _)) in Self.highlightColors.enumerated() {
-            let dot = ColorDotView(color: color, size: 14) { [weak self] in
+            let dot = ColorDotView(color: color, size: 20) { [weak self] in
                 self?.applyHighlight(colorIndex: index)
             }
             dot.toolTip = name
             colorStack.addArrangedSubview(dot)
         }
 
-        let container = NSVisualEffectView()
-        container.material = .popover
-        container.state = .active
-        container.wantsLayer = true
-        container.layer?.cornerRadius = 8
-
-        container.addSubview(colorStack)
-        colorStack.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            colorStack.topAnchor.constraint(equalTo: container.topAnchor),
-            colorStack.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-            colorStack.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            colorStack.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-        ])
+        let container = makePopupGlassContainer(content: colorStack)
 
         let panel = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: 10, height: 10),
@@ -303,23 +307,24 @@ class WebSelectionPopupPanel: NSPanel {
         }
 
         let (_, _, cssColor) = Self.highlightColors[colorIndex]
-        let js = """
-        (function() {
-            var sel = window.getSelection();
-            if (!sel.rangeCount || sel.isCollapsed) return;
-            var range = sel.getRangeAt(0);
-            var contents = range.extractContents();
-            var mark = document.createElement('mark');
-            mark.className = 'oak-highlight';
-            mark.style.backgroundColor = '\(cssColor)';
-            mark.style.borderRadius = '2px';
-            mark.style.padding = '1px 0';
-            mark.appendChild(contents);
-            range.insertNode(mark);
-            sel.removeAllRanges();
-        })();
-        """
-        webView.evaluateJavaScript(js, completionHandler: nil)
+        webView.evaluateJavaScript(
+            "OakHighlighter.highlightSelection('\(cssColor)', 'highlight');",
+            completionHandler: nil
+        )
+        dismiss()
+    }
+
+    private func applyUnderline() {
+        guard let webView else {
+            dismiss()
+            return
+        }
+
+        let (_, _, cssColor) = Self.highlightColors[0]
+        webView.evaluateJavaScript(
+            "OakHighlighter.highlightSelection('\(cssColor)', 'underline');",
+            completionHandler: nil
+        )
         dismiss()
     }
 
@@ -348,6 +353,8 @@ class WebSelectionPopupPanel: NSPanel {
     }
 
     func dismiss() {
+        removeAppResignObserver()
+
         colorSubPanel?.orderOut(nil)
         colorSubPanel = nil
 
@@ -369,12 +376,13 @@ class WebSelectionPopupPanel: NSPanel {
 
 /// Popup for area captures in the web snapshot viewer.
 /// Offers "Add to Chat" and "Copy Image".
-class WebAreaPopupPanel: NSPanel {
+class WebAreaPopupPanel: NSPanel, AppResignDismissable {
     private static var current: WebAreaPopupPanel?
 
     private let viewModel: DocumentViewModel
     private let imageData: Data
     private let onDismiss: () -> Void
+    var resignObserver: NSObjectProtocol?
 
     static func show(
         at screenPoint: NSPoint,
@@ -438,6 +446,8 @@ class WebAreaPopupPanel: NSPanel {
             ctx.duration = 0.12
             self.animator().alphaValue = 1
         }
+
+        observeAppResign()
     }
 
     private func buildContentView() -> NSView {
@@ -488,23 +498,10 @@ class WebAreaPopupPanel: NSPanel {
         copyBtn.trailingAnchor.constraint(equalTo: stack.trailingAnchor, constant: -6).isActive = true
 
         // Background
-        let container = NSVisualEffectView()
-        container.material = .popover
-        container.state = .active
-        container.wantsLayer = true
-        container.layer?.cornerRadius = 6
+        let container = makePopupGlassContainer(content: stack, cornerRadius: 6)
 
         // Match PDF popup width
         container.widthAnchor.constraint(equalToConstant: 246).isActive = true
-
-        container.addSubview(stack)
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: container.topAnchor),
-            stack.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-            stack.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-        ])
 
         return container
     }
@@ -592,6 +589,8 @@ class WebAreaPopupPanel: NSPanel {
     }
 
     func dismiss() {
+        removeAppResignObserver()
+
         let callback = onDismiss
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = 0.08

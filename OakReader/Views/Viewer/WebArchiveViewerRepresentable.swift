@@ -48,35 +48,91 @@ struct WebArchiveViewerRepresentable: NSViewRepresentable {
     func makeNSView(context: Context) -> OakWebView {
         let config = WKWebViewConfiguration()
 
-        // Register text selection handler — sends text + bounding rect for popup positioning
+        // Register text selection handler — sends text + bounding rect for popup positioning.
+        // Uses requestAnimationFrame tracking to follow the selection during scroll/zoom,
+        // since WKWebView on macOS may not reliably fire DOM scroll events.
         let selectionScript = WKUserScript(
             source: """
-            document.addEventListener('mouseup', function() {
-                var sel = window.getSelection();
-                var text = sel.toString();
-                if (text && sel.rangeCount > 0) {
-                    var rects = sel.getRangeAt(0).getClientRects();
-                    if (rects.length > 0) {
-                        var r = rects[0];
-                        window.webkit.messageHandlers.textSelected.postMessage({
-                            text: text, x: r.x + r.width / 2, y: r.y
-                        });
-                    } else {
-                        var rect = sel.getRangeAt(0).getBoundingClientRect();
-                        window.webkit.messageHandlers.textSelected.postMessage({
-                            text: text, x: rect.x + rect.width / 2, y: rect.y
-                        });
+            (function() {
+                var rafId = null;
+                var lastKey = '';
+
+                function getSelectionInfo() {
+                    var sel = window.getSelection();
+                    var text = sel.toString();
+                    if (text && sel.rangeCount > 0) {
+                        var range = sel.getRangeAt(0);
+                        var rect = range.getBoundingClientRect();
+                        var rects = range.getClientRects();
+                        var topY = (rects.length > 0) ? rects[0].y : rect.y;
+                        return {
+                            text: text,
+                            x: rect.x + rect.width / 2,
+                            y: topY,
+                            bottomY: rect.y + rect.height,
+                            vpWidth: window.innerWidth,
+                            vpHeight: window.innerHeight
+                        };
                     }
-                } else {
-                    window.webkit.messageHandlers.textSelected.postMessage({text: '', x: 0, y: 0});
+                    return null;
                 }
-            });
+
+                function sendInfo(info) {
+                    if (info) {
+                        window.webkit.messageHandlers.textSelected.postMessage(info);
+                    } else {
+                        window.webkit.messageHandlers.textSelected.postMessage({text: ''});
+                    }
+                }
+
+                function trackLoop() {
+                    var info = getSelectionInfo();
+                    if (info) {
+                        var key = info.x + ',' + info.y + ',' + info.bottomY;
+                        if (key !== lastKey) {
+                            lastKey = key;
+                            sendInfo(info);
+                        }
+                        rafId = requestAnimationFrame(trackLoop);
+                    } else {
+                        rafId = null;
+                        lastKey = '';
+                    }
+                }
+
+                function startTracking() {
+                    if (rafId !== null) return;
+                    rafId = requestAnimationFrame(trackLoop);
+                }
+
+                document.addEventListener('mouseup', function() {
+                    var info = getSelectionInfo();
+                    sendInfo(info);
+                    if (info) startTracking();
+                });
+            })();
             """,
             injectionTime: .atDocumentEnd,
             forMainFrameOnly: true
         )
         config.userContentController.addUserScript(selectionScript)
         config.userContentController.add(context.coordinator, name: "textSelected")
+
+        // Inject web-highlighter library + OakHighlighter bridge (order matters)
+        let jsBundle = Bundle.main.resourceURL?
+            .appendingPathComponent("Preview.bundle/js")
+        for jsFile in ["web-highlighter.min.js", "oak-web-highlighter.js"] {
+            if let url = jsBundle?.appendingPathComponent(jsFile),
+               let src = try? String(contentsOf: url, encoding: .utf8) {
+                let script = WKUserScript(
+                    source: src,
+                    injectionTime: .atDocumentEnd,
+                    forMainFrameOnly: true
+                )
+                config.userContentController.addUserScript(script)
+            }
+        }
+        config.userContentController.add(context.coordinator, name: "highlightEvent")
 
         let webView = OakWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator

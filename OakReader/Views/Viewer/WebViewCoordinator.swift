@@ -75,12 +75,29 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessageH
         decisionHandler(.allow)
     }
 
+    // MARK: - Page Load Complete
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        webView.evaluateJavaScript("OakHighlighter.init();") { [weak self] _, _ in
+            self?.restoreSavedHighlights()
+        }
+    }
+
     // MARK: - WKScriptMessageHandler
 
     func userContentController(
         _ userContentController: WKUserContentController,
         didReceive message: WKScriptMessage
     ) {
+        // Handle highlight creation events from the bridge script
+        if message.name == "highlightEvent",
+           let body = message.body as? [String: Any],
+           let action = body["action"] as? String,
+           action == "create" {
+            persistWebHighlight(body)
+            return
+        }
+
         guard message.name == "textSelected",
               let body = message.body as? [String: Any],
               let text = body["text"] as? String else {
@@ -89,35 +106,120 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessageH
 
         viewModel.state.selectedText = text.isEmpty ? nil : text
 
+        // Don't dismiss popup on empty text — the mouse monitor handles dismissal on click.
+        // This prevents the popup from vanishing during scroll when the selection briefly clears.
         guard !text.isEmpty,
               let x = body["x"] as? CGFloat,
               let y = body["y"] as? CGFloat,
+              let bottomY = body["bottomY"] as? CGFloat,
+              let vpWidth = body["vpWidth"] as? CGFloat, vpWidth > 0,
+              let vpHeight = body["vpHeight"] as? CGFloat, vpHeight > 0,
               let webView = self.webView,
               let window = webView.window else {
-            WebSelectionPopupPanel.dismissCurrent()
-            removeMouseMonitor()
             return
         }
 
-        // Convert content-relative coords (JS getBoundingClientRect) to screen coords.
-        // JS coords are relative to the WKWebView's visible viewport, Y-down.
-        // NSView coords are Y-up from the view's bottom.
-        // CSS pixels -> view points (pageZoom scales the CSS coordinate space)
-        let zoom = webView.pageZoom
-        let viewPoint = NSPoint(x: x * zoom, y: webView.bounds.height - y * zoom)
-        let windowPoint = webView.convert(viewPoint, to: nil)
-        let screenPoint = window.convertPoint(toScreen: windowPoint)
+        // Convert JS viewport coords to NSView coords using viewport-to-bounds scale.
+        // This correctly handles pageZoom and magnification without manual zoom math.
+        let scaleX = webView.bounds.width / vpWidth
+        let scaleY = webView.bounds.height / vpHeight
+        let topViewPoint = NSPoint(x: x * scaleX, y: webView.bounds.height - y * scaleY)
+        let topWindowPoint = webView.convert(topViewPoint, to: nil)
+        let topScreenPoint = window.convertPoint(toScreen: topWindowPoint)
 
-        WebSelectionPopupPanel.show(
-            at: screenPoint,
+        let bottomViewPoint = NSPoint(x: x * scaleX, y: webView.bounds.height - bottomY * scaleY)
+        let bottomWindowPoint = webView.convert(bottomViewPoint, to: nil)
+        let bottomScreenPoint = window.convertPoint(toScreen: bottomWindowPoint)
+
+        // Reposition existing popup on scroll, or create new one
+        if let popup = WebSelectionPopupPanel.current {
+            popup.reposition(atTop: topScreenPoint, atBottom: bottomScreenPoint)
+        } else {
+            WebSelectionPopupPanel.show(
+                atTop: topScreenPoint,
+                atBottom: bottomScreenPoint,
+                text: text,
+                viewModel: viewModel,
+                webView: webView,
+                onDismiss: { [weak self] in
+                    self?.removeMouseMonitor()
+                }
+            )
+            installMouseMonitor()
+        }
+    }
+
+    // MARK: - Web Highlight Persistence
+
+    /// Persist a new highlight created via OakHighlighter to the annotation store.
+    private func persistWebHighlight(_ body: [String: Any]) {
+        guard let db = viewModel.database,
+              let attId = viewModel.attachmentId,
+              let itmId = viewModel.itemId else { return }
+
+        guard let highlightId = body["id"] as? String,
+              let color = body["color"] as? String,
+              let type = body["type"] as? String,
+              let sourcesJson = body["sources"] as? String else { return }
+
+        // Extract text from the serialized sources for the annotation record
+        var text: String?
+        if let data = sourcesJson.data(using: .utf8),
+           let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            text = dict["text"] as? String
+        }
+
+        let now = Date().iso8601String
+        let store = AnnotationStore(database: db)
+        let record = AnnotationRecord(
+            id: highlightId,
+            userId: localUserId,
+            itemId: itmId,
+            attachmentId: attId,
+            key: AnnotationStore.generateKey(),
+            type: type,
+            authorName: nil,
             text: text,
-            viewModel: viewModel,
-            webView: webView,
-            onDismiss: { [weak self] in
-                self?.removeMouseMonitor()
-            }
+            comment: nil,
+            color: color,
+            pageLabel: nil,
+            sortIndex: "00000|000000|000000",
+            positionKind: "web",
+            positionJson: sourcesJson,
+            styleJson: nil,
+            source: "oakreader",
+            sourceKey: nil,
+            isExternal: false,
+            createdAt: now,
+            updatedAt: now,
+            deletedAt: nil
         )
-        installMouseMonitor()
+        store.upsert(record)
+    }
+
+    /// Restore all saved web highlights from the annotation store.
+    private func restoreSavedHighlights() {
+        guard let db = viewModel.database,
+              let attId = viewModel.attachmentId else { return }
+
+        let store = AnnotationStore(database: db)
+        let records = store.fetch(attachmentId: attId)
+            .filter { $0.positionKind == "web" && $0.deletedAt == nil }
+
+        guard let webView, !records.isEmpty else { return }
+
+        for record in records {
+            let escapedJson = record.positionJson
+                .replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "'", with: "\\'")
+            let escapedColor = record.color
+                .replacingOccurrences(of: "'", with: "\\'")
+            let escapedType = record.type
+                .replacingOccurrences(of: "'", with: "\\'")
+
+            let js = "OakHighlighter.restore('\(record.id)', '\(escapedJson)', '\(escapedColor)', '\(escapedType)');"
+            webView.evaluateJavaScript(js, completionHandler: nil)
+        }
     }
 
     // MARK: - Mouse Monitor (dismiss popup on outside click)
