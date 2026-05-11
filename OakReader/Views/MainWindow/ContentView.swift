@@ -3,6 +3,7 @@ import PDFKit
 
 struct ContentView: View {
     let viewModel: DocumentViewModel
+    var isActive: Bool = true
 
     // MARK: - Sheet State
 
@@ -160,9 +161,9 @@ struct ContentView: View {
             )
             .onHover { hovering in
                 if hovering {
-                    NSCursor.resizeLeftRight.push()
+                    NSCursor.resizeLeftRight.set()
                 } else {
-                    NSCursor.pop()
+                    NSCursor.arrow.set()
                 }
             }
     }
@@ -174,7 +175,7 @@ struct ContentView: View {
         switch viewModel.itemType {
         case .pdf:
             ZStack {
-                PDFViewerRepresentable(viewModel: viewModel)
+                PDFViewerRepresentable(viewModel: viewModel, isActive: isActive)
 
                 if viewModel.state.editorMode == .snapshot {
                     SnapshotOverlayView(viewModel: viewModel)
@@ -182,7 +183,7 @@ struct ContentView: View {
             }
         case .webSnapshot:
             ZStack {
-                WebArchiveViewerRepresentable(viewModel: viewModel)
+                WebArchiveViewerRepresentable(viewModel: viewModel, isActive: isActive)
                 if viewModel.state.editorMode == .snapshot {
                     WebSnapshotOverlayView(viewModel: viewModel)
                 }
@@ -190,7 +191,7 @@ struct ContentView: View {
         case .embed:
             ZStack {
                 if viewModel.mediaDocument?.metadata.resolvedEmbedType == .youtube {
-                    MediaViewerView(viewModel: viewModel)
+                    MediaViewerView(viewModel: viewModel, isActive: isActive)
                 } else {
                     EmbedCardView(viewModel: viewModel)
                 }

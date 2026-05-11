@@ -1,5 +1,60 @@
 import AppKit
 
+// MARK: - Popup Panel Dismiss-on-Resign
+
+/// Panels conforming to this protocol automatically dismiss when the app loses focus.
+protocol AppResignDismissable: NSPanel {
+    var resignObserver: NSObjectProtocol? { get set }
+    func dismiss()
+}
+
+extension AppResignDismissable {
+    func observeAppResign() {
+        resignObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didResignActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.dismiss()
+        }
+    }
+
+    func removeAppResignObserver() {
+        if let observer = resignObserver {
+            NotificationCenter.default.removeObserver(observer)
+            resignObserver = nil
+        }
+    }
+}
+
+// MARK: - Glass Container Factory
+
+/// Creates a popup container with Liquid Glass on macOS 26+, falling back to NSVisualEffectView.
+func makePopupGlassContainer(content: NSView, cornerRadius: CGFloat = 8) -> NSView {
+    let container: NSView
+    if #available(macOS 26, *) {
+        let glass = NSGlassEffectView()
+        glass.cornerRadius = cornerRadius
+        container = glass
+    } else {
+        let vev = NSVisualEffectView()
+        vev.material = .popover
+        vev.state = .active
+        vev.wantsLayer = true
+        vev.layer?.cornerRadius = cornerRadius
+        container = vev
+    }
+    container.addSubview(content)
+    content.translatesAutoresizingMaskIntoConstraints = false
+    NSLayoutConstraint.activate([
+        content.topAnchor.constraint(equalTo: container.topAnchor),
+        content.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+        content.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+        content.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+    ])
+    return container
+}
+
 // MARK: - Color Dot (OakReader-style round swatch)
 
 class ColorDotView: NSView {

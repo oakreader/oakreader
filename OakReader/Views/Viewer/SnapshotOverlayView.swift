@@ -181,7 +181,7 @@ private struct CursorModifier: ViewModifier {
     let cursor: NSCursor
     func body(content: Content) -> some View {
         content.onHover { inside in
-            if inside { cursor.push() } else { NSCursor.pop() }
+            if inside { cursor.set() } else { NSCursor.arrow.set() }
         }
     }
 }

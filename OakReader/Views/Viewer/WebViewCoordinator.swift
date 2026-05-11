@@ -20,6 +20,17 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessageH
         removeScrollMonitor()
     }
 
+    // MARK: - Active State
+
+    /// Install or remove global event monitors when the tab becomes active/inactive.
+    func setActive(_ active: Bool) {
+        if active {
+            if scrollMonitor == nil { setupScrollMonitor() }
+        } else {
+            removeScrollMonitor()
+        }
+    }
+
     // MARK: - Setup
 
     func setupScrollMonitor() {
@@ -120,14 +131,17 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessageH
         }
 
         // Convert JS viewport coords to NSView coords using viewport-to-bounds scale.
-        // This correctly handles pageZoom and magnification without manual zoom math.
+        // WKWebView is flipped (origin at top-left, Y down) matching JS viewport coords,
+        // so no Y-flip is needed. Non-flipped views need bounds.height - y.
         let scaleX = webView.bounds.width / vpWidth
         let scaleY = webView.bounds.height / vpHeight
-        let topViewPoint = NSPoint(x: x * scaleX, y: webView.bounds.height - y * scaleY)
+        let topViewY = webView.isFlipped ? y * scaleY : webView.bounds.height - y * scaleY
+        let topViewPoint = NSPoint(x: x * scaleX, y: topViewY)
         let topWindowPoint = webView.convert(topViewPoint, to: nil)
         let topScreenPoint = window.convertPoint(toScreen: topWindowPoint)
 
-        let bottomViewPoint = NSPoint(x: x * scaleX, y: webView.bounds.height - bottomY * scaleY)
+        let bottomViewY = webView.isFlipped ? bottomY * scaleY : webView.bounds.height - bottomY * scaleY
+        let bottomViewPoint = NSPoint(x: x * scaleX, y: bottomViewY)
         let bottomWindowPoint = webView.convert(bottomViewPoint, to: nil)
         let bottomScreenPoint = window.convertPoint(toScreen: bottomWindowPoint)
 

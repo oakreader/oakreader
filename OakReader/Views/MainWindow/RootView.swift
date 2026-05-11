@@ -24,7 +24,7 @@ struct RootView: View {
 
                 // Document tabs — each kept alive, visibility toggled
                 ForEach(appState.openTabs) { tab in
-                    ContentView(viewModel: tab.viewModel)
+                    ContentView(viewModel: tab.viewModel, isActive: tab.id == appState.activeTabID)
                         .opacity(tab.id == appState.activeTabID ? 1 : 0)
                         .allowsHitTesting(tab.id == appState.activeTabID)
                 }

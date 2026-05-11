@@ -6,7 +6,7 @@ import OakReaderAI
 /// Horizontal toolbar popup for text selected in the Markdown editor.
 /// Offers AI writing tools (Improve Writing, Fix Grammar), Translate, Speak, Copy,
 /// with inline diff display and Accept/Reject flow.
-class MarkdownSelectionPopupPanel: NSPanel {
+class MarkdownSelectionPopupPanel: NSPanel, AppResignDismissable {
     private(set) static var current: MarkdownSelectionPopupPanel?
 
     private let viewModel: DocumentViewModel?
@@ -30,6 +30,7 @@ class MarkdownSelectionPopupPanel: NSPanel {
 
     // Mouse monitor
     private var mouseMonitor: Any?
+    var resignObserver: NSObjectProtocol?
 
     static func show(
         at screenPoint: NSPoint,
@@ -107,6 +108,8 @@ class MarkdownSelectionPopupPanel: NSPanel {
         }
 
         installMouseMonitor()
+
+        observeAppResign()
     }
 
     // MARK: - Content View
@@ -115,7 +118,7 @@ class MarkdownSelectionPopupPanel: NSPanel {
         let stack = NSStackView()
         stack.orientation = .horizontal
         stack.spacing = 2
-        stack.edgeInsets = NSEdgeInsets(top: 4, left: 6, bottom: 4, right: 6)
+        stack.edgeInsets = NSEdgeInsets(top: 8, left: 6, bottom: 8, right: 6)
         stack.alignment = .centerY
         self.mainStack = stack
 
@@ -212,22 +215,7 @@ class MarkdownSelectionPopupPanel: NSPanel {
         }
 
         // Background container
-        let container = NSVisualEffectView()
-        container.material = .popover
-        container.state = .active
-        container.wantsLayer = true
-        container.layer?.cornerRadius = 8
-
-        container.addSubview(stack)
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: container.topAnchor),
-            stack.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-            stack.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-        ])
-
-        return container
+        return makePopupGlassContainer(content: stack)
     }
 
     private func makeVerticalSeparator() -> NSView {
@@ -468,6 +456,7 @@ class MarkdownSelectionPopupPanel: NSPanel {
             NSEvent.removeMonitor(monitor)
             mouseMonitor = nil
         }
+        removeAppResignObserver()
 
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = 0.08

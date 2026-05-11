@@ -63,6 +63,9 @@ final class MarkdownHighlighter: NSObject, NSTextStorageDelegate {
 
     private var isHighlighting = false
 
+    /// Debounce work item for `highlightAll` calls to avoid redundant full-document passes.
+    private var highlightAllWorkItem: DispatchWorkItem?
+
     init(baseFont: NSFont, lineHeight: CGFloat = 1.3, lineSpacing: CGFloat = 3.0, letterSpacing: CGFloat = 0.5) {
         self.baseFont = baseFont
         self.lineHeight = lineHeight
@@ -105,14 +108,42 @@ final class MarkdownHighlighter: NSObject, NSTextStorageDelegate {
         let ns = textStorage.string as NSString
         guard ns.length > 0 else { return }
 
+        // Invalidate cached fenced blocks on every text edit
+        fencedBlocksDirty = true
+
         isHighlighting = true
         applyAttributes(ns.lineRange(for: editedRange), in: textStorage)
         isHighlighting = false
     }
 
+    /// Highlight the entire document. For large documents, deferred to the next run loop
+    /// to avoid blocking SwiftUI view updates.
     func highlightAll(in textStorage: NSTextStorage) {
         let len = (textStorage.string as NSString).length
         guard len > 0 else { return }
+
+        // Cancel any pending deferred highlight
+        highlightAllWorkItem?.cancel()
+
+        // For small documents, highlight synchronously (no visible delay)
+        if len < 10_000 {
+            performHighlightAll(in: textStorage)
+            return
+        }
+
+        // For large documents, defer to next run loop to unblock the UI
+        let workItem = DispatchWorkItem { [weak self, weak textStorage] in
+            guard let self, let ts = textStorage else { return }
+            self.performHighlightAll(in: ts)
+        }
+        highlightAllWorkItem = workItem
+        DispatchQueue.main.async(execute: workItem)
+    }
+
+    private func performHighlightAll(in textStorage: NSTextStorage) {
+        let len = (textStorage.string as NSString).length
+        guard len > 0 else { return }
+        fencedBlocksDirty = true
         isHighlighting = true
         textStorage.beginEditing()
         applyAttributes(NSRange(location: 0, length: len), in: textStorage)
@@ -163,8 +194,11 @@ final class MarkdownHighlighter: NSObject, NSTextStorageDelegate {
         ]
         ts.setAttributes(baseAttrs, range: safe)
 
-        // Fenced code blocks (scan full doc, apply within range)
-        scanFencedCodeBlocks(in: ts)
+        // Fenced code blocks (rescan only if dirty, then apply within range)
+        if fencedBlocksDirty {
+            scanFencedCodeBlocks(in: ts)
+            fencedBlocksDirty = false
+        }
         applyFencedCodeBlocks(in: ts, range: safe)
 
         // Inline markdown
@@ -192,7 +226,7 @@ final class MarkdownHighlighter: NSObject, NSTextStorageDelegate {
             guard let match else { return }
             let hashRange = match.range(at: 1)
             ts.addAttribute(.foregroundColor, value: self.accentColor, range: match.range)
-            ts.addAttribute(.foregroundColor, value: NSColor.tertiaryLabelColor, range: hashRange)
+            ts.addAttribute(.foregroundColor, value: self.accentColor, range: hashRange)
         }
     }
 
@@ -205,8 +239,8 @@ final class MarkdownHighlighter: NSObject, NSTextStorageDelegate {
             ts.addAttribute(.font, value: NSFontManager.shared.convert(cur, toHaveTrait: .boldFontMask), range: match.range)
             let openRange = NSRange(location: match.range.location, length: 2)
             let closeRange = NSRange(location: NSMaxRange(match.range) - 2, length: 2)
-            ts.addAttribute(.foregroundColor, value: NSColor.tertiaryLabelColor, range: openRange)
-            ts.addAttribute(.foregroundColor, value: NSColor.tertiaryLabelColor, range: closeRange)
+            ts.addAttribute(.foregroundColor, value: self.accentColor, range: openRange)
+            ts.addAttribute(.foregroundColor, value: self.accentColor, range: closeRange)
             // Shift * down — the glyph sits near cap-height, not baseline
             let offset = -cur.pointSize * 0.18
             ts.addAttribute(.baselineOffset, value: offset, range: openRange)
@@ -224,8 +258,8 @@ final class MarkdownHighlighter: NSObject, NSTextStorageDelegate {
             ts.addAttribute(.foregroundColor, value: self.accentColor, range: match.range)
             let openRange = NSRange(location: match.range.location, length: 1)
             let closeRange = NSRange(location: NSMaxRange(match.range) - 1, length: 1)
-            ts.addAttribute(.foregroundColor, value: NSColor.tertiaryLabelColor, range: openRange)
-            ts.addAttribute(.foregroundColor, value: NSColor.tertiaryLabelColor, range: closeRange)
+            ts.addAttribute(.foregroundColor, value: self.accentColor, range: openRange)
+            ts.addAttribute(.foregroundColor, value: self.accentColor, range: closeRange)
             let offset = -cur.pointSize * 0.18
             ts.addAttribute(.baselineOffset, value: offset, range: openRange)
             ts.addAttribute(.baselineOffset, value: offset, range: closeRange)
@@ -315,9 +349,9 @@ final class MarkdownHighlighter: NSObject, NSTextStorageDelegate {
         Self.referenceRegex.enumerateMatches(in: ts.string, range: range) { match, _, _ in
             guard let match, !isInsideFence(match.range) else { return }
             ts.addAttribute(.foregroundColor, value: self.accentColor, range: match.range)
-            ts.addAttribute(.foregroundColor, value: NSColor.tertiaryLabelColor,
+            ts.addAttribute(.foregroundColor, value: self.accentColor,
                             range: NSRange(location: match.range.location, length: 2))
-            ts.addAttribute(.foregroundColor, value: NSColor.tertiaryLabelColor,
+            ts.addAttribute(.foregroundColor, value: self.accentColor,
                             range: NSRange(location: NSMaxRange(match.range) - 2, length: 2))
         }
     }
@@ -364,7 +398,9 @@ final class MarkdownHighlighter: NSObject, NSTextStorageDelegate {
         let contentStart: Int
     }
 
+    /// Cached fenced blocks — only rescanned when text changes.
     private var fencedBlocks: [FencedBlock] = []
+    private var fencedBlocksDirty = true
 
     private func scanFencedCodeBlocks(in ts: NSTextStorage) {
         let ns = ts.string as NSString
@@ -443,8 +479,24 @@ final class MarkdownHighlighter: NSObject, NSTextStorageDelegate {
         }
     }
 
+    /// Binary search for fence containment — fencedBlocks are sorted by position.
     private func isInsideFence(_ range: NSRange) -> Bool {
-        fencedBlocks.contains { NSIntersectionRange($0.fullRange, range).length > 0 }
+        guard !fencedBlocks.isEmpty else { return false }
+        let loc = range.location
+
+        // Binary search: find the last block whose fullRange.location <= loc
+        var lo = 0, hi = fencedBlocks.count - 1
+        while lo <= hi {
+            let mid = (lo + hi) / 2
+            if fencedBlocks[mid].fullRange.location <= loc {
+                lo = mid + 1
+            } else {
+                hi = mid - 1
+            }
+        }
+        // hi is the index of the candidate block (or -1 if none)
+        guard hi >= 0 else { return false }
+        return NSIntersectionRange(fencedBlocks[hi].fullRange, range).length > 0
     }
 
     // MARK: - Helpers

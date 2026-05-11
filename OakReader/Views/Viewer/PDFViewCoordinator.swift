@@ -86,6 +86,25 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
         setupScrollMonitor(for: pdfView)
     }
 
+    /// Install or remove global event monitors when the tab becomes active/inactive.
+    /// Called from `updateNSView` in response to SwiftUI state changes.
+    func setActive(_ active: Bool) {
+        guard let pdfView else { return }
+        if active {
+            // Only install if not already present
+            if mouseMonitor == nil { setupMouseMonitor(for: pdfView) }
+            if rightClickMonitor == nil { setupRightClickMonitor(for: pdfView) }
+            if keyMonitor == nil { setupKeyMonitor() }
+            if scrollMonitor == nil { setupScrollMonitor(for: pdfView) }
+        } else {
+            removeMouseMonitor()
+            removeRightClickMonitor()
+            removeKeyMonitor()
+            removeScrollMonitor()
+            dismissSelectionPopup()
+        }
+    }
+
     // MARK: - Mouse Monitor for Annotation Tools
 
     private func setupMouseMonitor(for pdfView: PDFView) {
