@@ -6,7 +6,6 @@ struct ZoomableChapterTimelineView: View {
     let currentTime: Double
     let activeChapterID: UUID?
     let onSeek: (Double) -> Void
-    var isActive: Bool = true
 
     @State private var zoomLevel: CGFloat = 1.0
     @State private var hoveredChapter: VideoChapter?
@@ -85,7 +84,7 @@ struct ZoomableChapterTimelineView: View {
                 }
 
                 // Zoom gesture capture (behind everything)
-                TimelineZoomGestureView(zoomLevel: $zoomLevel, isActive: isActive)
+                TimelineZoomGestureView(zoomLevel: $zoomLevel)
                     .frame(width: containerWidth, height: 50)
                     .allowsHitTesting(true)
             }
