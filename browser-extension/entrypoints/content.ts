@@ -160,6 +160,111 @@ export default defineContentScript({
         }
         return true;
       }
+
+      if (request.action === "captureHTML") {
+        captureHTML(request.options)
+          .then(sendResponse)
+          .catch((err) =>
+            sendResponse({ html: null, error: err instanceof Error ? err.message : String(err) })
+          );
+        return true;
+      }
     });
   },
 });
+
+// ─── SingleFile HTML Capture ────────────────────────────────────────────────────
+
+async function captureHTML(
+  options: Record<string, unknown>
+): Promise<{ html: string | null; error?: string }> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const singlefile = (globalThis as any).singlefile;
+    if (!singlefile) {
+      return { html: null, error: "SingleFile not loaded" };
+    }
+
+    // Fetch proxy: try direct fetch first, fallback to background for cross-origin
+    const fetchResource = async (
+      url: string,
+      fetchOptions?: { referrer?: string; headers?: Record<string, string> }
+    ) => {
+      try {
+        return await globalThis.fetch(url, {
+          referrer: fetchOptions?.referrer,
+          headers: fetchOptions?.headers,
+        });
+      } catch {
+        // Cross-origin: proxy through background service worker
+        const result = await chrome.runtime.sendMessage({
+          method: "singlefile.fetch",
+          url,
+          referrer: fetchOptions?.referrer,
+          headers: fetchOptions?.headers,
+        });
+        if (result.error) throw new Error(result.error);
+        return {
+          status: result.status,
+          headers: { get: (name: string) => result.headers?.[name] ?? null },
+          arrayBuffer: async () => new Uint8Array(result.array).buffer,
+        };
+      }
+    };
+
+    // Progress reporting — relay SingleFile's internal progress to the popup
+    let resourceIndex = 0;
+    let resourceMax = 0;
+
+    options.onprogress = async (event: {
+      type: string;
+      detail?: { step?: number; max?: number; url?: string };
+      PAGE_LOADING: string;
+      PAGE_LOADED: string;
+      RESOURCES_INITIALIZED: string;
+      RESOURCE_LOADED: string;
+      STAGE_STARTED: string;
+      STAGE_ENDED: string;
+      PAGE_ENDED: string;
+    }) => {
+      if (event.type === event.RESOURCES_INITIALIZED) {
+        resourceMax = event.detail?.max ?? 0;
+      }
+      if (event.type === event.RESOURCE_LOADED) {
+        resourceIndex++;
+      }
+      chrome.runtime.sendMessage({
+        method: "singlefile.progress",
+        eventType: event.type,
+        step: event.detail?.step,
+        resourceIndex,
+        resourceMax,
+      }).catch(() => {});
+    };
+
+    if (typeof singlefile.getPageData !== "function") {
+      return { html: null, error: `SingleFile loaded but getPageData missing. Keys: ${Object.keys(singlefile).join(", ")}` };
+    }
+
+    // Timeout: getPageData can hang if frame communication or deferred images stall
+    const CAPTURE_TIMEOUT = 30000;
+    const pageData = await Promise.race([
+      singlefile.getPageData(options, { fetch: fetchResource }),
+      new Promise<never>((_, reject) =>
+        AbortSignal.timeout(CAPTURE_TIMEOUT).addEventListener("abort", (e) =>
+          reject((e.target as AbortSignal).reason)
+        )
+      ),
+    ]);
+
+    if (!pageData) {
+      return { html: null, error: "getPageData returned null/undefined" };
+    }
+    if (!pageData.content) {
+      return { html: null, error: `getPageData returned empty content. Keys: ${Object.keys(pageData).join(", ")}` };
+    }
+    return { html: pageData.content };
+  } catch (err) {
+    return { html: null, error: err instanceof Error ? err.message : String(err) };
+  }
+}
