@@ -121,12 +121,12 @@ final class AudioRecordingService {
             if writer.status == .completed {
                 return url
             } else {
-                Log.error("AudioRecording", "Writer failed: \(writer.error?.localizedDescription ?? "unknown")")
+                Log.error(Log.audio, "Writer failed: \(writer.error?.localizedDescription ?? "unknown")")
                 try? FileManager.default.removeItem(at: url)
                 return nil
             }
         } catch {
-            Log.error("AudioRecording", "Recording failed: \(error)")
+            Log.error(Log.audio, "Recording failed: \(error)")
             try? FileManager.default.removeItem(at: url)
             self.assetWriter = nil
             self.writerInput = nil
