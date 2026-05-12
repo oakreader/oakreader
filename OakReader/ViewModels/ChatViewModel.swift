@@ -9,14 +9,15 @@ struct PendingConfirmation {
 @Observable
 class ChatViewModel {
     weak var parent: DocumentViewModel?
+    weak var appState: AppState?
 
     // MARK: - State
 
-    var turns: [ChatTurn] = []
+    var turns: [Turn] = []
     var inputText: String = ""
     var isStreaming: Bool = false
     var selectedSkill: Skill? = nil
-    var pendingAttachments: [ChatAttachment] = []
+    var pendingAttachments: [TurnAttachment] = []
     var showSettings: Bool = false
     var errorMessage: String?
     var pendingToolConfirmation: PendingConfirmation?
@@ -34,7 +35,7 @@ class ChatViewModel {
 
     // MARK: - Private
 
-    private let engine: ChatEngine
+    private let engine: AgentSession
     private let contextProvider = PDFContextProvider()
     private var streamTask: Task<Void, Never>?
     /// Whether a DB record has been created for the current session.
@@ -44,7 +45,7 @@ class ChatViewModel {
 
     init(parent: DocumentViewModel, documentStoragePath: URL? = nil) {
         self.parent = parent
-        self.engine = ChatEngine(chatsDirectory: CatalogDatabase.chatsDirectory)
+        self.engine = AgentSession(chatsDirectory: CatalogDatabase.chatsDirectory)
         if let path = documentStoragePath {
             // Sandbox tool access to the document storage directory
             self.toolContext = ToolExecutionContext(
@@ -56,7 +57,7 @@ class ChatViewModel {
 
     init() {
         self.parent = nil
-        self.engine = ChatEngine(chatsDirectory: CatalogDatabase.chatsDirectory)
+        self.engine = AgentSession(chatsDirectory: CatalogDatabase.chatsDirectory)
     }
 
     // MARK: - Configuration
@@ -86,32 +87,67 @@ class ChatViewModel {
         // Create or update session record in DB
         persistSessionMetadata(firstUserMessage: text)
 
-        // Build PDF context
+        // Build enriched context snapshot
         let contextMode = selectedSkill?.contextMode ?? .currentPage
-        let pdfContext: PDFContextSnapshot?
-        if let parent {
-            pdfContext = contextProvider.snapshot(from: parent, contextMode: contextMode)
-        } else {
-            pdfContext = nil
-        }
+        let snapshot = PDFContextProvider.buildContextSnapshot(
+            from: parent,
+            appState: parent?.appState ?? appState,
+            contextMode: contextMode
+        )
+
+        // Build system prompt from snapshot
+        let currentSkill = selectedSkill
+        let systemPrompt = PDFContextProvider.buildSystemPrompt(
+            skill: currentSkill,
+            context: snapshot
+        )
 
         let currentHistory = turns.filter { !$0.isStreaming }
         let currentSessionId = sessionId
         let currentConfig = config
-        let currentSkill = selectedSkill
+        let turnMetadata: [String: String] = currentSkill.map { ["skill": $0.id] } ?? [:]
 
         let prefs = Preferences.shared
-        let currentToolContext = prefs.agentToolsEnabled ? toolContext : nil
 
-        // Build enabled tools list from per-tool preferences
-        let currentTools: [any AgentTool]?
-        if currentToolContext != nil {
-            var tools: [any AgentTool] = []
+        // Build tools list — document tools are always available when a document is open
+        var tools: [any AgentTool] = []
+
+        if let doc = snapshot.document {
+            tools.append(ReadDocumentTool(
+                filePath: doc.filePath,
+                documentType: doc.itemType,
+                pageCount: doc.pageCount
+            ))
+            tools.append(SearchDocumentTool(
+                filePath: doc.filePath,
+                documentType: doc.itemType,
+                pageCount: doc.pageCount
+            ))
+            if !doc.noteSummaries.isEmpty {
+                tools.append(ReadNotesTool(
+                    notes: doc.noteSummaries.map { (id: $0.id.uuidString, title: $0.title) }
+                ))
+            }
+        }
+
+        // Existing filesystem agent tools (gated by preferences)
+        if prefs.agentToolsEnabled, toolContext != nil {
             if prefs.agentReadFileEnabled { tools.append(ReadTool()) }
             if prefs.agentWriteFileEnabled { tools.append(WriteTool()) }
-            currentTools = tools.isEmpty ? nil : tools
+        }
+
+        let currentTools: [any AgentTool]? = tools.isEmpty ? nil : tools
+
+        // Ensure a tool context exists when document tools are present
+        let effectiveToolContext: ToolExecutionContext?
+        if !tools.isEmpty {
+            let storagePath = parent?.itemStorageKey.map { CatalogDatabase.documentDirectory(storageKey: $0) }
+            effectiveToolContext = toolContext ?? ToolExecutionContext(
+                workingDirectory: storagePath ?? URL(fileURLWithPath: NSTemporaryDirectory()),
+                allowedPaths: storagePath.map { [$0] } ?? []
+            )
         } else {
-            currentTools = nil
+            effectiveToolContext = nil
         }
 
         let requireConfirmation = prefs.agentRequireConfirmation
@@ -127,10 +163,10 @@ class ChatViewModel {
                     history: currentHistory,
                     sessionId: currentSessionId,
                     config: currentConfig,
-                    skill: currentSkill,
-                    pdfContext: pdfContext,
+                    systemPrompt: systemPrompt,
+                    turnMetadata: turnMetadata,
                     tools: currentTools,
-                    toolContext: currentToolContext,
+                    toolContext: effectiveToolContext,
                     agentSkills: agentSkills,
                     toolConfirmation: requireConfirmation ? self?.makeToolConfirmation() : nil
                 )
@@ -146,11 +182,11 @@ class ChatViewModel {
                             turns[idx].content += delta
                         } else {
                             // First delta — create assistant turn placeholder
-                            let newTurn = ChatTurn(
+                            let newTurn = Turn(
                                 role: .assistant,
                                 content: delta,
                                 isStreaming: true,
-                                skill: currentSkill?.id
+                                metadata: turnMetadata
                             )
                             assistantTurnId = newTurn.id
                             turns.append(newTurn)
@@ -268,7 +304,7 @@ class ChatViewModel {
     // MARK: - Attachments
 
     func addTextAttachment(_ text: String, pageIndex: Int) {
-        let attachment = ChatAttachment(
+        let attachment = TurnAttachment(
             type: .textSelection,
             label: "Page \(pageIndex + 1), selected text",
             textContent: text,
@@ -278,7 +314,7 @@ class ChatViewModel {
     }
 
     func addImageAttachment(_ imageData: Data, pageIndex: Int) {
-        let attachment = ChatAttachment(
+        let attachment = TurnAttachment(
             type: .imageCapture,
             label: "Page \(pageIndex + 1), region capture",
             imageData: imageData,
@@ -288,7 +324,7 @@ class ChatViewModel {
     }
 
     func addClipboardImage(_ imageData: Data) {
-        let attachment = ChatAttachment(
+        let attachment = TurnAttachment(
             type: .imageCapture,
             label: "Pasted image",
             imageData: imageData
