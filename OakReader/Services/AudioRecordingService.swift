@@ -8,6 +8,7 @@ import OakVoiceAI
 final class AudioRecordingService {
     enum State {
         case idle
+        case starting
         case recording
         case stopping
     }
@@ -43,34 +44,64 @@ final class AudioRecordingService {
         return dir
     }()
 
+    /// Error from the last recording attempt, if it failed.
+    private(set) var lastError: String?
+
     func startRecording(deviceUID: String? = nil, mode: RecordingMode = .micOnly) {
         guard state == .idle else { return }
+
+        // Check microphone permission before starting
+        let authStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+        guard authStatus == .authorized else {
+            if authStatus == .notDetermined {
+                AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in
+                    if granted {
+                        DispatchQueue.main.async {
+                            self?.startRecording(deviceUID: deviceUID, mode: mode)
+                        }
+                    } else {
+                        DispatchQueue.main.async {
+                            self?.lastError = "Microphone access denied. Grant permission in System Settings → Privacy & Security → Microphone."
+                            Log.error(Log.audio, "Microphone access denied by user")
+                        }
+                    }
+                }
+            } else {
+                lastError = "Microphone access denied. Grant permission in System Settings → Privacy & Security → Microphone."
+                Log.error(Log.audio, "Microphone access denied (status: \(authStatus.rawValue))")
+            }
+            return
+        }
 
         let fileName = "recording-\(UUID().uuidString).m4a"
         let url = Self.recordingsDir.appendingPathComponent(fileName)
         outputURL = url
 
-        state = .recording
+        state = .starting
         elapsedSeconds = 0
         startTime = Date()
 
-        // Start elapsed time timer
-        timerTask = Task { @MainActor [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 250_000_000)
-                guard let self, let start = self.startTime, self.state == .recording else { break }
-                self.elapsedSeconds = Date().timeIntervalSince(start)
-            }
-        }
-
         recordingTask = Task { [weak self] in
             guard let self else { return nil }
-            return await self.performRecording(to: url, deviceUID: deviceUID, mode: mode)
+            let result = await self.performRecording(to: url, deviceUID: deviceUID, mode: mode)
+            // If the recording ended on its own (error or stream ended)
+            // rather than via stopRecording(), reset state to idle.
+            await MainActor.run {
+                if self.state == .recording || self.state == .starting {
+                    self.timerTask?.cancel()
+                    self.timerTask = nil
+                    self.state = .idle
+                    if result == nil {
+                        self.lastError = "Recording failed. Check that a microphone is connected and accessible."
+                    }
+                }
+            }
+            return result
         }
     }
 
     func stopRecording() async -> URL? {
-        guard state == .recording else { return nil }
+        guard state == .recording || state == .starting else { return nil }
         state = .stopping
         timerTask?.cancel()
         timerTask = nil
@@ -134,10 +165,24 @@ final class AudioRecordingService {
                 audioStream = mixer.mix(micStream: micStream, systemStream: sysStream)
             }
 
+            // Audio engine confirmed running — transition to .recording
+            await MainActor.run {
+                guard self.state == .starting else { return }
+                self.lastError = nil
+                self.state = .recording
+                self.timerTask = Task { @MainActor [weak self] in
+                    while !Task.isCancelled {
+                        try? await Task.sleep(nanoseconds: 250_000_000)
+                        guard let self, let start = self.startTime, self.state == .recording else { break }
+                        self.elapsedSeconds = Date().timeIntervalSince(start)
+                    }
+                }
+            }
+
             var sampleOffset: Int64 = 0
 
             for await buffer in audioStream {
-                guard state == .recording else { break }
+                guard state == .recording || state == .starting else { break }
                 if let sampleBuffer = Self.createSampleBuffer(from: buffer, sampleOffset: sampleOffset, sampleRate: Self.sampleRate) {
                     if input.isReadyForMoreMediaData {
                         input.append(sampleBuffer)
@@ -169,7 +214,9 @@ final class AudioRecordingService {
             try? FileManager.default.removeItem(at: url)
             self.assetWriter = nil
             self.writerInput = nil
+            self.capture?.stopCapture()
             self.capture = nil
+            self.systemCapture?.stopCapture()
             self.systemCapture = nil
             return nil
         }
