@@ -1,10 +1,12 @@
 import Foundation
 import MLX
+import MLXEmbedders
+import MLXLMCommon
 
-/// On-device embedding service using vendored mlx.embeddings code (Qwen3-Embedding).
+/// On-device embedding service using MLXEmbedders (Qwen3-Embedding).
 /// Thread-safe actor that manages model loading and text embedding.
 actor EmbeddingService {
-    private var container: EmbeddingModelContainer?
+    private var container: EmbedderModelContainer?
     private(set) var modelId: String
 
     init(modelId: String) {
@@ -13,8 +15,10 @@ actor EmbeddingService {
 
     /// Load the embedding model. Call once before embedding.
     func loadModel() async throws {
-        let config = EmbeddingModelConfiguration(id: modelId)
-        container = try await loadEmbeddingModelContainer(configuration: config)
+        let config = ModelConfiguration(id: modelId)
+        container = try await EmbedderModelFactory.shared.loadContainer(
+            configuration: config
+        )
         Log.info(Log.semantic, "Loaded embedding model: \(modelId)")
     }
 
@@ -26,7 +30,11 @@ actor EmbeddingService {
 
         guard !texts.isEmpty else { return [] }
 
-        return await container.perform { model, tokenizer -> [[Float]] in
+        return try await container.perform { context -> [[Float]] in
+            let tokenizer = context.tokenizer
+            let model = context.model
+            let pooling = context.pooling
+
             let tokenizedInputs = texts.map {
                 tokenizer.encode(text: $0, addSpecialTokens: true)
             }
@@ -57,8 +65,7 @@ actor EmbeddingService {
                 attentionMask: attentionMask
             )
 
-            // textEmbeds is already L2-normalized by the Qwen3 model
-            let embeddings = output.textEmbeds
+            let embeddings = pooling(output, mask: attentionMask, normalize: true)
             eval(embeddings)
             return embeddings.map { $0.asArray(Float.self) }
         }
