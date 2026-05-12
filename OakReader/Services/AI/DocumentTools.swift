@@ -94,23 +94,15 @@ struct ReadDocumentTool: AgentTool, Sendable {
             return .success(String(markdown.prefix(50_000)))
         }
 
-        // Fall back to HTML tag stripping
+        // Fall back to proper HTML parsing via XMLDocument
         guard let data = try? Data(contentsOf: url) else {
             return .error("Failed to read web snapshot at \(filePath)")
         }
-        guard let html = String(data: data, encoding: .utf8) else {
-            return .error("Failed to decode web snapshot content")
+        let text = HTMLTextExtractor.extractText(from: data)
+        if text.isEmpty {
+            return .error("Failed to extract text from web snapshot")
         }
-        let stripped = html.replacingOccurrences(
-            of: "<[^>]+>",
-            with: "",
-            options: .regularExpression
-        )
-        let cleaned = stripped
-            .components(separatedBy: .whitespacesAndNewlines)
-            .filter { !$0.isEmpty }
-            .joined(separator: " ")
-        return .success(String(cleaned.prefix(50_000)))
+        return .success(String(text.prefix(50_000)))
     }
 
     /// Parse a page range string like "1-5", "3,7,12", "1-3,8,10-12" into 0-based indices.
@@ -227,12 +219,11 @@ struct SearchDocumentTool: AgentTool, Sendable {
             return searchPlainText(markdown, query: query, maxResults: maxResults)
         }
 
-        guard let data = try? Data(contentsOf: url),
-              let html = String(data: data, encoding: .utf8) else {
+        guard let data = try? Data(contentsOf: url) else {
             return .error("Failed to read web snapshot at \(filePath)")
         }
-        let stripped = html.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
-        return searchPlainText(stripped, query: query, maxResults: maxResults)
+        let text = HTMLTextExtractor.extractText(from: data)
+        return searchPlainText(text, query: query, maxResults: maxResults)
     }
 
     private func searchPlainText(_ text: String, query: String, maxResults: Int) -> ToolOutput {
@@ -347,5 +338,83 @@ struct ReadNotesTool: AgentTool, Sendable {
             return .success("Note \"\(match.title)\" is empty.")
         }
         return .success("Note: \(match.title)\n\n\(String(content.prefix(30_000)))")
+    }
+}
+
+// MARK: - HTML Text Extraction
+
+/// Extracts plain text from HTML using macOS Foundation's XMLDocument parser.
+/// Thread-safe (no main-thread requirement unlike NSAttributedString(html:)).
+enum HTMLTextExtractor {
+    /// Tags whose content should be suppressed entirely.
+    private static let suppressedTags: Set<String> = [
+        "script", "style", "noscript", "svg", "math"
+    ]
+
+    /// Block-level tags that should produce a newline boundary.
+    private static let blockTags: Set<String> = [
+        "p", "div", "section", "article", "header", "footer", "nav", "main",
+        "h1", "h2", "h3", "h4", "h5", "h6", "blockquote", "pre",
+        "ul", "ol", "li", "table", "tr", "td", "th",
+        "br", "hr", "figcaption", "figure", "details", "summary"
+    ]
+
+    static func extractText(from data: Data) -> String {
+        // XMLDocument with .documentTidyHTML cleans up malformed HTML
+        guard let doc = try? XMLDocument(data: data, options: .documentTidyHTML) else {
+            // Last resort: decode as string and return raw
+            return String(data: data, encoding: .utf8) ?? ""
+        }
+
+        var parts: [String] = []
+        if let root = doc.rootElement() {
+            collectText(from: root, into: &parts)
+        }
+
+        // Join, collapse excessive newlines
+        return parts.joined()
+            .components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .joined(separator: "\n")
+            .replacingOccurrences(
+                of: "\n{3,}",
+                with: "\n\n",
+                options: .regularExpression
+            )
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func collectText(from node: XMLNode, into parts: inout [String]) {
+        switch node.kind {
+        case .text:
+            if let text = node.stringValue, !text.isEmpty {
+                parts.append(text)
+            }
+
+        case .element:
+            guard let element = node as? XMLElement else { return }
+            let tag = element.name?.lowercased() ?? ""
+
+            // Skip suppressed tags entirely
+            if suppressedTags.contains(tag) { return }
+
+            // Block elements get a newline before
+            let isBlock = blockTags.contains(tag)
+            if isBlock { parts.append("\n") }
+
+            // Recurse into children
+            for child in node.children ?? [] {
+                collectText(from: child, into: &parts)
+            }
+
+            // Block elements get a newline after
+            if isBlock { parts.append("\n") }
+
+        default:
+            // Recurse for document nodes, etc.
+            for child in node.children ?? [] {
+                collectText(from: child, into: &parts)
+            }
+        }
     }
 }
