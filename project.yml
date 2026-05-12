@@ -36,6 +36,15 @@ packages:
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
     from: "2.6.0"
+  mlx-swift:
+    url: https://github.com/ml-explore/mlx-swift
+    from: "0.31.3"
+  mlx-swift-lm:
+    url: https://github.com/ml-explore/mlx-swift-lm.git
+    from: "3.0.0"
+  usearch:
+    url: https://github.com/unum-cloud/usearch
+    from: "2.0.0"
 
 settings:
   base:
@@ -54,6 +63,7 @@ targets:
           - "**/*.entitlements"
     dependencies:
       - package: OakAI
+      - package: OakAgent
       - package: OakVoiceAI
       - package: Textual
       - package: GRDB
@@ -63,6 +73,14 @@ targets:
       - package: YouTubePlayerKit
       - package: YoutubeTranscript
       - package: Sparkle
+      - package: mlx-swift
+        product: MLX
+      - package: mlx-swift-lm
+        product: MLXEmbedders
+      - package: mlx-swift-lm
+        product: MLXLMCommon
+      - package: usearch
+        product: USearch
       - target: oak
     postCompileScripts:
       - script: |
@@ -93,7 +111,7 @@ targets:
     sources:
       - path: cli
     dependencies:
-      - package: OakAI
+      - package: OakAgent
       - package: GRDB
         product: GRDB
     settings:
