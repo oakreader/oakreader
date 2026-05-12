@@ -91,7 +91,7 @@ struct ReferenceMetadataView: View {
         let spec = CSLTypeFieldRegistry.spec(for: cslType)
 
         VStack(alignment: .leading, spacing: 0) {
-            // Item Type — full width picker
+            // Item Type
             gridRow("Item Type") {
                 Picker("", selection: $cslType) {
                     ForEach(CSLItemType.allCases) { type in
@@ -100,6 +100,7 @@ struct ReferenceMetadataView: View {
                 }
                 .labelsHidden()
                 .controlSize(.small)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .onChange(of: cslType) { _, _ in saveDebounced() }
             }
 
