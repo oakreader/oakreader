@@ -1,5 +1,5 @@
 import AppKit
-import OakReaderAI
+import OakAI
 
 // MARK: - Markdown Text Selection Popup Panel
 

@@ -7,8 +7,9 @@ let package = Package(
         .macOS(.v15)
     ],
     dependencies: [
-        .package(path: "Packages/OakReaderAI"),
-        .package(path: "Packages/VoiceAgentKit"),
+        .package(path: "Packages/OakAgent"),
+        .package(path: "Packages/OakAI"),
+        .package(path: "Packages/OakVoiceAI"),
         .package(url: "https://github.com/gonzalezreal/textual", from: "0.1.0"),
         .package(url: "https://github.com/groue/GRDB.swift", from: "7.0.0"),
         .package(url: "https://github.com/raspu/Highlightr.git", from: "2.3.0"),
@@ -21,8 +22,8 @@ let package = Package(
         .executableTarget(
             name: "OakReader",
             dependencies: [
-                "OakReaderAI",
-                "VoiceAgentKit",
+                "OakAI",
+                "OakVoiceAI",
                 .product(name: "Textual", package: "textual"),
                 .product(name: "GRDB", package: "GRDB.swift"),
                 .product(name: "Highlightr", package: "Highlightr"),
@@ -38,8 +39,11 @@ let package = Package(
             ]
         ),
         .executableTarget(
-            name: "oakreader-chat",
-            dependencies: ["OakReaderAI"],
+            name: "oak",
+            dependencies: [
+                "OakAI",
+                .product(name: "GRDB", package: "GRDB.swift"),
+            ],
             path: "CLI"
         )
     ],

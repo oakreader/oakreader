@@ -1,4 +1,5 @@
 import Foundation
+import OakAgent
 
 /// Snapshot of PDF context to pass across actor boundaries.
 public struct PDFContextSnapshot: Sendable {
@@ -46,8 +47,9 @@ public actor ChatEngine {
         config: ProviderConfig,
         skill: Skill?,
         pdfContext: PDFContextSnapshot?,
-        toolExecutor: ToolExecutor? = nil,
-        enabledTools: [String]? = nil,
+        tools: [any AgentTool]? = nil,
+        toolContext: ToolExecutionContext? = nil,
+        agentSkills: [AgentSkill] = [],
         toolConfirmation: (@Sendable (ToolCall) async -> Bool)? = nil
     ) -> AsyncThrowingStream<StreamEvent, Error> {
         AsyncThrowingStream { continuation in
@@ -64,7 +66,13 @@ public actor ChatEngine {
                     continuation.yield(.finished(userTurn))
 
                     // 2. Build system prompt
-                    let systemPrompt = buildSystemPrompt(skill: skill, context: pdfContext)
+                    var systemPrompt = buildSystemPrompt(skill: skill, context: pdfContext)
+
+                    // Append agent skills listing (file-based skills)
+                    let skillsBlock = SkillPromptFormatter.formatForPrompt(agentSkills)
+                    if !skillsBlock.isEmpty {
+                        systemPrompt += skillsBlock
+                    }
 
                     // 3. Build initial LLM messages
                     var llmMessages = buildMessages(
@@ -75,17 +83,16 @@ public actor ChatEngine {
                     // 4. Get provider
                     let provider = try router.provider(for: config)
 
-                    // 5. Determine tools to send (filtered by enabledTools)
-                    let tools: [ToolDefinition]?
-                    if toolExecutor != nil {
-                        if let enabled = enabledTools {
-                            tools = BuiltInTools.all.filter { enabled.contains($0.name) }
-                        } else {
-                            tools = BuiltInTools.all
-                        }
-                    } else {
-                        tools = nil
+                    // 5. Determine tools
+                    let activeTools = tools ?? []
+                    let toolDefs: [ToolDefinition]? = activeTools.isEmpty ? nil : activeTools.map { $0.definition }
+
+                    // Build tool lookup for execution
+                    var toolsByName: [String: any AgentTool] = [:]
+                    for tool in activeTools {
+                        toolsByName[tool.name] = tool
                     }
+                    let ctx = toolContext
 
                     // 6. Agentic loop — up to 10 iterations
                     let maxIterations = 10
@@ -97,7 +104,7 @@ public actor ChatEngine {
                             model: config.model,
                             systemPrompt: systemPrompt,
                             maxTokens: config.maxTokens,
-                            tools: tools
+                            tools: toolDefs
                         )
 
                         var assistantTurn = ChatTurn(
@@ -128,7 +135,7 @@ public actor ChatEngine {
                             }
                         }
 
-                        if !toolCalls.isEmpty, let executor = toolExecutor {
+                        if !toolCalls.isEmpty, let toolContext = ctx {
                             // Execute tools and collect results
                             var toolUseRecords: [ToolUseRecord] = []
                             var toolResults: [ToolResult] = []
@@ -164,13 +171,43 @@ public actor ChatEngine {
                                 record.status = .executing
                                 continuation.yield(.toolUseStarted(record))
 
-                                let result = await executor.execute(call)
-                                record.result = result.content
-                                record.isError = result.isError
-                                record.status = .completed
-                                toolResults.append(result)
-                                toolUseRecords.append(record)
+                                // Execute via AgentTool
+                                if let tool = toolsByName[call.name] {
+                                    do {
+                                        let output = try await tool.execute(input: call.input, context: toolContext)
+                                        record.result = output.content
+                                        record.isError = output.isError
+                                        record.status = .completed
+                                        toolResults.append(ToolResult(
+                                            toolCallId: call.id,
+                                            toolName: call.name,
+                                            content: output.content,
+                                            isError: output.isError
+                                        ))
+                                    } catch {
+                                        record.result = "Tool error: \(error.localizedDescription)"
+                                        record.isError = true
+                                        record.status = .completed
+                                        toolResults.append(ToolResult(
+                                            toolCallId: call.id,
+                                            toolName: call.name,
+                                            content: "Tool error: \(error.localizedDescription)",
+                                            isError: true
+                                        ))
+                                    }
+                                } else {
+                                    record.result = "Unknown tool: \(call.name)"
+                                    record.isError = true
+                                    record.status = .completed
+                                    toolResults.append(ToolResult(
+                                        toolCallId: call.id,
+                                        toolName: call.name,
+                                        content: "Unknown tool: \(call.name)",
+                                        isError: true
+                                    ))
+                                }
 
+                                toolUseRecords.append(record)
                                 continuation.yield(.toolUseCompleted(record))
                             }
 

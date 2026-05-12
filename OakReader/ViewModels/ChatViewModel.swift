@@ -1,5 +1,5 @@
 import Foundation
-import OakReaderAI
+import OakAI
 
 struct PendingConfirmation {
     let toolCall: ToolCall
@@ -39,15 +39,18 @@ class ChatViewModel {
     private var streamTask: Task<Void, Never>?
     /// Whether a DB record has been created for the current session.
     private var sessionRecordCreated: Bool = false
-    /// Sandboxed tool executor for AI agent tool use.
-    private var toolExecutor: ToolExecutor?
+    /// Tool context for AI agent tool use (path sandbox).
+    private var toolContext: ToolExecutionContext?
 
     init(parent: DocumentViewModel, documentStoragePath: URL? = nil) {
         self.parent = parent
         self.engine = ChatEngine(chatsDirectory: CatalogDatabase.chatsDirectory)
         if let path = documentStoragePath {
             // Sandbox tool access to the document storage directory
-            self.toolExecutor = ToolExecutor(allowedPaths: [path])
+            self.toolContext = ToolExecutionContext(
+                workingDirectory: path,
+                allowedPaths: [path]
+            )
         }
     }
 
@@ -98,20 +101,23 @@ class ChatViewModel {
         let currentSkill = selectedSkill
 
         let prefs = Preferences.shared
-        let currentToolExecutor = prefs.agentToolsEnabled ? toolExecutor : nil
+        let currentToolContext = prefs.agentToolsEnabled ? toolContext : nil
 
         // Build enabled tools list from per-tool preferences
-        let enabledTools: [String]?
-        if currentToolExecutor != nil {
-            var tools: [String] = []
-            if prefs.agentReadFileEnabled { tools.append("read_file") }
-            if prefs.agentWriteFileEnabled { tools.append("write_file") }
-            enabledTools = tools.isEmpty ? nil : tools
+        let currentTools: [any AgentTool]?
+        if currentToolContext != nil {
+            var tools: [any AgentTool] = []
+            if prefs.agentReadFileEnabled { tools.append(ReadTool()) }
+            if prefs.agentWriteFileEnabled { tools.append(WriteTool()) }
+            currentTools = tools.isEmpty ? nil : tools
         } else {
-            enabledTools = nil
+            currentTools = nil
         }
 
         let requireConfirmation = prefs.agentRequireConfirmation
+
+        // Load file-based agent skills from standard directories
+        let agentSkills = Self.loadAgentSkills()
 
         streamTask = Task { @MainActor [weak self] in
             do {
@@ -123,8 +129,9 @@ class ChatViewModel {
                     config: currentConfig,
                     skill: currentSkill,
                     pdfContext: pdfContext,
-                    toolExecutor: currentToolExecutor,
-                    enabledTools: enabledTools,
+                    tools: currentTools,
+                    toolContext: currentToolContext,
+                    agentSkills: agentSkills,
                     toolConfirmation: requireConfirmation ? self?.makeToolConfirmation() : nil
                 )
 
@@ -362,6 +369,19 @@ class ChatViewModel {
         if sessionId == id {
             newSession()
         }
+    }
+
+    // MARK: - Agent Skills
+
+    private static func loadAgentSkills() -> [AgentSkill] {
+        var dirs: [URL] = []
+
+        // User-global skills directory
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let globalSkills = home.appendingPathComponent(".oakreader/skills")
+        dirs.append(globalSkills)
+
+        return SkillLoader.loadSkills(from: dirs).skills
     }
 
     // MARK: - Private — Session Persistence

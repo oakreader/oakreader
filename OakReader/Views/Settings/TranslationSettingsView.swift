@@ -1,5 +1,5 @@
 import SwiftUI
-import OakReaderAI
+import OakAI
 
 struct TranslationSettingsView: View {
     @State private var translationProviderId: String

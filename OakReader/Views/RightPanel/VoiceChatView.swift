@@ -1,6 +1,6 @@
 import SwiftUI
 import Textual
-import VoiceAgentKit
+import OakVoiceAI
 
 struct VoiceChatView: View {
     let voiceVM: VoiceViewModel

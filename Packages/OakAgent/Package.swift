@@ -2,13 +2,13 @@
 import PackageDescription
 
 let package = Package(
-    name: "OakReaderAI",
+    name: "OakAgent",
     platforms: [.macOS(.v15)],
     products: [
-        .library(name: "OakReaderAI", targets: ["OakReaderAI"])
+        .library(name: "OakAgent", targets: ["OakAgent"])
     ],
     targets: [
-        .target(name: "OakReaderAI", path: "Sources/OakReaderAI")
+        .target(name: "OakAgent", path: "Sources/OakAgent")
     ],
     swiftLanguageModes: [.v5]
 )

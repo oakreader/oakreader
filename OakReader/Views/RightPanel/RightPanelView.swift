@@ -1,5 +1,5 @@
 import SwiftUI
-import OakReaderAI
+import OakAI
 
 /// Resizable right panel content shown inside HSplitView.
 struct RightPanelContentView: View {

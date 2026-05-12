@@ -1,6 +1,6 @@
 import SwiftUI
-import OakReaderAI
-import VoiceAgentKit
+import OakAI
+import OakVoiceAI
 
 struct AIProvidersSettingsView: View {
     /// Sentinel ID for the "Defaults" row.

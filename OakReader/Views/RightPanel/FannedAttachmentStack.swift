@@ -1,5 +1,5 @@
 import SwiftUI
-import OakReaderAI
+import OakAI
 
 struct FannedAttachmentStack: View {
     let attachments: [ChatAttachment]

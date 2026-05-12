@@ -1,6 +1,6 @@
 import Foundation
-import VoiceAgentKit
-import OakReaderAI
+import OakVoiceAI
+import OakAI
 
 @Observable
 class VoiceViewModel {

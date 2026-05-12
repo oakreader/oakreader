@@ -2,7 +2,7 @@ import Foundation
 import PDFKit
 import AppKit
 import Combine
-import OakReaderAI
+import OakAI
 
 @Observable
 class DocumentViewModel {

@@ -1,5 +1,5 @@
 import SwiftUI
-import OakReaderAI
+import OakAI
 
 struct ToolCallCardView: View {
     let record: ToolUseRecord
