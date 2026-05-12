@@ -1,5 +1,5 @@
 import Foundation
-import OakReaderAI
+import OakAI
 import PDFKit
 
 struct CLIChatRunner {
