@@ -1,6 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
-import OakAI
+import OakAgent
 
 /// L-shaped filled border: 1px top + left edges with a rounded top-left corner.
 /// Uses a filled path instead of stroke so it renders fully inside the view bounds.

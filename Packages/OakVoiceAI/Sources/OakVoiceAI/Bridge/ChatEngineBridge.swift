@@ -1,5 +1,5 @@
 import Foundation
-import OakAI
+import OakAgent
 
 /// Bridges OakAI's ``ChatEngine`` to the ``LLMService`` protocol.
 ///

@@ -7,13 +7,9 @@ let package = Package(
     products: [
         .library(name: "OakAI", targets: ["OakAI"])
     ],
-    dependencies: [
-        .package(path: "../OakAgent"),
-    ],
     targets: [
         .target(
             name: "OakAI",
-            dependencies: ["OakAgent"],
             path: "Sources/OakAI"
         )
     ],

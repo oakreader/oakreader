@@ -1,7 +1,7 @@
 import Foundation
 import PDFKit
 import AppKit
-import OakAI
+import OakAgent
 
 /// Creates a Sendable PDFContextSnapshot from the current document state.
 struct PDFContextProvider {

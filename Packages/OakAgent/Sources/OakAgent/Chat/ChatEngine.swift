@@ -1,5 +1,4 @@
 import Foundation
-import OakAgent
 
 /// Snapshot of PDF context to pass across actor boundaries.
 public struct PDFContextSnapshot: Sendable {

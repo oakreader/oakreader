@@ -7,8 +7,15 @@ let package = Package(
     products: [
         .library(name: "OakAgent", targets: ["OakAgent"])
     ],
+    dependencies: [
+        .package(path: "../OakAI"),
+    ],
     targets: [
-        .target(name: "OakAgent", path: "Sources/OakAgent")
+        .target(
+            name: "OakAgent",
+            dependencies: ["OakAI"],
+            path: "Sources/OakAgent"
+        )
     ],
     swiftLanguageModes: [.v5]
 )
