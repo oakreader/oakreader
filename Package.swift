@@ -17,7 +17,7 @@ let package = Package(
         .package(url: "https://github.com/SvenTiigi/YouTubePlayerKit.git", from: "2.0.0"),
         .package(url: "https://github.com/skainguyen1412/swift-youtube-transcript.git", from: "1.0.0"),
         .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.0"),
-        .package(url: "https://github.com/ml-explore/mlx-swift", from: "0.25.4"),
+        .package(url: "https://github.com/ml-explore/mlx-swift", from: "0.30.6"),
         .package(url: "https://github.com/ml-explore/mlx-swift-lm.git", from: "3.0.0"),
     ],
     targets: [
