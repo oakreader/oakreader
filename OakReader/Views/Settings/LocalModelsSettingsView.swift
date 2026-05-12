@@ -51,12 +51,13 @@ struct LocalModelsSettingsView: View {
     @State private var embeddingModel: String
     @State private var hfEndpoint: String
 
-    @State private var modelStates: [String: ModelManager.ModelState] = [:]
-    @State private var stateTask: Task<Void, Never>?
+    // Model download states (shared with AISettingsView)
+    let modelStates: SharedModelStates
 
     private var modelManager: ModelManager { ModelManager.shared }
 
-    init() {
+    init(modelStates: SharedModelStates) {
+        self.modelStates = modelStates
         let prefs = Preferences.shared
         let defaultSTT = KnownModels.stt.first?.repo ?? ""
         let defaultTTS = KnownModels.tts.first?.repo ?? ""
@@ -73,7 +74,7 @@ struct LocalModelsSettingsView: View {
 
     private var allDownloaded: Bool {
         allRepos.allSatisfy { repo in
-            switch modelStates[repo] {
+            switch modelStates.states[repo] {
             case .downloaded, .ready: return true
             default: return false
             }
@@ -93,15 +94,12 @@ struct LocalModelsSettingsView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .onAppear {
-            startObserving()
+            modelStates.refresh(repos: allRepos)
             applyHFEndpoint(hfEndpoint)
         }
-        .onDisappear {
-            stateTask?.cancel()
-            save()
-        }
+        .onDisappear { save() }
         .onChange(of: allRepos) { _, _ in
-            refreshModelStates()
+            modelStates.refresh(repos: allRepos)
         }
     }
 
@@ -233,7 +231,7 @@ struct LocalModelsSettingsView: View {
     private func categoryDetailView(_ category: ModelCategory) -> some View {
         let binding = modelBinding(for: category)
         let repo = binding.wrappedValue
-        let state = modelStates[repo] ?? .notDownloaded
+        let state: ModelManager.ModelState = modelStates.states[repo] ?? .notDownloaded
         let currentOption = category.knownModels.first { $0.repo == repo }
 
         return Form {
@@ -277,7 +275,7 @@ struct LocalModelsSettingsView: View {
 
     @ViewBuilder
     private func modelStatusRow(repo: String) -> some View {
-        let state = modelStates[repo] ?? .notDownloaded
+        let state: ModelManager.ModelState = modelStates.states[repo] ?? .notDownloaded
         HStack {
             switch state {
             case .notDownloaded:
@@ -370,7 +368,7 @@ struct LocalModelsSettingsView: View {
     }
 
     private func isDownloaded(repo: String) -> Bool {
-        switch modelStates[repo] {
+        switch modelStates.states[repo] {
         case .downloaded, .ready: return true
         default: return false
         }
@@ -380,26 +378,6 @@ struct LocalModelsSettingsView: View {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         let url = trimmed.isEmpty ? nil : URL(string: trimmed)
         Task { await modelManager.endpointURL = url }
-    }
-
-    private func startObserving() {
-        stateTask?.cancel()
-        refreshModelStates()
-
-        stateTask = Task {
-            for await (repo, state) in modelManager.stateChanges {
-                await MainActor.run { modelStates[repo] = state }
-            }
-        }
-    }
-
-    private func refreshModelStates() {
-        Task {
-            for repo in allRepos {
-                let state = await modelManager.state(for: repo)
-                await MainActor.run { modelStates[repo] = state }
-            }
-        }
     }
 
     private func save() {

@@ -86,16 +86,16 @@ struct AISettingsView: View {
     @State private var agentWriteFileEnabled: Bool
     @State private var agentRequireConfirmation: Bool
 
-    // Model download states
-    @State private var modelStates: [String: ModelManager.ModelState] = [:]
-    @State private var stateTask: Task<Void, Never>?
+    // Model download states (shared with LocalModelsSettingsView)
+    let modelStates: SharedModelStates
 
     private let store = ConfiguredProviderStore.shared
     private var modelManager: ModelManager { ModelManager.shared }
 
     // MARK: - Init
 
-    init() {
+    init(modelStates: SharedModelStates) {
+        self.modelStates = modelStates
         let prefs = Preferences.shared
         let defaults = UserDefaults.standard
 
@@ -174,11 +174,8 @@ struct AISettingsView: View {
             detailPanel
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .onAppear { startObserving() }
-        .onDisappear {
-            stateTask?.cancel()
-            save()
-        }
+        .onAppear { modelStates.refresh(repos: allRepos) }
+        .onDisappear { save() }
     }
 
     // MARK: - Sidebar
@@ -522,7 +519,7 @@ struct AISettingsView: View {
 
     @ViewBuilder
     private func modelStatusRow(repo: String) -> some View {
-        let state = modelStates[repo] ?? .notDownloaded
+        let state = modelStates.states[repo] ?? .notDownloaded
         HStack {
             switch state {
             case .notDownloaded:
@@ -597,25 +594,6 @@ struct AISettingsView: View {
     }
 
     private var allRepos: [String] { [sttModel, ttsModel, vadModel, embeddingModel] }
-
-    private func startObserving() {
-        stateTask?.cancel()
-        refreshModelStates()
-        stateTask = Task {
-            for await (repo, state) in modelManager.stateChanges {
-                await MainActor.run { modelStates[repo] = state }
-            }
-        }
-    }
-
-    private func refreshModelStates() {
-        Task {
-            for repo in allRepos {
-                let state = await modelManager.state(for: repo)
-                await MainActor.run { modelStates[repo] = state }
-            }
-        }
-    }
 
     private func save() {
         let prefs = Preferences.shared
