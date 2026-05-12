@@ -39,6 +39,10 @@ final class SystemAudioCapture: NSObject, SCStreamOutput, @unchecked Sendable {
 
         let asyncStream = AsyncStream<AVAudioPCMBuffer> { continuation in
             self.continuation = continuation
+
+            continuation.onTermination = { @Sendable [weak self] _ in
+                self?.stopCapture()
+            }
         }
 
         try await stream.startCapture()
@@ -47,20 +51,28 @@ final class SystemAudioCapture: NSObject, SCStreamOutput, @unchecked Sendable {
 
     /// Stop system audio capture.
     func stopCapture() {
-        Task {
-            try? await stream?.stopCapture()
-            stream = nil
-            continuation?.finish()
-            continuation = nil
+        // Finish the continuation synchronously so consumers see the stream end
+        // before any further buffers can be yielded.
+        let cont = continuation
+        continuation = nil
+
+        let captureStream = stream
+        stream = nil
+
+        cont?.finish()
+
+        // Stop the SCStream asynchronously (requires await).
+        if let captureStream {
+            Task { try? await captureStream.stopCapture() }
         }
     }
 
     // MARK: - SCStreamOutput
 
     func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
-        guard type == .audio else { return }
+        guard type == .audio, let continuation else { return }
         guard let pcmBuffer = sampleBuffer.toPCMBuffer() else { return }
-        continuation?.yield(pcmBuffer)
+        continuation.yield(pcmBuffer)
     }
 
     enum SystemAudioError: LocalizedError {

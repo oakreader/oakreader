@@ -249,6 +249,7 @@
 		BED3AEF28A699F0D3102C745 /* DocumentViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 258BBD44D9EA81C666F6CA0F /* DocumentViewModel.swift */; };
 		BF331128A5EB291CD2CE3563 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02CC2D250D2F0DC2A519B204 /* SidebarView.swift */; };
 		BF8C26ABD01C44FE8E24914D /* VoiceCallTranscriptStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 666DEB9793B25E268BB8BE31 /* VoiceCallTranscriptStore.swift */; };
+		C07A8D83CF7E8D4DC9DB5F3F /* SystemSettingsPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDE768C03F160B07582B7D35 /* SystemSettingsPanel.swift */; };
 		C0B2CBFE824C5F19A1A071C0 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = F10B728DCD9CF1D3612369BE /* Sparkle */; };
 		C0BB4EFB91FC8970E8BB9B7D /* ContentChunker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 101914D5471BD54C347EA63C /* ContentChunker.swift */; };
 		C1205D6CBED8E36E3DCFFFE0 /* ZoteroImportProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8769A6CEF743D0FD408B953D /* ZoteroImportProgressView.swift */; };
@@ -256,6 +257,7 @@
 		C2B309A76047B15E74B45B02 /* ComparisonResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80B3554CCD076A22926BEB61 /* ComparisonResult.swift */; };
 		C385D06AE6E5E50056D08470 /* SkillPickerBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D993F8238878DD875EE7745 /* SkillPickerBar.swift */; };
 		C41F3611D632FD05974FC81E /* CatalogStoragePaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF16A725DAC68F199227892D /* CatalogStoragePaths.swift */; };
+		C4A4B6846CACAAFC6BAC27E1 /* SystemPermissionStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = FADC7847A8EEE480FA43B301 /* SystemPermissionStatus.swift */; };
 		C73671CC66A89080E1325E14 /* ContentInsertionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0900EBB862D12D5EE4CCFBC5 /* ContentInsertionView.swift */; };
 		C7F0FBF2D01470D0E19FF93E /* HeaderFooterConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 983F1066364AF86842F5EEE9 /* HeaderFooterConfig.swift */; };
 		C7FE49CF7D7C4FA6E5EAB53F /* OakToolButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = D18E67DFB5D1EAA11B2B5A07 /* OakToolButton.swift */; };
@@ -565,6 +567,7 @@
 		B759AEF7B571932C2B41C37C /* CatalogDatabase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogDatabase.swift; sourceTree = "<group>"; };
 		B9C644594425945C7B78ACFD /* FannedAttachmentStack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FannedAttachmentStack.swift; sourceTree = "<group>"; };
 		BBEB161E817EFFADAC274C26 /* ToolCallCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolCallCardView.swift; sourceTree = "<group>"; };
+		BDE768C03F160B07582B7D35 /* SystemSettingsPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemSettingsPanel.swift; sourceTree = "<group>"; };
 		C0187FC1D799B964D1113CFF /* NotesViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesViewModel.swift; sourceTree = "<group>"; };
 		C0FE711046DE4ECA2EF9D116 /* HeaderFooterPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeaderFooterPreviewView.swift; sourceTree = "<group>"; };
 		C400ED74A219453CE82442BC /* VoiceChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceChatView.swift; sourceTree = "<group>"; };
@@ -625,6 +628,7 @@
 		F62FA62E452AE2C6D5F47C62 /* AudioPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlayerView.swift; sourceTree = "<group>"; };
 		F6FC88B25FF895E6D4DD6BC5 /* PluginManifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginManifest.swift; sourceTree = "<group>"; };
 		FA017F31D0A69846D78444B1 /* AccessibilityCheckerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityCheckerView.swift; sourceTree = "<group>"; };
+		FADC7847A8EEE480FA43B301 /* SystemPermissionStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemPermissionStatus.swift; sourceTree = "<group>"; };
 		FBBE6D49F98D1B1167564D4E /* WebArchiveViewerRepresentable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebArchiveViewerRepresentable.swift; sourceTree = "<group>"; };
 		FBC94D6AD3ECED8EF2A749EF /* PluginManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginManagementView.swift; sourceTree = "<group>"; };
 		FC395EC31691A9D1B6B267F7 /* PostMeetingDialogCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostMeetingDialogCoordinator.swift; sourceTree = "<group>"; };
@@ -912,6 +916,8 @@
 				1840016B0F1A816F6BBC95D2 /* SnapshotServer.swift */,
 				46A468F7943DDEA20CA97FB1 /* SplitService.swift */,
 				309BCE12823C4BE30330B3B4 /* SystemAudioCapture.swift */,
+				FADC7847A8EEE480FA43B301 /* SystemPermissionStatus.swift */,
+				BDE768C03F160B07582B7D35 /* SystemSettingsPanel.swift */,
 				67A7297F5A3894E12796E73F /* TextExtractionService.swift */,
 				666DEB9793B25E268BB8BE31 /* VoiceCallTranscriptStore.swift */,
 				05966AC3C84F90C11F322217 /* VoiceSpeakerService.swift */,
@@ -1691,6 +1697,8 @@
 				5167A5F178842356E9BA878D /* StatusBarView.swift in Sources */,
 				3F859EB10C97917820558AF4 /* String+PDFSearch.swift in Sources */,
 				375270ECB43D48DA7703ED6C /* SystemAudioCapture.swift in Sources */,
+				C4A4B6846CACAAFC6BAC27E1 /* SystemPermissionStatus.swift in Sources */,
+				C07A8D83CF7E8D4DC9DB5F3F /* SystemSettingsPanel.swift in Sources */,
 				A1FF6687AAE88ECA6BDA7180 /* TabBarView.swift in Sources */,
 				1B3F3326B81994E9CC8AC3DA /* TagEditorView.swift in Sources */,
 				F2A0733891B412C9F5F1F350 /* TagNode.swift in Sources */,
