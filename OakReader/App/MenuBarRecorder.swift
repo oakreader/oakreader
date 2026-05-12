@@ -1,4 +1,5 @@
 import Cocoa
+import OakVoiceAI
 import SwiftUI
 import UserNotifications
 
@@ -8,6 +9,7 @@ final class MenuBarRecorder: NSObject {
     private let popover = NSPopover()
     private var updateTimer: Timer?
     private var postMeetingPanel: NSPanel?
+    private let islandController = RecordingIslandController()
 
     let recordingService = AudioRecordingService()
     let meetingDetection = MeetingDetectionService()
@@ -25,6 +27,7 @@ final class MenuBarRecorder: NSObject {
         setupStatusItem()
         setupPopover()
         startUpdateTimer()
+        setupIsland()
 
         meetingDetection.onMeetingDetected = { [weak self] _ in
             self?.updateStatusItemAppearance()
@@ -39,6 +42,7 @@ final class MenuBarRecorder: NSObject {
 
             if self.wasRecordingDuringMeeting && self.recordingService.state == .recording {
                 // Auto-stop the recording and pass the saved item to the dialog
+                self.islandController.hide()
                 Task { @MainActor in
                     let duration = Int(self.recordingService.elapsedSeconds)
                     guard let url = await self.recordingService.stopRecording() else { return }
@@ -58,6 +62,14 @@ final class MenuBarRecorder: NSObject {
 
     deinit {
         updateTimer?.invalidate()
+    }
+
+    // MARK: - Recording Island
+
+    private func setupIsland() {
+        islandController.onStopRequested = { [weak self] in
+            self?.stopRecording()
+        }
     }
 
     // MARK: - Status Item
@@ -105,6 +117,7 @@ final class MenuBarRecorder: NSObject {
             button.image?.size = NSSize(width: 16, height: 16)
             button.contentTintColor = .systemRed
             button.title = " \(recordingService.formattedElapsedTime)"
+            islandController.model.elapsedTime = recordingService.formattedElapsedTime
         case .stopping:
             button.title = " Saving…"
         case .idle:
@@ -126,9 +139,22 @@ final class MenuBarRecorder: NSObject {
     func startRecording(deviceUID: String?) {
         let mode = AudioRecordingService.RecordingMode(rawValue: Preferences.shared.recordingMode) ?? .micOnly
         recordingService.startRecording(deviceUID: deviceUID, mode: mode)
+
+        // Show recording island
+        islandController.model.recordingMode = mode.rawValue
+        islandController.model.inputDeviceName = resolveDeviceName(uid: deviceUID)
+        islandController.show()
+    }
+
+    private func resolveDeviceName(uid: String?) -> String {
+        guard let uid else { return "System Default" }
+        return AudioDeviceManager.shared.inputDevices
+            .first(where: { $0.uniqueID == uid })?.name ?? "System Default"
     }
 
     func stopRecording() {
+        islandController.hide()
+
         Task { @MainActor in
             let duration = Int(recordingService.elapsedSeconds)
             guard let url = await recordingService.stopRecording() else { return }
