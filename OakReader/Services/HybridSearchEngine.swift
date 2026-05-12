@@ -8,6 +8,7 @@ final class HybridSearchEngine: @unchecked Sendable {
     private let semanticDB: SemanticDatabase
     private let dimensions: UInt32
     private let indexPath: String
+    private let lock = NSLock()
 
     struct SearchHit: Sendable {
         let chunkId: Int64
@@ -34,17 +35,34 @@ final class HybridSearchEngine: @unchecked Sendable {
         if FileManager.default.fileExists(atPath: indexPath) {
             idx.load(path: indexPath)
         }
+        // Pre-allocate capacity so USearch has thread slots for add/search.
+        let currentLength = idx.length
+        idx.reserve(max(currentLength + Self.reserveGrowth, Self.reserveGrowth))
         index = idx
+    }
+
+    /// How many extra slots to reserve beyond current length.
+    private static let reserveGrowth: UInt32 = 1024
+
+    /// Ensure the index has room for at least one more entry.
+    private func reserveIfNeeded() {
+        guard let index, index.length >= index.capacity else { return }
+        index.reserve(index.length + Self.reserveGrowth)
     }
 
     /// Add a vector with its chunk rowid as key.
     func addVector(key: UInt64, vector: [Float]) {
+        lock.lock()
+        defer { lock.unlock() }
         guard let index else { return }
+        reserveIfNeeded()
         index.add(key: USearchKey(key), vector: vector)
     }
 
     /// Remove vectors by keys.
     func removeVectors(keys: [UInt64]) {
+        lock.lock()
+        defer { lock.unlock() }
         guard let index else { return }
         for key in keys {
             index.remove(key: USearchKey(key))
@@ -53,21 +71,29 @@ final class HybridSearchEngine: @unchecked Sendable {
 
     /// Persist the USearch index to disk.
     func save() {
+        lock.lock()
+        defer { lock.unlock() }
         guard let index else { return }
         index.save(path: indexPath)
     }
 
     /// Reset the index for a full rebuild (e.g. model switch).
     func reset() {
+        lock.lock()
+        defer { lock.unlock() }
         index?.clear()
         if FileManager.default.fileExists(atPath: indexPath) {
             try? FileManager.default.removeItem(atPath: indexPath)
         }
+        // Note: loadOrCreateIndex() does not acquire the lock itself;
+        // it is safe to call here because the lock is already held.
         loadOrCreateIndex()
     }
 
     /// Reinitialize with new dimensions (e.g. different embedding model).
     func reinitialize(dimensions newDimensions: UInt32) {
+        lock.lock()
+        defer { lock.unlock() }
         let idx = USearchIndex.make(
             metric: .cos,
             dimensions: newDimensions,
@@ -75,6 +101,7 @@ final class HybridSearchEngine: @unchecked Sendable {
             quantization: .F32,
             multi: false
         )
+        idx.reserve(Self.reserveGrowth)
         index = idx
     }
 
@@ -86,13 +113,17 @@ final class HybridSearchEngine: @unchecked Sendable {
         let k: Float = 60
 
         // 1. Vector search via USearch
-        if let index, !index.isEmpty {
-            let vectorCount = min(50, index.count)
-            let (keys, _) = index.search(vector: queryEmbedding, count: vectorCount)
+        do {
+            lock.lock()
+            defer { lock.unlock() }
+            if let index, !index.isEmpty {
+                let vectorCount = min(50, index.count)
+                let (keys, _) = index.search(vector: queryEmbedding, count: vectorCount)
 
-            for (rank, key) in keys.enumerated() {
-                let chunkId = Int64(bitPattern: key)
-                scores[chunkId, default: 0] += 1 / (k + Float(rank + 1))
+                for (rank, key) in keys.enumerated() {
+                    let chunkId = Int64(bitPattern: key)
+                    scores[chunkId, default: 0] += 1 / (k + Float(rank + 1))
+                }
             }
         }
 
