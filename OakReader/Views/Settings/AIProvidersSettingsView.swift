@@ -3,13 +3,11 @@ import OakAgent
 import OakVoiceAI
 
 struct AIProvidersSettingsView: View {
-    /// Sentinel ID for the "Defaults" row.
-    static let defaultsId = "___defaults___"
     /// Sentinel ID for ElevenLabs (not in ProviderRegistry).
     static let elevenLabsId = "__elevenlabs__"
 
     @State private var store = ConfiguredProviderStore.shared
-    @State private var selectedProviderId: String? = defaultsId
+    @State private var selectedProviderId: String?
 
     private var allLLMProviders: [ProviderInfo] {
         ProviderRegistry.shared.allProviders
@@ -32,15 +30,6 @@ struct AIProvidersSettingsView: View {
     private var providerList: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 2) {
-                // Defaults row
-                listRow(
-                    id: Self.defaultsId,
-                    iconAsset: nil,
-                    sfSymbol: "gearshape",
-                    title: "Defaults",
-                    isConfigured: true
-                )
-
                 sectionHeader("LLM Providers")
 
                 ForEach(allLLMProviders) { provider in

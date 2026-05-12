@@ -9,6 +9,7 @@ struct SettingsView: View {
         case general
         case library
         case ai
+        case aiSettings
         case localModels
         case audio
         case characters
@@ -25,6 +26,7 @@ struct SettingsView: View {
             case .general: return "General"
             case .library: return "Library"
             case .ai: return "AI Providers"
+            case .aiSettings: return "AI Settings"
             case .localModels: return "Local Models"
             case .audio: return "Audio"
             case .characters: return "Characters"
@@ -40,6 +42,7 @@ struct SettingsView: View {
             case .general: return "gearshape"
             case .library: return "books.vertical"
             case .ai: return "sparkles.2"
+            case .aiSettings: return "cpu"
             case .localModels: return "arrow.down.circle"
             case .audio: return "speaker.wave.2"
             case .characters: return "person.2"
@@ -68,7 +71,7 @@ struct SettingsView: View {
     }
 
     /// Fixed tabs that always appear.
-    private static let fixedTabs: [Tab] = [.general, .library, .ai, .localModels, .audio, .characters, .plugins, .youtube]
+    private static let fixedTabs: [Tab] = [.general, .library, .ai, .aiSettings, .localModels, .audio, .characters, .plugins, .youtube]
 
     @State private var selectedTab: Tab = .general
     @State private var pluginRefresh = false
@@ -124,6 +127,8 @@ struct SettingsView: View {
             LibrarySettingsView(store: store)
         case .ai:
             AIProvidersSettingsView()
+        case .aiSettings:
+            AISettingsView()
         case .localModels:
             LocalModelsSettingsView()
         case .audio:

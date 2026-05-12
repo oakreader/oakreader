@@ -1,5 +1,4 @@
 import SwiftUI
-import OakAgent
 
 struct YouTubeSettingsView: View {
     // yt-dlp state
@@ -8,12 +7,6 @@ struct YouTubeSettingsView: View {
     @State private var isInstalling = false
     @State private var installMessage: String?
     @State private var latestVersion: String?
-
-    // AI chapter generation state
-    @State private var youtubeProviderId: String
-    @State private var youtubeModel: String
-    @State private var testResult: String?
-    @State private var isTesting = false
 
     // Prompt file state
     @State private var promptPreview: String = ""
@@ -25,22 +18,10 @@ struct YouTubeSettingsView: View {
         case notFound
     }
 
-    init() {
-        let prefs = Preferences.shared
-        let pid = prefs.youtubeAIProviderId
-        _youtubeProviderId = State(initialValue: pid)
-        _youtubeModel = State(initialValue: {
-            let m = prefs.youtubeAIModel
-            return m.isEmpty ? (ProviderRegistry.shared.provider(for: pid)?.defaultModelId ?? "") : m
-        }())
-    }
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 ytDlpSection
-                Divider()
-                aiChapterSection
                 Divider()
                 chapterPromptSection
                 Spacer()
@@ -54,9 +35,6 @@ struct YouTubeSettingsView: View {
                 restoreOrVerifyYtDlp(at: ytDlpPath)
             }
             loadPromptPreview()
-        }
-        .onDisappear {
-            saveAISettings()
         }
     }
 
@@ -152,72 +130,7 @@ struct YouTubeSettingsView: View {
         }
     }
 
-    // MARK: - Section 2: AI Highlight Generation
-
-    private var aiChapterSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("AI Highlight Generation")
-                .font(.system(size: 13, weight: .bold))
-
-            Text("Select the AI provider and model used to find video highlights from transcripts.")
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-
-            HStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Provider")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                    Picker("Provider", selection: $youtubeProviderId) {
-                        ForEach(ConfiguredProviderStore.shared.configuredLLMProviders) { p in
-                            Text(p.displayName).tag(p.id)
-                        }
-                    }
-                    .labelsHidden()
-                    .frame(width: 160)
-                    .onChange(of: youtubeProviderId) { _, newValue in
-                        youtubeModel = ProviderRegistry.shared.provider(for: newValue)?.defaultModelId ?? ""
-                        testResult = nil
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Model")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                    Picker("Model", selection: $youtubeModel) {
-                        ForEach(ProviderRegistry.shared.provider(for: youtubeProviderId)?.models ?? []) { m in
-                            Text(m.name).tag(m.id)
-                        }
-                    }
-                    .labelsHidden()
-                    .frame(width: 220)
-                }
-            }
-
-            HStack(spacing: 6) {
-                if isTesting {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text("Testing...")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                } else {
-                    Button("Test Connection") { testConnection() }
-                        .controlSize(.small)
-                        .disabled(!CredentialResolver.hasCredentials(for: youtubeProviderId))
-                }
-
-                if let result = testResult {
-                    Text(result)
-                        .font(.system(size: 11))
-                        .foregroundStyle(result.contains("Success") ? .green : .red)
-                }
-            }
-        }
-    }
-
-    // MARK: - Section 3: Highlight Prompt
+    // MARK: - Section 2: Highlight Prompt
 
     private var chapterPromptSection: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -460,46 +373,6 @@ struct YouTubeSettingsView: View {
             return String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
         } catch {
             return nil
-        }
-    }
-
-    // MARK: - AI Helpers
-
-    private func saveAISettings() {
-        let prefs = Preferences.shared
-        prefs.youtubeAIProviderId = youtubeProviderId
-        prefs.youtubeAIModel = youtubeModel
-    }
-
-    private func testConnection() {
-        saveAISettings()
-        isTesting = true
-        testResult = nil
-
-        Task {
-            do {
-                let router = ProviderRouter()
-                let config = ProviderConfig(providerId: youtubeProviderId, model: youtubeModel)
-                let svc = try router.provider(for: config)
-                let messages = [LLMMessage(role: .user, text: "Say 'OK' and nothing else.")]
-                let stream = svc.sendMessage(
-                    messages: messages, model: youtubeModel,
-                    systemPrompt: nil, maxTokens: 50
-                )
-                var gotDelta = false
-                for try await chunk in stream {
-                    if case .delta = chunk { gotDelta = true; break }
-                }
-                await MainActor.run {
-                    testResult = gotDelta ? "Success!" : "No response received"
-                    isTesting = false
-                }
-            } catch {
-                await MainActor.run {
-                    testResult = "Error: \(error.localizedDescription)"
-                    isTesting = false
-                }
-            }
         }
     }
 
