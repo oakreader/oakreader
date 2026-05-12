@@ -114,7 +114,7 @@
 		655B09752BD059F6AA1CF8E4 /* BatchProcessingWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 414C4917B5476636EE2EE633 /* BatchProcessingWindow.swift */; };
 		6668BD5BB724783878035CAC /* SplitDocumentSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54B822DAA6FAE842CB585B93 /* SplitDocumentSheet.swift */; };
 		68C759913CA34CE2423602F4 /* NotePreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FF26392F8BE88816E86DC83 /* NotePreviewView.swift */; };
-		69646E7C83625923A7D82316 /* OakAI in Frameworks */ = {isa = PBXBuildFile; productRef = 19E322BB594FF18127BAB222 /* OakAI */; };
+		69646E7C83625923A7D82316 /* OakAgent in Frameworks */ = {isa = PBXBuildFile; productRef = 19E322BB594FF18127BAB222 /* OakAgent */; };
 		69661ABF1192BAACDD69A0A9 /* LibraryCitationExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE52226111AD1C0257F4BB64 /* LibraryCitationExport.swift */; };
 		6A9B45CB67160400C30F813B /* WebSnapshotDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = E619D163110C86F5906E9DD1 /* WebSnapshotDocument.swift */; };
 		6B7943692C35CBD68E2E8E3C /* BookmarkSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4B69107E3E492061A5CADE5 /* BookmarkSidebarView.swift */; };
@@ -202,7 +202,7 @@
 		B8E4EFD9CE3A433CF854203D /* NotesViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0187FC1D799B964D1113CFF /* NotesViewModel.swift */; };
 		B989E8A812E77BE101B5E7D4 /* CompareViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 202DECC1CD2165A023ADC37E /* CompareViewModel.swift */; };
 		B9BE36D6C7401EE88CE7071D /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = F10B728DCD9CF1D3612369BE /* Sparkle */; };
-		BA0B27333EF86F5FC6F02701 /* OakAI in Frameworks */ = {isa = PBXBuildFile; productRef = D35092B735BE70B3D2813F1C /* OakAI */; };
+		BA0B27333EF86F5FC6F02701 /* OakAgent in Frameworks */ = {isa = PBXBuildFile; productRef = D35092B735BE70B3D2813F1C /* OakAgent */; };
 		BA681F5E1B8D6ABC7D0878ED /* AnnotationModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CED884CFE0ED6221919B28F8 /* AnnotationModel.swift */; };
 		BAD50B0EC547A5E9B57F8BC9 /* CGPDFDocument+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7CB0C597FBB0F0023496A41 /* CGPDFDocument+Extensions.swift */; };
 		BAF4691DD4A1CF16CD23B8C7 /* NotePanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 945247B103C64684D0124953 /* NotePanelView.swift */; };
@@ -558,7 +558,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				69646E7C83625923A7D82316 /* OakAI in Frameworks */,
+				69646E7C83625923A7D82316 /* OakAgent in Frameworks */,
 				8B2875617706938CE893A311 /* OakVoiceAI in Frameworks */,
 				055A3A7F37ECA58BFCFE749A /* Textual in Frameworks */,
 				B81B9BA647234E09506AC8D5 /* GRDB in Frameworks */,
@@ -574,7 +574,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				BA0B27333EF86F5FC6F02701 /* OakAI in Frameworks */,
+				BA0B27333EF86F5FC6F02701 /* OakAgent in Frameworks */,
 				0F13A6E0A89F4F20EAFA4069 /* GRDB in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1154,7 +1154,7 @@
 			);
 			name = oak;
 			packageProductDependencies = (
-				D35092B735BE70B3D2813F1C /* OakAI */,
+				D35092B735BE70B3D2813F1C /* OakAgent */,
 				F7AB5ED40472FCDDFAE174DE /* GRDB */,
 			);
 			productName = oak;
@@ -1178,7 +1178,7 @@
 			);
 			name = OakReader;
 			packageProductDependencies = (
-				19E322BB594FF18127BAB222 /* OakAI */,
+				19E322BB594FF18127BAB222 /* OakAgent */,
 				10474B09A17487E535582955 /* OakVoiceAI */,
 				1EAE2888C4FE81992BDCCD25 /* Textual */,
 				DBFC960D58BB4D238DFC9FF1 /* GRDB */,
@@ -1868,9 +1868,9 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = OakVoiceAI;
 		};
-		19E322BB594FF18127BAB222 /* OakAI */ = {
+		19E322BB594FF18127BAB222 /* OakAgent */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = OakAI;
+			productName = OakAgent;
 		};
 		1EAE2888C4FE81992BDCCD25 /* Textual */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -1892,9 +1892,9 @@
 			package = 24190CE4AF0B5944ACA7AEE4 /* XCRemoteSwiftPackageReference "YouTubePlayerKit" */;
 			productName = YouTubePlayerKit;
 		};
-		D35092B735BE70B3D2813F1C /* OakAI */ = {
+		D35092B735BE70B3D2813F1C /* OakAgent */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = OakAI;
+			productName = OakAgent;
 		};
 		DBFC960D58BB4D238DFC9FF1 /* GRDB */ = {
 			isa = XCSwiftPackageProductDependency;

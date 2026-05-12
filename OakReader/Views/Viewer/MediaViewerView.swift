@@ -2,7 +2,7 @@ import SwiftUI
 import WebKit
 import YouTubePlayerKit
 import YoutubeTranscript
-import OakAI
+import OakAgent
 import Darwin
 
 /// A single timestamped line in the transcript.

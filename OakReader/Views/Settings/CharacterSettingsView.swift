@@ -1,5 +1,5 @@
 import SwiftUI
-import OakAI
+import OakAgent
 import UniformTypeIdentifiers
 
 struct CharacterSettingsView: View {

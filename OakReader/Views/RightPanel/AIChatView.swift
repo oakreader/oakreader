@@ -1,5 +1,5 @@
 import SwiftUI
-import OakAI
+import OakAgent
 
 struct AIChatView: View {
     let chatVM: ChatViewModel

@@ -7,8 +7,8 @@ let package = Package(
         .macOS(.v15)
     ],
     dependencies: [
-        .package(path: "Packages/OakAgent"),
         .package(path: "Packages/OakAI"),
+        .package(path: "Packages/OakAgent"),
         .package(path: "Packages/OakVoiceAI"),
         .package(url: "https://github.com/gonzalezreal/textual", from: "0.1.0"),
         .package(url: "https://github.com/groue/GRDB.swift", from: "7.0.0"),
@@ -22,7 +22,7 @@ let package = Package(
         .executableTarget(
             name: "OakReader",
             dependencies: [
-                "OakAI",
+                "OakAgent",
                 "OakVoiceAI",
                 .product(name: "Textual", package: "textual"),
                 .product(name: "GRDB", package: "GRDB.swift"),
@@ -41,7 +41,7 @@ let package = Package(
         .executableTarget(
             name: "oak",
             dependencies: [
-                "OakAI",
+                "OakAgent",
                 .product(name: "GRDB", package: "GRDB.swift"),
             ],
             path: "CLI"

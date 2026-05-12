@@ -1,6 +1,6 @@
 import Foundation
 import Darwin
-import OakAI
+import OakAgent
 import YoutubeTranscript
 
 /// Determines whether to generate structural chapters or AI highlights.

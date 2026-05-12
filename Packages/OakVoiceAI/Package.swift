@@ -9,7 +9,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/Blaizzy/mlx-audio-swift", branch: "main"),
-        .package(path: "../OakAI"),
+        .package(path: "../OakAgent"),
     ],
     targets: [
         .target(
@@ -19,7 +19,7 @@ let package = Package(
                 .product(name: "MLXAudioTTS", package: "mlx-audio-swift"),
                 .product(name: "MLXAudioVAD", package: "mlx-audio-swift"),
                 .product(name: "MLXAudioCore", package: "mlx-audio-swift"),
-                "OakAI",
+                "OakAgent",
             ],
             path: "Sources/OakVoiceAI"
         )

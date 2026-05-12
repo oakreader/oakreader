@@ -1,5 +1,5 @@
 import Foundation
-import OakAI
+import OakAgent
 
 @Observable
 final class ConfiguredProviderStore {

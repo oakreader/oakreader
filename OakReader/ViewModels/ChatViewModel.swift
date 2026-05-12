@@ -1,5 +1,5 @@
 import Foundation
-import OakAI
+import OakAgent
 
 struct PendingConfirmation {
     let toolCall: ToolCall

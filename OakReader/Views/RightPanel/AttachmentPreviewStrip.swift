@@ -1,5 +1,5 @@
 import SwiftUI
-import OakAI
+import OakAgent
 
 struct AttachmentPreviewStrip: View {
     let attachments: [ChatAttachment]
