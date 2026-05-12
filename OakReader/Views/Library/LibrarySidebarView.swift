@@ -422,6 +422,15 @@ private struct CollectionRowView: View {
                     }
                 }
 
+                if appState.semanticIndexService != nil {
+                    Divider()
+                    Button {
+                        embedCollectionContent(collection)
+                    } label: {
+                        Label("Embed All Content", systemImage: "brain")
+                    }
+                }
+
                 if !collection.isSystem {
                     Divider()
                     Button(role: .destructive) { store.deleteCollection(collection) } label: {
@@ -444,6 +453,16 @@ private struct CollectionRowView: View {
                     )
                 }
             }
+        }
+    }
+
+    private func embedCollectionContent(_ collection: PDFCollection) {
+        guard let service = appState.semanticIndexService else { return }
+        let collectionItems = store.items.filter { $0.collections.contains { $0.id == collection.id } }
+        let itemIds = collectionItems.map(\.id.uuidString)
+        guard !itemIds.isEmpty else { return }
+        Task {
+            await service.indexItems(itemIds)
         }
     }
 

@@ -1,110 +1,11 @@
 import Foundation
 import PDFKit
-import AppKit
 import OakAgent
 
-/// Snapshot of document context to pass across actor boundaries.
-public struct PDFContextSnapshot: Sendable {
-    public let fileName: String
-    public let pageCount: Int
-    public let currentPageIndex: Int
-    public let currentPageText: String
-    public let fullDocumentText: String?   // nil if not needed by skill
-    public let selectedText: String?
-
-    public init(
-        fileName: String,
-        pageCount: Int,
-        currentPageIndex: Int,
-        currentPageText: String,
-        fullDocumentText: String? = nil,
-        selectedText: String? = nil
-    ) {
-        self.fileName = fileName
-        self.pageCount = pageCount
-        self.currentPageIndex = currentPageIndex
-        self.currentPageText = currentPageText
-        self.fullDocumentText = fullDocumentText
-        self.selectedText = selectedText
-    }
-}
-
-/// Creates a Sendable PDFContextSnapshot from the current document state.
+/// Builds context snapshots and system prompts for the AI chat session.
 struct PDFContextProvider {
-    private let textExtractor = TextExtractionService()
 
-    func snapshot(
-        from viewModel: DocumentViewModel,
-        contextMode: ContextMode
-    ) -> PDFContextSnapshot? {
-        switch viewModel.itemType {
-        case .pdf:
-            return pdfSnapshot(from: viewModel, contextMode: contextMode)
-        case .webSnapshot:
-            return webSnapshotSnapshot(from: viewModel, contextMode: contextMode)
-        case .embed:
-            return mediaSnapshot(from: viewModel, contextMode: contextMode)
-        case .markdown:
-            return markdownSnapshot(from: viewModel, contextMode: contextMode)
-        case .audio:
-            return nil
-        }
-    }
-
-    /// Build a system prompt from a skill and document context.
-    ///
-    /// This is the app-layer prompt builder that was formerly inside ChatEngine.
-    /// The caller passes the result to ``AgentSession/send(…systemPrompt:…)``.
-    static func buildSystemPrompt(skill: Skill?, context: PDFContextSnapshot?) -> String {
-        var parts: [String] = []
-
-        // Base system prompt
-        parts.append("""
-            You are a helpful AI assistant integrated into OakReader, \
-            a document reader application. Do not praise questions or \
-            validate premises — if the user is wrong, say so directly. \
-            If uncertain, say so; do not fabricate citations or facts. \
-            Do not change your answer under pressure unless new evidence \
-            is presented.
-            """)
-
-        // Skill prompt
-        if let skill {
-            parts.append(skill.systemPrompt)
-        }
-
-        // PDF context
-        if let ctx = context {
-            parts.append("The user has a PDF document open: \"\(ctx.fileName)\" (\(ctx.pageCount) pages).")
-            parts.append("Current page: \(ctx.currentPageIndex + 1) of \(ctx.pageCount).")
-
-            if let selected = ctx.selectedText, !selected.isEmpty {
-                parts.append("Selected text:\n\"\"\"\n\(selected)\n\"\"\"")
-            }
-
-            // Determine context based on skill
-            let contextMode = skill?.contextMode ?? .currentPage
-            switch contextMode {
-            case .fullDocument:
-                if let fullText = ctx.fullDocumentText, !fullText.isEmpty {
-                    let truncated = String(fullText.prefix(32000))
-                    parts.append("Document text:\n\"\"\"\n\(truncated)\n\"\"\"")
-                }
-            case .currentPage:
-                if !ctx.currentPageText.isEmpty {
-                    parts.append("Current page text:\n\"\"\"\n\(ctx.currentPageText)\n\"\"\"")
-                }
-            case .selectedText:
-                break // Already handled above
-            case .none:
-                break
-            }
-        }
-
-        return parts.joined(separator: "\n\n")
-    }
-
-    // MARK: - Context Snapshot (enriched)
+    // MARK: - Context Snapshot
 
     /// Build a ``ChatContextSnapshot`` capturing all app + document context for the AI.
     static func buildContextSnapshot(
@@ -141,7 +42,7 @@ struct PDFContextProvider {
         from vm: DocumentViewModel,
         contextMode: ContextMode
     ) -> ChatContextSnapshot.DocumentContext {
-        let provider = PDFContextProvider()
+        let textExtractor = TextExtractionService()
 
         // Extract current page text
         let currentPageText: String
@@ -151,7 +52,7 @@ struct PDFContextProvider {
         switch vm.itemType {
         case .pdf:
             if let pdfDoc = vm.pdfDocument, let page = pdfDoc.page(at: currentPageIndex) {
-                currentPageText = provider.textExtractor.extractText(from: page)
+                currentPageText = textExtractor.extractText(from: page)
             } else {
                 currentPageText = ""
             }
@@ -162,10 +63,12 @@ struct PDFContextProvider {
                     .appendingPathComponent("content.md")
                 if let md = try? String(contentsOf: mdURL, encoding: .utf8), !md.isEmpty {
                     currentPageText = String(md.prefix(4_000))
-                } else {
+                } else if let data = try? Data(contentsOf: snapshot.htmlURL) {
                     currentPageText = String(
-                        provider.extractTextFromHTML(url: snapshot.htmlURL).prefix(4_000)
+                        HTMLTextExtractor.extractText(from: data).prefix(4_000)
                     )
+                } else {
+                    currentPageText = ""
                 }
             } else {
                 currentPageText = ""
@@ -211,19 +114,21 @@ struct PDFContextProvider {
         let ref = item?.referenceMetadata
         let csl = ref?.cslItem
 
-        // Notes
-        var noteSummaries: [(id: UUID, title: String)] = []
+        // Notes — resolve to absolute paths so the AI can use ReadTool
+        var notes: [(title: String, path: String)] = []
         if let db = vm.database, let storageKey = vm.itemStorageKey {
             let noteService = NoteService(database: db)
-            if let notes = try? noteService.fetchNotes(forItemId: storageKey) {
-                noteSummaries = notes.map { ($0.id, $0.displayTitle) }
+            if let fetched = try? noteService.fetchNotes(forItemId: storageKey) {
+                notes = fetched.map {
+                    ($0.displayTitle, CatalogDatabase.noteFileURL(noteId: $0.id).path)
+                }
             }
         }
 
         return ChatContextSnapshot.DocumentContext(
             fileName: vm.fileName,
             filePath: filePath,
-            itemType: vm.itemType.rawValue,
+            itemType: vm.itemType,
             pageCount: pageCount,
             currentPageIndex: currentPageIndex,
             currentPageText: currentPageText,
@@ -242,12 +147,11 @@ struct PDFContextProvider {
             volume: csl?.volume,
             issue: csl?.issue,
             pages: csl?.page,
-            noteCount: noteSummaries.count,
-            noteSummaries: noteSummaries
+            notes: notes
         )
     }
 
-    // MARK: - System Prompt (enriched)
+    // MARK: - System Prompt
 
     /// Build a system prompt from a skill and enriched context snapshot.
     /// Uses structured XML for metadata, includes current page text, and references
@@ -319,10 +223,15 @@ struct PDFContextProvider {
                 docParts.append("  <collections>\(doc.collectionNames.joined(separator: ", "))</collections>")
             }
 
-            // Notes summary
-            if doc.noteCount > 0 {
-                let titles = doc.noteSummaries.map(\.title).joined(separator: "; ")
-                docParts.append("  <notes count=\"\(doc.noteCount)\">\(xmlEscape(titles))</notes>")
+            // Notes with paths — AI can use ReadTool to read them
+            if !doc.notes.isEmpty {
+                var noteLines: [String] = []
+                for note in doc.notes {
+                    noteLines.append(
+                        "    <note title=\"\(xmlEscape(note.title))\" path=\"\(xmlEscape(note.path))\" />"
+                    )
+                }
+                docParts.append("  <notes count=\"\(doc.notes.count)\">\n\(noteLines.joined(separator: "\n"))\n  </notes>")
             }
 
             // Selected text
@@ -338,15 +247,16 @@ struct PDFContextProvider {
 
             let docBlock = docParts.joined(separator: "\n")
             parts.append(
-                "<document type=\"\(xmlEscape(doc.itemType))\" pages=\"\(doc.pageCount)\">\n\(docBlock)\n</document>"
+                "<document type=\"\(xmlEscape(doc.itemType.rawValue))\" pages=\"\(doc.pageCount)\">\n\(docBlock)\n</document>"
             )
 
             // Tool usage hint
             parts.append("""
                 You have tools to read document pages (read_document), search within the \
-                document (search_document), read notes (read_notes), and find conceptually \
-                related items via vector search (search_semantic). Use search_semantic for \
-                thematic queries and search_library for keyword matches.
+                document (search_document), and find conceptually related items via vector \
+                search (search_semantic). Use the read tool to read note files by their \
+                path listed above. Use search_semantic for thematic queries and \
+                search_library for keyword matches.
                 """)
 
             // Abstract (outside document block to not crowd metadata)
@@ -370,117 +280,5 @@ struct PDFContextProvider {
             .replacingOccurrences(of: "<", with: "&lt;")
             .replacingOccurrences(of: ">", with: "&gt;")
             .replacingOccurrences(of: "\"", with: "&quot;")
-    }
-
-    // MARK: - PDF
-
-    private func pdfSnapshot(
-        from viewModel: DocumentViewModel,
-        contextMode: ContextMode
-    ) -> PDFContextSnapshot? {
-        guard let pdfDoc = viewModel.pdfDocument else { return nil }
-
-        let currentPageIndex = viewModel.state.currentPageIndex
-        let currentPageText: String
-        if let page = pdfDoc.page(at: currentPageIndex) {
-            currentPageText = textExtractor.extractText(from: page)
-        } else {
-            currentPageText = ""
-        }
-
-        var fullText: String?
-        if contextMode == .fullDocument {
-            let raw = textExtractor.extractAllText(from: pdfDoc)
-            // Truncate to ~32K characters (~8K tokens)
-            fullText = String(raw.prefix(32_000))
-        }
-
-        return PDFContextSnapshot(
-            fileName: viewModel.fileName,
-            pageCount: viewModel.pageCount,
-            currentPageIndex: currentPageIndex,
-            currentPageText: currentPageText,
-            fullDocumentText: fullText,
-            selectedText: viewModel.state.selectedText
-        )
-    }
-
-    // MARK: - Web Snapshot
-
-    private func webSnapshotSnapshot(
-        from viewModel: DocumentViewModel,
-        contextMode: ContextMode
-    ) -> PDFContextSnapshot? {
-        guard let snapshot = viewModel.webSnapshot else { return nil }
-
-        let htmlText = extractTextFromHTML(url: snapshot.htmlURL)
-        let truncated = String(htmlText.prefix(32_000))
-
-        return PDFContextSnapshot(
-            fileName: viewModel.fileName,
-            pageCount: 1,
-            currentPageIndex: 0,
-            currentPageText: truncated,
-            fullDocumentText: contextMode == .fullDocument ? truncated : nil,
-            selectedText: viewModel.state.selectedText
-        )
-    }
-
-    // MARK: - Media (Embed)
-
-    private func mediaSnapshot(
-        from viewModel: DocumentViewModel,
-        contextMode: ContextMode
-    ) -> PDFContextSnapshot? {
-        guard let media = viewModel.mediaDocument else { return nil }
-
-        // Read transcript, fall back to description
-        var text = ""
-        if let transcriptURL = media.transcriptURL,
-           let transcript = try? String(contentsOf: transcriptURL, encoding: .utf8) {
-            text = transcript
-        } else if let description = media.metadata.description {
-            text = description
-        }
-        let truncated = String(text.prefix(32_000))
-
-        return PDFContextSnapshot(
-            fileName: media.metadata.title,
-            pageCount: 1,
-            currentPageIndex: 0,
-            currentPageText: truncated,
-            fullDocumentText: contextMode == .fullDocument ? truncated : nil,
-            selectedText: viewModel.state.selectedText
-        )
-    }
-
-    // MARK: - Markdown
-
-    private func markdownSnapshot(
-        from viewModel: DocumentViewModel,
-        contextMode: ContextMode
-    ) -> PDFContextSnapshot? {
-        guard let mdDoc = viewModel.markdownDocument else { return nil }
-        let truncated = String(mdDoc.content.prefix(32_000))
-
-        return PDFContextSnapshot(
-            fileName: viewModel.fileName,
-            pageCount: 1,
-            currentPageIndex: 0,
-            currentPageText: truncated,
-            fullDocumentText: contextMode == .fullDocument ? truncated : nil,
-            selectedText: viewModel.state.selectedText
-        )
-    }
-
-    /// Extract plain text from an HTML file by stripping tags via NSAttributedString.
-    func extractTextFromHTML(url: URL) -> String {
-        guard let htmlData = try? Data(contentsOf: url) else { return "" }
-        guard let attrString = NSAttributedString(
-            html: htmlData,
-            baseURL: url.deletingLastPathComponent(),
-            documentAttributes: nil
-        ) else { return "" }
-        return attrString.string
     }
 }

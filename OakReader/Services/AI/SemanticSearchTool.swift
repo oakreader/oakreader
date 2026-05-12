@@ -15,7 +15,6 @@ struct SemanticSearchTool: AgentTool, Sendable {
         Returns matching items with relevance scores, excerpts, and page references.
         """
     let service: SemanticIndexService
-    let dbQueue: DatabaseQueue
 
     var inputSchema: [String: Any] {
         [
@@ -47,11 +46,11 @@ struct SemanticSearchTool: AgentTool, Sendable {
             return .success("No semantically similar items found for \"\(query)\" in the library.")
         }
 
-        // Enrich results with item metadata
+        // Enrich results with item metadata from catalog.db
         let itemIds = results.map(\.itemId)
         let metadata: [String: ItemMeta]
         do {
-            metadata = try await dbQueue.read { db -> [String: ItemMeta] in
+            metadata = try await service.catalogDBQueue.read { db -> [String: ItemMeta] in
                 let placeholders = itemIds.map { _ in "?" }.joined(separator: ",")
                 let rows = try Row.fetchAll(db, sql: """
                     SELECT i.id, i.title, i.author, i.cite_key,

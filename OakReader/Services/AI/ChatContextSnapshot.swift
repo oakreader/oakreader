@@ -16,7 +16,7 @@ struct ChatContextSnapshot: Sendable {
         // File info
         let fileName: String
         let filePath: String
-        let itemType: String       // "pdf", "webSnapshot", "embed", "markdown"
+        let itemType: ItemType
         let pageCount: Int
         let currentPageIndex: Int
         let currentPageText: String
@@ -40,11 +40,7 @@ struct ChatContextSnapshot: Sendable {
         let issue: String?
         let pages: String?
 
-        // Notes
-        let noteCount: Int
-        let noteSummaries: [(id: UUID, title: String)]
-
-        // Sendable conformance requires manual Equatable-like behavior for the tuple array
-        // Since tuples aren't Hashable, we don't conform to Hashable/Equatable
+        // Notes — title + absolute path so the AI can read them with ReadTool
+        let notes: [(title: String, path: String)]
     }
 }

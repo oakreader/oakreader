@@ -109,9 +109,10 @@ class ChatViewModel {
 
         let prefs = Preferences.shared
 
-        // Build tools list — document tools are always available when a document is open
+        // Build tools list
         var tools: [any AgentTool] = []
 
+        // 1. Document tools (always when a document is open)
         if let doc = snapshot.document {
             tools.append(ReadDocumentTool(
                 filePath: doc.filePath,
@@ -123,32 +124,31 @@ class ChatViewModel {
                 documentType: doc.itemType,
                 pageCount: doc.pageCount
             ))
-            if !doc.noteSummaries.isEmpty {
-                tools.append(ReadNotesTool(
-                    notes: doc.noteSummaries.map { (id: $0.id.uuidString, title: $0.title) },
-                    notesDirectory: CatalogDatabase.notesDirectory
-                ))
-            }
         }
 
-        // Library-wide search tools — always available
+        // 2. Library tools (always when database is available)
         if let dbQueue = sessionService?.database.dbQueue {
             tools.append(SearchLibraryTool(dbQueue: dbQueue))
             tools.append(ReadLibraryItemTool(dbQueue: dbQueue))
 
-            // Semantic search — available when index service is ready
             if let semanticService = appState?.semanticIndexService {
-                tools.append(SemanticSearchTool(service: semanticService, dbQueue: dbQueue))
+                tools.append(SemanticSearchTool(service: semanticService))
             }
         }
 
-        // Academic web search — always available
+        // 3. Web search (always)
         tools.append(AcademicSearchTool())
 
-        // Existing filesystem agent tools (gated by preferences)
+        // 4. Filesystem tools (user preference gated)
         if prefs.agentToolsEnabled, toolContext != nil {
             if prefs.agentReadFileEnabled { tools.append(ReadTool()) }
             if prefs.agentWriteFileEnabled { tools.append(WriteTool()) }
+        }
+
+        // 5. ReadTool for notes (when document has notes but ReadTool not already added)
+        if snapshot.document?.notes.isEmpty == false,
+           !tools.contains(where: { $0.name == "read" }) {
+            tools.append(ReadTool())
         }
 
         let currentTools: [any AgentTool]? = tools.isEmpty ? nil : tools
@@ -156,10 +156,17 @@ class ChatViewModel {
         // Ensure a tool context exists when document tools are present
         let effectiveToolContext: ToolExecutionContext?
         if !tools.isEmpty {
-            let storagePath = parent?.itemStorageKey.map { CatalogDatabase.documentDirectory(storageKey: $0) }
+            let storagePath = parent?.itemStorageKey.map {
+                CatalogDatabase.documentDirectory(storageKey: $0)
+            }
+            var allowed = storagePath.map { [$0] } ?? []
+            // Allow ReadTool to access notes directory (paths are in the system prompt)
+            if snapshot.document?.notes.isEmpty == false {
+                allowed.append(CatalogDatabase.notesDirectory)
+            }
             effectiveToolContext = toolContext ?? ToolExecutionContext(
                 workingDirectory: storagePath ?? URL(fileURLWithPath: NSTemporaryDirectory()),
-                allowedPaths: storagePath.map { [$0] } ?? []
+                allowedPaths: allowed
             )
         } else {
             effectiveToolContext = nil

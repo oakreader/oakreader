@@ -17,6 +17,16 @@ extension CatalogDatabase {
         dataDirectory.appendingPathComponent("vectors", isDirectory: true)
     }
 
+    /// ~/OakReader/semantic.db — regenerable chunk text + metadata + FTS5
+    static var semanticDatabaseURL: URL {
+        dataDirectory.appendingPathComponent("semantic.db")
+    }
+
+    /// ~/OakReader/semantic.usearch — HNSW vector index (regenerable)
+    static var semanticIndexURL: URL {
+        dataDirectory.appendingPathComponent("semantic.usearch")
+    }
+
     /// ~/OakReader/logs/
     static var logsDirectory: URL {
         dataDirectory.appendingPathComponent("logs", isDirectory: true)
@@ -182,5 +192,11 @@ extension CatalogDatabase {
     static func attachmentHighlightsURL(itemStorageKey: String, attachmentStorageKey: String) -> URL {
         attachmentDirectory(itemStorageKey: itemStorageKey, attachmentStorageKey: attachmentStorageKey)
             .appendingPathComponent("highlights.json")
+    }
+
+    /// Summary JSON URL for an audio recording attachment.
+    static func attachmentSummaryURL(itemStorageKey: String, attachmentStorageKey: String) -> URL {
+        attachmentDirectory(itemStorageKey: itemStorageKey, attachmentStorageKey: attachmentStorageKey)
+            .appendingPathComponent("summary.json")
     }
 }

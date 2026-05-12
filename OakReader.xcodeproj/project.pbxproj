@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		DA0B1C2D3E4F5A6B7C8D9E0F /* DocumentTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA0B1C2D3E4F5A6B7C8D9E0F /* DocumentTools.swift */; };
 		0025F759B35E0D3485583036 /* ChapterModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6FBF2AB294757A782CCEA5D /* ChapterModel.swift */; };
 		0071ECB4FF73D275746077AA /* AttachmentPreviewStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CE7B963BA9AF27C8640777F /* AttachmentPreviewStrip.swift */; };
 		00A5CCB098340CB80CB0B71D /* AnnotationListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E55DE9B5224B2F68AF785CF /* AnnotationListView.swift */; };
@@ -124,6 +125,7 @@
 		6A9B45CB67160400C30F813B /* WebSnapshotDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = E619D163110C86F5906E9DD1 /* WebSnapshotDocument.swift */; };
 		6B7943692C35CBD68E2E8E3C /* BookmarkSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4B69107E3E492061A5CADE5 /* BookmarkSidebarView.swift */; };
 		6D04B816877CCBF912AD7BAA /* AIProviderConfigView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42F45F7A5E5FBBA78F6F352C /* AIProviderConfigView.swift */; };
+		A1B2C3D4E5F60718293A4B5C /* AISettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E5F6071829A1B2C3A4B5C6 /* AISettingsView.swift */; };
 		6E8C433D698AEC5FC7C4FBF0 /* VoicePanelContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF7AB1761714E874C581C32A /* VoicePanelContainerView.swift */; };
 		6EB17E48EFDF2EFCB2F8DDFA /* TsangerJinKai02-W04.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 912AD36ADFACA2448194EBB7 /* TsangerJinKai02-W04.ttf */; };
 		6F07540DDB092DF115E1F8EC /* PageNavigationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00C73F9EEB44740568DAFD2A /* PageNavigationView.swift */; };
@@ -287,14 +289,21 @@
 		FD86B18DAC21BDACE850161C /* LibraryPropertyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 699913DA93CBA7649507A450 /* LibraryPropertyStore.swift */; };
 		FFE10D25C8CCA1B1A5982951 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CF758B038910E7989807B7E1 /* Assets.xcassets */; };
 		E1A2B3C4D5F6A7B8C9D01234 /* EmbeddingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A2B3C4E5F6A7B8C9D01234 /* EmbeddingService.swift */; };
-		E2A3B4C5D6F7A8B9C0D12345 /* VectorSearchEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2A3B4C5E6F7A8B9C0D12345 /* VectorSearchEngine.swift */; };
-		E6A7B8C9D0F1A2B3C4D56789 /* SemanticChunkRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6A7B8C9E0F1A2B3C4D56789 /* SemanticChunkRecord.swift */; };
+		DD1A2B3C4D5E6F7A8B9C0D1E /* SemanticDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1B2C3D4E5F6A7B8C9D0E1F /* SemanticDatabase.swift */; };
+		A2B3C4D5E6F7A8B9C0D1E2F3 /* ContentChunker.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F6A7B8C9D0E1F2A4 /* ContentChunker.swift */; };
+		A3B4C5D6E7F8A9B0C1D2E3F4 /* HybridSearchEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3C4D5E6F7A8B9C0D1E2F3A5 /* HybridSearchEngine.swift */; };
 		E7A8B9C0D1F2A3B4C5D6789A /* SemanticIndexService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7A8B9C0E1F2A3B4C5D6789A /* SemanticIndexService.swift */; };
 		E8A9B0C1D2F3A4B5C6D789AB /* SearchTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8A9B0C1E2F3A4B5C6D789AB /* SearchTools.swift */; };
+		F0A1B2C3D4E5F6A7B8C9D0E1 /* AcademicSearchProviders.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0A1B2C3D4E5F6A7B8C9D0E1 /* AcademicSearchProviders.swift */; };
 		E9A0B1C2D3F4A5B6C7D89ABC /* SemanticSearchTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9A0B1C2E3F4A5B6C7D89ABC /* SemanticSearchTool.swift */; };
 		EA1B2C3D4E5F6A7B8C9D0E1F /* CLIImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A1B2C3D5E6F7A8B9C0D1E2F /* CLIImporter.swift */; };
 		EB2C3D4E5F6A7B8C9D0E1F2A /* PluginCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3C4D5E6F7A8B9C0D1E2F3A4 /* PluginCommands.swift */; };
 		EC3D4E5F6A7B8C9D0E1F2A3B /* PluginRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F6A7B8C9D0E1F2A3 /* PluginRegistry.swift */; };
+		AUD1B001AUD1B001AUD1B001 /* AudioRecordingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AUD10001AUD10001AUD10001 /* AudioRecordingService.swift */; };
+		AUD2B002AUD2B002AUD2B002 /* ImportService+Audio.swift in Sources */ = {isa = PBXBuildFile; fileRef = AUD20002AUD20002AUD20002 /* ImportService+Audio.swift */; };
+		AUD3B003AUD3B003AUD3B003 /* MeetingDetectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AUD30003AUD30003AUD30003 /* MeetingDetectionService.swift */; };
+		AUD4B004AUD4B004AUD4B004 /* MenuBarRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = AUD40004AUD40004AUD40004 /* MenuBarRecorder.swift */; };
+		AUD5B005AUD5B005AUD5B005 /* MenuBarRecorderPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = AUD50005AUD50005AUD50005 /* MenuBarRecorderPopover.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -400,6 +409,7 @@
 		412451D7D488F2DCEF2F1CF2 /* LibraryCollectionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryCollectionStore.swift; sourceTree = "<group>"; };
 		414C4917B5476636EE2EE633 /* BatchProcessingWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchProcessingWindow.swift; sourceTree = "<group>"; };
 		42F45F7A5E5FBBA78F6F352C /* AIProviderConfigView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIProviderConfigView.swift; sourceTree = "<group>"; };
+		D4E5F6071829A1B2C3A4B5C6 /* AISettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AISettingsView.swift; sourceTree = "<group>"; };
 		444CCC199D01E402686514A7 /* Log.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Log.swift; sourceTree = "<group>"; };
 		444DF6B212EC837B45FC546D /* AIProvidersSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIProvidersSettingsView.swift; sourceTree = "<group>"; };
 		45878CC78A8E01ED0197FA6A /* VoiceSpeakerModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceSpeakerModels.swift; sourceTree = "<group>"; };
@@ -580,11 +590,19 @@
 		FC870F643394FB8FDBD788D1 /* ZoomableChapterTimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoomableChapterTimelineView.swift; sourceTree = "<group>"; };
 		FEC033770C091AC5B1EA41B0 /* PDFRenderingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFRenderingService.swift; sourceTree = "<group>"; };
 		D1A2B3C4E5F6A7B8C9D01234 /* EmbeddingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmbeddingService.swift; sourceTree = "<group>"; };
-		D2A3B4C5E6F7A8B9C0D12345 /* VectorSearchEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VectorSearchEngine.swift; sourceTree = "<group>"; };
-		D6A7B8C9E0F1A2B3C4D56789 /* SemanticChunkRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SemanticChunkRecord.swift; sourceTree = "<group>"; };
+		AA1B2C3D4E5F6A7B8C9D0E1F /* SemanticDatabase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SemanticDatabase.swift; sourceTree = "<group>"; };
+		B2C3D4E5F6A7B8C9D0E1F2A4 /* ContentChunker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentChunker.swift; sourceTree = "<group>"; };
+		B3C4D5E6F7A8B9C0D1E2F3A5 /* HybridSearchEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HybridSearchEngine.swift; sourceTree = "<group>"; };
 		D7A8B9C0E1F2A3B4C5D6789A /* SemanticIndexService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SemanticIndexService.swift; sourceTree = "<group>"; };
+		CA0B1C2D3E4F5A6B7C8D9E0F /* DocumentTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentTools.swift; sourceTree = "<group>"; };
 		D8A9B0C1E2F3A4B5C6D789AB /* SearchTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchTools.swift; sourceTree = "<group>"; };
+		E0A1B2C3D4E5F6A7B8C9D0E1 /* AcademicSearchProviders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcademicSearchProviders.swift; sourceTree = "<group>"; };
 		D9A0B1C2E3F4A5B6C7D89ABC /* SemanticSearchTool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SemanticSearchTool.swift; sourceTree = "<group>"; };
+		AUD10001AUD10001AUD10001 /* AudioRecordingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRecordingService.swift; sourceTree = "<group>"; };
+		AUD20002AUD20002AUD20002 /* ImportService+Audio.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ImportService+Audio.swift"; sourceTree = "<group>"; };
+		AUD30003AUD30003AUD30003 /* MeetingDetectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingDetectionService.swift; sourceTree = "<group>"; };
+		AUD40004AUD40004AUD40004 /* MenuBarRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarRecorder.swift; sourceTree = "<group>"; };
+		AUD50005AUD50005AUD50005 /* MenuBarRecorderPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarRecorderPopover.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -713,6 +731,14 @@
 			path = MainWindow;
 			sourceTree = "<group>";
 		};
+		AUD6G006AUD6G006AUD6G006 /* MenuBar */ = {
+			isa = PBXGroup;
+			children = (
+				AUD50005AUD50005AUD50005 /* MenuBarRecorderPopover.swift */,
+			);
+			path = MenuBar;
+			sourceTree = "<group>";
+		};
 		40F35883F95E930F2AC4719F /* Watermark */ = {
 			isa = PBXGroup;
 			children = (
@@ -735,6 +761,7 @@
 				581FE606366A611FC670B8CC /* HeaderFooter */,
 				F7AC517DDCD8DE765969F4E9 /* Library */,
 				40DD8EDFE38E76A98B424280 /* MainWindow */,
+				AUD6G006AUD6G006AUD6G006 /* MenuBar */,
 				A3477A34C15DAACA95CF86BA /* Organize */,
 				BC6036477AC800DC21714BD4 /* RightPanel */,
 				62A9AFB04667BDE9F9FC9CAE /* Security */,
@@ -803,6 +830,7 @@
 				67F1728C98D705DA07BF53F6 /* AI */,
 				F02C8B8FC0791BE4586D323C /* AccessibilityService.swift */,
 				936AA0D7A9E66908D29318BA /* AnnotationStore.swift */,
+				AUD10001AUD10001AUD10001 /* AudioRecordingService.swift */,
 				3365106A06C3516BB125705C /* BatchProcessingService.swift */,
 				B759AEF7B571932C2B41C37C /* CatalogDatabase.swift */,
 				6BCAD1385B34DBC5A6F33CD9 /* CatalogMigrations.swift */,
@@ -824,6 +852,7 @@
 				6106DCBA3718298030ECD0F2 /* HeaderFooterService.swift */,
 				0724C6AE2119D33624CEADB2 /* ImageConversionService.swift */,
 				1F1698F5AB44279251965023 /* ImportService.swift */,
+				AUD20002AUD20002AUD20002 /* ImportService+Audio.swift */,
 				056A16C1DE874FC016E512AF /* ImportService+Embed.swift */,
 				F567438B9F047B4A7C8C4594 /* ImportService+Markdown.swift */,
 				6F1E73B68CE5C3BAB49180CE /* ImportService+PDF.swift */,
@@ -835,6 +864,7 @@
 				699913DA93CBA7649507A450 /* LibraryPropertyStore.swift */,
 				D6E956A0342EDE33F8AC2ACB /* LibraryStore.swift */,
 				24FB9A6CF90E7947927E64EF /* MarkdownRenderer.swift */,
+				AUD30003AUD30003AUD30003 /* MeetingDetectionService.swift */,
 				336D639AE3FEAE342018B695 /* MergeService.swift */,
 				C7D638724571F0F10662E5F3 /* MigrationService.swift */,
 				94F9C17092924D9A9C6BAC31 /* NoteService.swift */,
@@ -849,7 +879,9 @@
 				46A468F7943DDEA20CA97FB1 /* SplitService.swift */,
 				67A7297F5A3894E12796E73F /* TextExtractionService.swift */,
 				666DEB9793B25E268BB8BE31 /* VoiceCallTranscriptStore.swift */,
-				D2A3B4C5E6F7A8B9C0D12345 /* VectorSearchEngine.swift */,
+				AA1B2C3D4E5F6A7B8C9D0E1F /* SemanticDatabase.swift */,
+				B2C3D4E5F6A7B8C9D0E1F2A4 /* ContentChunker.swift */,
+				B3C4D5E6F7A8B9C0D1E2F3A5 /* HybridSearchEngine.swift */,
 				05966AC3C84F90C11F322217 /* VoiceSpeakerService.swift */,
 				7A9D3622F2AF740C7B4DE15B /* WatermarkService.swift */,
 				60B1BE6A503FBBAE5E5F6D33 /* ZoteroFieldMapping.swift */,
@@ -861,8 +893,9 @@
 		67F1728C98D705DA07BF53F6 /* AI */ = {
 			isa = PBXGroup;
 			children = (
+				E0A1B2C3D4E5F6A7B8C9D0E1 /* AcademicSearchProviders.swift */,
 				A1B2C3D4E5F6A7B8C9D0E1F3 /* ChatContextSnapshot.swift */,
-
+				CA0B1C2D3E4F5A6B7C8D9E0F /* DocumentTools.swift */,
 				C89EEADCAA40A0524474DF72 /* PDFContextProvider.swift */,
 				D8A9B0C1E2F3A4B5C6D789AB /* SearchTools.swift */,
 				D9A0B1C2E3F4A5B6C7D89ABC /* SemanticSearchTool.swift */,
@@ -904,7 +937,6 @@
 				7B98EDB4935AA7D2EBBD45F8 /* PageModel.swift */,
 				D8D3F1C30CD4202DFA8C64B4 /* RedactionRegion.swift */,
 				A1A0EE8E4D060414A9DE9009 /* SecuritySettings.swift */,
-				D6A7B8C9E0F1A2B3C4D56789 /* SemanticChunkRecord.swift */,
 				D62609E48881FD798A356BDD /* SignatureModel.swift */,
 				5ADEB81E2037E219F10BD1AD /* TagNode.swift */,
 				3232D6BA9590F8C571CF9937 /* TranslationLanguage.swift */,
@@ -948,6 +980,7 @@
 			children = (
 				42F45F7A5E5FBBA78F6F352C /* AIProviderConfigView.swift */,
 				444DF6B212EC837B45FC546D /* AIProvidersSettingsView.swift */,
+				D4E5F6071829A1B2C3A4B5C6 /* AISettingsView.swift */,
 				71025755C0E4031874CD681D /* AudioSettingsView.swift */,
 				1630E582085262AAE1AA9C0B /* CharacterSettingsView.swift */,
 				C5078B5988D5C8EEA78A023A /* GeneralSettingsView.swift */,
@@ -980,6 +1013,7 @@
 				547098B895F78EA1D38277DC /* AppState.swift */,
 				93C99C7591916F9811A0E20C /* main.swift */,
 				86F8522DF838B0A5C1D31B28 /* MainMenuBuilder.swift */,
+				AUD40004AUD40004AUD40004 /* MenuBarRecorder.swift */,
 				CF62422793C7EE0AA7518AFA /* OakReaderApp.swift */,
 			);
 			path = App;
@@ -1239,6 +1273,7 @@
 				FC21222324252627282930EF /* MLX */,
 				FD31323334353637383940AB /* MLXEmbedders */,
 				FE41424344454647484950CD /* MLXLMCommon */,
+				FF51626364656667686970EF /* USearch */,
 			);
 			productName = OakReader;
 			productReference = 62D8CC8D7C726C11792024B3 /* OakReader.app */;
@@ -1274,6 +1309,7 @@
 				159B6E97585769D8037891EE /* XCRemoteSwiftPackageReference "swift-youtube-transcript" */,
 				FA01020304050607080910AB /* XCRemoteSwiftPackageReference "mlx-swift" */,
 				FB11121314151617181920CD /* XCRemoteSwiftPackageReference "mlx-swift-lm" */,
+				FC51525354555657585960AB /* XCRemoteSwiftPackageReference "usearch" */,
 				F163331A134E539182CE77A7 /* XCLocalSwiftPackageReference "Packages/OakAI" */,
 				33DEE7E7B16365AF42655D31 /* XCLocalSwiftPackageReference "Packages/OakAgent" */,
 				144FEED95A0E24F15EC51BCC /* XCLocalSwiftPackageReference "Packages/OakVoiceAI" */,
@@ -1369,6 +1405,7 @@
 				B47BBACED773D14CCE38F4A3 /* AIChatView.swift in Sources */,
 				6D04B816877CCBF912AD7BAA /* AIProviderConfigView.swift in Sources */,
 				8BD9E86A75480D5B9C3AC485 /* AIProvidersSettingsView.swift in Sources */,
+				A1B2C3D4E5F60718293A4B5C /* AISettingsView.swift in Sources */,
 				5967878A95FEAB1001C9CD7B /* AccessibilityCheckerView.swift in Sources */,
 				90DE9085FF6AE8B0685DCA90 /* AccessibilityService.swift in Sources */,
 				97C7D2D229684834E3047E32 /* AccessibilityTag.swift in Sources */,
@@ -1385,6 +1422,7 @@
 				785110B982E23861D414F9B1 /* AreaSelectionPopupPanel.swift in Sources */,
 				0071ECB4FF73D275746077AA /* AttachmentPreviewStrip.swift in Sources */,
 				2A8E9CDB4D8AEECDC62B3196 /* AudioPlayerView.swift in Sources */,
+				AUD1B001AUD1B001AUD1B001 /* AudioRecordingService.swift in Sources */,
 				A68B2638A8791B12A8DAD805 /* AudioSettingsView.swift in Sources */,
 				CA10A16ABDC1E4596AB459C2 /* BatchFileListView.swift in Sources */,
 				8CC885D349D23FF2A8E6FB53 /* BatchOperation.swift in Sources */,
@@ -1470,6 +1508,7 @@
 				7E69E6EE49F85C05E60DAF93 /* ImageConversionService.swift in Sources */,
 				E67539ACBBD36D05236E38AA /* ImageEditOverlay.swift in Sources */,
 				074310D264538484E52A5F59 /* ImageExportOptionsView.swift in Sources */,
+				AUD2B002AUD2B002AUD2B002 /* ImportService+Audio.swift in Sources */,
 				2DDC564360FD661498498235 /* ImportService+Embed.swift in Sources */,
 				A62A69DC501698A2DC0BEF2E /* ImportService+Markdown.swift in Sources */,
 				B1FE1232C2E15AF345399697 /* ImportService+PDF.swift in Sources */,
@@ -1508,8 +1547,11 @@
 				B346916E0BE2FE17E1F7FC5C /* MediaDocument.swift in Sources */,
 				20A5EA555198EDD09927D2CE /* MediaSnapshotOverlayView.swift in Sources */,
 				A4734AE72DCAFD235B91DFD5 /* MediaViewerView.swift in Sources */,
+				AUD3B003AUD3B003AUD3B003 /* MeetingDetectionService.swift in Sources */,
 				21D6E7FC33246E5792605570 /* MergeDocumentsSheet.swift in Sources */,
 				BE678A0288B9835A3E7B4012 /* MergeService.swift in Sources */,
+				AUD4B004AUD4B004AUD4B004 /* MenuBarRecorder.swift in Sources */,
+				AUD5B005AUD5B005AUD5B005 /* MenuBarRecorderPopover.swift in Sources */,
 				50C9D716C1D0FFD111BC429F /* MigrationService.swift in Sources */,
 				35AC4A178210B13C19012AD1 /* NSImage+Extensions.swift in Sources */,
 				014F67B0D45A071186132CE4 /* NoteEditorView.swift in Sources */,
@@ -1619,14 +1661,14 @@
 				58DFACB7DB1AF310CEA7A4CD /* ZoteroMigrationService.swift in Sources */,
 				3CDCD47693C52BAE40D233F5 /* main.swift in Sources */,
 				E1A2B3C4D5F6A7B8C9D01234 /* EmbeddingService.swift in Sources */,
-				E2A3B4C5D6F7A8B9C0D12345 /* VectorSearchEngine.swift in Sources */,
-				E6A7B8C9D0F1A2B3C4D56789 /* SemanticChunkRecord.swift in Sources */,
+				DD1A2B3C4D5E6F7A8B9C0D1E /* SemanticDatabase.swift in Sources */,
+				A2B3C4D5E6F7A8B9C0D1E2F3 /* ContentChunker.swift in Sources */,
+				A3B4C5D6E7F8A9B0C1D2E3F4 /* HybridSearchEngine.swift in Sources */,
 				E7A8B9C0D1F2A3B4C5D6789A /* SemanticIndexService.swift in Sources */,
+				DA0B1C2D3E4F5A6B7C8D9E0F /* DocumentTools.swift in Sources */,
 				E8A9B0C1D2F3A4B5C6D789AB /* SearchTools.swift in Sources */,
 				E9A0B1C2D3F4A5B6C7D89ABC /* SemanticSearchTool.swift in Sources */,
-				EA1B2C3D4E5F6A7B8C9D0E1F /* CLIImporter.swift in Sources */,
-				EB2C3D4E5F6A7B8C9D0E1F2A /* PluginCommands.swift in Sources */,
-				EC3D4E5F6A7B8C9D0E1F2A3B /* PluginRegistry.swift in Sources */,
+				F0A1B2C3D4E5F6A7B8C9D0E1 /* AcademicSearchProviders.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1950,6 +1992,15 @@
 				minimumVersion = 3.0.0;
 			};
 		};
+		FC51525354555657585960AB /* XCRemoteSwiftPackageReference "usearch" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/unum-cloud/usearch";
+			requirement = {
+				kind = versionRange;
+				minimumVersion = 2.0.0;
+				maximumVersion = 2.17.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -2019,6 +2070,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = FB11121314151617181920CD /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
 			productName = MLXLMCommon;
+		};
+		FF51626364656667686970EF /* USearch */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FC51525354555657585960AB /* XCRemoteSwiftPackageReference "usearch" */;
+			productName = USearch;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

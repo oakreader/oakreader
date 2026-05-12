@@ -33,6 +33,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         snapshotServer = SnapshotServer(importService: appState.importService)
         snapshotServer?.start()
 
+        // Recover any recordings from a previous crash
+        RecordingRecoveryService.checkAndRecover(importService: appState.importService)
+
         // Menu bar audio recorder
         menuBarRecorder = MenuBarRecorder(importService: appState.importService)
 

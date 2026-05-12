@@ -788,6 +788,13 @@ extension CatalogDatabase {
             try db.create(index: "idx_semantic_chunks_item_id", on: "semantic_chunks", columns: ["item_id"])
         }
 
+        migrator.registerMigration("v15-remove-semantic-chunks") { db in
+            // Semantic chunks are now stored in the separate semantic.db file.
+            if try db.tableExists("semantic_chunks") {
+                try db.drop(table: "semantic_chunks")
+            }
+        }
+
         return migrator
     }
 

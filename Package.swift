@@ -17,8 +17,9 @@ let package = Package(
         .package(url: "https://github.com/SvenTiigi/YouTubePlayerKit.git", from: "2.0.0"),
         .package(url: "https://github.com/skainguyen1412/swift-youtube-transcript.git", from: "1.0.0"),
         .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.0"),
-        .package(url: "https://github.com/ml-explore/mlx-swift", from: "0.30.6"),
+        .package(url: "https://github.com/ml-explore/mlx-swift", from: "0.31.3"),
         .package(url: "https://github.com/ml-explore/mlx-swift-lm.git", from: "3.0.0"),
+        .package(url: "https://github.com/unum-cloud/usearch", "2.0.0"..<"2.17.0"),
     ],
     targets: [
         .executableTarget(
@@ -36,6 +37,7 @@ let package = Package(
                 .product(name: "MLX", package: "mlx-swift"),
                 .product(name: "MLXEmbedders", package: "mlx-swift-lm"),
                 .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
+                .product(name: "USearch", package: "usearch"),
             ],
             path: "OakReader",
             exclude: ["App/Info.plist", "OakReader.entitlements", "Resources/Assets.xcassets", "Resources/DefaultStamps"],

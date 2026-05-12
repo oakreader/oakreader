@@ -3,12 +3,18 @@ import CoreMedia
 import OakVoiceAI
 
 /// Records microphone audio to M4A (AAC) files via AVAssetWriter.
+/// Supports mic-only and mic+system audio modes.
 @Observable
 final class AudioRecordingService {
     enum State {
         case idle
         case recording
         case stopping
+    }
+
+    enum RecordingMode: String {
+        case micOnly
+        case micAndSystem
     }
 
     private(set) var state: State = .idle
@@ -21,21 +27,23 @@ final class AudioRecordingService {
     }
 
     private var capture: MicrophoneCapture?
+    private var systemCapture: SystemAudioCapture?
     private var assetWriter: AVAssetWriter?
     private var writerInput: AVAssetWriterInput?
     private var recordingTask: Task<URL?, Never>?
     private var timerTask: Task<Void, Never>?
     private var startTime: Date?
-    private var outputURL: URL?
+    private(set) var outputURL: URL?
 
     private static let sampleRate: Double = 44100
-    private static let recordingsDir: URL = {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("OakReader-recordings", isDirectory: true)
+
+    static let recordingsDir: URL = {
+        let dir = CatalogDatabase.dataDirectory.appendingPathComponent("recordings", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }()
 
-    func startRecording(deviceUID: String? = nil) {
+    func startRecording(deviceUID: String? = nil, mode: RecordingMode = .micOnly) {
         guard state == .idle else { return }
 
         let fileName = "recording-\(UUID().uuidString).m4a"
@@ -57,7 +65,7 @@ final class AudioRecordingService {
 
         recordingTask = Task { [weak self] in
             guard let self else { return nil }
-            return await self.performRecording(to: url, deviceUID: deviceUID)
+            return await self.performRecording(to: url, deviceUID: deviceUID, mode: mode)
         }
     }
 
@@ -67,6 +75,7 @@ final class AudioRecordingService {
         timerTask?.cancel()
         timerTask = nil
         capture?.stopCapture()
+        systemCapture?.stopCapture()
         let url = await recordingTask?.value
         recordingTask = nil
         state = .idle
@@ -75,7 +84,7 @@ final class AudioRecordingService {
 
     // MARK: - Private
 
-    private func performRecording(to url: URL, deviceUID: String?) async -> URL? {
+    private func performRecording(to url: URL, deviceUID: String?, mode: RecordingMode) async -> URL? {
         do {
             let writer = try AVAssetWriter(outputURL: url, fileType: .m4a)
 
@@ -95,13 +104,39 @@ final class AudioRecordingService {
             self.assetWriter = writer
             self.writerInput = input
 
-            let mic = MicrophoneCapture(deviceUID: deviceUID)
-            self.capture = mic
-            let stream = try mic.startCapture(sampleRate: Self.sampleRate)
+            // Write checkpoint for crash recovery
+            RecordingCheckpointManager.save(RecordingCheckpoint(
+                id: UUID(),
+                audioFilePath: url.path,
+                startedAt: startTime ?? Date(),
+                deviceUID: deviceUID,
+                mode: mode.rawValue
+            ))
+
+            let audioStream: AsyncStream<AVAudioPCMBuffer>
+
+            switch mode {
+            case .micOnly:
+                let mic = MicrophoneCapture(deviceUID: deviceUID)
+                self.capture = mic
+                audioStream = try mic.startCapture(sampleRate: Self.sampleRate)
+
+            case .micAndSystem:
+                let mic = MicrophoneCapture(deviceUID: deviceUID)
+                self.capture = mic
+                let micStream = try mic.startCapture(sampleRate: Self.sampleRate)
+
+                let sys = SystemAudioCapture()
+                self.systemCapture = sys
+                let sysStream = try await sys.startCapture(sampleRate: Self.sampleRate)
+
+                let mixer = AudioMixer(sampleRate: Self.sampleRate)
+                audioStream = mixer.mix(micStream: micStream, systemStream: sysStream)
+            }
 
             var sampleOffset: Int64 = 0
 
-            for await buffer in stream {
+            for await buffer in audioStream {
                 guard state == .recording else { break }
                 if let sampleBuffer = Self.createSampleBuffer(from: buffer, sampleOffset: sampleOffset, sampleRate: Self.sampleRate) {
                     if input.isReadyForMoreMediaData {
@@ -117,20 +152,25 @@ final class AudioRecordingService {
             self.assetWriter = nil
             self.writerInput = nil
             self.capture = nil
+            self.systemCapture = nil
 
             if writer.status == .completed {
+                RecordingCheckpointManager.clear()
                 return url
             } else {
                 Log.error(Log.audio, "Writer failed: \(writer.error?.localizedDescription ?? "unknown")")
+                RecordingCheckpointManager.clear()
                 try? FileManager.default.removeItem(at: url)
                 return nil
             }
         } catch {
             Log.error(Log.audio, "Recording failed: \(error)")
+            RecordingCheckpointManager.clear()
             try? FileManager.default.removeItem(at: url)
             self.assetWriter = nil
             self.writerInput = nil
             self.capture = nil
+            self.systemCapture = nil
             return nil
         }
     }

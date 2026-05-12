@@ -2,73 +2,82 @@ import Foundation
 import PDFKit
 import GRDB
 
-/// On-device semantic search using mlx.embeddings + GRDB vector storage.
-/// Documents are chunked and embedded on import; search returns deduplicated
-/// results with best-matching excerpts and page references.
+/// On-device semantic search using MLXEmbedders + USearch HNSW + FTS5 BM25.
+/// Documents are chunked (heading-aware for markdown, sentence-boundary for others)
+/// and indexed into semantic.db + semantic.usearch on import.
+/// Search uses hybrid RRF to merge vector and keyword results.
 final class SemanticIndexService: @unchecked Sendable {
     let embeddingService: EmbeddingService
-    let dbQueue: DatabaseQueue
+    let semanticDB: SemanticDatabase
+    let searchEngine: HybridSearchEngine
+    let catalogDBQueue: DatabaseQueue
 
-    /// Initialize the service with a loaded EmbeddingService.
-    static func create(embeddingService: EmbeddingService, dbQueue: DatabaseQueue) -> SemanticIndexService {
-        SemanticIndexService(embeddingService: embeddingService, dbQueue: dbQueue)
+    static func create(
+        embeddingService: EmbeddingService,
+        semanticDB: SemanticDatabase,
+        searchEngine: HybridSearchEngine,
+        catalogDBQueue: DatabaseQueue
+    ) -> SemanticIndexService {
+        SemanticIndexService(
+            embeddingService: embeddingService,
+            semanticDB: semanticDB,
+            searchEngine: searchEngine,
+            catalogDBQueue: catalogDBQueue
+        )
     }
 
-    private init(embeddingService: EmbeddingService, dbQueue: DatabaseQueue) {
+    private init(
+        embeddingService: EmbeddingService,
+        semanticDB: SemanticDatabase,
+        searchEngine: HybridSearchEngine,
+        catalogDBQueue: DatabaseQueue
+    ) {
         self.embeddingService = embeddingService
-        self.dbQueue = dbQueue
+        self.semanticDB = semanticDB
+        self.searchEngine = searchEngine
+        self.catalogDBQueue = catalogDBQueue
     }
 
-    // MARK: - Index Item
+    // MARK: - Public Index API
 
-    /// Extract text from a PDF, chunk it, embed via MLX, and store embeddings as GRDB BLOBs.
-    func indexItem(itemId: String, pdfURL: URL) async {
-        guard let pdfDoc = PDFDocument(url: pdfURL) else {
-            Log.error(Log.semantic, "Cannot open PDF for indexing: \(pdfURL.lastPathComponent)")
-            return
-        }
-
+    /// Index an item by type. Routes to the appropriate text extractor and chunker.
+    func indexItem(itemId: String, attachmentType: String, storageKey: String, attStorageKey: String, fileName: String) async {
         let currentModel = await embeddingService.modelId
 
         // Skip if already indexed with the current model
-        let existingCount = (try? await dbQueue.read { db in
-            try Int.fetchOne(db, sql: """
-                SELECT COUNT(*) FROM semantic_chunks
-                WHERE item_id = ? AND embedding IS NOT NULL AND embedding_model = ?
-                """, arguments: [itemId, currentModel])
-        }) ?? 0
-        if existingCount > 0 { return }
-
-        // Remove any stale chunks (different model or no embedding)
-        try? await dbQueue.write { db in
-            try db.execute(
-                sql: "DELETE FROM semantic_chunks WHERE item_id = ?",
-                arguments: [itemId]
-            )
+        if let count = try? semanticDB.chunkCount(forItemId: itemId, embeddingModel: currentModel), count > 0 {
+            return
         }
 
-        let now = Date().iso8601String
-        var chunks: [(id: UUID, text: String, type: String, pageStart: Int?, pageEnd: Int?, tokenCount: Int)] = []
-
-        // Chunk 1: Abstract (from citations table if available)
-        let abstract: String? = try? await dbQueue.read { db in
-            try String.fetchOne(db, sql: "SELECT abstract FROM citations WHERE item_id = ?", arguments: [itemId])
-        }
-        if let abstract, !abstract.isEmpty {
-            let id = UUID()
-            let tokenCount = Self.estimateTokenCount(abstract)
-            chunks.append((id: id, text: abstract, type: "abstract", pageStart: nil, pageEnd: nil, tokenCount: tokenCount))
+        // Remove any stale chunks (different model)
+        if let deletedIds = try? semanticDB.deleteChunks(forItemId: itemId), !deletedIds.isEmpty {
+            searchEngine.removeVectors(keys: deletedIds.map { UInt64(bitPattern: $0) })
         }
 
-        // Chunk 2+: Page text segments (~500 tokens each, all pages)
-        for pageIndex in 0..<pdfDoc.pageCount {
-            guard let page = pdfDoc.page(at: pageIndex), let text = page.string, !text.isEmpty else { continue }
-            let segments = Self.chunkText(text, targetTokens: 500)
-            for segment in segments {
-                let id = UUID()
-                let tokenCount = Self.estimateTokenCount(segment)
-                chunks.append((id: id, text: segment, type: "page", pageStart: pageIndex, pageEnd: pageIndex, tokenCount: tokenCount))
-            }
+        // Extract text chunks based on content type
+        var chunks = await extractAbstract(itemId: itemId)
+
+        let fileURL = CatalogDatabase.attachmentFileURL(
+            itemStorageKey: storageKey,
+            attachmentStorageKey: attStorageKey,
+            fileName: fileName
+        )
+        let attDir = CatalogDatabase.attachmentDirectory(
+            itemStorageKey: storageKey,
+            attachmentStorageKey: attStorageKey
+        )
+
+        switch attachmentType {
+        case "pdf":
+            chunks += extractPDFChunks(pdfURL: fileURL)
+        case "webSnapshot":
+            chunks += extractWebSnapshotChunks(attachmentDir: attDir, htmlURL: fileURL)
+        case "markdown":
+            chunks += extractMarkdownChunks(fileURL: fileURL)
+        case "embed":
+            chunks += extractTranscriptChunks(attachmentDir: attDir)
+        default:
+            break
         }
 
         guard !chunks.isEmpty else {
@@ -76,11 +85,75 @@ final class SemanticIndexService: @unchecked Sendable {
             return
         }
 
-        // Embed all chunks via MLX
+        await embedAndStore(itemId: itemId, chunks: chunks, model: currentModel)
+    }
+
+    // MARK: - Text Extraction
+
+    /// Extract abstract from catalog.db citations table if available.
+    private func extractAbstract(itemId: String) async -> [ContentChunker.Chunk] {
+        let abstract: String? = try? await catalogDBQueue.read { db in
+            try String.fetchOne(db, sql: "SELECT abstract FROM citations WHERE item_id = ?", arguments: [itemId])
+        }
+        guard let abstract, !abstract.isEmpty else { return [] }
+        return [ContentChunker.Chunk(text: abstract, type: "abstract", pageStart: nil, pageEnd: nil)]
+    }
+
+    /// Extract chunks from a PDF document.
+    private func extractPDFChunks(pdfURL: URL) -> [ContentChunker.Chunk] {
+        guard let pdfDoc = PDFDocument(url: pdfURL) else {
+            Log.error(Log.semantic, "Cannot open PDF: \(pdfURL.lastPathComponent)")
+            return []
+        }
+        var chunks: [ContentChunker.Chunk] = []
+        for pageIndex in 0..<pdfDoc.pageCount {
+            guard let page = pdfDoc.page(at: pageIndex), let text = page.string, !text.isEmpty else { continue }
+            chunks += ContentChunker.chunkPlainText(text, type: "page", pageStart: pageIndex, pageEnd: pageIndex)
+        }
+        return chunks
+    }
+
+    /// Extract chunks from a web snapshot: prefer content.md (heading-aware), fall back to HTML.
+    private func extractWebSnapshotChunks(attachmentDir: URL, htmlURL: URL) -> [ContentChunker.Chunk] {
+        let mdURL = attachmentDir.appendingPathComponent("content.md")
+
+        if let md = try? String(contentsOf: mdURL, encoding: .utf8), !md.isEmpty {
+            return ContentChunker.chunkMarkdown(md)
+        }
+
+        if let data = try? Data(contentsOf: htmlURL) {
+            let text = HTMLTextExtractor.extractText(from: data)
+            if !text.isEmpty {
+                return ContentChunker.chunkPlainText(text)
+            }
+        }
+
+        return []
+    }
+
+    /// Extract chunks from a markdown file using heading-aware chunking.
+    private func extractMarkdownChunks(fileURL: URL) -> [ContentChunker.Chunk] {
+        guard let text = try? String(contentsOf: fileURL, encoding: .utf8), !text.isEmpty else {
+            return []
+        }
+        return ContentChunker.chunkMarkdown(text)
+    }
+
+    /// Extract chunks from an embed's transcript.txt file.
+    private func extractTranscriptChunks(attachmentDir: URL) -> [ContentChunker.Chunk] {
+        let transcriptURL = attachmentDir.appendingPathComponent("transcript.txt")
+        guard let text = try? String(contentsOf: transcriptURL, encoding: .utf8), !text.isEmpty else {
+            return []
+        }
+        return ContentChunker.chunkPlainText(text)
+    }
+
+    // MARK: - Embed & Store
+
+    private func embedAndStore(itemId: String, chunks: [ContentChunker.Chunk], model: String) async {
         let texts = chunks.map(\.text)
         let embeddings: [[Float]]
         do {
-            // Batch in groups to limit memory pressure
             var allEmbeddings: [[Float]] = []
             let batchSize = 32
             for i in stride(from: 0, to: texts.count, by: batchSize) {
@@ -99,28 +172,32 @@ final class SemanticIndexService: @unchecked Sendable {
             return
         }
 
-        // Save chunk records with embeddings to GRDB
+        let now = Date().iso8601String
         do {
-            try await dbQueue.write { db in
-                for (i, chunk) in chunks.enumerated() {
-                    let embeddingData = SemanticChunkRecord.embeddingToData(embeddings[i])
-                    var record = SemanticChunkRecord(
-                        id: chunk.id.uuidString,
-                        itemId: itemId,
-                        chunkType: chunk.type,
-                        pageStart: chunk.pageStart,
-                        pageEnd: chunk.pageEnd,
-                        tokenCount: chunk.tokenCount,
-                        createdAt: now,
-                        embedding: embeddingData,
-                        embeddingDim: embeddings[i].count,
-                        chunkText: chunk.text,
-                        embeddingModel: currentModel,
-                        embeddingProvider: "local"
-                    )
-                    try record.insert(db)
-                }
+            // Build SemanticChunk records
+            let records = chunks.enumerated().map { i, chunk in
+                SemanticChunk(
+                    id: nil,
+                    itemId: itemId,
+                    chunkType: chunk.type,
+                    pageStart: chunk.pageStart,
+                    pageEnd: chunk.pageEnd,
+                    chunkText: chunk.text,
+                    tokenCount: ContentChunker.estimateTokenCount(chunk.text),
+                    embeddingModel: model,
+                    createdAt: now
+                )
             }
+
+            // Insert into semantic.db (returns rowids)
+            let rowids = try semanticDB.insertChunks(records)
+
+            // Add vectors to USearch index
+            for (i, rowid) in rowids.enumerated() {
+                searchEngine.addVector(key: UInt64(bitPattern: rowid), vector: embeddings[i])
+            }
+            searchEngine.save()
+
             Log.info(Log.semantic, "Indexed \(chunks.count) chunks for item \(itemId)")
         } catch {
             Log.error(Log.semantic, "Failed to save chunk records for item \(itemId): \(error)")
@@ -138,11 +215,8 @@ final class SemanticIndexService: @unchecked Sendable {
         let pageEnd: Int?
     }
 
-    /// Search for semantically similar documents, deduplicating by item_id (keep highest score).
-    func search(query: String, maxResults: Int = 10, threshold: Float = 0.3) async -> [SearchResult] {
-        let currentModel = await embeddingService.modelId
-
-        // Embed the query
+    /// Search using hybrid RRF (vector + BM25), deduplicating by item_id (keep highest score).
+    func search(query: String, maxResults: Int = 10) async -> [SearchResult] {
         let queryEmbedding: [Float]
         do {
             queryEmbedding = try await embeddingService.embed(text: query)
@@ -151,40 +225,51 @@ final class SemanticIndexService: @unchecked Sendable {
             return []
         }
 
-        // Search via VectorSearchEngine
-        let hits: [VectorSearchEngine.SearchHit]
+        let hits: [HybridSearchEngine.SearchHit]
         do {
-            hits = try await VectorSearchEngine.search(
+            hits = try searchEngine.search(
                 queryEmbedding: queryEmbedding,
-                dbQueue: dbQueue,
-                embeddingModel: currentModel,
-                maxResults: maxResults * 3,
-                threshold: threshold
+                queryText: query,
+                maxResults: maxResults * 3
             )
         } catch {
-            Log.error(Log.semantic, "Vector search failed: \(error)")
+            Log.error(Log.semantic, "Hybrid search failed: \(error)")
             return []
         }
 
         guard !hits.isEmpty else { return [] }
 
-        // Deduplicate by item_id — keep the highest-scoring chunk per item
+        // Fetch chunk metadata from semantic.db
+        let chunkIds = hits.map(\.chunkId)
+        let scoreMap = Dictionary(uniqueKeysWithValues: hits.map { ($0.chunkId, $0.score) })
+
+        let chunks: [SemanticChunk]
+        do {
+            chunks = try semanticDB.fetchChunks(byIds: chunkIds)
+        } catch {
+            Log.error(Log.semantic, "Failed to fetch chunks: \(error)")
+            return []
+        }
+
+        // Deduplicate by item_id, keeping highest score
         var bestByItem: [String: SearchResult] = [:]
-        for hit in hits {
+        for chunk in chunks {
+            guard let chunkId = chunk.id else { continue }
+            let score = scoreMap[chunkId] ?? 0
             let result = SearchResult(
-                itemId: hit.itemId,
-                score: hit.score,
-                excerpt: String(hit.chunkText.prefix(300)),
-                chunkType: hit.chunkType,
-                pageStart: hit.pageStart,
-                pageEnd: hit.pageEnd
+                itemId: chunk.itemId,
+                score: score,
+                excerpt: String(chunk.chunkText.prefix(300)),
+                chunkType: chunk.chunkType,
+                pageStart: chunk.pageStart,
+                pageEnd: chunk.pageEnd
             )
-            if let existing = bestByItem[hit.itemId] {
-                if hit.score > existing.score {
-                    bestByItem[hit.itemId] = result
+            if let existing = bestByItem[chunk.itemId] {
+                if score > existing.score {
+                    bestByItem[chunk.itemId] = result
                 }
             } else {
-                bestByItem[hit.itemId] = result
+                bestByItem[chunk.itemId] = result
             }
         }
 
@@ -196,14 +281,12 @@ final class SemanticIndexService: @unchecked Sendable {
 
     // MARK: - Remove Chunks
 
-    /// Remove all chunks for an item from GRDB.
     func removeChunks(forItemId itemId: String) async {
         do {
-            try await dbQueue.write { db in
-                try db.execute(
-                    sql: "DELETE FROM semantic_chunks WHERE item_id = ?",
-                    arguments: [itemId]
-                )
+            let deletedIds = try semanticDB.deleteChunks(forItemId: itemId)
+            if !deletedIds.isEmpty {
+                searchEngine.removeVectors(keys: deletedIds.map { UInt64(bitPattern: $0) })
+                searchEngine.save()
             }
         } catch {
             Log.error(Log.semantic, "Failed to delete chunk records for item \(itemId): \(error)")
@@ -212,37 +295,53 @@ final class SemanticIndexService: @unchecked Sendable {
 
     // MARK: - Background Index All
 
+    private struct UnindexedItem {
+        let itemId: String
+        let storageKey: String
+        let attStorageKey: String
+        let fileName: String
+        let attachmentType: String
+    }
+
     /// Find unindexed items (or items with outdated embedding model) and index each one.
     func backgroundIndexAll() async {
         let currentModel = await embeddingService.modelId
 
-        let itemsToIndex: [(itemId: String, storageKey: String, attStorageKey: String, fileName: String)]
+        // Get already-indexed item IDs from semantic.db
+        let indexedIds: Set<String>
         do {
-            itemsToIndex = try await dbQueue.read { db in
-                // Items that either have no chunks or have chunks from a different model
+            indexedIds = try semanticDB.indexedItemIds(embeddingModel: currentModel)
+        } catch {
+            Log.error(Log.semantic, "Failed to query indexed items: \(error)")
+            return
+        }
+
+        // Get all indexable items from catalog.db
+        let allItems: [UnindexedItem]
+        do {
+            allItems = try await catalogDBQueue.read { db in
                 let rows = try Row.fetchAll(db, sql: """
-                    SELECT i.id, i.storage_key, a.storage_key AS att_key, a.file_name
+                    SELECT i.id, i.storage_key, a.storage_key AS att_key, a.file_name, a.attachment_type
                     FROM items i
                     JOIN attachments a ON a.item_id = i.id AND a.is_primary = 1
-                    LEFT JOIN semantic_chunks sc
-                        ON sc.item_id = i.id
-                        AND sc.embedding IS NOT NULL
-                        AND sc.embedding_model = ?
-                    WHERE a.attachment_type = 'pdf' AND sc.id IS NULL
-                    """, arguments: [currentModel])
+                    WHERE a.attachment_type IN ('pdf', 'webSnapshot', 'markdown', 'embed')
+                    """)
                 return rows.map { row in
-                    (
+                    UnindexedItem(
                         itemId: row["id"] as String,
                         storageKey: row["storage_key"] as String,
                         attStorageKey: row["att_key"] as String,
-                        fileName: row["file_name"] as String
+                        fileName: row["file_name"] as String,
+                        attachmentType: row["attachment_type"] as String
                     )
                 }
             }
         } catch {
-            Log.error(Log.semantic, "Failed to query unindexed items: \(error)")
+            Log.error(Log.semantic, "Failed to query items: \(error)")
             return
         }
+
+        let itemsToIndex = allItems.filter { !indexedIds.contains($0.itemId) }
 
         guard !itemsToIndex.isEmpty else {
             Log.info(Log.semantic, "All items already indexed with \(currentModel)")
@@ -254,68 +353,92 @@ final class SemanticIndexService: @unchecked Sendable {
         for item in itemsToIndex {
             guard !Task.isCancelled else { break }
 
-            let pdfURL = CatalogDatabase.attachmentFileURL(
-                itemStorageKey: item.storageKey,
-                attachmentStorageKey: item.attStorageKey,
+            await indexItem(
+                itemId: item.itemId,
+                attachmentType: item.attachmentType,
+                storageKey: item.storageKey,
+                attStorageKey: item.attStorageKey,
                 fileName: item.fileName
             )
-            await indexItem(itemId: item.itemId, pdfURL: pdfURL)
 
-            // Throttle to avoid blocking the system
             try? await Task.sleep(for: .milliseconds(100))
         }
 
         Log.info(Log.semantic, "Background indexing complete")
     }
 
-    // MARK: - Text Chunking
+    /// Index specific items by their IDs (for manual collection embedding).
+    func indexItems(_ itemIds: [String]) async {
+        let currentModel = await embeddingService.modelId
 
-    /// Split text into segments of approximately `targetTokens` tokens, breaking on sentence boundaries.
-    static func chunkText(_ text: String, targetTokens: Int) -> [String] {
-        let sentences = splitSentences(text)
-        var chunks: [String] = []
-        var current = ""
-        var currentTokens = 0
-
-        for sentence in sentences {
-            let sentenceTokens = estimateTokenCount(sentence)
-            if currentTokens + sentenceTokens > targetTokens, !current.isEmpty {
-                chunks.append(current.trimmingCharacters(in: .whitespacesAndNewlines))
-                current = ""
-                currentTokens = 0
+        let itemsToIndex: [UnindexedItem]
+        do {
+            let placeholders = itemIds.map { _ in "?" }.joined(separator: ",")
+            itemsToIndex = try await catalogDBQueue.read { db in
+                let rows = try Row.fetchAll(db, sql: """
+                    SELECT i.id, i.storage_key, a.storage_key AS att_key, a.file_name, a.attachment_type
+                    FROM items i
+                    JOIN attachments a ON a.item_id = i.id AND a.is_primary = 1
+                    WHERE a.attachment_type IN ('pdf', 'webSnapshot', 'markdown', 'embed')
+                      AND i.id IN (\(placeholders))
+                    """, arguments: StatementArguments(itemIds))
+                return rows.map { row in
+                    UnindexedItem(
+                        itemId: row["id"] as String,
+                        storageKey: row["storage_key"] as String,
+                        attStorageKey: row["att_key"] as String,
+                        fileName: row["file_name"] as String,
+                        attachmentType: row["attachment_type"] as String
+                    )
+                }
             }
-            current += sentence
-            currentTokens += sentenceTokens
+        } catch {
+            Log.error(Log.semantic, "Failed to query items for collection embedding: \(error)")
+            return
         }
 
-        if !current.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            chunks.append(current.trimmingCharacters(in: .whitespacesAndNewlines))
-        }
+        Log.info(Log.semantic, "Embedding \(itemsToIndex.count) items from collection")
 
-        return chunks
-    }
+        for item in itemsToIndex {
+            guard !Task.isCancelled else { break }
 
-    /// Rough token estimate: ~0.75 tokens per character for English text.
-    static func estimateTokenCount(_ text: String) -> Int {
-        max(1, Int(Double(text.count) * 0.75))
-    }
-
-    /// Split text on sentence boundaries (period/question/exclamation followed by whitespace).
-    private static func splitSentences(_ text: String) -> [String] {
-        var sentences: [String] = []
-        var current = ""
-
-        for char in text {
-            current.append(char)
-            if char == "." || char == "?" || char == "!" {
-                sentences.append(current)
-                current = ""
+            // Force re-index: delete existing chunks first
+            if let deletedIds = try? semanticDB.deleteChunks(forItemId: item.itemId), !deletedIds.isEmpty {
+                searchEngine.removeVectors(keys: deletedIds.map { UInt64(bitPattern: $0) })
             }
-        }
-        if !current.isEmpty {
-            sentences.append(current)
+
+            // Extract text chunks
+            var chunks = await extractAbstract(itemId: item.itemId)
+
+            let fileURL = CatalogDatabase.attachmentFileURL(
+                itemStorageKey: item.storageKey,
+                attachmentStorageKey: item.attStorageKey,
+                fileName: item.fileName
+            )
+            let attDir = CatalogDatabase.attachmentDirectory(
+                itemStorageKey: item.storageKey,
+                attachmentStorageKey: item.attStorageKey
+            )
+
+            switch item.attachmentType {
+            case "pdf":
+                chunks += extractPDFChunks(pdfURL: fileURL)
+            case "webSnapshot":
+                chunks += extractWebSnapshotChunks(attachmentDir: attDir, htmlURL: fileURL)
+            case "markdown":
+                chunks += extractMarkdownChunks(fileURL: fileURL)
+            case "embed":
+                chunks += extractTranscriptChunks(attachmentDir: attDir)
+            default:
+                break
+            }
+
+            guard !chunks.isEmpty else { continue }
+            await embedAndStore(itemId: item.itemId, chunks: chunks, model: currentModel)
+
+            try? await Task.sleep(for: .milliseconds(100))
         }
 
-        return sentences
+        Log.info(Log.semantic, "Collection embedding complete")
     }
 }
