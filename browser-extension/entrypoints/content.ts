@@ -153,7 +153,7 @@ export default defineContentScript({
       if (request.action === "extractMarkdown") {
         try {
           const result = new Defuddle(document).parse();
-          const markdown = createMarkdownContent(result.content);
+          const markdown = createMarkdownContent(result.content, location.href);
           sendResponse({ markdown });
         } catch {
           sendResponse({ markdown: null });
