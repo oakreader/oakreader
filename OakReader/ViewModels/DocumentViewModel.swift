@@ -145,6 +145,7 @@ class DocumentViewModel {
         case .webSnapshot: return 1
         case .embed: return 1
         case .markdown: return 1
+        case .audio: return 1
         }
     }
 
@@ -154,6 +155,7 @@ class DocumentViewModel {
         case .webSnapshot: return webSnapshot != nil
         case .embed: return mediaDocument != nil
         case .markdown: return markdownDocument != nil
+        case .audio: return false
         }
     }
 
@@ -171,6 +173,8 @@ class DocumentViewModel {
             return mediaDocument?.metadata.title ?? "Untitled"
         case .markdown:
             return markdownDocument?.fileURL.deletingPathExtension().lastPathComponent ?? "Untitled"
+        case .audio:
+            return "Untitled"
         }
     }
 

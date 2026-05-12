@@ -285,6 +285,8 @@ final class AppState {
             openMediaItem(item)
         case .markdown:
             openMarkdownItem(item)
+        case .audio:
+            break // Audio items are played in-library; no separate document tab
         }
     }
 
