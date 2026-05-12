@@ -199,9 +199,7 @@ final class AppState {
             return
         }
         if ext == "md" || ext == "markdown" {
-            if let item = importService.importMarkdown(from: url) {
-                openMarkdownItem(item)
-            }
+            openExternalMarkdown(url: url)
             return
         }
         // Check if already open by URL
@@ -253,6 +251,32 @@ final class AppState {
         openTabs.append(tab)
         activeTabID = tab.id
         updateWindowTitle()
+    }
+
+    /// Open a markdown file at its original path without importing to library.
+    func openExternalMarkdown(url: URL) {
+        // Dedup: check if already open by fileURL
+        if let existing = openTabs.first(where: {
+            if case .markdown(let doc) = $0.content { return doc.fileURL == url }
+            return false
+        }) {
+            switchToTab(existing.id)
+            return
+        }
+
+        do {
+            let mdDoc = try MarkdownDocument(fileURL: url)
+            let tab = DocumentTab(markdown: mdDoc, storageKey: nil)
+            tab.viewModel.appState = self
+            tab.viewModel.characterListVM = characterListVM
+            tab.title = url.deletingPathExtension().lastPathComponent
+            openTabs.append(tab)
+            activeTabID = tab.id
+            updateWindowTitle()
+        } catch {
+            Log.error(Log.open, "Failed to open markdown: \(url.lastPathComponent) — \(error)")
+            NSAlert(error: error).runModal()
+        }
     }
 
     /// Open an HTML file as a web snapshot.

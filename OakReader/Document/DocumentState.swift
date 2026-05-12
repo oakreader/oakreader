@@ -17,6 +17,7 @@ class DocumentState {
 
     var isSidebarVisible: Bool = true
     var rightPanelMode: RightPanelMode? = nil
+    var isZenMode: Bool = false
     var isLoading: Bool = false
     var errorMessage: String?
     var showError: Bool = false

@@ -81,11 +81,13 @@ struct ContentView: View {
                     )
                 )
 
-                // Side navigation strip — spans full height (toolbar + content)
-                SideNavView(rightPanelMode: Binding(
-                    get: { viewModel.state.rightPanelMode },
-                    set: { viewModel.state.rightPanelMode = $0 }
-                ))
+                // Side navigation strip — hidden in zen mode and for external files
+                if viewModel.storageKey != nil && !viewModel.state.isZenMode {
+                    SideNavView(rightPanelMode: Binding(
+                        get: { viewModel.state.rightPanelMode },
+                        set: { viewModel.state.rightPanelMode = $0 }
+                    ))
+                }
             }
         }
         .background(OakStyle.Colors.tabBarBackground)
