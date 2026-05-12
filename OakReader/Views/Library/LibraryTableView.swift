@@ -23,12 +23,23 @@ struct LibraryTableView: View {
         return item.dateAdded
     }
 
+    private var isDuplicatesMode: Bool {
+        store.isDuplicatesSelected
+    }
+
     var body: some View {
         let items = store.filteredItems
+        let groupMap = isDuplicatesMode ? store.duplicateGroupIndexMap : [:]
 
         Table(of: LibraryItem.self, selection: $selection) {
             TableColumn("Title") { item in
                 HStack(spacing: 7) {
+                    if isDuplicatesMode, let groupIdx = groupMap[item.id] {
+                        Circle()
+                            .fill(duplicateGroupColor(groupIdx))
+                            .frame(width: 6, height: 6)
+                    }
+
                     Image(systemName: item.displayIcon)
                         .foregroundStyle(Color.primary.opacity(0.4))
                         .font(.system(size: 14))
@@ -322,5 +333,15 @@ struct LibraryTableView: View {
             }
             appState.openLibraryItem(item)
         }
+    }
+
+    // MARK: - Duplicate Group Colors
+
+    private static let groupColors: [Color] = [
+        .blue, .orange, .green, .purple, .pink, .teal, .indigo, .mint
+    ]
+
+    private func duplicateGroupColor(_ index: Int) -> Color {
+        Self.groupColors[index % Self.groupColors.count].opacity(0.7)
     }
 }

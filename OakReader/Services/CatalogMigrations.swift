@@ -740,6 +740,14 @@ extension CatalogDatabase {
             }
         }
 
+        migrator.registerMigration("v12-duplicates-collection") { db in
+            let now = Date().iso8601String
+            try db.execute(sql: """
+                INSERT OR IGNORE INTO collections (id, user_id, name, icon, sort_order, parent_id, is_smart, is_system, filter_rules, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, NULL, 1, 1, NULL, ?, ?)
+            """, arguments: [SystemCollectionID.duplicates.uuidString, localUserId, "Duplicates", "square.on.square", 7, now, now])
+        }
+
         return migrator
     }
 

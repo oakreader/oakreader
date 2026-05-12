@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		9CACC4155FEA8B2A08A1B041 /* DuplicatesMergePane.swift in Sources */ = {isa = PBXBuildFile; fileRef = E307A42D0F45E1EEDF3CB53E /* DuplicatesMergePane.swift */; };
+		1563D1B0322D3342FD01D2E8 /* DuplicateService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68C6BAC41DB14708194EC0FF /* DuplicateService.swift */; };
 		7EF29E96D9334369A132B1D8 /* ConfiguredProviderStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB2511470B7B4DB4BF0B7B1C /* ConfiguredProviderStore.swift */; };
 		D097FF2E15564C5488FCE435 /* AIProvidersSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 335C720830184E51AFF7C9B1 /* AIProvidersSettingsView.swift */; };
 		5BA641AA762B412F8CDB979C /* AIProviderConfigView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AF4A514D8214C9A8D2C33D0 /* AIProviderConfigView.swift */; };
@@ -271,6 +273,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		E307A42D0F45E1EEDF3CB53E /* DuplicatesMergePane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuplicatesMergePane.swift; sourceTree = "<group>"; };
+		68C6BAC41DB14708194EC0FF /* DuplicateService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuplicateService.swift; sourceTree = "<group>"; };
 		FB2511470B7B4DB4BF0B7B1C /* ConfiguredProviderStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfiguredProviderStore.swift; sourceTree = "<group>"; };
 		335C720830184E51AFF7C9B1 /* AIProvidersSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIProvidersSettingsView.swift; sourceTree = "<group>"; };
 		3AF4A514D8214C9A8D2C33D0 /* AIProviderConfigView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIProviderConfigView.swift; sourceTree = "<group>"; };
@@ -750,6 +754,7 @@ A1B2C3D4E5F6A7B8C9D0E1F2 /* CSLTypeFieldSpec.swift */ = {isa = PBXFileReference;
 				E07BDF84A6F0CD5CC84D64FC /* ChapterGenerationService.swift */,
 				321349C45AEC61F2E40F34B9 /* CitationFormatter.swift */,
 				21CDA00C280D985B61794989 /* CiteKeyService.swift */,
+				68C6BAC41DB14708194EC0FF /* DuplicateService.swift */,
 				C497912FB85EEFBF241327F9 /* ComparisonService.swift */,
 				ACEBA28EA4CB1D91190356B4 /* CompressionService.swift */,
 				B1428432F0FC92A5486EAF1E /* ConversationService.swift */,
@@ -1066,6 +1071,7 @@ A1B2C3D4E5F6A7B8C9D0E1F2 /* CSLTypeFieldSpec.swift */ = {isa = PBXFileReference;
 			isa = PBXGroup;
 			children = (
 				CFA59E881FAEADC7AB4ACA27 /* CollectionEditorSheet.swift */,
+				E307A42D0F45E1EEDF3CB53E /* DuplicatesMergePane.swift */,
 				31E4F106C2F0C64B0191320B /* FlowLayout.swift */,
 				3A1E8B02C7D5F9A2B6E71423 /* LibraryFilterPopover.swift */,
 				4A72FAA928BCA03348A4CC8F /* LibraryRootView.swift */,
@@ -1238,6 +1244,8 @@ A1B2C3D4E5F6A7B8C9D0E1F2 /* CSLTypeFieldSpec.swift */ = {isa = PBXFileReference;
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9CACC4155FEA8B2A08A1B041 /* DuplicatesMergePane.swift in Sources */,
+				1563D1B0322D3342FD01D2E8 /* DuplicateService.swift in Sources */,
 				B47BBACED773D14CCE38F4A3 /* AIChatView.swift in Sources */,
 				5967878A95FEAB1001C9CD7B /* AccessibilityCheckerView.swift in Sources */,
 				90DE9085FF6AE8B0685DCA90 /* AccessibilityService.swift in Sources */,

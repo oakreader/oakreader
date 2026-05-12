@@ -125,6 +125,8 @@ struct LibraryRootView: View {
                     voiceVM: appState.libraryVoiceVM
                 )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if store.isDuplicatesSelected {
+                DuplicatesMergePane(appState: appState)
             } else if let item = selectedItemInCurrentFilter {
                 LibrarySidebarPanel(item: item, appState: appState)
             } else {

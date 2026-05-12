@@ -244,6 +244,140 @@ extension LibraryStore {
         }
     }
 
+    // MARK: - Merge Duplicates
+
+    /// Merge duplicate items into a keeper. Transfers attachments, collections, property values,
+    /// and notes from each duplicate to the keeper, then deletes the duplicates.
+    func mergeItems(keeper: LibraryItem, duplicates: [LibraryItem]) {
+        let now = Date().iso8601String
+        do {
+            try database.dbQueue.write { db in
+                for dup in duplicates {
+                    guard dup.id != keeper.id else { continue }
+
+                    // 1. Transfer non-primary attachments
+                    try db.execute(
+                        sql: "UPDATE attachments SET item_id = ?, is_primary = 0, updated_at = ? WHERE item_id = ?",
+                        arguments: [keeper.id.uuidString, now, dup.id.uuidString]
+                    )
+
+                    // Move attachment files on disk
+                    let fm = FileManager.default
+                    let srcDir = CatalogDatabase.documentDirectory(storageKey: dup.storageKey)
+                        .appendingPathComponent("attachments", isDirectory: true)
+                    let dstDir = CatalogDatabase.documentDirectory(storageKey: keeper.storageKey)
+                        .appendingPathComponent("attachments", isDirectory: true)
+                    if fm.fileExists(atPath: srcDir.path) {
+                        try fm.createDirectory(at: dstDir, withIntermediateDirectories: true)
+                        let children = (try? fm.contentsOfDirectory(at: srcDir, includingPropertiesForKeys: nil, options: .skipsHiddenFiles)) ?? []
+                        for child in children {
+                            let dest = dstDir.appendingPathComponent(child.lastPathComponent)
+                            if !fm.fileExists(atPath: dest.path) {
+                                try? fm.moveItem(at: child, to: dest)
+                            }
+                        }
+                    }
+
+                    // 2. Transfer collections (ignore duplicates via INSERT OR IGNORE)
+                    let collRows = try Row.fetchAll(db,
+                        sql: "SELECT collection_id FROM collection_items WHERE item_id = ?",
+                        arguments: [dup.id.uuidString]
+                    )
+                    for row in collRows {
+                        let collId: String = row["collection_id"]
+                        try db.execute(
+                            sql: "INSERT OR IGNORE INTO collection_items (item_id, collection_id, created_at) VALUES (?, ?, ?)",
+                            arguments: [keeper.id.uuidString, collId, now]
+                        )
+                    }
+
+                    // 3. Transfer property values (skip if keeper already has same option)
+                    let propRows = try Row.fetchAll(db,
+                        sql: "SELECT property_id, option_id, text_value FROM item_property_values WHERE item_id = ?",
+                        arguments: [dup.id.uuidString]
+                    )
+                    for row in propRows {
+                        let propertyId: String = row["property_id"]
+                        let optionId: String? = row["option_id"]
+                        let textValue: String? = row["text_value"]
+
+                        // Check if keeper already has this exact value
+                        let existing: Int
+                        if let oid = optionId {
+                            existing = try Int.fetchOne(db,
+                                sql: "SELECT COUNT(*) FROM item_property_values WHERE item_id = ? AND property_id = ? AND option_id = ?",
+                                arguments: [keeper.id.uuidString, propertyId, oid]
+                            ) ?? 0
+                        } else {
+                            existing = try Int.fetchOne(db,
+                                sql: "SELECT COUNT(*) FROM item_property_values WHERE item_id = ? AND property_id = ? AND text_value = ?",
+                                arguments: [keeper.id.uuidString, propertyId, textValue]
+                            ) ?? 0
+                        }
+
+                        if existing == 0 {
+                            try db.execute(
+                                sql: "INSERT INTO item_property_values (id, item_id, property_id, option_id, text_value) VALUES (?, ?, ?, ?, ?)",
+                                arguments: [UUID().uuidString, keeper.id.uuidString, propertyId, optionId, textValue]
+                            )
+                        }
+                    }
+
+                    // 4. Transfer notes
+                    try db.execute(
+                        sql: "UPDATE notes SET item_id = ?, updated_at = ? WHERE item_id = ?",
+                        arguments: [keeper.id.uuidString, now, dup.id.uuidString]
+                    )
+
+                    // 5. Transfer conversations
+                    try db.execute(
+                        sql: "UPDATE conversations SET item_id = ?, updated_at = ? WHERE item_id = ?",
+                        arguments: [keeper.id.uuidString, now, dup.id.uuidString]
+                    )
+
+                    // 6. Transfer annotations
+                    try db.execute(
+                        sql: "UPDATE annotations SET item_id = ?, updated_at = ? WHERE item_id = ?",
+                        arguments: [keeper.id.uuidString, now, dup.id.uuidString]
+                    )
+
+                    // 7. Transfer citation (if keeper lacks one)
+                    let keeperHasCitation = try Int.fetchOne(db,
+                        sql: "SELECT COUNT(*) FROM citations WHERE item_id = ?",
+                        arguments: [keeper.id.uuidString]
+                    ) ?? 0
+                    if keeperHasCitation == 0 {
+                        // Re-parent the dup's citation to the keeper
+                        try db.execute(
+                            sql: "UPDATE citations SET item_id = ?, updated_at = ? WHERE item_id = ?",
+                            arguments: [keeper.id.uuidString, now, dup.id.uuidString]
+                        )
+                    }
+
+                    // 8. Delete the duplicate item and its DB records (CASCADE handles remaining references).
+                    //    Notes, conversations, annotations, and attachments were already re-parented above,
+                    //    so CASCADE only cleans up orphaned collection_items, property_values, and citations.
+                    try db.execute(
+                        sql: "DELETE FROM items WHERE id = ?",
+                        arguments: [dup.id.uuidString]
+                    )
+                }
+            }
+
+            // Clean up files for deleted duplicates (DB records already gone)
+            let fm = FileManager.default
+            for dup in duplicates where dup.id != keeper.id {
+                // Storage directory (attachments already moved to keeper above)
+                let dir = CatalogDatabase.documentDirectory(storageKey: dup.storageKey)
+                try? fm.removeItem(at: dir)
+            }
+
+            invalidate()
+        } catch {
+            Log.error(Log.store, "mergeItems failed: \(error)")
+        }
+    }
+
     // MARK: - Cover helpers
 
     private static func loadCoverData(attachment: Attachment) -> Data? {
