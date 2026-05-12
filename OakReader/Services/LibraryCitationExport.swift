@@ -12,7 +12,7 @@ extension LibraryStore {
         case .apa: text = CitationFormatter.toAPA(csl: csl)
         case .mla: text = CitationFormatter.toMLA(csl: csl)
         case .chicago: text = CitationFormatter.toChicago(csl: csl)
-        case .bibtex: text = CitationFormatter.toBibTeX(csl: csl)
+        case .bibtex: text = CitationFormatter.toBibTeX(csl: csl, citeKey: item.citeKey)
         case .ris: text = CitationFormatter.toRIS(csl: csl)
         case .cslJson: text = CitationFormatter.toCSLJSON(csl: csl)
         }
@@ -22,9 +22,10 @@ extension LibraryStore {
 
     /// Export multiple items as BibTeX.
     func exportBibTeX(items: [LibraryItem]) -> String {
-        items.compactMap { $0.referenceMetadata?.cslItem }
-            .map { CitationFormatter.toBibTeX(csl: $0) }
-            .joined(separator: "\n\n")
+        items.compactMap { item -> String? in
+            guard let csl = item.referenceMetadata?.cslItem else { return nil }
+            return CitationFormatter.toBibTeX(csl: csl, citeKey: item.citeKey)
+        }.joined(separator: "\n\n")
     }
 
     /// Export multiple items as RIS.

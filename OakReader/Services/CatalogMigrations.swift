@@ -662,6 +662,84 @@ extension CatalogDatabase {
             )
         }
 
+        // Regenerate all cite keys using the improved {auth}{TitleWords}{year} formula.
+        migrator.registerMigration("v11-regenerate-cite-keys") { db in
+            let rows = try Row.fetchAll(db, sql: """
+                SELECT i.id, i.title, i.author, c.csl_json, c.year
+                FROM items i
+                LEFT JOIN citations c ON c.item_id = i.id
+            """)
+
+            // Collect all new keys first, then resolve collisions
+            var usedKeys: [String: Int] = [:]  // base → count
+
+            struct PendingKey {
+                let itemId: String
+                let base: String
+            }
+            var pending: [PendingKey] = []
+
+            for row in rows {
+                let itemId: String = row["id"]
+                let title: String = row["title"]
+                let author: String = row["author"]
+                let cslJson: String? = row["csl_json"]
+                let year: Int? = row["year"]
+
+                let base: String
+                if let json = cslJson,
+                   let data = json.data(using: .utf8),
+                   let csl = try? JSONDecoder().decode(CSLItem.self, from: data)
+                {
+                    let authorPart = CiteKeyService.extractAuthorKey(csl: csl)
+                    let titlePart = CiteKeyService.extractTitleWords(csl: csl)
+                    let yearPart = csl.issued?.year.map { "\($0)" } ?? ""
+                    if authorPart.isEmpty, !titlePart.isEmpty {
+                        base = CiteKeyService.lowercaseFirstWord(titlePart) + yearPart
+                    } else {
+                        base = authorPart + titlePart + yearPart
+                    }
+                } else {
+                    let authorPart = CiteKeyService.processAuthorName(author)
+                    let titlePart = title.isEmpty ? "" : CiteKeyService.extractTitleWordsFromString(title)
+                    let yearPart = year.map { "\($0)" } ?? ""
+                    if authorPart.isEmpty, !titlePart.isEmpty {
+                        base = CiteKeyService.lowercaseFirstWord(titlePart) + yearPart
+                    } else {
+                        base = authorPart + titlePart + yearPart
+                    }
+                }
+
+                guard !base.isEmpty else { continue }
+                pending.append(PendingKey(itemId: itemId, base: base))
+                usedKeys[base, default: 0] += 1
+            }
+
+            // Track suffix counters per base for collision resolution
+            var suffixCounters: [String: Int] = [:]
+            let now = Date().iso8601String
+
+            for entry in pending {
+                let candidate: String
+                if usedKeys[entry.base, default: 0] <= 1 {
+                    candidate = entry.base
+                } else {
+                    let idx = suffixCounters[entry.base, default: 0]
+                    if idx == 0 {
+                        candidate = entry.base
+                    } else {
+                        candidate = entry.base + String(UnicodeScalar(UInt8(96 + idx)))
+                    }
+                    suffixCounters[entry.base] = idx + 1
+                }
+
+                try db.execute(
+                    sql: "UPDATE items SET cite_key = ?, updated_at = ? WHERE id = ?",
+                    arguments: [candidate, now, entry.itemId]
+                )
+            }
+        }
+
         return migrator
     }
 
