@@ -63,8 +63,17 @@ final class LibraryStore {
     // Observation trigger — bump this to force computed properties to re-evaluate
     private(set) var revision: Int = 0
 
+    // Caches keyed on revision — avoids redundant DB fetches within the same revision cycle.
+    // Marked @ObservationIgnored so writes inside computed getters don't trigger extra observations.
+    @ObservationIgnored var _itemsCache: (revision: Int, items: [LibraryItem])?
+    @ObservationIgnored var _collectionsCache: (revision: Int, collections: [PDFCollection])?
+    @ObservationIgnored var _propertiesCache: (revision: Int, properties: [PropertyDefinition])?
+
     /// Notify the store that data has changed externally.
     func invalidate() {
+        _itemsCache = nil
+        _collectionsCache = nil
+        _propertiesCache = nil
         revision += 1
     }
 
@@ -76,7 +85,12 @@ final class LibraryStore {
 
     var items: [LibraryItem] {
         _ = revision
-        return (try? fetchAllItems()) ?? []
+        if let cached = _itemsCache, cached.revision == revision {
+            return cached.items
+        }
+        let result = (try? fetchAllItems()) ?? []
+        _itemsCache = (revision: revision, items: result)
+        return result
     }
 
     var filteredItems: [LibraryItem] {

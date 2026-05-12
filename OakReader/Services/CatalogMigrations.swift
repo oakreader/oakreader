@@ -653,6 +653,15 @@ extension CatalogDatabase {
             """)
         }
 
+        migrator.registerMigration("v10-collection-items-index") { db in
+            try db.create(
+                index: "idx_collection_items_collection_id",
+                on: "collection_items",
+                columns: ["collection_id"],
+                ifNotExists: true
+            )
+        }
+
         return migrator
     }
 
