@@ -131,7 +131,7 @@ struct SettingsView: View {
         case .characters:
             CharacterSettingsView()
         case .plugins:
-            PluginSettingsView()
+            PluginManagementView()
         case .youtube:
             YouTubeSettingsView()
         case .pluginNotes:
