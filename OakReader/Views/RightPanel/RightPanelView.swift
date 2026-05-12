@@ -39,11 +39,11 @@ struct RightPanelContentView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
-    private var saveAssistantResponseAction: ((ChatTurn) -> Bool)? {
+    private var saveAssistantResponseAction: ((Turn) -> Bool)? {
         Preferences.shared.isPluginEnabled(.notes) ? saveAssistantResponseToNote : nil
     }
 
-    private func saveAssistantResponseToNote(_ turn: ChatTurn) -> Bool {
+    private func saveAssistantResponseToNote(_ turn: Turn) -> Bool {
         viewModel.notes.addChatResponseToNote(turn.content)
     }
 }

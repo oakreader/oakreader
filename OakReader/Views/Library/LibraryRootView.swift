@@ -147,7 +147,7 @@ struct LibraryRootView: View {
         )
     }
 
-    private var librarySaveAssistantResponseAction: ((ChatTurn) -> Bool)? {
+    private var librarySaveAssistantResponseAction: ((Turn) -> Bool)? {
         guard Preferences.shared.isPluginEnabled(.notes) else { return nil }
         return saveAssistantResponseToSelectedNote
     }
@@ -157,7 +157,7 @@ struct LibraryRootView: View {
         return store.filteredItems.first { $0.id == id }
     }
 
-    private func saveAssistantResponseToSelectedNote(_ turn: ChatTurn) -> Bool {
+    private func saveAssistantResponseToSelectedNote(_ turn: Turn) -> Bool {
         guard let item = appState.selectedLibraryItem else { return false }
 
         let notesVM = NotesViewModel(
