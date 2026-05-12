@@ -9,10 +9,12 @@ options:
   generateEmptyDirectories: true
 
 packages:
-  OakReaderAI:
-    path: Packages/OakReaderAI
-  VoiceAgentKit:
-    path: Packages/VoiceAgentKit
+  OakAgent:
+    path: Packages/OakAgent
+  OakAI:
+    path: Packages/OakAI
+  OakVoiceAI:
+    path: Packages/OakVoiceAI
   Textual:
     url: https://github.com/gonzalezreal/textual
     from: "0.1.0"
@@ -51,8 +53,8 @@ targets:
           - "**/Info.plist"
           - "**/*.entitlements"
     dependencies:
-      - package: OakReaderAI
-      - package: VoiceAgentKit
+      - package: OakAI
+      - package: OakVoiceAI
       - package: Textual
       - package: GRDB
         product: GRDB
@@ -61,6 +63,7 @@ targets:
       - package: YouTubePlayerKit
       - package: YoutubeTranscript
       - package: Sparkle
+      - target: oak
     postCompileScripts:
       - script: |
           if which swiftlint > /dev/null; then
@@ -69,6 +72,9 @@ targets:
             echo "warning: SwiftLint not installed"
           fi
         name: "SwiftLint"
+      - script: |
+          cp "${BUILT_PRODUCTS_DIR}/oak" "${BUILT_PRODUCTS_DIR}/OakReader.app/Contents/Resources/oak"
+        name: "Embed oak CLI"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.oakreader.OakReader
@@ -81,14 +87,16 @@ targets:
         CODE_SIGN_IDENTITY: "-"
         SWIFT_STRICT_CONCURRENCY: minimal
 
-  oakreader-chat:
+  oak:
     type: tool
     platform: macOS
     sources:
       - path: cli
     dependencies:
-      - package: OakReaderAI
+      - package: OakAI
+      - package: GRDB
+        product: GRDB
     settings:
       base:
-        PRODUCT_NAME: oakreader-chat
+        PRODUCT_NAME: oak
         SWIFT_STRICT_CONCURRENCY: minimal
