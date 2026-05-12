@@ -53,7 +53,7 @@ export interface CollectionInfo {
   id: string;
   name: string;
   icon: string;
-  parentId: string | null;
+  children?: CollectionInfo[];
 }
 
 export interface TagNodeInfo {
@@ -62,5 +62,6 @@ export interface TagNodeInfo {
   fullPath: string;
   count: number;
   isTag?: boolean;
+  colorHex?: string;
   children?: TagNodeInfo[];
 }

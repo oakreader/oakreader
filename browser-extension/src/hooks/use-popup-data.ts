@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchCollections, fetchTags } from "@/src/lib/api";
+import { fetchCollections, fetchTags, fetchSelectedCollection } from "@/src/lib/api";
 import type { CollectionInfo, PageMeta, TagNodeInfo } from "@/src/lib/types";
 import { detectContentKind, contentKindToPageType } from "@/src/lib/translators";
 
@@ -8,6 +8,7 @@ interface PopupData {
   tabId: number | null;
   collections: CollectionInfo[];
   tags: TagNodeInfo[];
+  initialCollectionId: string;
   loading: boolean;
   error: string | null;
 }
@@ -28,6 +29,7 @@ export function usePopupData(): PopupData {
   const [tabId, setTabId] = useState<number | null>(null);
   const [collections, setCollections] = useState<CollectionInfo[]>([]);
   const [tags, setTags] = useState<TagNodeInfo[]>([]);
+  const [initialCollectionId, setInitialCollectionId] = useState("__all__");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -77,11 +79,12 @@ export function usePopupData(): PopupData {
             ]);
 
         // Pass AbortSignal directly to fetch — cancels the request on timeout
-        const [collectionsResult, tagsResult, metaResult] =
+        const [collectionsResult, tagsResult, metaResult, selectedCollResult] =
           await Promise.allSettled([
             fetchCollections(serverSignal),
             fetchTags(serverSignal),
             pageMetaPromise,
+            fetchSelectedCollection(serverSignal),
           ]);
 
         // If both server calls failed, the app is not running
@@ -94,13 +97,49 @@ export function usePopupData(): PopupData {
           return;
         }
 
+        const collectionsList =
+          collectionsResult.status === "fulfilled"
+            ? collectionsResult.value
+            : [];
         if (collectionsResult.status === "fulfilled") {
-          setCollections(collectionsResult.value);
+          setCollections(collectionsList);
         }
 
         if (tagsResult.status === "fulfilled") {
           setTags(tagsResult.value);
         }
+
+        // Resolve initial collection: server selection > chrome.storage > "__all__"
+        // Collect all IDs recursively from the tree
+        const collectionIds = new Set<string>();
+        function walkIds(items: CollectionInfo[]) {
+          for (const c of items) {
+            collectionIds.add(c.id);
+            if (c.children) walkIds(c.children);
+          }
+        }
+        walkIds(collectionsList);
+        let resolvedId = "__all__";
+
+        const serverSelId =
+          selectedCollResult.status === "fulfilled"
+            ? selectedCollResult.value
+            : null;
+        if (serverSelId && collectionIds.has(serverSelId)) {
+          resolvedId = serverSelId;
+        } else {
+          // Fallback to chrome.storage
+          try {
+            const stored = await chrome.storage.local.get("selectedCollectionId");
+            const storedId = stored.selectedCollectionId as string | undefined;
+            if (storedId && (storedId === "__all__" || collectionIds.has(storedId))) {
+              resolvedId = storedId;
+            }
+          } catch {
+            // storage not available — keep default
+          }
+        }
+        setInitialCollectionId(resolvedId);
 
         if (metaResult.status === "fulfilled" && metaResult.value) {
           setPageMeta(metaResult.value as PageMeta);
@@ -126,5 +165,5 @@ export function usePopupData(): PopupData {
     load();
   }, []);
 
-  return { pageMeta, tabId, collections, tags, loading, error };
+  return { pageMeta, tabId, collections, tags, initialCollectionId, loading, error };
 }

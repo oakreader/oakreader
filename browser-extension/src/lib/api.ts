@@ -4,6 +4,7 @@ const SERVER_BASE = "http://127.0.0.1:23119";
 const SNAPSHOT_URL = `${SERVER_BASE}/snapshot`;
 const COLLECTIONS_URL = `${SERVER_BASE}/collections`;
 const TAGS_URL = `${SERVER_BASE}/tags`;
+const SELECTED_COLLECTION_URL = `${SERVER_BASE}/selected-collection`;
 
 export async function fetchCollections(signal?: AbortSignal): Promise<CollectionInfo[]> {
   const response = await fetch(COLLECTIONS_URL, { signal });
@@ -13,6 +14,12 @@ export async function fetchCollections(signal?: AbortSignal): Promise<Collection
 export async function fetchTags(signal?: AbortSignal): Promise<TagNodeInfo[]> {
   const response = await fetch(TAGS_URL, { signal });
   return response.json();
+}
+
+export async function fetchSelectedCollection(signal?: AbortSignal): Promise<string | null> {
+  const response = await fetch(SELECTED_COLLECTION_URL, { signal });
+  const data: { id: string | null } = await response.json();
+  return data.id;
 }
 
 export async function postSnapshot(
