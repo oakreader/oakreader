@@ -125,7 +125,8 @@ class ChatViewModel {
             ))
             if !doc.noteSummaries.isEmpty {
                 tools.append(ReadNotesTool(
-                    notes: doc.noteSummaries.map { (id: $0.id.uuidString, title: $0.title) }
+                    notes: doc.noteSummaries.map { (id: $0.id.uuidString, title: $0.title) },
+                    notesDirectory: CatalogDatabase.notesDirectory
                 ))
             }
         }
