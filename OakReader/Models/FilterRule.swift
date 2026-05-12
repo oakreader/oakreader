@@ -13,11 +13,28 @@ struct FilterRuleSet: Codable, Hashable {
 }
 
 struct FilterCondition: Codable, Hashable, Identifiable {
-    var id = UUID()
+    var id: UUID
     var field: FilterField
     var op: FilterOperator
     var value: String
     var propertyId: String?
+
+    init(id: UUID = UUID(), field: FilterField, op: FilterOperator, value: String, propertyId: String? = nil) {
+        self.id = id
+        self.field = field
+        self.op = op
+        self.value = value
+        self.propertyId = propertyId
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        self.field = try container.decode(FilterField.self, forKey: .field)
+        self.op = try container.decode(FilterOperator.self, forKey: .op)
+        self.value = try container.decode(String.self, forKey: .value)
+        self.propertyId = try container.decodeIfPresent(String.self, forKey: .propertyId)
+    }
 }
 
 enum FilterField: String, Codable, CaseIterable {
