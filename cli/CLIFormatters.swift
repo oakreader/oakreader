@@ -146,6 +146,46 @@ enum CLIFormatters {
         return "\(item.title): \(statusText)"
     }
 
+    // MARK: - Search Results
+
+    static func formatSearchResults(_ results: [CLIDatabase.SearchResultRow], query: String, mode: String) -> String {
+        guard !results.isEmpty else {
+            return "No results found for \"\(query)\" (\(mode) search)."
+        }
+
+        var lines: [String] = []
+        lines.append("Found \(results.count) result(s) for \"\(query)\" (\(mode) search):\n")
+
+        for (i, r) in results.enumerated() {
+            var line = "\(i + 1). "
+            if let ck = r.citeKey { line += "[\(ck)] " }
+            line += r.title
+            lines.append(line)
+
+            if !r.author.isEmpty {
+                lines.append("   Authors: \(r.author)")
+            }
+
+            var meta: [String] = []
+            if let y = r.year { meta.append("Year: \(y)") }
+            if let at = r.attachmentType, let pc = r.pageCount {
+                meta.append("\(at), \(pc) pages")
+            }
+            if !meta.isEmpty { lines.append("   \(meta.joined(separator: " | "))") }
+
+            if let j = r.journal { lines.append("   Journal: \(j)") }
+            if let d = r.doi { lines.append("   DOI: \(d)") }
+            if let t = r.tags, !t.isEmpty { lines.append("   Tags: \(t)") }
+            if let abs = r.abstract {
+                let truncated = String(abs.prefix(150))
+                lines.append("   Abstract: \(truncated)\(abs.count > 150 ? "..." : "")")
+            }
+            lines.append("")
+        }
+
+        return lines.joined(separator: "\n")
+    }
+
     // MARK: - Stats (for root `oak` command)
 
     static func formatStats(items: Int, collections: Int, tags: Int) -> String {

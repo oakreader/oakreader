@@ -1,4 +1,5 @@
 import Foundation
+import GRDB
 
 // MARK: - Command Handlers
 
@@ -222,6 +223,139 @@ struct CLICommands {
         let item = try resolver.resolveItem(args[1])
         try db.removeTagFromItem(tagId: tag.id, itemId: item.id)
         print("Removed tag '\(tag.name)' from '\(item.title)'")
+    }
+
+    // MARK: - Import
+
+    func runImport(args: [String], flags: ParsedFlags) throws -> Bool {
+        guard let input = args.first else {
+            printError("Usage: oak import <file|url> [--title <title>] [--collection <name>] [--tag <name>]")
+            return false
+        }
+
+        let titleOverride = flags["title"]
+        let importer = CLIImporter(db: db)
+        let result: CLIImporter.ImportResult
+
+        // Detect if input is a URL or file path
+        if input.hasPrefix("http://") || input.hasPrefix("https://") {
+            // URL import — needs async, return false to signal caller
+            return false
+        } else {
+            // Local file import
+            let fileURL = URL(fileURLWithPath: (input as NSString).expandingTildeInPath)
+                .standardizedFileURL
+            guard FileManager.default.fileExists(atPath: fileURL.path) else {
+                throw ImportError.fileNotFound(input)
+            }
+
+            let ext = fileURL.pathExtension.lowercased()
+            switch ext {
+            case "pdf":
+                result = try importer.importPDF(from: fileURL, title: titleOverride)
+            case "html", "htm":
+                result = try importer.importHTML(from: fileURL, title: titleOverride)
+            case "md", "markdown":
+                result = try importer.importMarkdown(from: fileURL, title: titleOverride)
+            default:
+                throw ImportError.unsupportedType(ext.isEmpty ? "(none)" : ".\(ext)")
+            }
+        }
+
+        if result.isDuplicate {
+            print("Already imported '\(result.title)' [\(result.itemId.prefix(8))]")
+        } else {
+            // Apply --collection and --tag flags
+            applyPostImportFlags(itemId: result.itemId, flags: flags)
+            print("Imported '\(result.title)' [\(result.itemId.prefix(8))]")
+        }
+
+        return true
+    }
+
+    func runImportAsync(args: [String], flags: ParsedFlags) async throws {
+        guard let input = args.first else {
+            printError("Usage: oak import <file|url> [--title <title>] [--collection <name>] [--tag <name>]")
+            return
+        }
+
+        let titleOverride = flags["title"]
+        let importer = CLIImporter(db: db)
+
+        let result = try await importer.importURL(input, title: titleOverride)
+
+        if result.isDuplicate {
+            print("Already imported '\(result.title)' [\(result.itemId.prefix(8))]")
+        } else {
+            applyPostImportFlags(itemId: result.itemId, flags: flags)
+            print("Imported '\(result.title)' [\(result.itemId.prefix(8))]")
+        }
+    }
+
+    private func applyPostImportFlags(itemId: String, flags: ParsedFlags) {
+        if let collectionName = flags["collection"] {
+            do {
+                let collection = try resolver.resolveCollection(collectionName)
+                try db.addItemToCollection(collectionId: collection.id, itemId: itemId)
+            } catch {
+                printError("Failed to add to collection '\(collectionName)': \(error.localizedDescription)")
+            }
+        }
+
+        if let tagName = flags["tag"] {
+            do {
+                let tag = try resolver.resolveTag(tagName)
+                try db.addTagToItem(tagId: tag.id, itemId: itemId)
+            } catch {
+                printError("Failed to add tag '\(tagName)': \(error.localizedDescription)")
+            }
+        }
+    }
+
+    // MARK: - Search
+
+    /// `oak search <query> [--mode keyword|semantic|hybrid] [--limit N]`
+    func runSearch(args: [String], flags: ParsedFlags) throws {
+        let query = args.joined(separator: " ")
+        guard !query.isEmpty else {
+            printError("Usage: oak search <query> [--mode keyword|semantic|hybrid] [--limit N]")
+            return
+        }
+        let mode = flags["mode"] ?? "keyword"
+        let limit = Int(flags["limit"] ?? "20") ?? 20
+
+        switch mode {
+        case "keyword":
+            let results = try db.keywordSearch(query: query, limit: limit)
+            print(CLIFormatters.formatSearchResults(results, query: query, mode: "keyword"))
+        case "semantic", "hybrid":
+            printError("Semantic search requires the OakReader app (MLX embedding model). Use --mode keyword in the CLI.")
+        default:
+            printError("Unknown search mode '\(mode)'. Use keyword, semantic, or hybrid.")
+        }
+    }
+
+    /// Async search for semantic and hybrid modes.
+    func runSearchAsync(args: [String], flags: ParsedFlags) async throws {
+        let query = args.joined(separator: " ")
+        guard !query.isEmpty else {
+            printError("Usage: oak search <query> [--mode keyword|semantic|hybrid] [--limit N]")
+            return
+        }
+        let mode = flags["mode"] ?? "keyword"
+        let limit = Int(flags["limit"] ?? "20") ?? 20
+
+        switch mode {
+        case "keyword":
+            let results = try db.keywordSearch(query: query, limit: limit)
+            print(CLIFormatters.formatSearchResults(results, query: query, mode: "keyword"))
+
+        case "semantic", "hybrid":
+            printError("Semantic search requires the OakReader app (MLX embedding model). Use --mode keyword in the CLI.")
+
+        default:
+            printError("Unknown search mode '\(mode)'. Use keyword, semantic, or hybrid.")
+        }
     }
 
     // MARK: - Status

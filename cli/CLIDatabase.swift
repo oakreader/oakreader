@@ -478,6 +478,188 @@ final class CLIDatabase {
         }
     }
 
+    // MARK: - Import (Insert)
+
+    /// Insert an item and its primary attachment in one transaction.
+    func insertItem(
+        id: String,
+        storageKey: String,
+        title: String,
+        author: String,
+        attachmentId: String,
+        attachmentStorageKey: String,
+        fileName: String,
+        attachmentType: String,
+        sourceURL: String?,
+        fileSize: Int64,
+        pageCount: Int
+    ) throws {
+        let timestamp = now()
+        try dbQueue.write { db in
+            try db.execute(sql: """
+                INSERT INTO items (id, user_id, storage_key, title, author, sync_status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, 'local', ?, ?)
+            """, arguments: [id, self.userId, storageKey, title, author, timestamp, timestamp])
+
+            try db.execute(sql: """
+                INSERT INTO attachments (id, item_id, storage_key, file_name, attachment_type, source_url, file_size, page_count, is_primary, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+            """, arguments: [attachmentId, id, attachmentStorageKey, fileName, attachmentType, sourceURL, fileSize, pageCount, timestamp, timestamp])
+        }
+    }
+
+    /// Return storage paths for all primary attachments (for hash-based duplicate detection).
+    func findAttachmentPaths() throws -> [(itemStorageKey: String, attachmentStorageKey: String, fileName: String)] {
+        try dbQueue.read { db in
+            let rows = try Row.fetchAll(db, sql: """
+                SELECT i.storage_key AS item_storage_key,
+                       a.storage_key AS att_storage_key,
+                       a.file_name
+                FROM attachments a
+                JOIN items i ON i.id = a.item_id
+                WHERE a.is_primary = 1
+            """)
+            return rows.map { row in
+                (
+                    itemStorageKey: row["item_storage_key"] as String,
+                    attachmentStorageKey: row["att_storage_key"] as String,
+                    fileName: row["file_name"] as String
+                )
+            }
+        }
+    }
+
+    // MARK: - Search
+
+    struct SearchResultRow {
+        let itemId: String
+        let title: String
+        let author: String
+        let citeKey: String?
+        let attachmentType: String?
+        let pageCount: Int?
+        let year: Int?
+        let doi: String?
+        let journal: String?
+        let abstract: String?
+        let tags: String?
+    }
+
+    /// Keyword search using FTS5 + abstract/DOI/journal/tag LIKE queries (mirrors SearchLibraryTool).
+    func keywordSearch(query: String, limit: Int = 20) throws -> [SearchResultRow] {
+        try dbQueue.read { db in
+            let words = query.lowercased()
+                .components(separatedBy: .whitespaces)
+                .filter { !$0.isEmpty }
+            guard !words.isEmpty else { return [] }
+
+            var matchingIds = Set<String>()
+
+            // FTS5 on title + author
+            let ftsTokens = words.compactMap { word -> String? in
+                let clean = word.filter { $0.isLetter || $0.isNumber }
+                return clean.isEmpty ? nil : "\"\(clean)\""
+            }
+            if !ftsTokens.isEmpty {
+                let ftsQuery = ftsTokens.joined(separator: " ")
+                for row in try Row.fetchAll(db, sql: """
+                    SELECT i.id FROM items i
+                    JOIN items_fts ON items_fts.rowid = i.rowid
+                    WHERE items_fts MATCH ?
+                    """, arguments: [ftsQuery]) {
+                    matchingIds.insert(row["id"] as String)
+                }
+            }
+
+            // Abstract LIKE
+            if words.count <= 5 {
+                let absConditions = words.map { _ in "c.abstract LIKE ?" }.joined(separator: " AND ")
+                let absArgs = words.map { "%\($0)%" }
+                for row in try Row.fetchAll(db, sql: """
+                    SELECT c.item_id FROM citations c
+                    WHERE c.abstract IS NOT NULL AND (\(absConditions))
+                    """, arguments: StatementArguments(absArgs)) {
+                    matchingIds.insert(row["item_id"] as String)
+                }
+            }
+
+            // DOI
+            let fullPattern = "%\(query)%"
+            for row in try Row.fetchAll(db, sql: "SELECT item_id FROM citations WHERE doi LIKE ?",
+                                        arguments: [fullPattern]) {
+                matchingIds.insert(row["item_id"] as String)
+            }
+
+            // Journal
+            for row in try Row.fetchAll(db, sql: "SELECT item_id FROM citations WHERE container_title LIKE ?",
+                                        arguments: [fullPattern]) {
+                matchingIds.insert(row["item_id"] as String)
+            }
+
+            // Tags
+            let tagConditions = words.map { _ in "po.name LIKE ?" }.joined(separator: " OR ")
+            let tagArgs = words.map { "%\($0)%" }
+            for row in try Row.fetchAll(db, sql: """
+                SELECT DISTINCT ipv.item_id FROM item_property_values ipv
+                JOIN property_options po ON po.id = ipv.option_id
+                WHERE \(tagConditions)
+                """, arguments: StatementArguments(tagArgs)) {
+                matchingIds.insert(row["item_id"] as String)
+            }
+
+            guard !matchingIds.isEmpty else { return [] }
+            return try Self.fetchSearchDetails(db: db, ids: Array(matchingIds), limit: limit)
+        }
+    }
+
+    /// Fetch enriched details for a set of item IDs (shared by keyword and semantic search).
+    static func fetchSearchDetails(db: Database, ids: [String], limit: Int) throws -> [SearchResultRow] {
+        let placeholders = ids.map { _ in "?" }.joined(separator: ",")
+        let rows = try Row.fetchAll(db, sql: """
+            SELECT i.id, i.title, i.author, i.cite_key,
+                   a.attachment_type, a.page_count,
+                   c.year, c.doi, c.container_title, c.abstract,
+                   (SELECT GROUP_CONCAT(po.name, ', ')
+                    FROM item_property_values ipv
+                    JOIN property_options po ON po.id = ipv.option_id
+                    JOIN properties p ON p.id = ipv.property_id AND p.name = 'Tags'
+                    WHERE ipv.item_id = i.id) AS tag_names
+            FROM items i
+            LEFT JOIN attachments a ON a.item_id = i.id AND a.is_primary = 1
+            LEFT JOIN citations c ON c.item_id = i.id
+            WHERE i.id IN (\(placeholders))
+            ORDER BY
+                CASE WHEN i.last_opened_at IS NOT NULL THEN 0 ELSE 1 END,
+                i.last_opened_at DESC,
+                i.created_at DESC
+            LIMIT ?
+            """, arguments: StatementArguments(ids + ["\(limit)"]))
+
+        return rows.map { row in
+            SearchResultRow(
+                itemId: row["id"],
+                title: row["title"],
+                author: row["author"],
+                citeKey: row["cite_key"],
+                attachmentType: row["attachment_type"],
+                pageCount: row["page_count"],
+                year: row["year"],
+                doi: row["doi"],
+                journal: row["container_title"],
+                abstract: row["abstract"],
+                tags: row["tag_names"]
+            )
+        }
+    }
+
+    /// Fetch semantic chunk records for a set of item IDs (for semantic search result enrichment).
+    func fetchSemanticChunkItemIds() throws -> Set<String> {
+        try dbQueue.read { db in
+            let ids = try String.fetchAll(db, sql: "SELECT DISTINCT item_id FROM semantic_chunks")
+            return Set(ids)
+        }
+    }
+
     // MARK: - Helpers
 
     static func mapItemType(_ input: String) -> String {
