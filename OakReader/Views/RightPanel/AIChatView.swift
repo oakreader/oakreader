@@ -367,22 +367,24 @@ struct AIChatView: View {
     // MARK: - Error Banner
 
     private func errorBanner(_ message: String) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(.yellow)
-                .font(.caption)
+                .font(.body)
             Text(message)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.callout)
+                .foregroundStyle(.primary)
                 .lineLimit(2)
             Spacer()
             Button("Dismiss") { chatVM.errorMessage = nil }
-                .font(.caption)
+                .font(.callout)
                 .buttonStyle(.plain)
         }
         .padding(.horizontal, OakStyle.Spacing.sm)
-        .padding(.vertical, OakStyle.Spacing.xxs)
-        .background(Color.yellow.opacity(0.1))
+        .padding(.vertical, OakStyle.Spacing.xs)
+        .background(Color.yellow.opacity(0.15))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .padding(.horizontal, OakStyle.Spacing.sm)
     }
 }
 
