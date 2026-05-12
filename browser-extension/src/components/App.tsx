@@ -17,8 +17,25 @@ interface CaptureProgress {
 }
 
 export function App() {
-  const { pageMeta, tabId, collections, tags, loading, error } = usePopupData();
+  const { pageMeta, tabId, collections, tags, initialCollectionId, loading, error } = usePopupData();
   const [collectionId, setCollectionId] = useState("__all__");
+
+  // Initialize collectionId from resolved initial value once data loads
+  useEffect(() => {
+    if (!loading) {
+      setCollectionId(initialCollectionId);
+    }
+  }, [loading, initialCollectionId]);
+
+  // Persist collection changes to chrome.storage.local
+  const handleCollectionChange = useCallback((id: string) => {
+    setCollectionId(id);
+    try {
+      chrome.storage.local.set({ selectedCollectionId: id });
+    } catch {
+      // storage not available — ignore
+    }
+  }, []);
   const [selectedTagIds, setSelectedTagIds] = useState<Set<string>>(new Set());
   const [newTags, setNewTags] = useState<string[]>([]);
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -247,20 +264,21 @@ export function App() {
   if (error && !pageMeta) {
     const isNotRunning = error.includes("not running");
     return (
-      <>
-        <Header />
-        <div className="px-3 py-8 text-center space-y-2">
-          <p className="text-[20px]">{isNotRunning ? "\u{1F4D6}" : "\u26A0\uFE0F"}</p>
-          <p className="text-[13px] font-semibold text-foreground">
-            {isNotRunning ? "OakReader is not running" : "Cannot access page"}
-          </p>
-          <p className="text-[12px] text-secondary">
-            {isNotRunning
-              ? "Start the app to save pages."
-              : error}
-          </p>
-        </div>
-      </>
+      <div className="flex-1 flex flex-col items-center justify-center px-6 text-center space-y-3">
+        {isNotRunning ? (
+          <img src="/icon-128.png" alt="OakReader" className="size-12 opacity-40" />
+        ) : (
+          <p className="text-[36px]">{"\u26A0\uFE0F"}</p>
+        )}
+        <p className="text-[15px] font-semibold text-foreground">
+          {isNotRunning ? "OakReader is not running" : "Cannot access page"}
+        </p>
+        <p className="text-[13px] text-secondary leading-relaxed">
+          {isNotRunning
+            ? "Open OakReader on your Mac to start saving pages."
+            : error}
+        </p>
+      </div>
     );
   }
 
@@ -303,7 +321,7 @@ export function App() {
         <CollectionPicker
           collections={collections}
           value={collectionId}
-          onChange={setCollectionId}
+          onChange={handleCollectionChange}
         />
 
         <TagInput
