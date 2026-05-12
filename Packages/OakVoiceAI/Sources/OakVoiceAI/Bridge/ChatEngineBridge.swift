@@ -1,13 +1,13 @@
 import Foundation
 import OakAgent
 
-/// Bridges OakAI's ``ChatEngine`` to the ``LLMService`` protocol.
+/// Bridges OakAgent's ``AgentSession`` to the ``LLMService`` protocol.
 ///
 /// Includes automatic retry with exponential back-off for transient errors
 /// (overloaded, rate-limited, timeout) — only before any response deltas
 /// have been streamed to avoid duplicate text.
 public final class ChatEngineBridge: LLMService, @unchecked Sendable {
-    private let chatEngine: ChatEngine
+    private let session: AgentSession
     private let config: ProviderConfig
     private let sessionId: UUID
 
@@ -15,11 +15,11 @@ public final class ChatEngineBridge: LLMService, @unchecked Sendable {
     private static let baseRetryDelay: UInt64 = 500_000_000 // 0.5 s
 
     public init(
-        chatEngine: ChatEngine,
+        chatEngine: AgentSession,
         config: ProviderConfig,
         sessionId: UUID = UUID()
     ) {
-        self.chatEngine = chatEngine
+        self.session = chatEngine
         self.config = config
         self.sessionId = sessionId
     }
@@ -31,29 +31,19 @@ public final class ChatEngineBridge: LLMService, @unchecked Sendable {
         history: [VoiceMessage],
         systemPrompt: String?
     ) -> AsyncThrowingStream<String, Error> {
-        let chatEngine = self.chatEngine
+        let session = self.session
         let config = self.config
         let sessionId = self.sessionId
+        let prompt = systemPrompt ?? "You are a helpful voice assistant."
 
-        let skill: Skill? = systemPrompt.map { prompt in
-            Skill(
-                id: "voice-agent",
-                name: "Voice Agent",
-                description: "Voice conversation assistant",
-                systemPrompt: prompt,
-                icon: "waveform",
-                contextMode: .none
-            )
-        }
-
-        let chatHistory = history.map { msg -> ChatTurn in
-            let role: ChatTurn.ChatRole
+        let chatHistory = history.map { msg -> Turn in
+            let role: Turn.Role
             switch msg.role {
             case .system: role = .system
             case .user: role = .user
             case .assistant: role = .assistant
             }
-            return ChatTurn(role: role, content: msg.content, timestamp: msg.timestamp)
+            return Turn(role: role, content: msg.content, timestamp: msg.timestamp)
         }
 
         return AsyncThrowingStream { continuation in
@@ -76,14 +66,13 @@ public final class ChatEngineBridge: LLMService, @unchecked Sendable {
                     }
 
                     do {
-                        let engineStream = await chatEngine.send(
+                        let engineStream = await session.send(
                             userContent: userMessage,
                             attachments: [],
                             history: chatHistory,
                             sessionId: sessionId,
                             config: config,
-                            skill: skill,
-                            pdfContext: nil
+                            systemPrompt: prompt
                         )
 
                         var gotDelta = false

@@ -2,7 +2,7 @@ import Foundation
 
 /// Persists chat turns as JSONL files (one JSON object per line).
 /// All sessions are stored in the provided base directory.
-public actor ChatSessionStore {
+public actor SessionStore {
     private let baseDirectory: URL
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
@@ -27,7 +27,7 @@ public actor ChatSessionStore {
 
     // MARK: - Write
 
-    public func appendTurn(_ turn: ChatTurn, sessionId: UUID) throws {
+    public func appendTurn(_ turn: Turn, sessionId: UUID) throws {
         let url = fileURL(for: sessionId)
         let data = try encoder.encode(persistedTurn(turn, sessionId: sessionId))
         guard var line = String(data: data, encoding: .utf8) else { return }
@@ -44,7 +44,7 @@ public actor ChatSessionStore {
     }
 
     /// Replaces the last turn (used to finalize a streaming assistant message).
-    public func replaceLastTurn(_ turn: ChatTurn, sessionId: UUID) throws {
+    public func replaceLastTurn(_ turn: Turn, sessionId: UUID) throws {
         var turns = try loadTurns(sessionId: sessionId)
         if let idx = turns.lastIndex(where: { $0.id == turn.id }) {
             turns[idx] = turn
@@ -56,7 +56,7 @@ public actor ChatSessionStore {
 
     // MARK: - Read
 
-    public func loadTurns(sessionId: UUID) throws -> [ChatTurn] {
+    public func loadTurns(sessionId: UUID) throws -> [Turn] {
         let url = fileURL(for: sessionId)
         guard FileManager.default.fileExists(atPath: url.path) else { return [] }
         let content = try String(contentsOf: url, encoding: .utf8)
@@ -64,7 +64,7 @@ public actor ChatSessionStore {
             .split(separator: "\n", omittingEmptySubsequences: true)
             .compactMap { line in
                 guard let data = line.data(using: .utf8) else { return nil }
-                return try? decoder.decode(ChatTurn.self, from: data)
+                return try? decoder.decode(Turn.self, from: data)
             }
             .map { hydratedTurn($0, sessionId: sessionId) }
     }
@@ -80,7 +80,7 @@ public actor ChatSessionStore {
 
     // MARK: - Internal
 
-    private func writeAll(_ turns: [ChatTurn], sessionId: UUID) throws {
+    private func writeAll(_ turns: [Turn], sessionId: UUID) throws {
         let url = fileURL(for: sessionId)
         let lines = try turns.map { turn -> String in
             let data = try encoder.encode(persistedTurn(turn, sessionId: sessionId))
@@ -90,8 +90,8 @@ public actor ChatSessionStore {
         try content.write(to: url, atomically: true, encoding: .utf8)
     }
 
-    private func persistedTurn(_ turn: ChatTurn, sessionId: UUID) throws -> ChatTurn {
-        let attachments = try turn.attachments.map { attachment -> ChatAttachment in
+    private func persistedTurn(_ turn: Turn, sessionId: UUID) throws -> Turn {
+        let attachments = try turn.attachments.map { attachment -> TurnAttachment in
             guard attachment.type == .imageCapture,
                   let imageData = attachment.imageData else {
                 return attachment
@@ -105,7 +105,7 @@ public actor ChatSessionStore {
                 try imageData.write(to: url, options: .atomic)
             }
 
-            return ChatAttachment(
+            return TurnAttachment(
                 id: attachment.id,
                 type: attachment.type,
                 label: attachment.label,
@@ -116,21 +116,21 @@ public actor ChatSessionStore {
             )
         }
 
-        return ChatTurn(
+        return Turn(
             id: turn.id,
             role: turn.role,
             content: turn.content,
             timestamp: turn.timestamp,
             isStreaming: turn.isStreaming,
-            skill: turn.skill,
+            metadata: turn.metadata,
             error: turn.error,
             attachments: attachments,
             toolUses: turn.toolUses
         )
     }
 
-    private func hydratedTurn(_ turn: ChatTurn, sessionId: UUID) -> ChatTurn {
-        let attachments = turn.attachments.map { attachment -> ChatAttachment in
+    private func hydratedTurn(_ turn: Turn, sessionId: UUID) -> Turn {
+        let attachments = turn.attachments.map { attachment -> TurnAttachment in
             guard attachment.type == .imageCapture,
                   attachment.imageData == nil,
                   let filePath = attachment.filePath else {
@@ -139,7 +139,7 @@ public actor ChatSessionStore {
 
             let url = attachmentDirectory(for: sessionId).appendingPathComponent(filePath)
             let imageData = try? Data(contentsOf: url)
-            return ChatAttachment(
+            return TurnAttachment(
                 id: attachment.id,
                 type: attachment.type,
                 label: attachment.label,
@@ -150,13 +150,13 @@ public actor ChatSessionStore {
             )
         }
 
-        return ChatTurn(
+        return Turn(
             id: turn.id,
             role: turn.role,
             content: turn.content,
             timestamp: turn.timestamp,
             isStreaming: turn.isStreaming,
-            skill: turn.skill,
+            metadata: turn.metadata,
             error: turn.error,
             attachments: attachments,
             toolUses: turn.toolUses

@@ -3,7 +3,7 @@ import OakAgent
 
 struct AIChatView: View {
     let chatVM: ChatViewModel
-    var onSaveAssistantResponse: ((ChatTurn) -> Bool)?
+    var onSaveAssistantResponse: ((Turn) -> Bool)?
 
     var body: some View {
         VStack(spacing: 0) {

@@ -2,7 +2,7 @@ import SwiftUI
 import OakAgent
 
 struct FannedAttachmentStack: View {
-    let attachments: [ChatAttachment]
+    let attachments: [TurnAttachment]
 
     @State private var isHovered = false
     @State private var appeared = false
@@ -71,7 +71,7 @@ struct FannedAttachmentStack: View {
 
     // MARK: - Single card
 
-    private func cardView(_ attachment: ChatAttachment) -> some View {
+    private func cardView(_ attachment: TurnAttachment) -> some View {
         HStack(spacing: 6) {
             Image(systemName: attachment.type == .textSelection ? "text.quote" : "photo")
                 .font(.system(size: 11))

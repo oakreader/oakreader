@@ -99,9 +99,9 @@ class VoiceViewModel {
             return
         }
 
-        // Build LLM bridge using shared ChatEngine + provider config.
+        // Build LLM bridge using shared AgentSession + provider config.
         // Use the voice-specific LLM model if set, otherwise fall back to AI Chat model.
-        let chatEngine = ChatEngine(chatsDirectory: CatalogDatabase.chatsDirectory)
+        let chatEngine = AgentSession(chatsDirectory: CatalogDatabase.chatsDirectory)
         let pid = prefs.aiProviderId
         let defaultModel = ProviderRegistry.shared.provider(for: pid)?.defaultModelId ?? ""
         let chatModel = prefs.aiModel.isEmpty ? defaultModel : prefs.aiModel

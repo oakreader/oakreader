@@ -1,31 +1,31 @@
 import Foundation
 
-// MARK: - Chat Turn
+// MARK: - Turn
 
-public struct ChatTurn: Identifiable, Codable, Sendable {
+public struct Turn: Identifiable, Codable, Sendable {
     public let id: UUID
-    public let role: ChatRole
+    public let role: Role
     public var content: String
     public let timestamp: Date
     public var isStreaming: Bool
-    public var skill: String?
+    public var metadata: [String: String]
     public var error: String?
-    public var attachments: [ChatAttachment]
+    public var attachments: [TurnAttachment]
     public var toolUses: [ToolUseRecord]
 
-    public enum ChatRole: String, Codable, Sendable {
+    public enum Role: String, Codable, Sendable {
         case user, assistant, system
     }
 
     public init(
         id: UUID = UUID(),
-        role: ChatRole,
+        role: Role,
         content: String,
         timestamp: Date = Date(),
         isStreaming: Bool = false,
-        skill: String? = nil,
+        metadata: [String: String] = [:],
         error: String? = nil,
-        attachments: [ChatAttachment] = [],
+        attachments: [TurnAttachment] = [],
         toolUses: [ToolUseRecord] = []
     ) {
         self.id = id
@@ -33,30 +33,58 @@ public struct ChatTurn: Identifiable, Codable, Sendable {
         self.content = content
         self.timestamp = timestamp
         self.isStreaming = isStreaming
-        self.skill = skill
+        self.metadata = metadata
         self.error = error
         self.attachments = attachments
         self.toolUses = toolUses
     }
 
-    // Custom Decodable for backward compatibility with old JSONL files without toolUses
+    // Custom Decodable for backward compatibility with old JSONL files
+    // that may have `skill` instead of `metadata`, or missing fields.
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
-        role = try container.decode(ChatRole.self, forKey: .role)
+        role = try container.decode(Role.self, forKey: .role)
         content = try container.decode(String.self, forKey: .content)
         timestamp = try container.decode(Date.self, forKey: .timestamp)
         isStreaming = try container.decode(Bool.self, forKey: .isStreaming)
-        skill = try container.decodeIfPresent(String.self, forKey: .skill)
         error = try container.decodeIfPresent(String.self, forKey: .error)
-        attachments = try container.decodeIfPresent([ChatAttachment].self, forKey: .attachments) ?? []
+        attachments = try container.decodeIfPresent([TurnAttachment].self, forKey: .attachments) ?? []
         toolUses = try container.decodeIfPresent([ToolUseRecord].self, forKey: .toolUses) ?? []
+
+        // Backward compat: decode `metadata` dict, or fall back to legacy `skill` string
+        if let meta = try container.decodeIfPresent([String: String].self, forKey: .metadata) {
+            metadata = meta
+        } else if let skill = try container.decodeIfPresent(String.self, forKey: .skill) {
+            metadata = ["skill": skill]
+        } else {
+            metadata = [:]
+        }
+    }
+
+    // Coding keys include legacy `skill` for backward-compatible decoding
+    private enum CodingKeys: String, CodingKey {
+        case id, role, content, timestamp, isStreaming, metadata, error, attachments, toolUses, skill
+    }
+
+    // Custom encode to only write `metadata` (not the legacy `skill` key)
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(role, forKey: .role)
+        try container.encode(content, forKey: .content)
+        try container.encode(timestamp, forKey: .timestamp)
+        try container.encode(isStreaming, forKey: .isStreaming)
+        try container.encode(metadata, forKey: .metadata)
+        try container.encodeIfPresent(error, forKey: .error)
+        try container.encode(attachments, forKey: .attachments)
+        try container.encode(toolUses, forKey: .toolUses)
     }
 }
 
-// MARK: - Chat Attachment
+// MARK: - Turn Attachment
 
-public struct ChatAttachment: Identifiable, Codable, Sendable {
+public struct TurnAttachment: Identifiable, Codable, Sendable {
     public let id: UUID
     public let type: AttachmentType
     public let label: String

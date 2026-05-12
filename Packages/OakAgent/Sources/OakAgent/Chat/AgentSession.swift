@@ -1,62 +1,37 @@
 import Foundation
 
-/// Snapshot of PDF context to pass across actor boundaries.
-public struct PDFContextSnapshot: Sendable {
-    public let fileName: String
-    public let pageCount: Int
-    public let currentPageIndex: Int
-    public let currentPageText: String
-    public let fullDocumentText: String?   // nil if not needed by skill
-    public let selectedText: String?
-
-    public init(
-        fileName: String,
-        pageCount: Int,
-        currentPageIndex: Int,
-        currentPageText: String,
-        fullDocumentText: String? = nil,
-        selectedText: String? = nil
-    ) {
-        self.fileName = fileName
-        self.pageCount = pageCount
-        self.currentPageIndex = currentPageIndex
-        self.currentPageText = currentPageText
-        self.fullDocumentText = fullDocumentText
-        self.selectedText = selectedText
-    }
-}
-
-/// Actor that coordinates message flow: builds prompts, routes to provider, persists turns.
-public actor ChatEngine {
+/// Actor that coordinates message flow: routes to provider, persists turns.
+public actor AgentSession {
     private let router = ProviderRouter()
-    private let store: ChatSessionStore
+    private let store: SessionStore
 
     /// Initialize with a centralized chats directory.
     public init(chatsDirectory: URL) {
-        self.store = ChatSessionStore(baseDirectory: chatsDirectory)
+        self.store = SessionStore(baseDirectory: chatsDirectory)
     }
 
     // MARK: - Send message
 
     public func send(
         userContent: String,
-        attachments: [ChatAttachment],
-        history: [ChatTurn],
+        attachments: [TurnAttachment],
+        history: [Turn],
         sessionId: UUID,
         config: ProviderConfig,
-        skill: Skill?,
-        pdfContext: PDFContextSnapshot?,
+        systemPrompt: String,
+        turnMetadata: [String: String] = [:],
         tools: [any AgentTool]? = nil,
         toolContext: ToolExecutionContext? = nil,
         agentSkills: [AgentSkill] = [],
+        maxIterations: Int = 10,
         toolConfirmation: (@Sendable (ToolCall) async -> Bool)? = nil
-    ) -> AsyncThrowingStream<StreamEvent, Error> {
+    ) -> AsyncThrowingStream<SessionEvent, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
                     // 1. Build user turn
                     try Task.checkCancellation()
-                    let userTurn = ChatTurn(
+                    let userTurn = Turn(
                         role: .user,
                         content: userContent,
                         attachments: attachments
@@ -64,13 +39,11 @@ public actor ChatEngine {
                     try await store.appendTurn(userTurn, sessionId: sessionId)
                     continuation.yield(.finished(userTurn))
 
-                    // 2. Build system prompt
-                    var systemPrompt = buildSystemPrompt(skill: skill, context: pdfContext)
-
-                    // Append agent skills listing (file-based skills)
+                    // 2. Build final system prompt (append agent skills listing)
+                    var finalPrompt = systemPrompt
                     let skillsBlock = SkillPromptFormatter.formatForPrompt(agentSkills)
                     if !skillsBlock.isEmpty {
-                        systemPrompt += skillsBlock
+                        finalPrompt += skillsBlock
                     }
 
                     // 3. Build initial LLM messages
@@ -93,24 +66,23 @@ public actor ChatEngine {
                     }
                     let ctx = toolContext
 
-                    // 6. Agentic loop — up to 10 iterations
-                    let maxIterations = 10
+                    // 6. Agentic loop
                     for _ in 0..<maxIterations {
                         try Task.checkCancellation()
 
                         let stream = provider.sendMessage(
                             messages: llmMessages,
                             model: config.model,
-                            systemPrompt: systemPrompt,
+                            systemPrompt: finalPrompt,
                             maxTokens: config.maxTokens,
                             tools: toolDefs
                         )
 
-                        var assistantTurn = ChatTurn(
+                        var assistantTurn = Turn(
                             role: .assistant,
                             content: "",
                             isStreaming: true,
-                            skill: skill?.id
+                            metadata: turnMetadata
                         )
                         var toolCalls: [ToolCall] = []
 
@@ -262,7 +234,7 @@ public actor ChatEngine {
 
     // MARK: - Session management
 
-    public func loadSession(_ sessionId: UUID) async throws -> [ChatTurn] {
+    public func loadSession(_ sessionId: UUID) async throws -> [Turn] {
         try await store.loadTurns(sessionId: sessionId)
     }
 
@@ -272,49 +244,7 @@ public actor ChatEngine {
 
     // MARK: - Private helpers
 
-    private func buildSystemPrompt(skill: Skill?, context: PDFContextSnapshot?) -> String {
-        var parts: [String] = []
-
-        // Base system prompt
-        parts.append("You are a helpful AI assistant integrated into OakReader, a document reader application. Do not praise questions or validate premises — if the user is wrong, say so directly. If uncertain, say so; do not fabricate citations or facts. Do not change your answer under pressure unless new evidence is presented.")
-
-        // Skill prompt
-        if let skill {
-            parts.append(skill.systemPrompt)
-        }
-
-        // PDF context
-        if let ctx = context {
-            parts.append("The user has a PDF document open: \"\(ctx.fileName)\" (\(ctx.pageCount) pages).")
-            parts.append("Current page: \(ctx.currentPageIndex + 1) of \(ctx.pageCount).")
-
-            if let selected = ctx.selectedText, !selected.isEmpty {
-                parts.append("Selected text:\n\"\"\"\n\(selected)\n\"\"\"")
-            }
-
-            // Determine context based on skill
-            let contextMode = skill?.contextMode ?? .currentPage
-            switch contextMode {
-            case .fullDocument:
-                if let fullText = ctx.fullDocumentText, !fullText.isEmpty {
-                    let truncated = String(fullText.prefix(32000))
-                    parts.append("Document text:\n\"\"\"\n\(truncated)\n\"\"\"")
-                }
-            case .currentPage:
-                if !ctx.currentPageText.isEmpty {
-                    parts.append("Current page text:\n\"\"\"\n\(ctx.currentPageText)\n\"\"\"")
-                }
-            case .selectedText:
-                break // Already handled above
-            case .none:
-                break
-            }
-        }
-
-        return parts.joined(separator: "\n\n")
-    }
-
-    private func buildMessages(history: [ChatTurn], userTurn: ChatTurn) -> [LLMMessage] {
+    private func buildMessages(history: [Turn], userTurn: Turn) -> [LLMMessage] {
         var messages: [LLMMessage] = []
 
         // Add history (skip system turns, they go in system prompt)

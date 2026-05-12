@@ -3,7 +3,7 @@ import OakAgent
 import PDFKit
 
 struct CLIChatRunner {
-    private let engine = ChatEngine(chatsDirectory: {
+    private let engine = AgentSession(chatsDirectory: {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("OakReader", isDirectory: true)
             .appendingPathComponent("chats", isDirectory: true)
@@ -14,7 +14,7 @@ struct CLIChatRunner {
 
     func oneShot(filePath: String?, question: String) async throws {
         let config = loadConfig()
-        let context = buildContext(filePath: filePath, contextMode: .fullDocument)
+        let systemPrompt = buildSystemPrompt(filePath: filePath)
 
         print("Thinking...\n")
 
@@ -24,8 +24,7 @@ struct CLIChatRunner {
             history: [],
             sessionId: sessionId,
             config: config,
-            skill: nil,
-            pdfContext: context
+            systemPrompt: systemPrompt
         )
 
         for try await event in stream {
@@ -50,7 +49,7 @@ struct CLIChatRunner {
 
     func interactive(filePath: String?) async throws {
         let config = loadConfig()
-        var history: [ChatTurn] = []
+        var history: [Turn] = []
 
         if let path = filePath {
             print("Loaded: \(path)")
@@ -76,7 +75,7 @@ struct CLIChatRunner {
                 continue
             }
 
-            let context = buildContext(filePath: filePath, contextMode: .fullDocument)
+            let systemPrompt = buildSystemPrompt(filePath: filePath)
 
             print("\nAssistant: ", terminator: "")
             fflush(stdout)
@@ -87,8 +86,7 @@ struct CLIChatRunner {
                 history: history,
                 sessionId: sessionId,
                 config: config,
-                skill: nil,
-                pdfContext: context
+                systemPrompt: systemPrompt
             )
 
             do {
@@ -130,29 +128,15 @@ struct CLIChatRunner {
         )
     }
 
-    private func buildContext(filePath: String?, contextMode: ContextMode) -> PDFContextSnapshot? {
-        guard let path = filePath else { return nil }
-        let url = URL(fileURLWithPath: path)
-        guard let doc = PDFDocument(url: url) else {
-            fputs("Warning: Could not open PDF at \(path)\n", stderr)
-            return nil
+    private func buildSystemPrompt(filePath: String?) -> String {
+        var parts = ["You are a helpful AI assistant."]
+        guard let path = filePath,
+              let doc = PDFDocument(url: URL(fileURLWithPath: path)) else {
+            return parts.joined(separator: "\n\n")
         }
-
-        let pageCount = doc.pageCount
-        let currentPageText = doc.page(at: 0)?.string ?? ""
-
-        var fullText: String? = nil
-        if contextMode == .fullDocument {
-            let allText = (0..<pageCount).compactMap { doc.page(at: $0)?.string }.joined(separator: "\n\n")
-            fullText = String(allText.prefix(32_000))
-        }
-
-        return PDFContextSnapshot(
-            fileName: url.lastPathComponent,
-            pageCount: pageCount,
-            currentPageIndex: 0,
-            currentPageText: currentPageText,
-            fullDocumentText: fullText
-        )
+        parts.append("Document: \"\(URL(fileURLWithPath: path).lastPathComponent)\" (\(doc.pageCount) pages).")
+        let text = (0..<doc.pageCount).compactMap { doc.page(at: $0)?.string }.joined(separator: "\n\n")
+        parts.append("Document text:\n\"\"\"\n\(String(text.prefix(32_000)))\n\"\"\"")
+        return parts.joined(separator: "\n\n")
     }
 }

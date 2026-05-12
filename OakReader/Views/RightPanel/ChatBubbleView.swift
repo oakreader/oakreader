@@ -3,8 +3,8 @@ import OakAgent
 import Textual
 
 struct ChatBubbleView: View {
-    let turn: ChatTurn
-    var onSaveToNote: ((ChatTurn) -> Bool)?
+    let turn: Turn
+    var onSaveToNote: ((Turn) -> Bool)?
     var onApproveToolCall: (() -> Void)?
     var onDenyToolCall: (() -> Void)?
 
@@ -25,7 +25,7 @@ struct ChatBubbleView: View {
 
                 VStack(alignment: turn.role == .user ? .trailing : .leading, spacing: 4) {
                     // Skill badge
-                    if let skill = turn.skill {
+                    if let skill = turn.metadata["skill"] {
                         Text(skill)
                             .font(.system(size: 13))
                             .foregroundStyle(.secondary)

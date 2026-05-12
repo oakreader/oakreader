@@ -2,7 +2,7 @@ import SwiftUI
 import OakAgent
 
 struct AttachmentPreviewStrip: View {
-    let attachments: [ChatAttachment]
+    let attachments: [TurnAttachment]
     let onRemove: (UUID) -> Void
 
     var body: some View {
@@ -16,7 +16,7 @@ struct AttachmentPreviewStrip: View {
         }
     }
 
-    private func attachmentCard(_ attachment: ChatAttachment) -> some View {
+    private func attachmentCard(_ attachment: TurnAttachment) -> some View {
         HStack(spacing: 5) {
             // Small thumbnail / icon
             if attachment.type == .imageCapture, let data = attachment.imageData,
