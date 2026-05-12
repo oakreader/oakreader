@@ -130,6 +130,20 @@ class ChatViewModel {
             }
         }
 
+        // Library-wide search tools — always available
+        if let dbQueue = sessionService?.database.dbQueue {
+            tools.append(SearchLibraryTool(dbQueue: dbQueue))
+            tools.append(ReadLibraryItemTool(dbQueue: dbQueue))
+
+            // Semantic search — available when index service is ready
+            if let semanticService = appState?.semanticIndexService {
+                tools.append(SemanticSearchTool(service: semanticService, dbQueue: dbQueue))
+            }
+        }
+
+        // Academic web search — always available
+        tools.append(AcademicSearchTool())
+
         // Existing filesystem agent tools (gated by preferences)
         if prefs.agentToolsEnabled, toolContext != nil {
             if prefs.agentReadFileEnabled { tools.append(ReadTool()) }
@@ -416,6 +430,9 @@ class ChatViewModel {
         let home = FileManager.default.homeDirectoryForCurrentUser
         let globalSkills = home.appendingPathComponent(".oakreader/skills")
         dirs.append(globalSkills)
+
+        // Add skill directories from enabled plugins
+        dirs.append(contentsOf: PluginService.shared.pluginSkillDirectories())
 
         return SkillLoader.loadSkills(from: dirs).skills
     }

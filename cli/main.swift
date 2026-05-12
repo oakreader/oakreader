@@ -27,10 +27,35 @@ USAGE:
     oak tags add <tag> <item>                    Tag an item
     oak tags remove <tag> <item>                 Untag an item
 
+    oak import <file|url>                       Import PDF, HTML, Markdown, or URL
+        [--title <title>]                        Override title
+        [--collection <name>]                    Add to collection after import
+        [--tag <name>]                           Tag after import
+
+    oak search <query>                           Search library
+        [--mode keyword|semantic|hybrid]          Search mode (default: keyword)
+        [--limit N]                               Max results (default: 20)
+
     oak status <item>                            Show item status
     oak status <item> <value>                    Set status (unread/reading/completed/archived)
 
     oak chat [--file <path>] [--ask "question"]  AI chat with PDF
+
+    oak plugins [list]                           List all plugins and status
+    oak plugins show <name>                      Show plugin detail
+    oak plugins check                            Verify all plugin dependencies
+    oak plugins install-tools <name>             Install tools for a plugin
+    oak plugins enable <name>                    Enable a plugin
+    oak plugins disable <name>                   Disable a plugin
+
+    oak tools [list]                             List all tools across plugins
+    oak tools check                              Verify all tools are installed
+    oak tools install <name>                     Install a specific tool
+    oak tools path <name>                        Print resolved tool path
+
+    oak credentials [list]                       List API keys (masked)
+    oak credentials set <provider>               Set API key (Keychain)
+    oak credentials remove <provider>            Remove API key
 
 OPTIONS:
     --db <path>     Path to database (default: ~/OakReader/library.sqlite)
@@ -180,6 +205,75 @@ case "status":
         printError(error.localizedDescription)
         exit(1)
     }
+
+case "import":
+    do {
+        let db = try CLIDatabase(path: dbPath)
+        let commands = CLICommands(db: db)
+        var remaining = allArgs
+        let flags = parseFlags(&remaining)
+
+        // Check if this is a URL import (needs async)
+        let input = remaining.first ?? ""
+        if input.hasPrefix("http://") || input.hasPrefix("https://") {
+            _ = Task {
+                do {
+                    try await commands.runImportAsync(args: remaining, flags: flags)
+                } catch {
+                    printError(error.localizedDescription)
+                    exit(1)
+                }
+                exit(0)
+            }
+            RunLoop.main.run()
+        } else {
+            let handled = try commands.runImport(args: remaining, flags: flags)
+            if !handled {
+                printError("Unexpected import error.")
+                exit(1)
+            }
+        }
+    } catch {
+        printError(error.localizedDescription)
+        exit(1)
+    }
+
+case "search":
+    do {
+        let db = try CLIDatabase(path: dbPath)
+        let commands = CLICommands(db: db)
+        var remaining = allArgs
+        let flags = parseFlags(&remaining)
+        let mode = flags["mode"] ?? "keyword"
+
+        if mode == "semantic" || mode == "hybrid" {
+            // Semantic/hybrid search requires async
+            _ = Task {
+                do {
+                    try await commands.runSearchAsync(args: remaining, flags: flags)
+                } catch {
+                    printError(error.localizedDescription)
+                    exit(1)
+                }
+                exit(0)
+            }
+            RunLoop.main.run()
+        } else {
+            try commands.runSearch(args: remaining, flags: flags)
+        }
+    } catch {
+        printError(error.localizedDescription)
+        exit(1)
+    }
+
+case "plugins":
+    PluginCommands.runPlugins(args: allArgs)
+
+case "tools":
+    PluginCommands.runTools(args: allArgs)
+
+case "credentials":
+    PluginCommands.runCredentials(args: allArgs)
 
 case "chat":
     // Preserve existing chat functionality
