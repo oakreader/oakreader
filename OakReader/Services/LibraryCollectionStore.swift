@@ -7,11 +7,11 @@ extension LibraryStore {
 
     var collections: [PDFCollection] {
         _ = revision
-        if let cached = _collectionsCache, cached.revision == revision {
+        if let cached = collectionsCache, cached.revision == revision {
             return cached.collections
         }
         let result = (try? fetchAllCollections()) ?? []
-        _collectionsCache = (revision: revision, collections: result)
+        collectionsCache = (revision: revision, collections: result)
         return result
     }
 

@@ -109,6 +109,27 @@ struct LibrarySidebarView: View {
         }
         .buttonStyle(.plain)
         .help(collection.name)
+        .contextMenu {
+            if collection.id == SystemCollectionID.duplicates {
+                let groupCount = store.duplicateGroups.count
+                Button {
+                    mergeAllDuplicates()
+                } label: {
+                    Label("Merge All Duplicates", systemImage: "arrow.triangle.merge")
+                }
+                .disabled(groupCount == 0)
+            }
+        }
+    }
+
+    private func mergeAllDuplicates() {
+        let groups = store.duplicateGroups
+        for group in groups {
+            let sorted = group.sorted { $0.dateAdded < $1.dateAdded }
+            guard let keeper = sorted.first else { continue }
+            let others = Array(sorted.dropFirst())
+            store.mergeItems(keeper: keeper, duplicates: others)
+        }
     }
 }
 
@@ -382,6 +403,25 @@ private struct CollectionRowView: View {
                         Label("Move to...", systemImage: "folder.badge.gearshape")
                     }
                 }
+                // Remove duplicates within this collection
+                if !collection.isSmart {
+                    let collectionItems = store.items.filter { $0.collections.contains { $0.id == collection.id } }
+                    let collectionDuplicates = DuplicateService.findDuplicates(in: collectionItems)
+                    if !collectionDuplicates.isEmpty {
+                        Divider()
+                        Button {
+                            for group in collectionDuplicates {
+                                let sorted = group.sorted { $0.dateAdded < $1.dateAdded }
+                                guard let keeper = sorted.first else { continue }
+                                let others = Array(sorted.dropFirst())
+                                store.mergeItems(keeper: keeper, duplicates: others)
+                            }
+                        } label: {
+                            Label("Remove Duplicates (\(collectionDuplicates.count))", systemImage: "arrow.triangle.merge")
+                        }
+                    }
+                }
+
                 if !collection.isSystem {
                     Divider()
                     Button(role: .destructive) { store.deleteCollection(collection) } label: {

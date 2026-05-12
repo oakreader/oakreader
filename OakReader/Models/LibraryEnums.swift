@@ -27,8 +27,9 @@ enum SystemCollectionID {
     static let videos      = UUID(uuidString: "00000000-0000-0000-0000-000000000007")!
     static let recentlyRead = UUID(uuidString: "00000000-0000-0000-0000-000000000008")!
     static let notes       = UUID(uuidString: "00000000-0000-0000-0000-000000000009")!
+    static let duplicates  = UUID(uuidString: "00000000-0000-0000-0000-00000000000A")!
 
-    static let all: [UUID] = [allItems, recentlyRead, pdfs, webSnapshots, videos, notes]
+    static let all: [UUID] = [allItems, recentlyRead, pdfs, webSnapshots, videos, notes, duplicates]
 }
 
 // MARK: - Local user ID

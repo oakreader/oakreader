@@ -65,15 +65,17 @@ final class LibraryStore {
 
     // Caches keyed on revision — avoids redundant DB fetches within the same revision cycle.
     // Marked @ObservationIgnored so writes inside computed getters don't trigger extra observations.
-    @ObservationIgnored var _itemsCache: (revision: Int, items: [LibraryItem])?
-    @ObservationIgnored var _collectionsCache: (revision: Int, collections: [PDFCollection])?
-    @ObservationIgnored var _propertiesCache: (revision: Int, properties: [PropertyDefinition])?
+    @ObservationIgnored var itemsCache: (revision: Int, items: [LibraryItem])?
+    @ObservationIgnored var collectionsCache: (revision: Int, collections: [PDFCollection])?
+    @ObservationIgnored var propertiesCache: (revision: Int, properties: [PropertyDefinition])?
+    @ObservationIgnored var duplicateGroupsCache: (revision: Int, groups: [[LibraryItem]])?
 
     /// Notify the store that data has changed externally.
     func invalidate() {
-        _itemsCache = nil
-        _collectionsCache = nil
-        _propertiesCache = nil
+        itemsCache = nil
+        collectionsCache = nil
+        propertiesCache = nil
+        duplicateGroupsCache = nil
         revision += 1
     }
 
@@ -85,15 +87,47 @@ final class LibraryStore {
 
     var items: [LibraryItem] {
         _ = revision
-        if let cached = _itemsCache, cached.revision == revision {
+        if let cached = itemsCache, cached.revision == revision {
             return cached.items
         }
         let result = (try? fetchAllItems()) ?? []
-        _itemsCache = (revision: revision, items: result)
+        itemsCache = (revision: revision, items: result)
         return result
     }
 
+    // MARK: - Duplicate Detection
+
+    var isDuplicatesSelected: Bool {
+        selectedCollectionId == SystemCollectionID.duplicates
+    }
+
+    var duplicateGroups: [[LibraryItem]] {
+        _ = revision
+        if let cached = duplicateGroupsCache, cached.revision == revision {
+            return cached.groups
+        }
+        let groups = DuplicateService.findDuplicates(in: items)
+        duplicateGroupsCache = (revision: revision, groups: groups)
+        return groups
+    }
+
+    /// Map from item ID to its duplicate group index (for visual grouping in the table).
+    var duplicateGroupIndexMap: [UUID: Int] {
+        var map: [UUID: Int] = [:]
+        for (index, group) in duplicateGroups.enumerated() {
+            for item in group {
+                map[item.id] = index
+            }
+        }
+        return map
+    }
+
     var filteredItems: [LibraryItem] {
+        // Special handling for Duplicates collection
+        if isDuplicatesSelected {
+            return duplicatesFilteredItems
+        }
+
         var results = items
 
         // Apply tag filter (mutually exclusive with collection)
@@ -220,10 +254,39 @@ final class LibraryStore {
 
     /// Count items matching a smart collection's rules.
     func smartCollectionItemCount(for collection: PDFCollection) -> Int {
+        if collection.id == SystemCollectionID.duplicates {
+            return duplicateGroups.flatMap { $0 }.count
+        }
         guard collection.isSmart, let rules = collection.filterRules else {
             return collection.itemCount
         }
         return items.filter { evaluateRules(rules, against: $0) }.count
+    }
+
+    // MARK: - Duplicates Filtered Items
+
+    /// Returns all items in duplicate groups, sorted so duplicates within a group appear adjacent.
+    private var duplicatesFilteredItems: [LibraryItem] {
+        let groups = duplicateGroups
+        var results: [LibraryItem] = []
+        for group in groups.sorted(by: { DuplicateService.normalizeTitle($0.first?.title ?? "") < DuplicateService.normalizeTitle($1.first?.title ?? "") }) {
+            let sorted = group.sorted { a, b in
+                a.dateAdded < b.dateAdded
+            }
+            results.append(contentsOf: sorted)
+        }
+
+        // Apply search within duplicates
+        if !searchText.isEmpty {
+            let query = searchText.lowercased()
+            results = results.filter {
+                $0.title.lowercased().contains(query) ||
+                $0.author.lowercased().contains(query) ||
+                $0.fileName.lowercased().contains(query)
+            }
+        }
+
+        return results
     }
 
 }

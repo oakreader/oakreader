@@ -7,11 +7,11 @@ extension LibraryStore {
 
     var properties: [PropertyDefinition] {
         _ = revision
-        if let cached = _propertiesCache, cached.revision == revision {
+        if let cached = propertiesCache, cached.revision == revision {
             return cached.properties
         }
         let result = (try? fetchAllProperties()) ?? []
-        _propertiesCache = (revision: revision, properties: result)
+        propertiesCache = (revision: revision, properties: result)
         return result
     }
 
