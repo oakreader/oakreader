@@ -152,7 +152,16 @@ enum CitationFormatter {
     /// BibTeX format.
     static func toBibTeX(csl: CSLItem, citeKey: String? = nil) -> String {
         let entryType = bibTeXType(csl.type)
-        let key = citeKey ?? generateCiteKey(csl)
+        let key: String
+        if let citeKey, !citeKey.isEmpty {
+            key = citeKey
+        } else {
+            // Simple fallback when no stored cite key is available
+            let author = csl.author?.first?.family?.lowercased()
+                .replacingOccurrences(of: " ", with: "") ?? "unknown"
+            let year = csl.issued?.year.map { "\($0)" } ?? "nd"
+            key = "\(author)\(year)"
+        }
 
         var fields: [(String, String)] = []
 
@@ -527,14 +536,6 @@ enum CitationFormatter {
         case "treaty": return "GEN"
         default: return "GEN"
         }
-    }
-
-    private static func generateCiteKey(_ csl: CSLItem) -> String {
-        let author = csl.author?.first?.family?.lowercased()
-            .replacingOccurrences(of: " ", with: "") ?? "unknown"
-        let year = csl.issued?.year.map { "\($0)" } ?? "nd"
-        let titleWord = csl.title?.split(separator: " ").first.map { String($0).lowercased() } ?? "untitled"
-        return "\(author)\(year)\(titleWord)"
     }
 
     private static func bibTeXName(_ name: CSLName) -> String {
