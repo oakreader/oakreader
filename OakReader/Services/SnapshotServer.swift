@@ -171,6 +171,12 @@ final class SnapshotServer {
             return
         }
 
+        // GET /selected-collection
+        if method == "GET", path == "/selected-collection" {
+            handleGetSelectedCollection(connection: connection)
+            return
+        }
+
         // POST /snapshot
         if method == "POST", path == "/snapshot" {
             guard !bodyData.isEmpty else {
@@ -206,25 +212,23 @@ final class SnapshotServer {
             guard let self else { return }
             let collections = self.importService.store.collections
 
-            // Flatten collections with parent info for the extension
-            var result: [[String: Any]] = []
-            func flatten(_ colls: [PDFCollection], parentId: String?) {
-                for c in colls {
+            // Serialize as a tree with children (matching the tags endpoint pattern)
+            func serialize(_ colls: [PDFCollection]) -> [[String: Any]] {
+                colls.map { c in
                     var entry: [String: Any] = [
                         "id": c.id.uuidString,
                         "name": c.name,
                         "icon": c.icon,
                     ]
-                    if let pid = parentId {
-                        entry["parentId"] = pid
+                    if !c.subcollections.isEmpty {
+                        entry["children"] = serialize(c.subcollections)
                     }
-                    result.append(entry)
-                    flatten(c.subcollections, parentId: c.id.uuidString)
+                    return entry
                 }
             }
-            flatten(collections.filter { $0.parentId == nil }, parentId: nil)
 
-            // Serialize
+            let result = serialize(collections.filter { $0.parentId == nil })
+
             if let jsonData = try? JSONSerialization.data(withJSONObject: result),
                let jsonString = String(data: jsonData, encoding: .utf8) {
                 self.sendResponse(connection: connection, status: 200, body: jsonString)
@@ -254,8 +258,9 @@ final class SnapshotServer {
                     if !node.children.isEmpty {
                         entry["children"] = serialize(node.children)
                     }
-                    if node.option != nil {
+                    if let option = node.option {
                         entry["isTag"] = true
+                        entry["colorHex"] = option.colorHex
                     }
                     return entry
                 }
@@ -267,6 +272,21 @@ final class SnapshotServer {
                 self.sendResponse(connection: connection, status: 200, body: jsonString)
             } else {
                 self.sendResponse(connection: connection, status: 200, body: "[]")
+            }
+        }
+    }
+
+    // MARK: - GET /selected-collection
+
+    private func handleGetSelectedCollection(connection: NWConnection) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            let store = self.importService.store
+            if let id = store.selectedCollectionId {
+                let json = #"{"id":"\#(id.uuidString)"}"#
+                self.sendResponse(connection: connection, status: 200, body: json)
+            } else {
+                self.sendResponse(connection: connection, status: 200, body: #"{"id":null}"#)
             }
         }
     }
