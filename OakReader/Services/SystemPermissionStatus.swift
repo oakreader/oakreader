@@ -1,7 +1,9 @@
 import AVFoundation
 import CoreGraphics
+import AppKit
 
 /// Centralized permission tracker for Microphone and Screen Recording.
+/// Refreshes automatically when the app becomes active (e.g. user returns from System Settings).
 @Observable
 @MainActor
 final class SystemPermissionStatus {
@@ -12,11 +14,28 @@ final class SystemPermissionStatus {
     private(set) var screenRecordingAuthorized = false
 
     var allGranted: Bool { micAuthorized && screenRecordingAuthorized }
+    var allRecordingGranted: Bool { micAuthorized }
+    var allSystemAudioGranted: Bool { micAuthorized && screenRecordingAuthorized }
 
     private var pollTask: Task<Void, Never>?
+    private nonisolated(unsafe) var activationObserver: NSObjectProtocol?
 
     private init() {
         refresh()
+        // Auto-refresh when user returns from System Settings
+        activationObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.refresh()
+        }
+    }
+
+    deinit {
+        if let activationObserver {
+            NotificationCenter.default.removeObserver(activationObserver)
+        }
     }
 
     /// Re-reads all permission state from the OS (cheap, synchronous calls).
@@ -37,8 +56,15 @@ final class SystemPermissionStatus {
         }
     }
 
+    /// Triggers the system screen recording permission prompt.
+    func requestScreenRecordingAccess() {
+        CGRequestScreenCaptureAccess()
+        // Poll for a while since the user may grant it from the system dialog
+        startPolling()
+    }
+
     /// Polls permission state every 2 seconds for up to 30 seconds.
-    /// Auto-stops when `allGranted` becomes true.
+    /// Auto-stops when all needed permissions are granted.
     func startPolling() {
         stopPolling()
         pollTask = Task { [weak self] in
@@ -46,7 +72,7 @@ final class SystemPermissionStatus {
                 try? await Task.sleep(for: .seconds(2))
                 guard !Task.isCancelled else { return }
                 self?.refresh()
-                if self?.allGranted == true { return }
+                if self?.allSystemAudioGranted == true { return }
             }
         }
     }
