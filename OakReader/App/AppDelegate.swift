@@ -3,7 +3,7 @@ import PDFKit
 import Sparkle
 import UniformTypeIdentifiers
 import SwiftUI
-import VoiceAgentKit
+import OakVoiceAI
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     let documentController = PDFDocumentController()
@@ -19,7 +19,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Forward VoiceAgentKit logs to the shared log file
+        // Forward OakVoiceAI logs to the shared log file
         VoiceAgentLog.sink = { level, category, message in
             LogFileWriter.shared.write(level: level, category: category, message: message)
         }
@@ -316,6 +316,88 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         appState.zoteroImportDataDir = dir
         appState.showZoteroImport = true
+    }
+
+    // MARK: - Command Line Tools
+
+    @objc func installCommandLineTools(_ sender: Any?) {
+        let destPath = "/usr/local/bin/oak"
+
+        guard let bundleBinary = Bundle.main.resourceURL?.appendingPathComponent("oak") else {
+            showAlert(
+                title: "CLI Binary Not Found",
+                message: "The oak command-line tool was not found inside the application bundle.",
+                style: .critical
+            )
+            return
+        }
+
+        let bundlePath = bundleBinary.path
+
+        guard FileManager.default.fileExists(atPath: bundlePath) else {
+            showAlert(
+                title: "CLI Binary Not Found",
+                message: "The oak command-line tool was not found at:\n\(bundlePath)",
+                style: .critical
+            )
+            return
+        }
+
+        // Check if already installed and pointing to the correct location
+        if let existing = try? FileManager.default.destinationOfSymbolicLink(atPath: destPath),
+           existing == bundlePath {
+            showAlert(
+                title: "Already Installed",
+                message: "The oak command-line tool is already installed at \(destPath).",
+                style: .informational
+            )
+            return
+        }
+
+        // Confirmation dialog
+        let alert = NSAlert()
+        alert.messageText = "Install Command Line Tools"
+        alert.informativeText = "This will create a symlink at \(destPath) pointing to the oak binary inside OakReader.app.\n\nAdministrator privileges are required."
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Install")
+        alert.addButton(withTitle: "Cancel")
+        let response = alert.runModal()
+        guard response == .alertFirstButtonReturn else { return }
+
+        // Use AppleScript to create symlink with admin privileges
+        let script = """
+            do shell script "mkdir -p /usr/local/bin && ln -sf '\(bundlePath)' '\(destPath)'" \
+            with administrator privileges
+            """
+
+        var error: NSDictionary?
+        if let appleScript = NSAppleScript(source: script) {
+            appleScript.executeAndReturnError(&error)
+        }
+
+        if let error = error {
+            let message = error[NSAppleScript.errorMessage] as? String ?? "Unknown error"
+            showAlert(
+                title: "Installation Failed",
+                message: message,
+                style: .critical
+            )
+        } else {
+            showAlert(
+                title: "Installation Successful",
+                message: "The oak command-line tool has been installed at \(destPath).\n\nYou can now use 'oak' from your terminal.",
+                style: .informational
+            )
+        }
+    }
+
+    private func showAlert(title: String, message: String, style: NSAlert.Style) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.alertStyle = style
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
     }
 
     // MARK: - Menu Action Dispatch

@@ -8,7 +8,7 @@ enum MainMenuBuilder {
         let mainMenu = NSMenu()
 
         // App menu
-        mainMenu.addItem(buildAppMenu(updaterController: target.updaterController))
+        mainMenu.addItem(buildAppMenu(target: target, updaterController: target.updaterController))
 
         // File menu
         mainMenu.addItem(buildFileMenu(target: target))
@@ -38,6 +38,7 @@ enum MainMenuBuilder {
     // MARK: - App Menu
 
     private static func buildAppMenu(
+        target: AppDelegate,
         updaterController: SPUStandardUpdaterController
     ) -> NSMenuItem {
         let appMenu = NSMenu()
@@ -54,6 +55,14 @@ enum MainMenuBuilder {
         )
         checkForUpdatesItem.target = updaterController
         appMenu.addItem(checkForUpdatesItem)
+        let installCLIItem = NSMenuItem(
+            title: "Install Command Line Tools...",
+            action: #selector(AppDelegate.installCommandLineTools(_:)),
+            keyEquivalent: ""
+        )
+        installCLIItem.target = target
+        installCLIItem.image = icon("terminal")
+        appMenu.addItem(installCLIItem)
         appMenu.addItem(.separator())
         appMenu.addItem(NSMenuItem(
             title: "Settings...",
