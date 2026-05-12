@@ -204,6 +204,10 @@ struct ContentView: View {
             .padding(.bottom, 8)
         case .markdown:
             MarkdownViewerView(viewModel: viewModel)
+        case .audio:
+            Text("Audio playback not yet available")
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 

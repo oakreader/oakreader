@@ -46,6 +46,8 @@ struct PDFContextProvider {
             return mediaSnapshot(from: viewModel, contextMode: contextMode)
         case .markdown:
             return markdownSnapshot(from: viewModel, contextMode: contextMode)
+        case .audio:
+            return nil
         }
     }
 
@@ -185,6 +187,8 @@ struct PDFContextProvider {
             } else {
                 currentPageText = ""
             }
+        case .audio:
+            currentPageText = ""
         }
 
         // Library metadata
