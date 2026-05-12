@@ -39,6 +39,8 @@ USAGE:
     oak status <item>                            Show item status
     oak status <item> <value>                    Set status (unread/reading/completed/archived)
 
+    oak open <file>                              Open file in OakReader (no import)
+
     oak chat [--file <path>] [--ask "question"]  AI chat with PDF
 
     oak plugins [list]                           List all plugins and status
@@ -274,6 +276,28 @@ case "tools":
 
 case "credentials":
     PluginCommands.runCredentials(args: allArgs)
+
+case "open":
+    let filePath = allArgs.first ?? ""
+    guard !filePath.isEmpty else {
+        printError("Usage: oak open <file>")
+        exit(1)
+    }
+    let resolved = URL(fileURLWithPath: (filePath as NSString).expandingTildeInPath).standardizedFileURL
+    guard FileManager.default.fileExists(atPath: resolved.path) else {
+        printError("File not found: \(resolved.path)")
+        exit(1)
+    }
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+    process.arguments = ["-a", "OakReader", resolved.path]
+    do {
+        try process.run()
+        process.waitUntilExit()
+    } catch {
+        printError("Failed to open file: \(error.localizedDescription)")
+        exit(1)
+    }
 
 case "chat":
     // Preserve existing chat functionality

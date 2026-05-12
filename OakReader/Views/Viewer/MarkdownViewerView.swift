@@ -39,20 +39,47 @@ struct MarkdownViewerView: View {
             ?? NSFont.systemFont(ofSize: effectiveFontSize)
     }
 
-    var body: some View {
-        VStack(spacing: 0) {
-            toolbar
+    private var isZenMode: Bool { viewModel.state.isZenMode }
 
-            switch currentMode {
-            case .edit:
-                editorPane
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            case .preview:
-                previewPane
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            case .split:
-                splitPane
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            VStack(spacing: 0) {
+                if !isZenMode {
+                    toolbar
+                }
+
+                if isZenMode {
+                    zenPreviewPane
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    switch currentMode {
+                    case .edit:
+                        editorPane
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    case .preview:
+                        previewPane
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    case .split:
+                        splitPane
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                }
+            }
+
+            // Floating zen mode exit button
+            if isZenMode {
+                Button {
+                    viewModel.appState?.dispatchAction(.toggleZenMode)
+                } label: {
+                    Image(systemName: "eye.slash")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 28, height: 28)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 6))
+                }
+                .buttonStyle(.plain)
+                .help("Exit Zen Mode")
+                .padding(12)
             }
         }
         .onAppear {
@@ -65,6 +92,19 @@ struct MarkdownViewerView: View {
     private var toolbar: some View {
         HStack(spacing: 6) {
             Spacer()
+
+            // Zen mode toggle
+            Button {
+                viewModel.appState?.dispatchAction(.toggleZenMode)
+            } label: {
+                Image(systemName: "eye")
+                    .font(.system(size: OakStyle.Font.icon))
+                    .foregroundStyle(.tertiary)
+                    .frame(width: OakStyle.Size.buttonStandard, height: OakStyle.Size.buttonStandard)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Zen Mode (⇧⌘.)")
 
             // Toggle between edit and preview
             Button {
@@ -132,6 +172,17 @@ struct MarkdownViewerView: View {
             content: viewModel.markdownContent,
             baseURL: viewModel.markdownDocument?.fileURL.deletingLastPathComponent()
         )
+    }
+
+    // MARK: - Zen Preview Pane
+
+    private var zenPreviewPane: some View {
+        NotePreviewView(
+            content: viewModel.markdownContent,
+            baseURL: viewModel.markdownDocument?.fileURL.deletingLastPathComponent()
+        )
+        .frame(maxWidth: 780)
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Split Pane

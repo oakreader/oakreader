@@ -232,9 +232,17 @@ class DocumentViewModel {
 
     func handleAction(_ action: DocumentAction) {
         switch action {
+        case .toggleZenMode:
+            state.isZenMode.toggle()
+            if state.isZenMode {
+                state.isSidebarVisible = false
+                state.rightPanelMode = nil
+            }
         case .toggleSidebar:
+            guard !state.isZenMode else { return }
             state.isSidebarVisible.toggle()
         case .toggleInspector:
+            guard !state.isZenMode else { return }
             if state.rightPanelMode != nil {
                 state.rightPanelMode = nil
             } else {

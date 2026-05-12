@@ -296,6 +296,10 @@ enum MainMenuBuilder {
             "Toggle Inspector", action: .toggleInspector,
             key: "i", modifiers: [.command, .option], icon: "sidebar.right", target: target
         ))
+        viewMenu.addItem(actionItem(
+            "Zen Mode", action: .toggleZenMode,
+            key: ".", modifiers: [.command, .shift], icon: "eye", target: target
+        ))
         viewMenu.addItem(.separator())
         viewMenu.addItem(actionItem(
             "Zoom In", action: .zoomIn,
