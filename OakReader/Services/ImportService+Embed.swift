@@ -114,6 +114,19 @@ extension ImportService {
         try? referenceService.saveMetadata(csl, forItemId: docId.uuidString)
         store.invalidate()
 
+        // Semantic index for vector search
+        if let service = semanticIndexService {
+            Task {
+                await service.indexItem(
+                    itemId: docId.uuidString,
+                    attachmentType: ItemType.embed.rawValue,
+                    storageKey: itemStorageKey,
+                    attStorageKey: attStorageKey,
+                    fileName: "metadata.json"
+                )
+            }
+        }
+
         // Auto-generate chapters and highlights for YouTube embeds
         if embedType == "youtube" {
             let hasTranscript = transcript != nil && !transcript!.isEmpty

@@ -2,7 +2,7 @@ import Foundation
 
 /// Content search using grep -rn.
 public struct GrepTool: AgentTool {
-    public let name = "grep"
+    public let name = "search_files"
     public let description = "Search for a pattern in files using grep. Returns matching lines with file paths and line numbers."
 
     public var inputSchema: [String: Any] {
@@ -70,7 +70,4 @@ public struct GrepTool: AgentTool {
         }
     }
 
-    private func shellQuote(_ s: String) -> String {
-        "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'"
-    }
 }

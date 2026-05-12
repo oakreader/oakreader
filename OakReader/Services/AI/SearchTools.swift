@@ -322,9 +322,12 @@ struct ReadLibraryItemTool: AgentTool, Sendable {
         )
 
         // Delegate to ReadDocumentTool for the actual file reading
+        guard let itemType = ItemType(rawValue: info.attachmentType) else {
+            return .error("Unsupported attachment type: \(info.attachmentType)")
+        }
         let reader = ReadDocumentTool(
             filePath: fileURL.path,
-            documentType: info.attachmentType,
+            documentType: itemType,
             pageCount: info.pageCount
         )
         return try await reader.execute(input: ["pages": input["pages"] ?? ""], context: context)
@@ -341,14 +344,24 @@ struct ReadLibraryItemTool: AgentTool, Sendable {
 
 // MARK: - Academic Search Tool
 
-/// Searches academic papers on the web via Semantic Scholar.
+/// Searches academic papers across multiple providers concurrently:
+/// Semantic Scholar, OpenAlex, CrossRef, arXiv, and PubMed.
 struct AcademicSearchTool: AgentTool, Sendable {
     let name = "search_academic"
     let description = """
-        Search academic papers on the web using Semantic Scholar. Find papers by \
-        topic, author, or keywords. Returns titles, authors, years, abstracts, \
-        citation counts, and DOIs. Useful for discovering papers not yet in the library.
+        Search academic papers on the web across Semantic Scholar, OpenAlex, \
+        CrossRef, arXiv, and PubMed. Find papers by topic, author, or keywords. \
+        Returns titles, authors, years, abstracts, citation counts, DOIs, and \
+        source databases. Useful for discovering papers not yet in the library.
         """
+
+    private let providers: [any AcademicSearchProvider] = [
+        SemanticScholarProvider(),
+        OpenAlexProvider(),
+        CrossRefSearchProvider(),
+        ArXivProvider(),
+        PubMedProvider(),
+    ]
 
     var inputSchema: [String: Any] {
         [
@@ -357,19 +370,19 @@ struct AcademicSearchTool: AgentTool, Sendable {
                 "query": [
                     "type": "string",
                     "description":
-                        "Search query — topic, keywords, paper title, or author name"
+                        "Search query — topic, keywords, paper title, or author name",
                 ],
                 "max_results": [
                     "type": "string",
-                    "description": "Maximum results (default: 5, max: 20)"
+                    "description": "Maximum results (default: 10, max: 20)",
                 ],
                 "year": [
                     "type": "string",
                     "description":
-                        "Filter by year or range (e.g., \"2024\" or \"2020-2024\")"
-                ]
+                        "Filter by year or range (e.g., \"2024\" or \"2020-2024\")",
+                ],
             ],
-            "required": ["query"]
+            "required": ["query"],
         ]
     }
 
@@ -377,95 +390,84 @@ struct AcademicSearchTool: AgentTool, Sendable {
         guard let query = input["query"], !query.isEmpty else {
             return .error("Missing required parameter: query")
         }
-        let limit = min(Int(input["max_results"] ?? "5") ?? 5, 20)
+        let limit = min(Int(input["max_results"] ?? "10") ?? 10, 20)
+        let year = input["year"]
 
-        var components = URLComponents(
-            string: "https://api.semanticscholar.org/graph/v1/paper/search"
-        )!
-        var items = [
-            URLQueryItem(name: "query", value: query),
-            URLQueryItem(name: "limit", value: String(limit)),
-            URLQueryItem(
-                name: "fields",
-                value: "title,authors,year,abstract,citationCount,externalIds,url"
-            )
-        ]
-        if let year = input["year"], !year.isEmpty {
-            items.append(URLQueryItem(name: "year", value: year))
-        }
-        components.queryItems = items
+        Log.info(Log.search, "Academic search: \"\(query)\" (limit=\(limit), year=\(year ?? "any"))")
 
-        guard let url = components.url else {
-            return .error("Failed to build search URL")
-        }
-
-        var request = URLRequest(url: url)
-        request.timeoutInterval = 15
-
-        let data: Data
-        let response: URLResponse
-        do {
-            (data, response) = try await URLSession.shared.data(for: request)
-        } catch is CancellationError {
-            return .error("Search cancelled")
-        } catch {
-            return .error("Network error: \(error.localizedDescription)")
-        }
-
-        guard let http = response as? HTTPURLResponse else {
-            return .error("Invalid response from Semantic Scholar")
-        }
-        guard http.statusCode == 200 else {
-            if http.statusCode == 429 {
-                return .error("Rate limited by Semantic Scholar. Wait a moment and retry.")
+        // Fan out to all providers concurrently
+        let allResults = await withTaskGroup(
+            of: (String, [AcademicPaper]).self
+        ) { group in
+            for provider in providers {
+                group.addTask {
+                    let papers = await provider.search(query: query, limit: 5, year: year)
+                    return (provider.providerName, papers)
+                }
             }
-            return .error("Semantic Scholar returned HTTP \(http.statusCode)")
+            var collected: [(String, [AcademicPaper])] = []
+            for await result in group {
+                collected.append(result)
+            }
+            return collected
         }
 
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let papers = json["data"] as? [[String: Any]]
-        else {
-            return .error("Failed to parse Semantic Scholar response")
+        // Log which providers responded
+        let respondedProviders = allResults.filter { !$0.1.isEmpty }.map(\.0)
+        let failedProviders = allResults.filter { $0.1.isEmpty }.map(\.0)
+        if !failedProviders.isEmpty {
+            Log.warning(
+                Log.search,
+                "Providers returned no results: \(failedProviders.joined(separator: ", "))"
+            )
         }
 
-        if papers.isEmpty {
+        // Deduplicate across providers
+        let deduplicated = AcademicPaperDeduplicator.deduplicate(allResults)
+
+        if deduplicated.isEmpty {
             return .success("No academic papers found for \"\(query)\".")
         }
 
-        let total = json["total"] as? Int ?? papers.count
-        var out = "Found \(total) papers (showing \(papers.count)):\n"
+        // Rank and take top results
+        let currentYear = Calendar.current.component(.year, from: Date())
+        let ranked = AcademicPaperRanker.rank(deduplicated, limit: limit, currentYear: currentYear)
+
+        Log.info(
+            Log.search,
+            "Academic search returned \(ranked.count) papers from \(respondedProviders.count)/\(providers.count) providers"
+        )
+
+        return .success(formatResults(ranked, query: query, respondedProviders: respondedProviders))
+    }
+
+    // MARK: Private
+
+    private func formatResults(
+        _ papers: [AcademicPaper],
+        query: String,
+        respondedProviders: [String]
+    ) -> String {
+        var out = "Found \(papers.count) papers for \"\(query)\""
+        out += " (sources: \(respondedProviders.joined(separator: ", "))):\n"
 
         for (i, paper) in papers.enumerated() {
-            let title = paper["title"] as? String ?? "Unknown"
-            let year = paper["year"] as? Int
-            let abstract = paper["abstract"] as? String
-            let citations = paper["citationCount"] as? Int
-            let paperURL = paper["url"] as? String
-            let extIds = paper["externalIds"] as? [String: Any]
-            let doi = extIds?["DOI"] as? String
-            let arxiv = extIds?["ArXiv"] as? String
-
-            let authors: String
-            if let list = paper["authors"] as? [[String: Any]] {
-                authors = list.compactMap { $0["name"] as? String }.joined(separator: ", ")
-            } else {
-                authors = "Unknown"
-            }
-
-            out += "\n\(i + 1). \(title)"
-            out += "\n   Authors: \(authors)"
-            if let y = year { out += "\n   Year: \(y)" }
-            if let c = citations { out += " | Citations: \(c)" }
-            if let d = doi { out += "\n   DOI: \(d)" }
-            if let a = arxiv { out += "\n   ArXiv: \(a)" }
-            if let u = paperURL { out += "\n   URL: \(u)" }
-            if let abs = abstract {
+            out += "\n\(i + 1). \(paper.title)"
+            if !paper.authors.isEmpty { out += "\n   Authors: \(paper.authors)" }
+            if let y = paper.year { out += "\n   Year: \(y)" }
+            if let c = paper.citationCount { out += " | Citations: \(c)" }
+            if let v = paper.venue { out += "\n   Venue: \(v)" }
+            if let d = paper.doi { out += "\n   DOI: \(d)" }
+            if let a = paper.arxivId { out += "\n   arXiv: \(a)" }
+            if let u = paper.url { out += "\n   URL: \(u)" }
+            out += "\n   Source: \(paper.source)"
+            if let abs = paper.abstract {
                 out += "\n   Abstract: \(String(abs.prefix(250)))"
                 if abs.count > 250 { out += "..." }
             }
             out += "\n"
         }
 
-        return .success(String(out.prefix(30_000)))
+        return String(out.prefix(30_000))
     }
 }

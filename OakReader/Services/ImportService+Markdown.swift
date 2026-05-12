@@ -112,6 +112,19 @@ extension ImportService {
             Log.error(Log.importer, "Failed to save markdown reference metadata: \(error)")
         }
 
+        // Semantic index for vector search
+        if let service = semanticIndexService {
+            Task {
+                await service.indexItem(
+                    itemId: docId.uuidString,
+                    attachmentType: ItemType.markdown.rawValue,
+                    storageKey: itemStorageKey,
+                    attStorageKey: attStorageKey,
+                    fileName: sourceURL.lastPathComponent
+                )
+            }
+        }
+
         return item
     }
 

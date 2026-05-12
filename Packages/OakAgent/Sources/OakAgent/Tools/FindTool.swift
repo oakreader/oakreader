@@ -57,7 +57,4 @@ public struct FindTool: AgentTool {
         }
     }
 
-    private func shellQuote(_ s: String) -> String {
-        "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'"
-    }
 }

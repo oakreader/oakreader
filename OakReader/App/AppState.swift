@@ -161,9 +161,19 @@ final class AppState {
             do {
                 let embeddingService = EmbeddingService(modelId: embeddingRepo)
                 try await embeddingService.loadModel()
+
+                let semanticDB = try SemanticDatabase()
+                let dimensions = try await embeddingService.embed(text: "test").count
+                let searchEngine = HybridSearchEngine(
+                    semanticDB: semanticDB,
+                    dimensions: UInt32(dimensions)
+                )
+
                 let service = SemanticIndexService.create(
                     embeddingService: embeddingService,
-                    dbQueue: database.dbQueue
+                    semanticDB: semanticDB,
+                    searchEngine: searchEngine,
+                    catalogDBQueue: database.dbQueue
                 )
                 await MainActor.run {
                     self.semanticIndexService = service

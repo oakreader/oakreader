@@ -63,6 +63,8 @@
 	<string>.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>OakReader needs microphone access for Voice AI conversations.</string>
+	<key>NSScreenCaptureUsageDescription</key>
+	<string>OakReader captures system audio to record both sides of your calls.</string>
 	<key>SUFeedURL</key>
 	<string>https://oakreader.github.io/oakreader/appcast.xml</string>
 	<key>SUPublicEDKey</key>

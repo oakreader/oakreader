@@ -652,10 +652,16 @@ final class CLIDatabase {
         }
     }
 
-    /// Fetch semantic chunk records for a set of item IDs (for semantic search result enrichment).
+    /// Fetch indexed item IDs from the separate semantic.db.
     func fetchSemanticChunkItemIds() throws -> Set<String> {
-        try dbQueue.read { db in
-            let ids = try String.fetchAll(db, sql: "SELECT DISTINCT item_id FROM semantic_chunks")
+        let dataDir = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("OakReader", isDirectory: true)
+        let semanticDBURL = dataDir.appendingPathComponent("semantic.db")
+        guard FileManager.default.fileExists(atPath: semanticDBURL.path) else { return [] }
+        let semanticQueue = try DatabaseQueue(path: semanticDBURL.path)
+        return try semanticQueue.read { db in
+            guard try db.tableExists("chunks") else { return [] }
+            let ids = try String.fetchAll(db, sql: "SELECT DISTINCT item_id FROM chunks")
             return Set(ids)
         }
     }

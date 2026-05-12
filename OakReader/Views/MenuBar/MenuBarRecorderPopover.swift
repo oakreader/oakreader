@@ -5,6 +5,9 @@ struct MenuBarRecorderPopover: View {
     let recorder: MenuBarRecorder
 
     @State private var selectedDeviceUID: String?
+    @State private var recordingMode: AudioRecordingService.RecordingMode = {
+        AudioRecordingService.RecordingMode(rawValue: Preferences.shared.recordingMode) ?? .micOnly
+    }()
 
     private var devices: [AudioDevice] {
         AudioDeviceManager.shared.inputDevices
@@ -31,6 +34,24 @@ struct MenuBarRecorderPopover: View {
                     Spacer()
                 }
                 .padding(.horizontal, 4)
+            }
+
+            // Recording mode picker
+            Picker("Mode", selection: $recordingMode) {
+                Text("Mic Only").tag(AudioRecordingService.RecordingMode.micOnly)
+                Text("Mic + System").tag(AudioRecordingService.RecordingMode.micAndSystem)
+            }
+            .pickerStyle(.segmented)
+            .disabled(isRecording || isStopping)
+            .onChange(of: recordingMode) { _, newValue in
+                Preferences.shared.recordingMode = newValue.rawValue
+            }
+
+            if recordingMode == .micAndSystem {
+                Text("Requires screen recording permission to capture system audio.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             // Device picker

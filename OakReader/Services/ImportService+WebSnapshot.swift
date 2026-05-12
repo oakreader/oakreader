@@ -105,6 +105,19 @@ extension ImportService {
             }
         }
 
+        // Semantic index for vector search
+        if let service = semanticIndexService {
+            Task {
+                await service.indexItem(
+                    itemId: docId.uuidString,
+                    attachmentType: ItemType.webSnapshot.rawValue,
+                    storageKey: itemStorageKey,
+                    attStorageKey: attStorageKey,
+                    fileName: sourceURL.lastPathComponent
+                )
+            }
+        }
+
         return item
     }
 
