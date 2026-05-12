@@ -340,8 +340,9 @@ struct PDFContextProvider {
             // Tool usage hint
             parts.append("""
                 You have tools to read document pages (read_document), search within the \
-                document (search_document), and read notes (read_notes). Use them when you \
-                need content beyond the current page shown above.
+                document (search_document), read notes (read_notes), and find conceptually \
+                related items via vector search (search_semantic). Use search_semantic for \
+                thematic queries and search_library for keyword matches.
                 """)
 
             // Abstract (outside document block to not crowd metadata)

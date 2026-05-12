@@ -226,6 +226,7 @@ struct CitationRecord: Codable, FetchableRecord, MutablePersistableRecord, Hasha
     var doi: String?
     var year: Int?
     var containerTitle: String?
+    var abstract: String?
     var createdAt: String
     var updatedAt: String
 
@@ -235,6 +236,7 @@ struct CitationRecord: Codable, FetchableRecord, MutablePersistableRecord, Hasha
         case cslType = "csl_type"
         case doi, year
         case containerTitle = "container_title"
+        case abstract
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }

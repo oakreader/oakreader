@@ -6,6 +6,7 @@ import PDFKit
 @Observable
 final class LibraryStore {
     let database: CatalogDatabase
+    var semanticIndexService: SemanticIndexService?
 
     // Search & filter state
     var searchText: String = ""

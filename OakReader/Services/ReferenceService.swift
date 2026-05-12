@@ -43,6 +43,7 @@ struct ReferenceService {
                 doi: cslItem.DOI,
                 year: cslItem.issued?.year,
                 containerTitle: cslItem.containerTitle,
+                abstract: cslItem.abstract,
                 createdAt: existing?.createdAt ?? now,
                 updatedAt: now
             )

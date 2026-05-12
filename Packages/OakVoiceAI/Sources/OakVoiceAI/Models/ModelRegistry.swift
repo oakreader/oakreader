@@ -86,6 +86,7 @@ public enum ModelComponent: String, Sendable, Codable {
     case tts
     case vad
     case turnDetector
+    case embedding
 }
 
 /// Catalog of known/tested models for each component.
@@ -115,8 +116,12 @@ public enum KnownModels {
         ModelOption(repo: "mlx-community/smart-turn-v3", name: "SmartTurn v3 (endpoint)", sizeLabel: "~30 MB", component: .turnDetector),
     ]
 
+    public static let embedding: [ModelOption] = [
+        ModelOption(repo: "mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ", name: "Qwen3-Embedding 0.6B (4-bit)", sizeLabel: "~400 MB", component: .embedding),
+    ]
+
     /// All known models across all components.
-    public static var all: [ModelOption] { stt + tts + vad + turnDetector }
+    public static var all: [ModelOption] { stt + tts + vad + turnDetector + embedding }
 
     /// Look up models for a given component.
     public static func models(for component: ModelComponent) -> [ModelOption] {
@@ -125,6 +130,7 @@ public enum KnownModels {
         case .tts: return tts
         case .vad: return vad
         case .turnDetector: return turnDetector
+        case .embedding: return embedding
         }
     }
 }

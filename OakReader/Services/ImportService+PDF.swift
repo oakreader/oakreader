@@ -118,6 +118,13 @@ extension ImportService {
             await autoExtractReference(itemId: docId.uuidString, pdfURL: destURL, title: title, author: author, webSourceURL: webSourceURL)
         }
 
+        // Semantic index for vector search
+        if let service = semanticIndexService {
+            Task {
+                await service.indexItem(itemId: docId.uuidString, pdfURL: destURL)
+            }
+        }
+
         return item
     }
 
