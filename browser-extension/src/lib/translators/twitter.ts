@@ -36,7 +36,7 @@ export const twitterTranslator: Translator = {
       '[data-testid="tweetPhoto"] img, [data-testid="videoPlayer"] video[poster]'
     );
     const tweetMediaURL = tweetMediaImg
-      ? (tweetMediaImg as HTMLImageElement).src || (tweetMediaImg as HTMLVideoElement).poster
+      ? (tweetMediaImg as HTMLImageElement).src || (tweetMediaImg as unknown as HTMLVideoElement).poster
       : null;
     const ogImage =
       doc.querySelector<HTMLMetaElement>('meta[property="og:image"]')?.content ?? null;

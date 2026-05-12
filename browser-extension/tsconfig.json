@@ -1,12 +1,20 @@
 {
   "extends": ".wxt/tsconfig.json",
   "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "types": ["chrome"],
     "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
     "skipLibCheck": true,
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
       "@/*": ["./*"]
     }
-  }
+  },
+  "include": ["**/*", ".wxt/wxt.d.ts"]
 }

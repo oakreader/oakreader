@@ -22,7 +22,7 @@ export const youtubeTranslator: Translator = {
 
     const author =
       doc.querySelector("#owner #channel-name a")?.textContent?.trim() ??
-      doc.querySelector<HTMLLinkElement>('link[itemprop="name"]')?.content ??
+      doc.querySelector('link[itemprop="name"]')?.getAttribute("content") ??
       null;
 
     let duration: number | null = null;
