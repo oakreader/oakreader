@@ -1,6 +1,7 @@
 import Foundation
 import PDFKit
 import AppKit
+import OakVoiceAI
 
 // MARK: - Tab Content
 
@@ -75,6 +76,7 @@ final class AppState {
     let coverService = LibraryCoverService()
     let referenceService: ReferenceService
     let importService: ImportService
+    var semanticIndexService: SemanticIndexService?
 
 
 
@@ -143,6 +145,37 @@ final class AppState {
         self.referenceService = ReferenceService(database: database)
         self.importService = ImportService(store: libraryStore, coverService: coverService, referenceService: referenceService)
         startAutosaveTimer()
+
+        // Initialize semantic index service asynchronously
+        Task {
+            let defaultEmbedding = KnownModels.embedding.first?.repo ?? ""
+            let embeddingRepo = Preferences.shared.embeddingModel.isEmpty
+                ? defaultEmbedding
+                : Preferences.shared.embeddingModel
+
+            guard await ModelManager.shared.isDownloaded(embeddingRepo) else {
+                Log.info(Log.semantic, "Embedding model not downloaded, skipping semantic service")
+                return
+            }
+
+            do {
+                let embeddingService = EmbeddingService(modelId: embeddingRepo)
+                try await embeddingService.loadModel()
+                let service = SemanticIndexService.create(
+                    embeddingService: embeddingService,
+                    dbQueue: database.dbQueue
+                )
+                await MainActor.run {
+                    self.semanticIndexService = service
+                    self.importService.semanticIndexService = service
+                    self.libraryStore.semanticIndexService = service
+                }
+                Log.info(Log.semantic, "Semantic index service initialized")
+                await service.backgroundIndexAll()
+            } catch {
+                Log.error(Log.semantic, "Failed to initialize semantic index service: \(error)")
+            }
+        }
     }
 
     // MARK: - Tab Operations

@@ -748,6 +748,46 @@ extension CatalogDatabase {
             """, arguments: [SystemCollectionID.duplicates.uuidString, localUserId, "Duplicates", "square.on.square", 7, now, now])
         }
 
+        migrator.registerMigration("v13-search-index") { db in
+            // Add abstract column to citations for direct search (avoids JSON parsing)
+            try db.alter(table: "citations") { t in
+                t.add(column: "abstract", .text)
+            }
+
+            // Populate abstract from existing csl_json
+            try db.execute(sql: """
+                UPDATE citations
+                SET abstract = json_extract(csl_json, '$.abstract')
+                WHERE json_valid(csl_json) AND json_extract(csl_json, '$.abstract') IS NOT NULL
+            """)
+
+            // Index on container_title for journal searches
+            try db.create(
+                index: "idx_citations_container_title",
+                on: "citations",
+                columns: ["container_title"],
+                ifNotExists: true
+            )
+        }
+
+        migrator.registerMigration("v14-semantic-chunks") { db in
+            try db.create(table: "semantic_chunks") { t in
+                t.column("id", .text).primaryKey()
+                t.column("item_id", .text).notNull().references("items", onDelete: .cascade)
+                t.column("chunk_type", .text).notNull()    // "abstract" or "page"
+                t.column("page_start", .integer)
+                t.column("page_end", .integer)
+                t.column("token_count", .integer)
+                t.column("created_at", .text).notNull()
+                t.column("embedding", .blob)               // raw Float32 bytes
+                t.column("embedding_dim", .integer)         // e.g. 1024
+                t.column("chunk_text", .text)               // original text for excerpts
+                t.column("embedding_model", .text)          // e.g. "mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ"
+                t.column("embedding_provider", .text)       // "local" or future cloud providers
+            }
+            try db.create(index: "idx_semantic_chunks_item_id", on: "semantic_chunks", columns: ["item_id"])
+        }
+
         return migrator
     }
 

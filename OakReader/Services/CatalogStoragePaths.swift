@@ -12,6 +12,11 @@ extension CatalogDatabase {
         dataDirectory.appendingPathComponent("storage", isDirectory: true)
     }
 
+    /// ~/OakReader/vectors/
+    static var vectorsDirectory: URL {
+        dataDirectory.appendingPathComponent("vectors", isDirectory: true)
+    }
+
     /// ~/OakReader/logs/
     static var logsDirectory: URL {
         dataDirectory.appendingPathComponent("logs", isDirectory: true)

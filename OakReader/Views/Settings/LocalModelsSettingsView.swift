@@ -5,6 +5,7 @@ struct LocalModelsSettingsView: View {
     @State private var sttModel: String
     @State private var ttsModel: String
     @State private var vadModel: String
+    @State private var embeddingModel: String
     @State private var hfEndpoint: String
 
     @State private var modelStates: [String: ModelManager.ModelState] = [:]
@@ -17,13 +18,15 @@ struct LocalModelsSettingsView: View {
         let defaultSTT = KnownModels.stt.first?.repo ?? ""
         let defaultTTS = KnownModels.tts.first?.repo ?? ""
         let defaultVAD = KnownModels.vad.first?.repo ?? ""
+        let defaultEmbedding = KnownModels.embedding.first?.repo ?? ""
         _sttModel = State(initialValue: prefs.voiceSTTModel.isEmpty ? defaultSTT : prefs.voiceSTTModel)
         _ttsModel = State(initialValue: prefs.voiceTTSModel.isEmpty ? defaultTTS : prefs.voiceTTSModel)
         _vadModel = State(initialValue: prefs.voiceVADModel.isEmpty ? defaultVAD : prefs.voiceVADModel)
+        _embeddingModel = State(initialValue: prefs.embeddingModel.isEmpty ? defaultEmbedding : prefs.embeddingModel)
         _hfEndpoint = State(initialValue: prefs.hfEndpoint)
     }
 
-    private var allRepos: [String] { [sttModel, ttsModel, vadModel] }
+    private var allRepos: [String] { [sttModel, ttsModel, vadModel, embeddingModel] }
 
     private var allDownloaded: Bool {
         allRepos.allSatisfy { repo in
@@ -36,6 +39,7 @@ struct LocalModelsSettingsView: View {
 
     var body: some View {
         Form {
+            embeddingSection
             sttSection
             ttsSection
             vadSection
@@ -56,6 +60,17 @@ struct LocalModelsSettingsView: View {
     }
 
     // MARK: - Sections
+
+    private var embeddingSection: some View {
+        Section("Embedding (Semantic Search)") {
+            Picker("Model", selection: $embeddingModel) {
+                ForEach(KnownModels.embedding) { option in
+                    Text("\(option.name) (\(option.sizeLabel))").tag(option.repo)
+                }
+            }
+            modelStatusRow(repo: embeddingModel)
+        }
+    }
 
     private var sttSection: some View {
         Section("Speech-to-Text") {
@@ -232,6 +247,7 @@ struct LocalModelsSettingsView: View {
         prefs.voiceSTTModel = sttModel
         prefs.voiceTTSModel = ttsModel
         prefs.voiceVADModel = vadModel
+        prefs.embeddingModel = embeddingModel
         prefs.hfEndpoint = hfEndpoint
     }
 }

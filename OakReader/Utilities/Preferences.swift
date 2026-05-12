@@ -81,6 +81,8 @@ final class Preferences {
         static let elevenLabsVoiceId = "elevenLabsVoiceId"
         static let elevenLabsTTSModelId = "elevenLabsTTSModelId"
         static let elevenLabsSTTModelId = "elevenLabsSTTModelId"
+        // Embedding
+        static let embeddingModel = "embeddingModel"
         // Appearance
         static let appearanceMode = "appearanceMode"
         // External tools
@@ -510,6 +512,13 @@ final class Preferences {
     var hfEndpoint: String {
         get { defaults.string(forKey: Keys.hfEndpoint) ?? "" }
         set { defaults.set(newValue, forKey: Keys.hfEndpoint) }
+    }
+
+    // MARK: - Embedding Model
+
+    var embeddingModel: String {
+        get { defaults.string(forKey: Keys.embeddingModel) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.embeddingModel) }
     }
 
     // MARK: - ElevenLabs Cloud Provider Preferences

@@ -8,6 +8,7 @@ final class ImportService {
     let store: LibraryStore
     let coverService: LibraryCoverService
     let referenceService: ReferenceService
+    var semanticIndexService: SemanticIndexService?
 
     init(store: LibraryStore, coverService: LibraryCoverService, referenceService: ReferenceService) {
         self.store = store
