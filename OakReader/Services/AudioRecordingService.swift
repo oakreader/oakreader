@@ -55,12 +55,11 @@ final class AudioRecordingService {
         guard authStatus == .authorized else {
             if authStatus == .notDetermined {
                 AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in
-                    if granted {
-                        DispatchQueue.main.async {
+                    DispatchQueue.main.async {
+                        SystemPermissionStatus.shared.refresh()
+                        if granted {
                             self?.startRecording(deviceUID: deviceUID, mode: mode)
-                        }
-                    } else {
-                        DispatchQueue.main.async {
+                        } else {
                             self?.lastError = "Microphone access denied. Grant permission in System Settings → Privacy & Security → Microphone."
                             Log.error(Log.audio, "Microphone access denied by user")
                         }

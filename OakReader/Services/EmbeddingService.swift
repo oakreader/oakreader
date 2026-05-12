@@ -114,7 +114,7 @@ actor EmbeddingService {
 
         guard !texts.isEmpty else { return [] }
 
-        return try await container.perform { context -> [[Float]] in
+        let result = try await container.perform { context -> [[Float]] in
             let tokenizer = context.tokenizer
             let model = context.model
             let pooling = context.pooling
@@ -153,6 +153,11 @@ actor EmbeddingService {
             eval(embeddings)
             return embeddings.map { $0.asArray(Float.self) }
         }
+
+        // Release intermediate MLX tensors from this batch
+        Memory.clearCache()
+
+        return result
     }
 
     /// Embed a single text.

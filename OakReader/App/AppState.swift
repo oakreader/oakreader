@@ -77,6 +77,7 @@ final class AppState {
     let referenceService: ReferenceService
     let importService: ImportService
     var semanticIndexService: SemanticIndexService?
+    private var backgroundIndexTask: Task<Void, Never>?
 
 
 
@@ -147,7 +148,7 @@ final class AppState {
         startAutosaveTimer()
 
         // Initialize semantic index service asynchronously
-        Task {
+        backgroundIndexTask = Task {
             let defaultEmbedding = KnownModels.embedding.first?.repo ?? ""
             let embeddingRepo = Preferences.shared.embeddingModel.isEmpty
                 ? defaultEmbedding
@@ -575,5 +576,6 @@ final class AppState {
 
     deinit {
         autosaveTimer?.invalidate()
+        backgroundIndexTask?.cancel()
     }
 }

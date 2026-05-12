@@ -20,6 +20,10 @@ final class AudioMixer: @unchecked Sendable {
         self.windowSize = Int(sampleRate * 0.25)
     }
 
+    /// Maximum buffered samples per source before dropping oldest data.
+    /// At 44100 Hz this is ~10 seconds — far more than the 250ms window needs.
+    private static let maxBufferSamples = 44100 * 10
+
     /// Mix two async audio streams into a single output stream.
     func mix(
         micStream: AsyncStream<AVAudioPCMBuffer>,
@@ -27,33 +31,44 @@ final class AudioMixer: @unchecked Sendable {
     ) -> AsyncStream<AVAudioPCMBuffer> {
         AsyncStream { continuation in
             let mixTask = Task { [weak self] in
-                guard let self else { return }
-
-                // Collect mic audio in background
-                let micTask = Task {
-                    for await buffer in micStream {
-                        self.appendMic(buffer)
-                    }
+                guard let self else {
+                    continuation.finish()
+                    return
                 }
 
-                // Collect system audio in background
-                let sysTask = Task {
-                    for await buffer in systemStream {
-                        self.appendSystem(buffer)
+                await withTaskGroup(of: Void.self) { group in
+                    // Collect mic audio in background
+                    group.addTask {
+                        for await buffer in micStream {
+                            guard !Task.isCancelled else { break }
+                            self.appendMic(buffer)
+                        }
                     }
-                }
 
-                // Periodically produce mixed output windows
-                while !Task.isCancelled {
-                    try? await Task.sleep(nanoseconds: 62_500_000) // 62.5ms (quarter of window)
-
-                    if let mixed = self.drainWindow() {
-                        continuation.yield(mixed)
+                    // Collect system audio in background
+                    group.addTask {
+                        for await buffer in systemStream {
+                            guard !Task.isCancelled else { break }
+                            self.appendSystem(buffer)
+                        }
                     }
-                }
 
-                micTask.cancel()
-                sysTask.cancel()
+                    // Periodically produce mixed output windows
+                    group.addTask {
+                        while !Task.isCancelled {
+                            try? await Task.sleep(nanoseconds: 62_500_000) // 62.5ms
+                            if let mixed = self.drainWindow() {
+                                continuation.yield(mixed)
+                            }
+                        }
+                    }
+
+                    // When any task finishes (streams end or cancellation),
+                    // cancel the rest so the group completes.
+                    // Wait for one completion, then cancel siblings.
+                    _ = await group.next()
+                    group.cancelAll()
+                }
 
                 // Drain remaining
                 if let mixed = self.drainRemaining() {
@@ -77,6 +92,10 @@ final class AudioMixer: @unchecked Sendable {
         let samples = Array(UnsafeBufferPointer(start: data[0], count: count))
         lock.lock()
         micBuffer.append(contentsOf: samples)
+        // Drop oldest samples if buffer grows beyond cap
+        if micBuffer.count > Self.maxBufferSamples {
+            micBuffer.removeFirst(micBuffer.count - Self.maxBufferSamples)
+        }
         lock.unlock()
     }
 
@@ -86,6 +105,9 @@ final class AudioMixer: @unchecked Sendable {
         let samples = Array(UnsafeBufferPointer(start: data[0], count: count))
         lock.lock()
         sysBuffer.append(contentsOf: samples)
+        if sysBuffer.count > Self.maxBufferSamples {
+            sysBuffer.removeFirst(sysBuffer.count - Self.maxBufferSamples)
+        }
         lock.unlock()
     }
 

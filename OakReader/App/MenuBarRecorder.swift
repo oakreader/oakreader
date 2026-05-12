@@ -5,12 +5,14 @@ import SwiftUI
 import UserNotifications
 
 /// Persistent menu bar item with book icon. Shows a context menu for one-click recording.
+@MainActor
 final class MenuBarRecorder: NSObject {
     private var statusItem: NSStatusItem?
     private var selectedDeviceUID: String?
     private var updateTimer: Timer?
     private var postMeetingPanel: NSPanel?
     private let islandController = RecordingIslandController()
+    private let permissionStatus = SystemPermissionStatus.shared
 
     let recordingService = AudioRecordingService()
     let meetingDetection = MeetingDetectionService()
@@ -97,20 +99,15 @@ final class MenuBarRecorder: NSObject {
         statusItem?.menu = menu
     }
 
-    private var micPermission: AVAuthorizationStatus {
-        AVCaptureDevice.authorizationStatus(for: .audio)
-    }
-
-    private var screenRecordingPermission: Bool {
-        CGPreflightScreenCaptureAccess()
-    }
-
     private func buildMenu(into menu: NSMenu) {
+        permissionStatus.refresh()
+
         let currentState = recordingService.state
         let isRecording = currentState == .recording
         let isStarting = currentState == .starting
         let isStopping = currentState == .stopping
-        let micAuthorized = micPermission == .authorized
+        let micAuthorized = permissionStatus.micAuthorized
+        let screenRecordingGranted = permissionStatus.screenRecordingAuthorized
         let currentMode = AudioRecordingService.RecordingMode(rawValue: Preferences.shared.recordingMode) ?? .micOnly
 
         // Permission warnings
@@ -120,7 +117,7 @@ final class MenuBarRecorder: NSObject {
             permItem.image = NSImage(systemSymbolName: "exclamationmark.triangle.fill", accessibilityDescription: nil)
             menu.addItem(permItem)
             menu.addItem(.separator())
-        } else if currentMode == .micAndSystem && !screenRecordingPermission {
+        } else if currentMode == .micAndSystem && !screenRecordingGranted {
             let permItem = NSMenuItem(title: "Screen Recording Access Required", action: #selector(openScreenRecordingPermission), keyEquivalent: "")
             permItem.target = self
             permItem.image = NSImage(systemSymbolName: "exclamationmark.triangle.fill", accessibilityDescription: nil)
@@ -165,7 +162,7 @@ final class MenuBarRecorder: NSObject {
             let recordItem = NSMenuItem(title: "Start Recording", action: #selector(startRecordingAction), keyEquivalent: "r")
             recordItem.target = self
             recordItem.image = NSImage(systemSymbolName: "record.circle", accessibilityDescription: nil)
-            recordItem.isEnabled = micAuthorized && (currentMode != .micAndSystem || screenRecordingPermission)
+            recordItem.isEnabled = micAuthorized && (currentMode != .micAndSystem || screenRecordingGranted)
             menu.addItem(recordItem)
         }
 
@@ -226,17 +223,15 @@ final class MenuBarRecorder: NSObject {
     // MARK: - Permission Actions
 
     @objc private func openMicPermission() {
-        let status = AVCaptureDevice.authorizationStatus(for: .audio)
-        if status == .notDetermined {
-            AVCaptureDevice.requestAccess(for: .audio) { _ in }
+        if permissionStatus.micNotDetermined {
+            permissionStatus.requestMicAccess()
         } else {
-            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_Microphone")!)
+            SystemSettingsPanel.microphone.open()
         }
     }
 
     @objc private func openScreenRecordingPermission() {
-        // Triggers the system permission prompt; on newer macOS opens Settings if already decided.
-        CGRequestScreenCaptureAccess()
+        SystemSettingsPanel.screenRecording.open()
     }
 
     // MARK: - Menu Actions

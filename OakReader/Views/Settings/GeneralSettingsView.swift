@@ -8,8 +8,49 @@ struct GeneralSettingsView: View {
     @AppStorage("globalFontFamily") private var fontFamily: String = "system"
     @AppStorage("globalFontSize") private var fontSize: Double = 14.0
 
+    private let permissionStatus = SystemPermissionStatus.shared
+
     var body: some View {
         Form {
+            // MARK: - Permissions
+            Section("Permissions") {
+                // Microphone
+                LabeledContent("Microphone") {
+                    if permissionStatus.micAuthorized {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                    } else {
+                        Button("Grant Access") {
+                            if permissionStatus.micNotDetermined {
+                                permissionStatus.requestMicAccess()
+                            } else {
+                                SystemSettingsPanel.microphone.open()
+                                permissionStatus.startPolling()
+                            }
+                        }
+                    }
+                }
+
+                // Screen Recording
+                LabeledContent("Screen Recording") {
+                    if permissionStatus.screenRecordingAuthorized {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                    } else {
+                        Button("Grant Access") {
+                            SystemSettingsPanel.screenRecording.open()
+                            permissionStatus.startPolling()
+                        }
+                    }
+                }
+
+                if permissionStatus.allGranted {
+                    Text("All permissions granted")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             Section("Appearance") {
                 Picker("Mode", selection: $appearanceMode) {
                     ForEach(AppearanceMode.allCases) { mode in
@@ -73,6 +114,10 @@ struct GeneralSettingsView: View {
         .formStyle(.grouped)
         .onAppear {
             dataDirectory = dataDirectoryPath()
+            permissionStatus.refresh()
+        }
+        .onDisappear {
+            permissionStatus.stopPolling()
         }
     }
 

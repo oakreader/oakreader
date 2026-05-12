@@ -151,56 +151,59 @@ final class SemanticIndexService: @unchecked Sendable {
     // MARK: - Embed & Store
 
     private func embedAndStore(itemId: String, chunks: [ContentChunker.Chunk], model: String) async {
-        let texts = chunks.map(\.text)
-        let embeddings: [[Float]]
-        do {
-            var allEmbeddings: [[Float]] = []
-            let batchSize = 32
-            for i in stride(from: 0, to: texts.count, by: batchSize) {
-                let batch = Array(texts[i..<min(i + batchSize, texts.count)])
-                let batchEmbeddings = try await embeddingService.embed(texts: batch)
-                allEmbeddings.append(contentsOf: batchEmbeddings)
-            }
-            embeddings = allEmbeddings
-        } catch {
-            Log.error(Log.semantic, "MLX embedding failed for item \(itemId): \(error)")
-            return
-        }
-
-        guard embeddings.count == chunks.count else {
-            Log.error(Log.semantic, "Embedding count mismatch for item \(itemId)")
-            return
-        }
-
         let now = Date().iso8601String
-        do {
-            // Build SemanticChunk records
-            let records = chunks.enumerated().map { i, chunk in
-                SemanticChunk(
-                    id: nil,
-                    itemId: itemId,
-                    chunkType: chunk.type,
-                    pageStart: chunk.pageStart,
-                    pageEnd: chunk.pageEnd,
-                    chunkText: chunk.text,
-                    tokenCount: ContentChunker.estimateTokenCount(chunk.text),
-                    embeddingModel: model,
-                    createdAt: now
-                )
+        let batchSize = 32
+        var totalIndexed = 0
+
+        for batchStart in stride(from: 0, to: chunks.count, by: batchSize) {
+            let batchEnd = min(batchStart + batchSize, chunks.count)
+            let batchChunks = Array(chunks[batchStart..<batchEnd])
+            let batchTexts = batchChunks.map(\.text)
+
+            // Embed this batch
+            let batchEmbeddings: [[Float]]
+            do {
+                batchEmbeddings = try await embeddingService.embed(texts: batchTexts)
+            } catch {
+                Log.error(Log.semantic, "MLX embedding failed for item \(itemId) batch \(batchStart): \(error)")
+                return
             }
 
-            // Insert into semantic.db (returns rowids)
-            let rowids = try semanticDB.insertChunks(records)
-
-            // Add vectors to USearch index
-            for (i, rowid) in rowids.enumerated() {
-                searchEngine.addVector(key: UInt64(bitPattern: rowid), vector: embeddings[i])
+            guard batchEmbeddings.count == batchChunks.count else {
+                Log.error(Log.semantic, "Embedding count mismatch for item \(itemId) batch \(batchStart)")
+                return
             }
+
+            // Insert this batch into DB and index immediately, then release embeddings
+            do {
+                let records = batchChunks.enumerated().map { i, chunk in
+                    SemanticChunk(
+                        id: nil,
+                        itemId: itemId,
+                        chunkType: chunk.type,
+                        pageStart: chunk.pageStart,
+                        pageEnd: chunk.pageEnd,
+                        chunkText: chunk.text,
+                        tokenCount: ContentChunker.estimateTokenCount(chunk.text),
+                        embeddingModel: model,
+                        createdAt: now
+                    )
+                }
+
+                let rowids = try semanticDB.insertChunks(records)
+                for (i, rowid) in rowids.enumerated() {
+                    searchEngine.addVector(key: UInt64(bitPattern: rowid), vector: batchEmbeddings[i])
+                }
+                totalIndexed += batchChunks.count
+            } catch {
+                Log.error(Log.semantic, "Failed to save chunk records for item \(itemId): \(error)")
+                return
+            }
+        }
+
+        if totalIndexed > 0 {
             searchEngine.save()
-
-            Log.info(Log.semantic, "Indexed \(chunks.count) chunks for item \(itemId)")
-        } catch {
-            Log.error(Log.semantic, "Failed to save chunk records for item \(itemId): \(error)")
+            Log.info(Log.semantic, "Indexed \(totalIndexed) chunks for item \(itemId)")
         }
     }
 
