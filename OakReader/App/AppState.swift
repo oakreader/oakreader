@@ -93,6 +93,7 @@ final class AppState {
         if let vm = _libraryChatVM { return vm }
         let vm = ChatViewModel()
         vm.sessionService = ConversationService(database: libraryStore.database)
+        vm.appState = self
         _libraryChatVM = vm
         return vm
     }
