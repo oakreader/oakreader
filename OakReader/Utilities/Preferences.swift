@@ -262,6 +262,10 @@ final class Preferences {
 
     // MARK: - Plugins
 
+    /// Posted when a built-in plugin is toggled. Settings sidebar listens for this
+    /// instead of the blanket UserDefaults.didChangeNotification.
+    static let pluginToggleNotification = Notification.Name("OakReader.pluginToggle")
+
     var disabledPlugins: Set<String> {
         get { Set(defaults.stringArray(forKey: Keys.disabledPlugins) ?? []) }
         set { defaults.set(Array(newValue), forKey: Keys.disabledPlugins) }
@@ -279,6 +283,7 @@ final class Preferences {
             disabled.insert(plugin.rawValue)
         }
         disabledPlugins = disabled
+        NotificationCenter.default.post(name: Self.pluginToggleNotification, object: nil)
     }
 
     // MARK: - External Plugins (PluginManifest-based)

@@ -1,4 +1,5 @@
 import SwiftUI
+import OakVoiceAI
 
 /// Unified settings view with left sidebar list navigation.
 struct SettingsView: View {
@@ -74,12 +75,11 @@ struct SettingsView: View {
     private static let fixedTabs: [Tab] = [.general, .library, .ai, .aiSettings, .localModels, .audio, .characters, .plugins, .youtube]
 
     @State private var selectedTab: Tab = .general
-    @State private var pluginRefresh = false
+    @State private var visibleTabs: [Tab] = Self.buildVisibleTabs()
+    @State private var modelStates = SharedModelStates()
 
-    private var visibleTabs: [Tab] {
-        _ = pluginRefresh
-        var tabs = Self.fixedTabs
-        // Insert enabled plugin tabs after .plugins
+    private static func buildVisibleTabs() -> [Tab] {
+        var tabs = fixedTabs
         let pluginTabs = Plugin.allCases
             .filter { Preferences.shared.isPluginEnabled($0) }
             .map { Tab.tab(for: $0) }
@@ -99,6 +99,8 @@ struct SettingsView: View {
             .navigationSplitViewColumnWidth(min: 140, ideal: 160, max: 200)
         } detail: {
             settingsContent
+                .id(selectedTab)
+                .transition(.identity)
                 .navigationTitle(selectedTab.label)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .toolbar {
@@ -108,13 +110,16 @@ struct SettingsView: View {
                     }
                 }
         }
+        .animation(.none, value: selectedTab)
         .frame(width: 900, height: 620)
-        .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in
-            // If current tab's plugin was disabled, fall back to .plugins
-            if let plugin = selectedTab.plugin, !Preferences.shared.isPluginEnabled(plugin) {
-                selectedTab = .plugins
+        .onReceive(NotificationCenter.default.publisher(for: Preferences.pluginToggleNotification)) { _ in
+            let updated = Self.buildVisibleTabs()
+            if visibleTabs != updated {
+                if let plugin = selectedTab.plugin, !Preferences.shared.isPluginEnabled(plugin) {
+                    selectedTab = .plugins
+                }
+                visibleTabs = updated
             }
-            pluginRefresh.toggle()
         }
     }
 
@@ -128,13 +133,13 @@ struct SettingsView: View {
         case .ai:
             AIProvidersSettingsView()
         case .aiSettings:
-            AISettingsView()
+            AISettingsView(modelStates: modelStates)
         case .localModels:
-            LocalModelsSettingsView()
+            LocalModelsSettingsView(modelStates: modelStates)
         case .audio:
             AudioSettingsView()
         case .characters:
-            CharacterSettingsView()
+            CharacterSettingsView(database: store.database)
         case .plugins:
             PluginManagementView()
         case .youtube:
@@ -144,5 +149,40 @@ struct SettingsView: View {
         case .pluginTranslation:
             TranslationSettingsView()
         }
+    }
+}
+
+// MARK: - Shared Model States
+
+/// Shared model download state observer, used by AISettingsView and LocalModelsSettingsView
+/// so only one observation loop runs regardless of which tab is active.
+@Observable
+final class SharedModelStates {
+    var states: [String: ModelManager.ModelState] = [:]
+    private var observeTask: Task<Void, Never>?
+    private var isObserving = false
+
+    func startIfNeeded() {
+        guard !isObserving else { return }
+        isObserving = true
+        observeTask = Task { [weak self] in
+            for await (repo, state) in ModelManager.shared.stateChanges {
+                await MainActor.run { self?.states[repo] = state }
+            }
+        }
+    }
+
+    func refresh(repos: [String]) {
+        startIfNeeded()
+        Task {
+            for repo in repos {
+                let state = await ModelManager.shared.state(for: repo)
+                await MainActor.run { self.states[repo] = state }
+            }
+        }
+    }
+
+    deinit {
+        observeTask?.cancel()
     }
 }

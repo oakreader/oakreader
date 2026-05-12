@@ -3,13 +3,20 @@ import OakAgent
 import UniformTypeIdentifiers
 
 struct CharacterSettingsView: View {
+    let database: CatalogDatabase
+
     @State private var characters: [Character] = []
     @State private var selectedCharacterId: UUID?
     @State private var voiceLanguage: String
     @State private var liveTranscription: Bool
     @State private var voiceLLMModel: String
+    @State private var errorMessage: String?
 
-    init() {
+    private let service: VoiceCharacterService
+
+    init(database: CatalogDatabase) {
+        self.database = database
+        self.service = VoiceCharacterService(database: database)
         let prefs = Preferences.shared
         _voiceLanguage = State(initialValue: prefs.voiceLanguage)
         _liveTranscription = State(initialValue: prefs.voiceLiveTranscription)
@@ -22,6 +29,13 @@ struct CharacterSettingsView: View {
 
     var body: some View {
         Form {
+            if let errorMessage {
+                Section {
+                    Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
+                }
+            }
+
             defaultsSection
             characterListSection
 
@@ -30,7 +44,7 @@ struct CharacterSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .onAppear { loadCharacters() }
+        .task { await loadCharactersAsync() }
         .onDisappear { save() }
     }
 
@@ -134,52 +148,98 @@ struct CharacterSettingsView: View {
 
     // MARK: - Actions
 
-    private func loadCharacters() {
+    private func loadCharactersAsync() async {
+        let svc = service
         do {
-            let db = try CatalogDatabase()
-            let svc = VoiceCharacterService(database: db)
-            characters = try svc.fetchAllCharacters()
+            let result = try await withCheckedThrowingContinuation { (cont: CheckedContinuation<[Character], Error>) in
+                DispatchQueue.global(qos: .userInitiated).async {
+                    do {
+                        let chars = try svc.fetchAllCharacters()
+                        cont.resume(returning: chars)
+                    } catch {
+                        cont.resume(throwing: error)
+                    }
+                }
+            }
+            characters = result
+            errorMessage = nil
         } catch {
-            // Silently handle
+            errorMessage = "Failed to load characters: \(error.localizedDescription)"
         }
+    }
+
+    private func reloadCharacters() {
+        Task { await loadCharactersAsync() }
     }
 
     private func addCharacter() {
         let colors = ["#5FB236", "#2EA8E5", "#FF8C19", "#A28AE5", "#FF6666", "#E5A02E", "#36B5A0"]
         let color = colors[characters.count % colors.count]
-        do {
-            let db = try CatalogDatabase()
-            let svc = VoiceCharacterService(database: db)
-            let character = try svc.createCharacter(name: "New Character", colorHex: color, language: voiceLanguage)
-            loadCharacters()
-            selectedCharacterId = character.id
-        } catch {
-            // Silently handle
+        Task {
+            do {
+                let svc = service
+                let lang = voiceLanguage
+                let character = try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Character, Error>) in
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        do {
+                            let c = try svc.createCharacter(name: "New Character", colorHex: color, language: lang)
+                            cont.resume(returning: c)
+                        } catch {
+                            cont.resume(throwing: error)
+                        }
+                    }
+                }
+                await loadCharactersAsync()
+                selectedCharacterId = character.id
+            } catch {
+                errorMessage = "Failed to create character: \(error.localizedDescription)"
+            }
         }
     }
 
     private func saveCharacter(_ character: Character) {
-        do {
-            let db = try CatalogDatabase()
-            let svc = VoiceCharacterService(database: db)
-            try svc.updateCharacter(character)
-            loadCharacters()
-        } catch {
-            // Silently handle
+        Task {
+            do {
+                let svc = service
+                try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        do {
+                            try svc.updateCharacter(character)
+                            cont.resume()
+                        } catch {
+                            cont.resume(throwing: error)
+                        }
+                    }
+                }
+                await loadCharactersAsync()
+            } catch {
+                errorMessage = "Failed to save character: \(error.localizedDescription)"
+            }
         }
     }
 
     private func deleteCharacter(_ character: Character) {
-        do {
-            let db = try CatalogDatabase()
-            let svc = VoiceCharacterService(database: db)
-            try svc.deleteCharacter(id: character.id)
-            if selectedCharacterId == character.id {
-                selectedCharacterId = nil
+        let charId = character.id
+        Task {
+            do {
+                let svc = service
+                try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        do {
+                            try svc.deleteCharacter(id: charId)
+                            cont.resume()
+                        } catch {
+                            cont.resume(throwing: error)
+                        }
+                    }
+                }
+                if selectedCharacterId == charId {
+                    selectedCharacterId = nil
+                }
+                await loadCharactersAsync()
+            } catch {
+                errorMessage = "Failed to delete character: \(error.localizedDescription)"
             }
-            loadCharacters()
-        } catch {
-            // Silently handle
         }
     }
 
