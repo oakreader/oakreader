@@ -7,7 +7,12 @@ extension LibraryStore {
 
     var collections: [PDFCollection] {
         _ = revision
-        return (try? fetchAllCollections()) ?? []
+        if let cached = _collectionsCache, cached.revision == revision {
+            return cached.collections
+        }
+        let result = (try? fetchAllCollections()) ?? []
+        _collectionsCache = (revision: revision, collections: result)
+        return result
     }
 
     func findCollection(bySource source: String, sourceKey: String) -> PDFCollection? {

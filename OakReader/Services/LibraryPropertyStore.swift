@@ -7,7 +7,12 @@ extension LibraryStore {
 
     var properties: [PropertyDefinition] {
         _ = revision
-        return (try? fetchAllProperties()) ?? []
+        if let cached = _propertiesCache, cached.revision == revision {
+            return cached.properties
+        }
+        let result = (try? fetchAllProperties()) ?? []
+        _propertiesCache = (revision: revision, properties: result)
+        return result
     }
 
     func fetchAllProperties() throws -> [PropertyDefinition] {
