@@ -1,5 +1,5 @@
 import SwiftUI
-import OakReaderAI
+import OakAI
 
 struct SkillPickerBar: View {
     @Binding var selectedSkill: Skill?

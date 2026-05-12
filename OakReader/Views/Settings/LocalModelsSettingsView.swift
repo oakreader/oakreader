@@ -1,5 +1,5 @@
 import SwiftUI
-import VoiceAgentKit
+import OakVoiceAI
 
 struct LocalModelsSettingsView: View {
     @State private var sttModel: String

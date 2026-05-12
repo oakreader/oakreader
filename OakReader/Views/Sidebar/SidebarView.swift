@@ -1,5 +1,5 @@
 import SwiftUI
-import OakReaderAI
+import OakAI
 
 struct SidebarView: View {
     let viewModel: DocumentViewModel

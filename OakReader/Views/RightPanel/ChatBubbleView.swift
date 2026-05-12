@@ -1,5 +1,5 @@
 import SwiftUI
-import OakReaderAI
+import OakAI
 import Textual
 
 struct ChatBubbleView: View {

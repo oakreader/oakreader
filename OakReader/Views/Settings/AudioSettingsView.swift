@@ -1,7 +1,7 @@
 import AVFoundation
 import CoreAudio
 import SwiftUI
-import VoiceAgentKit
+import OakVoiceAI
 
 struct AudioSettingsView: View {
     @State private var inputDeviceUID: String

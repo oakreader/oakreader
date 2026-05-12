@@ -1,7 +1,7 @@
 import Foundation
-import OakReaderAI
+import OakAI
 
-/// Bridges OakReaderAI's ``ChatEngine`` to the ``LLMService`` protocol.
+/// Bridges OakAI's ``ChatEngine`` to the ``LLMService`` protocol.
 ///
 /// Includes automatic retry with exponential back-off for transient errors
 /// (overloaded, rate-limited, timeout) — only before any response deltas
@@ -83,8 +83,7 @@ public final class ChatEngineBridge: LLMService, @unchecked Sendable {
                             sessionId: sessionId,
                             config: config,
                             skill: skill,
-                            pdfContext: nil,
-                            toolExecutor: nil
+                            pdfContext: nil
                         )
 
                         var gotDelta = false
