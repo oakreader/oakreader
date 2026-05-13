@@ -7,6 +7,9 @@ struct CharacterSettingsView: View {
 
     @State private var characters: [Character] = []
     @State private var selectedCharacterId: UUID?
+    @State private var catalogTemplates: [CharacterTemplate] = []
+    @State private var bundledTemplateNames: Set<String> = []
+    @State private var installedTemplateNames: Set<String> = []
     @State private var voiceLanguage: String
     @State private var liveTranscription: Bool
     @State private var voiceLLMModel: String
@@ -37,6 +40,7 @@ struct CharacterSettingsView: View {
             }
 
             defaultsSection
+            characterCatalogSection
             characterListSection
 
             if let character = selectedCharacter {
@@ -44,7 +48,19 @@ struct CharacterSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .task { await loadCharactersAsync() }
+        .task {
+            reloadCharacterTemplates()
+            await loadCharactersAsync()
+        }
+        .toolbar {
+            ToolbarItem(placement: .automatic) {
+                Button {
+                    openCharactersFolder()
+                } label: {
+                    Label("Open Character Folder", systemImage: "folder")
+                }
+            }
+        }
         .onDisappear { save() }
     }
 
@@ -81,6 +97,72 @@ struct CharacterSettingsView: View {
                 .foregroundStyle(.secondary)
 
             Toggle("Live Transcription", isOn: $liveTranscription)
+        }
+    }
+
+    // MARK: - Character Catalog
+
+    private var characterCatalogSection: some View {
+        Section("Popular Characters for Academic PDFs") {
+            if catalogTemplates.isEmpty {
+                Text("No character templates found.")
+                    .foregroundStyle(.secondary)
+            }
+
+            ForEach(catalogTemplates) { template in
+                HStack(alignment: .top, spacing: 10) {
+                    CharacterAvatarView(
+                        avatar: template.avatar ?? CharacterAvatar(colorHex: template.fallbackColorHex),
+                        initials: template.initials,
+                        size: 34
+                    )
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 6) {
+                            Text(template.displayName)
+                                .font(.body.weight(.semibold))
+                            if let category = template.category, !category.isEmpty {
+                                Text(category)
+                                    .font(.caption2)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Capsule().fill(Color.secondary.opacity(0.14)))
+                            }
+                        }
+
+                        Text(template.description)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+
+                        if !template.previewPrompts.isEmpty {
+                            Text(template.previewPrompts.prefix(2).joined(separator: "  ·  "))
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                                .lineLimit(1)
+                        }
+                    }
+
+                    Spacer(minLength: 8)
+
+                    if installedTemplateNames.contains(template.name) {
+                        Button("Uninstall") {
+                            uninstallTemplate(template)
+                        }
+                        .controlSize(.small)
+                    } else {
+                        Button("Install") {
+                            installTemplate(template)
+                        }
+                        .controlSize(.small)
+                    }
+                }
+                .padding(.vertical, 3)
+            }
+
+            Text("Install a character to add it to Voice AI. Personal character packs can be dropped into ~/OakReader/agent/characters.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -148,6 +230,37 @@ struct CharacterSettingsView: View {
 
     // MARK: - Actions
 
+    private func reloadCharacterTemplates() {
+        var sources: [(url: URL, bundled: Bool)] = []
+        if let bundled = Bundle.main.url(forResource: "character", withExtension: nil) {
+            sources.append((bundled, true))
+        } else {
+            // Development fallback when running from Xcode without bundled resources.
+            sources.append((URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("character"), true))
+        }
+        sources.append((CharacterTemplateLoader.installedDir, false))
+
+        let loaded = CharacterTemplateLoader.loadTemplates(from: sources)
+        var byName: [String: CharacterTemplate] = [:]
+        for template in loaded {
+            // Installed personal templates override bundled templates with the same name.
+            if byName[template.name] == nil || !template.isBundled {
+                byName[template.name] = template
+            }
+        }
+        catalogTemplates = byName.values.sorted {
+            if $0.popularity != $1.popularity { return $0.popularity > $1.popularity }
+            return $0.displayName < $1.displayName
+        }
+        bundledTemplateNames = Set(loaded.filter(\.isBundled).map(\.name))
+        refreshInstalledTemplateNames()
+    }
+
+    private func refreshInstalledTemplateNames() {
+        installedTemplateNames = CharacterTemplateLoader.scanInstalledNames()
+            .union(characters.compactMap { $0.config.sourceTemplateId })
+    }
+
     private func loadCharactersAsync() async {
         let svc = service
         do {
@@ -162,6 +275,7 @@ struct CharacterSettingsView: View {
                 }
             }
             characters = result
+            refreshInstalledTemplateNames()
             errorMessage = nil
         } catch {
             errorMessage = "Failed to load characters: \(error.localizedDescription)"
@@ -170,6 +284,91 @@ struct CharacterSettingsView: View {
 
     private func reloadCharacters() {
         Task { await loadCharactersAsync() }
+    }
+
+    private func installTemplate(_ template: CharacterTemplate) {
+        Task {
+            do {
+                try CharacterTemplateLoader.install(template)
+
+                let alreadyExists = characters.contains { $0.config.sourceTemplateId == template.name }
+                if !alreadyExists {
+                    let svc = service
+                    let language = template.language ?? voiceLanguage
+                    let existingCharacter = characters.first { $0.name == template.displayName }
+                    let character = try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Character, Error>) in
+                        DispatchQueue.global(qos: .userInitiated).async {
+                            do {
+                                var installed: Character
+                                if let existingCharacter {
+                                    installed = existingCharacter
+                                } else {
+                                    installed = try svc.createCharacter(
+                                        name: template.displayName,
+                                        colorHex: template.avatar?.colorHex ?? template.fallbackColorHex,
+                                        language: language
+                                    )
+                                }
+                                installed.config.avatar = template.avatar ?? installed.config.avatar
+                                installed.config.systemPrompt = template.systemPrompt
+                                installed.config.personaPrompt = template.personaPrompt
+                                installed.config.agentPrompt = template.agentPrompt
+                                installed.config.voicePrompt = template.voicePrompt
+                                installed.config.language = template.language ?? installed.config.language
+                                installed.config.llmModel = template.llmModel ?? ""
+                                installed.config.ttsVoice = template.ttsVoice ?? .init()
+                                installed.config.transcription = template.transcription
+                                installed.config.sourceTemplateId = template.name
+                                try svc.updateCharacter(installed)
+                                cont.resume(returning: installed)
+                            } catch {
+                                cont.resume(throwing: error)
+                            }
+                        }
+                    }
+                    selectedCharacterId = character.id
+                }
+
+                reloadCharacterTemplates()
+                await loadCharactersAsync()
+            } catch {
+                errorMessage = "Failed to install character: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func uninstallTemplate(_ template: CharacterTemplate) {
+        Task {
+            do {
+                try CharacterTemplateLoader.uninstall(templateName: template.name)
+                let svc = service
+                let ids = characters.filter { $0.config.sourceTemplateId == template.name }.map(\.id)
+                try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        do {
+                            for id in ids {
+                                try svc.deleteCharacter(id: id)
+                            }
+                            cont.resume()
+                        } catch {
+                            cont.resume(throwing: error)
+                        }
+                    }
+                }
+                if let selectedCharacterId, ids.contains(selectedCharacterId) {
+                    self.selectedCharacterId = nil
+                }
+                reloadCharacterTemplates()
+                await loadCharactersAsync()
+            } catch {
+                errorMessage = "Failed to uninstall character: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func openCharactersFolder() {
+        try? FileManager.default.createDirectory(at: CharacterTemplateLoader.installedDir, withIntermediateDirectories: true)
+        NSWorkspace.shared.open(CharacterTemplateLoader.installedDir)
     }
 
     private func addCharacter() {
@@ -442,5 +641,181 @@ private struct CharacterDetailEditor: View {
         } catch {
             referenceAudioImportError = "Could not import reference audio: \(error.localizedDescription)"
         }
+    }
+}
+
+// MARK: - Character Template Catalog
+
+private struct CharacterTemplate: Identifiable {
+    let name: String
+    let displayName: String
+    let description: String
+    let category: String?
+    let popularity: Int
+    let language: String?
+    let llmModel: String?
+    let avatar: CharacterAvatar?
+    let ttsVoice: CharacterTTSVoice?
+    let transcription: CharacterTranscriptionSettings?
+    let previewPrompts: [String]
+    let systemPrompt: String
+    let personaPrompt: String?
+    let agentPrompt: String?
+    let voicePrompt: String?
+    let sourceDir: URL
+    let isBundled: Bool
+
+    var id: String { name }
+
+    var initials: String {
+        let words = displayName.split(separator: " ")
+        let letters = words.prefix(2).compactMap { $0.first }
+        return letters.isEmpty ? "?" : String(letters).uppercased()
+    }
+
+    var fallbackColorHex: String {
+        let colors = ["#5FB236", "#2EA8E5", "#FF8C19", "#A28AE5", "#FF6666", "#E5A02E", "#36B5A0"]
+        let idx = abs(name.hashValue) % colors.count
+        return colors[idx]
+    }
+}
+
+private struct CharacterTemplateManifest: Decodable {
+    let name: String
+    let displayName: String?
+    let description: String?
+    let category: String?
+    let popularity: Int?
+    let language: String?
+    let llmModel: String?
+    let avatar: CharacterAvatar?
+    let ttsVoice: CharacterTTSVoice?
+    let transcription: CharacterTranscriptionSettings?
+    let previewPrompts: [String]?
+    let systemPrompt: String?
+    let personaPrompt: String?
+    let agentPrompt: String?
+    let voicePrompt: String?
+}
+
+private enum CharacterTemplateLoader {
+    static let installedDir: URL = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent("OakReader/agent/characters", isDirectory: true)
+
+    static func loadTemplates(from sources: [(url: URL, bundled: Bool)]) -> [CharacterTemplate] {
+        sources.flatMap { loadTemplates(in: $0.url, bundled: $0.bundled) }
+    }
+
+    static func scanInstalledNames() -> Set<String> {
+        let fm = FileManager.default
+        guard let entries = try? fm.contentsOfDirectory(
+            at: installedDir,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else { return [] }
+
+        return Set(entries.compactMap { entry in
+            var isDir: ObjCBool = false
+            guard fm.fileExists(atPath: entry.path, isDirectory: &isDir), isDir.boolValue else { return nil }
+            guard fm.fileExists(atPath: entry.appendingPathComponent("character.json").path) else { return nil }
+            return entry.lastPathComponent
+        })
+    }
+
+    static func install(_ template: CharacterTemplate) throws {
+        let fm = FileManager.default
+        try fm.createDirectory(at: installedDir, withIntermediateDirectories: true)
+        let destDir = installedDir.appendingPathComponent(template.name, isDirectory: true)
+
+        if template.sourceDir.standardizedFileURL == destDir.standardizedFileURL {
+            return
+        }
+
+        if fm.fileExists(atPath: destDir.path) {
+            try fm.removeItem(at: destDir)
+        }
+        try fm.copyItem(at: template.sourceDir, to: destDir)
+    }
+
+    static func uninstall(templateName: String) throws {
+        let destDir = installedDir.appendingPathComponent(templateName, isDirectory: true)
+        if FileManager.default.fileExists(atPath: destDir.path) {
+            try FileManager.default.removeItem(at: destDir)
+        }
+    }
+
+    private static func loadTemplates(in root: URL, bundled: Bool) -> [CharacterTemplate] {
+        let fm = FileManager.default
+        var isDir: ObjCBool = false
+        guard fm.fileExists(atPath: root.path, isDirectory: &isDir), isDir.boolValue else { return [] }
+
+        let rootManifest = root.appendingPathComponent("character.json")
+        if fm.fileExists(atPath: rootManifest.path), let template = loadTemplate(from: rootManifest, sourceDir: root, bundled: bundled) {
+            return [template]
+        }
+
+        guard let entries = try? fm.contentsOfDirectory(
+            at: root,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else { return [] }
+
+        return entries.compactMap { entry in
+            var entryIsDir: ObjCBool = false
+            guard fm.fileExists(atPath: entry.path, isDirectory: &entryIsDir), entryIsDir.boolValue else { return nil }
+            let manifestURL = entry.appendingPathComponent("character.json")
+            guard fm.fileExists(atPath: manifestURL.path) else { return nil }
+            return loadTemplate(from: manifestURL, sourceDir: entry, bundled: bundled)
+        }
+    }
+
+    private static func loadTemplate(from url: URL, sourceDir: URL, bundled: Bool) -> CharacterTemplate? {
+        guard let data = try? Data(contentsOf: url),
+              let manifest = try? JSONDecoder().decode(CharacterTemplateManifest.self, from: data),
+              isValidName(manifest.name) else {
+            return nil
+        }
+
+        let systemPrompt = manifest.systemPrompt?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let personaPrompt = manifest.personaPrompt?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let agentPrompt = manifest.agentPrompt?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let voicePrompt = manifest.voicePrompt?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !systemPrompt.isEmpty || !(personaPrompt ?? "").isEmpty || !(agentPrompt ?? "").isEmpty || !(voicePrompt ?? "").isEmpty else {
+            return nil
+        }
+
+        return CharacterTemplate(
+            name: manifest.name,
+            displayName: manifest.displayName ?? displayName(for: manifest.name),
+            description: manifest.description ?? "",
+            category: manifest.category,
+            popularity: manifest.popularity ?? 0,
+            language: manifest.language,
+            llmModel: manifest.llmModel,
+            avatar: manifest.avatar,
+            ttsVoice: manifest.ttsVoice,
+            transcription: manifest.transcription,
+            previewPrompts: manifest.previewPrompts ?? [],
+            systemPrompt: systemPrompt,
+            personaPrompt: personaPrompt,
+            agentPrompt: agentPrompt,
+            voicePrompt: voicePrompt,
+            sourceDir: sourceDir,
+            isBundled: bundled
+        )
+    }
+
+    private static func displayName(for name: String) -> String {
+        name.split(separator: "-").map { $0.capitalized }.joined(separator: " ")
+    }
+
+    private static func isValidName(_ name: String) -> Bool {
+        guard !name.isEmpty, name.count <= 64, !name.hasPrefix("-"), !name.hasSuffix("-"), !name.contains("--") else {
+            return false
+        }
+        let allowed = CharacterSet.lowercaseLetters
+            .union(.decimalDigits)
+            .union(CharacterSet(charactersIn: "-"))
+        return name.unicodeScalars.allSatisfy { allowed.contains($0) }
     }
 }

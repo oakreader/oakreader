@@ -4,18 +4,28 @@ import Foundation
 
 struct CharacterConfig: Codable, Equatable {
     var avatar: CharacterAvatar
+    /// Legacy/shared prompt fallback. New character packs should prefer personaPrompt + agentPrompt/voicePrompt.
     var systemPrompt: String
+    var personaPrompt: String?
+    var agentPrompt: String?
+    var voicePrompt: String?
     var language: String
     var llmModel: String
     var ttsVoice: CharacterTTSVoice
+    var transcription: CharacterTranscriptionSettings?
     var referenceAudio: CharacterReferenceAudio
+    var sourceTemplateId: String?
 
     static let `default` = CharacterConfig(
         avatar: .init(),
         systemPrompt: "",
+        personaPrompt: nil,
+        agentPrompt: nil,
+        voicePrompt: nil,
         language: "en",
         llmModel: "",
         ttsVoice: .init(),
+        transcription: nil,
         referenceAudio: .init()
     )
 }
@@ -57,6 +67,24 @@ struct CharacterTTSVoice: Codable, Equatable {
 
     var isEmpty: Bool {
         provider.isEmpty && voiceId.isEmpty
+    }
+}
+
+// MARK: - Transcription
+
+struct CharacterTranscriptionSettings: Codable, Equatable {
+    var provider: String
+    var modelId: String
+    var live: Bool?
+
+    init(provider: String = "", modelId: String = "", live: Bool? = nil) {
+        self.provider = provider
+        self.modelId = modelId
+        self.live = live
+    }
+
+    var isEmpty: Bool {
+        provider.isEmpty && modelId.isEmpty && live == nil
     }
 }
 
@@ -107,9 +135,29 @@ struct Character: Identifiable, Hashable {
 
     var avatar: CharacterAvatar { config.avatar }
     var systemPrompt: String { config.systemPrompt }
+    var personaPrompt: String { config.personaPrompt ?? "" }
+    var agentPrompt: String { config.agentPrompt ?? "" }
+    var voicePrompt: String { config.voicePrompt ?? "" }
     var language: String { config.language }
+
+    var effectiveVoicePrompt: String {
+        let parts = [personaPrompt, voicePrompt]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        if !parts.isEmpty { return parts.joined(separator: "\n\n") }
+        return systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var effectiveAgentPrompt: String {
+        let parts = [personaPrompt, agentPrompt]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        if !parts.isEmpty { return parts.joined(separator: "\n\n") }
+        return systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
     var llmModel: String { config.llmModel }
     var ttsVoice: CharacterTTSVoice { config.ttsVoice }
+    var transcriptionSettings: CharacterTranscriptionSettings { config.transcription ?? .init() }
     var referenceAudio: CharacterReferenceAudio { config.referenceAudio }
 
     var initials: String {
