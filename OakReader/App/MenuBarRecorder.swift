@@ -311,12 +311,16 @@ final class MenuBarRecorder: NSObject {
         switch state {
         case .starting:
             if lastDisplayedState != .starting {
-                button.title = " Starting…"
+                button.image = Self.idleIcon
+                button.imagePosition = .imageOnly
+                button.contentTintColor = .systemRed
+                button.title = ""
             }
         case .recording:
             let time = recordingService.formattedElapsedTime
             if lastDisplayedState != .recording {
-                button.image = Self.recordingIcon
+                button.image = Self.idleIcon
+                button.imagePosition = .imageLeading
                 button.contentTintColor = .systemRed
                 // Show island now that recording is confirmed running
                 let mode = AudioRecordingService.RecordingMode(rawValue: Preferences.shared.recordingMode) ?? .micOnly
@@ -324,15 +328,19 @@ final class MenuBarRecorder: NSObject {
                 islandController.model.inputDeviceName = resolveDeviceName(uid: selectedDeviceUID)
                 islandController.show()
             }
-            button.title = " \(time)"
+            button.title = time
             islandController.model.elapsedTime = time
         case .stopping:
             if lastDisplayedState != .stopping {
-                button.title = " Saving…"
+                button.image = Self.idleIcon
+                button.imagePosition = .imageOnly
+                button.contentTintColor = .systemRed
+                button.title = ""
             }
         case .idle:
             if lastDisplayedState != .idle {
                 button.image = Self.idleIcon
+                button.imagePosition = .imageOnly
                 button.contentTintColor = meetingDetection.detectedMeeting != nil ? .systemOrange : nil
                 button.title = ""
                 // Hide island if recording ended unexpectedly (error/stream end)
