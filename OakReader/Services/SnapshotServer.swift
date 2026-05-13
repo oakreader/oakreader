@@ -328,15 +328,14 @@ final class SnapshotServer {
 
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            let item = self.importService.importWebSnapshot(from: tempURL, originalPageURL: originalURL, title: payload.title)
+            let item = self.importService.importWebSnapshot(
+                from: tempURL,
+                originalPageURL: originalURL,
+                title: payload.title,
+                contentMarkdown: payload.markdown
+            )
             try? FileManager.default.removeItem(at: tempURL)
             if let item {
-                // Save extracted markdown alongside snapshot HTML
-                if let markdown = payload.markdown, !markdown.isEmpty {
-                    let mdURL = item.fileURL.deletingLastPathComponent()
-                        .appendingPathComponent("content.md")
-                    try? markdown.write(to: mdURL, atomically: true, encoding: .utf8)
-                }
                 self.assignToCollection(item: item, collectionId: payload.collectionId)
                 self.assignTags(item: item, tagOptionIds: payload.tagOptionIds)
                 self.createAndAssignNewTags(item: item, newTags: payload.newTags)
