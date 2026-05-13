@@ -80,11 +80,6 @@ final class Preferences {
         static let elevenLabsVoiceId = "elevenLabsVoiceId"
         static let elevenLabsTTSModelId = "elevenLabsTTSModelId"
         static let elevenLabsSTTModelId = "elevenLabsSTTModelId"
-        // Recording
-        static let autoTranscribeAfterMeeting = "autoTranscribeAfterMeeting"
-        static let showPostMeetingDialog = "showPostMeetingDialog"
-        static let recordingMode = "recordingMode"
-        static let autoSummarizeAfterTranscription = "autoSummarizeAfterTranscription"
         // Embedding
         static let embeddingModel = "embeddingModel"
         // Appearance
@@ -580,29 +575,4 @@ final class Preferences {
         set { defaults.set(newValue, forKey: Keys.ytDlpLastVersionCheck) }
     }
 
-    // MARK: - Recording Preferences
-
-    /// Automatically transcribe recordings after meetings end.
-    var autoTranscribeAfterMeeting: Bool {
-        get { defaults.bool(forKey: Keys.autoTranscribeAfterMeeting) }
-        set { defaults.set(newValue, forKey: Keys.autoTranscribeAfterMeeting) }
-    }
-
-    /// Show the post-meeting dialog when a meeting ends.
-    var showPostMeetingDialog: Bool {
-        get { defaults.object(forKey: Keys.showPostMeetingDialog) as? Bool ?? true }
-        set { defaults.set(newValue, forKey: Keys.showPostMeetingDialog) }
-    }
-
-    /// Recording mode: "micOnly" or "micAndSystem".
-    var recordingMode: String {
-        get { defaults.string(forKey: Keys.recordingMode) ?? "micOnly" }
-        set { defaults.set(newValue, forKey: Keys.recordingMode) }
-    }
-
-    /// Automatically generate an AI summary after transcription completes.
-    var autoSummarizeAfterTranscription: Bool {
-        get { defaults.bool(forKey: Keys.autoSummarizeAfterTranscription) }
-        set { defaults.set(newValue, forKey: Keys.autoSummarizeAfterTranscription) }
-    }
 }
