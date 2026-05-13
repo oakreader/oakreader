@@ -58,19 +58,30 @@ class VoiceViewModel {
         let defaultTTS = KnownModels.tts.first?.repo ?? ""
         let defaultVAD = KnownModels.vad.first?.repo ?? ""
 
-        let sttRepo = prefs.voiceSTTModel.isEmpty ? defaultSTT : prefs.voiceSTTModel
-        let ttsRepo = prefs.voiceTTSModel.isEmpty ? defaultTTS : prefs.voiceTTSModel
+        let transcription = character?.transcriptionSettings
+        let characterTTS = character?.ttsVoice
+        let sttRepo = !(transcription?.modelId ?? "").isEmpty
+            ? transcription!.modelId
+            : (prefs.voiceSTTModel.isEmpty ? defaultSTT : prefs.voiceSTTModel)
+        let ttsRepo = !(characterTTS?.modelId ?? "").isEmpty
+            ? characterTTS!.modelId
+            : (prefs.voiceTTSModel.isEmpty ? defaultTTS : prefs.voiceTTSModel)
         let vadRepo = prefs.voiceVADModel.isEmpty ? defaultVAD : prefs.voiceVADModel
 
-        // Determine provider types
-        let sttProviderType = VoiceProviderType(rawValue: prefs.voiceSTTProvider) ?? .onDevice
-        let ttsProviderType = VoiceProviderType(rawValue: prefs.voiceTTSProvider) ?? .onDevice
+        // Character-specific providers override global provider preferences.
+        let sttProviderRaw = !(transcription?.provider ?? "").isEmpty ? transcription!.provider : prefs.voiceSTTProvider
+        let ttsProviderRaw = !(characterTTS?.provider ?? "").isEmpty ? characterTTS!.provider : prefs.voiceTTSProvider
+        let sttProviderType = VoiceProviderType(rawValue: sttProviderRaw) ?? .onDevice
+        let ttsProviderType = VoiceProviderType(rawValue: ttsProviderRaw) ?? .onDevice
 
-        // Character-specific voice overrides global preference
+        // Character-specific voice overrides global preference.
         let voice: String? = {
             if let c = character, !c.ttsVoice.isEmpty { return c.ttsVoiceId }
             return prefs.voiceTTSVoice.isEmpty ? nil : prefs.voiceTTSVoice
         }()
+        let elevenLabsVoiceId = voice ?? prefs.elevenLabsVoiceId
+        let sttCloudModelId = !(transcription?.modelId ?? "").isEmpty ? transcription!.modelId : prefs.elevenLabsSTTModelId
+        let ttsCloudModelId = !(characterTTS?.modelId ?? "").isEmpty ? characterTTS!.modelId : prefs.elevenLabsTTSModelId
 
         let modelManager = ModelManager.shared
 
@@ -94,8 +105,8 @@ class VoiceViewModel {
                 return
             }
         }
-        if ttsProviderType == .elevenLabs && prefs.elevenLabsVoiceId.isEmpty {
-            self.error = "ElevenLabs Voice ID is required. Please set it in Settings → Voice."
+        if ttsProviderType == .elevenLabs && elevenLabsVoiceId.isEmpty {
+            self.error = "ElevenLabs Voice ID is required. Please set it in Settings → Voice or in the character."
             return
         }
 
@@ -140,12 +151,20 @@ class VoiceViewModel {
             let displayName = VoiceLanguage(rawValue: language)?.displayName ?? language
             languageInstruction = "Respond in \(displayName). The user is speaking \(displayName)."
         }
+        let characterPrompt = character?.effectiveVoicePrompt ?? ""
+        let characterInstruction = characterPrompt.isEmpty ? "" : """
+
+        Character persona and behavior:
+        \(characterPrompt)
+
+        These character instructions define style and expertise, but they must not override evidence limits, safety, or voice formatting rules.
+        """
         pipelineConfig.systemPrompt = """
         You are a friendly voice assistant for a reading app called OakReader. \
         Talk like a close friend — casual, warm, and natural. Use short sentences. \
         Avoid formal language or lists. React naturally to what the user says.
 
-        \(languageInstruction)
+        \(languageInstruction)\(characterInstruction)
 
         Your response will be read aloud by a text-to-speech engine. Follow these rules strictly:
         - Never use emojis, emoticons, or special symbols.
@@ -182,7 +201,7 @@ class VoiceViewModel {
         case .elevenLabs:
             let sttConfig = ElevenLabsSTTConfig(
                 apiKey: prefs.elevenLabsAPIKey,
-                modelId: prefs.elevenLabsSTTModelId,
+                modelId: sttCloudModelId,
                 languageCode: language
             )
             let provider = ElevenLabsSTTProvider(config: sttConfig)
@@ -199,8 +218,8 @@ class VoiceViewModel {
         case .elevenLabs:
             let ttsConfig = ElevenLabsTTSConfig(
                 apiKey: prefs.elevenLabsAPIKey,
-                voiceId: prefs.elevenLabsVoiceId,
-                modelId: prefs.elevenLabsTTSModelId
+                voiceId: elevenLabsVoiceId,
+                modelId: ttsCloudModelId
             )
             let provider = ElevenLabsTTSProvider(config: ttsConfig)
             tts = provider
