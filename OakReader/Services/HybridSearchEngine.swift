@@ -1,5 +1,8 @@
 import Foundation
 import USearch
+#if SWIFT_PACKAGE
+import ObjCExceptionCatcher
+#endif
 
 /// Hybrid search combining USearch HNSW vector index + FTS5 BM25 keyword search,
 /// merged via Reciprocal Rank Fusion (RRF).
@@ -33,7 +36,15 @@ final class HybridSearchEngine: @unchecked Sendable {
             multi: false
         )
         if FileManager.default.fileExists(atPath: indexPath) {
-            idx.load(path: indexPath)
+            let path = indexPath
+            let loaded = ObjCExceptionCatcher.perform({
+                idx.load(path: path)
+            }, error: { exception in
+                Log.warning(Log.semantic, "Corrupt vector index: \(exception.reason ?? exception.name.rawValue), rebuilding")
+            })
+            if !loaded {
+                try? FileManager.default.removeItem(atPath: indexPath)
+            }
         }
         // Pre-allocate capacity so USearch has thread slots for add/search.
         let currentLength = idx.length
