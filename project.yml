@@ -61,6 +61,9 @@ targets:
         excludes:
           - "**/Info.plist"
           - "**/*.entitlements"
+    resources:
+      - path: skills
+      - path: character
     dependencies:
       - package: OakAI
       - package: OakAgent
