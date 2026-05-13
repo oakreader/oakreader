@@ -593,6 +593,102 @@ private struct CharacterDetailEditor: View {
         }
     }
 
+    private var voiceProviderSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Voice Overrides")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Picker("Transcription Provider", selection: transcriptionProviderBinding) {
+                Text("Same as Default").tag("")
+                ForEach(VoiceProviderType.allCases, id: \.rawValue) { provider in
+                    Text(provider.displayName).tag(provider.rawValue)
+                }
+            }
+
+            if transcriptionProviderBinding.wrappedValue == VoiceProviderType.onDevice.rawValue {
+                Picker("Transcription Model", selection: transcriptionModelBinding) {
+                    Text("Same as Default").tag("")
+                    ForEach(KnownModels.stt) { option in
+                        Text("\(option.name) (\(option.sizeLabel))").tag(option.repo)
+                    }
+                }
+            } else if transcriptionProviderBinding.wrappedValue == VoiceProviderType.elevenLabs.rawValue {
+                Picker("Transcription Model", selection: transcriptionModelBinding) {
+                    Text("Same as Default").tag("")
+                    Text("Scribe v2 Realtime").tag("scribe_v2_realtime")
+                }
+            }
+
+            Divider()
+
+            Picker("Speech Provider", selection: ttsProviderBinding) {
+                Text("Same as Default").tag("")
+                ForEach(VoiceProviderType.allCases, id: \.rawValue) { provider in
+                    Text(provider.displayName).tag(provider.rawValue)
+                }
+            }
+
+            if ttsProviderBinding.wrappedValue == VoiceProviderType.onDevice.rawValue {
+                Picker("Speech Model", selection: $config.ttsVoice.modelId) {
+                    Text("Same as Default").tag("")
+                    ForEach(KnownModels.tts) { option in
+                        Text("\(option.name) (\(option.sizeLabel))").tag(option.repo)
+                    }
+                }
+            } else if ttsProviderBinding.wrappedValue == VoiceProviderType.elevenLabs.rawValue {
+                TextField("Voice ID (optional; default if empty)", text: $config.ttsVoice.voiceId)
+                    .textFieldStyle(.roundedBorder)
+
+                Picker("Speech Model", selection: $config.ttsVoice.modelId) {
+                    Text("Same as Default").tag("")
+                    Text("Turbo v2.5 (fastest)").tag("eleven_turbo_v2_5")
+                    Text("Flash v2.5 (fast)").tag("eleven_flash_v2_5")
+                    Text("Multilingual v2 (quality)").tag("eleven_multilingual_v2")
+                }
+            }
+        }
+    }
+
+    private var transcriptionProviderBinding: Binding<String> {
+        Binding(
+            get: { config.transcription?.provider ?? "" },
+            set: { value in
+                var transcription = config.transcription ?? .init()
+                transcription.provider = value
+                if value.isEmpty {
+                    transcription.modelId = ""
+                    transcription.live = nil
+                }
+                config.transcription = transcription.isEmpty ? nil : transcription
+            }
+        )
+    }
+
+    private var transcriptionModelBinding: Binding<String> {
+        Binding(
+            get: { config.transcription?.modelId ?? "" },
+            set: { value in
+                var transcription = config.transcription ?? .init()
+                transcription.modelId = value
+                config.transcription = transcription.isEmpty ? nil : transcription
+            }
+        )
+    }
+
+    private var ttsProviderBinding: Binding<String> {
+        Binding(
+            get: { config.ttsVoice.provider },
+            set: { value in
+                config.ttsVoice.provider = value
+                if value.isEmpty {
+                    config.ttsVoice.modelId = ""
+                    config.ttsVoice.voiceId = ""
+                }
+            }
+        )
+    }
+
     private func importReferenceAudio(from url: URL) {
         let didAccess = url.startAccessingSecurityScopedResource()
         defer {

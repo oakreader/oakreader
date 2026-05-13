@@ -76,7 +76,7 @@ class VoiceViewModel {
 
         // Character-specific voice overrides global preference.
         let voice: String? = {
-            if let c = character, !c.ttsVoice.isEmpty { return c.ttsVoiceId }
+            if let c = character, !c.ttsVoiceId.isEmpty { return c.ttsVoiceId }
             return prefs.voiceTTSVoice.isEmpty ? nil : prefs.voiceTTSVoice
         }()
         let elevenLabsVoiceId = voice ?? prefs.elevenLabsVoiceId
