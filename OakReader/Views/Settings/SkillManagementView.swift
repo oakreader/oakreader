@@ -317,7 +317,7 @@ private enum SkillListFilter: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .all: return "All"
-        case .installed: return "Installed"
+        case .installed: return "Added"
         case .available: return "Available"
         case .needsSetup: return "Needs Setup"
         }
@@ -432,7 +432,7 @@ private struct SkillCatalogItem: View {
                         .offset(x: -4, y: 5)
                 }
             }
-            .help(hasMissingSetup ? "Installed, setup required" : "Installed")
+            .help(hasMissingSetup ? "Added, setup required" : "Added")
         } else {
             Button {
                 onInstall()
@@ -447,7 +447,7 @@ private struct SkillCatalogItem: View {
                     )
             }
             .buttonStyle(.plain)
-            .help("Install skill")
+            .help("Add skill")
         }
     }
 
@@ -520,7 +520,7 @@ private struct SkillDetailView: View {
                             .font(OakStyle.Font.styled(size: OakStyle.Font.body + 3, weight: .semibold))
 
                         if isInstalled {
-                            Label("Installed", systemImage: "checkmark")
+                            Label("Added", systemImage: "checkmark")
                                 .font(OakStyle.Font.styledCaption)
                                 .foregroundStyle(.green)
                         }
@@ -542,10 +542,10 @@ private struct SkillDetailView: View {
                 Spacer()
 
                 if isInstalled {
-                    Button("Uninstall", role: .destructive) { onUninstall() }
+                    Button("Remove", role: .destructive) { onUninstall() }
                         .controlSize(.small)
                 } else {
-                    Button("Install") { onInstall() }
+                    Button("Add Skill") { onInstall() }
                         .controlSize(.small)
                         .buttonStyle(.borderedProminent)
                 }
