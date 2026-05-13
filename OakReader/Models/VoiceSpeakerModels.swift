@@ -4,11 +4,9 @@ import Foundation
 
 struct CharacterConfig: Codable, Equatable {
     var avatar: CharacterAvatar
-    /// Legacy/shared prompt fallback. New character packs should prefer personaPrompt + agentPrompt/voicePrompt.
+    /// The single character prompt. Mode-specific behavior is added by the caller
+    /// (for example, the voice pipeline adds a transcription-in / speech-out contract).
     var systemPrompt: String
-    var personaPrompt: String?
-    var agentPrompt: String?
-    var voicePrompt: String?
     var language: String
     var llmModel: String
     var ttsVoice: CharacterTTSVoice
@@ -19,9 +17,6 @@ struct CharacterConfig: Codable, Equatable {
     static let `default` = CharacterConfig(
         avatar: .init(),
         systemPrompt: "",
-        personaPrompt: nil,
-        agentPrompt: nil,
-        voicePrompt: nil,
         language: "en",
         llmModel: "",
         ttsVoice: .init(),
@@ -135,26 +130,7 @@ struct Character: Identifiable, Hashable {
 
     var avatar: CharacterAvatar { config.avatar }
     var systemPrompt: String { config.systemPrompt }
-    var personaPrompt: String { config.personaPrompt ?? "" }
-    var agentPrompt: String { config.agentPrompt ?? "" }
-    var voicePrompt: String { config.voicePrompt ?? "" }
     var language: String { config.language }
-
-    var effectiveVoicePrompt: String {
-        let parts = [personaPrompt, voicePrompt]
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-        if !parts.isEmpty { return parts.joined(separator: "\n\n") }
-        return systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    var effectiveAgentPrompt: String {
-        let parts = [personaPrompt, agentPrompt]
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-        if !parts.isEmpty { return parts.joined(separator: "\n\n") }
-        return systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
     var llmModel: String { config.llmModel }
     var ttsVoice: CharacterTTSVoice { config.ttsVoice }
     var transcriptionSettings: CharacterTranscriptionSettings { config.transcription ?? .init() }
