@@ -43,9 +43,8 @@ final class Preferences {
         // YouTube preferences
         static let youtubeAIProvider = "youtubeAIProvider"
         static let youtubeAIModel = "youtubeAIModel"
-        // Plugins
+        // Plugins (extensions)
         static let disabledPlugins = "disabledPlugins"
-        static let disabledExternalPlugins = "disabledExternalPlugins"
         // Translation preferences
         static let translationAIProvider = "translationAIProvider"
         static let translationAIModel = "translationAIModel"
@@ -284,27 +283,6 @@ final class Preferences {
         }
         disabledPlugins = disabled
         NotificationCenter.default.post(name: Self.appExtensionToggleNotification, object: nil)
-    }
-
-    // MARK: - External Plugins (PluginManifest-based)
-
-    var disabledExternalPlugins: Set<String> {
-        get { Set(defaults.stringArray(forKey: Keys.disabledExternalPlugins) ?? []) }
-        set { defaults.set(Array(newValue), forKey: Keys.disabledExternalPlugins) }
-    }
-
-    func isExternalPluginEnabled(_ name: String) -> Bool {
-        !disabledExternalPlugins.contains(name)
-    }
-
-    func setExternalPlugin(_ name: String, enabled: Bool) {
-        var disabled = disabledExternalPlugins
-        if enabled {
-            disabled.remove(name)
-        } else {
-            disabled.insert(name)
-        }
-        disabledExternalPlugins = disabled
     }
 
     // MARK: - AI Preferences

@@ -47,9 +47,15 @@ struct ChatCompletionItem: Identifiable, Equatable {
             )
         }
         items += agent.map { skill in
-            ChatCompletionItem(
+            let iconName: String
+            if case .symbol(let name) = skill.icon {
+                iconName = name
+            } else {
+                iconName = "hammer"
+            }
+            return ChatCompletionItem(
                 id: "agent:\(skill.id)",
-                icon: "hammer",
+                icon: iconName,
                 label: skill.name,
                 description: skill.description,
                 kind: .agentSkill(skill),

@@ -1,0 +1,20 @@
+{
+    "name": "latex",
+    "description": "Export documents with professional typesetting",
+    "icon": { "type": "symbol", "value": "doc.richtext" },
+    "requires": {
+        "bins": [
+            {
+                "name": "typst",
+                "description": "Modern typesetting system for documents",
+                "searchPaths": [
+                    "~/Library/Application Support/OakReader/bin/typst",
+                    "/opt/homebrew/bin/typst",
+                    "/usr/local/bin/typst"
+                ],
+                "install": { "brew": "typst" },
+                "versionArgs": ["--version"]
+            }
+        ]
+    }
+}

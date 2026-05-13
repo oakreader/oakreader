@@ -1,0 +1,20 @@
+{
+    "name": "youtube",
+    "description": "Download and manage YouTube videos",
+    "icon": { "type": "symbol", "value": "play.rectangle" },
+    "requires": {
+        "bins": [
+            {
+                "name": "yt-dlp",
+                "description": "Download YouTube videos and metadata",
+                "searchPaths": [
+                    "~/Library/Application Support/OakReader/bin/yt-dlp",
+                    "/opt/homebrew/bin/yt-dlp",
+                    "/usr/local/bin/yt-dlp"
+                ],
+                "install": { "url": "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos" },
+                "versionArgs": ["--version"]
+            }
+        ]
+    }
+}

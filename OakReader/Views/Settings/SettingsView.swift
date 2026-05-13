@@ -15,7 +15,7 @@ struct SettingsView: View {
         case audio
         case characters
         case extensions
-        case plugins
+        case skills
         case youtube
         // Extension tabs
         case extensionNotes
@@ -33,7 +33,7 @@ struct SettingsView: View {
             case .audio: return "Audio"
             case .characters: return "Characters"
             case .extensions: return "Extensions"
-            case .plugins: return "Plugins"
+            case .skills: return "Skills"
             case .youtube: return "YouTube"
             case .extensionNotes: return AppExtension.notes.label
             case .extensionTranslation: return AppExtension.translation.label
@@ -50,7 +50,7 @@ struct SettingsView: View {
             case .audio: return "speaker.wave.2"
             case .characters: return "person.2"
             case .extensions: return "square.grid.2x2"
-            case .plugins: return "puzzlepiece.extension"
+            case .skills: return "hammer"
             case .youtube: return "play.rectangle"
             case .extensionNotes: return AppExtension.notes.systemImage
             case .extensionTranslation: return AppExtension.translation.systemImage
@@ -75,7 +75,7 @@ struct SettingsView: View {
     }
 
     /// Fixed tabs that always appear.
-    private static let fixedTabs: [Tab] = [.general, .library, .ai, .aiSettings, .localModels, .audio, .characters, .extensions, .plugins, .youtube]
+    private static let fixedTabs: [Tab] = [.general, .library, .ai, .aiSettings, .localModels, .audio, .characters, .extensions, .skills, .youtube]
 
     @State private var selectedTab: Tab = .general
     @State private var visibleTabs: [Tab] = Self.buildVisibleTabs()
@@ -145,8 +145,8 @@ struct SettingsView: View {
             CharacterSettingsView(database: store.database)
         case .extensions:
             AppExtensionSettingsView()
-        case .plugins:
-            PluginManagementView()
+        case .skills:
+            SkillManagementView()
         case .youtube:
             YouTubeSettingsView()
         case .extensionNotes:

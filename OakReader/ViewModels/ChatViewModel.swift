@@ -469,17 +469,10 @@ class ChatViewModel {
     // MARK: - Agent Skills
 
     private static func loadAgentSkills() -> [AgentSkill] {
-        var dirs: [URL] = []
-
-        // User-global skills directory
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        let globalSkills = home.appendingPathComponent(".oakreader/skills")
-        dirs.append(globalSkills)
-
-        // Add skill directories from enabled plugins
-        dirs.append(contentsOf: PluginService.shared.pluginSkillDirectories())
-
-        return SkillLoader.loadSkills(from: dirs).skills
+        // Only load installed skills from ~/OakReader/agent/skills/
+        let installedDir = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("OakReader/agent/skills")
+        return SkillLoader.loadSkills(from: [installedDir]).skills
     }
 
     // MARK: - Private — Session Persistence

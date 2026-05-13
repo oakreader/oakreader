@@ -1,6 +1,7 @@
 import Foundation
 import CommonCrypto
 import PDFKit
+import OakAgent
 
 // MARK: - CLI Importer
 
@@ -274,7 +275,7 @@ struct CLIImporter {
             return try importPDF(from: pdfURL, title: title)
         } else {
             // Capture web page with monolith
-            guard let monolithPath = PluginRegistry.shared.resolve(tool: "monolith") else {
+            guard let monolithPath = ToolResolver.resolveFromInstalledSkills(name: "monolith") else {
                 throw ImportError.monolithNotFound
             }
 
@@ -311,7 +312,7 @@ struct CLIImporter {
     /// If pandoc is available, convert HTML to markdown and save as content.md.
     /// Silent no-op if pandoc is not installed.
     func extractMarkdown(from htmlURL: URL, to attachmentDir: URL) {
-        guard let pandocPath = PluginRegistry.shared.resolve(tool: "pandoc") else { return }
+        guard let pandocPath = ToolResolver.resolveFromInstalledSkills(name: "pandoc") else { return }
 
         let mdURL = attachmentDir.appendingPathComponent("content.md")
         let process = Process()

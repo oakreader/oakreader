@@ -24,17 +24,37 @@ public struct AgentSkill: Sendable, Identifiable {
     /// will not see it in the available skills listing.
     public let disableModelInvocation: Bool
 
+    /// Icon from `skill.json` sidecar. `nil` uses a default icon.
+    public let icon: SkillIcon?
+
+    /// Author metadata from `skill.json` sidecar.
+    public let author: SkillAuthor?
+
+    /// Context mode override from `skill.json` sidecar.
+    public let contextMode: ContextMode?
+
+    /// Binary/env requirements from `skill.json` sidecar.
+    public let requirements: SkillRequirements?
+
     public init(
         name: String,
         description: String,
         filePath: String,
         baseDir: String,
-        disableModelInvocation: Bool = false
+        disableModelInvocation: Bool = false,
+        icon: SkillIcon? = nil,
+        author: SkillAuthor? = nil,
+        contextMode: ContextMode? = nil,
+        requirements: SkillRequirements? = nil
     ) {
         self.name = name
         self.description = description
         self.filePath = filePath
         self.baseDir = baseDir
         self.disableModelInvocation = disableModelInvocation
+        self.icon = icon
+        self.author = author
+        self.contextMode = contextMode
+        self.requirements = requirements
     }
 }
