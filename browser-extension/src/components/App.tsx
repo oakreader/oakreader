@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Archive, CheckCircle2, FileText, Link2, Sparkles } from "lucide-react";
 import { usePopupData } from "@/src/hooks/use-popup-data";
 import { postSnapshot } from "@/src/lib/api";
 import type { PageCapture, PDFSavePayload } from "@/src/lib/types";
@@ -6,9 +7,28 @@ import { PageCard } from "./PageCard";
 import { CollectionPicker } from "./CollectionPicker";
 import { TagInput } from "./TagInput";
 import { SaveButton, type SaveState } from "./SaveButton";
-import { Button } from "./ui/button";
 
 type SaveMode = "pdf" | "html" | "link";
+
+const SAVE_MODE_OPTIONS: Array<{
+  mode: SaveMode;
+  title: string;
+  description: string;
+}> = [
+  { mode: "html", title: "Archive", description: "Full page" },
+  { mode: "pdf", title: "PDF", description: "Printable" },
+  { mode: "link", title: "Link", description: "Fast save" },
+];
+
+const OAKREADER_DEEP_LINK = "oakreader://open";
+
+function openOakReaderApp() {
+  try {
+    chrome.tabs.create({ url: OAKREADER_DEEP_LINK });
+  } catch {
+    window.open(OAKREADER_DEEP_LINK, "_blank", "noopener,noreferrer");
+  }
+}
 
 interface CaptureProgress {
   deferredImages: "loading" | "done" | null;
@@ -254,30 +274,37 @@ export function App() {
   }, [pageMeta, tabId, collectionId, collections, selectedTagIds, newTags, saveMode]);
 
   if (loading) {
-    return (
-      <div className="py-12 text-center text-[12px] text-secondary">
-        Loading&hellip;
-      </div>
-    );
+    return <LoadingState />;
   }
 
   if (error && !pageMeta) {
     const isNotRunning = error.includes("not running");
     return (
-      <div className="flex-1 flex flex-col items-center justify-center px-6 text-center space-y-3">
-        {isNotRunning ? (
-          <img src="/icon-128.png" alt="OakReader" className="size-12 opacity-40" />
-        ) : (
-          <p className="text-[36px]">{"\u26A0\uFE0F"}</p>
-        )}
-        <p className="text-[15px] font-semibold text-foreground">
-          {isNotRunning ? "OakReader is not running" : "Cannot access page"}
-        </p>
-        <p className="text-[13px] text-secondary leading-relaxed">
-          {isNotRunning
-            ? "Open OakReader on your Mac to start saving pages."
-            : error}
-        </p>
+      <div className="flex-1 flex flex-col items-center justify-center p-5 text-center">
+        <div className="oak-glass-card w-full px-5 py-7 space-y-3">
+          {isNotRunning ? (
+            <img src="/oakreader-logo.svg" alt="OakReader" className="mx-auto size-16 drop-shadow-sm" />
+          ) : (
+            <p className="text-[38px]">{"\u26A0\uFE0F"}</p>
+          )}
+          <p className="text-[16px] font-semibold text-foreground tracking-[-0.02em]">
+            {isNotRunning ? "OakReader is not running" : "Cannot access page"}
+          </p>
+          <p className="text-[13px] text-secondary leading-relaxed">
+            {isNotRunning
+              ? "Open the Mac app, then come back here to save this page."
+              : error}
+          </p>
+          {isNotRunning && (
+            <button
+              type="button"
+              className="oak-primary-button mx-auto mt-1 inline-flex h-10 items-center justify-center px-5 text-[13px] font-semibold text-primary-foreground transition-all duration-200 hover:brightness-110 active:scale-[0.985]"
+              onClick={openOakReaderApp}
+            >
+              Open OakReader
+            </button>
+          )}
+        </div>
       </div>
     );
   }
@@ -285,37 +312,11 @@ export function App() {
   return (
     <>
       <Header />
-      <div className="flex-1 min-h-0 overflow-y-auto px-3 space-y-2">
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-2 space-y-3">
         {pageMeta && <PageCard pageMeta={pageMeta} />}
 
         {pageMeta?.type === "html" && (
-          <div className="flex items-center gap-1 rounded-[var(--radius-outer)] bg-grouped p-1"
-               style={{ boxShadow: "0 0 0 0.5px rgba(0,0,0,0.06)" }}>
-            <Button
-              variant={saveMode === "html" ? "secondary" : "ghost"}
-              size="xs"
-              className="flex-1"
-              onClick={() => setSaveMode("html")}
-            >
-              HTML
-            </Button>
-            <Button
-              variant={saveMode === "pdf" ? "secondary" : "ghost"}
-              size="xs"
-              className="flex-1"
-              onClick={() => setSaveMode("pdf")}
-            >
-              PDF
-            </Button>
-            <Button
-              variant={saveMode === "link" ? "secondary" : "ghost"}
-              size="xs"
-              className="flex-1"
-              onClick={() => setSaveMode("link")}
-            >
-              Link
-            </Button>
-          </div>
+          <SaveModePicker value={saveMode} onChange={setSaveMode} />
         )}
 
         <CollectionPicker
@@ -334,7 +335,7 @@ export function App() {
         />
       </div>
 
-      <div className="shrink-0 px-3 pt-2 pb-3 space-y-2">
+      <div className="shrink-0 px-4 pt-2 pb-4 space-y-2 oak-sticky-footer">
         {saveState === "capturing" && saveMode === "html" && captureProgress && (
           <CaptureProgressSteps progress={captureProgress} />
         )}
@@ -358,9 +359,90 @@ export function App() {
 
 function Header() {
   return (
-    <div className="px-3 pt-3 pb-2">
-      <span className="text-[13px] font-semibold text-secondary">OakReader</span>
+    <div className="px-4 pt-4 pb-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="relative flex size-9 items-center justify-center rounded-2xl bg-grouped shadow-[var(--shadow-card)] ring-1 ring-white/80">
+            <img src="/oakreader-logo.svg" alt="" className="size-5" />
+            <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-success ring-2 ring-background" />
+          </div>
+          <div>
+            <p className="text-[15px] font-semibold leading-tight text-foreground tracking-[-0.02em]">OakReader</p>
+            <p className="text-[11px] leading-tight text-secondary">Clip into your reading library</p>
+          </div>
+        </div>
+        <div className="inline-flex items-center gap-1 rounded-full bg-primary/8 px-2 py-1 text-[11px] font-medium text-primary">
+          <Sparkles className="size-3" strokeWidth={2.4} />
+          Ready
+        </div>
+      </div>
     </div>
+  );
+}
+
+function SaveModePicker({
+  value,
+  onChange,
+}: {
+  value: SaveMode;
+  onChange: (value: SaveMode) => void;
+}) {
+  return (
+    <section className="space-y-1.5">
+      <p className="text-[11px] font-semibold text-secondary">Capture style</p>
+      <div className="grid grid-cols-3 gap-2">
+        {SAVE_MODE_OPTIONS.map((option) => {
+          const selected = option.mode === value;
+          return (
+            <button
+              key={option.mode}
+              type="button"
+              className={`oak-mode-card ${selected ? "oak-mode-card-selected" : ""}`}
+              onClick={() => onChange(option.mode)}
+              aria-pressed={selected}
+            >
+              <span className="flex items-center justify-between">
+                <ModeIcon mode={option.mode} />
+                {selected && <CheckCircle2 className="size-3.5 text-primary" strokeWidth={2.4} />}
+              </span>
+              <span className="mt-2 block text-[12px] font-semibold text-foreground">{option.title}</span>
+              <span className="mt-0.5 block text-[10.5px] text-secondary">{option.description}</span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function ModeIcon({ mode }: { mode: SaveMode }) {
+  const className = "size-4 text-primary";
+  if (mode === "html") return <Archive className={className} strokeWidth={2.2} />;
+  if (mode === "pdf") return <FileText className={className} strokeWidth={2.2} />;
+  return <Link2 className={className} strokeWidth={2.2} />;
+}
+
+function LoadingState() {
+  return (
+    <>
+      <Header />
+      <div className="flex-1 px-4 space-y-3">
+        <div className="oak-glass-card p-3 space-y-3">
+          <div className="flex items-start gap-3">
+            <div className="size-10 rounded-xl bg-fill oak-shimmer" />
+            <div className="flex-1 space-y-2 pt-1">
+              <div className="h-3 rounded-full bg-fill oak-shimmer" />
+              <div className="h-3 w-2/3 rounded-full bg-fill oak-shimmer" />
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="h-16 rounded-xl bg-fill oak-shimmer" />
+            <div className="h-16 rounded-xl bg-fill oak-shimmer" />
+            <div className="h-16 rounded-xl bg-fill oak-shimmer" />
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
 
