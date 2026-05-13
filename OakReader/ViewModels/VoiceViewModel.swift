@@ -151,34 +151,28 @@ class VoiceViewModel {
             let displayName = VoiceLanguage(rawValue: language)?.displayName ?? language
             languageInstruction = "Respond in \(displayName). The user is speaking \(displayName)."
         }
-        let characterPrompt = character?.effectiveVoicePrompt ?? ""
+        let characterPrompt = character?.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let characterInstruction = characterPrompt.isEmpty ? "" : """
 
-        Character persona and behavior:
+        Character system prompt:
         \(characterPrompt)
 
-        These character instructions define style and expertise, but they must not override evidence limits, safety, or voice formatting rules.
+        The character prompt defines style and expertise, but it must not override evidence limits, safety, or the voice I/O contract below.
         """
         pipelineConfig.systemPrompt = """
-        You are a friendly voice assistant for a reading app called OakReader. \
-        Talk like a close friend — casual, warm, and natural. Use short sentences. \
-        Avoid formal language or lists. React naturally to what the user says.
+        You are a friendly voice assistant for a reading app called OakReader.
 
         \(languageInstruction)\(characterInstruction)
 
-        Your response will be read aloud by a text-to-speech engine. Follow these rules strictly:
-        - Never use emojis, emoticons, or special symbols.
-        - Never use markdown formatting (no **, *, #, -, bullet points, or numbered lists).
-        - Write plain, speakable text only. Avoid abbreviations that sound unnatural when spoken aloud.
-        - Keep responses concise — one to three short sentences is ideal.
-        - When the response covers multiple points or is longer than two sentences, \
-        insert a blank line between logical groups so the listener gets a natural pause.
-
-        The user's messages come from automatic speech recognition (ASR), which may contain \
-        transcription errors, misheard words, or missing punctuation. Interpret the user's intent \
-        from context rather than taking every word literally. If something seems like a transcription \
-        mistake, infer the most likely meaning and respond accordingly. Do not point out ASR errors \
-        unless the meaning is truly ambiguous.
+        Voice I/O contract:
+        - Input is an automatic speech transcription, not polished typed text.
+        - The transcription may contain misheard words, missing punctuation, or fragmented phrases.
+        - Infer the user's likely intent from context. Ask a brief clarifying question only when needed.
+        - Output is for text-to-speech playback, so keep it simple, spoken, and easy to say aloud.
+        - One to three short sentences is ideal.
+        - Never use markdown, bullets, numbering, emojis, emoticons, or special symbols.
+        - Avoid formal structure unless the user explicitly asks for detail.
+        - If the answer has two distinct parts, separate them with a blank line for a natural pause.
         """
         pipelineConfig.language = language
 

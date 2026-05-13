@@ -1,5 +1,6 @@
 import SwiftUI
 import OakAgent
+import OakVoiceAI
 import UniformTypeIdentifiers
 
 struct CharacterSettingsView: View {
@@ -51,15 +52,6 @@ struct CharacterSettingsView: View {
         .task {
             reloadCharacterTemplates()
             await loadCharactersAsync()
-        }
-        .toolbar {
-            ToolbarItem(placement: .automatic) {
-                Button {
-                    openCharactersFolder()
-                } label: {
-                    Label("Open Character Folder", systemImage: "folder")
-                }
-            }
         }
         .onDisappear { save() }
     }
@@ -146,13 +138,13 @@ struct CharacterSettingsView: View {
                     Spacer(minLength: 8)
 
                     if installedTemplateNames.contains(template.name) {
-                        Button("Uninstall") {
-                            uninstallTemplate(template)
+                        Button("Remove") {
+                            removeTemplate(template)
                         }
                         .controlSize(.small)
                     } else {
-                        Button("Install") {
-                            installTemplate(template)
+                        Button("Add Character") {
+                            addTemplate(template)
                         }
                         .controlSize(.small)
                     }
@@ -160,7 +152,7 @@ struct CharacterSettingsView: View {
                 .padding(.vertical, 3)
             }
 
-            Text("Install a character to add it to Voice AI. Personal character packs can be dropped into ~/OakReader/agent/characters.")
+            Text("Add a character to make it available in Voice AI. Personal character templates can be dropped into ~/OakReader/agent/characters.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -286,7 +278,7 @@ struct CharacterSettingsView: View {
         Task { await loadCharactersAsync() }
     }
 
-    private func installTemplate(_ template: CharacterTemplate) {
+    private func addTemplate(_ template: CharacterTemplate) {
         Task {
             do {
                 try CharacterTemplateLoader.install(template)
@@ -311,13 +303,8 @@ struct CharacterSettingsView: View {
                                 }
                                 installed.config.avatar = template.avatar ?? installed.config.avatar
                                 installed.config.systemPrompt = template.systemPrompt
-                                installed.config.personaPrompt = template.personaPrompt
-                                installed.config.agentPrompt = template.agentPrompt
-                                installed.config.voicePrompt = template.voicePrompt
                                 installed.config.language = template.language ?? installed.config.language
                                 installed.config.llmModel = template.llmModel ?? ""
-                                installed.config.ttsVoice = template.ttsVoice ?? .init()
-                                installed.config.transcription = template.transcription
                                 installed.config.sourceTemplateId = template.name
                                 try svc.updateCharacter(installed)
                                 cont.resume(returning: installed)
@@ -332,12 +319,12 @@ struct CharacterSettingsView: View {
                 reloadCharacterTemplates()
                 await loadCharactersAsync()
             } catch {
-                errorMessage = "Failed to install character: \(error.localizedDescription)"
+                errorMessage = "Failed to add character: \(error.localizedDescription)"
             }
         }
     }
 
-    private func uninstallTemplate(_ template: CharacterTemplate) {
+    private func removeTemplate(_ template: CharacterTemplate) {
         Task {
             do {
                 try CharacterTemplateLoader.uninstall(templateName: template.name)
@@ -361,14 +348,9 @@ struct CharacterSettingsView: View {
                 reloadCharacterTemplates()
                 await loadCharactersAsync()
             } catch {
-                errorMessage = "Failed to uninstall character: \(error.localizedDescription)"
+                errorMessage = "Failed to remove character: \(error.localizedDescription)"
             }
         }
-    }
-
-    private func openCharactersFolder() {
-        try? FileManager.default.createDirectory(at: CharacterTemplateLoader.installedDir, withIntermediateDirectories: true)
-        NSWorkspace.shared.open(CharacterTemplateLoader.installedDir)
     }
 
     private func addCharacter() {
@@ -549,15 +531,7 @@ private struct CharacterDetailEditor: View {
                 .border(Color.secondary.opacity(0.2), width: 1)
         }
 
-        // TTS Voice
-        TextField("TTS Voice ID", text: $config.ttsVoice.voiceId)
-            .textFieldStyle(.roundedBorder)
-
-        TextField("TTS Provider", text: $config.ttsVoice.provider)
-            .textFieldStyle(.roundedBorder)
-
-        TextField("TTS Model ID", text: $config.ttsVoice.modelId)
-            .textFieldStyle(.roundedBorder)
+        voiceProviderSection
 
         // Reference audio
         HStack {
@@ -655,13 +629,8 @@ private struct CharacterTemplate: Identifiable {
     let language: String?
     let llmModel: String?
     let avatar: CharacterAvatar?
-    let ttsVoice: CharacterTTSVoice?
-    let transcription: CharacterTranscriptionSettings?
     let previewPrompts: [String]
     let systemPrompt: String
-    let personaPrompt: String?
-    let agentPrompt: String?
-    let voicePrompt: String?
     let sourceDir: URL
     let isBundled: Bool
 
@@ -689,13 +658,8 @@ private struct CharacterTemplateManifest: Decodable {
     let language: String?
     let llmModel: String?
     let avatar: CharacterAvatar?
-    let ttsVoice: CharacterTTSVoice?
-    let transcription: CharacterTranscriptionSettings?
     let previewPrompts: [String]?
     let systemPrompt: String?
-    let personaPrompt: String?
-    let agentPrompt: String?
-    let voicePrompt: String?
 }
 
 private enum CharacterTemplateLoader {
@@ -777,10 +741,7 @@ private enum CharacterTemplateLoader {
         }
 
         let systemPrompt = manifest.systemPrompt?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let personaPrompt = manifest.personaPrompt?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let agentPrompt = manifest.agentPrompt?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let voicePrompt = manifest.voicePrompt?.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !systemPrompt.isEmpty || !(personaPrompt ?? "").isEmpty || !(agentPrompt ?? "").isEmpty || !(voicePrompt ?? "").isEmpty else {
+        guard !systemPrompt.isEmpty else {
             return nil
         }
 
@@ -793,13 +754,8 @@ private enum CharacterTemplateLoader {
             language: manifest.language,
             llmModel: manifest.llmModel,
             avatar: manifest.avatar,
-            ttsVoice: manifest.ttsVoice,
-            transcription: manifest.transcription,
             previewPrompts: manifest.previewPrompts ?? [],
             systemPrompt: systemPrompt,
-            personaPrompt: personaPrompt,
-            agentPrompt: agentPrompt,
-            voicePrompt: voicePrompt,
             sourceDir: sourceDir,
             isBundled: bundled
         )
