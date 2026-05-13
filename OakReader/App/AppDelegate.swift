@@ -51,10 +51,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        if !flag {
-            mainWindow?.makeKeyAndOrderFront(nil)
-        }
+        showMainWindow()
         return true
+    }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        guard urls.contains(where: { $0.scheme?.lowercased() == "oakreader" }) else { return }
+        showMainWindow()
+    }
+
+    private func showMainWindow() {
+        if mainWindow == nil {
+            createMainWindow()
+        }
+        mainWindow?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     // MARK: - Window Creation
