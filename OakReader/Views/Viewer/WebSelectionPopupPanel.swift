@@ -185,7 +185,7 @@ class WebSelectionPopupPanel: NSPanel, AppResignDismissable {
         }
         mainStack.addArrangedSubview(chatBtn)
 
-        if Preferences.shared.isPluginEnabled(.notes) {
+        if Preferences.shared.isExtensionEnabled(.notes) {
             let noteBtn = PopupIconButton(
                 systemImage: "note.text.badge.plus",
                 accessibilityLabel: "Add to Note"
@@ -195,7 +195,7 @@ class WebSelectionPopupPanel: NSPanel, AppResignDismissable {
             mainStack.addArrangedSubview(noteBtn)
         }
 
-        if Preferences.shared.isPluginEnabled(.translation) {
+        if Preferences.shared.isExtensionEnabled(.translation) {
             let translateBtn = PopupIconButton(
                 systemImage: "character.bubble",
                 accessibilityLabel: "Translate"
@@ -468,7 +468,7 @@ class WebAreaPopupPanel: NSPanel, AppResignDismissable {
         chatBtn.trailingAnchor.constraint(equalTo: stack.trailingAnchor, constant: -6).isActive = true
 
         // Add to Note
-        if Preferences.shared.isPluginEnabled(.notes) {
+        if Preferences.shared.isExtensionEnabled(.notes) {
             let noteBtn = PopupActionButton(
                 systemImage: "note.text.badge.plus",
                 title: "Add to Note"

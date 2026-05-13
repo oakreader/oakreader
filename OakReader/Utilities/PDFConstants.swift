@@ -181,7 +181,7 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
     }
 }
 
-enum Plugin: String, CaseIterable, Identifiable {
+enum AppExtension: String, CaseIterable, Identifiable {
     case notes
     case translation
 

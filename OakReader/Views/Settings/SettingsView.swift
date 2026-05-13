@@ -14,11 +14,12 @@ struct SettingsView: View {
         case localModels
         case audio
         case characters
+        case extensions
         case plugins
         case youtube
-        // Plugin tabs
-        case pluginNotes
-        case pluginTranslation
+        // Extension tabs
+        case extensionNotes
+        case extensionTranslation
 
         var id: String { rawValue }
 
@@ -31,10 +32,11 @@ struct SettingsView: View {
             case .localModels: return "Local Models"
             case .audio: return "Audio"
             case .characters: return "Characters"
+            case .extensions: return "Extensions"
             case .plugins: return "Plugins"
             case .youtube: return "YouTube"
-            case .pluginNotes: return Plugin.notes.label
-            case .pluginTranslation: return Plugin.translation.label
+            case .extensionNotes: return AppExtension.notes.label
+            case .extensionTranslation: return AppExtension.translation.label
             }
         }
 
@@ -47,32 +49,33 @@ struct SettingsView: View {
             case .localModels: return "arrow.down.circle"
             case .audio: return "speaker.wave.2"
             case .characters: return "person.2"
+            case .extensions: return "square.grid.2x2"
             case .plugins: return "puzzlepiece.extension"
             case .youtube: return "play.rectangle"
-            case .pluginNotes: return Plugin.notes.systemImage
-            case .pluginTranslation: return Plugin.translation.systemImage
+            case .extensionNotes: return AppExtension.notes.systemImage
+            case .extensionTranslation: return AppExtension.translation.systemImage
             }
         }
 
-        /// The plugin this tab belongs to, if any.
-        var plugin: Plugin? {
+        /// The app extension this tab belongs to, if any.
+        var appExtension: AppExtension? {
             switch self {
-            case .pluginNotes: return .notes
-            case .pluginTranslation: return .translation
+            case .extensionNotes: return .notes
+            case .extensionTranslation: return .translation
             default: return nil
             }
         }
 
-        static func tab(for plugin: Plugin) -> Tab {
-            switch plugin {
-            case .notes: return .pluginNotes
-            case .translation: return .pluginTranslation
+        static func tab(for ext: AppExtension) -> Tab {
+            switch ext {
+            case .notes: return .extensionNotes
+            case .translation: return .extensionTranslation
             }
         }
     }
 
     /// Fixed tabs that always appear.
-    private static let fixedTabs: [Tab] = [.general, .library, .ai, .aiSettings, .localModels, .audio, .characters, .plugins, .youtube]
+    private static let fixedTabs: [Tab] = [.general, .library, .ai, .aiSettings, .localModels, .audio, .characters, .extensions, .plugins, .youtube]
 
     @State private var selectedTab: Tab = .general
     @State private var visibleTabs: [Tab] = Self.buildVisibleTabs()
@@ -80,10 +83,10 @@ struct SettingsView: View {
 
     private static func buildVisibleTabs() -> [Tab] {
         var tabs = fixedTabs
-        let pluginTabs = Plugin.allCases
-            .filter { Preferences.shared.isPluginEnabled($0) }
+        let pluginTabs = AppExtension.allCases
+            .filter { Preferences.shared.isExtensionEnabled($0) }
             .map { Tab.tab(for: $0) }
-        if let idx = tabs.firstIndex(of: .plugins) {
+        if let idx = tabs.firstIndex(of: .extensions) {
             tabs.insert(contentsOf: pluginTabs, at: idx + 1)
         }
         return tabs
@@ -112,11 +115,11 @@ struct SettingsView: View {
         }
         .animation(.none, value: selectedTab)
         .frame(width: 900, height: 620)
-        .onReceive(NotificationCenter.default.publisher(for: Preferences.pluginToggleNotification)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: Preferences.appExtensionToggleNotification)) { _ in
             let updated = Self.buildVisibleTabs()
             if visibleTabs != updated {
-                if let plugin = selectedTab.plugin, !Preferences.shared.isPluginEnabled(plugin) {
-                    selectedTab = .plugins
+                if let ext = selectedTab.appExtension, !Preferences.shared.isExtensionEnabled(ext) {
+                    selectedTab = .extensions
                 }
                 visibleTabs = updated
             }
@@ -140,13 +143,15 @@ struct SettingsView: View {
             AudioSettingsView()
         case .characters:
             CharacterSettingsView(database: store.database)
+        case .extensions:
+            AppExtensionSettingsView()
         case .plugins:
             PluginManagementView()
         case .youtube:
             YouTubeSettingsView()
-        case .pluginNotes:
+        case .extensionNotes:
             NoteSettingsView()
-        case .pluginTranslation:
+        case .extensionTranslation:
             TranslationSettingsView()
         }
     }

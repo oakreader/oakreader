@@ -26,11 +26,11 @@ struct RightPanelContentView: View {
                         VoiceChatView(voiceVM: viewModel.voice)
                     }
                 case .notes:
-                    if Preferences.shared.isPluginEnabled(.notes) {
+                    if Preferences.shared.isExtensionEnabled(.notes) {
                         NotePanelView(notesVM: viewModel.notes)
                     }
                 case .translation:
-                    if Preferences.shared.isPluginEnabled(.translation) {
+                    if Preferences.shared.isExtensionEnabled(.translation) {
                         TranslationPanelView(translationVM: viewModel.translation)
                     }
                 }
@@ -40,7 +40,7 @@ struct RightPanelContentView: View {
     }
 
     private var saveAssistantResponseAction: ((Turn) -> Bool)? {
-        Preferences.shared.isPluginEnabled(.notes) ? saveAssistantResponseToNote : nil
+        Preferences.shared.isExtensionEnabled(.notes) ? saveAssistantResponseToNote : nil
     }
 
     private func saveAssistantResponseToNote(_ turn: Turn) -> Bool {
