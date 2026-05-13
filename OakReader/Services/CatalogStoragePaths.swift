@@ -82,6 +82,16 @@ extension CatalogDatabase {
         chatAttachmentDirectory(sessionId: sessionId).appendingPathComponent(fileName)
     }
 
+    /// ~/OakReader/chats/agent-threads/
+    static var characterAgentThreadsDirectory: URL {
+        chatsDirectory.appendingPathComponent("agent-threads", isDirectory: true)
+    }
+
+    /// ~/OakReader/chats/agent-threads/{threadId}.jsonl
+    static func characterAgentThreadURL(threadId: UUID) -> URL {
+        characterAgentThreadsDirectory.appendingPathComponent("\(threadId.uuidString).jsonl")
+    }
+
     /// ~/OakReader/calls/
     static var callsDirectory: URL {
         dataDirectory.appendingPathComponent("calls", isDirectory: true)
@@ -130,6 +140,7 @@ extension CatalogDatabase {
         try FileManager.default.createDirectory(at: notesAttachmentsDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: chatsDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: chatAttachmentsDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: characterAgentThreadsDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: callsDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: charactersDirectory, withIntermediateDirectories: true)
     }

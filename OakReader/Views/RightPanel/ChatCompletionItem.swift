@@ -8,6 +8,7 @@ struct ChatCompletionItem: Identifiable, Equatable {
     enum Kind {
         case installedSkill(Skill)
         case contextMention(ContextMention)
+        case characterAgent(CharacterAgent)
     }
 
     enum ContextMention: String, Equatable, CaseIterable {
@@ -85,6 +86,18 @@ struct ChatCompletionItem: Identifiable, Equatable {
                 trigger: "@"
             ))
         }
+
+        items.append(contentsOf: CharacterAgent.catalog.map { agent in
+            ChatCompletionItem(
+                id: "agent:\(agent.id)",
+                icon: agent.icon,
+                label: agent.handle,
+                description: "\(agent.domain) · \(agent.description)",
+                kind: .characterAgent(agent),
+                trigger: "@"
+            )
+        })
+
         return items
     }
 

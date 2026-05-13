@@ -20,6 +20,7 @@ public actor AgentSession {
         config: ProviderConfig,
         systemPrompt: String,
         turnMetadata: [String: String] = [:],
+        additionalUserTurns: [Turn] = [],
         tools: [any AgentTool]? = nil,
         toolContext: ToolExecutionContext? = nil,
         agentSkills: [AgentSkill] = [],
@@ -40,6 +41,12 @@ public actor AgentSession {
                     try await store.appendTurn(userTurn, sessionId: sessionId)
                     continuation.yield(.finished(userTurn))
 
+                    for additionalTurn in additionalUserTurns {
+                        try Task.checkCancellation()
+                        try await store.appendTurn(additionalTurn, sessionId: sessionId)
+                        continuation.yield(.finished(additionalTurn))
+                    }
+
                     // 2. Build final system prompt (append agent skills listing)
                     var finalPrompt = systemPrompt
                     let skillsBlock = SkillPromptFormatter.formatForPrompt(agentSkills)
@@ -50,7 +57,8 @@ public actor AgentSession {
                     // 3. Build initial LLM messages
                     var llmMessages = buildMessages(
                         history: history,
-                        userTurn: userTurn
+                        userTurn: userTurn,
+                        additionalUserTurns: additionalUserTurns
                     )
 
                     // 4. Get provider
@@ -244,7 +252,7 @@ public actor AgentSession {
 
     // MARK: - Private helpers
 
-    private func buildMessages(history: [Turn], userTurn: Turn) -> [LLMMessage] {
+    private func buildMessages(history: [Turn], userTurn: Turn, additionalUserTurns: [Turn] = []) -> [LLMMessage] {
         var messages: [LLMMessage] = []
 
         // Add history (skip system turns, they go in system prompt)
@@ -300,6 +308,11 @@ public actor AgentSession {
         contentParts.append(.text(Self.modelText(from: userTurn.content)))
 
         messages.append(LLMMessage(role: .user, content: contentParts))
+
+        for turn in additionalUserTurns {
+            messages.append(LLMMessage(role: .user, text: Self.modelText(from: turn.content)))
+        }
+
         return messages
     }
 
