@@ -1,0 +1,30 @@
+{
+    "name": "web-import",
+    "description": "Import web pages as offline snapshots",
+    "icon": { "type": "symbol", "value": "globe" },
+    "requires": {
+        "bins": [
+            {
+                "name": "monolith",
+                "description": "Save web pages as single HTML files",
+                "searchPaths": [
+                    "~/Library/Application Support/OakReader/bin/monolith",
+                    "/opt/homebrew/bin/monolith",
+                    "/usr/local/bin/monolith"
+                ],
+                "install": { "brew": "monolith" },
+                "versionArgs": ["--version"]
+            },
+            {
+                "name": "pandoc",
+                "description": "Convert HTML to Markdown for AI context",
+                "searchPaths": [
+                    "/opt/homebrew/bin/pandoc",
+                    "/usr/local/bin/pandoc"
+                ],
+                "install": { "brew": "pandoc" },
+                "versionArgs": ["--version"]
+            }
+        ]
+    }
+}

@@ -43,21 +43,11 @@ USAGE:
 
     oak chat [--file <path>] [--ask "question"]  AI chat with PDF
 
-    oak plugins [list]                           List all plugins and status
-    oak plugins show <name>                      Show plugin detail
-    oak plugins check                            Verify all plugin dependencies
-    oak plugins install-tools <name>             Install tools for a plugin
-    oak plugins enable <name>                    Enable a plugin
-    oak plugins disable <name>                   Disable a plugin
-
-    oak tools [list]                             List all tools across plugins
-    oak tools check                              Verify all tools are installed
-    oak tools install <name>                     Install a specific tool
-    oak tools path <name>                        Print resolved tool path
-
-    oak credentials [list]                       List API keys (masked)
-    oak credentials set <provider>               Set API key (Keychain)
-    oak credentials remove <provider>            Remove API key
+    oak skills [list]                            List all skills and install status
+    oak skills show <name>                       Show skill detail
+    oak skills install <name>                    Install a skill
+    oak skills uninstall <name>                  Uninstall a skill
+    oak skills check                             Verify installed skill dependencies
 
 OPTIONS:
     --db <path>     Path to database (default: ~/OakReader/library.sqlite)
@@ -268,14 +258,8 @@ case "search":
         exit(1)
     }
 
-case "plugins":
-    PluginCommands.runPlugins(args: allArgs)
-
-case "tools":
-    PluginCommands.runTools(args: allArgs)
-
-case "credentials":
-    PluginCommands.runCredentials(args: allArgs)
+case "skills":
+    SkillCommands.run(args: allArgs)
 
 case "open":
     let filePath = allArgs.first ?? ""

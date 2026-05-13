@@ -18,9 +18,10 @@ public struct SkillLoadResult: Sendable {
 ///
 /// Discovery rules:
 /// 1. If a directory contains `SKILL.md`, treat it as a skill root (don't recurse further).
-/// 2. Otherwise, load direct `.md` children as skills.
-/// 3. Recurse into non-hidden subdirectories to find `SKILL.md`.
-/// 4. Skip hidden directories and `node_modules`.
+/// 2. If a directory contains `skill.json` (without `SKILL.md`), load metadata-only skill.
+/// 3. Otherwise, load direct `.md` children as skills.
+/// 4. Recurse into non-hidden subdirectories to find `SKILL.md` or `skill.json`.
+/// 5. Skip hidden directories and `node_modules`.
 public enum SkillLoader {
 
     /// Load skills from multiple directories (e.g. user-global, project-local).
@@ -57,6 +58,18 @@ public enum SkillLoader {
             return SkillLoadResult()
         }
 
+        // If this directory contains skill.json but no SKILL.md, load metadata-only
+        let jsonFile = dir.appendingPathComponent("skill.json")
+        if fm.fileExists(atPath: jsonFile.path) {
+            let result = loadSkillJsonOnly(at: jsonFile, expectedName: dir.lastPathComponent)
+            if let skill = result.skill {
+                return SkillLoadResult(skills: [skill])
+            } else if let error = result.error {
+                return SkillLoadResult(errors: [(jsonFile.path, error)])
+            }
+            return SkillLoadResult()
+        }
+
         var skills: [AgentSkill] = []
         var errors: [(path: String, message: String)] = []
 
@@ -80,12 +93,21 @@ public enum SkillLoader {
             if itemIsDir.boolValue {
                 // Recurse into subdirectory
                 let subSkillFile = item.appendingPathComponent("SKILL.md")
+                let subJsonFile = item.appendingPathComponent("skill.json")
+
                 if fm.fileExists(atPath: subSkillFile.path) {
                     let result = loadSkillFile(at: subSkillFile, expectedName: item.lastPathComponent)
                     if let skill = result.skill {
                         skills.append(skill)
                     } else if let error = result.error {
                         errors.append((subSkillFile.path, error))
+                    }
+                } else if fm.fileExists(atPath: subJsonFile.path) {
+                    let result = loadSkillJsonOnly(at: subJsonFile, expectedName: item.lastPathComponent)
+                    if let skill = result.skill {
+                        skills.append(skill)
+                    } else if let error = result.error {
+                        errors.append((subJsonFile.path, error))
                     }
                 } else {
                     // Recurse deeper
@@ -122,6 +144,50 @@ public enum SkillLoader {
         return name.unicodeScalars.allSatisfy { allowed.contains($0) }
     }
 
+    /// Load a `skill.json`-only skill (no SKILL.md present).
+    private static func loadSkillJsonOnly(
+        at url: URL,
+        expectedName: String
+    ) -> (skill: AgentSkill?, error: String?) {
+        guard let data = FileManager.default.contents(atPath: url.path) else {
+            return (nil, "Cannot read skill.json")
+        }
+
+        let manifest: SkillManifest
+        do {
+            manifest = try JSONDecoder().decode(SkillManifest.self, from: data)
+        } catch {
+            return (nil, "Invalid skill.json: \(error.localizedDescription)")
+        }
+
+        let name = manifest.name ?? expectedName
+        if !isValidName(name) {
+            return (nil, "Skill name '\(name)' must be lowercase alphanumeric with hyphens, max 64 chars")
+        }
+
+        let description = manifest.description ?? ""
+        let disableModelInvocation = manifest.disableModelInvocation ?? false
+
+        var contextMode: ContextMode? = nil
+        if let mode = manifest.contextMode {
+            contextMode = ContextMode(rawValue: mode)
+        }
+
+        let skill = AgentSkill(
+            name: name,
+            description: description,
+            filePath: url.path,
+            baseDir: url.deletingLastPathComponent().path,
+            disableModelInvocation: disableModelInvocation,
+            icon: manifest.icon,
+            author: manifest.author,
+            contextMode: contextMode,
+            requirements: manifest.requires
+        )
+
+        return (skill, nil)
+    }
+
     private static func loadSkillFile(
         at url: URL,
         expectedName: String
@@ -154,14 +220,36 @@ public enum SkillLoader {
         // Optional flags
         let disableModelInvocation = meta["disable-model-invocation"]?.lowercased() == "true"
 
+        // Try loading skill.json sidecar from the same directory
+        let baseDir = url.deletingLastPathComponent()
+        let sidecar = loadSidecarManifest(in: baseDir)
+
+        var contextMode: ContextMode? = nil
+        if let mode = sidecar?.contextMode {
+            contextMode = ContextMode(rawValue: mode)
+        }
+
         let skill = AgentSkill(
             name: name,
             description: description,
             filePath: url.path,
-            baseDir: url.deletingLastPathComponent().path,
-            disableModelInvocation: disableModelInvocation
+            baseDir: baseDir.path,
+            disableModelInvocation: sidecar?.disableModelInvocation ?? disableModelInvocation,
+            icon: sidecar?.icon,
+            author: sidecar?.author,
+            contextMode: contextMode,
+            requirements: sidecar?.requires
         )
 
         return (skill, nil)
+    }
+
+    /// Load `skill.json` from a directory if it exists.
+    private static func loadSidecarManifest(in directory: URL) -> SkillManifest? {
+        let jsonURL = directory.appendingPathComponent("skill.json")
+        guard let data = FileManager.default.contents(atPath: jsonURL.path) else {
+            return nil
+        }
+        return try? JSONDecoder().decode(SkillManifest.self, from: data)
     }
 }
