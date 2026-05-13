@@ -1,6 +1,7 @@
 import AVFoundation
 import CoreGraphics
 import AppKit
+import ScreenCaptureKit
 
 /// Centralized permission tracker for Microphone and Screen Recording.
 /// Refreshes automatically when the app becomes active (e.g. user returns from System Settings).
@@ -38,12 +39,37 @@ final class SystemPermissionStatus {
         }
     }
 
-    /// Re-reads all permission state from the OS (cheap, synchronous calls).
+    /// Re-reads all permission state from the OS.
     func refresh() {
         let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
         micAuthorized = micStatus == .authorized
         micNotDetermined = micStatus == .notDetermined
-        screenRecordingAuthorized = CGPreflightScreenCaptureAccess()
+
+        // CGPreflightScreenCaptureAccess() is unreliable on macOS 15+;
+        // it often returns false even after the user grants permission.
+        // Use SCShareableContent as a more reliable check.
+        if !CGPreflightScreenCaptureAccess() {
+            Task { @MainActor in
+                await self.checkScreenRecordingViaSCK()
+            }
+        } else {
+            screenRecordingAuthorized = true
+        }
+    }
+
+    /// Checks screen recording permission by attempting to enumerate windows
+    /// via ScreenCaptureKit — this reflects the actual permission state.
+    private func checkScreenRecordingViaSCK() async {
+        do {
+            let content = try await SCShareableContent.excludingDesktopWindows(
+                false, onScreenWindowsOnly: false
+            )
+            // If we can see windows from other apps, permission is granted.
+            screenRecordingAuthorized = !content.windows.isEmpty
+        } catch {
+            // SCShareableContent throws when permission is denied.
+            screenRecordingAuthorized = false
+        }
     }
 
     /// Requests microphone access when status is `.notDetermined`.
@@ -71,7 +97,12 @@ final class SystemPermissionStatus {
             for _ in 0..<15 {
                 try? await Task.sleep(for: .seconds(2))
                 guard !Task.isCancelled else { return }
-                self?.refresh()
+                // Refresh mic status synchronously
+                let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+                self?.micAuthorized = micStatus == .authorized
+                self?.micNotDetermined = micStatus == .notDetermined
+                // Check screen recording via the reliable async path
+                await self?.checkScreenRecordingViaSCK()
                 if self?.allSystemAudioGranted == true { return }
             }
         }
