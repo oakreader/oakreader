@@ -21,9 +21,9 @@ struct ChatBubbleView: View {
 
         return AnyView(
             HStack(alignment: .top) {
-                if turn.role == .user { Spacer(minLength: 40) }
+                if turn.role == .user && characterAgentInput == nil { Spacer(minLength: 40) }
 
-                VStack(alignment: turn.role == .user ? .trailing : .leading, spacing: 4) {
+                VStack(alignment: turn.role == .user && characterAgentInput == nil ? .trailing : .leading, spacing: 4) {
                     // Inline attachments for user messages
                     if turn.role == .user && !turn.attachments.isEmpty {
                         FannedAttachmentStack(attachments: turn.attachments)
@@ -100,7 +100,7 @@ struct ChatBubbleView: View {
                     }
                 }
 
-                if turn.role == .assistant { Spacer(minLength: 4) }
+                if turn.role == .assistant || characterAgentInput != nil { Spacer(minLength: 4) }
             }
             .clipped()
             .onHover { isHovered = $0 }
@@ -139,7 +139,9 @@ struct ChatBubbleView: View {
             .textual.textSelection(.enabled)
             .font(.body)
 
-        if turn.role == .assistant {
+        if let characterAgentInput {
+            characterAgentCard(characterAgentInput)
+        } else if turn.role == .assistant {
             base
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 4)
@@ -177,8 +179,14 @@ struct ChatBubbleView: View {
         }
     }
 
+    private var characterAgentInput: CharacterAgentInput? {
+        guard turn.role == .user else { return nil }
+        return Self.parseCharacterAgentInput(from: turn.content)
+    }
+
     private var renderedContent: String {
         if turn.role == .user {
+            if let characterAgentInput { return characterAgentInput.body }
             let parsed = Self.extractLeadingSkillTags(from: turn.content)
             if !parsed.skillIds.isEmpty && parsed.content == "/" { return "" }
             return parsed.content
@@ -187,7 +195,7 @@ struct ChatBubbleView: View {
     }
 
     private var skillBadges: [String] {
-        guard turn.role == .user else { return [] }
+        guard turn.role == .user, characterAgentInput == nil else { return [] }
         let parsed = Self.extractLeadingSkillTags(from: turn.content)
         if !parsed.skillIds.isEmpty { return parsed.skillIds }
         if let skill = turn.metadata["skill"] { return [skill] }
@@ -216,7 +224,41 @@ struct ChatBubbleView: View {
     }
 
     private var shouldShowMessageBubble: Bool {
-        turn.role == .assistant || !renderedContent.isEmpty || !skillBadges.isEmpty
+        characterAgentInput != nil || turn.role == .assistant || !renderedContent.isEmpty || !skillBadges.isEmpty
+    }
+
+    private func characterAgentCard(_ input: CharacterAgentInput) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 7) {
+                Image(systemName: input.icon ?? "sparkles")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
+                Text(input.agentName)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.primary)
+                Text("CharacterAgent input")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+            }
+
+            StructuredText(markdown: input.body, syntaxExtensions: [.math])
+                .textual.headingStyle(ChatHeadingStyle())
+                .textual.textSelection(.enabled)
+                .font(.body)
+                .foregroundStyle(Color(nsColor: .labelColor))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(nsColor: .controlBackgroundColor))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.accentColor.opacity(0.22), lineWidth: 1)
+        )
     }
 
     private func skillBadge(_ skill: String) -> some View {
@@ -271,6 +313,58 @@ struct ChatBubbleView: View {
     private func copyContent() {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(turn.content, forType: .string)
+    }
+
+    private struct CharacterAgentInput {
+        let agentId: String?
+        let agentName: String
+        let icon: String?
+        let threadId: String?
+        let jsonlPath: String?
+        let body: String
+    }
+
+    private static func parseCharacterAgentInput(from content: String) -> CharacterAgentInput? {
+        let startMarker = "<character-agent-input"
+        let endMarker = "</character-agent-input>"
+        guard let startRange = content.range(of: startMarker),
+              let tagClose = content[startRange.upperBound...].firstIndex(of: ">")
+        else { return nil }
+
+        let bodyStart = content.index(after: tagClose)
+        guard let endRange = content.range(of: endMarker, range: bodyStart..<content.endIndex) else { return nil }
+
+        let tag = String(content[startRange.lowerBound...tagClose])
+        let body = String(content[bodyStart..<endRange.lowerBound])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !body.isEmpty else { return nil }
+
+        let agentId = xmlAttribute("agent_id", in: tag)
+        let agentName = xmlAttribute("agent_name", in: tag) ?? agentId ?? "CharacterAgent"
+        return CharacterAgentInput(
+            agentId: agentId,
+            agentName: agentName,
+            icon: xmlAttribute("icon", in: tag),
+            threadId: xmlAttribute("thread_id", in: tag),
+            jsonlPath: xmlAttribute("jsonl_path", in: tag),
+            body: body
+        )
+    }
+
+    private static func xmlAttribute(_ name: String, in tag: String) -> String? {
+        let marker = name + "=\""
+        guard let start = tag.range(of: marker) else { return nil }
+        let valueStart = start.upperBound
+        guard let valueEnd = tag[valueStart...].firstIndex(of: "\"") else { return nil }
+        return unescapeXML(String(tag[valueStart..<valueEnd]))
+    }
+
+    private static func unescapeXML(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "&quot;", with: "\"")
+            .replacingOccurrences(of: "&gt;", with: ">")
+            .replacingOccurrences(of: "&lt;", with: "<")
+            .replacingOccurrences(of: "&amp;", with: "&")
     }
 
     private func saveToNote() {

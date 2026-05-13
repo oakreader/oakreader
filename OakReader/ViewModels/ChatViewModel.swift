@@ -94,8 +94,9 @@ class ChatViewModel {
     @MainActor
     func send() {
         let parsedInput = Self.extractLeadingSkillTags(from: inputText.trimmingCharacters(in: .whitespacesAndNewlines))
-        let text = parsedInput.content.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty || !parsedInput.skillIds.isEmpty || !activeTokens.isEmpty else { return }
+        let parsedCharacterMentions = Self.extractCharacterAgentMentions(from: parsedInput.content)
+        let text = parsedCharacterMentions.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty || !parsedInput.skillIds.isEmpty || !activeTokens.isEmpty || !parsedCharacterMentions.agents.isEmpty else { return }
 
         let attachments = pendingAttachments
         let tokens = activeTokens
@@ -111,6 +112,14 @@ class ChatViewModel {
             if case .installedSkill(let skill) = item.kind { return skill }
             return nil
         }.first
+
+        var seenCharacterAgentIds = Set<String>()
+        let characterAgents: [CharacterAgent] = (tokens.compactMap { item in
+            if case .characterAgent(let agent) = item.kind { return agent }
+            return nil
+        } + parsedCharacterMentions.agents).filter { agent in
+            seenCharacterAgentIds.insert(agent.id).inserted
+        }
 
         // Also support an explicit leading markdown tag: [[skill:skill-id]].
         let taggedSkill: Skill? = parsedInput.skillIds.lazy.compactMap { skillId in
@@ -155,6 +164,10 @@ class ChatViewModel {
         let currentSessionId = sessionId
         let currentConfig = config
         let turnMetadata: [String: String] = currentSkill.map { ["skill": $0.id] } ?? [:]
+        let characterAgentRequest = text.isEmpty
+            ? "Provide your perspective on the current context."
+            : text
+        let characterAgentService = CharacterAgentService()
 
         let prefs = Preferences.shared
 
@@ -228,6 +241,25 @@ class ChatViewModel {
 
         streamTask = Task { @MainActor [weak self] in
             do {
+                var characterAgentTurns: [Turn] = []
+                for agent in characterAgents {
+                    let result = try await characterAgentService.run(
+                        agent: agent,
+                        request: characterAgentRequest,
+                        contextSystemPrompt: systemPrompt,
+                        config: currentConfig
+                    )
+                    characterAgentTurns.append(Turn(
+                        role: .user,
+                        content: result.xmlBlock,
+                        metadata: [
+                            "characterAgent": agent.id,
+                            "characterAgentName": agent.name,
+                            "characterAgentThreadId": result.threadRef.id.uuidString
+                        ]
+                    ))
+                }
+
                 let stream = await engine.send(
                     userContent: userContent,
                     attachments: attachments,
@@ -236,6 +268,7 @@ class ChatViewModel {
                     config: currentConfig,
                     systemPrompt: systemPrompt,
                     turnMetadata: turnMetadata,
+                    additionalUserTurns: characterAgentTurns,
                     tools: currentTools,
                     toolContext: effectiveToolContext,
                     agentSkills: agentSkills,
@@ -506,6 +539,34 @@ class ChatViewModel {
     private static func contentWithSkillTag(skillId: String, text: String) -> String {
         if text.isEmpty { return "[[skill:\(skillId)]]" }
         return "[[skill:\(skillId)]]\n\(text)"
+    }
+
+    private static func extractCharacterAgentMentions(from content: String) -> (agents: [CharacterAgent], content: String) {
+        let pattern = #"(?<!\S)@([A-Za-z][A-Za-z0-9_-]*)"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else {
+            return ([], content)
+        }
+
+        let ns = content as NSString
+        let matches = regex.matches(in: content, range: NSRange(location: 0, length: ns.length))
+        var agents: [CharacterAgent] = []
+        var removeRanges: [NSRange] = []
+        var seen = Set<String>()
+
+        for match in matches {
+            guard match.numberOfRanges > 1 else { continue }
+            let handle = ns.substring(with: match.range(at: 1))
+            guard let agent = CharacterAgent.find(idOrHandle: handle), seen.insert(agent.id).inserted else { continue }
+            agents.append(agent)
+            removeRanges.append(match.range(at: 0))
+        }
+
+        guard !agents.isEmpty else { return ([], content) }
+        let mutable = NSMutableString(string: content)
+        for range in removeRanges.sorted(by: { $0.location > $1.location }) {
+            mutable.replaceCharacters(in: range, with: "")
+        }
+        return (agents, String(mutable).trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
     /// Older chat records stored skill metadata on the assistant turn. For display,
