@@ -1,3 +1,5 @@
 {
+    "name": "grill",
+    "description": "Test comprehension of the document's core ideas and reasoning",
     "icon": { "type": "symbol", "value": "flame" }
 }

@@ -1,3 +1,5 @@
 {
+    "name": "socratic",
+    "description": "Guide deeper understanding through Socratic questioning",
     "icon": { "type": "symbol", "value": "bubble.left.and.bubble.right" }
 }

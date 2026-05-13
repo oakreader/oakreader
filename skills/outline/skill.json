@@ -1,3 +1,5 @@
 {
+    "name": "outline",
+    "description": "Structural overview of the document",
     "icon": { "type": "symbol", "value": "list.bullet.indent" }
 }

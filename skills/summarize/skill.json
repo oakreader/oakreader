@@ -1,3 +1,5 @@
 {
+    "name": "summarize",
+    "description": "Concise document summary",
     "icon": { "type": "symbol", "value": "doc.text.magnifyingglass" }
 }

@@ -1,19 +1,25 @@
 import Foundation
 
-public final class SkillManager: Sendable {
+@MainActor
+public final class SkillManager {
     public static let shared = SkillManager()
 
-    public let builtInSkills: [Skill]
+    public nonisolated static let installedDir: URL = {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("OakReader/agent/skills", isDirectory: true)
+    }()
+
+    public private(set) var installedSkills: [Skill] = []
 
     public func skill(byId id: String) -> Skill? {
-        builtInSkills.first { $0.id == id }
+        installedSkills.first { $0.id == id }
+    }
+
+    public func reload() {
+        installedSkills = BuiltInSkillLoader.loadSkills(from: Self.installedDir)
     }
 
     private init() {
-        if let skillsDir = Bundle.main.url(forResource: "skills", withExtension: nil) {
-            builtInSkills = BuiltInSkillLoader.loadSkills(from: skillsDir)
-        } else {
-            builtInSkills = []
-        }
+        reload()
     }
 }

@@ -4,7 +4,7 @@ import OakAgent
 struct SkillPickerBar: View {
     @Binding var selectedSkill: Skill?
 
-    private let skills = SkillManager.shared.builtInSkills
+    private var skills: [Skill] { SkillManager.shared.installedSkills }
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {

@@ -34,6 +34,7 @@ public actor AgentSession {
                     let userTurn = Turn(
                         role: .user,
                         content: userContent,
+                        metadata: turnMetadata,
                         attachments: attachments
                     )
                     try await store.appendTurn(userTurn, sessionId: sessionId)
@@ -81,8 +82,7 @@ public actor AgentSession {
                         var assistantTurn = Turn(
                             role: .assistant,
                             content: "",
-                            isStreaming: true,
-                            metadata: turnMetadata
+                            isStreaming: true
                         )
                         var toolCalls: [ToolCall] = []
 
@@ -276,7 +276,7 @@ public actor AgentSession {
                 }
                 messages.append(LLMMessage(role: .user, content: resultParts))
             } else {
-                messages.append(LLMMessage(role: role, text: turn.content))
+                messages.append(LLMMessage(role: role, text: Self.modelText(from: turn.content)))
             }
         }
 
@@ -297,9 +297,34 @@ public actor AgentSession {
             }
         }
 
-        contentParts.append(.text(userTurn.content))
+        contentParts.append(.text(Self.modelText(from: userTurn.content)))
 
         messages.append(LLMMessage(role: .user, content: contentParts))
         return messages
+    }
+
+    /// UI-only marker used by OakReader chat bubbles. The selected skill is applied
+    /// through the system prompt, so do not leak the marker to model providers.
+    /// If the user only selected a skill and typed no text, use the skill id as the
+    /// provider-facing text so the provider never receives an empty user message.
+    private static func modelText(from content: String) -> String {
+        var remaining = content
+        var skillIds: [String] = []
+
+        while true {
+            let trimmed = remaining.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard trimmed.hasPrefix("[[skill:") else { break }
+            guard let closeRange = trimmed.range(of: "]]") else { break }
+
+            let valueStart = trimmed.index(trimmed.startIndex, offsetBy: "[[skill:".count)
+            let rawSkill = String(trimmed[valueStart..<closeRange.lowerBound])
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if !rawSkill.isEmpty { skillIds.append(rawSkill) }
+            remaining = String(trimmed[closeRange.upperBound...])
+        }
+
+        let text = remaining.trimmingCharacters(in: .whitespacesAndNewlines)
+        if skillIds.isEmpty { return text.isEmpty ? "Go" : text }
+        return (text.isEmpty || text == "/") ? (skillIds.first ?? "Go") : text
     }
 }

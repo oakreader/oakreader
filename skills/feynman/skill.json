@@ -1,3 +1,5 @@
 {
+    "name": "feynman",
+    "description": "Deepen understanding by teaching back and finding gaps",
     "icon": { "type": "symbol", "value": "person.and.background.dotted" }
 }

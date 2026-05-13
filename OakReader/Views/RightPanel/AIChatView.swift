@@ -212,7 +212,7 @@ struct AIChatView: View {
 
     // MARK: - Input Bar
 
-    @State private var inputContentHeight: CGFloat = 48
+    @State private var inputContentHeight: CGFloat = ChatInputTextView.minContentHeight
     private let inputFocusRef = ChatInputTextView.FocusRef()
 
     private var inputHasText: Bool {
@@ -245,6 +245,7 @@ struct AIChatView: View {
                 slashItems: chatVM.chatSlashItems,
                 mentionItems: chatVM.chatMentionItems,
                 onActiveTokensChanged: { tokens in chatVM.activeTokens = tokens },
+                resetToken: chatVM.inputResetToken,
                 focusRef: inputFocusRef
             )
             .frame(height: inputContentHeight)
