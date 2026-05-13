@@ -104,6 +104,7 @@ targets:
         ENABLE_HARDENED_RUNTIME: YES
         CODE_SIGN_IDENTITY: "-"
         SWIFT_STRICT_CONCURRENCY: minimal
+        SWIFT_OBJC_BRIDGING_HEADER: OakReader/OakReader-Bridging-Header.h
 
   oak:
     type: tool

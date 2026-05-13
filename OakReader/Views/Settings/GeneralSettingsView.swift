@@ -31,20 +31,7 @@ struct GeneralSettingsView: View {
                     }
                 }
 
-                // Screen Recording
-                LabeledContent("Screen Recording") {
-                    if permissionStatus.screenRecordingAuthorized {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
-                    } else {
-                        Button("Grant Access") {
-                            SystemSettingsPanel.screenRecording.open()
-                            permissionStatus.startPolling()
-                        }
-                    }
-                }
-
-                if permissionStatus.allGranted {
+                if permissionStatus.micAuthorized {
                     Text("All permissions granted")
                         .font(.caption)
                         .foregroundStyle(.secondary)

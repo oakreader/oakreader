@@ -12,8 +12,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var mainWindow: NSWindow?
     private var snapshotServer: SnapshotServer?
     private var appearanceObserver: NSObjectProtocol?
-    private var menuBarRecorder: MenuBarRecorder?
-
     func applicationWillFinishLaunching(_ notification: Notification) {
         documentController.appState = appState
         NSApp.mainMenu = MainMenuBuilder.build(target: self)
@@ -32,12 +30,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Start the snapshot server for Chrome extension
         snapshotServer = SnapshotServer(importService: appState.importService)
         snapshotServer?.start()
-
-        // Recover any recordings from a previous crash
-        RecordingRecoveryService.checkAndRecover(importService: appState.importService)
-
-        // Menu bar audio recorder
-        menuBarRecorder = MenuBarRecorder(importService: appState.importService)
 
         createMainWindow()
     }
