@@ -15,11 +15,20 @@ final class LibraryStore {
     var selectedCollectionId: UUID? = SystemCollectionID.allItems
     var selectedTagOptionId: UUID?
 
-    // Ad-hoc toolbar filters
-    var activeFilters: [FilterCondition] = []
-    var hasActiveFilters: Bool { !activeFilters.isEmpty }
+    // Chip-based toolbar filters
+    var selectedTypes: Set<String> = []
+    var selectedTagOptionIds: Set<UUID> = []
+    var selectedStatusOptionIds: Set<UUID> = []
 
-    func clearFilters() { activeFilters = [] }
+    var hasActiveChipFilters: Bool {
+        !selectedTypes.isEmpty || !selectedTagOptionIds.isEmpty || !selectedStatusOptionIds.isEmpty
+    }
+
+    func clearChipFilters() {
+        selectedTypes = []
+        selectedTagOptionIds = []
+        selectedStatusOptionIds = []
+    }
 
     /// Resolved collection for the current selection.
     var selectedCollection: PDFCollection? {
@@ -147,10 +156,24 @@ final class LibraryStore {
             // isSmart with nil rules → show all (e.g. "All Items")
         }
 
-        // Apply ad-hoc toolbar filters (AND logic)
-        if !activeFilters.isEmpty {
+        // Apply chip-based toolbar filters (OR within category, AND between categories)
+        if hasActiveChipFilters {
             results = results.filter { item in
-                activeFilters.allSatisfy { evaluateCondition($0, against: item) }
+                // Type filter: item matches any selected type (OR)
+                if !selectedTypes.isEmpty {
+                    guard selectedTypes.contains(item.itemType.rawValue) else { return false }
+                }
+                // Tag filter: item has any selected tag option (OR)
+                if !selectedTagOptionIds.isEmpty {
+                    let itemTagIds = Set(item.propertyValues.compactMap { $0.option?.id })
+                    guard !itemTagIds.isDisjoint(with: selectedTagOptionIds) else { return false }
+                }
+                // Status filter: item has any selected status option (OR)
+                if !selectedStatusOptionIds.isEmpty {
+                    let itemStatusIds = Set(item.propertyValues.compactMap { $0.option?.id })
+                    guard !itemStatusIds.isDisjoint(with: selectedStatusOptionIds) else { return false }
+                }
+                return true
             }
         }
 
