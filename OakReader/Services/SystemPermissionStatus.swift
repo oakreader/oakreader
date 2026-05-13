@@ -2,6 +2,7 @@ import AVFoundation
 import CoreGraphics
 import AppKit
 import ScreenCaptureKit
+import os
 
 /// Centralized permission tracker for Microphone and Screen Recording.
 /// Refreshes automatically when the app becomes active (e.g. user returns from System Settings).
@@ -55,9 +56,16 @@ final class SystemPermissionStatus {
         micNotDetermined = status == .notDetermined
     }
 
-    /// Uses SCShareableContent to check the real permission state.
-    /// CGPreflightScreenCaptureAccess() is unreliable on macOS 15 — it caches
-    /// the value from launch and doesn't reflect runtime changes.
+    private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.oakreader.OakReader", category: "permission")
+
+    /// Uses SCShareableContent to check the real permission state, with
+    /// CGPreflightScreenCaptureAccess() as a fallback.
+    ///
+    /// SCShareableContent can throw even when permission is granted — common
+    /// with debug builds whose code signature changes on every rebuild.
+    /// CGPreflightScreenCaptureAccess() caches from launch so it won't catch
+    /// runtime revocations, but it's a useful fallback when SCShareableContent
+    /// fails despite the app being authorized.
     private func refreshScreenRecordingStatus() async {
         do {
             let content = try await SCShareableContent.excludingDesktopWindows(
@@ -65,7 +73,8 @@ final class SystemPermissionStatus {
             )
             screenRecordingAuthorized = !content.windows.isEmpty
         } catch {
-            screenRecordingAuthorized = false
+            Self.log.warning("SCShareableContent failed: \(error.localizedDescription, privacy: .public), falling back to CGPreflightScreenCaptureAccess")
+            screenRecordingAuthorized = CGPreflightScreenCaptureAccess()
         }
     }
 
