@@ -25,18 +25,25 @@ final class PluginService {
             .appendingPathComponent(".oak/plugins")
     }()
 
+    private static let _bundledPlugins = bundledPlugins()
+
     private init() {
-        reload()
+        // Load plugin list synchronously (fast — no subprocess calls).
+        var all = Self._bundledPlugins
+        all.append(contentsOf: loadWorkspacePlugins())
+        plugins = all
+        // Resolve tool paths and versions in the background.
+        rebuildToolStatusesAsync()
     }
 
     // MARK: - Reload
 
     /// Rescan bundled + `~/.oak/plugins/` and rebuild tool statuses.
     func reload() {
-        var all = Self.bundledPlugins()
+        var all = Self._bundledPlugins
         all.append(contentsOf: loadWorkspacePlugins())
         plugins = all
-        rebuildToolStatuses()
+        rebuildToolStatusesAsync()
     }
 
     // MARK: - Tool Resolution
@@ -133,7 +140,7 @@ final class PluginService {
 
     /// Whether a plugin is bundled (vs. workspace-installed).
     func isBundled(_ pluginName: String) -> Bool {
-        Self.bundledPlugins().contains { $0.name == pluginName }
+        Self._bundledPlugins.contains { $0.name == pluginName }
     }
 
     // MARK: - Filesystem Loading
@@ -189,16 +196,21 @@ final class PluginService {
         return nil
     }
 
-    private func rebuildToolStatuses() {
-        var statuses: [String: ToolStatus] = [:]
-        for plugin in plugins {
-            for tool in plugin.tools {
-                let path = resolve(tool: tool)
-                let ver = path.flatMap { version(tool: tool, at: $0) }
-                statuses[tool.name] = ToolStatus(tool: tool, pluginName: plugin.name, path: path, version: ver)
+    private func rebuildToolStatusesAsync() {
+        let currentPlugins = plugins
+        DispatchQueue.global(qos: .userInitiated).async { [self] in
+            var statuses: [String: ToolStatus] = [:]
+            for plugin in currentPlugins {
+                for tool in plugin.tools {
+                    let path = resolve(tool: tool)
+                    let ver = path.flatMap { version(tool: tool, at: $0) }
+                    statuses[tool.name] = ToolStatus(tool: tool, pluginName: plugin.name, path: path, version: ver)
+                }
+            }
+            DispatchQueue.main.async {
+                self.toolStatuses = statuses
             }
         }
-        toolStatuses = statuses
     }
 
     private func version(tool decl: PluginManifest.ToolDeclaration, at path: String) -> String? {

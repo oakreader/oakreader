@@ -69,8 +69,10 @@ struct PluginManagementView: View {
 
     private func pluginRow(_ plugin: PluginManifest) -> some View {
         let isEnabled = service.isEnabled(plugin.name)
-        let statuses = service.checkTools(for: plugin)
-        let hasMissingTools = statuses.contains { $0.path == nil && $0.tool.required }
+        let hasMissingTools = plugin.tools.contains { tool in
+            let status = service.toolStatuses[tool.name]
+            return status?.path == nil && tool.required
+        }
 
         return Button {
             selectedPluginName = plugin.name
@@ -254,7 +256,7 @@ private struct PluginDetailView: View {
 
     private func toolRow(_ tool: PluginManifest.ToolDeclaration) -> some View {
         let status = service.toolStatuses[tool.name]
-        let path = status?.path ?? service.resolve(tool: tool)
+        let path = status?.path
         let version = status?.version
 
         return VStack(alignment: .leading, spacing: 4) {
