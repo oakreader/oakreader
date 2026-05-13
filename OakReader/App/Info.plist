@@ -41,6 +41,17 @@
 	<string>6.0</string>
 	<key>CFBundleName</key>
 	<string>OakReader</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.oakreader.OakReader</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>oakreader</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
