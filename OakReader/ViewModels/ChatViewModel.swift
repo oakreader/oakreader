@@ -17,6 +17,7 @@ class ChatViewModel {
     var inputText: String = ""
     var isStreaming: Bool = false
     var selectedSkill: Skill? = nil
+    var activeTokens: [ChatCompletionItem] = []
     var pendingAttachments: [TurnAttachment] = []
     var showSettings: Bool = false
     var errorMessage: String?
@@ -72,23 +73,58 @@ class ChatViewModel {
         )
     }
 
+    // MARK: - Completion Items
+
+    /// Items shown in the `/` slash completion panel.
+    var chatSlashItems: [ChatCompletionItem] {
+        ChatCompletionItem.slashItems(
+            builtIn: SkillManager.shared.builtInSkills,
+            agent: Self.loadAgentSkills()
+        )
+    }
+
+    /// Items shown in the `@` mention completion panel (requires a document).
+    var chatMentionItems: [ChatCompletionItem] {
+        ChatCompletionItem.mentionItems(hasDocument: parent != nil)
+    }
+
     // MARK: - Send Message
 
     func send() {
         let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
+        guard !text.isEmpty || !activeTokens.isEmpty else { return }
 
         let attachments = pendingAttachments
+        let tokens = activeTokens
         inputText = ""
+        activeTokens = []
         pendingAttachments = []
         isStreaming = true
         errorMessage = nil
 
+        // Extract skill from tokens (overrides selectedSkill)
+        let tokenSkill: Skill? = tokens.lazy.compactMap { item -> Skill? in
+            if case .builtInSkill(let skill) = item.kind { return skill }
+            return nil
+        }.first
+
+        // Extract broadest context mode from @mention tokens
+        let tokenContextMode: ContextMode? = tokens.lazy.compactMap { $0.contextMode }
+            .sorted { lhs, rhs in
+                // fullDocument > currentPage > selectedText > none
+                let order: [ContextMode: Int] = [.fullDocument: 0, .currentPage: 1, .selectedText: 2, .none: 3]
+                return (order[lhs] ?? 3) < (order[rhs] ?? 3)
+            }
+            .first
+
+        let effectiveSkill = tokenSkill ?? selectedSkill
+        let sendText = text.isEmpty ? (effectiveSkill?.name ?? "Go") : text
+
         // Create or update session record in DB
-        persistSessionMetadata(firstUserMessage: text)
+        persistSessionMetadata(firstUserMessage: sendText)
 
         // Build enriched context snapshot
-        let contextMode = selectedSkill?.contextMode ?? .currentPage
+        let contextMode = tokenContextMode ?? effectiveSkill?.contextMode ?? .currentPage
         let snapshot = PDFContextProvider.buildContextSnapshot(
             from: parent,
             appState: parent?.appState ?? appState,
@@ -96,7 +132,7 @@ class ChatViewModel {
         )
 
         // Build system prompt from snapshot
-        let currentSkill = selectedSkill
+        let currentSkill = effectiveSkill
         let systemPrompt = PDFContextProvider.buildSystemPrompt(
             skill: currentSkill,
             context: snapshot
@@ -180,7 +216,7 @@ class ChatViewModel {
         streamTask = Task { @MainActor [weak self] in
             do {
                 let stream = await engine.send(
-                    userContent: text,
+                    userContent: sendText,
                     attachments: attachments,
                     history: currentHistory,
                     sessionId: currentSessionId,
@@ -365,6 +401,7 @@ class ChatViewModel {
         sessionId = UUID()
         sessionRecordCreated = false
         selectedSkill = nil
+        activeTokens = []
         pendingAttachments = []
         inputText = ""
         errorMessage = nil

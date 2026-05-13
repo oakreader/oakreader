@@ -2,12 +2,20 @@ import SwiftUI
 
 /// A multi-line text input that sends on Enter and inserts a newline on Cmd+Enter.
 /// Reports its content height so the parent can size it to fit.
+/// Supports `/` slash commands and `@` context mentions via inline token chips.
 struct ChatInputTextView: NSViewRepresentable {
     @Binding var text: String
     var placeholder: String = "Ask about this Document..."
     var onSend: () -> Void
     var onPasteImage: ((Data) -> Void)?
     @Binding var contentHeight: CGFloat
+
+    /// Items shown when the user types `/`.
+    var slashItems: [ChatCompletionItem] = []
+    /// Items shown when the user types `@`.
+    var mentionItems: [ChatCompletionItem] = []
+    /// Called whenever the set of active token chips changes.
+    var onActiveTokensChanged: (([ChatCompletionItem]) -> Void)?
 
     /// Shared reference so the parent SwiftUI view can trigger focus.
     class FocusRef {
@@ -46,6 +54,12 @@ struct ChatInputTextView: NSViewRepresentable {
         textView.textContainer?.lineFragmentPadding = 0
         textView.textContainer?.widthTracksTextView = true
 
+        textView.slashItems = slashItems
+        textView.mentionItems = mentionItems
+        textView.onTokensChanged = { tokens in
+            context.coordinator.parent.onActiveTokensChanged?(tokens)
+        }
+
         scrollView.documentView = textView
         context.coordinator.textView = textView
         focusRef.textView = textView
@@ -67,9 +81,18 @@ struct ChatInputTextView: NSViewRepresentable {
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let textView = scrollView.documentView as? ChatNSTextView else { return }
 
-        if textView.string != text && !context.coordinator.isUpdating {
+        // Sync text from SwiftUI → NSTextView only when externally changed
+        // (e.g. cleared after send). Check plainText to avoid fighting with tokens.
+        let currentPlain = textView.plainText()
+        if currentPlain != text && !context.coordinator.isUpdating {
             context.coordinator.isUpdating = true
-            textView.string = text
+            if text.isEmpty {
+                // Full clear (after send): remove all tokens too
+                textView.textStorage?.setAttributedString(NSAttributedString())
+                textView.string = ""
+            } else {
+                textView.string = text
+            }
             context.coordinator.updatePlaceholder()
             context.coordinator.updateHeight()
             context.coordinator.isUpdating = false
@@ -77,6 +100,11 @@ struct ChatInputTextView: NSViewRepresentable {
 
         textView.onSend = onSend
         textView.onPasteImage = onPasteImage
+        textView.slashItems = slashItems
+        textView.mentionItems = mentionItems
+        textView.onTokensChanged = { tokens in
+            context.coordinator.parent.onActiveTokensChanged?(tokens)
+        }
         focusRef.textView = textView
     }
 
@@ -93,9 +121,9 @@ struct ChatInputTextView: NSViewRepresentable {
         }
 
         func textDidChange(_ notification: Notification) {
-            guard !isUpdating, let textView = notification.object as? NSTextView else { return }
+            guard !isUpdating, let textView = notification.object as? ChatNSTextView else { return }
             isUpdating = true
-            parent.text = textView.string
+            parent.text = textView.plainText()
             updatePlaceholder()
             updateHeight()
             isUpdating = false
@@ -114,7 +142,8 @@ struct ChatInputTextView: NSViewRepresentable {
 
         func updatePlaceholder() {
             guard let textView else { return }
-            if textView.string.isEmpty {
+            let isEmpty = textView.plainText().isEmpty && textView.activeTokens().isEmpty
+            if isEmpty {
                 if placeholderView == nil {
                     let label = PassthroughTextField(labelWithString: parent.placeholder)
                     label.textColor = .placeholderTextColor
@@ -152,6 +181,16 @@ private final class PassthroughTextField: NSTextField {
 final class ChatNSTextView: NSTextView {
     var onSend: (() -> Void)?
     var onPasteImage: ((Data) -> Void)?
+
+    // MARK: - Completion State
+
+    var slashItems: [ChatCompletionItem] = []
+    var mentionItems: [ChatCompletionItem] = []
+    var onTokensChanged: (([ChatCompletionItem]) -> Void)?
+
+    private var completionPanel: ChatCompletionPanel?
+    private var triggerChar: String?
+    private var triggerLocation: Int?
 
     override var acceptsFirstResponder: Bool { true }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
@@ -199,7 +238,14 @@ final class ChatNSTextView: NSTextView {
         super.willOpenMenu(menu, with: event)
     }
 
+    // MARK: - Key Handling
+
     override func keyDown(with event: NSEvent) {
+        // Route to completion panel if active
+        if completionPanel != nil {
+            if handleCompletionKey(event) { return }
+        }
+
         let isReturn = event.keyCode == 36
         let hasCommand = event.modifierFlags.contains(.command)
         let hasShift = event.modifierFlags.contains(.shift)
@@ -214,8 +260,33 @@ final class ChatNSTextView: NSTextView {
             return
         }
 
+        // Detect trigger characters
+        if let chars = event.characters, chars.count == 1,
+           !event.modifierFlags.contains(.command) {
+            let ch = chars.first!
+            if ch == "/" {
+                // Only trigger at input start (no preceding text except whitespace/attachments)
+                let loc = selectedRange().location
+                if loc == 0 || isAtEffectiveStart(loc) {
+                    if !slashItems.isEmpty && !hasSlashToken() {
+                        super.keyDown(with: event)
+                        showCompletionPanel(trigger: "/", items: slashItems)
+                        return
+                    }
+                }
+            } else if ch == "@" {
+                if !mentionItems.isEmpty {
+                    super.keyDown(with: event)
+                    showCompletionPanel(trigger: "@", items: mentionItems)
+                    return
+                }
+            }
+        }
+
         super.keyDown(with: event)
     }
+
+    // MARK: - Paste
 
     override func paste(_ sender: Any?) {
         guard let handler = onPasteImage else {
@@ -249,5 +320,191 @@ final class ChatNSTextView: NSTextView {
         }
 
         super.paste(sender)
+    }
+
+    // MARK: - Completion Panel
+
+    private func showCompletionPanel(trigger: String, items: [ChatCompletionItem]) {
+        dismissCompletionPanel()
+
+        triggerChar = trigger
+        triggerLocation = selectedRange().location - 1  // before the trigger char we just inserted
+
+        guard let screenPt = cursorScreenPoint() else { return }
+
+        completionPanel = ChatCompletionPanel(items: items, at: screenPt) { [weak self] item in
+            self?.insertToken(item)
+        }
+    }
+
+    private func dismissCompletionPanel() {
+        completionPanel?.dismiss()
+        completionPanel = nil
+        triggerChar = nil
+        triggerLocation = nil
+    }
+
+    private func handleCompletionKey(_ event: NSEvent) -> Bool {
+        guard completionPanel != nil, let startLoc = triggerLocation else { return false }
+
+        switch event.keyCode {
+        case 53:  // Escape
+            dismissCompletionPanel()
+            return true
+        case 36:  // Enter
+            if let item = completionPanel?.selectedItem {
+                insertToken(item)
+            } else {
+                dismissCompletionPanel()
+            }
+            return true
+        case 126:  // Up
+            completionPanel?.moveSelection(by: -1)
+            return true
+        case 125:  // Down
+            completionPanel?.moveSelection(by: 1)
+            return true
+        case 51:  // Backspace
+            if selectedRange().location <= startLoc {
+                dismissCompletionPanel()
+                super.keyDown(with: event)
+                return true
+            }
+            super.keyDown(with: event)
+            updateCompletionFilter()
+            return true
+        default:
+            if let c = event.characters, !c.isEmpty {
+                if c == " " {
+                    dismissCompletionPanel()
+                    super.keyDown(with: event)
+                    return true
+                }
+                super.keyDown(with: event)
+                updateCompletionFilter()
+                return true
+            }
+            return false
+        }
+    }
+
+    private func updateCompletionFilter() {
+        guard let panel = completionPanel, let startLoc = triggerLocation else { return }
+        let cur = selectedRange().location
+        let filterStart = startLoc + 1  // skip the trigger character
+        guard filterStart <= cur else { dismissCompletionPanel(); return }
+        let query = (string as NSString).substring(
+            with: NSRange(location: filterStart, length: cur - filterStart)
+        )
+        panel.filter(query: query)
+        if panel.filteredCount == 0 { dismissCompletionPanel() }
+    }
+
+    // MARK: - Token Insertion
+
+    private func insertToken(_ item: ChatCompletionItem) {
+        guard let startLoc = triggerLocation else { return }
+        dismissCompletionPanel()
+
+        // Enforce: only one slash token allowed
+        if item.trigger == "/" && hasSlashToken() { return }
+
+        // Delete the trigger text (trigger char + any filter text typed)
+        let curLoc = selectedRange().location
+        let deleteRange = NSRange(location: startLoc, length: curLoc - startLoc)
+
+        // Need rich text temporarily to insert attachment
+        let wasRichText = isRichText
+        isRichText = true
+
+        // Build attributed string with attachment
+        let attachment = ChatTokenAttachment(item: item)
+        let attachStr = NSAttributedString(attachment: attachment)
+
+        // Insert attachment + trailing space
+        let mutable = NSMutableAttributedString(attributedString: attachStr)
+        let spaceAttrs: [NSAttributedString.Key: Any] = [
+            .font: font ?? .systemFont(ofSize: 15),
+            .foregroundColor: NSColor.labelColor,
+        ]
+        mutable.append(NSAttributedString(string: " ", attributes: spaceAttrs))
+
+        textStorage?.replaceCharacters(in: deleteRange, with: mutable)
+        setSelectedRange(NSRange(location: startLoc + mutable.length, length: 0))
+
+        isRichText = wasRichText
+
+        notifyTokensChanged()
+    }
+
+    // MARK: - Token Queries
+
+    /// Returns all `ChatCompletionItem`s currently embedded as token attachments.
+    func activeTokens() -> [ChatCompletionItem] {
+        guard let storage = textStorage else { return [] }
+        var tokens: [ChatCompletionItem] = []
+        storage.enumerateAttribute(.attachment, in: NSRange(location: 0, length: storage.length)) { value, _, _ in
+            if let tokenAttachment = value as? ChatTokenAttachment {
+                tokens.append(tokenAttachment.item)
+            }
+        }
+        return tokens
+    }
+
+    /// Returns the plain text content, stripping attachment characters.
+    func plainText() -> String {
+        guard let storage = textStorage else { return string }
+        var result = ""
+        storage.enumerateAttributes(in: NSRange(location: 0, length: storage.length)) { attrs, range, _ in
+            if attrs[.attachment] is ChatTokenAttachment {
+                // Skip attachment characters
+            } else {
+                result += (storage.string as NSString).substring(with: range)
+            }
+        }
+        return result.trimmingCharacters(in: .whitespaces)
+    }
+
+    /// Whether a `/skill` token is already present.
+    private func hasSlashToken() -> Bool {
+        activeTokens().contains { $0.trigger == "/" }
+    }
+
+    /// Whether the cursor is at the effective start of input (only attachments/whitespace before).
+    private func isAtEffectiveStart(_ location: Int) -> Bool {
+        guard let storage = textStorage else { return location == 0 }
+        let before = NSRange(location: 0, length: location)
+        var onlyWhitespaceOrAttachments = true
+        storage.enumerateAttributes(in: before) { attrs, range, stop in
+            if attrs[.attachment] is ChatTokenAttachment { return }
+            let text = (storage.string as NSString).substring(with: range)
+            if !text.trimmingCharacters(in: .whitespaces).isEmpty {
+                onlyWhitespaceOrAttachments = false
+                stop.pointee = true
+            }
+        }
+        return onlyWhitespaceOrAttachments
+    }
+
+    private func notifyTokensChanged() {
+        onTokensChanged?(activeTokens())
+    }
+
+    /// Computes the screen point above the current cursor for panel positioning.
+    /// Uses `firstRect(forCharacterRange:)` which works with both TextKit 1 and TextKit 2.
+    private func cursorScreenPoint() -> NSPoint? {
+        var actualRange = NSRange()
+        let screenRect = firstRect(forCharacterRange: selectedRange(), actualRange: &actualRange)
+        guard screenRect != .zero else { return nil }
+        // screenRect is in screen coordinates (y=0 at bottom).
+        // Position the panel above the cursor line.
+        return NSPoint(x: screenRect.origin.x, y: screenRect.origin.y + screenRect.height + 4)
+    }
+
+    // MARK: - Override text changes to track token deletions
+
+    override func didChangeText() {
+        super.didChangeText()
+        notifyTokensChanged()
     }
 }
