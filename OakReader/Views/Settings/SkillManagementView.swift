@@ -86,6 +86,7 @@ struct SkillManagementView: View {
             catalogDirs.append(bundled)
         }
         catalogSkills = SkillLoader.loadSkills(from: catalogDirs).skills
+            .filter { !$0.disableModelInvocation }
 
         // Include user skills from installed dir that aren't in catalog
         let installedResult = SkillLoader.loadSkills(from: [Self.installedDir])
