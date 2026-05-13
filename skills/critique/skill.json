@@ -1,3 +1,5 @@
 {
+    "name": "critique",
+    "description": "Evaluate argument strength and reasoning",
     "icon": { "type": "symbol", "value": "checkmark.shield" }
 }

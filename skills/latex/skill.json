@@ -1,18 +1,21 @@
 {
     "name": "latex",
-    "description": "Export documents with professional typesetting",
+    "description": "Export documents as LaTeX compilable with Tectonic",
     "icon": { "type": "symbol", "value": "doc.richtext" },
     "requires": {
         "bins": [
             {
-                "name": "typst",
-                "description": "Modern typesetting system for documents",
+                "name": "tectonic",
+                "description": "Self-contained LaTeX engine written in Rust",
                 "searchPaths": [
-                    "~/Library/Application Support/OakReader/bin/typst",
-                    "/opt/homebrew/bin/typst",
-                    "/usr/local/bin/typst"
+                    "~/Library/Application Support/OakReader/bin/tectonic",
+                    "/opt/homebrew/bin/tectonic",
+                    "/usr/local/bin/tectonic"
                 ],
-                "install": { "brew": "typst" },
+                "install": {
+                    "brew": "tectonic",
+                    "url": "https://github.com/tectonic-typesetting/tectonic/releases/latest/download/tectonic-0.15.0-aarch64-apple-darwin.tar.gz"
+                },
                 "versionArgs": ["--version"]
             }
         ]

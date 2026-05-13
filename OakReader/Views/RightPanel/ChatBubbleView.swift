@@ -24,16 +24,6 @@ struct ChatBubbleView: View {
                 if turn.role == .user { Spacer(minLength: 40) }
 
                 VStack(alignment: turn.role == .user ? .trailing : .leading, spacing: 4) {
-                    // Skill badge
-                    if let skill = turn.metadata["skill"] {
-                        Text(skill)
-                            .font(.system(size: 13))
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 2)
-                            .background(Capsule().fill(Color.accentColor.opacity(0.1)))
-                    }
-
                     // Inline attachments for user messages
                     if turn.role == .user && !turn.attachments.isEmpty {
                         FannedAttachmentStack(attachments: turn.attachments)
@@ -51,7 +41,9 @@ struct ChatBubbleView: View {
                     }
 
                     // Message content
-                    messageBubble
+                    if shouldShowMessageBubble {
+                        messageBubble
+                    }
 
                     // Streaming indicator
                     if turn.isStreaming {
@@ -142,7 +134,7 @@ struct ChatBubbleView: View {
 
     @ViewBuilder
     private var messageBubble: some View {
-        let base = StructuredText(markdown: reveal.displayedContent, syntaxExtensions: [.math])
+        let base = StructuredText(markdown: renderedContent, syntaxExtensions: [.math])
             .textual.headingStyle(ChatHeadingStyle())
             .textual.textSelection(.enabled)
             .font(.body)
@@ -158,14 +150,21 @@ struct ChatBubbleView: View {
                 )
                 .foregroundStyle(Color(nsColor: .labelColor))
         } else {
-            base
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(bubbleColor)
-                )
-                .foregroundStyle(Color(nsColor: .labelColor))
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                ForEach(skillBadges, id: \.self) { skill in
+                    skillBadge(skill)
+                }
+                if !renderedContent.isEmpty {
+                    base
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(bubbleColor)
+            )
+            .foregroundStyle(Color(nsColor: .labelColor))
         }
     }
 
@@ -176,6 +175,58 @@ struct ChatBubbleView: View {
         case .assistant, .system:
             return Color(nsColor: .controlBackgroundColor)
         }
+    }
+
+    private var renderedContent: String {
+        if turn.role == .user {
+            let parsed = Self.extractLeadingSkillTags(from: turn.content)
+            if !parsed.skillIds.isEmpty && parsed.content == "/" { return "" }
+            return parsed.content
+        }
+        return reveal.displayedContent
+    }
+
+    private var skillBadges: [String] {
+        guard turn.role == .user else { return [] }
+        let parsed = Self.extractLeadingSkillTags(from: turn.content)
+        if !parsed.skillIds.isEmpty { return parsed.skillIds }
+        if let skill = turn.metadata["skill"] { return [skill] }
+        return []
+    }
+
+    private static func extractLeadingSkillTags(from content: String) -> (skillIds: [String], content: String) {
+        var remaining = content
+        var skillIds: [String] = []
+
+        while true {
+            let trimmed = remaining.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard trimmed.hasPrefix("[[skill:") else { break }
+            guard let closeRange = trimmed.range(of: "]]") else { break }
+
+            let valueStart = trimmed.index(trimmed.startIndex, offsetBy: "[[skill:".count)
+            let rawSkill = String(trimmed[valueStart..<closeRange.lowerBound])
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if !rawSkill.isEmpty {
+                skillIds.append(rawSkill)
+            }
+            remaining = String(trimmed[closeRange.upperBound...])
+        }
+
+        return (skillIds, remaining.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    private var shouldShowMessageBubble: Bool {
+        turn.role == .assistant || !renderedContent.isEmpty || !skillBadges.isEmpty
+    }
+
+    private func skillBadge(_ skill: String) -> some View {
+        Text(skill)
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(Capsule().fill(Color.accentColor.opacity(0.1)))
+            .fixedSize()
     }
 
     private var saveIcon: String {

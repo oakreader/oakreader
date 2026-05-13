@@ -1,3 +1,5 @@
 {
+    "name": "translate",
+    "description": "Translate document content to target language",
     "icon": { "type": "symbol", "value": "globe" }
 }

@@ -17,6 +17,12 @@ struct ChatInputTextView: NSViewRepresentable {
     /// Called whenever the set of active token chips changes.
     var onActiveTokensChanged: (([ChatCompletionItem]) -> Void)?
 
+    /// Incremented by the parent to force-clear rich text attachments after send.
+    var resetToken: Int = 0
+
+    static let minContentHeight: CGFloat = 48
+    static let maxContentHeight: CGFloat = 120
+
     /// Shared reference so the parent SwiftUI view can trigger focus.
     class FocusRef {
         weak var textView: ChatNSTextView?
@@ -59,6 +65,10 @@ struct ChatInputTextView: NSViewRepresentable {
         textView.onTokensChanged = { tokens in
             context.coordinator.parent.onActiveTokensChanged?(tokens)
         }
+        textView.onPlainTextChanged = { [weak coordinator = context.coordinator, weak textView] in
+            guard let textView else { return }
+            coordinator?.syncTextFromTextView(textView)
+        }
 
         scrollView.documentView = textView
         context.coordinator.textView = textView
@@ -81,8 +91,18 @@ struct ChatInputTextView: NSViewRepresentable {
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let textView = scrollView.documentView as? ChatNSTextView else { return }
 
-        // Sync text from SwiftUI → NSTextView only when externally changed
-        // (e.g. cleared after send). Check plainText to avoid fighting with tokens.
+        if context.coordinator.lastResetToken != resetToken {
+            context.coordinator.lastResetToken = resetToken
+            context.coordinator.isUpdating = true
+            textView.textStorage?.setAttributedString(NSAttributedString())
+            textView.string = ""
+            context.coordinator.updatePlaceholder()
+            context.coordinator.updateHeight()
+            context.coordinator.isUpdating = false
+        }
+
+        // Sync text from SwiftUI → NSTextView only when externally changed.
+        // Check plainText to avoid fighting with tokens while the user is composing.
         let currentPlain = textView.plainText()
         if currentPlain != text && !context.coordinator.isUpdating {
             context.coordinator.isUpdating = true
@@ -105,6 +125,10 @@ struct ChatInputTextView: NSViewRepresentable {
         textView.onTokensChanged = { tokens in
             context.coordinator.parent.onActiveTokensChanged?(tokens)
         }
+        textView.onPlainTextChanged = { [weak coordinator = context.coordinator, weak textView] in
+            guard let textView else { return }
+            coordinator?.syncTextFromTextView(textView)
+        }
         focusRef.textView = textView
     }
 
@@ -114,14 +138,21 @@ struct ChatInputTextView: NSViewRepresentable {
         var parent: ChatInputTextView
         weak var textView: ChatNSTextView?
         var isUpdating = false
+        var lastResetToken: Int
         private var placeholderView: NSTextField?
 
         init(_ parent: ChatInputTextView) {
             self.parent = parent
+            self.lastResetToken = parent.resetToken
         }
 
         func textDidChange(_ notification: Notification) {
-            guard !isUpdating, let textView = notification.object as? ChatNSTextView else { return }
+            guard let textView = notification.object as? ChatNSTextView else { return }
+            syncTextFromTextView(textView)
+        }
+
+        func syncTextFromTextView(_ textView: ChatNSTextView) {
+            guard !isUpdating else { return }
             isUpdating = true
             parent.text = textView.plainText()
             updatePlaceholder()
@@ -133,10 +164,11 @@ struct ChatInputTextView: NSViewRepresentable {
             guard let textView else { return }
             textView.layoutManager?.ensureLayout(for: textView.textContainer!)
             let usedRect = textView.layoutManager?.usedRect(for: textView.textContainer!) ?? .zero
-            let singleLineHeight = (textView.font?.boundingRectForFont.height ?? 20).rounded(.up)
-            let newHeight = max(usedRect.height + 2, singleLineHeight * 3)
+            let fittingHeight = ceil(usedRect.height + textView.textContainerInset.height * 2 + 2)
+            let newHeight = min(max(fittingHeight, ChatInputTextView.minContentHeight), ChatInputTextView.maxContentHeight)
             DispatchQueue.main.async {
-                self.parent.contentHeight = min(newHeight, 120)
+                guard abs(self.parent.contentHeight - newHeight) > 0.5 else { return }
+                self.parent.contentHeight = newHeight
             }
         }
 
@@ -181,6 +213,7 @@ private final class PassthroughTextField: NSTextField {
 final class ChatNSTextView: NSTextView {
     var onSend: (() -> Void)?
     var onPasteImage: ((Data) -> Void)?
+    var onPlainTextChanged: (() -> Void)?
 
     // MARK: - Completion State
 
@@ -330,7 +363,7 @@ final class ChatNSTextView: NSTextView {
         triggerChar = trigger
         triggerLocation = selectedRange().location - 1  // before the trigger char we just inserted
 
-        guard let screenPt = cursorScreenPoint() else { return }
+        guard let screenPt = popupAnchorScreenPoint() else { return }
 
         completionPanel = ChatCompletionPanel(items: items, at: screenPt) { [weak self] item in
             self?.insertToken(item)
@@ -434,6 +467,7 @@ final class ChatNSTextView: NSTextView {
 
         isRichText = wasRichText
 
+        onPlainTextChanged?()
         notifyTokensChanged()
     }
 
@@ -490,15 +524,14 @@ final class ChatNSTextView: NSTextView {
         onTokensChanged?(activeTokens())
     }
 
-    /// Computes the screen point above the current cursor for panel positioning.
-    /// Uses `firstRect(forCharacterRange:)` which works with both TextKit 1 and TextKit 2.
-    private func cursorScreenPoint() -> NSPoint? {
-        var actualRange = NSRange()
-        let screenRect = firstRect(forCharacterRange: selectedRange(), actualRange: &actualRange)
-        guard screenRect != .zero else { return nil }
-        // screenRect is in screen coordinates (y=0 at bottom).
-        // Position the panel above the cursor line.
-        return NSPoint(x: screenRect.origin.x, y: screenRect.origin.y + screenRect.height + 4)
+    /// Computes the screen point for the completion popup. It is anchored to the
+    /// left edge of the chat input instead of the slash cursor so the menu visually
+    /// aligns with the input border.
+    private func popupAnchorScreenPoint() -> NSPoint? {
+        guard let window else { return nil }
+        let local = NSPoint(x: bounds.minX, y: bounds.maxY + 8)
+        let inWindow = convert(local, to: nil)
+        return window.convertPoint(toScreen: inWindow)
     }
 
     // MARK: - Override text changes to track token deletions

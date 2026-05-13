@@ -13,9 +13,9 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
     private let stackView = NSStackView()
     private let onSelect: (ChatCompletionItem) -> Void
 
-    fileprivate static let panelWidth: CGFloat = 260
-    fileprivate static let rowHeight: CGFloat = 36
-    private static let maxVisible = 8
+    fileprivate static let panelWidth: CGFloat = 320
+    fileprivate static let rowHeight: CGFloat = 30
+    private static let maxVisible = 6
 
     var selectedItem: ChatCompletionItem? {
         guard selectedIndex >= 0, selectedIndex < filtered.count else { return nil }
@@ -40,24 +40,32 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
         backgroundColor = .clear
         level = .floating
         hasShadow = true
+        collectionBehavior = [.transient, .ignoresCycle]
 
         stackView.orientation = .vertical
         stackView.spacing = 0
-        stackView.edgeInsets = NSEdgeInsets(top: 4, left: 0, bottom: 4, right: 0)
+        stackView.edgeInsets = NSEdgeInsets(top: 4, left: 4, bottom: 4, right: 4)
+        stackView.translatesAutoresizingMaskIntoConstraints = false
 
-        let container = makePopupGlassContainer(content: stackView, cornerRadius: 8)
-        container.translatesAutoresizingMaskIntoConstraints = false
-
-        let scroll = NSScrollView()
-        scroll.drawsBackground = false
-        scroll.hasVerticalScroller = true
-        scroll.autohidesScrollers = true
-        scroll.borderType = .noBorder
-        scroll.documentView = container
-        contentView = scroll
+        // Keep this popup simple and predictable. The previous glass container
+        // inside a scroll view produced nested/offset backgrounds around slash
+        // skill results. A plain rounded container matches the app chrome and
+        // avoids visual artifacts.
+        let container = NSView()
+        container.wantsLayer = true
+        container.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
+        container.layer?.cornerRadius = 14
+        container.layer?.borderWidth = 0.5
+        container.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.45).cgColor
+        container.layer?.masksToBounds = true
+        container.addSubview(stackView)
+        contentView = container
 
         NSLayoutConstraint.activate([
-            stackView.widthAnchor.constraint(equalToConstant: Self.panelWidth),
+            stackView.topAnchor.constraint(equalTo: container.topAnchor),
+            stackView.bottomAnchor.constraint(lessThanOrEqualTo: container.bottomAnchor),
+            stackView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            stackView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
         ])
 
         buildRows()
@@ -126,7 +134,7 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
     private func sizeAndPosition(at topPt: NSPoint) {
         let visibleCount = min(filtered.count, Self.maxVisible)
         let h = CGFloat(visibleCount) * Self.rowHeight + 8
-        // Position panel above the cursor (chat input is at window bottom)
+        // `topPt` is the chat input's top-left point in screen coordinates.
         setFrame(NSRect(x: topPt.x, y: topPt.y, width: Self.panelWidth, height: h), display: true)
     }
 }
@@ -141,20 +149,21 @@ private final class ChatCompletionRowView: NSView {
         self.onClick = onClick
         super.init(frame: NSRect(x: 0, y: 0, width: ChatCompletionPanel.panelWidth, height: ChatCompletionPanel.rowHeight))
         wantsLayer = true
+        layer?.cornerRadius = 8
         translatesAutoresizingMaskIntoConstraints = false
         heightAnchor.constraint(equalToConstant: ChatCompletionPanel.rowHeight).isActive = true
 
         // Icon
         let icon = NSImageView(frame: .zero)
         if let img = NSImage(systemSymbolName: item.icon, accessibilityDescription: item.label) {
-            icon.image = img.withSymbolConfiguration(.init(pointSize: 13, weight: .medium))
+            icon.image = img.withSymbolConfiguration(.init(pointSize: 11, weight: .regular))
         }
         icon.contentTintColor = .controlAccentColor
         icon.translatesAutoresizingMaskIntoConstraints = false
 
         // Label
         let label = NSTextField(labelWithString: item.displayText)
-        label.font = .systemFont(ofSize: 13, weight: .medium)
+        label.font = .systemFont(ofSize: 12, weight: .semibold)
         label.textColor = .labelColor
         label.translatesAutoresizingMaskIntoConstraints = false
 
@@ -171,15 +180,15 @@ private final class ChatCompletionRowView: NSView {
         addSubview(desc)
 
         NSLayoutConstraint.activate([
-            icon.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
+            icon.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
             icon.centerYAnchor.constraint(equalTo: centerYAnchor),
-            icon.widthAnchor.constraint(equalToConstant: 18),
+            icon.widthAnchor.constraint(equalToConstant: 16),
 
-            label.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 8),
+            label.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 6),
             label.centerYAnchor.constraint(equalTo: centerYAnchor),
 
-            desc.leadingAnchor.constraint(equalTo: label.trailingAnchor, constant: 8),
-            desc.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -10),
+            desc.leadingAnchor.constraint(equalTo: label.trailingAnchor, constant: 7),
+            desc.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -8),
             desc.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
     }
@@ -188,10 +197,12 @@ private final class ChatCompletionRowView: NSView {
     required init?(coder: NSCoder) { fatalError() }
 
     func setHighlighted(_ on: Bool) {
+        // Liquid-glass style: avoid the old blue selection fill; use a subtle
+        // neutral lift so the row still has keyboard/mouse focus affordance.
         layer?.backgroundColor = on
-            ? NSColor.controlAccentColor.withAlphaComponent(0.15).cgColor
-            : nil
-        layer?.cornerRadius = 4
+            ? NSColor.labelColor.withAlphaComponent(0.07).cgColor
+            : NSColor.white.withAlphaComponent(0.001).cgColor
+        layer?.cornerRadius = 8
     }
 
     override func updateTrackingAreas() {

@@ -6,8 +6,7 @@ import OakAgent
 struct ChatCompletionItem: Identifiable, Equatable {
 
     enum Kind {
-        case builtInSkill(Skill)
-        case agentSkill(AgentSkill)
+        case installedSkill(Skill)
         case contextMention(ContextMention)
     }
 
@@ -35,34 +34,17 @@ struct ChatCompletionItem: Identifiable, Equatable {
 
     // MARK: - Factory — Slash Items
 
-    static func slashItems(builtIn: [Skill], agent: [AgentSkill]) -> [ChatCompletionItem] {
-        var items: [ChatCompletionItem] = builtIn.map { skill in
+    static func slashItems(installed: [Skill]) -> [ChatCompletionItem] {
+        installed.map { skill in
             ChatCompletionItem(
                 id: "skill:\(skill.id)",
                 icon: skill.icon,
                 label: skill.name,
                 description: skill.description,
-                kind: .builtInSkill(skill),
+                kind: .installedSkill(skill),
                 trigger: "/"
             )
         }
-        items += agent.map { skill in
-            let iconName: String
-            if case .symbol(let name) = skill.icon {
-                iconName = name
-            } else {
-                iconName = "hammer"
-            }
-            return ChatCompletionItem(
-                id: "agent:\(skill.id)",
-                icon: iconName,
-                label: skill.name,
-                description: skill.description,
-                kind: .agentSkill(skill),
-                trigger: "/"
-            )
-        }
-        return items
     }
 
     // MARK: - Factory — Mention Items

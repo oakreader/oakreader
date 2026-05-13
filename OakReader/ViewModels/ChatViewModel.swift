@@ -19,6 +19,7 @@ class ChatViewModel {
     var selectedSkill: Skill? = nil
     var activeTokens: [ChatCompletionItem] = []
     var pendingAttachments: [TurnAttachment] = []
+    var inputResetToken: Int = 0
     var showSettings: Bool = false
     var errorMessage: String?
     var pendingToolConfirmation: PendingConfirmation?
@@ -76,10 +77,10 @@ class ChatViewModel {
     // MARK: - Completion Items
 
     /// Items shown in the `/` slash completion panel.
+    @MainActor
     var chatSlashItems: [ChatCompletionItem] {
         ChatCompletionItem.slashItems(
-            builtIn: SkillManager.shared.builtInSkills,
-            agent: Self.loadAgentSkills()
+            installed: SkillManager.shared.installedSkills
         )
     }
 
@@ -90,22 +91,33 @@ class ChatViewModel {
 
     // MARK: - Send Message
 
+    @MainActor
     func send() {
-        let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty || !activeTokens.isEmpty else { return }
+        let parsedInput = Self.extractLeadingSkillTags(from: inputText.trimmingCharacters(in: .whitespacesAndNewlines))
+        let text = parsedInput.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty || !parsedInput.skillIds.isEmpty || !activeTokens.isEmpty else { return }
 
         let attachments = pendingAttachments
         let tokens = activeTokens
         inputText = ""
         activeTokens = []
         pendingAttachments = []
+        inputResetToken += 1
         isStreaming = true
         errorMessage = nil
 
-        // Extract skill from tokens (overrides selectedSkill)
+        // Extract skill from tokens (overrides typed tags and selectedSkill)
         let tokenSkill: Skill? = tokens.lazy.compactMap { item -> Skill? in
-            if case .builtInSkill(let skill) = item.kind { return skill }
+            if case .installedSkill(let skill) = item.kind { return skill }
             return nil
+        }.first
+
+        // Also support an explicit leading markdown tag: [[skill:skill-id]].
+        let taggedSkill: Skill? = parsedInput.skillIds.lazy.compactMap { skillId in
+            SkillManager.shared.installedSkills.first {
+                $0.id.caseInsensitiveCompare(skillId) == .orderedSame
+                    || $0.name.caseInsensitiveCompare(skillId) == .orderedSame
+            }
         }.first
 
         // Extract broadest context mode from @mention tokens
@@ -117,8 +129,9 @@ class ChatViewModel {
             }
             .first
 
-        let effectiveSkill = tokenSkill ?? selectedSkill
+        let effectiveSkill = tokenSkill ?? taggedSkill ?? selectedSkill
         let sendText = text.isEmpty ? (effectiveSkill?.name ?? "Go") : text
+        let userContent = effectiveSkill.map { Self.contentWithSkillTag(skillId: $0.id, text: text) } ?? sendText
 
         // Create or update session record in DB
         persistSessionMetadata(firstUserMessage: sendText)
@@ -216,7 +229,7 @@ class ChatViewModel {
         streamTask = Task { @MainActor [weak self] in
             do {
                 let stream = await engine.send(
-                    userContent: sendText,
+                    userContent: userContent,
                     attachments: attachments,
                     history: currentHistory,
                     sessionId: currentSessionId,
@@ -243,8 +256,7 @@ class ChatViewModel {
                             let newTurn = Turn(
                                 role: .assistant,
                                 content: delta,
-                                isStreaming: true,
-                                metadata: turnMetadata
+                                isStreaming: true
                             )
                             assistantTurnId = newTurn.id
                             turns.append(newTurn)
@@ -415,7 +427,7 @@ class ChatViewModel {
         showHistory = false
         Task { @MainActor in
             do {
-                turns = try await engine.loadSession(id)
+                turns = Self.normalizedSkillMetadata(try await engine.loadSession(id))
             } catch {
                 errorMessage = "Failed to load session: \(error.localizedDescription)"
             }
@@ -466,13 +478,60 @@ class ChatViewModel {
         }
     }
 
+    // MARK: - Skill Tags / Metadata Normalization
+
+    /// Special inline tags stored in user messages for durable UI rendering.
+    /// Example: `[[skill:summarize]] Please summarize this page.`
+    private static func extractLeadingSkillTags(from content: String) -> (skillIds: [String], content: String) {
+        var remaining = content
+        var skillIds: [String] = []
+
+        while true {
+            let trimmed = remaining.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard trimmed.hasPrefix("[[skill:") else { break }
+            guard let closeRange = trimmed.range(of: "]]") else { break }
+
+            let valueStart = trimmed.index(trimmed.startIndex, offsetBy: "[[skill:".count)
+            let rawSkill = String(trimmed[valueStart..<closeRange.lowerBound])
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if !rawSkill.isEmpty {
+                skillIds.append(rawSkill)
+            }
+            remaining = String(trimmed[closeRange.upperBound...])
+        }
+
+        return (skillIds, remaining.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    private static func contentWithSkillTag(skillId: String, text: String) -> String {
+        if text.isEmpty { return "[[skill:\(skillId)]]" }
+        return "[[skill:\(skillId)]]\n\(text)"
+    }
+
+    /// Older chat records stored skill metadata on the assistant turn. For display,
+    /// a skill belongs to the user's request, so move it to the preceding user turn.
+    private static func normalizedSkillMetadata(_ turns: [Turn]) -> [Turn] {
+        var normalized = turns
+        for idx in normalized.indices where normalized[idx].role == .assistant {
+            guard let skill = normalized[idx].metadata["skill"] else { continue }
+            if let userIdx = normalized[..<idx].lastIndex(where: { $0.role == .user }) {
+                if normalized[userIdx].metadata["skill"] == nil {
+                    normalized[userIdx].metadata["skill"] = skill
+                }
+                if extractLeadingSkillTags(from: normalized[userIdx].content).skillIds.isEmpty {
+                    normalized[userIdx].content = contentWithSkillTag(skillId: skill, text: normalized[userIdx].content)
+                }
+            }
+            normalized[idx].metadata.removeValue(forKey: "skill")
+        }
+        return normalized
+    }
+
     // MARK: - Agent Skills
 
     private static func loadAgentSkills() -> [AgentSkill] {
-        // Only load installed skills from ~/OakReader/agent/skills/
-        let installedDir = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("OakReader/agent/skills")
-        return SkillLoader.loadSkills(from: [installedDir]).skills
+        // Only load installed skills from the shared SkillManager directory.
+        SkillLoader.loadSkills(from: [SkillManager.installedDir]).skills
     }
 
     // MARK: - Private — Session Persistence

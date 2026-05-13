@@ -1,3 +1,5 @@
 {
+    "name": "explain",
+    "description": "Answer questions and explain document content",
     "icon": { "type": "symbol", "value": "questionmark.bubble" }
 }
