@@ -179,7 +179,7 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
         }
         mainStack.addArrangedSubview(chatBtn)
 
-        if Preferences.shared.isPluginEnabled(.notes) {
+        if Preferences.shared.isExtensionEnabled(.notes) {
             let noteBtn = PopupIconButton(
                 systemImage: "note.text.badge.plus",
                 accessibilityLabel: "Add to Note"
@@ -189,7 +189,7 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
             mainStack.addArrangedSubview(noteBtn)
         }
 
-        if Preferences.shared.isPluginEnabled(.translation) {
+        if Preferences.shared.isExtensionEnabled(.translation) {
             let translateBtn = PopupIconButton(
                 systemImage: "character.bubble",
                 accessibilityLabel: "Translate"

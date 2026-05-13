@@ -8,8 +8,8 @@ struct SideNavView: View {
 
     private var visibleModes: [RightPanelMode] {
         _ = pluginRefresh // read to establish dependency
-        let disabledModes = Plugin.allCases
-            .filter { !Preferences.shared.isPluginEnabled($0) }
+        let disabledModes = AppExtension.allCases
+            .filter { !Preferences.shared.isExtensionEnabled($0) }
             .flatMap(\.rightPanelModes)
         return RightPanelMode.allCases.filter { !disabledModes.contains($0) }
     }

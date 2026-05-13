@@ -148,7 +148,7 @@ struct LibraryRootView: View {
     }
 
     private var librarySaveAssistantResponseAction: ((Turn) -> Bool)? {
-        guard Preferences.shared.isPluginEnabled(.notes) else { return nil }
+        guard Preferences.shared.isExtensionEnabled(.notes) else { return nil }
         return saveAssistantResponseToSelectedNote
     }
 

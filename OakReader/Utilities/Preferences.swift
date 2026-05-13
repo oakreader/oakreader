@@ -262,28 +262,28 @@ final class Preferences {
 
     // MARK: - Plugins
 
-    /// Posted when a built-in plugin is toggled. Settings sidebar listens for this
+    /// Posted when a built-in app extension is toggled. Settings sidebar listens for this
     /// instead of the blanket UserDefaults.didChangeNotification.
-    static let pluginToggleNotification = Notification.Name("OakReader.pluginToggle")
+    static let appExtensionToggleNotification = Notification.Name("OakReader.pluginToggle")
 
     var disabledPlugins: Set<String> {
         get { Set(defaults.stringArray(forKey: Keys.disabledPlugins) ?? []) }
         set { defaults.set(Array(newValue), forKey: Keys.disabledPlugins) }
     }
 
-    func isPluginEnabled(_ plugin: Plugin) -> Bool {
-        !disabledPlugins.contains(plugin.rawValue)
+    func isExtensionEnabled(_ ext: AppExtension) -> Bool {
+        !disabledPlugins.contains(ext.rawValue)
     }
 
-    func setPlugin(_ plugin: Plugin, enabled: Bool) {
+    func setExtension(_ ext: AppExtension, enabled: Bool) {
         var disabled = disabledPlugins
         if enabled {
-            disabled.remove(plugin.rawValue)
+            disabled.remove(ext.rawValue)
         } else {
-            disabled.insert(plugin.rawValue)
+            disabled.insert(ext.rawValue)
         }
         disabledPlugins = disabled
-        NotificationCenter.default.post(name: Self.pluginToggleNotification, object: nil)
+        NotificationCenter.default.post(name: Self.appExtensionToggleNotification, object: nil)
     }
 
     // MARK: - External Plugins (PluginManifest-based)

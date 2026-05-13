@@ -1,10 +1,10 @@
 import SwiftUI
 
-struct PluginSettingsView: View {
-    @State private var enabledStates: [Plugin: Bool] = {
-        var states: [Plugin: Bool] = [:]
-        for plugin in Plugin.allCases {
-            states[plugin] = Preferences.shared.isPluginEnabled(plugin)
+struct AppExtensionSettingsView: View {
+    @State private var enabledStates: [AppExtension: Bool] = {
+        var states: [AppExtension: Bool] = [:]
+        for ext in AppExtension.allCases {
+            states[ext] = Preferences.shared.isExtensionEnabled(ext)
         }
         return states
     }()
@@ -12,27 +12,27 @@ struct PluginSettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                ForEach(Plugin.allCases) { plugin in
-                    pluginRow(plugin)
+                ForEach(AppExtension.allCases) { ext in
+                    extensionRow(ext)
                 }
             }
         }
     }
 
     @ViewBuilder
-    private func pluginRow(_ plugin: Plugin) -> some View {
-        let isEnabled = enabledStates[plugin] ?? plugin.enabledByDefault
+    private func extensionRow(_ ext: AppExtension) -> some View {
+        let isEnabled = enabledStates[ext] ?? ext.enabledByDefault
 
         HStack(spacing: 10) {
-            Image(systemName: plugin.systemImage)
+            Image(systemName: ext.systemImage)
                 .font(.system(size: 18))
                 .foregroundStyle(isEnabled ? .primary : .tertiary)
                 .frame(width: 24, alignment: .center)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(plugin.label)
+                Text(ext.label)
                     .font(.system(size: 13, weight: .medium))
-                Text(plugin.description)
+                Text(ext.description)
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
@@ -42,8 +42,8 @@ struct PluginSettingsView: View {
             Toggle("", isOn: Binding(
                 get: { isEnabled },
                 set: { newValue in
-                    enabledStates[plugin] = newValue
-                    Preferences.shared.setPlugin(plugin, enabled: newValue)
+                    enabledStates[ext] = newValue
+                    Preferences.shared.setExtension(ext, enabled: newValue)
                 }
             ))
             .toggleStyle(.switch)
