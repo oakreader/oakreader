@@ -1,3 +1,4 @@
+import { ExternalLink } from "lucide-react";
 import type { PageMeta } from "@/src/lib/types";
 import { detectContentKind, contentKindToLabel } from "@/src/lib/translators";
 
@@ -39,13 +40,9 @@ function getPDFTitle(url: string): string {
 
 function PDFIcon() {
   return (
-    <svg
-      className="size-8 shrink-0"
-      viewBox="0 0 32 32"
-      fill="none"
-    >
-      <rect x="4" y="2" width="24" height="28" rx="4" fill="#FF3B30" opacity="0.1" />
-      <rect x="4" y="2" width="24" height="28" rx="4" stroke="#FF3B30" opacity="0.3" strokeWidth="1" />
+    <svg className="size-6" viewBox="0 0 32 32" fill="none">
+      <rect x="4" y="2" width="24" height="28" rx="4" fill="#FF3B30" opacity="0.12" />
+      <rect x="4" y="2" width="24" height="28" rx="4" stroke="#FF3B30" opacity="0.35" strokeWidth="1" />
       <text x="16" y="20" textAnchor="middle" fill="#FF3B30" fontSize="8" fontWeight="700" fontFamily="-apple-system, system-ui, sans-serif">PDF</text>
     </svg>
   );
@@ -67,28 +64,36 @@ export function PageCard({ pageMeta }: PageCardProps) {
     `https://www.google.com/s2/favicons?sz=32&domain=${encodeURIComponent(domain)}`;
 
   return (
-    <div className="flex items-start gap-2.5 rounded-[var(--radius-outer)] bg-grouped p-3"
-         style={{ boxShadow: "0 0 0 0.5px rgba(0,0,0,0.06)" }}>
-      {isPDF ? (
-        <PDFIcon />
-      ) : (
-        <img
-          src={faviconSrc}
-          alt=""
-          className="size-8 rounded-[6px] shrink-0 bg-fill"
-          onError={(e) => {
-            (e.target as HTMLImageElement).style.display = "none";
-          }}
-        />
-      )}
-      <div className="min-w-0 flex-1 py-0.5">
-        <p className="text-[13px] font-semibold leading-snug text-foreground line-clamp-2">
-          {displayTitle}
-        </p>
-        <p className="mt-0.5 text-[11px] text-secondary">
-          {domain} &middot; {typeLabel}
-        </p>
+    <article className="oak-glass-card p-3.5">
+      <div className="flex items-start gap-3">
+        <div className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-fill ring-1 ring-black/5">
+          {isPDF ? (
+            <PDFIcon />
+          ) : (
+            <img
+              src={faviconSrc}
+              alt=""
+              className="size-7 rounded-lg bg-white shadow-sm"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = "none";
+              }}
+            />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="mb-1 flex items-center gap-1.5 text-[11px] text-secondary">
+            <span className="oak-chip">{typeLabel}</span>
+            <span className="truncate">{domain}</span>
+          </div>
+          <p className="text-[14px] font-semibold leading-snug text-foreground line-clamp-2 tracking-[-0.02em]">
+            {displayTitle}
+          </p>
+          <div className="mt-2 inline-flex max-w-full items-center gap-1 rounded-full bg-fill px-2 py-1 text-[10.5px] text-secondary">
+            <ExternalLink className="size-3 shrink-0" strokeWidth={2.2} />
+            <span className="truncate">Ready to capture</span>
+          </div>
+        </div>
       </div>
-    </div>
+    </article>
   );
 }

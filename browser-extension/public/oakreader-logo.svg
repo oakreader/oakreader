@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <clipPath id="c8c"><rect x="16" y="16" width="480" height="480" rx="108"/></clipPath>
+    <linearGradient id="bg8c" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFF8EE"/>
+      <stop offset="100%" stop-color="#F5ECDC"/>
+    </linearGradient>
+    <linearGradient id="leaf8c" x1="0.1" y1="0" x2="0.9" y2="1">
+      <stop offset="0%" stop-color="#E8A020"/>
+      <stop offset="35%" stop-color="#D47A18"/>
+      <stop offset="70%" stop-color="#C45C15"/>
+      <stop offset="100%" stop-color="#8B3A10"/>
+    </linearGradient>
+  </defs>
+  <rect x="16" y="16" width="480" height="480" rx="108" fill="url(#bg8c)"/>
+  <g clip-path="url(#c8c)">
+    <!-- Leaf floating with gentle tilt, scaled up -->
+    <g transform="translate(256,295) rotate(-12) scale(1.15) translate(-256,-250)">
+      <!-- Stem with natural curve -->
+      <path d="M155 460 C178 425, 208 382, 232 340 C248 310, 256 280, 256 255"
+        fill="none" stroke="#8B5A18" stroke-width="13" stroke-linecap="round"/>
+      <!-- Stem curl -->
+      <path d="M155 460 C148 468, 145 475, 150 480" fill="none" stroke="#8B5A18" stroke-width="9" stroke-linecap="round"/>
+
+      <!-- Oak leaf - warm autumn -->
+      <path d="
+        M256 255
+        C252 242, 244 225, 232 215
+        C222 205, 214 210, 202 200
+        C192 190, 196 180, 186 170
+        C176 160, 166 164, 160 152
+        C152 142, 156 130, 152 120
+        C148 110, 142 104, 144 94
+        C146 84, 154 74, 164 70
+        C174 65, 182 70, 192 65
+        C202 60, 206 52, 216 52
+        C226 52, 234 60, 244 60
+        C254 60, 260 52, 270 54
+        C280 57, 286 64, 296 67
+        C306 70, 316 62, 324 70
+        C332 78, 330 88, 338 94
+        C344 100, 354 97, 358 106
+        C362 114, 356 124, 360 134
+        C364 144, 374 150, 372 160
+        C370 170, 360 175, 362 185
+        C364 195, 374 200, 367 210
+        C360 220, 350 224, 347 234
+        C342 248, 334 250, 328 260
+        C320 272, 310 275, 300 282
+        C292 288, 285 292, 275 294
+        C268 298, 262 272, 258 260 Z"
+        fill="url(#leaf8c)"/>
+
+      <!-- Central vein -->
+      <path d="M256 252 C260 232, 266 202, 268 175 C270 148, 268 118, 264 88 C262 75, 260 62, 260 55"
+        fill="none" stroke="#6B3810" stroke-width="2.5" opacity="0.5" stroke-linecap="round"/>
+
+      <!-- Veins left -->
+      <path d="M265 208 C246 198, 226 196, 206 202" fill="none" stroke="#6B3810" stroke-width="1.3" opacity="0.3" stroke-linecap="round"/>
+      <path d="M267 182 C248 172, 225 170, 198 176" fill="none" stroke="#6B3810" stroke-width="1.3" opacity="0.3" stroke-linecap="round"/>
+      <path d="M268 155 C252 147, 232 145, 210 152" fill="none" stroke="#6B3810" stroke-width="1.3" opacity="0.3" stroke-linecap="round"/>
+      <path d="M268 130 C256 122, 242 122, 228 130" fill="none" stroke="#6B3810" stroke-width="1" opacity="0.25" stroke-linecap="round"/>
+      <path d="M266 108 C258 102, 248 102, 238 108" fill="none" stroke="#6B3810" stroke-width="1" opacity="0.25" stroke-linecap="round"/>
+
+      <!-- Veins right -->
+      <path d="M267 202 C286 194, 310 194, 335 202" fill="none" stroke="#6B3810" stroke-width="1.3" opacity="0.3" stroke-linecap="round"/>
+      <path d="M268 178 C290 168, 316 167, 344 175" fill="none" stroke="#6B3810" stroke-width="1.3" opacity="0.3" stroke-linecap="round"/>
+      <path d="M269 152 C292 144, 320 143, 350 150" fill="none" stroke="#6B3810" stroke-width="1.3" opacity="0.3" stroke-linecap="round"/>
+      <path d="M268 128 C286 122, 308 122, 332 128" fill="none" stroke="#6B3810" stroke-width="1" opacity="0.25" stroke-linecap="round"/>
+      <path d="M266 105 C278 98, 296 98, 314 105" fill="none" stroke="#6B3810" stroke-width="1" opacity="0.25" stroke-linecap="round"/>
+
+      <!-- Golden highlight -->
+      <path d="M234 135 C244 115, 255 98, 260 82" fill="none" stroke="#FFDD70" stroke-width="3" opacity="0.2" stroke-linecap="round"/>
+    </g>
+  </g>
+</svg>
