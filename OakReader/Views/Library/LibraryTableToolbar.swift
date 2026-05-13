@@ -6,7 +6,7 @@ struct LibraryTableToolbar: View {
     let appState: AppState
 
     @State private var searchText = ""
-    @State private var showFilterPopover = false
+    @State private var showFilterBar = false
 
     private var store: LibraryStore { appState.libraryStore }
 
@@ -48,19 +48,20 @@ struct LibraryTableToolbar: View {
 
                 // Filter button
                 Button {
-                    showFilterPopover.toggle()
+                    showFilterBar.toggle()
                 } label: {
                     Image(systemName: "line.3.horizontal.decrease")
                         .font(.system(size: OakStyle.Font.icon))
-                        .foregroundStyle(store.hasActiveFilters ? Color.accentColor : Color.primary.opacity(0.55))
+                        .foregroundStyle(
+                            store.hasActiveChipFilters || showFilterBar
+                                ? Color.accentColor
+                                : Color.primary.opacity(0.55)
+                        )
                         .frame(width: OakStyle.Size.buttonStandard, height: OakStyle.Size.buttonStandard)
                 }
                 .buttonStyle(.borderless)
                 .help("Filter Library")
                 .accessibilityLabel("Filter Library")
-                .popover(isPresented: $showFilterPopover, arrowEdge: .bottom) {
-                    LibraryFilterPopover(store: store)
-                }
 
                 // Sort menu
                 Menu {
@@ -112,22 +113,10 @@ struct LibraryTableToolbar: View {
             .padding(.horizontal, 8)
             .frame(height: 41)
 
-            // Filter pills row
-            if store.hasActiveFilters {
+            // Filter chips bar
+            if showFilterBar {
                 Divider()
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ForEach(store.activeFilters) { filter in
-                            FilterPillView(
-                                label: filter.displayLabel(store: store)
-                            ) {
-                                store.activeFilters.removeAll { $0.id == filter.id }
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                }
+                LibraryFilterChipsView(store: store)
             }
         }
         .background(Color(nsColor: .windowBackgroundColor))
