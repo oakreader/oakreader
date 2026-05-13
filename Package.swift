@@ -22,11 +22,18 @@ let package = Package(
         .package(url: "https://github.com/unum-cloud/usearch", "2.0.0"..<"2.17.0"),
     ],
     targets: [
+        .target(
+            name: "ObjCExceptionCatcher",
+            path: "OakReader/Utilities",
+            sources: ["ObjCExceptionCatcher.m"],
+            publicHeadersPath: "."
+        ),
         .executableTarget(
             name: "OakReader",
             dependencies: [
                 "OakAgent",
                 "OakVoiceAI",
+                "ObjCExceptionCatcher",
                 .product(name: "Textual", package: "textual"),
                 .product(name: "GRDB", package: "GRDB.swift"),
                 .product(name: "Highlightr", package: "Highlightr"),
@@ -40,7 +47,15 @@ let package = Package(
                 .product(name: "USearch", package: "usearch"),
             ],
             path: "OakReader",
-            exclude: ["App/Info.plist", "OakReader.entitlements", "Resources/Assets.xcassets", "Resources/DefaultStamps"],
+            exclude: [
+                "App/Info.plist",
+                "OakReader.entitlements",
+                "OakReader-Bridging-Header.h",
+                "Resources/Assets.xcassets",
+                "Resources/DefaultStamps",
+                "Utilities/ObjCExceptionCatcher.h",
+                "Utilities/ObjCExceptionCatcher.m"
+            ],
             resources: [
                 .copy("Resources/Assets.xcassets")
             ]
