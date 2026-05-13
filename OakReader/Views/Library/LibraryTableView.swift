@@ -51,7 +51,7 @@ struct LibraryTableView: View {
 
                 }
             }
-            .width(min: 150, ideal: 300)
+            .width(min: 150, ideal: 300, max: .infinity)
 
             TableColumn("Author") { item in
                 Text(item.author)
