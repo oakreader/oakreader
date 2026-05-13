@@ -1,15 +1,25 @@
 import Cocoa
 import CoreAudio
+import IOKit.pwr_mgt
+import ScreenCaptureKit
 import UserNotifications
 
 /// Detects active meeting apps while the system microphone is in use.
-/// Uses CoreAudio property listener (no mic permission needed) + NSWorkspace running apps.
+/// Uses a multi-signal architecture: power assertions, window titles, and browser tab titles
+/// are fused via noisy-OR confidence scoring to reduce false positives.
 @Observable
 final class MeetingDetectionService {
 
     struct DetectedMeeting {
         let appName: String
         let bundleID: String
+        let confidence: Double
+
+        init(appName: String, bundleID: String, confidence: Double = 1.0) {
+            self.appName = appName
+            self.bundleID = bundleID
+            self.confidence = confidence
+        }
     }
 
     struct MeetingSession {
@@ -28,33 +38,41 @@ final class MeetingDetectionService {
     /// Callback invoked on main thread when a new meeting is detected.
     var onMeetingDetected: ((DetectedMeeting) -> Void)?
 
-    /// Callback invoked on main thread when a meeting ends (after debounce).
+    /// Callback invoked on main thread when a meeting ends (after grace period).
     var onMeetingEnded: ((MeetingSession) -> Void)?
 
     private var listenerBlock: AudioObjectPropertyListenerBlock?
     private var appObserver: NSObjectProtocol?
     private var meetingStartedAt: Date?
     private var activeMeetingInfo: DetectedMeeting?
-    private var endDebounceTimer: Timer?
 
-    // MARK: - Known Meeting Apps
+    // MARK: - Signal Aggregation
 
-    private static let meetingBundleIDs: [String: String] = [
-        "com.microsoft.teams2": "Microsoft Teams",
-        "com.microsoft.teams": "Microsoft Teams",
-        "com.tencent.meeting": "Tencent Meeting",
-        "us.zoom.xos": "Zoom",
-    ]
+    private let aggregator: MeetingSignalAggregator
 
-    private static let browserBundleIDs: Set<String> = [
-        "com.google.Chrome",
-        "com.apple.Safari",
-        "com.microsoft.edgemac",
-        "org.mozilla.firefox",
-        "company.thebrowser.Browser",
-    ]
+    // MARK: - Polling & Confirmation State Machine
+
+    private var pollingTask: Task<Void, Never>?
+    private let pollingInterval: TimeInterval = 5.0
+
+    /// Consecutive polls where a meeting was detected above threshold.
+    private var consecutivePositive: Int = 0
+
+    /// Consecutive polls where no meeting was detected.
+    private var consecutiveNegative: Int = 0
+
+    /// Number of consecutive positive polls required before declaring a meeting.
+    private var confirmationThreshold: Int { aggregator.confirmationCount }
+
+    /// Number of consecutive negative polls required before ending a meeting.
+    private var endGraceThreshold: Int { aggregator.endGraceCount }
 
     init() {
+        self.aggregator = MeetingSignalAggregator(detectors: [
+            PowerAssertionDetector(),
+            NativeAppWindowTitleDetector(),
+            BrowserWindowTitleDetector(),
+        ])
         installMicListener()
         observeAppLaunches()
         requestNotificationPermission()
@@ -62,7 +80,7 @@ final class MeetingDetectionService {
 
     deinit {
         removeMicListener()
-        endDebounceTimer?.invalidate()
+        pollingTask?.cancel()
         if let observer = appObserver {
             NSWorkspace.shared.notificationCenter.removeObserver(observer)
         }
@@ -70,8 +88,6 @@ final class MeetingDetectionService {
 
     // MARK: - CoreAudio Mic Listener
 
-    /// Listen for `kAudioDevicePropertyDeviceIsRunningSomewhere` on the default input device.
-    /// This fires when ANY process starts/stops using the mic — no microphone permission required.
     private func installMicListener() {
         guard let deviceID = Self.defaultInputDeviceID() else { return }
 
@@ -125,86 +141,117 @@ final class MeetingDetectionService {
         isMicActive = active
 
         if active && !wasActive {
-            endDebounceTimer?.invalidate()
-            endDebounceTimer = nil
-            evaluateMeetingApps()
+            Log.info(Log.meeting, "Mic activated, starting meeting detection polling")
+            consecutivePositive = 0
+            consecutiveNegative = 0
+            startPolling()
         } else if !active && wasActive {
+            Log.info(Log.meeting, "Mic deactivated, stopping meeting detection polling")
+            stopPolling()
             handleMicDeactivated()
         }
     }
 
-    /// Start a debounce timer when mic goes inactive to avoid false triggers from brief interruptions.
+    // MARK: - Polling Loop
+
+    private func startPolling() {
+        pollingTask?.cancel()
+        pollingTask = Task { [weak self] in
+            guard let self else { return }
+            // Run an immediate poll, then continue at the interval
+            await self.pollOnce()
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(self.pollingInterval))
+                if Task.isCancelled { break }
+                await self.pollOnce()
+            }
+        }
+    }
+
+    private func stopPolling() {
+        pollingTask?.cancel()
+        pollingTask = nil
+    }
+
+    @MainActor
+    private func pollOnce() async {
+        let assessment = await aggregator.bestAssessment()
+
+        if let assessment {
+            consecutivePositive += 1
+            consecutiveNegative = 0
+
+            Log.debug(Log.meeting,
+                "Poll positive: \(assessment.candidate.displayName) confidence=\(String(format: "%.2f", assessment.confidence)) " +
+                "consecutive=\(consecutivePositive)/\(confirmationThreshold)")
+
+            if consecutivePositive >= confirmationThreshold && detectedMeeting == nil {
+                let meeting = DetectedMeeting(
+                    appName: assessment.candidate.displayName,
+                    bundleID: assessment.candidate.bundleID,
+                    confidence: assessment.confidence
+                )
+                detectedMeeting = meeting
+                trackMeetingStart(meeting)
+                postMeetingNotification(meeting)
+                onMeetingDetected?(meeting)
+                Log.info(Log.meeting,
+                    "Meeting confirmed: \(meeting.appName) (confidence=\(String(format: "%.2f", meeting.confidence)))")
+            } else if detectedMeeting != nil {
+                // Update confidence on ongoing meeting
+                detectedMeeting = DetectedMeeting(
+                    appName: assessment.candidate.displayName,
+                    bundleID: assessment.candidate.bundleID,
+                    confidence: assessment.confidence
+                )
+            }
+        } else {
+            consecutiveNegative += 1
+            consecutivePositive = 0
+
+            Log.debug(Log.meeting,
+                "Poll negative: consecutive=\(consecutiveNegative)/\(endGraceThreshold)")
+
+            if consecutiveNegative >= endGraceThreshold && detectedMeeting != nil {
+                endMeeting()
+            }
+        }
+    }
+
+    // MARK: - Meeting Lifecycle
+
     private func handleMicDeactivated() {
+        guard detectedMeeting != nil else {
+            detectedMeeting = nil
+            return
+        }
+        // When mic goes inactive, end the meeting after grace period.
+        // Since polling has stopped, trigger the end directly.
+        endMeeting()
+    }
+
+    private func endMeeting() {
         guard let meeting = activeMeetingInfo, let startedAt = meetingStartedAt else {
             detectedMeeting = nil
             return
         }
 
-        endDebounceTimer?.invalidate()
-        endDebounceTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: false) { [weak self] _ in
-            guard let self else { return }
-            let session = MeetingSession(
-                appName: meeting.appName,
-                bundleID: meeting.bundleID,
-                startedAt: startedAt,
-                endedAt: Date()
-            )
-            self.lastEndedSession = session
-            self.detectedMeeting = nil
-            self.activeMeetingInfo = nil
-            self.meetingStartedAt = nil
-            self.onMeetingEnded?(session)
-        }
-    }
-
-    // MARK: - App Detection
-
-    private func observeAppLaunches() {
-        appObserver = NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.didLaunchApplicationNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            if self?.isMicActive == true {
-                self?.evaluateMeetingApps()
-            }
-        }
-    }
-
-    private func evaluateMeetingApps() {
-        let runningApps = NSWorkspace.shared.runningApplications
-        let runningBundleIDs = Set(runningApps.compactMap(\.bundleIdentifier))
-
-        // Check dedicated meeting apps first
-        for (bundleID, appName) in Self.meetingBundleIDs {
-            if runningBundleIDs.contains(bundleID) {
-                let meeting = DetectedMeeting(appName: appName, bundleID: bundleID)
-                if detectedMeeting?.bundleID != bundleID {
-                    detectedMeeting = meeting
-                    trackMeetingStart(meeting)
-                    postMeetingNotification(meeting)
-                    onMeetingDetected?(meeting)
-                }
-                return
-            }
-        }
-
-        // Check browser-based meetings (mic active + browser running = possible Google Meet)
-        for browserID in Self.browserBundleIDs {
-            if runningBundleIDs.contains(browserID) {
-                let browserName = runningApps.first(where: { $0.bundleIdentifier == browserID })?.localizedName ?? "Browser"
-                let meeting = DetectedMeeting(appName: "Meeting (\(browserName))", bundleID: browserID)
-                if detectedMeeting?.bundleID != browserID {
-                    detectedMeeting = meeting
-                    trackMeetingStart(meeting)
-                    postMeetingNotification(meeting)
-                    onMeetingDetected?(meeting)
-                }
-                return
-            }
-        }
-
+        let session = MeetingSession(
+            appName: meeting.appName,
+            bundleID: meeting.bundleID,
+            startedAt: startedAt,
+            endedAt: Date()
+        )
+        lastEndedSession = session
         detectedMeeting = nil
+        activeMeetingInfo = nil
+        meetingStartedAt = nil
+        consecutivePositive = 0
+        consecutiveNegative = 0
+        onMeetingEnded?(session)
+
+        Log.info(Log.meeting,
+            "Meeting ended: \(session.appName) duration=\(String(format: "%.0f", session.duration))s")
     }
 
     private func trackMeetingStart(_ meeting: DetectedMeeting) {
@@ -212,6 +259,24 @@ final class MeetingDetectionService {
             meetingStartedAt = Date()
         }
         activeMeetingInfo = meeting
+    }
+
+    // MARK: - App Launch Observer
+
+    private func observeAppLaunches() {
+        appObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didLaunchApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self, self.isMicActive else { return }
+            // If a meeting app just launched while mic is active, do an immediate poll
+            if let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+               let bid = app.bundleIdentifier,
+               MeetingAppRegistry.nativeBundleIDs.contains(bid) || MeetingAppRegistry.browserBundleIDs.contains(bid) {
+                Task { await self.pollOnce() }
+            }
+        }
     }
 
     // MARK: - Notifications
