@@ -99,10 +99,23 @@ public enum ToolResolver {
             throw InstallError.noInstallMethod(bin.name)
         }
 
+        // Try brew first; if brew is not installed or fails, fall back to URL download
         if let brew = method.brew {
-            try installViaBrew(formula: brew)
-        } else if let url = method.url {
+            if brewAvailable() {
+                do {
+                    try installViaBrew(formula: brew)
+                    return
+                } catch {
+                    // brew failed — fall through to URL if available
+                }
+            }
+        }
+
+        if let url = method.url {
             try installViaDownload(url: url, toolName: bin.name)
+        } else if method.brew != nil {
+            // brew was the only method and it failed or wasn't available
+            try installViaBrew(formula: method.brew!)
         } else {
             throw InstallError.noInstallMethod(bin.name)
         }
@@ -149,14 +162,71 @@ public enum ToolResolver {
             throw InstallError.downloadFailed("No data received.")
         }
 
+        let sourceURL: URL
+        let lowerURL = urlString.lowercased()
+        if lowerURL.hasSuffix(".tar.gz") || lowerURL.hasSuffix(".tgz") || lowerURL.hasSuffix(".zip") {
+            let extractionDir = fm.temporaryDirectory
+                .appendingPathComponent("OakReaderToolInstall-\(UUID().uuidString)", isDirectory: true)
+            try fm.createDirectory(at: extractionDir, withIntermediateDirectories: true)
+            defer { try? fm.removeItem(at: extractionDir) }
+
+            if lowerURL.hasSuffix(".zip") {
+                try runArchiveTool("/usr/bin/unzip", arguments: ["-q", tempFile.path, "-d", extractionDir.path])
+            } else {
+                try runArchiveTool("/usr/bin/tar", arguments: ["-xzf", tempFile.path, "-C", extractionDir.path])
+            }
+
+            guard let binary = findExecutable(named: toolName, in: extractionDir) else {
+                throw InstallError.downloadFailed("Could not find executable '\(toolName)' in downloaded archive.")
+            }
+            sourceURL = binary
+        } else {
+            sourceURL = tempFile
+        }
+
         let destPath = (destDir as NSString).appendingPathComponent(toolName)
         let destURL = URL(fileURLWithPath: destPath)
         try? fm.removeItem(at: destURL)
-        try fm.moveItem(at: tempFile, to: destURL)
+        try fm.moveItem(at: sourceURL, to: destURL)
         try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: destPath)
     }
 
+    private static func runArchiveTool(_ executable: String, arguments: [String]) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = arguments
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            throw InstallError.downloadFailed("Archive extraction failed with exit code \(process.terminationStatus).")
+        }
+    }
+
+    private static func findExecutable(named name: String, in directory: URL) -> URL? {
+        let fm = FileManager.default
+        guard let enumerator = fm.enumerator(
+            at: directory,
+            includingPropertiesForKeys: [.isRegularFileKey, .isExecutableKey],
+            options: [.skipsHiddenFiles]
+        ) else { return nil }
+
+        for case let url as URL in enumerator {
+            guard url.lastPathComponent == name else { continue }
+            let values = try? url.resourceValues(forKeys: [.isRegularFileKey])
+            if values?.isRegularFile == true {
+                return url
+            }
+        }
+        return nil
+    }
+
     // MARK: - Private
+
+    private static func brewAvailable() -> Bool {
+        whichFallback("brew") != nil
+    }
 
     private static func whichFallback(_ name: String) -> String? {
         let process = Process()
