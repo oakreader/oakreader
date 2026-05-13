@@ -217,6 +217,7 @@ struct AIChatView: View {
 
     private var inputHasText: Bool {
         !chatVM.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !chatVM.activeTokens.isEmpty
     }
 
     private var inputBar: some View {
@@ -241,6 +242,9 @@ struct AIChatView: View {
                 onSend: { if inputHasText { chatVM.send() } },
                 onPasteImage: { data in chatVM.addClipboardImage(data) },
                 contentHeight: $inputContentHeight,
+                slashItems: chatVM.chatSlashItems,
+                mentionItems: chatVM.chatMentionItems,
+                onActiveTokensChanged: { tokens in chatVM.activeTokens = tokens },
                 focusRef: inputFocusRef
             )
             .frame(height: inputContentHeight)
