@@ -5,7 +5,12 @@ extension ImportService {
 
     /// Import an HTML web snapshot into managed storage.
     @discardableResult
-    func importWebSnapshot(from sourceURL: URL, originalPageURL: URL? = nil, title: String? = nil) -> LibraryItem? {
+    func importWebSnapshot(
+        from sourceURL: URL,
+        originalPageURL: URL? = nil,
+        title: String? = nil,
+        contentMarkdown: String? = nil
+    ) -> LibraryItem? {
         // Duplicate detection
         if let hash = hashPrefix(of: sourceURL),
            let existing = findByHash(hash) {
@@ -86,6 +91,13 @@ extension ImportService {
         guard let item = store.insertItem(itemRecord, attachment: attRecord) else {
             try? FileManager.default.removeItem(at: docDir)
             return nil
+        }
+
+        // Save extracted Markdown before semantic indexing starts so search prefers clean article text.
+        if let contentMarkdown,
+           !contentMarkdown.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let mdURL = item.fileURL.deletingLastPathComponent().appendingPathComponent("content.md")
+            try? contentMarkdown.write(to: mdURL, atomically: true, encoding: .utf8)
         }
 
         // Auto-create reference metadata from HTML meta tags

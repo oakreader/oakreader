@@ -15,16 +15,16 @@ final class LibraryStore {
     var selectedCollectionId: UUID? = SystemCollectionID.allItems
     var selectedTagOptionId: UUID?
 
-    // Chip-based toolbar filters
+    // Toolbar filter state
     var selectedTypes: Set<String> = []
     var selectedTagOptionIds: Set<UUID> = []
     var selectedStatusOptionIds: Set<UUID> = []
 
-    var hasActiveChipFilters: Bool {
+    var hasActiveFilters: Bool {
         !selectedTypes.isEmpty || !selectedTagOptionIds.isEmpty || !selectedStatusOptionIds.isEmpty
     }
 
-    func clearChipFilters() {
+    func clearFilters() {
         selectedTypes = []
         selectedTagOptionIds = []
         selectedStatusOptionIds = []
@@ -156,8 +156,8 @@ final class LibraryStore {
             // isSmart with nil rules → show all (e.g. "All Items")
         }
 
-        // Apply chip-based toolbar filters (OR within category, AND between categories)
-        if hasActiveChipFilters {
+        // Apply toolbar filters (OR within category, AND between categories)
+        if hasActiveFilters {
             results = results.filter { item in
                 // Type filter: item matches any selected type (OR)
                 if !selectedTypes.isEmpty {
