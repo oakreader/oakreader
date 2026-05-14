@@ -186,7 +186,7 @@ struct ContentView: View {
             }
         case .webSnapshot:
             ZStack {
-                WebArchiveViewerRepresentable(viewModel: viewModel)
+                HTMLViewerRepresentable(viewModel: viewModel)
                 if viewModel.state.editorMode == .snapshot {
                     WebSnapshotOverlayView(viewModel: viewModel)
                 }

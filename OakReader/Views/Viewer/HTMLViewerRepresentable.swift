@@ -44,9 +44,8 @@ final class OakWebView: WKWebView {
 
 // MARK: - NSViewRepresentable
 
-/// NSViewRepresentable wrapper around WKWebView for rendering web snapshots.
-/// Security: blocks all external HTTP/HTTPS requests, scopes file access to storage directory only.
-struct WebArchiveViewerRepresentable: NSViewRepresentable {
+/// NSViewRepresentable wrapper around WKWebView for rendering HTML snapshots.
+struct HTMLViewerRepresentable: NSViewRepresentable {
     let viewModel: DocumentViewModel
 
     @Environment(\.isTabActive) private var isTabActive
@@ -150,20 +149,6 @@ struct WebArchiveViewerRepresentable: NSViewRepresentable {
         webView.coordinator = context.coordinator
         context.coordinator.webView = webView
         context.coordinator.setupScrollMonitor()
-
-        // Block all external network requests via content rule list (async to avoid deadlock)
-        let ruleJSON = """
-        [{"trigger":{"url-filter":"^https?://"},"action":{"type":"block"}}]
-        """
-        WKContentRuleListStore.default().compileContentRuleList(
-            forIdentifier: "BlockExternal",
-            encodedContentRuleList: ruleJSON
-        ) { [weak webView] list, _ in
-            DispatchQueue.main.async {
-                guard let webView, let ruleList = list else { return }
-                webView.configuration.userContentController.add(ruleList)
-            }
-        }
 
         // Load the HTML snapshot
         if let snapshot = viewModel.webSnapshot {

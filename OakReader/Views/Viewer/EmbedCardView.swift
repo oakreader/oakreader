@@ -2,7 +2,6 @@ import SwiftUI
 import WebKit
 
 /// Renders non-YouTube embed documents (tweets, generic links) using a local `embed.html` in WKWebView.
-/// Follows the same security pattern as `WebArchiveViewerRepresentable` — blocks all external requests.
 struct EmbedCardView: View {
     let viewModel: DocumentViewModel
 
@@ -55,7 +54,7 @@ struct EmbedCardView: View {
     }
 }
 
-// MARK: - Local Embed (blocks external requests)
+// MARK: - Local Embed
 
 private struct LocalEmbedWebView: NSViewRepresentable {
     let media: MediaDocument
@@ -64,20 +63,6 @@ private struct LocalEmbedWebView: NSViewRepresentable {
         let config = WKWebViewConfiguration()
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.allowsMagnification = true
-
-        // Block all external network requests
-        let ruleJSON = """
-        [{"trigger":{"url-filter":"^https?://"},"action":{"type":"block"}}]
-        """
-        WKContentRuleListStore.default().compileContentRuleList(
-            forIdentifier: "BlockExternalEmbed",
-            encodedContentRuleList: ruleJSON
-        ) { [weak webView] list, _ in
-            DispatchQueue.main.async {
-                guard let webView, let ruleList = list else { return }
-                webView.configuration.userContentController.add(ruleList)
-            }
-        }
 
         // Load embed.html from local storage
         if let embedURL = media.embedHTMLURL {
