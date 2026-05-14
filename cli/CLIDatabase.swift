@@ -480,31 +480,33 @@ final class CLIDatabase {
 
     // MARK: - Import (Insert)
 
+    struct InsertItemInput {
+        let id: String
+        let storageKey: String
+        let title: String
+        let author: String
+        let attachmentId: String
+        let attachmentStorageKey: String
+        let fileName: String
+        let attachmentType: String
+        let sourceURL: String?
+        let fileSize: Int64
+        let pageCount: Int
+    }
+
     /// Insert an item and its primary attachment in one transaction.
-    func insertItem(
-        id: String,
-        storageKey: String,
-        title: String,
-        author: String,
-        attachmentId: String,
-        attachmentStorageKey: String,
-        fileName: String,
-        attachmentType: String,
-        sourceURL: String?,
-        fileSize: Int64,
-        pageCount: Int
-    ) throws {
+    func insertItem(_ input: InsertItemInput) throws {
         let timestamp = now()
         try dbQueue.write { db in
             try db.execute(sql: """
                 INSERT INTO items (id, user_id, storage_key, title, author, sync_status, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, 'local', ?, ?)
-            """, arguments: [id, self.userId, storageKey, title, author, timestamp, timestamp])
+            """, arguments: [input.id, self.userId, input.storageKey, input.title, input.author, timestamp, timestamp])
 
             try db.execute(sql: """
                 INSERT INTO attachments (id, item_id, storage_key, file_name, attachment_type, source_url, file_size, page_count, is_primary, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
-            """, arguments: [attachmentId, id, attachmentStorageKey, fileName, attachmentType, sourceURL, fileSize, pageCount, timestamp, timestamp])
+            """, arguments: [input.attachmentId, input.id, input.attachmentStorageKey, input.fileName, input.attachmentType, input.sourceURL, input.fileSize, input.pageCount, timestamp, timestamp])
         }
     }
 

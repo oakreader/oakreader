@@ -228,7 +228,7 @@ extension ImportService {
         }
 
         let item = await MainActor.run {
-            importEmbed(
+            importEmbed(.init(
                 title: title,
                 author: author,
                 sourceURL: sourceURL,
@@ -237,7 +237,7 @@ extension ImportService {
                 transcript: nil,
                 metadata: metadata,
                 embedType: embedType
-            )
+            ))
         }
         guard let item else { throw URLImportError.importFailed }
         return item

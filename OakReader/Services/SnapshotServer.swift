@@ -430,7 +430,7 @@ final class SnapshotServer {
         downloadData(from: payload.thumbnailURL) { thumbnailData in
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
-                let item = self.importService.importEmbed(
+                let item = self.importService.importEmbed(.init(
                     title: payload.title ?? "Untitled",
                     author: payload.author ?? "",
                     sourceURL: sourceURL,
@@ -439,7 +439,7 @@ final class SnapshotServer {
                     transcript: payload.transcript,
                     metadata: metadata,
                     embedType: resolvedEmbedType
-                )
+                ))
                 if let item {
                     self.assignToCollection(item: item, collectionId: payload.collectionId)
                     self.assignTags(item: item, tagOptionIds: payload.tagOptionIds)
