@@ -18,6 +18,7 @@ public struct Skill: Identifiable, Codable, Hashable, Sendable {
     public let systemPrompt: String
     public let icon: String
     public let contextMode: ContextMode
+    public let version: String?
 
     public init(
         id: String,
@@ -25,7 +26,8 @@ public struct Skill: Identifiable, Codable, Hashable, Sendable {
         description: String,
         systemPrompt: String,
         icon: String,
-        contextMode: ContextMode
+        contextMode: ContextMode,
+        version: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -33,5 +35,6 @@ public struct Skill: Identifiable, Codable, Hashable, Sendable {
         self.systemPrompt = systemPrompt
         self.icon = icon
         self.contextMode = contextMode
+        self.version = version
     }
 }
