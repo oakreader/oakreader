@@ -19,15 +19,11 @@ struct YouTubeSettingsView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                ytDlpSection
-                Divider()
-                chapterPromptSection
-                Spacer()
-            }
-            .padding(20)
+        Form {
+            ytDlpSection
+            chapterPromptSection
         }
+        .formStyle(.grouped)
         .onAppear {
             if ytDlpPath.isEmpty {
                 autoDetectYtDlp()
@@ -41,129 +37,128 @@ struct YouTubeSettingsView: View {
     // MARK: - Section 1: yt-dlp
 
     private var ytDlpSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("yt-dlp")
-                .font(.system(size: 13, weight: .bold))
-
-            Text("yt-dlp is used to fetch YouTube transcripts and extract native video chapters.")
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-
-            HStack(spacing: 8) {
-                TextField("yt-dlp path", text: $ytDlpPath)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.system(size: 12, design: .monospaced))
-                    .frame(maxWidth: 360)
-                    .onChange(of: ytDlpPath) { _, newValue in
-                        Preferences.shared.ytDlpPath = newValue
-                        Preferences.shared.ytDlpCachedVersion = nil
-                        if !newValue.isEmpty {
-                            verifyYtDlp(at: newValue)
-                        } else {
-                            ytDlpStatus = .unknown
+        Section {
+            LabeledContent("Path") {
+                HStack(spacing: 8) {
+                    TextField("yt-dlp path", text: $ytDlpPath)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(size: 12, design: .monospaced))
+                        .onChange(of: ytDlpPath) { _, newValue in
+                            Preferences.shared.ytDlpPath = newValue
+                            Preferences.shared.ytDlpCachedVersion = nil
+                            if !newValue.isEmpty {
+                                verifyYtDlp(at: newValue)
+                            } else {
+                                ytDlpStatus = .unknown
+                            }
                         }
-                    }
 
-                Button("Browse...") { chooseYtDlp() }
-                Button("Auto-detect") { autoDetectYtDlp() }
-            }
-            .controlSize(.regular)
-
-            HStack(spacing: 6) {
-                switch ytDlpStatus {
-                case .unknown:
-                    Image(systemName: "minus.circle")
-                        .foregroundStyle(.secondary)
-                    Text("Not configured")
-                        .foregroundStyle(.secondary)
-                case .checking:
-                    ProgressView()
-                        .controlSize(.small)
-                    Text("Checking...")
-                        .foregroundStyle(.secondary)
-                case .found(let version):
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                    Text("yt-dlp \(version)")
-                        .foregroundStyle(.secondary)
-                case .notFound:
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.red)
-                    Text("Not found at this path")
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer().frame(width: 4)
-
-                if isInstalling {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text("Installing…")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                } else if case .found(let current) = ytDlpStatus {
-                    if let latest = latestVersion, latest != current {
-                        Button("Update to \(latest)") {
-                            installOrUpdateYtDlp()
-                        }
-                        .controlSize(.small)
-                    } else {
-                        Button("Check for Updates") {
-                            checkForUpdates()
-                        }
-                        .controlSize(.small)
-                    }
-                } else {
-                    Button("Install") {
-                        installOrUpdateYtDlp()
-                    }
-                    .controlSize(.small)
+                    Button("Browse...") { chooseYtDlp() }
+                    Button("Auto-detect") { autoDetectYtDlp() }
                 }
             }
-            .font(.system(size: 11))
+
+            LabeledContent("Status") {
+                HStack(spacing: 10) {
+                    statusLabel
+                    Spacer()
+                    ytDlpActionButton
+                }
+            }
 
             if let installMessage {
-                Text(installMessage)
-                    .font(.system(size: 11))
-                    .foregroundStyle(installMessage.contains("Error") ? .red : .green)
+                LabeledContent("Last Action") {
+                    Text(installMessage)
+                        .foregroundStyle(installMessage.contains("Error") ? .red : .secondary)
+                }
             }
+        } header: {
+            Text("yt-dlp")
+        } footer: {
+            Text("Used to fetch YouTube transcripts and extract native video chapters.")
         }
     }
 
     // MARK: - Section 2: Highlight Prompt
 
     private var chapterPromptSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        Section {
+            LabeledContent("Preview") {
+                promptPreviewBox
+            }
+
+            LabeledContent("Actions") {
+                HStack(spacing: 8) {
+                    Button("Open in Editor") { openPromptInEditor() }
+                    Button("Reset to Default") { resetPromptToDefault() }
+                }
+            }
+        } header: {
             Text("Highlight Generation Prompt")
-                .font(.system(size: 13, weight: .bold))
-
-            Text("The system prompt sent to the AI model. Edit to customize highlight output.")
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-
-            if promptPreview.isEmpty {
-                Text("(default prompt)")
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundStyle(.tertiary)
-                    .padding(8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.03)))
-            } else {
-                Text(promptPreview)
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(4)
-                    .padding(8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.03)))
-            }
-
-            HStack(spacing: 8) {
-                Button("Open in Editor") { openPromptInEditor() }
-                Button("Reset to Default") { resetPromptToDefault() }
-            }
-            .controlSize(.regular)
+        } footer: {
+            Text("System prompt sent to the AI model when generating highlight output.")
         }
+    }
+
+    @ViewBuilder
+    private var statusLabel: some View {
+        switch ytDlpStatus {
+        case .unknown:
+            Label("Not configured", systemImage: "minus.circle")
+                .foregroundStyle(.secondary)
+        case .checking:
+            HStack(spacing: 6) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Checking...")
+                    .foregroundStyle(.secondary)
+            }
+        case .found(let version):
+            Label("yt-dlp \(version)", systemImage: "checkmark.circle.fill")
+                .foregroundStyle(.secondary, .green)
+        case .notFound:
+            Label("Not found at this path", systemImage: "xmark.circle.fill")
+                .foregroundStyle(.secondary, .red)
+        }
+    }
+
+    @ViewBuilder
+    private var ytDlpActionButton: some View {
+        if isInstalling {
+            HStack(spacing: 6) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Installing...")
+                    .foregroundStyle(.secondary)
+            }
+        } else if case .found(let current) = ytDlpStatus {
+            if let latest = latestVersion, latest != current {
+                Button("Update to \(latest)") {
+                    installOrUpdateYtDlp()
+                }
+            } else {
+                Button("Check for Updates") {
+                    checkForUpdates()
+                }
+            }
+        } else {
+            Button("Install") {
+                installOrUpdateYtDlp()
+            }
+        }
+    }
+
+    private var promptPreviewBox: some View {
+        Text(promptPreview.isEmpty ? "(default prompt)" : promptPreview)
+            .font(.system(size: 12, design: .monospaced))
+            .foregroundStyle(promptPreview.isEmpty ? .tertiary : .secondary)
+            .lineLimit(promptPreview.isEmpty ? 1 : 4)
+            .padding(8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.primary.opacity(0.03))
+            }
     }
 
     // MARK: - yt-dlp Helpers
@@ -201,17 +196,15 @@ struct YouTubeSettingsView: View {
                 "\(homeDir)/Library/Python/3.10/bin/yt-dlp",
             ].compactMap { $0 }
 
-            for path in candidates {
-                if FileManager.default.isExecutableFile(atPath: path) {
-                    let version = Self.ytDlpVersion(at: path)
-                    Preferences.shared.ytDlpCachedVersion = version
-                    await MainActor.run {
-                        ytDlpPath = path
-                        Preferences.shared.ytDlpPath = path
-                        ytDlpStatus = version.map { .found($0) } ?? .found("installed")
-                    }
-                    return
+            for path in candidates where FileManager.default.isExecutableFile(atPath: path) {
+                let version = Self.ytDlpVersion(at: path)
+                Preferences.shared.ytDlpCachedVersion = version
+                await MainActor.run {
+                    ytDlpPath = path
+                    Preferences.shared.ytDlpPath = path
+                    ytDlpStatus = version.map { .found($0) } ?? .found("installed")
                 }
+                return
             }
 
             let process = Process()
