@@ -7,13 +7,12 @@ struct CharacterSettingsView: View {
     let database: CatalogDatabase
 
     @State private var characters: [Character] = []
-    @State private var selectedCharacterId: UUID?
+    @State private var selectedCharacter: Character?
     @State private var catalogTemplates: [CharacterTemplate] = []
     @State private var bundledTemplateNames: Set<String> = []
     @State private var installedTemplateNames: Set<String> = []
-    @State private var voiceLanguage: String
-    @State private var liveTranscription: Bool
-    @State private var voiceLLMModel: String
+    @State private var searchText = ""
+    @State private var filter: CharacterListFilter = .all
     @State private var errorMessage: String?
 
     private let service: VoiceCharacterService
@@ -21,202 +20,194 @@ struct CharacterSettingsView: View {
     init(database: CatalogDatabase) {
         self.database = database
         self.service = VoiceCharacterService(database: database)
-        let prefs = Preferences.shared
-        _voiceLanguage = State(initialValue: prefs.voiceLanguage)
-        _liveTranscription = State(initialValue: prefs.voiceLiveTranscription)
-        _voiceLLMModel = State(initialValue: prefs.voiceLLMModel)
-    }
-
-    private var selectedCharacter: Character? {
-        characters.first { $0.id == selectedCharacterId }
     }
 
     var body: some View {
-        Form {
-            if let errorMessage {
-                Section {
-                    Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.red)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 28) {
+                if let selectedCharacter {
+                    CharacterDetailView(
+                        character: selectedCharacter,
+                        onBack: { self.selectedCharacter = nil },
+                        onSave: { saveCharacter($0) },
+                        onDelete: { deleteCharacter($0) }
+                    )
+                } else {
+                    mainPage
                 }
             }
-
-            defaultsSection
-            characterCatalogSection
-            characterListSection
-
-            if let character = selectedCharacter {
-                characterDetailSection(character)
-            }
+            .frame(maxWidth: 920)
+            .padding(.horizontal, 36)
+            .padding(.vertical, 26)
+            .frame(maxWidth: .infinity, alignment: .top)
         }
-        .formStyle(.grouped)
+        .background(Color(nsColor: .windowBackgroundColor))
         .task {
             reloadCharacterTemplates()
             await loadCharactersAsync()
         }
-        .onDisappear { save() }
     }
 
-    // MARK: - Defaults
+    // MARK: - Main Page
 
-    private var defaultsSection: some View {
-        Section("Defaults") {
-            Picker("Language", selection: $voiceLanguage) {
-                ForEach(VoiceLanguage.allCases) { lang in
-                    Text(lang.displayName).tag(lang.code)
-                }
-            }
+    @ViewBuilder
+    private var mainPage: some View {
+        if let errorMessage {
+            Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
+                .foregroundStyle(.red)
+        }
 
-            let pid = Preferences.shared.aiProviderId
-            let models = ProviderRegistry.shared.provider(for: pid)?.models ?? []
+        header
+        controls
 
-            Picker("LLM Model", selection: $voiceLLMModel) {
-                Text("Same as AI Chat").tag("")
-                ForEach(models.filter { !$0.reasoning }) { model in
-                    Text(model.name).tag(model.id)
-                }
-                let reasoningModels = models.filter { $0.reasoning }
-                if !reasoningModels.isEmpty {
-                    Section("Reasoning (slower)") {
-                        ForEach(reasoningModels) { model in
-                            Text(model.name).tag(model.id)
-                        }
-                    }
-                }
-            }
+        let filteredTemplates = filteredCatalogTemplates
+        let filteredChars = filteredCharacters
 
-            Text("Pick a fast, non-reasoning model for lower latency.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            Toggle("Live Transcription", isOn: $liveTranscription)
+        if filteredTemplates.isEmpty && filteredChars.isEmpty {
+            emptyState
+        } else {
+            CharacterGridSection(
+                templates: filteredTemplates,
+                characters: filteredChars,
+                installedTemplateNames: installedTemplateNames,
+                onAddTemplate: { addTemplate($0) },
+                onRemoveTemplate: { removeTemplate($0) },
+                onSelectCharacter: { selectedCharacter = $0 },
+                onAddNew: { addCharacter() }
+            )
         }
     }
 
-    // MARK: - Character Catalog
-
-    private var characterCatalogSection: some View {
-        Section("Popular Characters for Academic PDFs") {
-            if catalogTemplates.isEmpty {
-                Text("No character templates found.")
-                    .foregroundStyle(.secondary)
-            }
-
-            ForEach(catalogTemplates) { template in
-                HStack(alignment: .top, spacing: 10) {
-                    CharacterAvatarView(
-                        avatar: template.avatar ?? CharacterAvatar(colorHex: template.fallbackColorHex),
-                        initials: template.initials,
-                        size: 34
-                    )
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 6) {
-                            Text(template.displayName)
-                                .font(.body.weight(.semibold))
-                            if let category = template.category, !category.isEmpty {
-                                Text(category)
-                                    .font(.caption2)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(Capsule().fill(Color.secondary.opacity(0.14)))
-                            }
-                        }
-
-                        Text(template.description)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-
-                        if !template.previewPrompts.isEmpty {
-                            Text(template.previewPrompts.prefix(2).joined(separator: "  ·  "))
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
-                                .lineLimit(1)
-                        }
-                    }
-
-                    Spacer(minLength: 8)
-
-                    if installedTemplateNames.contains(template.name) {
-                        Button("Remove") {
-                            removeTemplate(template)
-                        }
-                        .controlSize(.small)
-                    } else {
-                        Button("Add Character") {
-                            addTemplate(template)
-                        }
-                        .controlSize(.small)
-                    }
-                }
-                .padding(.vertical, 3)
-            }
-
-            Text("Add a character to make it available in Voice AI. Personal character templates can be dropped into ~/OakReader/agent/characters.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
+    private var header: some View {
+        Text("Your AI Study Partners")
+            .font(OakStyle.Font.styled(size: 22, weight: .regular))
+            .foregroundStyle(.primary)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.bottom, 8)
     }
 
-    // MARK: - Character List
-
-    private var characterListSection: some View {
-        Section("Characters") {
-            if characters.isEmpty {
-                Text("No characters yet.")
+    private var controls: some View {
+        HStack(spacing: 10) {
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: OakStyle.Font.iconSmall, weight: .regular))
                     .foregroundStyle(.secondary)
-            }
 
-            ForEach(characters) { character in
-                Button {
-                    selectedCharacterId = selectedCharacterId == character.id ? nil : character.id
-                } label: {
-                    HStack(spacing: 10) {
-                        CharacterAvatarView(avatar: character.avatar, initials: character.initials, size: 30)
+                TextField("Search characters", text: $searchText)
+                    .textFieldStyle(.plain)
+                    .font(OakStyle.Font.styledBody)
 
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(character.name)
-                                .font(.body)
-                            if !character.systemPrompt.isEmpty {
-                                Text(character.systemPrompt)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                            }
-                        }
-
-                        Spacer()
-
-                        Image(systemName: selectedCharacterId == character.id ? "chevron.down" : "chevron.right")
-                            .foregroundStyle(selectedCharacterId == character.id ? .secondary : .tertiary)
+                if !searchText.isEmpty {
+                    Button {
+                        searchText = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.tertiary)
                     }
-                    .contentShape(Rectangle())
+                    .buttonStyle(.plain)
+                    .help("Clear search")
                 }
-                .buttonStyle(.plain)
             }
+            .padding(.horizontal, 14)
+            .frame(height: 40)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color(nsColor: .textBackgroundColor))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.primary.opacity(0.10), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.04), radius: 5, y: 2)
+
+            Menu {
+                ForEach(CharacterListFilter.allCases) { option in
+                    Button {
+                        filter = option
+                    } label: {
+                        if filter == option {
+                            Label(option.title, systemImage: "checkmark")
+                        } else {
+                            Text(option.title)
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Text(filter.title)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .font(OakStyle.Font.styledBody)
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 14)
+                .frame(height: 40)
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color(nsColor: .controlBackgroundColor))
+                )
+            }
+            .buttonStyle(.plain)
+            .fixedSize()
 
             Button {
                 addCharacter()
             } label: {
-                Label("Add Character", systemImage: "plus")
+                Label("New Character", systemImage: "plus")
+                    .font(OakStyle.Font.styledBody)
             }
+            .buttonStyle(LiquidGlassButtonStyle())
         }
     }
 
-    // MARK: - Character Detail
+    private var emptyState: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "person.2.slash")
+                .font(.system(size: 24))
+                .foregroundStyle(.secondary)
+            Text("No characters found")
+                .font(OakStyle.Font.styled(size: OakStyle.Font.body, weight: .semibold))
+            Text("Try a different search or filter.")
+                .font(OakStyle.Font.styledCaption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 70)
+    }
 
-    @ViewBuilder
-    private func characterDetailSection(_ character: Character) -> some View {
-        Section("\(character.name) - Details") {
-            CharacterDetailEditor(
-                character: character,
-                onSave: { updated in
-                    saveCharacter(updated)
-                },
-                onDelete: {
-                    deleteCharacter(character)
-                }
-            )
+    // MARK: - Filtering
+
+    private var filteredCatalogTemplates: [CharacterTemplate] {
+        catalogTemplates.filter { template in
+            switch filter {
+            case .all: return true
+            case .catalog: return true
+            case .custom: return false
+            }
+        }
+        .filter { template in
+            let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !query.isEmpty else { return true }
+            return template.displayName.localizedCaseInsensitiveContains(query)
+                || template.description.localizedCaseInsensitiveContains(query)
+                || (template.category?.localizedCaseInsensitiveContains(query) ?? false)
+        }
+    }
+
+    private var filteredCharacters: [Character] {
+        characters.filter { character in
+            switch filter {
+            case .all: return true
+            case .catalog: return character.config.sourceTemplateId != nil
+            case .custom: return character.config.sourceTemplateId == nil
+            }
+        }
+        .filter { character in
+            let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !query.isEmpty else { return true }
+            return character.name.localizedCaseInsensitiveContains(query)
+                || character.systemPrompt.localizedCaseInsensitiveContains(query)
         }
     }
 
@@ -286,7 +277,7 @@ struct CharacterSettingsView: View {
                 let alreadyExists = characters.contains { $0.config.sourceTemplateId == template.name }
                 if !alreadyExists {
                     let svc = service
-                    let language = template.language ?? voiceLanguage
+                    let language = template.language ?? Preferences.shared.voiceLanguage
                     let existingCharacter = characters.first { $0.name == template.displayName }
                     let character = try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Character, Error>) in
                         DispatchQueue.global(qos: .userInitiated).async {
@@ -315,7 +306,7 @@ struct CharacterSettingsView: View {
                             }
                         }
                     }
-                    selectedCharacterId = character.id
+                    selectedCharacter = character
                 }
 
                 reloadCharacterTemplates()
@@ -344,8 +335,8 @@ struct CharacterSettingsView: View {
                         }
                     }
                 }
-                if let selectedCharacterId, ids.contains(selectedCharacterId) {
-                    self.selectedCharacterId = nil
+                if let sel = selectedCharacter, ids.contains(sel.id) {
+                    selectedCharacter = nil
                 }
                 reloadCharacterTemplates()
                 await loadCharactersAsync()
@@ -361,7 +352,7 @@ struct CharacterSettingsView: View {
         Task {
             do {
                 let svc = service
-                let lang = voiceLanguage
+                let lang = Preferences.shared.voiceLanguage
                 let character = try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Character, Error>) in
                     DispatchQueue.global(qos: .userInitiated).async {
                         do {
@@ -373,7 +364,7 @@ struct CharacterSettingsView: View {
                     }
                 }
                 await loadCharactersAsync()
-                selectedCharacterId = character.id
+                selectedCharacter = character
             } catch {
                 errorMessage = "Failed to create character: \(error.localizedDescription)"
             }
@@ -395,6 +386,7 @@ struct CharacterSettingsView: View {
                     }
                 }
                 await loadCharactersAsync()
+                selectedCharacter = nil
             } catch {
                 errorMessage = "Failed to save character: \(error.localizedDescription)"
             }
@@ -416,21 +408,236 @@ struct CharacterSettingsView: View {
                         }
                     }
                 }
-                if selectedCharacterId == charId {
-                    selectedCharacterId = nil
-                }
+                selectedCharacter = nil
                 await loadCharactersAsync()
             } catch {
                 errorMessage = "Failed to delete character: \(error.localizedDescription)"
             }
         }
     }
+}
 
-    private func save() {
-        let prefs = Preferences.shared
-        prefs.voiceLanguage = voiceLanguage
-        prefs.voiceLiveTranscription = liveTranscription
-        prefs.voiceLLMModel = voiceLLMModel
+// MARK: - Filter
+
+private enum CharacterListFilter: String, CaseIterable, Identifiable {
+    case all
+    case catalog
+    case custom
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all: return "All"
+        case .catalog: return "From Catalog"
+        case .custom: return "Custom"
+        }
+    }
+}
+
+// MARK: - Character Grid Section
+
+private struct CharacterGridSection: View {
+    let templates: [CharacterTemplate]
+    let characters: [Character]
+    let installedTemplateNames: Set<String>
+    let onAddTemplate: (CharacterTemplate) -> Void
+    let onRemoveTemplate: (CharacterTemplate) -> Void
+    let onSelectCharacter: (Character) -> Void
+    let onAddNew: () -> Void
+
+    private let columns = [
+        GridItem(.flexible(minimum: 0), spacing: 30, alignment: .top),
+        GridItem(.flexible(minimum: 0), spacing: 30, alignment: .top)
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Characters")
+                    .font(OakStyle.Font.styled(size: OakStyle.Font.body + 2, weight: .regular))
+                    .foregroundStyle(OakStyle.Colors.textPrimary)
+
+                Divider()
+            }
+
+            LazyVGrid(columns: columns, alignment: .leading, spacing: 14) {
+                ForEach(characters) { character in
+                    CharacterCardItem(
+                        character: character,
+                        onSelect: { onSelectCharacter(character) }
+                    )
+                }
+
+                AddCharacterCard(onAdd: onAddNew)
+
+                ForEach(templates.filter { !installedTemplateNames.contains($0.name) }) { template in
+                    CharacterCatalogItem(
+                        template: template,
+                        isInstalled: false,
+                        onAdd: { onAddTemplate(template) },
+                        onRemove: {}
+                    )
+                }
+            }
+
+            Text("Add a character to make it available in Voice AI. Personal templates can be dropped into ~/OakReader/agent/characters.")
+                .font(OakStyle.Font.styledCaption)
+                .foregroundStyle(OakStyle.Colors.textSecondary)
+        }
+    }
+}
+
+// MARK: - Catalog Item Card
+
+private struct CharacterCatalogItem: View {
+    let template: CharacterTemplate
+    let isInstalled: Bool
+    let onAdd: () -> Void
+    let onRemove: () -> Void
+
+    @State private var isHovered = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            CharacterAvatarView(
+                avatar: template.avatar ?? CharacterAvatar(colorHex: template.fallbackColorHex),
+                initials: template.initials,
+                size: 34
+            )
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(template.displayName)
+                        .font(OakStyle.Font.styled(size: OakStyle.Font.body, weight: .semibold))
+                        .foregroundStyle(OakStyle.Colors.textPrimary)
+                        .lineLimit(1)
+
+                    if let category = template.category, !category.isEmpty {
+                        Text(category)
+                            .font(.caption2)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Capsule().fill(Color.secondary.opacity(0.14)))
+                    }
+                }
+
+                if !template.description.isEmpty {
+                    Text(template.description)
+                        .font(OakStyle.Font.styledCaption)
+                        .foregroundStyle(OakStyle.Colors.textSecondary)
+                        .lineLimit(2)
+                }
+            }
+
+            Spacer(minLength: 6)
+
+            if isInstalled {
+                Button("Remove") { onRemove() }
+                    .controlSize(.small)
+            } else {
+                Button {
+                    onAdd()
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 15, weight: .regular))
+                        .foregroundStyle(OakStyle.Colors.textPrimary)
+                        .frame(width: 26, height: 26)
+                        .background(Circle().fill(OakStyle.Colors.buttonBackground))
+                }
+                .buttonStyle(.plain)
+                .help("Add character")
+            }
+        }
+        .padding(.horizontal, 7)
+        .padding(.vertical, 7)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(isHovered ? OakStyle.Colors.hoverBackground : Color.clear)
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .onHover { isHovered = $0 }
+    }
+}
+
+// MARK: - Character Card Item
+
+private struct CharacterCardItem: View {
+    let character: Character
+    let onSelect: () -> Void
+
+    @State private var isHovered = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            CharacterAvatarView(avatar: character.avatar, initials: character.initials, size: 34)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(character.name)
+                    .font(OakStyle.Font.styled(size: OakStyle.Font.body, weight: .semibold))
+                    .foregroundStyle(OakStyle.Colors.textPrimary)
+                    .lineLimit(1)
+
+                if !character.systemPrompt.isEmpty {
+                    Text(character.systemPrompt)
+                        .font(OakStyle.Font.styledCaption)
+                        .foregroundStyle(OakStyle.Colors.textSecondary)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer(minLength: 6)
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(OakStyle.Colors.textTertiary)
+        }
+        .padding(.horizontal, 7)
+        .padding(.vertical, 7)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(isHovered ? OakStyle.Colors.hoverBackground : Color.clear)
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .onTapGesture { onSelect() }
+        .onHover { isHovered = $0 }
+    }
+}
+
+// MARK: - Add Character Card
+
+private struct AddCharacterCard: View {
+    let onAdd: () -> Void
+
+    @State private var isHovered = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+                    .foregroundStyle(OakStyle.Colors.textTertiary)
+                Image(systemName: "plus")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(OakStyle.Colors.textTertiary)
+            }
+            .frame(width: 34, height: 34)
+
+            Text("New Character")
+                .font(OakStyle.Font.styled(size: OakStyle.Font.body, weight: .medium))
+                .foregroundStyle(OakStyle.Colors.textSecondary)
+
+            Spacer()
+        }
+        .padding(.horizontal, 7)
+        .padding(.vertical, 7)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(isHovered ? OakStyle.Colors.hoverBackground : Color.clear)
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .onTapGesture { onAdd() }
+        .onHover { isHovered = $0 }
     }
 }
 
@@ -484,20 +691,23 @@ struct CharacterAvatarView: View {
     }
 }
 
-// MARK: - Character Detail Editor
+// MARK: - Character Detail View
 
-private struct CharacterDetailEditor: View {
+private struct CharacterDetailView: View {
     @State private var name: String
     @State private var config: CharacterConfig
     @State private var showAudioFilePicker = false
     @State private var referenceAudioImportError: String?
+    @State private var showDeleteConfirmation = false
 
     let character: Character
+    let onBack: () -> Void
     let onSave: (Character) -> Void
-    let onDelete: () -> Void
+    let onDelete: (Character) -> Void
 
-    init(character: Character, onSave: @escaping (Character) -> Void, onDelete: @escaping () -> Void) {
+    init(character: Character, onBack: @escaping () -> Void, onSave: @escaping (Character) -> Void, onDelete: @escaping (Character) -> Void) {
         self.character = character
+        self.onBack = onBack
         self.onSave = onSave
         self.onDelete = onDelete
         _name = State(initialValue: character.name)
@@ -505,102 +715,148 @@ private struct CharacterDetailEditor: View {
     }
 
     var body: some View {
-        TextField("Name", text: $name)
-            .textFieldStyle(.roundedBorder)
-
-        Picker("Language", selection: $config.language) {
-            ForEach(VoiceLanguage.allCases) { lang in
-                Text(lang.displayName).tag(lang.code)
+        VStack(alignment: .leading, spacing: 22) {
+            // Back button
+            Button {
+                onBack()
+            } label: {
+                Label("Characters", systemImage: "chevron.left")
+                    .font(OakStyle.Font.styled(size: OakStyle.Font.body + 1, weight: .medium))
             }
-        }
+            .buttonStyle(LiquidGlassButtonStyle())
+            .foregroundStyle(OakStyle.Colors.textPrimary)
 
-        let pid = Preferences.shared.aiProviderId
-        let models = ProviderRegistry.shared.provider(for: pid)?.models ?? []
-        Picker("LLM Model", selection: $config.llmModel) {
-            Text("Same as default").tag("")
-            ForEach(models) { m in
-                Text(m.name).tag(m.id)
+            // Header
+            HStack(alignment: .top, spacing: 14) {
+                CharacterAvatarView(avatar: character.avatar, initials: character.initials, size: 52)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(character.name)
+                        .font(OakStyle.Font.styled(size: OakStyle.Font.body + 3, weight: .semibold))
+
+                    HStack(spacing: 8) {
+                        let lang = VoiceLanguage(rawValue: character.language)
+                        if let lang {
+                            Text(lang.displayName)
+                                .font(OakStyle.Font.styledCaption)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(Capsule().fill(Color.secondary.opacity(0.14)))
+                        }
+
+                        if let lastCall = character.lastCall {
+                            Text("Last call: \(lastCall.displayTitle)")
+                                .font(OakStyle.Font.styledCaption)
+                                .foregroundStyle(OakStyle.Colors.textTertiary)
+                        }
+                    }
+                }
+
+                Spacer()
             }
-        }
 
-        VStack(alignment: .leading, spacing: 4) {
-            Text("System Prompt")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Divider()
+
+            // Basic section
+            sectionHeader("Basic")
+
+            TextField("Name", text: $name)
+                .textFieldStyle(.roundedBorder)
+
+            Picker("Language", selection: $config.language) {
+                ForEach(VoiceLanguage.allCases) { lang in
+                    Text(lang.displayName).tag(lang.code)
+                }
+            }
+
+            // Language Model section
+            sectionHeader("Language Model")
+
+            let pid = Preferences.shared.aiProviderId
+            let models = ProviderRegistry.shared.provider(for: pid)?.models ?? []
+            Picker("LLM Model", selection: $config.llmModel) {
+                Text("Same as default").tag("")
+                ForEach(models.filter { !$0.reasoning }) { m in
+                    Text(m.name).tag(m.id)
+                }
+                let reasoningModels = models.filter { $0.reasoning }
+                if !reasoningModels.isEmpty {
+                    Section("Reasoning (slower)") {
+                        ForEach(reasoningModels) { model in
+                            Text(model.name).tag(model.id)
+                        }
+                    }
+                }
+            }
+
+            Text("Pick a fast, non-reasoning model for lower latency.")
+                .font(OakStyle.Font.styledCaption)
+                .foregroundStyle(OakStyle.Colors.textSecondary)
+
+            // Voice section
+            sectionHeader("Voice")
+            voiceProviderSection
+
+            // Reference Audio section
+            sectionHeader("Reference Audio")
+            referenceAudioSection
+
+            // System Prompt section
+            sectionHeader("System Prompt")
+
             TextEditor(text: $config.systemPrompt)
                 .font(.system(size: 12))
-                .frame(minHeight: 80)
-                .border(Color.secondary.opacity(0.2), width: 1)
-        }
+                .frame(minHeight: 100)
+                .padding(4)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Color(nsColor: .textBackgroundColor))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .stroke(Color.primary.opacity(0.10), lineWidth: 1)
+                )
 
-        voiceProviderSection
+            Divider()
 
-        // Reference audio
-        HStack {
-            if config.referenceAudio.path.isEmpty {
-                Text("No reference audio")
-                    .foregroundStyle(.secondary)
-            } else {
-                Text(URL(fileURLWithPath: config.referenceAudio.path).lastPathComponent)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
-            Spacer()
-            Button("Choose...") { showAudioFilePicker = true }
-                .controlSize(.small)
-            if !config.referenceAudio.path.isEmpty {
-                Button("Clear") {
-                    config.referenceAudio.path = ""
-                    referenceAudioImportError = nil
+            // Action buttons
+            HStack(spacing: 12) {
+                Button("Save") {
+                    var updated = character
+                    updated.name = name
+                    updated.config = config
+                    onSave(updated)
                 }
-                .controlSize(.small)
+                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
+
+                Spacer()
+
+                Button("Delete", role: .destructive) {
+                    showDeleteConfirmation = true
+                }
             }
         }
-        .fileImporter(
-            isPresented: $showAudioFilePicker,
-            allowedContentTypes: [.audio, .wav],
-            allowsMultipleSelection: false
-        ) { result in
-            if case .success(let urls) = result, let url = urls.first {
-                importReferenceAudio(from: url)
-            }
-        }
-
-        if let error = referenceAudioImportError {
-            Text(error)
-                .font(.caption)
-                .foregroundStyle(.red)
-        }
-
-        if !config.referenceAudio.path.isEmpty {
-            TextField("Reference Text", text: $config.referenceAudio.text, axis: .vertical)
-                .textFieldStyle(.roundedBorder)
-                .lineLimit(2...4)
-        }
-
-        HStack {
-            Button("Save") {
-                var updated = character
-                updated.name = name
-                updated.config = config
-                onSave(updated)
-            }
-            .keyboardShortcut(.defaultAction)
-
-            Spacer()
-
+        .alert("Delete Character", isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) {}
             Button("Delete", role: .destructive) {
-                onDelete()
+                onDelete(character)
             }
+        } message: {
+            Text("Are you sure you want to delete \"\(character.name)\"? This action cannot be undone.")
         }
     }
 
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(OakStyle.Font.styled(size: OakStyle.Font.body, weight: .semibold))
+            .padding(.top, 4)
+    }
+
+    // MARK: - Voice Provider
+
     private var voiceProviderSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Voice Overrides")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
             Picker("Transcription Provider", selection: transcriptionProviderBinding) {
                 Text("Same as Default").tag("")
                 ForEach(VoiceProviderType.allCases, id: \.rawValue) { provider in
@@ -652,6 +908,56 @@ private struct CharacterDetailEditor: View {
         }
     }
 
+    // MARK: - Reference Audio
+
+    private var referenceAudioSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                if config.referenceAudio.path.isEmpty {
+                    Text("No reference audio")
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text(URL(fileURLWithPath: config.referenceAudio.path).lastPathComponent)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                Spacer()
+                Button("Choose...") { showAudioFilePicker = true }
+                    .controlSize(.small)
+                if !config.referenceAudio.path.isEmpty {
+                    Button("Clear") {
+                        config.referenceAudio.path = ""
+                        referenceAudioImportError = nil
+                    }
+                    .controlSize(.small)
+                }
+            }
+            .fileImporter(
+                isPresented: $showAudioFilePicker,
+                allowedContentTypes: [.audio, .wav],
+                allowsMultipleSelection: false
+            ) { result in
+                if case .success(let urls) = result, let url = urls.first {
+                    importReferenceAudio(from: url)
+                }
+            }
+
+            if let error = referenceAudioImportError {
+                Text(error)
+                    .font(OakStyle.Font.styledCaption)
+                    .foregroundStyle(.red)
+            }
+
+            if !config.referenceAudio.path.isEmpty {
+                TextField("Reference Text", text: $config.referenceAudio.text, axis: .vertical)
+                    .textFieldStyle(.roundedBorder)
+                    .lineLimit(2...4)
+            }
+        }
+    }
+
+    // MARK: - Bindings
+
     private var transcriptionProviderBinding: Binding<String> {
         Binding(
             get: { config.transcription?.provider ?? "" },
@@ -691,6 +997,8 @@ private struct CharacterDetailEditor: View {
         )
     }
 
+    // MARK: - Import Audio
+
     private func importReferenceAudio(from url: URL) {
         let didAccess = url.startAccessingSecurityScopedResource()
         defer {
@@ -713,6 +1021,31 @@ private struct CharacterDetailEditor: View {
         } catch {
             referenceAudioImportError = "Could not import reference audio: \(error.localizedDescription)"
         }
+    }
+}
+
+// MARK: - Liquid Glass Button Style
+
+private struct LiquidGlassButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(.regularMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(configuration.isPressed ? Color.primary.opacity(0.08) : Color.white.opacity(0.03))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(Color.primary.opacity(0.10), lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.06), radius: 8, y: 3)
+            )
+            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 
