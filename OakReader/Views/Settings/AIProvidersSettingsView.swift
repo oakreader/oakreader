@@ -5,6 +5,10 @@ import OakVoiceAI
 struct AIProvidersSettingsView: View {
     /// Sentinel ID for ElevenLabs (not in ProviderRegistry).
     static let elevenLabsId = "__elevenlabs__"
+    /// Sentinel ID for Local Models.
+    static let localModelsId = "__local_models__"
+
+    let modelStates: SharedModelStates
 
     @State private var store = ConfiguredProviderStore.shared
     @State private var selectedProviderId: String?
@@ -51,6 +55,16 @@ struct AIProvidersSettingsView: View {
                     sfSymbol: nil,
                     title: "ElevenLabs",
                     isConfigured: store.isElevenLabsConfigured
+                )
+
+                sectionHeader("On-Device")
+
+                listRow(
+                    id: Self.localModelsId,
+                    iconAsset: nil,
+                    sfSymbol: "arrow.down.circle",
+                    title: "Local Models",
+                    isConfigured: true
                 )
             }
             .padding(.vertical, 8)
@@ -112,7 +126,9 @@ struct AIProvidersSettingsView: View {
 
     @ViewBuilder
     private var configPanel: some View {
-        if let id = selectedProviderId {
+        if selectedProviderId == Self.localModelsId {
+            LocalModelsSettingsView(modelStates: modelStates)
+        } else if let id = selectedProviderId {
             AIProviderConfigView(providerId: id, store: store)
         } else {
             ContentUnavailableView(
