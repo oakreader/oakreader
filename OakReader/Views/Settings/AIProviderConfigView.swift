@@ -218,7 +218,7 @@ private struct ProviderDetailView: View {
         }
 
         Section {
-            Button("Remove Provider", role: .destructive) {
+            Button("Reset Provider", role: .destructive) {
                 KeychainService.deleteAPIKey(forProviderId: provider.id)
                 OAuthTokenStore.delete(for: provider.id)
                 store.refresh()
