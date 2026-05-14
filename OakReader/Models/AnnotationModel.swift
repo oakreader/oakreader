@@ -8,6 +8,8 @@ struct AnnotationModel: Identifiable, Equatable {
     var bounds: CGRect
     var color: NSColor
     var contents: String?
+    /// The text content under a markup annotation (highlight, underline, etc.)
+    var markedUpText: String?
     var fontName: String?
     var fontSize: CGFloat?
     var lineWidth: CGFloat
@@ -27,6 +29,12 @@ struct AnnotationModel: Identifiable, Equatable {
         self.opacity = CGFloat(annotation.value(forAnnotationKey: .color) != nil ? 1.0 : 1.0)
         self.pageIndex = pageIndex
         self.interiorColor = annotation.interiorColor
+
+        // Extract marked-up text from the page for markup annotations
+        if let page = annotation.page {
+            let selection = page.selection(for: annotation.bounds)
+            self.markedUpText = selection?.string?.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
     }
 
     init(type: PDFAnnotationSubtype, bounds: CGRect, pageIndex: Int) {
