@@ -17,9 +17,13 @@ final class ConfiguredProviderStore {
     }
 
     /// All models from configured providers, paired with their provider.
+    /// Models that the user has toggled off are excluded.
     var availableLLMModels: [(provider: ProviderInfo, model: ModelInfo)] {
-        configuredLLMProviders.flatMap { provider in
-            provider.models.map { (provider: provider, model: $0) }
+        let disabled = Preferences.shared.disabledModelIds
+        return configuredLLMProviders.flatMap { provider in
+            provider.models
+                .filter { !disabled.contains($0.id) }
+                .map { (provider: provider, model: $0) }
         }
     }
 

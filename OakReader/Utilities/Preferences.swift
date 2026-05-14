@@ -80,6 +80,8 @@ final class Preferences {
         static let elevenLabsVoiceId = "elevenLabsVoiceId"
         static let elevenLabsTTSModelId = "elevenLabsTTSModelId"
         static let elevenLabsSTTModelId = "elevenLabsSTTModelId"
+        // Disabled models
+        static let disabledModelIds = "disabledModelIds"
         // Embedding
         static let embeddingModel = "embeddingModel"
         // Appearance
@@ -495,6 +497,28 @@ final class Preferences {
     var hfEndpoint: String {
         get { defaults.string(forKey: Keys.hfEndpoint) ?? "" }
         set { defaults.set(newValue, forKey: Keys.hfEndpoint) }
+    }
+
+    // MARK: - Disabled Models
+
+    /// Model IDs that the user has toggled off in provider settings.
+    var disabledModelIds: Set<String> {
+        get { Set(defaults.stringArray(forKey: Keys.disabledModelIds) ?? []) }
+        set { defaults.set(Array(newValue), forKey: Keys.disabledModelIds) }
+    }
+
+    func isModelEnabled(_ modelId: String) -> Bool {
+        !disabledModelIds.contains(modelId)
+    }
+
+    func setModel(_ modelId: String, enabled: Bool) {
+        var disabled = disabledModelIds
+        if enabled {
+            disabled.remove(modelId)
+        } else {
+            disabled.insert(modelId)
+        }
+        disabledModelIds = disabled
     }
 
     // MARK: - Embedding Model
