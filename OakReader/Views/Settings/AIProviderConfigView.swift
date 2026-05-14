@@ -158,9 +158,6 @@ private struct ProviderDetailView: View {
         Section("Models") {
             ForEach(provider.models) { model in
                 HStack(spacing: 8) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                        .font(.caption)
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 6) {
                             Text(model.name)
@@ -188,6 +185,16 @@ private struct ProviderDetailView: View {
                         .foregroundStyle(.secondary)
                     }
                     Spacer()
+                    Toggle("", isOn: Binding(
+                        get: { Preferences.shared.isModelEnabled(model.id) },
+                        set: { enabled in
+                            Preferences.shared.setModel(model.id, enabled: enabled)
+                            store.refresh()
+                        }
+                    ))
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
                 }
             }
         }
