@@ -4,11 +4,13 @@ import PDFKit
 struct AnnotationListView: View {
     let viewModel: DocumentViewModel
 
-    @State private var annotationsByPage: [Int: [AnnotationModel]] = [:]
+    private var annotationsByPage: [Int: [AnnotationModel]] {
+        Dictionary(grouping: viewModel.annotation.annotationModels, by: \.pageIndex)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
-            if annotationsByPage.isEmpty {
+            if viewModel.annotation.annotationModels.isEmpty {
                 VStack(spacing: 12) {
                     Image(systemName: "text.bubble")
                         .font(.largeTitle)
@@ -47,47 +49,16 @@ struct AnnotationListView: View {
             Divider()
 
             HStack {
-                Button {
-                    loadAnnotations()
-                } label: {
-                    Label("Refresh", systemImage: "arrow.clockwise")
-                }
-                .buttonStyle(.borderless)
-                .font(.caption)
-
                 Spacer()
 
-                Text("\(totalAnnotationCount) annotations")
+                Text("\(viewModel.annotation.annotationModels.count) annotations")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
             .padding(8)
         }
         .background(Color(nsColor: .controlBackgroundColor))
-        .onAppear { loadAnnotations() }
-    }
-
-    private var totalAnnotationCount: Int {
-        annotationsByPage.values.reduce(0) { $0 + $1.count }
-    }
-
-    private func loadAnnotations() {
-        guard let doc = viewModel.pdfDocument else { return }
-        var result: [Int: [AnnotationModel]] = [:]
-
-        for i in 0..<doc.pageCount {
-            guard let page = doc.page(at: i) else { continue }
-            let annotations = page.annotations.filter { annotation in
-                // Filter out link and widget annotations from the list
-                let type = annotation.type ?? ""
-                return type != "Link" && type != "Widget"
-            }.map { AnnotationModel(from: $0, pageIndex: i) }
-
-            if !annotations.isEmpty {
-                result[i] = annotations
-            }
-        }
-        annotationsByPage = result
+        .onAppear { viewModel.annotation.refreshAnnotationModels() }
     }
 
     private func selectAnnotation(_ model: AnnotationModel) {
@@ -104,6 +75,34 @@ struct AnnotationListView: View {
 private struct AnnotationRowView: View {
     let annotation: AnnotationModel
 
+    /// The best display text for this annotation.
+    private var displayText: String? {
+        // Prefer marked-up text (highlighted/underlined text), then user comment
+        if let text = annotation.markedUpText, !text.isEmpty {
+            return text
+        }
+        if let contents = annotation.contents, !contents.isEmpty {
+            return contents
+        }
+        return nil
+    }
+
+    /// A human-readable label for the annotation type.
+    private var typeLabel: String {
+        let raw = annotation.type.rawValue
+        switch raw {
+        case "Highlight": return "Highlight"
+        case "Underline": return "Underline"
+        case "StrikeOut": return "Strikethrough"
+        case "FreeText": return "Text"
+        case "Text": return "Note"
+        case "Ink": return "Drawing"
+        case "Square": return "Rectangle"
+        case "Circle": return "Oval"
+        default: return raw.isEmpty ? "Annotation" : raw
+        }
+    }
+
     var body: some View {
         HStack(spacing: 8) {
             Circle()
@@ -111,15 +110,18 @@ private struct AnnotationRowView: View {
                 .frame(width: 10, height: 10)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(annotation.type.rawValue.isEmpty ? "Annotation" : annotation.type.rawValue)
-                    .font(.caption)
-                    .fontWeight(.medium)
+                if let text = displayText {
+                    Text(text)
+                        .font(.caption)
+                        .lineLimit(3)
 
-                if let contents = annotation.contents, !contents.isEmpty {
-                    Text(contents)
+                    Text(typeLabel)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
-                        .lineLimit(2)
+                } else {
+                    Text(typeLabel)
+                        .font(.caption)
+                        .fontWeight(.medium)
                 }
             }
 
