@@ -19,6 +19,7 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
 
     private let anchorPoint: NSPoint
     private let panelWidth: CGFloat
+    private let windowFrame: NSRect
 
     fileprivate static let rowHeight: CGFloat = 34
     fileprivate static let headerHeight: CGFloat = 28
@@ -42,12 +43,14 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
         items: [ChatCompletionItem],
         at screenPoint: NSPoint,
         width requestedWidth: CGFloat,
+        windowFrame: NSRect,
         onSelect: @escaping (ChatCompletionItem) -> Void
     ) {
         self.allItems = items
         self.filtered = items.filter { !$0.requiresQuery }
         self.anchorPoint = screenPoint
         self.panelWidth = min(max(requestedWidth, Self.minPanelWidth), Self.maxPanelWidth)
+        self.windowFrame = windowFrame
         self.onSelect = onSelect
 
         super.init(
@@ -241,15 +244,19 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
     }
 
     private func sizeAndPosition() {
-        let height = min(contentHeight(), Self.maxPanelHeight)
-        let visibleFrame = NSScreen.screens
-            .first { $0.visibleFrame.contains(anchorPoint) }?
-            .visibleFrame ?? NSScreen.main?.visibleFrame ?? .zero
+        // Constrain to the parent window frame so the panel never extends
+        // beyond the application window edge.
+        let constraintRect = windowFrame
         let margin: CGFloat = 8
-        let maxX = visibleFrame.maxX - panelWidth - margin
-        let x = min(max(anchorPoint.x, visibleFrame.minX + margin), maxX)
-        let maxY = visibleFrame.maxY - height - margin
-        let y = min(max(anchorPoint.y, visibleFrame.minY + margin), maxY)
+
+        // Cap height to available space above the anchor within the window
+        let maxAvailableHeight = anchorPoint.y - constraintRect.minY - margin * 2
+        let height = min(contentHeight(), Self.maxPanelHeight, max(maxAvailableHeight, Self.emptyHeight + Self.verticalInset * 2))
+
+        let maxX = constraintRect.maxX - panelWidth - margin
+        let x = min(max(anchorPoint.x, constraintRect.minX + margin), maxX)
+        let maxY = constraintRect.maxY - height - margin
+        let y = min(max(anchorPoint.y, constraintRect.minY + margin), maxY)
         setFrame(NSRect(x: x, y: y, width: panelWidth, height: height), display: true)
     }
 }
