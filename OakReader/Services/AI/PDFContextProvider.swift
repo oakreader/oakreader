@@ -259,6 +259,15 @@ struct PDFContextProvider {
                 search_library for keyword matches.
                 """)
 
+            // Citation link format
+            parts.append("""
+                When referencing specific pages from the document, use clickable \
+                citation links: [p. N](oak://page/N) where N is the 1-based page \
+                number. When referencing other documents from search results, use: \
+                [citeKey, p. N](oak://cite/citeKey?page=N). Only cite pages you \
+                have actually read or found via search tools.
+                """)
+
             // Abstract (outside document block to not crowd metadata)
             if let abstract = doc.abstract, !abstract.isEmpty {
                 parts.append("Document abstract:\n\"\"\"\n\(String(abstract.prefix(2_000)))\n\"\"\"")

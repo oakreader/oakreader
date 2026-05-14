@@ -126,6 +126,9 @@ struct AIChatView: View {
     @State private var scrollBarOpacity: Double = 0
     @State private var fadeTask: Task<Void, Never>?
 
+    @State private var isNearBottom = true
+    @State private var scrollTask: Task<Void, Never>?
+
     private var messageList: some View {
         ScrollViewReader { proxy in
             ScrollView {
@@ -135,10 +138,19 @@ struct AIChatView: View {
                             turn: turn,
                             onSaveToNote: onSaveAssistantResponse,
                             onApproveToolCall: { chatVM.approveToolCall() },
-                            onDenyToolCall: { chatVM.denyToolCall() }
+                            onDenyToolCall: { chatVM.denyToolCall() },
+                            onNavigateToPage: { pageIndex in
+                                chatVM.parent?.viewer.goToPage(pageIndex)
+                            },
+                            onOpenCitation: { citeKey, pageIndex in
+                                chatVM.openCitation(citeKey: citeKey, pageIndex: pageIndex)
+                            }
                         )
                             .id(turn.id)
                     }
+                    // Invisible anchor at the very bottom — more reliable
+                    // than scrolling to the last turn whose height is still growing.
+                    Color.clear.frame(height: 1).id("bottom")
                 }
                 .padding(OakStyle.Spacing.sm)
                 .background(
@@ -157,6 +169,7 @@ struct AIChatView: View {
             .coordinateSpace(name: "chatScroll")
             .scrollIndicators(.hidden)
             .scrollContentBackground(.hidden)
+            .defaultScrollAnchor(.bottom)
             .overlay(alignment: .trailing) {
                 GeometryReader { geo in
                     let viewH = geo.size.height
@@ -184,17 +197,30 @@ struct AIChatView: View {
                 scrollOffset = metrics.offset
                 scrollContentHeight = metrics.contentHeight
                 showScrollBar()
+
+                // Track whether user is near the bottom (within 20px)
+                let scrollable = metrics.contentHeight - scrollViewHeight
+                isNearBottom = scrollable <= 0 || (scrollable - metrics.offset) < 20
             }
             .onChange(of: chatVM.turns.count) { _, _ in
-                if let last = chatVM.turns.last {
-                    withAnimation(.easeOut(duration: 0.2)) {
-                        proxy.scrollTo(last.id, anchor: .bottom)
-                    }
+                withAnimation(.easeOut(duration: 0.2)) {
+                    proxy.scrollTo("bottom")
                 }
+                isNearBottom = true
             }
-            .onChange(of: chatVM.turns.last?.content) { _, _ in
-                if let last = chatVM.turns.last {
-                    proxy.scrollTo(last.id, anchor: .bottom)
+            .onChange(of: scrollContentHeight) { old, new in
+                guard new - old > 1 else { return }
+                // During streaming: always follow. Otherwise: respect user scroll.
+                guard chatVM.isStreaming || isNearBottom else { return }
+                // Debounce: coalesce rapid height changes into one smooth scroll.
+                // Without this, 60fps height updates cause 60 discrete jumps.
+                scrollTask?.cancel()
+                scrollTask = Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(32))
+                    guard !Task.isCancelled else { return }
+                    withAnimation(.smooth(duration: 0.15)) {
+                        proxy.scrollTo("bottom")
+                    }
                 }
             }
         }

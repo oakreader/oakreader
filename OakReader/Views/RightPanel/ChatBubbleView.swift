@@ -7,6 +7,8 @@ struct ChatBubbleView: View {
     var onSaveToNote: ((Turn) -> Bool)?
     var onApproveToolCall: (() -> Void)?
     var onDenyToolCall: (() -> Void)?
+    var onNavigateToPage: ((Int) -> Void)?
+    var onOpenCitation: ((String, Int?) -> Void)?
 
     @State private var isHovered = false
     @State private var isCopyHovered = false
@@ -45,9 +47,9 @@ struct ChatBubbleView: View {
                         messageBubble
                     }
 
-                    // Streaming indicator
-                    if turn.isStreaming {
-                        GridSpinner()
+                    // Streaming cursor
+                    if turn.isStreaming || reveal.isAnimating {
+                        StreamingCursor()
                             .padding(.leading, 4)
                     }
 
@@ -63,8 +65,8 @@ struct ChatBubbleView: View {
                         }
                     }
 
-                    // Actions — always visible after response is done
-                    if !turn.isStreaming && turn.role == .assistant {
+                    // Actions — visible after response and flush are done
+                    if !turn.isStreaming && !reveal.isAnimating && turn.role == .assistant {
                         HStack(spacing: 2) {
                             actionButton(
                                 systemImage: showCopied ? "checkmark" : "doc.on.doc",
@@ -114,7 +116,7 @@ struct ChatBubbleView: View {
             }
             .onChange(of: turn.isStreaming) { _, streaming in
                 if !streaming {
-                    reveal.flush(turn.content)
+                    reveal.endStreaming(turn.content)
                 }
             }
             .onAppear {
@@ -141,6 +143,27 @@ struct ChatBubbleView: View {
 
         if turn.role == .assistant {
             base
+                .environment(\.openURL, OpenURLAction { url in
+                    guard url.scheme == "oak" else { return .systemAction }
+
+                    if url.host == "page",
+                       let pageStr = url.pathComponents.dropFirst().first,
+                       let page = Int(pageStr) {
+                        onNavigateToPage?(page - 1)
+                        return .handled
+                    }
+
+                    if url.host == "cite",
+                       let citeKey = url.pathComponents.dropFirst().first {
+                        let page = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                            .queryItems?.first(where: { $0.name == "page" })
+                            .flatMap { Int($0.value ?? "") }
+                        onOpenCitation?(citeKey, page.map { $0 - 1 })
+                        return .handled
+                    }
+
+                    return .systemAction
+                })
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 4)
                 .padding(.vertical, 8)
@@ -183,7 +206,14 @@ struct ChatBubbleView: View {
             if !parsed.skillIds.isEmpty && parsed.content == "/" { return "" }
             return parsed.content
         }
-        return reveal.displayedContent
+        let content = reveal.displayedContent
+        // Seal incomplete markdown during streaming to prevent jitter.
+        // Without this, `**bold` flips between literal and bold rendering
+        // as the closing `**` arrives character by character.
+        if turn.isStreaming || reveal.isAnimating {
+            return protectMathBackslashes(sealIncompleteMarkdown(content))
+        }
+        return protectMathBackslashes(content)
     }
 
     private var skillBadges: [String] {
@@ -293,34 +323,295 @@ struct ChatBubbleView: View {
             }
         }
     }
+
+    // MARK: - Protect Math Backslashes
+
+    // Regex: display math $$...$$ (dotall) or inline math $...$ (no newlines)
+    private static let mathPattern = try! NSRegularExpression(
+        pattern: #"\$\$(.+?)\$\$|\$(?!\$)((?:\\\$|[^$\n])+)\$"#,
+        options: [.dotMatchesLineSeparators]
+    )
+
+    /// Doubles backslashes inside math delimiters (`$$…$$` and `$…$`) so they
+    /// survive Foundation's markdown parser. Foundation treats `\\` as a valid
+    /// CommonMark escape (producing `\`), destroying LaTeX line breaks and
+    /// literal braces before Textual's math regex ever sees them.
+    private func protectMathBackslashes(_ text: String) -> String {
+        let ns = text as NSString
+        var result = ""
+        var cursor = 0
+
+        Self.mathPattern.enumerateMatches(in: text, range: NSRange(location: 0, length: ns.length)) { match, _, _ in
+            guard let match else { return }
+            let fullRange = match.range
+
+            // Append text before this match
+            result += ns.substring(with: NSRange(location: cursor, length: fullRange.location - cursor))
+
+            // Determine which group matched: group 1 = $$, group 2 = $
+            let isBlock = match.range(at: 1).location != NSNotFound
+            let contentRange = match.range(at: isBlock ? 1 : 2)
+            let content = ns.substring(with: contentRange)
+            let protected = content.replacingOccurrences(of: "\\", with: "\\\\")
+
+            result += isBlock ? "$$\(protected)$$" : "$\(protected)$"
+            cursor = fullRange.location + fullRange.length
+        }
+
+        // Append remaining text after last match
+        result += ns.substring(from: cursor)
+        return result
+    }
+
+    // MARK: - Seal Incomplete Markdown (Streamdown)
+
+    /// Closes unmatched markdown markers in streaming content to prevent jitter.
+    /// When the model streams `**bold`, the unclosed `**` causes the parser to
+    /// alternate between literal and bold rendering. By appending the missing
+    /// closing markers, the parser renders consistently on every frame.
+    ///
+    /// Pipeline order matters — process from most specific to least specific:
+    /// code fences → inline code → bold+italic → bold → italic → strikethrough → math
+    private func sealIncompleteMarkdown(_ text: String) -> String {
+        guard !text.isEmpty else { return text }
+        var s = text
+
+        // 1. Code fences — if odd count of ```, close the fence.
+        //    Everything inside a code fence is literal, so return early.
+        if s.countNonOverlapping("```") % 2 == 1 {
+            if !s.hasSuffix("\n") { s += "\n" }
+            s += "```"
+            return s
+        }
+
+        // 2. Inline code — count single backticks (not part of ```).
+        //    If odd, close it and return (markers inside code spans are literal).
+        let withoutFences = s.replacingOccurrences(of: "```", with: "   ")
+        if withoutFences.filter({ $0 == "`" }).count % 2 == 1 {
+            s += "`"
+            return s
+        }
+
+        // 3. Bold+italic *** (must check before ** and *)
+        let tripleStarCount = s.countNonOverlapping("***")
+        if tripleStarCount % 2 == 1 {
+            s += "***"
+            return s
+        }
+
+        // 4. Bold ** (count ** that aren't part of ***)
+        let withoutTriple = s.replacingOccurrences(of: "***", with: "   ")
+        if withoutTriple.countNonOverlapping("**") % 2 == 1 {
+            s += "**"
+        }
+
+        // 5. Italic * (single *, not part of ** or ***)
+        let withoutDouble = withoutTriple.replacingOccurrences(of: "**", with: "  ")
+        if withoutDouble.filter({ $0 == "*" }).count % 2 == 1 {
+            s += "*"
+        }
+
+        // 6. Strikethrough ~~
+        if s.countNonOverlapping("~~") % 2 == 1 {
+            s += "~~"
+        }
+
+        // 7. Math $$ — display math requires $$ on its own line.
+        //    If the unclosed $$ has a newline after it (block math), close
+        //    with \n$$ so the parser sees a proper display block.
+        if s.countNonOverlapping("$$") % 2 == 1 {
+            // Find the last (unclosed) $$
+            if let lastDollar = s.range(of: "$$", options: .backwards) {
+                let afterDollar = s[lastDollar.upperBound...]
+                if afterDollar.contains("\n") {
+                    // Block math — close on a new line
+                    if !s.hasSuffix("\n") { s += "\n" }
+                    s += "$$"
+                } else {
+                    // Inline-style $$ — close on same line
+                    s += "$$"
+                }
+            }
+        }
+
+        return s
+    }
 }
 
-// MARK: - Stream Reveal Controller
+// MARK: - String extension for non-overlapping pattern counting
 
-/// Reference-type controller that smoothly reveals streaming text line-by-line.
-/// Timer captures `self` by reference, so it always sees the latest target.
+private extension String {
+    /// Counts non-overlapping occurrences of `pattern` in the string.
+    func countNonOverlapping(_ pattern: String) -> Int {
+        var count = 0
+        var searchRange = startIndex..<endIndex
+        while let range = range(of: pattern, range: searchRange) {
+            count += 1
+            searchRange = range.upperBound..<endIndex
+        }
+        return count
+    }
+}
+
+// MARK: - Streaming Cursor (Alma-style pulsing caret)
+
+private struct StreamingCursor: View {
+    @State private var pulsing = false
+
+    var body: some View {
+        Text("▎")
+            .font(.system(size: 16, weight: .regular))
+            .foregroundStyle(Color.accentColor)
+            .opacity(pulsing ? 0.9 : 0.4)
+            .scaleEffect(y: pulsing ? 1.05 : 1.0)
+            .animation(
+                .easeInOut(duration: 0.6).repeatForever(autoreverses: true),
+                value: pulsing
+            )
+            .onAppear { pulsing = true }
+    }
+}
+
+// MARK: - Adaptive-CPS Stream Reveal Controller
+//
+// Inspired by Alma's useSmoothStreamContent. Instead of a fixed-rate timer
+// that reveals one line per tick, this controller:
+//   1. Tracks API token arrival rate via EMA (exponential moving average).
+//   2. Renders at a rate ≤ arrival rate so the buffer never empties mid-stream.
+//   3. Buffers an initial batch (~50 chars) before the first render to absorb
+//      early arrival jitter.
+//   4. When streaming ends, enters a "flush" phase that smoothly drains the
+//      remaining buffer at 1.25× the observed arrival rate (max 4 seconds).
+//
+// The result is zero render stalls: the display never catches up to the API
+// and then has to wait, producing the jarring "freeze → burst" pattern.
+
 @Observable
 private final class StreamRevealController {
     var displayedContent = ""
+    var isAnimating = false
+
+    // MARK: - Constants
+
+    private static let minCPS: Double = 15
+    private static let maxCPS: Double = 300
+    private static let defaultCPS: Double = 50
+    private static let emaAlpha: Double = 0.15
+    private static let largeAppend = 500
+    private static let flushMaxSeconds: Double = 4.0
+    private static let flushSpeedup: Double = 1.25
+    private static let minFlushCPS: Double = 18
+    private static let maxFlushCPS: Double = 90
+    private static let safetyBase: Double = 1.5
+    private static let safetyIncrement: Double = 0.2
+
+    // MARK: - State
 
     private var targetContent = ""
-    private var cursorOffset = 0 // character offset into targetContent
+    private var displayedCount = 0
+    private var targetCount = 0
     private var timer: Timer?
+    private var lastFrameTime: TimeInterval = 0
+    private var charAccum: Double = 0
+    private var currentCPS: Double = 0
+
+    // Arrival tracking
+    private var emaCPS: Double = defaultCPS
+    private var lastInputTime: TimeInterval = 0
+    private var lastInputCount: Int = 0
+    private var streamStartTime: TimeInterval = 0
+    private var streamStartCount: Int = 0
+    private var arrivalLog: [(time: TimeInterval, chars: Int)] = []
+    private var maxGapMs: Double = 0
+    private var stallCount: Int = 0
+
+    // Phase
+    private enum Phase { case idle, waiting, rendering, flushing }
+    private var phase: Phase = .idle
+    private var streaming = false
+    private var wasRendering = false
+    private var bufferEmptySince: TimeInterval = 0
+
+    // MARK: - Public API
 
     /// Feed new target content from streaming deltas.
     func push(_ content: String) {
+        let prev = targetContent
+        if content == prev { return }
+
+        // Content replaced (not appended) — sync immediately
+        if !content.hasPrefix(prev) {
+            syncImmediate(content)
+            return
+        }
+
+        let appendedLength = content.count - prev.count
+
+        // Very large append — skip animation
+        if appendedLength > Self.largeAppend {
+            syncImmediate(content)
+            return
+        }
+
+        streaming = true
         targetContent = content
-        if timer == nil {
-            startTimer()
+        targetCount = content.count
+
+        let now = ProcessInfo.processInfo.systemUptime
+
+        // Stall detection
+        if lastInputTime > 0 {
+            let gapMs = (now - lastInputTime) * 1000
+            if gapMs > maxGapMs { maxGapMs = gapMs }
+            if gapMs > 300 { stallCount += 1 }
+        }
+
+        // Arrival log (sliding 3-second window)
+        arrivalLog.append((time: now, chars: appendedLength))
+        let cutoff = now - 3.0
+        while let first = arrivalLog.first, first.time < cutoff {
+            arrivalLog.removeFirst()
+        }
+
+        // Stream start tracking
+        if streamStartTime == 0 {
+            streamStartTime = now
+            streamStartCount = targetCount - appendedLength
+        }
+
+        // EMA arrival CPS
+        let deltaChars = targetCount - lastInputCount
+        let deltaTime = max(0.001, now - lastInputTime)
+        if deltaChars > 0 && lastInputTime > 0 {
+            let instantCPS = Double(deltaChars) / deltaTime
+            let clamped = Self.clamp(instantCPS, Self.minCPS, Self.maxCPS * 2)
+            emaCPS = emaCPS * (1 - Self.emaAlpha) + clamped * Self.emaAlpha
+        }
+
+        lastInputTime = now
+        lastInputCount = targetCount
+        startLoop()
+    }
+
+    /// Streaming ended — flush remaining buffer smoothly.
+    func endStreaming(_ content: String) {
+        streaming = false
+        targetContent = content
+        targetCount = content.count
+
+        if displayedCount < targetCount {
+            // Enter flushing phase to drain the backlog at accelerated rate
+            charAccum = 0
+            startLoop()
+        } else {
+            // Already caught up
+            syncImmediate(content)
         }
     }
 
-    /// Show all content immediately (streaming ended or non-streaming message).
+    /// Show all content immediately (non-streaming message / view appeared).
     func flush(_ content: String) {
-        stopTimer()
-        targetContent = content
-        cursorOffset = content.count
-        displayedContent = content
+        syncImmediate(content)
     }
 
     func stop() {
@@ -331,12 +622,15 @@ private final class StreamRevealController {
         timer?.invalidate()
     }
 
-    // MARK: - Timer
+    // MARK: - Loop
 
-    /// ~30 fps — enough for smooth feel without burning CPU on markdown re-parse.
-    private func startTimer() {
-        stopTimer()
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
+    private func startLoop() {
+        if timer != nil { return }
+        if targetCount > displayedCount {
+            isAnimating = true
+        }
+        lastFrameTime = ProcessInfo.processInfo.systemUptime
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
             self?.tick()
         }
     }
@@ -344,91 +638,153 @@ private final class StreamRevealController {
     private func stopTimer() {
         timer?.invalidate()
         timer = nil
+        lastFrameTime = 0
     }
 
     private func tick() {
-        let target = targetContent
-        guard cursorOffset < target.count else { return }
+        let now = ProcessInfo.processInfo.systemUptime
+        let dt = Self.clamp(now - lastFrameTime, 0.001, 0.05)
+        lastFrameTime = now
 
-        // Advance to the next newline boundary (reveal one line per tick).
-        // If no newline found, reveal a chunk of characters instead.
-        let startIdx = target.index(target.startIndex, offsetBy: cursorOffset)
-        let remaining = target[startIdx...]
+        let backlog = targetCount - displayedCount
 
-        var newOffset: Int
-        if let nlIdx = remaining.firstIndex(of: "\n") {
-            // Reveal up to and including the newline
-            newOffset = target.distance(from: target.startIndex, to: target.index(after: nlIdx))
-        } else {
-            // No newline yet — reveal a small chunk (partial line arriving)
-            let gap = target.count - cursorOffset
-            let step = max(min(gap, 8), 1)
-            newOffset = min(cursorOffset + step, target.count)
+        // Stream ended and no backlog — done
+        if !streaming && backlog <= 0 {
+            phase = .idle
+            currentCPS = 0
+            wasRendering = false
+            bufferEmptySince = 0
+            isAnimating = false
+            stopTimer()
+            return
         }
 
-        cursorOffset = newOffset
-        let endIdx = target.index(target.startIndex, offsetBy: cursorOffset)
-        displayedContent = String(target[..<endIdx])
-    }
-}
+        // Buffer empty but still streaming — wait
+        if backlog <= 0 {
+            if wasRendering && bufferEmptySince == 0 {
+                bufferEmptySince = now
+            }
+            wasRendering = false
+            phase = .waiting
+            currentCPS = 0
+            return
+        }
 
-// MARK: - Grid Spinner (3×3, outer ring cycles clockwise)
+        bufferEmptySince = 0
 
-private struct GridSpinner: View {
-    @State private var active = 0
+        // --- Flushing phase (streaming ended, catch up smoothly) ---
+        if !streaming {
+            phase = .flushing
 
-    /// Clockwise order of the 8 outer cells: (row, col)
-    private static let ring: [(Int, Int)] = [
-        (0, 0), (0, 1), (0, 2),
-        (1, 2),
-        (2, 2), (2, 1), (2, 0),
-        (1, 0),
-    ]
-
-    private let timer = Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
-
-    var body: some View {
-        Grid(horizontalSpacing: 2, verticalSpacing: 2) {
-            ForEach(0..<3, id: \.self) { row in
-                GridRow {
-                    ForEach(0..<3, id: \.self) { col in
-                        cell(row: row, col: col)
-                    }
+            var recentArrivalCPS = Self.defaultCPS
+            if arrivalLog.count >= 2 {
+                let windowTime = now - arrivalLog[0].time
+                let windowChars = arrivalLog.reduce(0) { $0 + $1.chars }
+                if windowTime > 0.05 {
+                    recentArrivalCPS = Double(windowChars) / windowTime
                 }
             }
+
+            let naturalCPS = max(Self.minFlushCPS, recentArrivalCPS * Self.flushSpeedup)
+            let catchUpCPS = Double(backlog) / Self.flushMaxSeconds
+            let cps = Self.clamp(max(naturalCPS, catchUpCPS), Self.minFlushCPS, Self.maxFlushCPS)
+
+            currentCPS = cps
+            charAccum += cps * dt
+            let chars = min(Int(charAccum), backlog)
+            guard chars >= 1 else { return }
+            charAccum -= Double(chars)
+
+            advanceDisplay(by: chars)
+
+            if displayedCount >= targetCount {
+                phase = .idle
+                currentCPS = 0
+                isAnimating = false
+                stopTimer()
+            }
+            return
         }
-        .onReceive(timer) { _ in
-            active = (active + 1) % Self.ring.count
+
+        // --- Initial buffering — absorb early jitter ---
+        let elapsedSinceStart = streamStartTime > 0 ? now - streamStartTime : 0
+        let neverRenderedYet = displayedCount <= streamStartCount
+        let minInitialBuffer = max(50, Int(Self.minCPS * 2 * max(1, maxGapMs * 2 / 1000)))
+
+        if streaming && neverRenderedYet && elapsedSinceStart < 5 && backlog < minInitialBuffer {
+            phase = .waiting
+            currentCPS = 0
+            return
         }
+
+        // --- Normal rendering — adaptive CPS ---
+        var arrivalCPS: Double
+        if arrivalLog.count >= 2 {
+            let windowTime = now - arrivalLog[0].time
+            let windowChars = arrivalLog.reduce(0) { $0 + $1.chars }
+            arrivalCPS = windowTime > 0.05 ? Double(windowChars) / windowTime : Self.minCPS
+        } else {
+            arrivalCPS = Self.minCPS
+        }
+
+        let streamElapsed = streamStartTime > 0 ? now - streamStartTime : 0
+        let charsReceived = targetCount - streamStartCount
+        let effectiveCPS = streamElapsed > 1 && charsReceived > 10
+            ? Double(charsReceived) / streamElapsed : arrivalCPS
+
+        let maxGapS = max(0.5, maxGapMs / 1000)
+        let safety = Self.safetyBase + Double(stallCount) * Self.safetyIncrement
+        let safeCPS = Double(backlog) / (maxGapS * safety)
+        let arrivalCap = min(arrivalCPS, effectiveCPS)
+        let cps = Self.clamp(min(safeCPS, arrivalCap), Self.minCPS, Self.maxCPS)
+
+        phase = .rendering
+        currentCPS = cps
+        wasRendering = true
+
+        charAccum += cps * dt
+        let chars = min(Int(charAccum), backlog)
+        guard chars >= 1 else { return }
+        charAccum -= Double(chars)
+
+        advanceDisplay(by: chars)
     }
 
-    private func cell(row: Int, col: Int) -> some View {
-        let size: CGFloat = 3
-        let opacity = cellOpacity(row: row, col: col)
+    // MARK: - Helpers
 
-        return RoundedRectangle(cornerRadius: 0.5)
-            .fill(Color.secondary)
-            .opacity(opacity)
-            .frame(width: size, height: size)
-            .animation(.easeInOut(duration: 0.15), value: active)
+    private func advanceDisplay(by chars: Int) {
+        let target = targetContent
+        let newCount = min(displayedCount + chars, targetCount)
+        let endIdx = target.index(target.startIndex, offsetBy: newCount)
+        displayedContent = String(target[..<endIdx])
+        displayedCount = newCount
     }
 
-    private func cellOpacity(row: Int, col: Int) -> Double {
-        // Center cell: always dim
-        if row == 1 && col == 1 { return 0.1 }
+    private func syncImmediate(_ content: String) {
+        stopTimer()
+        targetContent = content
+        targetCount = content.count
+        displayedCount = content.count
+        displayedContent = content
+        phase = .idle
+        streaming = false
+        isAnimating = false
+        emaCPS = Self.defaultCPS
+        currentCPS = 0
+        lastInputTime = 0
+        lastInputCount = content.count
+        streamStartTime = 0
+        streamStartCount = content.count
+        arrivalLog = []
+        stallCount = 0
+        maxGapMs = 0
+        wasRendering = false
+        bufferEmptySince = 0
+        charAccum = 0
+    }
 
-        guard let idx = Self.ring.firstIndex(where: { $0.0 == row && $0.1 == col }) else {
-            return 0.1
-        }
-
-        let distance = (idx - active + Self.ring.count) % Self.ring.count
-        // Active cell + 2 trailing cells form a fading tail
-        switch distance {
-        case 0: return 1.0
-        case 1: return 0.55
-        case 2: return 0.3
-        default: return 0.1
-        }
+    private static func clamp(_ value: Double, _ lo: Double, _ hi: Double) -> Double {
+        min(hi, max(lo, value))
     }
 }
 

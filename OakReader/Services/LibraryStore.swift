@@ -105,6 +105,10 @@ final class LibraryStore {
         return result
     }
 
+    func findItem(byCiteKey citeKey: String) -> LibraryItem? {
+        items.first { $0.citeKey == citeKey }
+    }
+
     // MARK: - Duplicate Detection
 
     var isDuplicatesSelected: Bool {
@@ -237,6 +241,9 @@ final class LibraryStore {
             return matchString(item.author, op: condition.op, value: condition.value)
         case .property:
             return matchProperty(item, condition: condition)
+        case .source:
+            let actual = item.source ?? ""
+            return matchString(actual, op: condition.op, value: condition.value)
         }
     }
 
