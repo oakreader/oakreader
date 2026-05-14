@@ -301,7 +301,9 @@ struct CharacterSettingsView: View {
                                         language: language
                                     )
                                 }
-                                installed.config.avatar = template.avatar ?? installed.config.avatar
+                                installed.config.avatar = CharacterTemplateLoader.installedAvatar(for: template)
+                                    ?? template.avatar
+                                    ?? installed.config.avatar
                                 installed.config.systemPrompt = template.systemPrompt
                                 installed.config.language = template.language ?? installed.config.language
                                 installed.config.llmModel = template.llmModel ?? ""
@@ -849,7 +851,7 @@ private enum CharacterTemplateLoader {
             popularity: manifest.popularity ?? 0,
             language: manifest.language,
             llmModel: manifest.llmModel,
-            avatar: manifest.avatar,
+            avatar: resolvedAvatar(manifest.avatar, sourceDir: sourceDir),
             previewPrompts: manifest.previewPrompts ?? [],
             systemPrompt: systemPrompt,
             sourceDir: sourceDir,
@@ -859,6 +861,34 @@ private enum CharacterTemplateLoader {
 
     private static func displayName(for name: String) -> String {
         name.split(separator: "-").map { $0.capitalized }.joined(separator: " ")
+    }
+
+    static func installedAvatar(for template: CharacterTemplate) -> CharacterAvatar? {
+        guard var avatar = template.avatar else { return nil }
+        guard avatar.type == .image, let imagePath = avatar.imagePath, !imagePath.isEmpty else {
+            return avatar
+        }
+
+        let fileName = URL(fileURLWithPath: imagePath).lastPathComponent
+        let installedPath = installedDir
+            .appendingPathComponent(template.name, isDirectory: true)
+            .appendingPathComponent(fileName)
+            .path
+        if FileManager.default.fileExists(atPath: installedPath) {
+            avatar.imagePath = installedPath
+        }
+        return avatar
+    }
+
+    private static func resolvedAvatar(_ avatar: CharacterAvatar?, sourceDir: URL) -> CharacterAvatar? {
+        guard var avatar else { return nil }
+        guard avatar.type == .image, let imagePath = avatar.imagePath, !imagePath.isEmpty else {
+            return avatar
+        }
+        if !(imagePath as NSString).isAbsolutePath {
+            avatar.imagePath = sourceDir.appendingPathComponent(imagePath).path
+        }
+        return avatar
     }
 
     private static func isValidName(_ name: String) -> Bool {
