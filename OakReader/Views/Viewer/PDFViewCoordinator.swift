@@ -261,8 +261,29 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
             var annotation: PDFAnnotation?
             if let page {
                 let pdfPoint = pdfView.convert(locationInPDFView, to: page)
-                annotation = page.annotations.first { ann in
-                    ann.bounds.contains(pdfPoint) && ann.type != "Widget"
+                // Try PDFKit's built-in hit testing first
+                if let hit = page.annotation(at: pdfPoint), hit.type != "Widget" {
+                    annotation = hit
+                } else {
+                    // Fall back: check bounds and quad points for markup annotations
+                    annotation = page.annotations.first { ann in
+                        guard ann.type != "Widget" else { return false }
+                        if ann.bounds.contains(pdfPoint) { return true }
+                        // For markup annotations, check quad point rectangles
+                        if let quadPoints = ann.value(forAnnotationKey: .quadPoints) as? [NSValue] {
+                            for i in stride(from: 0, to: quadPoints.count - 3, by: 4) {
+                                let pts = (0...3).map { quadPoints[i + $0].pointValue }
+                                let quadRect = CGRect(
+                                    x: min(pts[0].x, pts[2].x),
+                                    y: min(pts[0].y, pts[1].y),
+                                    width: max(pts[1].x, pts[3].x) - min(pts[0].x, pts[2].x),
+                                    height: max(pts[2].y, pts[3].y) - min(pts[0].y, pts[1].y)
+                                )
+                                if quadRect.contains(pdfPoint) { return true }
+                            }
+                        }
+                        return false
+                    }
                 }
             }
 

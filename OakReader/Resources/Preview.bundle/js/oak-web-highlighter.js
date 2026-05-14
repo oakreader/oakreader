@@ -23,7 +23,7 @@
         var style = document.createElement('style');
         style.id = 'oak-hl-styles';
         style.textContent = [
-            '.' + HL_CLASS + ' { border-radius: 2px; padding: 1px 0; cursor: pointer; }',
+            '.' + HL_CLASS + ' { border-radius: 2px; padding: 1px 0; cursor: default; }',
             '.' + HL_CLASS + '[data-oak-type="highlight"] { background-color: var(--oak-hl-color, rgba(255,212,0,0.35)); }',
             '.' + HL_CLASS + '[data-oak-type="underline"] { background-color: transparent; text-decoration: underline; text-decoration-color: var(--oak-hl-color, rgba(255,212,0,0.35)); text-underline-offset: 3px; text-decoration-thickness: 2px; }'
         ].join('\n');
@@ -37,6 +37,7 @@
         for (var i = 0; i < doms.length; i++) {
             doms[i].style.setProperty('--oak-hl-color', color);
             doms[i].setAttribute('data-oak-type', type || 'highlight');
+            doms[i].setAttribute('data-oak-hl-id', id);
         }
     }
 
@@ -59,6 +60,30 @@
                 verbose: false
             });
             // Do NOT call run() — we control highlighting manually via fromRange.
+
+            // Right-click on a highlight → notify native to show context menu
+            document.addEventListener('contextmenu', function (e) {
+                var el = e.target;
+                while (el && el !== document.body) {
+                    if (el.classList && el.classList.contains(HL_CLASS)) {
+                        var hlId = el.getAttribute('data-oak-hl-id');
+                        if (hlId) {
+                            e.preventDefault();
+                            try {
+                                window.webkit.messageHandlers.highlightContextMenu.postMessage({
+                                    id: hlId,
+                                    x: e.clientX,
+                                    y: e.clientY,
+                                    vpWidth: window.innerWidth,
+                                    vpHeight: window.innerHeight
+                                });
+                            } catch (err) {}
+                            return;
+                        }
+                    }
+                    el = el.parentElement;
+                }
+            });
         },
 
         /**

@@ -67,7 +67,7 @@ struct SkillManagementView: View {
             .frame(maxWidth: 920)
             .padding(.horizontal, 36)
             .padding(.vertical, 26)
-            .frame(maxWidth: .infinity, alignment: .top)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .background(Color(nsColor: .windowBackgroundColor))
         .onAppear { reload() }

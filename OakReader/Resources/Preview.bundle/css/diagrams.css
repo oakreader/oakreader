@@ -154,7 +154,7 @@ pre:has(.language-mermaid) {
 .markmap g,
 .markmap circle,
 .markmap text {
-  cursor: pointer;
+  cursor: default;
 }
 
 .markmap svg {

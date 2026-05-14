@@ -4,7 +4,6 @@ import OakVoiceAI
 /// Unified settings view with left sidebar list navigation.
 struct SettingsView: View {
     let store: LibraryStore
-    @Environment(\.dismiss) private var dismiss
 
     enum Tab: String, Identifiable {
         case general
@@ -95,6 +94,7 @@ struct SettingsView: View {
     @State private var selectedTab: Tab = .general
     @State private var visibleTabs: [Tab] = Self.buildVisibleTabs()
     @State private var modelStates = SharedModelStates()
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
     private static func buildVisibleTabs() -> [Tab] {
         var tabs = fixedTabs
@@ -108,7 +108,7 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             List(visibleTabs, selection: $selectedTab) { tab in
                 Label {
                     Text(tab.label)
@@ -125,22 +125,20 @@ struct SettingsView: View {
                 .tag(tab)
             }
             .listStyle(.sidebar)
-            .navigationSplitViewColumnWidth(min: 140, ideal: 160, max: 200)
+            .navigationSplitViewColumnWidth(min: 160, ideal: 180, max: 200)
         } detail: {
             settingsContent
                 .id(selectedTab)
-                .transition(.identity)
-                .navigationTitle(selectedTab.label)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .toolbar {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Done") { dismiss() }
-                            .keyboardShortcut(.defaultAction)
-                    }
-                }
+                .navigationTitle(selectedTab.label)
         }
-        .animation(.none, value: selectedTab)
-        .frame(width: 900, height: 620)
+        .navigationSplitViewStyle(.balanced)
+        .toolbar(removing: .sidebarToggle)
+        .onChange(of: columnVisibility) { _, _ in
+            // Prevent sidebar from being collapsed
+            columnVisibility = .all
+        }
+        .frame(minWidth: 900, minHeight: 620)
         .onReceive(NotificationCenter.default.publisher(for: Preferences.appExtensionToggleNotification)) { _ in
             let updated = Self.buildVisibleTabs()
             if visibleTabs != updated {

@@ -109,6 +109,22 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessageH
             return
         }
 
+        // Handle right-click on a highlight → show native context menu
+        if message.name == "highlightContextMenu",
+           let body = message.body as? [String: Any],
+           let hlId = body["id"] as? String,
+           let x = body["x"] as? CGFloat,
+           let y = body["y"] as? CGFloat,
+           let vpWidth = body["vpWidth"] as? CGFloat, vpWidth > 0,
+           let vpHeight = body["vpHeight"] as? CGFloat, vpHeight > 0,
+           let webView = self.webView {
+            showHighlightContextMenu(
+                highlightId: hlId, jsX: x, jsY: y,
+                vpWidth: vpWidth, vpHeight: vpHeight, in: webView
+            )
+            return
+        }
+
         guard message.name == "textSelected",
               let body = message.body as? [String: Any],
               let text = body["text"] as? String else {
@@ -234,6 +250,42 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessageH
             let js = "OakHighlighter.restore('\(record.id)', '\(escapedJson)', '\(escapedColor)', '\(escapedType)');"
             webView.evaluateJavaScript(js, completionHandler: nil)
         }
+    }
+
+    // MARK: - Highlight Context Menu
+
+    private func showHighlightContextMenu(
+        highlightId: String, jsX: CGFloat, jsY: CGFloat,
+        vpWidth: CGFloat, vpHeight: CGFloat, in webView: WKWebView
+    ) {
+        let scaleX = webView.bounds.width / vpWidth
+        let scaleY = webView.bounds.height / vpHeight
+        let viewY = webView.isFlipped ? jsY * scaleY : webView.bounds.height - jsY * scaleY
+        let viewPoint = NSPoint(x: jsX * scaleX, y: viewY)
+
+        let menu = NSMenu()
+        let deleteItem = NSMenuItem(
+            title: "Delete",
+            action: #selector(deleteWebHighlight(_:)),
+            keyEquivalent: ""
+        )
+        deleteItem.target = self
+        deleteItem.representedObject = highlightId
+        deleteItem.image = NSImage(systemSymbolName: "trash", accessibilityDescription: nil)
+        menu.addItem(deleteItem)
+
+        menu.popUp(positioning: nil, at: viewPoint, in: webView)
+    }
+
+    @objc private func deleteWebHighlight(_ sender: NSMenuItem) {
+        guard let hlId = sender.representedObject as? String else { return }
+        // Remove from DOM
+        let escapedId = hlId.replacingOccurrences(of: "'", with: "\\'")
+        webView?.evaluateJavaScript("OakHighlighter.remove('\(escapedId)');", completionHandler: nil)
+        // Soft-delete from DB
+        guard let db = viewModel.database else { return }
+        let store = AnnotationStore(database: db)
+        store.softDelete(id: hlId)
     }
 
     // MARK: - Mouse Monitor (dismiss popup on outside click)
