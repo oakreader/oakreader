@@ -11,6 +11,7 @@ struct LibrarySidebarView: View {
     @State private var expandedCollections: Set<UUID> = []
     @State private var expandedTagNodes: Set<UUID> = []
     @State private var editingSmartCollection: PDFCollection?
+    @State private var extensionRevision = 0
 
     private var store: LibraryStore { appState.libraryStore }
 
@@ -46,6 +47,9 @@ struct LibrarySidebarView: View {
         }
         .sheet(isPresented: $showNewTag) {
             TagEditorSheet(store: store)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Preferences.appExtensionToggleNotification)) { _ in
+            extensionRevision += 1
         }
     }
 
@@ -86,10 +90,18 @@ struct LibrarySidebarView: View {
             appState.switchToLibrary()
         } label: {
             HStack(spacing: 6) {
-                Image(systemName: collection.icon)
-                    .font(.system(size: 13))
-                    .foregroundStyle(.primary)
-                    .frame(width: 18)
+                Group {
+                    if collection.icon.hasPrefix("icon-") {
+                        Image(collection.icon)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                    } else {
+                        Image(systemName: collection.icon)
+                            .font(.system(size: 13))
+                    }
+                }
+                .foregroundStyle(.primary)
+                .frame(width: 18, height: 18)
 
                 Text(collection.name)
                     .font(.system(size: 13, weight: isSelected ? .medium : .regular))
@@ -131,6 +143,7 @@ struct LibrarySidebarView: View {
             store.mergeItems(keeper: keeper, duplicates: others)
         }
     }
+
 }
 
 // MARK: - Subviews
@@ -141,10 +154,18 @@ private extension LibrarySidebarView {
             sectionHeader("MY LIBRARY")
 
             ForEach(store.systemSmartCollections.sorted(by: { $0.sortOrder < $1.sortOrder })) { collection in
-                if !store.hiddenSystemCollectionIds.contains(collection.id) {
+                if !store.hiddenSystemCollectionIds.contains(collection.id)
+                    && !isCollectionDisabledByExtension(collection.id) {
                     smartCollectionRow(collection)
                 }
             }
+        }
+    }
+
+    func isCollectionDisabledByExtension(_ collectionId: UUID) -> Bool {
+        _ = extensionRevision // force re-evaluation when extensions are toggled
+        return AppExtension.allCases.contains { ext in
+            ext.systemCollectionId == collectionId && !Preferences.shared.isExtensionEnabled(ext)
         }
     }
 
