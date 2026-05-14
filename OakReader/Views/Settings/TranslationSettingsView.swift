@@ -11,64 +11,37 @@ struct TranslationSettingsView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                languageSection
-                Spacer()
-            }
-            .padding(20)
+        Form {
+            languageSection
         }
-        .onDisappear {
-            saveSettings()
-        }
+        .formStyle(.grouped)
     }
 
     // MARK: - Default Languages Section
 
     private var languageSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Default Languages")
-                .font(.system(size: 13, weight: .bold))
-
-            Text("Default source and target languages for the translation panel.")
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-
-            HStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Source Language")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                    Picker("Source", selection: $sourceLang) {
-                        ForEach(TranslationLanguage.allCases) { lang in
-                            Text(lang.nativeName).tag(lang)
-                        }
-                    }
-                    .labelsHidden()
-                    .frame(width: 180)
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Target Language")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                    Picker("Target", selection: $targetLang) {
-                        ForEach(TranslationLanguage.targetCases) { lang in
-                            Text(lang.nativeName).tag(lang)
-                        }
-                    }
-                    .labelsHidden()
-                    .frame(width: 180)
+        Section {
+            Picker("Source Language", selection: $sourceLang) {
+                ForEach(TranslationLanguage.allCases) { language in
+                    Text(language.nativeName).tag(language)
                 }
             }
+            .onChange(of: sourceLang) { _, newValue in
+                Preferences.shared.translationSourceLang = newValue
+            }
+
+            Picker("Target Language", selection: $targetLang) {
+                ForEach(TranslationLanguage.targetCases) { language in
+                    Text(language.nativeName).tag(language)
+                }
+            }
+            .onChange(of: targetLang) { _, newValue in
+                Preferences.shared.translationTargetLang = newValue
+            }
+        } header: {
+            Text("Default Languages")
+        } footer: {
+            Text("Used by the translation panel when selected text is sent for translation.")
         }
-    }
-
-    // MARK: - Helpers
-
-    private func saveSettings() {
-        let prefs = Preferences.shared
-        prefs.translationSourceLang = sourceLang
-        prefs.translationTargetLang = targetLang
     }
 }
