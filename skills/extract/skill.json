@@ -1,5 +1,6 @@
 {
     "name": "extract",
     "description": "Extract key dates, names, figures, and conclusions",
-    "icon": { "type": "symbol", "value": "list.clipboard" }
+    "icon": { "type": "symbol", "value": "list.clipboard.fill" },
+    "version": "1.0.0"
 }
