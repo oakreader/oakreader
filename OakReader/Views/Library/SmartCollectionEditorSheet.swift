@@ -107,6 +107,7 @@ struct SmartCollectionEditorSheet: View {
                 Text("Last Opened").tag(FilterField.lastOpenedAt)
                 Text("Date Added").tag(FilterField.createdAt)
                 Text("Property").tag(FilterField.property)
+                Text("Source").tag(FilterField.source)
             }
             .frame(width: 100)
 
@@ -145,6 +146,8 @@ struct SmartCollectionEditorSheet: View {
             return [.withinDays]
         case .property:
             return [.hasOption, .eq, .contains]
+        case .source:
+            return [.eq, .neq]
         }
     }
 }

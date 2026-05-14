@@ -20,6 +20,8 @@ struct SettingsView: View {
         // Extension tabs
         case extensionNotes
         case extensionTranslation
+        case extensionXBookmarks
+        case extensionGitHubStars
 
         var id: String { rawValue }
 
@@ -37,6 +39,8 @@ struct SettingsView: View {
             case .youtube: return "YouTube"
             case .extensionNotes: return AppExtension.notes.label
             case .extensionTranslation: return AppExtension.translation.label
+            case .extensionXBookmarks: return AppExtension.xBookmarks.label
+            case .extensionGitHubStars: return AppExtension.githubStars.label
             }
         }
 
@@ -54,7 +58,14 @@ struct SettingsView: View {
             case .youtube: return "play.rectangle"
             case .extensionNotes: return AppExtension.notes.systemImage
             case .extensionTranslation: return AppExtension.translation.systemImage
+            case .extensionXBookmarks: return AppExtension.xBookmarks.systemImage
+            case .extensionGitHubStars: return AppExtension.githubStars.systemImage
             }
+        }
+
+        /// Custom icon asset name from the extension, if any.
+        var iconAsset: String? {
+            appExtension?.iconAsset
         }
 
         /// The app extension this tab belongs to, if any.
@@ -62,6 +73,8 @@ struct SettingsView: View {
             switch self {
             case .extensionNotes: return .notes
             case .extensionTranslation: return .translation
+            case .extensionXBookmarks: return .xBookmarks
+            case .extensionGitHubStars: return .githubStars
             default: return nil
             }
         }
@@ -70,6 +83,8 @@ struct SettingsView: View {
             switch ext {
             case .notes: return .extensionNotes
             case .translation: return .extensionTranslation
+            case .xBookmarks: return .extensionXBookmarks
+            case .githubStars: return .extensionGitHubStars
             }
         }
     }
@@ -95,8 +110,19 @@ struct SettingsView: View {
     var body: some View {
         NavigationSplitView {
             List(visibleTabs, selection: $selectedTab) { tab in
-                Label(tab.label, systemImage: tab.icon)
-                    .tag(tab)
+                Label {
+                    Text(tab.label)
+                } icon: {
+                    if let asset = tab.iconAsset {
+                        Image(asset)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 16, height: 16)
+                    } else {
+                        Image(systemName: tab.icon)
+                    }
+                }
+                .tag(tab)
             }
             .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 140, ideal: 160, max: 200)
@@ -153,6 +179,10 @@ struct SettingsView: View {
             NoteSettingsView()
         case .extensionTranslation:
             TranslationSettingsView()
+        case .extensionXBookmarks:
+            XBookmarksSettingsView(store: store)
+        case .extensionGitHubStars:
+            GitHubStarsSettingsView(store: store)
         }
     }
 }

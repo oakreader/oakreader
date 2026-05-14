@@ -11,6 +11,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
     private var mainWindow: NSWindow?
     private var snapshotServer: SnapshotServer?
+    private var syncScheduler: SyncScheduler?
     private var appearanceObserver: NSObjectProtocol?
     func applicationWillFinishLaunching(_ notification: Notification) {
         documentController.appState = appState
@@ -31,11 +32,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         snapshotServer = SnapshotServer(importService: appState.importService)
         snapshotServer?.start()
 
+        // Start background sync for X Bookmarks and GitHub Stars
+        syncScheduler = SyncScheduler(importService: appState.importService)
+        syncScheduler?.start()
+
         createMainWindow()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         snapshotServer?.stop()
+        syncScheduler?.stop()
     }
 
     func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool {
