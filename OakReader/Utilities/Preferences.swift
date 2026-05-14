@@ -1,4 +1,5 @@
 import Foundation
+import OakAI
 import PDFKit
 
 final class Preferences {
@@ -45,6 +46,7 @@ final class Preferences {
         static let youtubeAIModel = "youtubeAIModel"
         // Plugins (extensions)
         static let disabledPlugins = "disabledPlugins"
+        static let explicitlyToggledPlugins = "explicitlyToggledPlugins"
         // Translation preferences
         static let translationAIProvider = "translationAIProvider"
         static let translationAIModel = "translationAIModel"
@@ -91,6 +93,15 @@ final class Preferences {
         static let ytDlpCachedVersion = "ytDlpCachedVersion"
         static let ytDlpCachedLatestVersion = "ytDlpCachedLatestVersion"
         static let ytDlpLastVersionCheck = "ytDlpLastVersionCheck"
+        // X Bookmarks sync
+        static let xSyncEnabled = "xSyncEnabled"
+        static let xLastSyncDate = "xLastSyncDate"
+        static let xUserId = "xUserId"
+        // GitHub Stars sync
+        static let githubSyncEnabled = "githubSyncEnabled"
+        static let githubLastSyncDate = "githubLastSyncDate"
+        static let githubUsername = "githubUsername"
+        static let githubSyncInterval = "githubSyncInterval"
     }
 
     private init() {
@@ -267,11 +278,26 @@ final class Preferences {
         set { defaults.set(Array(newValue), forKey: Keys.disabledPlugins) }
     }
 
+    /// Set of extension raw values that the user has explicitly toggled (either on or off).
+    private var explicitlyToggledPlugins: Set<String> {
+        get { Set(defaults.stringArray(forKey: Keys.explicitlyToggledPlugins) ?? []) }
+        set { defaults.set(Array(newValue), forKey: Keys.explicitlyToggledPlugins) }
+    }
+
     func isExtensionEnabled(_ ext: AppExtension) -> Bool {
-        !disabledPlugins.contains(ext.rawValue)
+        if explicitlyToggledPlugins.contains(ext.rawValue) {
+            // User has explicitly toggled this extension — use the disabled set.
+            return !disabledPlugins.contains(ext.rawValue)
+        }
+        // Never explicitly toggled — use the default.
+        return ext.enabledByDefault
     }
 
     func setExtension(_ ext: AppExtension, enabled: Bool) {
+        var toggled = explicitlyToggledPlugins
+        toggled.insert(ext.rawValue)
+        explicitlyToggledPlugins = toggled
+
         var disabled = disabledPlugins
         if enabled {
             disabled.remove(ext.rawValue)
@@ -280,6 +306,73 @@ final class Preferences {
         }
         disabledPlugins = disabled
         NotificationCenter.default.post(name: Self.appExtensionToggleNotification, object: nil)
+    }
+
+    // MARK: - X Bookmarks Sync
+
+    /// Bearer token stored in Keychain under provider ID "x_bookmarks".
+    var xBearerToken: String? {
+        get { KeychainService.apiKey(forProviderId: "x_bookmarks") }
+        set {
+            if let value = newValue {
+                KeychainService.setAPIKey(value, forProviderId: "x_bookmarks")
+            } else {
+                KeychainService.deleteAPIKey(forProviderId: "x_bookmarks")
+            }
+        }
+    }
+
+    var xSyncEnabled: Bool {
+        get { defaults.bool(forKey: Keys.xSyncEnabled) }
+        set { defaults.set(newValue, forKey: Keys.xSyncEnabled) }
+    }
+
+    var xLastSyncDate: Date? {
+        get { defaults.object(forKey: Keys.xLastSyncDate) as? Date }
+        set { defaults.set(newValue, forKey: Keys.xLastSyncDate) }
+    }
+
+    var xUserId: String? {
+        get { defaults.string(forKey: Keys.xUserId) }
+        set { defaults.set(newValue, forKey: Keys.xUserId) }
+    }
+
+    // MARK: - GitHub Stars Sync
+
+    /// Personal Access Token stored in Keychain under provider ID "github_stars".
+    var githubToken: String? {
+        get { KeychainService.apiKey(forProviderId: "github_stars") }
+        set {
+            if let value = newValue {
+                KeychainService.setAPIKey(value, forProviderId: "github_stars")
+            } else {
+                KeychainService.deleteAPIKey(forProviderId: "github_stars")
+            }
+        }
+    }
+
+    var githubSyncEnabled: Bool {
+        get { defaults.bool(forKey: Keys.githubSyncEnabled) }
+        set { defaults.set(newValue, forKey: Keys.githubSyncEnabled) }
+    }
+
+    var githubLastSyncDate: Date? {
+        get { defaults.object(forKey: Keys.githubLastSyncDate) as? Date }
+        set { defaults.set(newValue, forKey: Keys.githubLastSyncDate) }
+    }
+
+    var githubUsername: String? {
+        get { defaults.string(forKey: Keys.githubUsername) }
+        set { defaults.set(newValue, forKey: Keys.githubUsername) }
+    }
+
+    /// Auto-sync interval in seconds. Default is 1 day (86400).
+    var githubSyncInterval: TimeInterval {
+        get {
+            let value = defaults.double(forKey: Keys.githubSyncInterval)
+            return value > 0 ? value : 86400
+        }
+        set { defaults.set(newValue, forKey: Keys.githubSyncInterval) }
     }
 
     // MARK: - AI Preferences

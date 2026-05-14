@@ -795,6 +795,34 @@ extension CatalogDatabase {
             }
         }
 
+        migrator.registerMigration("v16-sync-source-collections") { db in
+            let now = Date().iso8601String
+            // X Bookmarks: filter by source == "x_bookmarks"
+            try db.execute(sql: """
+                INSERT OR IGNORE INTO collections (id, user_id, name, icon, sort_order, parent_id, is_smart, is_system, filter_rules, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, NULL, 1, 1, ?, ?, ?)
+            """, arguments: [
+                SystemCollectionID.xBookmarks.uuidString, localUserId, "X Bookmarks", "icon-x", 8,
+                #"{"match":"all","conditions":[{"field":"source","op":"eq","value":"x_bookmarks"}]}"#, now, now
+            ])
+            // GitHub Stars: filter by source == "github_stars"
+            try db.execute(sql: """
+                INSERT OR IGNORE INTO collections (id, user_id, name, icon, sort_order, parent_id, is_smart, is_system, filter_rules, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, NULL, 1, 1, ?, ?, ?)
+            """, arguments: [
+                SystemCollectionID.githubStars.uuidString, localUserId, "GitHub Stars", "icon-github", 9,
+                #"{"match":"all","conditions":[{"field":"source","op":"eq","value":"github_stars"}]}"#, now, now
+            ])
+
+            // Fix icon for databases created before icon-github was used
+            try db.execute(sql: """
+                UPDATE collections SET icon = 'icon-github' WHERE id = ? AND icon != 'icon-github'
+            """, arguments: [SystemCollectionID.githubStars.uuidString])
+            try db.execute(sql: """
+                UPDATE collections SET icon = 'icon-x' WHERE id = ? AND icon != 'icon-x'
+            """, arguments: [SystemCollectionID.xBookmarks.uuidString])
+        }
+
         return migrator
     }
 

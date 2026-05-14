@@ -72,8 +72,7 @@ struct CharacterSettingsView: View {
                 installedTemplateNames: installedTemplateNames,
                 onAddTemplate: { addTemplate($0) },
                 onRemoveTemplate: { removeTemplate($0) },
-                onSelectCharacter: { selectedCharacter = $0 },
-                onAddNew: { addCharacter() }
+                onSelectCharacter: { selectedCharacter = $0 }
             )
         }
     }
@@ -444,7 +443,6 @@ private struct CharacterGridSection: View {
     let onAddTemplate: (CharacterTemplate) -> Void
     let onRemoveTemplate: (CharacterTemplate) -> Void
     let onSelectCharacter: (Character) -> Void
-    let onAddNew: () -> Void
 
     private let columns = [
         GridItem(.flexible(minimum: 0), spacing: 30, alignment: .top),
@@ -462,8 +460,6 @@ private struct CharacterGridSection: View {
             }
 
             LazyVGrid(columns: columns, alignment: .leading, spacing: 14) {
-                AddCharacterCard(onAdd: onAddNew)
-
                 ForEach(characters) { character in
                     CharacterCardItem(
                         character: character,
@@ -600,43 +596,6 @@ private struct CharacterCardItem: View {
         )
         .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .onTapGesture { onSelect() }
-        .onHover { isHovered = $0 }
-    }
-}
-
-// MARK: - Add Character Card
-
-private struct AddCharacterCard: View {
-    let onAdd: () -> Void
-
-    @State private var isHovered = false
-
-    var body: some View {
-        HStack(spacing: 10) {
-            ZStack {
-                Circle()
-                    .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
-                    .foregroundStyle(OakStyle.Colors.textTertiary)
-                Image(systemName: "plus")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(OakStyle.Colors.textTertiary)
-            }
-            .frame(width: 34, height: 34)
-
-            Text("New Character")
-                .font(OakStyle.Font.styled(size: OakStyle.Font.body, weight: .medium))
-                .foregroundStyle(OakStyle.Colors.textSecondary)
-
-            Spacer()
-        }
-        .padding(.horizontal, 7)
-        .padding(.vertical, 7)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(isHovered ? OakStyle.Colors.hoverBackground : Color.clear)
-        )
-        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .onTapGesture { onAdd() }
         .onHover { isHovered = $0 }
     }
 }
