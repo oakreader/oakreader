@@ -462,14 +462,14 @@ private struct CharacterGridSection: View {
             }
 
             LazyVGrid(columns: columns, alignment: .leading, spacing: 14) {
+                AddCharacterCard(onAdd: onAddNew)
+
                 ForEach(characters) { character in
                     CharacterCardItem(
                         character: character,
                         onSelect: { onSelectCharacter(character) }
                     )
                 }
-
-                AddCharacterCard(onAdd: onAddNew)
 
                 ForEach(templates.filter { !installedTemplateNames.contains($0.name) }) { template in
                     CharacterCatalogItem(
