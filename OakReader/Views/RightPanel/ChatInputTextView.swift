@@ -20,8 +20,8 @@ struct ChatInputTextView: NSViewRepresentable {
     /// Incremented by the parent to force-clear rich text attachments after send.
     var resetToken: Int = 0
 
-    static let minContentHeight: CGFloat = 48
-    static let maxContentHeight: CGFloat = 120
+    static let minContentHeight: CGFloat = 68
+    static let maxContentHeight: CGFloat = 180
 
     /// Shared reference so the parent SwiftUI view can trigger focus.
     class FocusRef {
@@ -51,12 +51,12 @@ struct ChatInputTextView: NSViewRepresentable {
         textView.onPasteImage = onPasteImage
         textView.isRichText = false
         textView.allowsUndo = true
-        textView.font = .systemFont(ofSize: 15)
+        textView.font = .systemFont(ofSize: 16)
         textView.textColor = .labelColor
         textView.drawsBackground = false
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
-        textView.textContainerInset = NSSize(width: 0, height: 0)
+        textView.textContainerInset = NSSize(width: 0, height: 4)
         textView.textContainer?.lineFragmentPadding = 0
         textView.textContainer?.widthTracksTextView = true
 
@@ -188,7 +188,7 @@ struct ChatInputTextView: NSViewRepresentable {
                     textView.addSubview(label)
                     NSLayoutConstraint.activate([
                         label.leadingAnchor.constraint(equalTo: textView.leadingAnchor),
-                        label.topAnchor.constraint(equalTo: textView.topAnchor),
+                        label.topAnchor.constraint(equalTo: textView.topAnchor, constant: 4),
                     ])
                     placeholderView = label
                 }
@@ -363,9 +363,9 @@ final class ChatNSTextView: NSTextView {
         triggerChar = trigger
         triggerLocation = selectedRange().location - 1  // before the trigger char we just inserted
 
-        guard let screenPt = popupAnchorScreenPoint() else { return }
+        guard let anchor = popupAnchor() else { return }
 
-        completionPanel = ChatCompletionPanel(items: items, at: screenPt) { [weak self] item in
+        completionPanel = ChatCompletionPanel(items: items, at: anchor.point, width: anchor.width) { [weak self] item in
             self?.insertToken(item)
         }
     }
@@ -430,7 +430,6 @@ final class ChatNSTextView: NSTextView {
             with: NSRange(location: filterStart, length: cur - filterStart)
         )
         panel.filter(query: query)
-        if panel.filteredCount == 0 { dismissCompletionPanel() }
     }
 
     // MARK: - Token Insertion
@@ -524,14 +523,23 @@ final class ChatNSTextView: NSTextView {
         onTokensChanged?(activeTokens())
     }
 
-    /// Computes the screen point for the completion popup. It is anchored to the
-    /// left edge of the chat input instead of the slash cursor so the menu visually
-    /// aligns with the input border.
-    private func popupAnchorScreenPoint() -> NSPoint? {
+    /// Computes the screen point and width for the completion popup. It is
+    /// anchored to the input region so the popup aligns with the composer.
+    private func popupAnchor() -> (point: NSPoint, width: CGFloat)? {
         guard let window else { return nil }
-        let local = NSPoint(x: bounds.minX, y: bounds.maxY + 8)
-        let inWindow = convert(local, to: nil)
-        return window.convertPoint(toScreen: inWindow)
+        let sourceView: NSView = enclosingScrollView ?? self
+        let inputRect = sourceView.convert(sourceView.bounds, to: nil)
+        let composerHorizontalPadding: CGFloat = 14
+        let composerTopPadding: CGFloat = 12
+        let popupGap: CGFloat = 10
+        let anchor = NSPoint(
+            x: inputRect.minX - composerHorizontalPadding,
+            y: inputRect.maxY + composerTopPadding + popupGap
+        )
+        return (
+            window.convertPoint(toScreen: anchor),
+            inputRect.width + composerHorizontalPadding * 2
+        )
     }
 
     // MARK: - Override text changes to track token deletions
