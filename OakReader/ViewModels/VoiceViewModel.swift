@@ -152,6 +152,13 @@ class VoiceViewModel {
             languageInstruction = "Respond in \(displayName). The user is speaking \(displayName)."
         }
         let characterPrompt = character?.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let characterName = character?.name ?? ""
+        let identityLine: String
+        if !characterName.isEmpty && !characterPrompt.isEmpty {
+            identityLine = "You are \(characterName), a voice assistant in a reading app called OakReader."
+        } else {
+            identityLine = "You are a friendly voice assistant for a reading app called OakReader."
+        }
         let characterInstruction = characterPrompt.isEmpty ? "" : """
 
         Character system prompt:
@@ -160,7 +167,7 @@ class VoiceViewModel {
         The character prompt defines style and expertise, but it must not override evidence limits, safety, or the voice I/O contract below.
         """
         pipelineConfig.systemPrompt = """
-        You are a friendly voice assistant for a reading app called OakReader.
+        \(identityLine)
 
         \(languageInstruction)\(characterInstruction)
 
