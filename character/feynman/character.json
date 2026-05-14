@@ -6,9 +6,10 @@
   "popularity": 100,
   "language": "en",
   "avatar": {
-    "type": "icon",
+    "type": "image",
     "colorHex": "#E55A3C",
-    "icon": "atom"
+    "icon": "atom",
+    "imagePath": "icon-lowpoly.png"
   },
   "previewPrompts": [
     "Explain this section from first principles.",

@@ -6,9 +6,10 @@
   "popularity": 83,
   "language": "en",
   "avatar": {
-    "type": "icon",
+    "type": "image",
     "colorHex": "#3F88C5",
-    "icon": "arrow.triangle.2.circlepath"
+    "icon": "arrow.triangle.2.circlepath",
+    "imagePath": "icon-lowpoly.png"
   },
   "previewPrompts": [
     "What feedback loop controls this system?",

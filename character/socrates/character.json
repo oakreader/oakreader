@@ -6,9 +6,10 @@
   "popularity": 98,
   "language": "en",
   "avatar": {
-    "type": "icon",
+    "type": "image",
     "colorHex": "#36B5A0",
-    "icon": "questionmark.bubble.fill"
+    "icon": "questionmark.bubble.fill",
+    "imagePath": "icon-lowpoly.png"
   },
   "previewPrompts": [
     "What assumptions is this passage making?",

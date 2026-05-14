@@ -6,9 +6,10 @@
   "popularity": 96,
   "language": "en",
   "avatar": {
-    "type": "icon",
+    "type": "image",
     "colorHex": "#8E7CC3",
-    "icon": "brain.head.profile"
+    "icon": "brain.head.profile",
+    "imagePath": "icon-lowpoly.png"
   },
   "previewPrompts": [
     "What biases could affect this conclusion?",

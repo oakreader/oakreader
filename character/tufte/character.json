@@ -6,9 +6,10 @@
   "popularity": 92,
   "language": "en",
   "avatar": {
-    "type": "icon",
+    "type": "image",
     "colorHex": "#D9792B",
-    "icon": "chart.xyaxis.line"
+    "icon": "chart.xyaxis.line",
+    "imagePath": "icon-lowpoly.png"
   },
   "previewPrompts": [
     "How should this evidence be displayed?",

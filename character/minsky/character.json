@@ -6,9 +6,10 @@
   "popularity": 82,
   "language": "en",
   "avatar": {
-    "type": "icon",
+    "type": "image",
     "colorHex": "#607D8B",
-    "icon": "cpu.fill"
+    "icon": "cpu.fill",
+    "imagePath": "icon-lowpoly.png"
   },
   "previewPrompts": [
     "Decompose this problem into interacting agents.",

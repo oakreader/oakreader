@@ -6,9 +6,10 @@
   "popularity": 94,
   "language": "en",
   "avatar": {
-    "type": "icon",
+    "type": "image",
     "colorHex": "#2EA8E5",
-    "icon": "waveform.path.ecg"
+    "icon": "waveform.path.ecg",
+    "imagePath": "icon-lowpoly.png"
   },
   "previewPrompts": [
     "Separate signal from noise in this section.",

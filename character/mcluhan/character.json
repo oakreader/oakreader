@@ -6,9 +6,10 @@
   "popularity": 84,
   "language": "en",
   "avatar": {
-    "type": "icon",
+    "type": "image",
     "colorHex": "#E5A02E",
-    "icon": "tv.fill"
+    "icon": "tv.fill",
+    "imagePath": "icon-lowpoly.png"
   },
   "previewPrompts": [
     "How does the medium shape the message?",
