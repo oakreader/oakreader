@@ -84,12 +84,23 @@ class ChatViewModel {
         )
     }
 
-    /// Items shown in the `@` mention completion panel (requires a document).
+    /// Items shown in the `@` mention completion panel.
     @MainActor
     var chatMentionItems: [ChatCompletionItem] {
-        ChatCompletionItem.mentionItems(
-            hasDocument: parent != nil
-        )
+        var items = ChatCompletionItem.mentionItems(hasDocument: parent != nil)
+
+        if let store = parent?.libraryStore ?? appState?.libraryStore {
+            items += ChatCompletionItem.libraryItems(from: store.items)
+        }
+
+        if let db = parent?.database, let storageKey = parent?.itemStorageKey {
+            let noteService = NoteService(database: db)
+            if let notes = try? noteService.fetchNotes(forItemId: storageKey) {
+                items += ChatCompletionItem.noteItems(from: notes, database: db)
+            }
+        }
+
+        return items
     }
 
     // MARK: - Send Message
@@ -134,7 +145,22 @@ class ChatViewModel {
 
         let effectiveSkill = tokenSkill ?? taggedSkill ?? selectedSkill
         let sendText = text.isEmpty ? (effectiveSkill?.name ?? "Go") : text
-        let userContent = effectiveSkill.map { Self.contentWithSkillTag(skillId: $0.id, text: text) } ?? sendText
+        var userContent = effectiveSkill.map { Self.contentWithSkillTag(skillId: $0.id, text: text) } ?? sendText
+
+        // Extract library/note reference tokens and append XML block
+        let libraryRefs = tokens.compactMap { token -> ChatCompletionItem.LibraryRefPayload? in
+            if case .libraryReference(let p) = token.kind { return p }
+            return nil
+        }
+        let noteRefs = tokens.compactMap { token -> ChatCompletionItem.NoteRefPayload? in
+            if case .noteReference(let p) = token.kind { return p }
+            return nil
+        }
+        if !libraryRefs.isEmpty || !noteRefs.isEmpty {
+            userContent += "\n\n" + Self.buildReferencedDocumentsXML(
+                libraryRefs: libraryRefs, noteRefs: noteRefs
+            )
+        }
 
         // Create or update session record in DB
         persistSessionMetadata(firstUserMessage: sendText)
@@ -197,9 +223,9 @@ class ChatViewModel {
             if prefs.agentWriteFileEnabled { tools.append(WriteTool()) }
         }
 
-        // 5. ReadTool for notes (when document has notes but ReadTool not already added)
-        if snapshot.document?.notes.isEmpty == false,
-           !tools.contains(where: { $0.name == "read" }) {
+        // 5. ReadTool for notes (when document has notes or note references but ReadTool not already added)
+        let hasNoteContext = snapshot.document?.notes.isEmpty == false || !noteRefs.isEmpty
+        if hasNoteContext, !tools.contains(where: { $0.name == "read" }) {
             tools.append(ReadTool())
         }
 
@@ -212,8 +238,8 @@ class ChatViewModel {
                 CatalogDatabase.documentDirectory(storageKey: $0)
             }
             var allowed = storagePath.map { [$0] } ?? []
-            // Allow ReadTool to access notes directory (paths are in the system prompt)
-            if snapshot.document?.notes.isEmpty == false {
+            // Allow ReadTool to access notes directory (paths are in the system prompt or user message)
+            if snapshot.document?.notes.isEmpty == false || !noteRefs.isEmpty {
                 allowed.append(CatalogDatabase.notesDirectory)
             }
             effectiveToolContext = toolContext ?? ToolExecutionContext(
@@ -544,6 +570,38 @@ class ChatViewModel {
             normalized[idx].metadata.removeValue(forKey: "skill")
         }
         return normalized
+    }
+
+    // MARK: - Referenced Documents XML
+
+    private static func buildReferencedDocumentsXML(
+        libraryRefs: [ChatCompletionItem.LibraryRefPayload],
+        noteRefs: [ChatCompletionItem.NoteRefPayload]
+    ) -> String {
+        var lines = ["<referenced-documents>"]
+        for ref in libraryRefs {
+            let ck = ref.citeKey ?? ref.storageKey
+            lines.append(
+                "  <doc cite-key=\"\(xmlEsc(ck))\" title=\"\(xmlEsc(ref.title))\" "
+                + "author=\"\(xmlEsc(ref.author))\" pages=\"\(ref.pageCount)\" "
+                + "link=\"oak://cite/\(xmlEsc(ck))\" />"
+            )
+        }
+        for ref in noteRefs {
+            lines.append(
+                "  <note title=\"\(xmlEsc(ref.title))\" path=\"\(xmlEsc(ref.path))\" />"
+            )
+        }
+        lines.append("</referenced-documents>")
+        return lines.joined(separator: "\n")
+    }
+
+    private static func xmlEsc(_ string: String) -> String {
+        string
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
     }
 
     // MARK: - Agent Skills

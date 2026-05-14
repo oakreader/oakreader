@@ -8,6 +8,23 @@ struct ChatCompletionItem: Identifiable, Equatable {
     enum Kind {
         case installedSkill(Skill)
         case contextMention(ContextMention)
+        case libraryReference(LibraryRefPayload)
+        case noteReference(NoteRefPayload)
+    }
+
+    struct LibraryRefPayload: Equatable {
+        let storageKey: String
+        let title: String
+        let author: String
+        let citeKey: String?
+        let itemType: String
+        let pageCount: Int
+    }
+
+    struct NoteRefPayload: Equatable {
+        let noteId: UUID
+        let title: String
+        let path: String
     }
 
     enum ContextMention: String, Equatable, CaseIterable {
@@ -91,16 +108,75 @@ struct ChatCompletionItem: Identifiable, Equatable {
         return items
     }
 
+    // MARK: - Factory - Library Items
+
+    static func libraryItems(from items: [LibraryItem]) -> [ChatCompletionItem] {
+        items.map { item in
+            let label = item.citeKey ?? item.title
+            let desc = item.author.isEmpty ? item.title : "\(item.author) — \(item.title)"
+            return ChatCompletionItem(
+                id: "lib:\(item.storageKey)",
+                icon: item.displayIcon,
+                label: label,
+                description: desc,
+                kind: .libraryReference(LibraryRefPayload(
+                    storageKey: item.storageKey,
+                    title: item.title,
+                    author: item.author,
+                    citeKey: item.citeKey,
+                    itemType: item.itemType.rawValue,
+                    pageCount: item.pageCount
+                )),
+                trigger: "@"
+            )
+        }
+    }
+
+    // MARK: - Factory - Note Items
+
+    static func noteItems(from notes: [Note], database: CatalogDatabase) -> [ChatCompletionItem] {
+        notes.map { note in
+            let path = CatalogDatabase.noteFileURL(noteId: note.id).path
+            return ChatCompletionItem(
+                id: "note:\(note.id.uuidString)",
+                icon: "note.text",
+                label: note.displayTitle,
+                description: "Note",
+                kind: .noteReference(NoteRefPayload(
+                    noteId: note.id,
+                    title: note.displayTitle,
+                    path: path
+                )),
+                trigger: "@"
+            )
+        }
+    }
+
     // MARK: - Helpers
+
+    /// Whether this item should only appear when the user has typed a non-empty query.
+    /// Library and note items are hidden on empty `@` to avoid flooding the panel.
+    var requiresQuery: Bool {
+        switch kind {
+        case .libraryReference, .noteReference: return true
+        default: return false
+        }
+    }
 
     /// Returns the `ContextMode` implied by this item, if it's a context mention.
     var contextMode: ContextMode? {
-        guard case .contextMention(let mention) = kind else { return nil }
-        switch mention {
-        case .document: return .fullDocument
-        case .page:     return .currentPage
-        case .selection: return .selectedText
-        case .notes:    return .fullDocument
+        switch kind {
+        case .contextMention(let mention):
+            switch mention {
+            case .document: return .fullDocument
+            case .page:     return .currentPage
+            case .selection: return .selectedText
+            case .notes:    return .fullDocument
+            }
+        case .libraryReference, .noteReference:
+            return nil
+        case .installedSkill:
+            return nil
         }
     }
 
@@ -123,6 +199,10 @@ struct ChatCompletionItem: Identifiable, Equatable {
             return "Skills"
         case .contextMention:
             return "Context"
+        case .libraryReference:
+            return "Library"
+        case .noteReference:
+            return "Notes"
         }
     }
 
