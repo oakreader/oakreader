@@ -77,6 +77,10 @@ struct AudioSettingsView: View {
 
                 LabeledContent("Test") {
                     HStack(spacing: 12) {
+                        SegmentedLevelMeter(level: speakerTestLevel, isActive: isSpeakerTesting)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 8)
+
                         Button {
                             if isSpeakerTesting {
                                 stopSpeakerTest()
@@ -85,16 +89,12 @@ struct AudioSettingsView: View {
                             }
                         } label: {
                             Label(
-                                isSpeakerTesting ? "Stop" : "Test Output",
+                                isSpeakerTesting ? "Stop" : "Test Speaker",
                                 systemImage: isSpeakerTesting ? "stop.fill" : "play.fill"
                             )
                             .frame(width: 128, alignment: .leading)
                         }
                         .buttonStyle(.bordered)
-
-                        SegmentedLevelMeter(level: speakerTestLevel, isActive: isSpeakerTesting)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 8)
                     }
                 }
             }
@@ -135,6 +135,10 @@ struct AudioSettingsView: View {
                 LabeledContent("Test") {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 12) {
+                            SegmentedLevelMeter(level: micTestLevel, isActive: micTestPhase != .idle)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 8)
+
                             Button {
                                 switch micTestPhase {
                                 case .idle:
@@ -153,10 +157,6 @@ struct AudioSettingsView: View {
                                 .frame(width: 128, alignment: .leading)
                             }
                             .buttonStyle(.bordered)
-
-                            SegmentedLevelMeter(level: micTestLevel, isActive: micTestPhase != .idle)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 8)
                         }
 
                         if micTestPhase == .recording {
