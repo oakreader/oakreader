@@ -75,7 +75,7 @@ final class SemanticIndexService: @unchecked Sendable {
         case "markdown":
             chunks += extractMarkdownChunks(fileURL: fileURL)
         case "embed":
-            chunks += extractTranscriptChunks(attachmentDir: attDir)
+            chunks += extractEmbedTextChunks(attachmentDir: attDir)
         default:
             break
         }
@@ -139,13 +139,26 @@ final class SemanticIndexService: @unchecked Sendable {
         return ContentChunker.chunkMarkdown(text)
     }
 
-    /// Extract chunks from an embed's transcript.txt file.
-    private func extractTranscriptChunks(attachmentDir: URL) -> [ContentChunker.Chunk] {
-        let transcriptURL = attachmentDir.appendingPathComponent("transcript.txt")
-        guard let text = try? String(contentsOf: transcriptURL, encoding: .utf8), !text.isEmpty else {
+    /// Extract chunks from all .md and .txt files in an embed's attachment directory.
+    private func extractEmbedTextChunks(attachmentDir: URL) -> [ContentChunker.Chunk] {
+        let fm = FileManager.default
+        guard let files = try? fm.contentsOfDirectory(at: attachmentDir, includingPropertiesForKeys: nil) else {
             return []
         }
-        return ContentChunker.chunkPlainText(text)
+
+        var chunks: [ContentChunker.Chunk] = []
+        for file in files.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
+            let ext = file.pathExtension.lowercased()
+            guard ext == "md" || ext == "txt" else { continue }
+            guard let text = try? String(contentsOf: file, encoding: .utf8), !text.isEmpty else { continue }
+
+            if ext == "md" {
+                chunks += ContentChunker.chunkMarkdown(text)
+            } else {
+                chunks += ContentChunker.chunkPlainText(text)
+            }
+        }
+        return chunks
     }
 
     // MARK: - Embed & Store
@@ -431,7 +444,7 @@ final class SemanticIndexService: @unchecked Sendable {
             case "markdown":
                 chunks += extractMarkdownChunks(fileURL: fileURL)
             case "embed":
-                chunks += extractTranscriptChunks(attachmentDir: attDir)
+                chunks += extractEmbedTextChunks(attachmentDir: attDir)
             default:
                 break
             }

@@ -160,7 +160,7 @@ extension ImportService {
 
     // MARK: - Embed HTML Generation
 
-    private static func escapeHTML(_ text: String) -> String {
+    static func escapeHTML(_ text: String) -> String {
         text.replacingOccurrences(of: "&", with: "&amp;")
             .replacingOccurrences(of: "<", with: "&lt;")
             .replacingOccurrences(of: ">", with: "&gt;")
