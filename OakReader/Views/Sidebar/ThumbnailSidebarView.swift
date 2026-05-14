@@ -7,22 +7,21 @@ struct ThumbnailSidebarView: View {
     @State private var draggedPageIndex: Int?
 
     private let padding: CGFloat = 8
+    private let spacing: CGFloat = 8
+    private let minThumbWidth: CGFloat = 90
 
     var body: some View {
         GeometryReader { geo in
-            let thumbWidth = max(60, geo.size.width - padding * 2)
-            let thumbHeight = thumbWidth * 1.294 // US Letter aspect ratio
+            let columns = [GridItem(.adaptive(minimum: minThumbWidth), spacing: spacing)]
 
             ScrollViewReader { proxy in
                 ScrollView {
-                    LazyVStack(spacing: 8) {
+                    LazyVGrid(columns: columns, spacing: spacing) {
                         ForEach(0..<viewModel.pageCount, id: \.self) { index in
                             ThumbnailItemView(
                                 pageIndex: index,
                                 isSelected: index == viewModel.state.currentPageIndex,
-                                pdfDocument: viewModel.pdfDocument,
-                                thumbWidth: thumbWidth,
-                                thumbHeight: thumbHeight
+                                pdfDocument: viewModel.pdfDocument
                             )
                             .id(index)
                             .onTapGesture {
@@ -55,14 +54,12 @@ private struct ThumbnailItemView: View {
     let pageIndex: Int
     let isSelected: Bool
     let pdfDocument: PDFDocument?
-    let thumbWidth: CGFloat
-    let thumbHeight: CGFloat
 
     @AppStorage("appearanceMode") private var appearanceMode: String = "system"
     @Environment(\.colorScheme) private var colorScheme
 
     private let borderWidth: CGFloat = 3
-    private let cardPadding: CGFloat = 6
+    private let cardPadding: CGFloat = 4
 
     private var shouldInvert: Bool {
         switch appearanceMode {
@@ -74,39 +71,30 @@ private struct ThumbnailItemView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Thumbnail image
-            ZStack {
-                if let page = pdfDocument?.page(at: pageIndex) {
-                    let renderSize = max(thumbWidth, thumbHeight)
-                    let thumbnail = page.thumbnail(maxDimension: renderSize)
-                    let imageView = Image(nsImage: thumbnail)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(maxWidth: thumbWidth - cardPadding * 2 - borderWidth * 2,
-                               maxHeight: thumbHeight - cardPadding * 2 - borderWidth * 2 - 28)
-                    if shouldInvert {
-                        imageView.colorInvert()
-                    } else {
-                        imageView
-                    }
+            // Thumbnail image — fills available width, aspect ratio preserved
+            if let page = pdfDocument?.page(at: pageIndex) {
+                let thumbnail = page.thumbnail(maxDimension: 240)
+                let imageView = Image(nsImage: thumbnail)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                if shouldInvert {
+                    imageView.colorInvert()
                 } else {
-                    Rectangle()
-                        .fill(Color.secondary.opacity(0.1))
-                        .frame(width: thumbWidth - cardPadding * 2 - borderWidth * 2,
-                               height: thumbHeight - cardPadding * 2 - borderWidth * 2 - 28)
+                    imageView
                 }
+            } else {
+                Color.secondary.opacity(0.1)
+                    .aspectRatio(1 / 1.294, contentMode: .fit)
             }
-            .padding(.horizontal, cardPadding)
-            .padding(.top, cardPadding)
-            .padding(.bottom, 4)
 
             // Page number at bottom
             Text("\(pageIndex + 1)")
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 4)
+                .padding(.vertical, 3)
         }
+        .padding([.horizontal, .top], cardPadding)
         .background(Color(nsColor: .textBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .overlay(
@@ -117,7 +105,6 @@ private struct ThumbnailItemView: View {
                 )
         )
         .shadow(color: .black.opacity(0.12), radius: 3, x: 0, y: 1)
-        .padding(.vertical, 4)
         .contextMenu {
             Button { } label: {
                 Label("Rotate Right", systemImage: "rotate.right")
