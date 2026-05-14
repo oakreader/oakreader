@@ -219,14 +219,20 @@ struct ChatBubbleView: View {
         turn.role == .assistant || !renderedContent.isEmpty || !skillBadges.isEmpty
     }
 
-    private func skillBadge(_ skill: String) -> some View {
-        Text(skill)
-            .font(.system(size: 13, weight: .medium))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 7)
-            .padding(.vertical, 3)
-            .background(Capsule().fill(Color.accentColor.opacity(0.1)))
-            .fixedSize()
+    private func skillBadge(_ skillId: String) -> some View {
+        let skill = SkillManager.shared.installedSkills.first {
+            $0.id.caseInsensitiveCompare(skillId) == .orderedSame
+                || $0.name.caseInsensitiveCompare(skillId) == .orderedSame
+        }
+        return HStack(spacing: 3) {
+            Image(systemName: skill?.icon ?? "sparkles")
+                .font(.system(size: 13, weight: .medium))
+                .opacity(0.8)
+            Text(skillId)
+                .font(.system(size: 13, weight: .medium))
+        }
+        .foregroundStyle(Color.accentColor)
+        .fixedSize()
     }
 
     private var saveIcon: String {

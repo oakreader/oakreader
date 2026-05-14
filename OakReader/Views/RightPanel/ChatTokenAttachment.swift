@@ -22,8 +22,8 @@ final class ChatTokenAttachment: NSTextAttachment {
 private final class ChatTokenCell: NSTextAttachmentCell {
 
     private let item: ChatCompletionItem
-    private static let font = NSFont.systemFont(ofSize: 13, weight: .medium)
-    private static let iconSize: CGFloat = 12
+    private static let font = NSFont.systemFont(ofSize: 16, weight: .medium)
+    private static let iconSize: CGFloat = 18
     private static let hPad: CGFloat = 6
     private static let iconTextGap: CGFloat = 3
     private static let vPad: CGFloat = 2
@@ -40,7 +40,7 @@ private final class ChatTokenCell: NSTextAttachmentCell {
     // MARK: - Sizing
 
     override func cellSize() -> NSSize {
-        let textWidth = (item.displayText as NSString).size(
+        let textWidth = (item.label as NSString).size(
             withAttributes: [.font: Self.font]
         ).width
         let width = Self.hPad + Self.iconSize + Self.iconTextGap + textWidth + Self.hPad
@@ -57,20 +57,6 @@ private final class ChatTokenCell: NSTextAttachmentCell {
     override func draw(withFrame cellFrame: NSRect, in controlView: NSView?) {
         let accentColor = NSColor.controlAccentColor
 
-        // Background fill
-        let bgColor = accentColor.withAlphaComponent(0.12)
-        let bgPath = NSBezierPath(roundedRect: cellFrame, xRadius: Self.cornerRadius, yRadius: Self.cornerRadius)
-        bgColor.setFill()
-        bgPath.fill()
-
-        // Border
-        let borderColor = accentColor.withAlphaComponent(0.35)
-        borderColor.setStroke()
-        let insetRect = cellFrame.insetBy(dx: 0.5, dy: 0.5)
-        let borderPath = NSBezierPath(roundedRect: insetRect, xRadius: Self.cornerRadius, yRadius: Self.cornerRadius)
-        borderPath.lineWidth = 1
-        borderPath.stroke()
-
         // Icon
         let iconY = cellFrame.minY + (cellFrame.height - Self.iconSize) / 2
         let iconRect = NSRect(
@@ -79,7 +65,9 @@ private final class ChatTokenCell: NSTextAttachmentCell {
             width: Self.iconSize,
             height: Self.iconSize
         )
-        if let image = NSImage(systemSymbolName: item.icon, accessibilityDescription: item.label) {
+        let iconName = item.icon.hasSuffix(".fill") ? item.icon : "\(item.icon).fill"
+        let resolvedName = NSImage(systemSymbolName: iconName, accessibilityDescription: nil) != nil ? iconName : item.icon
+        if let image = NSImage(systemSymbolName: resolvedName, accessibilityDescription: item.label) {
             let config = NSImage.SymbolConfiguration(pointSize: Self.iconSize, weight: .medium)
             let configured = image.withSymbolConfiguration(config) ?? image
             configured.draw(in: iconRect, from: .zero, operation: .sourceOver, fraction: 0.8)
@@ -91,10 +79,10 @@ private final class ChatTokenCell: NSTextAttachmentCell {
             .font: Self.font,
             .foregroundColor: accentColor
         ]
-        let textSize = (item.displayText as NSString).size(withAttributes: attrs)
+        let textSize = (item.label as NSString).size(withAttributes: attrs)
         let textY = cellFrame.minY + (cellFrame.height - textSize.height) / 2
         let textRect = NSRect(x: textX, y: textY, width: textSize.width, height: textSize.height)
-        (item.displayText as NSString).draw(in: textRect, withAttributes: attrs)
+        (item.label as NSString).draw(in: textRect, withAttributes: attrs)
     }
 
     override func draw(withFrame cellFrame: NSRect, in controlView: NSView?, characterIndex charIndex: Int, layoutManager: NSLayoutManager) {
