@@ -3,21 +3,22 @@ import Foundation
 extension ImportService {
     // MARK: - Embed Import
 
+    struct EmbedImportInput {
+        let title: String
+        let author: String
+        let sourceURL: URL
+        let duration: Int?
+        let thumbnailData: Data?
+        let transcript: String?
+        let metadata: MediaMetadata
+        var embedType: String = "youtube"
+    }
+
     /// Import an embed (YouTube, Twitter, or generic link) from Chrome extension payload.
     @discardableResult
-    // swiftlint:disable:next function_parameter_count
-    func importEmbed(
-        title: String,
-        author: String,
-        sourceURL: URL,
-        duration: Int?,
-        thumbnailData: Data?,
-        transcript: String?,
-        metadata: MediaMetadata,
-        embedType: String = "youtube"
-    ) -> LibraryItem? {
+    func importEmbed(_ input: EmbedImportInput) -> LibraryItem? {
         // Duplicate detection by source URL
-        if let existing = store.items.first(where: { $0.sourceURL == sourceURL }) {
+        if let existing = store.items.first(where: { $0.sourceURL == input.sourceURL }) {
             return existing
         }
 
@@ -34,28 +35,28 @@ extension ImportService {
 
             // Write metadata.json to attachment directory
             let metadataURL = CatalogDatabase.attachmentMetadataURL(itemStorageKey: itemStorageKey, attachmentStorageKey: attStorageKey)
-            let encoded = try JSONEncoder().encode(metadata)
+            let encoded = try JSONEncoder().encode(input.metadata)
             try encoded.write(to: metadataURL, options: .atomic)
 
             // Write transcript to attachment directory
-            if let transcript, !transcript.isEmpty {
+            if let transcript = input.transcript, !transcript.isEmpty {
                 let transcriptURL = CatalogDatabase.attachmentTranscriptURL(itemStorageKey: itemStorageKey, attachmentStorageKey: attStorageKey)
                 try transcript.write(to: transcriptURL, atomically: true, encoding: .utf8)
             }
 
             // Write thumbnail as cover to attachment directory
-            if let thumbnailData {
+            if let thumbnailData = input.thumbnailData {
                 let coverURL = CatalogDatabase.attachmentCoverURL(itemStorageKey: itemStorageKey, attachmentStorageKey: attStorageKey)
                 try thumbnailData.write(to: coverURL, options: .atomic)
             }
 
             // Generate embed.html for non-YouTube types (tweets, links)
-            if embedType != "youtube" {
+            if input.embedType != "youtube" {
                 let embedHTML: String
-                if embedType == "twitter" {
-                    embedHTML = Self.generateTweetEmbedHTML(metadata: metadata)
+                if input.embedType == "twitter" {
+                    embedHTML = Self.generateTweetEmbedHTML(metadata: input.metadata)
                 } else {
-                    embedHTML = Self.generateLinkEmbedHTML(metadata: metadata)
+                    embedHTML = Self.generateLinkEmbedHTML(metadata: input.metadata)
                 }
                 let embedHTMLURL = attDir.appendingPathComponent("embed.html")
                 try embedHTML.write(to: embedHTMLURL, atomically: true, encoding: .utf8)
@@ -71,8 +72,8 @@ extension ImportService {
             id: docId.uuidString,
             userId: localUserId,
             storageKey: itemStorageKey,
-            title: title,
-            author: author,
+            title: input.title,
+            author: input.author,
             lastOpenedAt: nil,
             syncStatus: SyncStatus.local.rawValue,
             createdAt: now,
@@ -85,9 +86,9 @@ extension ImportService {
             storageKey: attStorageKey,
             fileName: "metadata.json",
             attachmentType: ItemType.embed.rawValue,
-            sourceURL: sourceURL.absoluteString,
+            sourceURL: input.sourceURL.absoluteString,
             fileSize: 0,
-            pageCount: duration ?? 0,
+            pageCount: input.duration ?? 0,
             isPrimary: true,
             createdAt: now,
             updatedAt: now
@@ -100,17 +101,17 @@ extension ImportService {
 
         // Auto-create reference metadata
         let cslType: String
-        switch embedType {
+        switch input.embedType {
         case "twitter": cslType = "post"
         case "link": cslType = "webpage"
         default: cslType = "motion_picture"
         }
         var csl = CSLItem(type: cslType)
-        csl.title = title
-        if !author.isEmpty {
-            csl.author = [CSLName(family: author, given: nil)]
+        csl.title = input.title
+        if !input.author.isEmpty {
+            csl.author = [CSLName(family: input.author, given: nil)]
         }
-        csl.URL = sourceURL.absoluteString
+        csl.URL = input.sourceURL.absoluteString
         try? referenceService.saveMetadata(csl, forItemId: docId.uuidString)
         store.invalidate()
 
@@ -128,16 +129,16 @@ extension ImportService {
         }
 
         // Auto-generate chapters and highlights for YouTube embeds
-        if embedType == "youtube" {
-            let hasTranscript = transcript != nil && !transcript!.isEmpty
+        if input.embedType == "youtube" {
+            let hasTranscript = input.transcript != nil && !input.transcript!.isEmpty
             Task {
                 let service = ChapterGenerationService()
                 // Generate structural chapters (native YouTube or AI sections)
                 await service.run(
                     itemStorageKey: itemStorageKey,
                     attachmentStorageKey: attStorageKey,
-                    sourceURL: sourceURL,
-                    duration: duration,
+                    sourceURL: input.sourceURL,
+                    duration: input.duration,
                     transcriptAlreadyExists: hasTranscript,
                     mode: .chapters
                 )
@@ -145,8 +146,8 @@ extension ImportService {
                 await service.run(
                     itemStorageKey: itemStorageKey,
                     attachmentStorageKey: attStorageKey,
-                    sourceURL: sourceURL,
-                    duration: duration,
+                    sourceURL: input.sourceURL,
+                    duration: input.duration,
                     transcriptAlreadyExists: hasTranscript,
                     tryNativeChapters: false,
                     mode: .highlights

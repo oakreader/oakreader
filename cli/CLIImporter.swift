@@ -121,7 +121,7 @@ struct CLIImporter {
             fileSize = size
         }
 
-        try db.insertItem(
+        try db.insertItem(.init(
             id: docId,
             storageKey: itemStorageKey,
             title: title,
@@ -133,7 +133,7 @@ struct CLIImporter {
             sourceURL: nil,
             fileSize: fileSize,
             pageCount: pageCount
-        )
+        ))
 
         return ImportResult(itemId: docId, title: title, isDuplicate: false)
     }
@@ -177,7 +177,7 @@ struct CLIImporter {
             fileSize = size
         }
 
-        try db.insertItem(
+        try db.insertItem(.init(
             id: docId,
             storageKey: itemStorageKey,
             title: title,
@@ -189,7 +189,7 @@ struct CLIImporter {
             sourceURL: sourcePageURL,
             fileSize: fileSize,
             pageCount: 1
-        )
+        ))
 
         // Generate content.md via pandoc if available
         extractMarkdown(from: destURL, to: attDir)
@@ -241,7 +241,7 @@ struct CLIImporter {
             fileSize = size
         }
 
-        try db.insertItem(
+        try db.insertItem(.init(
             id: docId,
             storageKey: itemStorageKey,
             title: title,
@@ -253,7 +253,7 @@ struct CLIImporter {
             sourceURL: nil,
             fileSize: fileSize,
             pageCount: 1
-        )
+        ))
 
         return ImportResult(itemId: docId, title: title, isDuplicate: false)
     }
