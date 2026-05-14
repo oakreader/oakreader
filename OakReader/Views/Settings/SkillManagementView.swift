@@ -11,6 +11,8 @@ struct SkillManagementView: View {
     @State private var catalogSkills: [AgentSkill] = []
     @State private var bundledNames: Set<String> = []
     @State private var installedNames: Set<String> = []
+    @State private var bundledVersions: [String: String] = [:]
+    @State private var installedVersions: [String: String] = [:]
     @State private var selectedSkillName: String?
     @State private var searchText = ""
     @State private var filter: SkillListFilter = .all
@@ -33,10 +35,12 @@ struct SkillManagementView: View {
                     SkillDetailView(
                         skill: selectedSkill,
                         isInstalled: installedNames.contains(selectedSkill.name),
+                        hasUpdate: hasUpdate(selectedSkill),
                         refreshToken: refreshToken,
                         onBack: { selectedSkillName = nil },
                         onInstall: { installSkill(selectedSkill) },
                         onUninstall: { uninstallSkill(selectedSkill) },
+                        onUpdate: { installSkill(selectedSkill) },
                         onBinInstalled: { refreshToken += 1 }
                     )
                 } else {
@@ -51,6 +55,7 @@ struct SkillManagementView: View {
                                 title: section.title,
                                 skills: section.skills,
                                 installedNames: installedNames,
+                                hasUpdate: hasUpdate,
                                 refreshToken: refreshToken,
                                 onSelect: { selectedSkillName = $0.name },
                                 onInstall: { installSkill($0) }
@@ -264,14 +269,44 @@ struct SkillManagementView: View {
 
         let bundledSkills = SkillLoader.loadSkills(from: catalogDirs).skills
         bundledNames = Set(bundledSkills.map(\.name))
+        bundledVersions = [:]
+        for skill in bundledSkills {
+            if let v = skill.version { bundledVersions[skill.name] = v }
+        }
 
         // Include user skills from installed dir that aren't in catalog.
         let installedResult = SkillLoader.loadSkills(from: [Self.installedDir])
+        installedVersions = [:]
+        for skill in installedResult.skills {
+            if let v = skill.version { installedVersions[skill.name] = v }
+        }
+
         let catalogNames = Set(bundledSkills.map(\.name))
         let extra = installedResult.skills.filter { !catalogNames.contains($0.name) }
 
         catalogSkills = (bundledSkills + extra).sorted { Self.displayName(for: $0) < Self.displayName(for: $1) }
         installedNames = Self.scanInstalledNames()
+    }
+
+    func hasUpdate(_ skill: AgentSkill) -> Bool {
+        guard installedNames.contains(skill.name),
+              bundledNames.contains(skill.name) else { return false }
+        guard let bundledVersion = bundledVersions[skill.name] else { return false }
+        guard let installedVersion = installedVersions[skill.name] else { return true }
+        return Self.compareVersions(bundledVersion, isGreaterThan: installedVersion)
+    }
+
+    private static func compareVersions(_ a: String, isGreaterThan b: String) -> Bool {
+        let aParts = a.split(separator: ".").compactMap { Int($0) }
+        let bParts = b.split(separator: ".").compactMap { Int($0) }
+        let count = max(aParts.count, bParts.count)
+        for i in 0..<count {
+            let av = i < aParts.count ? aParts[i] : 0
+            let bv = i < bParts.count ? bParts[i] : 0
+            if av > bv { return true }
+            if av < bv { return false }
+        }
+        return false
     }
 
     static func scanInstalledNames() -> Set<String> {
@@ -337,6 +372,7 @@ private struct SkillCatalogSection: View {
     let title: String
     let skills: [AgentSkill]
     let installedNames: Set<String>
+    let hasUpdate: (AgentSkill) -> Bool
     let refreshToken: Int
     let onSelect: (AgentSkill) -> Void
     let onInstall: (AgentSkill) -> Void
@@ -361,6 +397,7 @@ private struct SkillCatalogSection: View {
                     SkillCatalogItem(
                         skill: skill,
                         isInstalled: installedNames.contains(skill.name),
+                        hasUpdate: hasUpdate(skill),
                         refreshToken: refreshToken,
                         onSelect: { onSelect(skill) },
                         onInstall: { onInstall(skill) }
@@ -376,6 +413,7 @@ private struct SkillCatalogSection: View {
 private struct SkillCatalogItem: View {
     let skill: AgentSkill
     let isInstalled: Bool
+    let hasUpdate: Bool
     let refreshToken: Int
     let onSelect: () -> Void
     let onInstall: () -> Void
@@ -418,7 +456,13 @@ private struct SkillCatalogItem: View {
 
     @ViewBuilder
     private var statusAction: some View {
-        if isInstalled {
+        if isInstalled && hasUpdate {
+            Image(systemName: "arrow.triangle.2.circlepath")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(.blue)
+                .frame(width: 26, height: 26)
+                .help("Update available")
+        } else if isInstalled {
             ZStack(alignment: .topTrailing) {
                 Image(systemName: "checkmark")
                     .font(.system(size: 14, weight: .medium))
@@ -494,10 +538,12 @@ private struct LiquidGlassButtonStyle: ButtonStyle {
 private struct SkillDetailView: View {
     let skill: AgentSkill
     let isInstalled: Bool
+    let hasUpdate: Bool
     let refreshToken: Int
     let onBack: () -> Void
     let onInstall: () -> Void
     let onUninstall: () -> Void
+    let onUpdate: () -> Void
     let onBinInstalled: () -> Void
 
     var body: some View {
@@ -542,8 +588,15 @@ private struct SkillDetailView: View {
                 Spacer()
 
                 if isInstalled {
-                    Button("Remove", role: .destructive) { onUninstall() }
-                        .controlSize(.small)
+                    HStack(spacing: 8) {
+                        if hasUpdate {
+                            Button("Update") { onUpdate() }
+                                .controlSize(.small)
+                                .buttonStyle(.borderedProminent)
+                        }
+                        Button("Remove", role: .destructive) { onUninstall() }
+                            .controlSize(.small)
+                    }
                 } else {
                     Button("Add Skill") { onInstall() }
                         .controlSize(.small)

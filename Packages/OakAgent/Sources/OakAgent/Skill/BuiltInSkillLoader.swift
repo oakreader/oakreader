@@ -37,15 +37,19 @@ public enum BuiltInSkillLoader {
             let contextMode = ContextMode(rawValue: meta["context-mode"] ?? "") ?? .fullDocument
             let order = Int(meta["order"] ?? "") ?? 99
 
-            // Read icon from skill.json sidecar
-            let icon: String = {
+            // Read icon and version from skill.json sidecar
+            let sidecar: SkillManifest? = {
                 let jsonURL = item.appendingPathComponent("skill.json")
                 guard let jsonData = fm.contents(atPath: jsonURL.path),
-                      let manifest = try? JSONDecoder().decode(SkillManifest.self, from: jsonData),
-                      case .symbol(let symbol) = manifest.icon else {
-                    return "sparkles"
+                      let manifest = try? JSONDecoder().decode(SkillManifest.self, from: jsonData) else {
+                    return nil
                 }
-                return symbol
+                return manifest
+            }()
+
+            let icon: String = {
+                if case .symbol(let symbol) = sidecar?.icon { return symbol }
+                return "sparkles"
             }()
 
             let skill = Skill(
@@ -54,7 +58,8 @@ public enum BuiltInSkillLoader {
                 description: description,
                 systemPrompt: parsed.body,
                 icon: icon,
-                contextMode: contextMode
+                contextMode: contextMode,
+                version: sidecar?.version
             )
             skills.append((order, skill))
         }

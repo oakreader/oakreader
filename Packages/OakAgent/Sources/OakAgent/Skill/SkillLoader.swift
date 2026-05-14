@@ -182,7 +182,8 @@ public enum SkillLoader {
             icon: manifest.icon,
             author: manifest.author,
             contextMode: contextMode,
-            requirements: manifest.requires
+            requirements: manifest.requires,
+            version: manifest.version
         )
 
         return (skill, nil)
@@ -238,7 +239,8 @@ public enum SkillLoader {
             icon: sidecar?.icon,
             author: sidecar?.author,
             contextMode: contextMode,
-            requirements: sidecar?.requires
+            requirements: sidecar?.requires,
+            version: sidecar?.version
         )
 
         return (skill, nil)

@@ -36,6 +36,9 @@ public struct AgentSkill: Sendable, Identifiable {
     /// Binary/env requirements from `skill.json` sidecar.
     public let requirements: SkillRequirements?
 
+    /// Semantic version from `skill.json` sidecar (e.g. "1.0.0").
+    public let version: String?
+
     public init(
         name: String,
         description: String,
@@ -45,7 +48,8 @@ public struct AgentSkill: Sendable, Identifiable {
         icon: SkillIcon? = nil,
         author: SkillAuthor? = nil,
         contextMode: ContextMode? = nil,
-        requirements: SkillRequirements? = nil
+        requirements: SkillRequirements? = nil,
+        version: String? = nil
     ) {
         self.name = name
         self.description = description
@@ -56,5 +60,6 @@ public struct AgentSkill: Sendable, Identifiable {
         self.author = author
         self.contextMode = contextMode
         self.requirements = requirements
+        self.version = version
     }
 }
