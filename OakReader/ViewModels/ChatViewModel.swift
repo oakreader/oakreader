@@ -88,22 +88,8 @@ class ChatViewModel {
     @MainActor
     var chatMentionItems: [ChatCompletionItem] {
         ChatCompletionItem.mentionItems(
-            hasDocument: parent != nil,
-            characterAgents: installedCharacterAgents
+            hasDocument: parent != nil
         )
-    }
-
-    private var installedCharacterAgents: [CharacterAgent] {
-        guard let database = sessionService?.database ?? parent?.database ?? appState?.libraryStore.database else {
-            return []
-        }
-
-        do {
-            let characters = try VoiceCharacterService(database: database).fetchAllCharacters()
-            return CharacterAgent.installed(from: characters)
-        } catch {
-            return []
-        }
     }
 
     // MARK: - Send Message
@@ -111,13 +97,8 @@ class ChatViewModel {
     @MainActor
     func send() {
         let parsedInput = Self.extractLeadingSkillTags(from: inputText.trimmingCharacters(in: .whitespacesAndNewlines))
-        let installedCharacterAgents = self.installedCharacterAgents
-        let parsedCharacterMentions = Self.extractCharacterAgentMentions(
-            from: parsedInput.content,
-            installedAgents: installedCharacterAgents
-        )
-        let text = parsedCharacterMentions.content.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty || !parsedInput.skillIds.isEmpty || !activeTokens.isEmpty || !parsedCharacterMentions.agents.isEmpty else { return }
+        let text = parsedInput.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty || !parsedInput.skillIds.isEmpty || !activeTokens.isEmpty else { return }
 
         let attachments = pendingAttachments
         let tokens = activeTokens
@@ -133,18 +114,6 @@ class ChatViewModel {
             if case .installedSkill(let skill) = item.kind { return skill }
             return nil
         }.first
-
-        var seenCharacterAgentIds = Set<String>()
-        let characterAgentsFromTokens = tokens.compactMap { item -> CharacterAgent? in
-            if case .characterAgent(let agent) = item.kind { return agent }
-            return nil
-        }.compactMap { agent in
-            CharacterAgent.find(idOrHandle: agent.id, in: installedCharacterAgents)
-                ?? CharacterAgent.find(idOrHandle: agent.handle, in: installedCharacterAgents)
-        }
-        let characterAgents: [CharacterAgent] = (characterAgentsFromTokens + parsedCharacterMentions.agents).filter { agent in
-            seenCharacterAgentIds.insert(agent.id).inserted
-        }
 
         // Also support an explicit leading markdown tag: [[skill:skill-id]].
         let taggedSkill: Skill? = parsedInput.skillIds.lazy.compactMap { skillId in
@@ -189,10 +158,6 @@ class ChatViewModel {
         let currentSessionId = sessionId
         let currentConfig = config
         let turnMetadata: [String: String] = currentSkill.map { ["skill": $0.id] } ?? [:]
-        let characterAgentRequest = text.isEmpty
-            ? "Provide your perspective on the current context."
-            : text
-        let characterAgentService = CharacterAgentService()
 
         let prefs = Preferences.shared
 
@@ -266,25 +231,6 @@ class ChatViewModel {
 
         streamTask = Task { @MainActor [weak self] in
             do {
-                var characterAgentTurns: [Turn] = []
-                for agent in characterAgents {
-                    let result = try await characterAgentService.run(
-                        agent: agent,
-                        request: characterAgentRequest,
-                        contextSystemPrompt: systemPrompt,
-                        config: currentConfig
-                    )
-                    characterAgentTurns.append(Turn(
-                        role: .user,
-                        content: result.xmlBlock,
-                        metadata: [
-                            "characterAgent": agent.id,
-                            "characterAgentName": agent.name,
-                            "characterAgentThreadId": result.threadRef.id.uuidString
-                        ]
-                    ))
-                }
-
                 let stream = await engine.send(
                     userContent: userContent,
                     attachments: attachments,
@@ -293,7 +239,6 @@ class ChatViewModel {
                     config: currentConfig,
                     systemPrompt: systemPrompt,
                     turnMetadata: turnMetadata,
-                    additionalUserTurns: characterAgentTurns,
                     tools: currentTools,
                     toolContext: effectiveToolContext,
                     agentSkills: agentSkills,
@@ -566,38 +511,6 @@ class ChatViewModel {
         return "[[skill:\(skillId)]]\n\(text)"
     }
 
-    private static func extractCharacterAgentMentions(
-        from content: String,
-        installedAgents: [CharacterAgent]
-    ) -> (agents: [CharacterAgent], content: String) {
-        let pattern = #"(?<!\S)@([A-Za-z][A-Za-z0-9_-]*)"#
-        guard let regex = try? NSRegularExpression(pattern: pattern) else {
-            return ([], content)
-        }
-
-        let ns = content as NSString
-        let matches = regex.matches(in: content, range: NSRange(location: 0, length: ns.length))
-        var agents: [CharacterAgent] = []
-        var removeRanges: [NSRange] = []
-        var seen = Set<String>()
-
-        for match in matches {
-            guard match.numberOfRanges > 1 else { continue }
-            let handle = ns.substring(with: match.range(at: 1))
-            guard let agent = CharacterAgent.find(idOrHandle: handle, in: installedAgents),
-                  seen.insert(agent.id).inserted else { continue }
-            agents.append(agent)
-            removeRanges.append(match.range(at: 0))
-        }
-
-        guard !agents.isEmpty else { return ([], content) }
-        let mutable = NSMutableString(string: content)
-        for range in removeRanges.sorted(by: { $0.location > $1.location }) {
-            mutable.replaceCharacters(in: range, with: "")
-        }
-        return (agents, String(mutable).trimmingCharacters(in: .whitespacesAndNewlines))
-    }
-
     /// Older chat records stored skill metadata on the assistant turn. For display,
     /// a skill belongs to the user's request, so move it to the preceding user turn.
     private static func normalizedSkillMetadata(_ turns: [Turn]) -> [Turn] {
@@ -644,147 +557,3 @@ class ChatViewModel {
     }
 }
 
-// MARK: - CharacterAgent Service
-
-struct CharacterAgentThreadMessage: Codable, Sendable {
-    let id: UUID
-    let role: String
-    let content: String
-    let timestamp: Date
-}
-
-struct CharacterAgentRunResult: Sendable {
-    let agent: CharacterAgent
-    let threadRef: CharacterAgentThreadRef
-    let output: String
-
-    var xmlBlock: String {
-        let agentId = Self.escapeAttribute(agent.id)
-        let agentName = Self.escapeAttribute(agent.name)
-        let icon = Self.escapeAttribute(agent.icon)
-        let jsonlPath = Self.escapeAttribute(threadRef.jsonlPath)
-        let trimmedOutput = output.trimmingCharacters(in: .whitespacesAndNewlines)
-        let attributes = [
-            "agent_id=\"\(agentId)\"",
-            "agent_name=\"\(agentName)\"",
-            "icon=\"\(icon)\"",
-            "thread_id=\"\(threadRef.id.uuidString)\"",
-            "jsonl_path=\"\(jsonlPath)\""
-        ].joined(separator: " ")
-
-        return """
-        <character-agent-input \(attributes)>
-        \(trimmedOutput)
-        </character-agent-input>
-        """
-    }
-
-    private static func escapeAttribute(_ value: String) -> String {
-        value
-            .replacingOccurrences(of: "&", with: "&amp;")
-            .replacingOccurrences(of: "\"", with: "&quot;")
-            .replacingOccurrences(of: "<", with: "&lt;")
-            .replacingOccurrences(of: ">", with: "&gt;")
-    }
-}
-
-struct CharacterAgentService: Sendable {
-    private let router = ProviderRouter()
-
-    func run(
-        agent: CharacterAgent,
-        request: String,
-        contextSystemPrompt: String,
-        config: ProviderConfig
-    ) async throws -> CharacterAgentRunResult {
-        let threadId = UUID()
-        let threadURL = CatalogDatabase.characterAgentThreadURL(threadId: threadId)
-        try FileManager.default.createDirectory(
-            at: CatalogDatabase.characterAgentThreadsDirectory,
-            withIntermediateDirectories: true
-        )
-
-        let trimmedRequest = request.trimmingCharacters(in: .whitespacesAndNewlines)
-        let userRequest = trimmedRequest.isEmpty
-            ? "Provide your perspective on the current context."
-            : trimmedRequest
-
-        try appendThreadMessage(
-            CharacterAgentThreadMessage(id: UUID(), role: "user", content: userRequest, timestamp: Date()),
-            to: threadURL
-        )
-
-        let systemPrompt = """
-        \(agent.prompt)
-
-        You are not the main chat assistant. Your job is to produce delegated user-role material for the main assistant.
-        Write a compact digest in your inspired method/style. Do not address the user as if you are the final assistant.
-        Do not impersonate or claim identity as \(agent.name).
-
-        App/document context available to you:
-        \(contextSystemPrompt)
-        """
-
-        let provider = try router.provider(for: config)
-        let stream = provider.sendMessage(
-            messages: [LLMMessage(role: .user, text: userRequest)],
-            model: config.model,
-            systemPrompt: systemPrompt,
-            maxTokens: min(config.maxTokens, 2_000)
-        )
-
-        var output = ""
-        for try await chunk in stream {
-            switch chunk {
-            case .delta(let text):
-                output += text
-            case .finished(_):
-                break
-            case .toolUse:
-                break
-            case .error(let message):
-                throw LLMProviderError.streamError(message)
-            }
-        }
-
-        let finalOutput = output.trimmingCharacters(in: .whitespacesAndNewlines)
-        try appendThreadMessage(
-            CharacterAgentThreadMessage(id: UUID(), role: "character_agent", content: finalOutput, timestamp: Date()),
-            to: threadURL
-        )
-
-        let now = Date()
-        let ref = CharacterAgentThreadRef(
-            id: threadId,
-            agentId: agent.id,
-            agentName: agent.name,
-            icon: agent.icon,
-            jsonlPath: threadURL.path,
-            status: .completed,
-            title: String(userRequest.prefix(80)),
-            summary: String(finalOutput.prefix(500)),
-            latestUserFollowUp: nil,
-            createdAt: now,
-            updatedAt: now
-        )
-
-        return CharacterAgentRunResult(agent: agent, threadRef: ref, output: finalOutput)
-    }
-
-    private func appendThreadMessage(_ message: CharacterAgentThreadMessage, to url: URL) throws {
-        let data = try JSONEncoder().encode(message)
-        guard var line = String(data: data, encoding: .utf8) else { return }
-        line += "\n"
-
-        if FileManager.default.fileExists(atPath: url.path) {
-            let handle = try FileHandle(forWritingTo: url)
-            defer { handle.closeFile() }
-            handle.seekToEndOfFile()
-            if let lineData = line.data(using: .utf8) {
-                handle.write(lineData)
-            }
-        } else {
-            try line.write(to: url, atomically: true, encoding: .utf8)
-        }
-    }
-}

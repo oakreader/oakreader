@@ -79,18 +79,7 @@ private final class ChatTokenCell: NSTextAttachmentCell {
             width: Self.iconSize,
             height: Self.iconSize
         )
-        if let imagePath = item.imagePath,
-           let image = NSImage(contentsOfFile: imagePath) {
-            NSGraphicsContext.saveGraphicsState()
-            NSBezierPath(ovalIn: iconRect).addClip()
-            image.draw(
-                in: iconRect,
-                from: NSRect(origin: .zero, size: image.size),
-                operation: .sourceOver,
-                fraction: 1
-            )
-            NSGraphicsContext.restoreGraphicsState()
-        } else if let image = NSImage(systemSymbolName: item.icon, accessibilityDescription: item.label) {
+        if let image = NSImage(systemSymbolName: item.icon, accessibilityDescription: item.label) {
             let config = NSImage.SymbolConfiguration(pointSize: Self.iconSize, weight: .medium)
             let configured = image.withSymbolConfiguration(config) ?? image
             configured.draw(in: iconRect, from: .zero, operation: .sourceOver, fraction: 0.8)
