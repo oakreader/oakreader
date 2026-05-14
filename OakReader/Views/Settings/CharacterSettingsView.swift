@@ -23,25 +23,27 @@ struct CharacterSettingsView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
-                if let selectedCharacter {
-                    CharacterDetailView(
-                        character: selectedCharacter,
-                        onBack: { self.selectedCharacter = nil },
-                        onSave: { saveCharacter($0) },
-                        onDelete: { deleteCharacter($0) }
-                    )
-                } else {
-                    mainPage
+        Group {
+            if let selectedCharacter {
+                CharacterDetailView(
+                    character: selectedCharacter,
+                    onBack: { self.selectedCharacter = nil },
+                    onSave: { saveCharacter($0) },
+                    onDelete: { deleteCharacter($0) }
+                )
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 28) {
+                        mainPage
+                    }
+                    .frame(maxWidth: 920)
+                    .padding(.horizontal, 36)
+                    .padding(.vertical, 26)
+                    .frame(maxWidth: .infinity, alignment: .top)
                 }
+                .background(Color(nsColor: .windowBackgroundColor))
             }
-            .frame(maxWidth: 920)
-            .padding(.horizontal, 36)
-            .padding(.vertical, 26)
-            .frame(maxWidth: .infinity, alignment: .top)
         }
-        .background(Color(nsColor: .windowBackgroundColor))
         .task {
             reloadCharacterTemplates()
             await loadCharactersAsync()
@@ -674,66 +676,77 @@ private struct CharacterDetailView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 22) {
-            // Back button
-            Button {
-                onBack()
-            } label: {
-                Label("Characters", systemImage: "chevron.left")
-                    .font(OakStyle.Font.styled(size: OakStyle.Font.body + 1, weight: .medium))
+        Form {
+            headerSection
+            basicSection
+            languageModelSection
+            voiceSection
+            referenceAudioSection
+            systemPromptSection
+            actionsSection
+        }
+        .formStyle(.grouped)
+        .alert("Delete Character", isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                onDelete(character)
             }
-            .buttonStyle(LiquidGlassButtonStyle())
-            .foregroundStyle(OakStyle.Colors.textPrimary)
+        } message: {
+            Text("Are you sure you want to delete \"\(character.name)\"? This action cannot be undone.")
+        }
+    }
 
-            // Header
-            HStack(alignment: .top, spacing: 14) {
+    // MARK: - Sections
+
+    private var headerSection: some View {
+        Section {
+            HStack(spacing: 14) {
                 CharacterAvatarView(avatar: character.avatar, initials: character.initials, size: 52)
-
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(character.name)
-                        .font(OakStyle.Font.styled(size: OakStyle.Font.body + 3, weight: .semibold))
-
+                        .font(.headline)
                     HStack(spacing: 8) {
-                        let lang = VoiceLanguage(rawValue: character.language)
-                        if let lang {
+                        if let lang = VoiceLanguage(rawValue: character.language) {
                             Text(lang.displayName)
-                                .font(OakStyle.Font.styledCaption)
+                                .font(.caption)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
                                 .background(Capsule().fill(Color.secondary.opacity(0.14)))
                         }
-
                         if let lastCall = character.lastCall {
                             Text("Last call: \(lastCall.displayTitle)")
-                                .font(OakStyle.Font.styledCaption)
-                                .foregroundStyle(OakStyle.Colors.textTertiary)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
                     }
                 }
-
                 Spacer()
+                Button {
+                    onBack()
+                } label: {
+                    Label("Characters", systemImage: "chevron.left")
+                }
+                .buttonStyle(.plain)
             }
+        }
+    }
 
-            Divider()
-
-            // Basic section
-            sectionHeader("Basic")
-
+    private var basicSection: some View {
+        Section("Basic") {
             TextField("Name", text: $name)
-                .textFieldStyle(.roundedBorder)
-
             Picker("Language", selection: $config.language) {
                 ForEach(VoiceLanguage.allCases) { lang in
                     Text(lang.displayName).tag(lang.code)
                 }
             }
+        }
+    }
 
-            // Language Model section
-            sectionHeader("Language Model")
-
+    private var languageModelSection: some View {
+        Section {
             let pid = Preferences.shared.aiProviderId
             let models = ProviderRegistry.shared.provider(for: pid)?.models ?? []
-            Picker("LLM Model", selection: $config.llmModel) {
+            Picker("Model", selection: $config.llmModel) {
                 Text("Same as default").tag("")
                 ForEach(models.filter { !$0.reasoning }) { m in
                     Text(m.name).tag(m.id)
@@ -747,76 +760,18 @@ private struct CharacterDetailView: View {
                     }
                 }
             }
-
+        } header: {
+            Text("Language Model")
+        } footer: {
             Text("Pick a fast, non-reasoning model for lower latency.")
-                .font(OakStyle.Font.styledCaption)
-                .foregroundStyle(OakStyle.Colors.textSecondary)
-
-            // Voice section
-            sectionHeader("Voice")
-            voiceProviderSection
-
-            // Reference Audio section
-            sectionHeader("Reference Audio")
-            referenceAudioSection
-
-            // System Prompt section
-            sectionHeader("System Prompt")
-
-            TextEditor(text: $config.systemPrompt)
-                .font(.system(size: 12))
-                .frame(minHeight: 100)
-                .padding(4)
-                .background(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(Color(nsColor: .textBackgroundColor))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .stroke(Color.primary.opacity(0.10), lineWidth: 1)
-                )
-
-            Divider()
-
-            // Action buttons
-            HStack(spacing: 12) {
-                Button("Save") {
-                    var updated = character
-                    updated.name = name
-                    updated.config = config
-                    onSave(updated)
-                }
-                .buttonStyle(.borderedProminent)
-                .keyboardShortcut(.defaultAction)
-
-                Spacer()
-
-                Button("Delete", role: .destructive) {
-                    showDeleteConfirmation = true
-                }
-            }
         }
-        .alert("Delete Character", isPresented: $showDeleteConfirmation) {
-            Button("Cancel", role: .cancel) {}
-            Button("Delete", role: .destructive) {
-                onDelete(character)
-            }
-        } message: {
-            Text("Are you sure you want to delete \"\(character.name)\"? This action cannot be undone.")
-        }
-    }
-
-    private func sectionHeader(_ title: String) -> some View {
-        Text(title)
-            .font(OakStyle.Font.styled(size: OakStyle.Font.body, weight: .semibold))
-            .padding(.top, 4)
     }
 
     // MARK: - Voice Provider
 
-    private var voiceProviderSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Picker("Transcription Provider", selection: transcriptionProviderBinding) {
+    private var voiceSection: some View {
+        Section("Voice") {
+            Picker("Transcription", selection: transcriptionProviderBinding) {
                 Text("Same as Default").tag("")
                 ForEach(VoiceProviderType.allCases, id: \.rawValue) { provider in
                     Text(provider.displayName).tag(provider.rawValue)
@@ -837,9 +792,7 @@ private struct CharacterDetailView: View {
                 }
             }
 
-            Divider()
-
-            Picker("Speech Provider", selection: ttsProviderBinding) {
+            Picker("Speech", selection: ttsProviderBinding) {
                 Text("Same as Default").tag("")
                 ForEach(VoiceProviderType.allCases, id: \.rawValue) { provider in
                     Text(provider.displayName).tag(provider.rawValue)
@@ -854,9 +807,10 @@ private struct CharacterDetailView: View {
                     }
                 }
             } else if ttsProviderBinding.wrappedValue == VoiceProviderType.elevenLabs.rawValue {
-                TextField("Voice ID (optional; default if empty)", text: $config.ttsVoice.voiceId)
-                    .textFieldStyle(.roundedBorder)
-
+                LabeledContent("Voice ID") {
+                    TextField("Default if empty", text: $config.ttsVoice.voiceId)
+                        .textFieldStyle(.roundedBorder)
+                }
                 Picker("Speech Model", selection: $config.ttsVoice.modelId) {
                     Text("Same as Default").tag("")
                     Text("Turbo v2.5 (fastest)").tag("eleven_turbo_v2_5")
@@ -870,25 +824,27 @@ private struct CharacterDetailView: View {
     // MARK: - Reference Audio
 
     private var referenceAudioSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                if config.referenceAudio.path.isEmpty {
-                    Text("No reference audio")
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text(URL(fileURLWithPath: config.referenceAudio.path).lastPathComponent)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
-                Spacer()
-                Button("Choose...") { showAudioFilePicker = true }
-                    .controlSize(.small)
-                if !config.referenceAudio.path.isEmpty {
-                    Button("Clear") {
-                        config.referenceAudio.path = ""
-                        referenceAudioImportError = nil
+        Section("Reference Audio") {
+            LabeledContent("File") {
+                HStack(spacing: 8) {
+                    if config.referenceAudio.path.isEmpty {
+                        Text("No reference audio")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text(URL(fileURLWithPath: config.referenceAudio.path).lastPathComponent)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
                     }
-                    .controlSize(.small)
+                    Spacer()
+                    Button("Choose...") { showAudioFilePicker = true }
+                        .controlSize(.small)
+                    if !config.referenceAudio.path.isEmpty {
+                        Button("Clear") {
+                            config.referenceAudio.path = ""
+                            referenceAudioImportError = nil
+                        }
+                        .controlSize(.small)
+                    }
                 }
             }
             .fileImporter(
@@ -903,14 +859,42 @@ private struct CharacterDetailView: View {
 
             if let error = referenceAudioImportError {
                 Text(error)
-                    .font(OakStyle.Font.styledCaption)
+                    .font(.caption)
                     .foregroundStyle(.red)
             }
 
             if !config.referenceAudio.path.isEmpty {
                 TextField("Reference Text", text: $config.referenceAudio.text, axis: .vertical)
-                    .textFieldStyle(.roundedBorder)
                     .lineLimit(2...4)
+            }
+        }
+    }
+
+    private var systemPromptSection: some View {
+        Section("System Prompt") {
+            TextEditor(text: $config.systemPrompt)
+                .font(.system(size: 12))
+                .frame(minHeight: 100)
+        }
+    }
+
+    private var actionsSection: some View {
+        Section {
+            HStack {
+                Button("Save") {
+                    var updated = character
+                    updated.name = name
+                    updated.config = config
+                    onSave(updated)
+                }
+                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
+
+                Spacer()
+
+                Button("Delete", role: .destructive) {
+                    showDeleteConfirmation = true
+                }
             }
         }
     }
