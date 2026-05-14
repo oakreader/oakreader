@@ -20,7 +20,7 @@ struct ChatInputTextView: NSViewRepresentable {
     /// Incremented by the parent to force-clear rich text attachments after send.
     var resetToken: Int = 0
 
-    static let minContentHeight: CGFloat = 68
+    static let minContentHeight: CGFloat = 40
     static let maxContentHeight: CGFloat = 180
 
     /// Shared reference so the parent SwiftUI view can trigger focus.
@@ -68,6 +68,9 @@ struct ChatInputTextView: NSViewRepresentable {
         textView.onPlainTextChanged = { [weak coordinator = context.coordinator, weak textView] in
             guard let textView else { return }
             coordinator?.syncTextFromTextView(textView)
+        }
+        textView.onCompositionChanged = { [weak coordinator = context.coordinator] in
+            coordinator?.updatePlaceholder()
         }
 
         scrollView.documentView = textView
@@ -129,6 +132,9 @@ struct ChatInputTextView: NSViewRepresentable {
             guard let textView else { return }
             coordinator?.syncTextFromTextView(textView)
         }
+        textView.onCompositionChanged = { [weak coordinator = context.coordinator] in
+            coordinator?.updatePlaceholder()
+        }
         focusRef.textView = textView
     }
 
@@ -174,7 +180,7 @@ struct ChatInputTextView: NSViewRepresentable {
 
         func updatePlaceholder() {
             guard let textView else { return }
-            let isEmpty = textView.plainText().isEmpty && textView.activeTokens().isEmpty
+            let isEmpty = textView.plainText().isEmpty && textView.activeTokens().isEmpty && !textView.hasMarkedText()
             if isEmpty {
                 if placeholderView == nil {
                     let label = PassthroughTextField(labelWithString: parent.placeholder)
@@ -214,6 +220,7 @@ final class ChatNSTextView: NSTextView {
     var onSend: (() -> Void)?
     var onPasteImage: ((Data) -> Void)?
     var onPlainTextChanged: (() -> Void)?
+    var onCompositionChanged: (() -> Void)?
 
     // MARK: - Completion State
 
@@ -231,6 +238,18 @@ final class ChatNSTextView: NSTextView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         insertionPointColor = .labelColor
+    }
+
+    // MARK: - IME Composition
+
+    override func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
+        super.setMarkedText(string, selectedRange: selectedRange, replacementRange: replacementRange)
+        onCompositionChanged?()
+    }
+
+    override func unmarkText() {
+        super.unmarkText()
+        onCompositionChanged?()
     }
 
     // MARK: - Context Menu
@@ -409,8 +428,14 @@ final class ChatNSTextView: NSTextView {
         default:
             if let c = event.characters, !c.isEmpty {
                 if c == " " {
-                    dismissCompletionPanel()
+                    if triggerChar == "/" {
+                        dismissCompletionPanel()
+                        super.keyDown(with: event)
+                        return true
+                    }
+                    // For @, allow spaces — library titles are multi-word
                     super.keyDown(with: event)
+                    updateCompletionFilter()
                     return true
                 }
                 super.keyDown(with: event)

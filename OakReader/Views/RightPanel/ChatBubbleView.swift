@@ -177,6 +177,9 @@ struct ChatBubbleView: View {
                 ForEach(skillBadges, id: \.self) { skill in
                     skillBadge(skill)
                 }
+                ForEach(Array(referenceBadges.enumerated()), id: \.offset) { _, ref in
+                    referenceBadge(ref.title, icon: ref.icon)
+                }
                 if !renderedContent.isEmpty {
                     base
                 }
@@ -204,7 +207,8 @@ struct ChatBubbleView: View {
         if turn.role == .user {
             let parsed = Self.extractLeadingSkillTags(from: turn.content)
             if !parsed.skillIds.isEmpty && parsed.content == "/" { return "" }
-            return parsed.content
+            let (_, stripped) = Self.extractReferencedDocuments(from: parsed.content)
+            return stripped
         }
         let content = reveal.displayedContent
         // Seal incomplete markdown during streaming to prevent jitter.
@@ -222,6 +226,50 @@ struct ChatBubbleView: View {
         if !parsed.skillIds.isEmpty { return parsed.skillIds }
         if let skill = turn.metadata["skill"] { return [skill] }
         return []
+    }
+
+    private var referenceBadges: [(title: String, icon: String)] {
+        guard turn.role == .user else { return [] }
+        let parsed = Self.extractLeadingSkillTags(from: turn.content)
+        let (refs, _) = Self.extractReferencedDocuments(from: parsed.content)
+        return refs
+    }
+
+    private static func extractReferencedDocuments(
+        from content: String
+    ) -> (refs: [(title: String, icon: String)], cleaned: String) {
+        guard let startRange = content.range(of: "<referenced-documents>"),
+              let endRange = content.range(of: "</referenced-documents>") else {
+            return ([], content)
+        }
+
+        let xmlBlock = String(content[startRange.lowerBound...endRange.upperBound])
+        let cleaned = content[..<startRange.lowerBound].description
+            + content[endRange.upperBound...].description
+
+        // Extract doc and note elements
+        var refs: [(title: String, icon: String)] = []
+        let ns = xmlBlock as NSString
+        let fullRange = NSRange(location: 0, length: ns.length)
+
+        for match in refDocPattern.matches(in: xmlBlock, range: fullRange) {
+            let title = ns.substring(with: match.range(at: 1))
+                .replacingOccurrences(of: "&amp;", with: "&")
+                .replacingOccurrences(of: "&lt;", with: "<")
+                .replacingOccurrences(of: "&gt;", with: ">")
+                .replacingOccurrences(of: "&quot;", with: "\"")
+            refs.append((title: title, icon: "doc.text"))
+        }
+        for match in refNotePattern.matches(in: xmlBlock, range: fullRange) {
+            let title = ns.substring(with: match.range(at: 1))
+                .replacingOccurrences(of: "&amp;", with: "&")
+                .replacingOccurrences(of: "&lt;", with: "<")
+                .replacingOccurrences(of: "&gt;", with: ">")
+                .replacingOccurrences(of: "&quot;", with: "\"")
+            refs.append((title: title, icon: "note.text"))
+        }
+
+        return (refs, cleaned.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
     private static func extractLeadingSkillTags(from content: String) -> (skillIds: [String], content: String) {
@@ -246,7 +294,7 @@ struct ChatBubbleView: View {
     }
 
     private var shouldShowMessageBubble: Bool {
-        turn.role == .assistant || !renderedContent.isEmpty || !skillBadges.isEmpty
+        turn.role == .assistant || !renderedContent.isEmpty || !skillBadges.isEmpty || !referenceBadges.isEmpty
     }
 
     private func skillBadge(_ skillId: String) -> some View {
@@ -262,6 +310,19 @@ struct ChatBubbleView: View {
                 .font(.system(size: 13, weight: .medium))
         }
         .foregroundStyle(Color.accentColor)
+        .fixedSize()
+    }
+
+    private func referenceBadge(_ title: String, icon: String) -> some View {
+        HStack(spacing: 3) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .medium))
+                .opacity(0.8)
+            Text(title)
+                .font(.system(size: 12, weight: .medium))
+                .lineLimit(1)
+        }
+        .foregroundStyle(Color.orange)
         .fixedSize()
     }
 
@@ -326,7 +387,18 @@ struct ChatBubbleView: View {
 
     // MARK: - Protect Math Backslashes
 
+    // Regex: extract title from <doc> and <note> elements in <referenced-documents>
+    // swiftlint:disable:next force_try
+    private static let refDocPattern = try! NSRegularExpression(
+        pattern: #"<doc\s[^>]*?title="([^"]*)"[^>]*/>"#
+    )
+    // swiftlint:disable:next force_try
+    private static let refNotePattern = try! NSRegularExpression(
+        pattern: #"<note\s[^>]*?title="([^"]*)"[^>]*/>"#
+    )
+
     // Regex: display math $$...$$ (dotall) or inline math $...$ (no newlines)
+    // swiftlint:disable:next force_try
     private static let mathPattern = try! NSRegularExpression(
         pattern: #"\$\$(.+?)\$\$|\$(?!\$)((?:\\\$|[^$\n])+)\$"#,
         options: [.dotMatchesLineSeparators]

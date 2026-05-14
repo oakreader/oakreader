@@ -45,7 +45,7 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
         onSelect: @escaping (ChatCompletionItem) -> Void
     ) {
         self.allItems = items
-        self.filtered = items
+        self.filtered = items.filter { !$0.requiresQuery }
         self.anchorPoint = screenPoint
         self.panelWidth = min(max(requestedWidth, Self.minPanelWidth), Self.maxPanelWidth)
         self.onSelect = onSelect
@@ -129,7 +129,11 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
     // MARK: - Filtering
 
     func filter(query: String) {
-        filtered = query.isEmpty ? allItems : allItems.filter { $0.matches(query: query) }
+        if query.isEmpty {
+            filtered = allItems.filter { !$0.requiresQuery }
+        } else {
+            filtered = allItems.filter { $0.matches(query: query) }
+        }
         selectedIndex = filtered.isEmpty ? -1 : 0
         buildRows()
         updateSelection()
@@ -406,6 +410,10 @@ private extension ChatCompletionItem {
             return .controlAccentColor
         case .contextMention:
             return .systemBlue
+        case .libraryReference:
+            return .systemOrange
+        case .noteReference:
+            return .systemGreen
         }
     }
 }
