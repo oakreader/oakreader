@@ -84,12 +84,27 @@ class ChatViewModel {
         )
     }
 
+    /// Cached mention items — rebuilt only when the library revision changes.
+    private var cachedMentionItems: [ChatCompletionItem]?
+    private var cachedMentionRevision: Int = -1
+    private var cachedMentionHasDocument: Bool?
+
     /// Items shown in the `@` mention completion panel.
     @MainActor
     var chatMentionItems: [ChatCompletionItem] {
-        var items = ChatCompletionItem.mentionItems(hasDocument: parent != nil)
+        let store = parent?.libraryStore ?? appState?.libraryStore
+        let currentRevision = store?.revision ?? 0
+        let hasDoc = parent != nil
 
-        if let store = parent?.libraryStore ?? appState?.libraryStore {
+        if let cached = cachedMentionItems,
+           cachedMentionRevision == currentRevision,
+           cachedMentionHasDocument == hasDoc {
+            return cached
+        }
+
+        var items = ChatCompletionItem.mentionItems(hasDocument: hasDoc)
+
+        if let store {
             items += ChatCompletionItem.libraryItems(from: store.items)
         }
 
@@ -100,6 +115,9 @@ class ChatViewModel {
             }
         }
 
+        cachedMentionItems = items
+        cachedMentionRevision = currentRevision
+        cachedMentionHasDocument = hasDoc
         return items
     }
 

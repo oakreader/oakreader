@@ -384,7 +384,12 @@ final class ChatNSTextView: NSTextView {
 
         guard let anchor = popupAnchor() else { return }
 
-        completionPanel = ChatCompletionPanel(items: items, at: anchor.point, width: anchor.width) { [weak self] item in
+        completionPanel = ChatCompletionPanel(
+            items: items,
+            at: anchor.point,
+            width: anchor.width,
+            windowFrame: anchor.windowFrame
+        ) { [weak self] item in
             self?.insertToken(item)
         }
     }
@@ -548,9 +553,9 @@ final class ChatNSTextView: NSTextView {
         onTokensChanged?(activeTokens())
     }
 
-    /// Computes the screen point and width for the completion popup. It is
-    /// anchored to the input region so the popup aligns with the composer.
-    private func popupAnchor() -> (point: NSPoint, width: CGFloat)? {
+    /// Computes the screen point, width, and window frame for the completion popup.
+    /// It is anchored to the input region so the popup aligns with the composer.
+    private func popupAnchor() -> (point: NSPoint, width: CGFloat, windowFrame: NSRect)? {
         guard let window else { return nil }
         let sourceView: NSView = enclosingScrollView ?? self
         let inputRect = sourceView.convert(sourceView.bounds, to: nil)
@@ -563,7 +568,8 @@ final class ChatNSTextView: NSTextView {
         )
         return (
             window.convertPoint(toScreen: anchor),
-            inputRect.width + composerHorizontalPadding * 2
+            inputRect.width + composerHorizontalPadding * 2,
+            window.frame
         )
     }
 

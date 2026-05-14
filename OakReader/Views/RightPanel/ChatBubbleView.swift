@@ -239,13 +239,15 @@ struct ChatBubbleView: View {
         from content: String
     ) -> (refs: [(title: String, icon: String)], cleaned: String) {
         guard let startRange = content.range(of: "<referenced-documents>"),
-              let endRange = content.range(of: "</referenced-documents>") else {
+              let endRange = content.range(of: "</referenced-documents>"),
+              startRange.lowerBound < endRange.upperBound else {
             return ([], content)
         }
 
-        let xmlBlock = String(content[startRange.lowerBound...endRange.upperBound])
-        let cleaned = content[..<startRange.lowerBound].description
-            + content[endRange.upperBound...].description
+        let xmlBlock = String(content[startRange.lowerBound..<endRange.upperBound])
+        let cleaned = (content[..<startRange.lowerBound].description
+            + content[endRange.upperBound...].description)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
 
         // Extract doc and note elements
         var refs: [(title: String, icon: String)] = []
