@@ -184,6 +184,8 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
 enum AppExtension: String, CaseIterable, Identifiable {
     case notes
     case translation
+    case xBookmarks
+    case githubStars
 
     var id: String { rawValue }
 
@@ -191,6 +193,8 @@ enum AppExtension: String, CaseIterable, Identifiable {
         switch self {
         case .notes: return "Notes"
         case .translation: return "Translation"
+        case .xBookmarks: return "X Bookmarks"
+        case .githubStars: return "GitHub Stars"
         }
     }
 
@@ -198,13 +202,27 @@ enum AppExtension: String, CaseIterable, Identifiable {
         switch self {
         case .notes: return "Rich markdown notes panel with Mermaid diagrams and image paste."
         case .translation: return "Translate selected text using AI-powered translation."
+        case .xBookmarks: return "Sync your X (Twitter) bookmarks into OakReader."
+        case .githubStars: return "Sync your GitHub starred repositories into OakReader."
         }
     }
 
+    /// SF Symbol name. Used as fallback when `iconAsset` is nil.
     var systemImage: String {
         switch self {
         case .notes: return "note.text"
         case .translation: return "character.bubble"
+        case .xBookmarks: return "at"
+        case .githubStars: return "star"
+        }
+    }
+
+    /// Custom asset catalog image name. Non-nil means use `Image(_:)` instead of SF Symbol.
+    var iconAsset: String? {
+        switch self {
+        case .xBookmarks: return "icon-x"
+        case .githubStars: return "icon-github"
+        default: return nil
         }
     }
 
@@ -212,13 +230,23 @@ enum AppExtension: String, CaseIterable, Identifiable {
         switch self {
         case .notes: return [.notes]
         case .translation: return [.translation]
+        case .xBookmarks: return []
+        case .githubStars: return []
+        }
+    }
+
+    var systemCollectionId: UUID? {
+        switch self {
+        case .xBookmarks: return SystemCollectionID.xBookmarks
+        case .githubStars: return SystemCollectionID.githubStars
+        default: return nil
         }
     }
 
     var enabledByDefault: Bool {
         switch self {
-        case .notes: return true
-        case .translation: return true
+        case .notes, .translation: return true
+        case .xBookmarks, .githubStars: return false
         }
     }
 }

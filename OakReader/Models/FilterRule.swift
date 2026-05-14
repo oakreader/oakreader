@@ -44,6 +44,7 @@ enum FilterField: String, Codable, CaseIterable {
     case title
     case author
     case property
+    case source
 }
 
 enum FilterOperator: String, Codable, CaseIterable {

@@ -24,10 +24,18 @@ struct AppExtensionSettingsView: View {
         let isEnabled = enabledStates[ext] ?? ext.enabledByDefault
 
         HStack(spacing: 10) {
-            Image(systemName: ext.systemImage)
-                .font(.system(size: 18))
-                .foregroundStyle(isEnabled ? .primary : .tertiary)
-                .frame(width: 24, alignment: .center)
+            Group {
+                if let asset = ext.iconAsset {
+                    Image(asset)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                } else {
+                    Image(systemName: ext.systemImage)
+                        .font(.system(size: 18))
+                }
+            }
+            .foregroundStyle(isEnabled ? .primary : .tertiary)
+            .frame(width: 24, height: 24, alignment: .center)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(ext.label)
