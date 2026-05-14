@@ -75,7 +75,7 @@ struct SettingsView: View {
     }
 
     /// Fixed tabs that always appear.
-    private static let fixedTabs: [Tab] = [.general, .library, .ai, .aiSettings, .audio, .characters, .extensions, .skills, .youtube]
+    private static let fixedTabs: [Tab] = [.general, .library, .ai, .aiSettings, .audio, .skills, .characters, .extensions, .youtube]
 
     @State private var selectedTab: Tab = .general
     @State private var visibleTabs: [Tab] = Self.buildVisibleTabs()
