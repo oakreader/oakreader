@@ -6,9 +6,10 @@
   "popularity": 90,
   "language": "en",
   "avatar": {
-    "type": "icon",
+    "type": "image",
     "colorHex": "#5FB236",
-    "icon": "macwindow"
+    "icon": "macwindow",
+    "imagePath": "icon-lowpoly.png"
   },
   "previewPrompts": [
     "What system is this really proposing?",

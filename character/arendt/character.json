@@ -6,9 +6,10 @@
   "popularity": 88,
   "language": "en",
   "avatar": {
-    "type": "icon",
+    "type": "image",
     "colorHex": "#7E6BC4",
-    "icon": "building.columns.fill"
+    "icon": "building.columns.fill",
+    "imagePath": "icon-lowpoly.png"
   },
   "previewPrompts": [
     "What does this imply for responsibility?",

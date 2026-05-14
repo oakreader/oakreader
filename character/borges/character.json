@@ -6,9 +6,10 @@
   "popularity": 80,
   "language": "en",
   "avatar": {
-    "type": "icon",
+    "type": "image",
     "colorHex": "#9A78B3",
-    "icon": "books.vertical.fill"
+    "icon": "books.vertical.fill",
+    "imagePath": "icon-lowpoly.png"
   },
   "previewPrompts": [
     "Give a symbolic reading of this passage.",
