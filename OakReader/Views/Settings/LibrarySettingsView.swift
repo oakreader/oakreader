@@ -35,6 +35,5 @@ struct LibrarySettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .padding()
     }
 }

@@ -38,12 +38,6 @@ struct RootView: View {
             NSCursor.arrow.set()
         }
         .sheet(isPresented: Binding(
-            get: { appState.showSettings },
-            set: { appState.showSettings = $0 }
-        )) {
-            SettingsView(store: appState.libraryStore)
-        }
-        .sheet(isPresented: Binding(
             get: { appState.showZoteroImport },
             set: { appState.showZoteroImport = $0 }
         )) {

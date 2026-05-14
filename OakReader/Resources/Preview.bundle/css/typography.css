@@ -14,7 +14,7 @@ pre, video, iframe {
 
 a {
   color: #0C6ADA;
-  cursor: pointer;
+  cursor: default;
 }
 
 /* Core Typography */
@@ -231,7 +231,7 @@ a {
   width: 1rem;
   height: 1rem;
   top: 0.1rem;
-  cursor: pointer;
+  cursor: default;
 }
 
 .heti ul.cb input[type='checkbox']::before {
@@ -468,7 +468,7 @@ blockquote blockquote {
 .heti summary {
   padding-inline-start: 1em;
   outline: 0;
-  cursor: pointer;
+  cursor: default;
 }
 
 .heti summary::-webkit-details-marker {

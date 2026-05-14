@@ -238,24 +238,32 @@ struct ChatBubbleView: View {
     private static func extractReferencedDocuments(
         from content: String
     ) -> (refs: [(title: String, icon: String)], cleaned: String) {
-        guard let startRange = content.range(of: "<referenced-documents>"),
-              let endRange = content.range(of: "</referenced-documents>"),
-              startRange.lowerBound < endRange.upperBound else {
+        // Use NSString/NSRange throughout to avoid String.Index validation
+        // crashes with certain Unicode content (e.g. emoji, CJK characters).
+        let ns = content as NSString
+        let startNS = ns.range(of: "<referenced-documents>")
+        let endNS = ns.range(of: "</referenced-documents>")
+
+        guard startNS.location != NSNotFound,
+              endNS.location != NSNotFound,
+              startNS.location + startNS.length <= endNS.location else {
             return ([], content)
         }
 
-        let xmlBlock = String(content[startRange.lowerBound..<endRange.upperBound])
-        let cleaned = (content[..<startRange.lowerBound].description
-            + content[endRange.upperBound...].description)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let blockEnd = endNS.location + endNS.length
+        let xmlBlock = ns.substring(with: NSRange(location: startNS.location,
+                                                  length: blockEnd - startNS.location))
+        let before = ns.substring(to: startNS.location)
+        let after = ns.substring(from: blockEnd)
+        let cleaned = (before + after).trimmingCharacters(in: .whitespacesAndNewlines)
 
         // Extract doc and note elements
         var refs: [(title: String, icon: String)] = []
-        let ns = xmlBlock as NSString
-        let fullRange = NSRange(location: 0, length: ns.length)
+        let xmlNS = xmlBlock as NSString
+        let fullRange = NSRange(location: 0, length: xmlNS.length)
 
         for match in refDocPattern.matches(in: xmlBlock, range: fullRange) {
-            let title = ns.substring(with: match.range(at: 1))
+            let title = xmlNS.substring(with: match.range(at: 1))
                 .replacingOccurrences(of: "&amp;", with: "&")
                 .replacingOccurrences(of: "&lt;", with: "<")
                 .replacingOccurrences(of: "&gt;", with: ">")
@@ -263,7 +271,7 @@ struct ChatBubbleView: View {
             refs.append((title: title, icon: "doc.text"))
         }
         for match in refNotePattern.matches(in: xmlBlock, range: fullRange) {
-            let title = ns.substring(with: match.range(at: 1))
+            let title = xmlNS.substring(with: match.range(at: 1))
                 .replacingOccurrences(of: "&amp;", with: "&")
                 .replacingOccurrences(of: "&lt;", with: "<")
                 .replacingOccurrences(of: "&gt;", with: ">")

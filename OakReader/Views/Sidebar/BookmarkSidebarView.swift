@@ -112,13 +112,6 @@ private struct OutlineTreeRow: View {
                     .padding(.horizontal, 4)
             )
             .contentShape(Rectangle())
-            .onHover { hovering in
-                if hovering {
-                    NSCursor.pointingHand.set()
-                } else {
-                    NSCursor.arrow.set()
-                }
-            }
             .onTapGesture { onTap(item) }
             .contextMenu {
                 Button { onTap(item) } label: {

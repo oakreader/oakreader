@@ -10,13 +10,14 @@ struct AppExtensionSettingsView: View {
     }()
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
+        Form {
+            Section {
                 ForEach(AppExtension.allCases) { ext in
                     extensionRow(ext)
                 }
             }
         }
+        .formStyle(.grouped)
     }
 
     @ViewBuilder
@@ -58,6 +59,6 @@ struct AppExtensionSettingsView: View {
             .controlSize(.small)
             .labelsHidden()
         }
-        .padding(20)
+        .padding(.vertical, 4)
     }
 }

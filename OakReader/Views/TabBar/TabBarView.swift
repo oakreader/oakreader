@@ -77,7 +77,7 @@ struct TabBarView: View {
 
             // Settings button — right end, aligned with SideNav column
             Button {
-                appState.showSettings = true
+                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
             } label: {
                 Image(systemName: "gearshape")
                     .font(.system(size: OakStyle.Font.icon))

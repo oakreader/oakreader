@@ -1,4 +1,5 @@
 import Cocoa
+import CoreText
 import PDFKit
 import Sparkle
 import UniformTypeIdentifiers
@@ -10,6 +11,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let appState = AppState()
     let updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
     private var mainWindow: NSWindow?
+    private var settingsWindow: NSWindow?
+    private var settingsCloseObserver: NSObjectProtocol?
     private var snapshotServer: SnapshotServer?
     private var syncScheduler: SyncScheduler?
     private var appearanceObserver: NSObjectProtocol?
@@ -19,6 +22,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Prewarm the emoji font so WebKit doesn't stall on first emoji render
+        _ = CTFontCreateWithName("Apple Color Emoji" as CFString, 12, nil)
+
         // Forward OakVoiceAI logs to the shared log file
         VoiceAgentLog.sink = { level, category, message in
             LogFileWriter.shared.write(level: level, category: category, message: message)
@@ -188,6 +194,51 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let centerFromBottom = titleBarHeight - desiredCenterFromTop
             let buttonY = centerFromBottom - buttonHeight / 2
             button.setFrameOrigin(NSPoint(x: button.frame.origin.x, y: buttonY))
+        }
+    }
+
+    // MARK: - Settings Window
+
+    @objc func showSettingsWindow(_ sender: Any?) {
+        if let existing = settingsWindow {
+            existing.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
+        let settingsView = SettingsView(store: appState.libraryStore)
+        let hostingController = NSHostingController(rootView: settingsView)
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 900, height: 620),
+            styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+        window.contentViewController = hostingController
+        window.title = "Settings"
+        window.titlebarSeparatorStyle = .none
+        window.toolbarStyle = .unified
+        window.isReleasedWhenClosed = false
+        settingsCloseObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: window,
+            queue: .main
+        ) { [weak self] _ in
+            self?.appState.showSettings = false
+            self?.settingsWindow = nil
+            if let obs = self?.settingsCloseObserver {
+                NotificationCenter.default.removeObserver(obs)
+                self?.settingsCloseObserver = nil
+            }
+        }
+
+        settingsWindow = window
+        appState.showSettings = true
+        window.makeKeyAndOrderFront(nil)
+        // Center after first layout pass so NavigationSplitView sizing is settled.
+        DispatchQueue.main.async {
+            window.center()
         }
     }
 
