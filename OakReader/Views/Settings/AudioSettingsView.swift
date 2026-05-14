@@ -20,7 +20,7 @@ struct AudioSettingsView: View {
     @State private var micTestTask: Task<Void, Never>?
     @State private var micTestCapture: MicrophoneCapture?
 
-    // Speaker test states
+    // Output test states
     @State private var isSpeakerTesting = false
     @State private var speakerTestLevel: Float = 0
     @State private var speakerTestTask: Task<Void, Never>?
@@ -42,9 +42,9 @@ struct AudioSettingsView: View {
 
     var body: some View {
         Form {
-            // MARK: - Speaker Section
-            Section("Speaker") {
-                Picker("Speaker", selection: $outputDeviceUID) {
+            // MARK: - Output Section
+            Section("Output") {
+                Picker("Device", selection: $outputDeviceUID) {
                     Text(defaultOutputLabel).tag("")
                     ForEach(deviceManager.outputDevices) { device in
                         Text(device.name).tag(device.uniqueID)
@@ -57,46 +57,51 @@ struct AudioSettingsView: View {
                     }
                 }
 
-                HStack(spacing: 12) {
-                    Button {
-                        if isSpeakerTesting {
-                            stopSpeakerTest()
-                        } else {
-                            startSpeakerTest()
-                        }
-                    } label: {
-                        Label(
-                            isSpeakerTesting ? "Stop" : "Test Speaker",
-                            systemImage: isSpeakerTesting ? "stop.fill" : "play.fill"
-                        )
-                        .frame(width: 130, alignment: .leading)
+                LabeledContent("Volume") {
+                    HStack(spacing: 8) {
+                        Image(systemName: "speaker.fill")
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                        Slider(value: $outputVolume, in: 0...1)
+                            .onChange(of: outputVolume) { _, newValue in
+                                let uid = outputDeviceUID.isEmpty ? nil : outputDeviceUID
+                                AudioDeviceManager.setVolume(
+                                    Float(newValue), uid: uid, scope: kAudioObjectPropertyScopeOutput
+                                )
+                            }
+                        Image(systemName: "speaker.wave.3.fill")
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
                     }
-                    .buttonStyle(.bordered)
-
-                    SegmentedLevelMeter(level: speakerTestLevel)
-                        .frame(height: 8)
                 }
 
-                HStack(spacing: 8) {
-                    Image(systemName: "speaker.fill")
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
-                    Slider(value: $outputVolume, in: 0...1)
-                        .onChange(of: outputVolume) { _, newValue in
-                            let uid = outputDeviceUID.isEmpty ? nil : outputDeviceUID
-                            AudioDeviceManager.setVolume(
-                                Float(newValue), uid: uid, scope: kAudioObjectPropertyScopeOutput
+                LabeledContent("Test") {
+                    HStack(spacing: 12) {
+                        Button {
+                            if isSpeakerTesting {
+                                stopSpeakerTest()
+                            } else {
+                                startSpeakerTest()
+                            }
+                        } label: {
+                            Label(
+                                isSpeakerTesting ? "Stop" : "Test Output",
+                                systemImage: isSpeakerTesting ? "stop.fill" : "play.fill"
                             )
+                            .frame(width: 128, alignment: .leading)
                         }
-                    Image(systemName: "speaker.wave.3.fill")
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
+                        .buttonStyle(.bordered)
+
+                        SegmentedLevelMeter(level: speakerTestLevel, isActive: isSpeakerTesting)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 8)
+                    }
                 }
             }
 
-            // MARK: - Microphone Section
-            Section("Microphone") {
-                Picker("Microphone", selection: $inputDeviceUID) {
+            // MARK: - Input Section
+            Section("Input") {
+                Picker("Device", selection: $inputDeviceUID) {
                     Text(defaultInputLabel).tag("")
                     ForEach(deviceManager.inputDevices) { device in
                         Text(device.name).tag(device.uniqueID)
@@ -109,54 +114,61 @@ struct AudioSettingsView: View {
                     }
                 }
 
-                HStack(spacing: 12) {
-                    Button {
-                        switch micTestPhase {
-                        case .idle:
-                            startMicTest()
-                        case .recording:
-                            // Stop recording early — flows into playback
-                            micTestCapture?.stopCapture()
-                        case .playingBack:
-                            stopMicTest()
-                        }
-                    } label: {
-                        Label(
-                            micTestButtonLabel,
-                            systemImage: micTestPhase == .idle ? "mic.fill" : "stop.fill"
-                        )
-                        .frame(width: 130, alignment: .leading)
+                LabeledContent("Input Volume") {
+                    HStack(spacing: 8) {
+                        Image(systemName: "mic.fill")
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                        Slider(value: $inputVolume, in: 0...1)
+                            .onChange(of: inputVolume) { _, newValue in
+                                let uid = inputDeviceUID.isEmpty ? nil : inputDeviceUID
+                                AudioDeviceManager.setVolume(
+                                    Float(newValue), uid: uid, scope: kAudioObjectPropertyScopeInput
+                                )
+                            }
+                        Image(systemName: "mic.fill.badge.plus")
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
                     }
-                    .buttonStyle(.bordered)
-
-                    SegmentedLevelMeter(level: micTestLevel)
-                        .frame(height: 8)
                 }
 
-                if micTestPhase == .recording {
-                    Text("Speak now... recording stops in \(micRecordingCountdown)s")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else if micTestPhase == .playingBack {
-                    Text("Playing back your recording...")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                LabeledContent("Test") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 12) {
+                            Button {
+                                switch micTestPhase {
+                                case .idle:
+                                    startMicTest()
+                                case .recording:
+                                    // Stop recording early — flows into playback
+                                    micTestCapture?.stopCapture()
+                                case .playingBack:
+                                    stopMicTest()
+                                }
+                            } label: {
+                                Label(
+                                    micTestButtonLabel,
+                                    systemImage: micTestPhase == .idle ? "mic.fill" : "stop.fill"
+                                )
+                                .frame(width: 128, alignment: .leading)
+                            }
+                            .buttonStyle(.bordered)
 
-                HStack(spacing: 8) {
-                    Image(systemName: "mic.fill")
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
-                    Slider(value: $inputVolume, in: 0...1)
-                        .onChange(of: inputVolume) { _, newValue in
-                            let uid = inputDeviceUID.isEmpty ? nil : inputDeviceUID
-                            AudioDeviceManager.setVolume(
-                                Float(newValue), uid: uid, scope: kAudioObjectPropertyScopeInput
-                            )
+                            SegmentedLevelMeter(level: micTestLevel, isActive: micTestPhase != .idle)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 8)
                         }
-                    Image(systemName: "mic.fill.badge.plus")
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
+
+                        if micTestPhase == .recording {
+                            Text("Recording stops in \(micRecordingCountdown)s")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else if micTestPhase == .playingBack {
+                            Text("Playing back your recording")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
             }
         }
@@ -334,7 +346,7 @@ struct AudioSettingsView: View {
         micTestLevel = 0
     }
 
-    // MARK: - Speaker Test
+    // MARK: - Output Test
 
     private func startSpeakerTest() {
         stopSpeakerTest()
@@ -394,6 +406,7 @@ struct AudioSettingsView: View {
 
 struct SegmentedLevelMeter: View {
     let level: Float
+    var isActive = true
 
     private let segmentCount = 12
 
@@ -401,13 +414,17 @@ struct SegmentedLevelMeter: View {
         HStack(spacing: 2) {
             ForEach(0..<segmentCount, id: \.self) { index in
                 let threshold = Float(index) / Float(segmentCount)
-                let isActive = level > threshold
+                let isLit = level > threshold
                 RoundedRectangle(cornerRadius: 1.5)
-                    .fill(segmentColor(index: index))
-                    .opacity(isActive ? 1 : 0.15)
+                    .fill(segmentFill(index: index, isLit: isLit))
             }
         }
         .animation(.linear(duration: 0.08), value: level)
+    }
+
+    private func segmentFill(index: Int, isLit: Bool) -> Color {
+        guard isActive else { return Color.secondary.opacity(0.14) }
+        return segmentColor(index: index).opacity(isLit ? 1 : 0.15)
     }
 
     private func segmentColor(index: Int) -> Color {
