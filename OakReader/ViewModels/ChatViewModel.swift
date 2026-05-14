@@ -85,8 +85,25 @@ class ChatViewModel {
     }
 
     /// Items shown in the `@` mention completion panel (requires a document).
+    @MainActor
     var chatMentionItems: [ChatCompletionItem] {
-        ChatCompletionItem.mentionItems(hasDocument: parent != nil)
+        ChatCompletionItem.mentionItems(
+            hasDocument: parent != nil,
+            characterAgents: installedCharacterAgents
+        )
+    }
+
+    private var installedCharacterAgents: [CharacterAgent] {
+        guard let database = sessionService?.database ?? parent?.database ?? appState?.libraryStore.database else {
+            return []
+        }
+
+        do {
+            let characters = try VoiceCharacterService(database: database).fetchAllCharacters()
+            return CharacterAgent.installed(from: characters)
+        } catch {
+            return []
+        }
     }
 
     // MARK: - Send Message
@@ -94,7 +111,11 @@ class ChatViewModel {
     @MainActor
     func send() {
         let parsedInput = Self.extractLeadingSkillTags(from: inputText.trimmingCharacters(in: .whitespacesAndNewlines))
-        let parsedCharacterMentions = Self.extractCharacterAgentMentions(from: parsedInput.content)
+        let installedCharacterAgents = self.installedCharacterAgents
+        let parsedCharacterMentions = Self.extractCharacterAgentMentions(
+            from: parsedInput.content,
+            installedAgents: installedCharacterAgents
+        )
         let text = parsedCharacterMentions.content.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty || !parsedInput.skillIds.isEmpty || !activeTokens.isEmpty || !parsedCharacterMentions.agents.isEmpty else { return }
 
@@ -114,10 +135,14 @@ class ChatViewModel {
         }.first
 
         var seenCharacterAgentIds = Set<String>()
-        let characterAgents: [CharacterAgent] = (tokens.compactMap { item in
+        let characterAgentsFromTokens = tokens.compactMap { item -> CharacterAgent? in
             if case .characterAgent(let agent) = item.kind { return agent }
             return nil
-        } + parsedCharacterMentions.agents).filter { agent in
+        }.compactMap { agent in
+            CharacterAgent.find(idOrHandle: agent.id, in: installedCharacterAgents)
+                ?? CharacterAgent.find(idOrHandle: agent.handle, in: installedCharacterAgents)
+        }
+        let characterAgents: [CharacterAgent] = (characterAgentsFromTokens + parsedCharacterMentions.agents).filter { agent in
             seenCharacterAgentIds.insert(agent.id).inserted
         }
 
@@ -541,7 +566,10 @@ class ChatViewModel {
         return "[[skill:\(skillId)]]\n\(text)"
     }
 
-    private static func extractCharacterAgentMentions(from content: String) -> (agents: [CharacterAgent], content: String) {
+    private static func extractCharacterAgentMentions(
+        from content: String,
+        installedAgents: [CharacterAgent]
+    ) -> (agents: [CharacterAgent], content: String) {
         let pattern = #"(?<!\S)@([A-Za-z][A-Za-z0-9_-]*)"#
         guard let regex = try? NSRegularExpression(pattern: pattern) else {
             return ([], content)
@@ -556,7 +584,8 @@ class ChatViewModel {
         for match in matches {
             guard match.numberOfRanges > 1 else { continue }
             let handle = ns.substring(with: match.range(at: 1))
-            guard let agent = CharacterAgent.find(idOrHandle: handle), seen.insert(agent.id).inserted else { continue }
+            guard let agent = CharacterAgent.find(idOrHandle: handle, in: installedAgents),
+                  seen.insert(agent.id).inserted else { continue }
             agents.append(agent)
             removeRanges.append(match.range(at: 0))
         }
@@ -611,6 +640,151 @@ class ChatViewModel {
             let title = turns.first(where: { $0.role == .user })?.content.prefix(50).description
                 ?? firstUserMessage.prefix(50).description
             try? service.updateSession(id: sessionId, title: title, messageCount: messageCount)
+        }
+    }
+}
+
+// MARK: - CharacterAgent Service
+
+struct CharacterAgentThreadMessage: Codable, Sendable {
+    let id: UUID
+    let role: String
+    let content: String
+    let timestamp: Date
+}
+
+struct CharacterAgentRunResult: Sendable {
+    let agent: CharacterAgent
+    let threadRef: CharacterAgentThreadRef
+    let output: String
+
+    var xmlBlock: String {
+        let agentId = Self.escapeAttribute(agent.id)
+        let agentName = Self.escapeAttribute(agent.name)
+        let icon = Self.escapeAttribute(agent.icon)
+        let jsonlPath = Self.escapeAttribute(threadRef.jsonlPath)
+        let trimmedOutput = output.trimmingCharacters(in: .whitespacesAndNewlines)
+        let attributes = [
+            "agent_id=\"\(agentId)\"",
+            "agent_name=\"\(agentName)\"",
+            "icon=\"\(icon)\"",
+            "thread_id=\"\(threadRef.id.uuidString)\"",
+            "jsonl_path=\"\(jsonlPath)\""
+        ].joined(separator: " ")
+
+        return """
+        <character-agent-input \(attributes)>
+        \(trimmedOutput)
+        </character-agent-input>
+        """
+    }
+
+    private static func escapeAttribute(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+    }
+}
+
+struct CharacterAgentService: Sendable {
+    private let router = ProviderRouter()
+
+    func run(
+        agent: CharacterAgent,
+        request: String,
+        contextSystemPrompt: String,
+        config: ProviderConfig
+    ) async throws -> CharacterAgentRunResult {
+        let threadId = UUID()
+        let threadURL = CatalogDatabase.characterAgentThreadURL(threadId: threadId)
+        try FileManager.default.createDirectory(
+            at: CatalogDatabase.characterAgentThreadsDirectory,
+            withIntermediateDirectories: true
+        )
+
+        let trimmedRequest = request.trimmingCharacters(in: .whitespacesAndNewlines)
+        let userRequest = trimmedRequest.isEmpty
+            ? "Provide your perspective on the current context."
+            : trimmedRequest
+
+        try appendThreadMessage(
+            CharacterAgentThreadMessage(id: UUID(), role: "user", content: userRequest, timestamp: Date()),
+            to: threadURL
+        )
+
+        let systemPrompt = """
+        \(agent.prompt)
+
+        You are not the main chat assistant. Your job is to produce delegated user-role material for the main assistant.
+        Write a compact digest in your inspired method/style. Do not address the user as if you are the final assistant.
+        Do not impersonate or claim identity as \(agent.name).
+
+        App/document context available to you:
+        \(contextSystemPrompt)
+        """
+
+        let provider = try router.provider(for: config)
+        let stream = provider.sendMessage(
+            messages: [LLMMessage(role: .user, text: userRequest)],
+            model: config.model,
+            systemPrompt: systemPrompt,
+            maxTokens: min(config.maxTokens, 2_000)
+        )
+
+        var output = ""
+        for try await chunk in stream {
+            switch chunk {
+            case .delta(let text):
+                output += text
+            case .finished(_):
+                break
+            case .toolUse:
+                break
+            case .error(let message):
+                throw LLMProviderError.streamError(message)
+            }
+        }
+
+        let finalOutput = output.trimmingCharacters(in: .whitespacesAndNewlines)
+        try appendThreadMessage(
+            CharacterAgentThreadMessage(id: UUID(), role: "character_agent", content: finalOutput, timestamp: Date()),
+            to: threadURL
+        )
+
+        let now = Date()
+        let ref = CharacterAgentThreadRef(
+            id: threadId,
+            agentId: agent.id,
+            agentName: agent.name,
+            icon: agent.icon,
+            jsonlPath: threadURL.path,
+            status: .completed,
+            title: String(userRequest.prefix(80)),
+            summary: String(finalOutput.prefix(500)),
+            latestUserFollowUp: nil,
+            createdAt: now,
+            updatedAt: now
+        )
+
+        return CharacterAgentRunResult(agent: agent, threadRef: ref, output: finalOutput)
+    }
+
+    private func appendThreadMessage(_ message: CharacterAgentThreadMessage, to url: URL) throws {
+        let data = try JSONEncoder().encode(message)
+        guard var line = String(data: data, encoding: .utf8) else { return }
+        line += "\n"
+
+        if FileManager.default.fileExists(atPath: url.path) {
+            let handle = try FileHandle(forWritingTo: url)
+            defer { handle.closeFile() }
+            handle.seekToEndOfFile()
+            if let lineData = line.data(using: .utf8) {
+                handle.write(lineData)
+            }
+        } else {
+            try line.write(to: url, atomically: true, encoding: .utf8)
         }
     }
 }
