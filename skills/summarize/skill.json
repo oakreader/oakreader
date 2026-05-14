@@ -1,5 +1,6 @@
 {
     "name": "summarize",
     "description": "Concise document summary",
-    "icon": { "type": "symbol", "value": "doc.text.magnifyingglass" }
+    "icon": { "type": "symbol", "value": "text.document.fill" },
+    "version": "1.0.0"
 }

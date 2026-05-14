@@ -1,7 +1,8 @@
 {
     "name": "youtube",
     "description": "Download and manage YouTube videos",
-    "icon": { "type": "symbol", "value": "play.rectangle" },
+    "icon": { "type": "symbol", "value": "play.rectangle.fill" },
+    "version": "1.0.0",
     "requires": {
         "bins": [
             {

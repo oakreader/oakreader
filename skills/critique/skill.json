@@ -1,5 +1,6 @@
 {
     "name": "critique",
     "description": "Evaluate argument strength and reasoning",
-    "icon": { "type": "symbol", "value": "checkmark.shield" }
+    "icon": { "type": "symbol", "value": "checkmark.shield.fill" },
+    "version": "1.0.0"
 }

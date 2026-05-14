@@ -1,5 +1,6 @@
 {
     "name": "translate",
     "description": "Translate document content to target language",
-    "icon": { "type": "symbol", "value": "globe" }
+    "icon": { "type": "symbol", "value": "globe" },
+    "version": "1.0.0"
 }

@@ -1,7 +1,8 @@
 {
     "name": "web-import",
     "description": "Import web pages as offline snapshots",
-    "icon": { "type": "symbol", "value": "globe" },
+    "icon": { "type": "symbol", "value": "globe.badge.chevron.backward" },
+    "version": "1.0.0",
     "requires": {
         "bins": [
             {

@@ -1,5 +1,6 @@
 {
     "name": "highlight",
     "description": "Suggest passages worth highlighting",
-    "icon": { "type": "symbol", "value": "highlighter" }
+    "icon": { "type": "symbol", "value": "highlighter" },
+    "version": "1.0.0"
 }
