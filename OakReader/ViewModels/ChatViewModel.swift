@@ -361,6 +361,22 @@ class ChatViewModel {
         }
     }
 
+    // MARK: - Citation Navigation
+
+    func openCitation(citeKey: String, pageIndex: Int?) {
+        guard let appState else { return }
+        let store = appState.libraryStore
+
+        guard let item = store.findItem(byCiteKey: citeKey) else { return }
+        appState.openLibraryItem(item)
+
+        if let pageIndex {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                appState.activeTab?.viewModel.viewer.goToPage(pageIndex)
+            }
+        }
+    }
+
     // MARK: - Stop Streaming
 
     func stopStreaming() {
