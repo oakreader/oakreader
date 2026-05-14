@@ -249,9 +249,9 @@ struct AIChatView: View {
                 focusRef: inputFocusRef
             )
             .frame(height: inputContentHeight)
-            .padding(.horizontal, 10)
-            .padding(.top, 8)
-            .padding(.bottom, 4)
+            .padding(.horizontal, 14)
+            .padding(.top, 12)
+            .padding(.bottom, 6)
 
             // Bottom row: attachment + send
             HStack(spacing: 6) {
@@ -264,10 +264,9 @@ struct AIChatView: View {
                     }
                 } label: {
                     Image(systemName: "plus")
-                        .font(.system(size: OakStyle.Font.icon, weight: .medium))
+                        .font(.system(size: 19, weight: .regular))
                         .foregroundStyle(.secondary)
-                        .frame(width: OakStyle.Size.buttonStandard, height: OakStyle.Size.buttonStandard)
-                        .background(Circle().fill(Color.primary.opacity(0.06)))
+                        .frame(width: 34, height: 34)
                 }
                 .buttonStyle(.plain)
                 .help("Add attachment")
@@ -281,7 +280,7 @@ struct AIChatView: View {
                         ZStack {
                             Circle()
                                 .fill(Color.primary)
-                                .frame(width: OakStyle.Size.buttonStandard, height: OakStyle.Size.buttonStandard)
+                                .frame(width: 38, height: 38)
                             RoundedRectangle(cornerRadius: 3)
                                 .fill(Color(nsColor: .windowBackgroundColor))
                                 .frame(width: 12, height: 12)
@@ -294,9 +293,9 @@ struct AIChatView: View {
                         ZStack {
                             Circle()
                                 .fill(inputHasText ? Color.primary : Color.gray.opacity(0.3))
-                                .frame(width: OakStyle.Size.buttonStandard, height: OakStyle.Size.buttonStandard)
+                                .frame(width: 38, height: 38)
                             Image(systemName: "arrow.up")
-                                .font(.system(size: OakStyle.Font.icon, weight: .bold))
+                                .font(.system(size: 18, weight: .bold))
                                 .foregroundStyle(Color(nsColor: .windowBackgroundColor))
                         }
                     }
@@ -305,16 +304,16 @@ struct AIChatView: View {
                     .help("Send message (↩)")
                 }
             }
-            .padding(.horizontal, 10)
-            .padding(.bottom, 6)
+            .padding(.horizontal, 14)
+            .padding(.bottom, 10)
         }
         .background(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: 18)
                 .fill(Color(nsColor: .textBackgroundColor))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(Color.primary.opacity(0.10), lineWidth: 0.5)
         )
         .padding(.horizontal, OakStyle.Spacing.sm)
         .padding(.vertical, OakStyle.Spacing.xs)
@@ -349,7 +348,7 @@ struct AIChatView: View {
         } label: {
             HStack(spacing: 3) {
                 Text(currentModelName)
-                    .font(.system(size: 12))
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                 Image(systemName: "chevron.up.chevron.down")
@@ -358,12 +357,6 @@ struct AIChatView: View {
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background(
-                Capsule().fill(Color.primary.opacity(0.06))
-            )
-            .overlay(
-                Capsule().strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5)
-            )
         }
         .buttonStyle(.plain)
         .help("Switch model")
