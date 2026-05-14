@@ -273,13 +273,7 @@ private final class ChatCompletionRowView: NSView {
         iconShell.translatesAutoresizingMaskIntoConstraints = false
 
         let icon = NSImageView(frame: .zero)
-        if let imagePath = item.imagePath,
-           let img = NSImage(contentsOfFile: imagePath) {
-            icon.image = img
-            icon.imageScaling = .scaleProportionallyUpOrDown
-            iconShell.layer?.cornerRadius = 14
-            iconShell.layer?.masksToBounds = true
-        } else if let img = NSImage(systemSymbolName: item.icon, accessibilityDescription: item.label) {
+        if let img = NSImage(systemSymbolName: item.icon, accessibilityDescription: item.label) {
             icon.image = img.withSymbolConfiguration(.init(pointSize: 19, weight: .regular))
             icon.contentTintColor = item.completionTint
         }
@@ -312,8 +306,8 @@ private final class ChatCompletionRowView: NSView {
 
             icon.centerXAnchor.constraint(equalTo: iconShell.centerXAnchor),
             icon.centerYAnchor.constraint(equalTo: iconShell.centerYAnchor),
-            icon.widthAnchor.constraint(equalToConstant: item.imagePath == nil ? 22 : 28),
-            icon.heightAnchor.constraint(equalToConstant: item.imagePath == nil ? 22 : 28),
+            icon.widthAnchor.constraint(equalToConstant: 22),
+            icon.heightAnchor.constraint(equalToConstant: 22),
 
             label.leadingAnchor.constraint(equalTo: iconShell.trailingAnchor, constant: 8),
             label.centerYAnchor.constraint(equalTo: centerYAnchor),
@@ -412,8 +406,6 @@ private extension ChatCompletionItem {
             return .controlAccentColor
         case .contextMention:
             return .systemBlue
-        case .characterAgent:
-            return .systemPurple
         }
     }
 }
