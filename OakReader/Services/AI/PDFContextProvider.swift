@@ -259,20 +259,24 @@ struct PDFContextProvider {
                 search_library for keyword matches.
                 """)
 
-            // Citation link format
-            parts.append("""
-                When referencing specific pages from the document, use clickable \
-                citation links: [p. N](oak://page/N) where N is the 1-based page \
-                number. When referencing other documents from search results, use: \
-                [citeKey, p. N](oak://cite/citeKey?page=N). Only cite pages you \
-                have actually read or found via search tools.
-                """)
-
             // Abstract (outside document block to not crowd metadata)
             if let abstract = doc.abstract, !abstract.isEmpty {
                 parts.append("Document abstract:\n\"\"\"\n\(String(abstract.prefix(2_000)))\n\"\"\"")
             }
         }
+
+        // Citation link format — outside document block so it applies to library-level chat too
+        parts.append("""
+            When referencing specific pages from the current document, use \
+            clickable citation links: [p. N](oak://page/N) where N is the \
+            1-based page number. When the user's message contains a \
+            <referenced-documents> block, use the `link` attribute from each \
+            <doc> element to create citation links, appending ?page=N when \
+            citing a specific page: [citeKey, p. N](oak://cite/citeKey?page=N). \
+            For referenced <note> elements, read them with the read tool using \
+            the provided path. Only cite pages you have actually read or found \
+            via search tools.
+            """)
 
         // Skill prompt (after context so the skill can reference it)
         if let skill {
