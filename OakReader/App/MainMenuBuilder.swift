@@ -142,6 +142,15 @@ enum MainMenuBuilder {
         zoteroItem.image = icon("tray.and.arrow.down")
         fileMenu.addItem(zoteroItem)
 
+        let importFolderItem = NSMenuItem(
+            title: "Import Folder...",
+            action: #selector(AppDelegate.importFolder(_:)),
+            keyEquivalent: ""
+        )
+        importFolderItem.target = target
+        importFolderItem.image = icon("folder.badge.plus")
+        fileMenu.addItem(importFolderItem)
+
         fileMenu.addItem(.separator())
 
         let closeItem = NSMenuItem(
@@ -207,6 +216,17 @@ enum MainMenuBuilder {
         exportSubItem.submenu = exportMenu
         exportSubItem.image = icon("square.and.arrow.up")
         fileMenu.addItem(exportSubItem)
+
+        fileMenu.addItem(.separator())
+
+        let shareItem = NSMenuItem(
+            title: "Share...",
+            action: #selector(AppDelegate.shareCurrentItem(_:)),
+            keyEquivalent: ""
+        )
+        shareItem.target = target
+        shareItem.image = icon("square.and.arrow.up")
+        fileMenu.addItem(shareItem)
 
         fileMenu.addItem(.separator())
 

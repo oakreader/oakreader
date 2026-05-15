@@ -3,6 +3,41 @@ import AVFoundation
 
 extension ImportService {
 
+    /// Audio file extensions accepted for import.
+    static let audioExtensions: Set<String> = ["m4a", "mp3", "wav", "aac", "aiff", "aif", "caf", "flac", "ogg"]
+
+    /// Import an external audio file (e.g. from Voice Memos) without deleting the original.
+    /// Copies to a temp location, probes duration via AVAsset, then delegates to `importAudioRecording`.
+    @discardableResult
+    func importAudioFile(from fileURL: URL) async -> LibraryItem? {
+        // Duplicate detection before copying
+        if let hash = hashPrefix(of: fileURL),
+           let existing = findByHash(hash) {
+            return existing
+        }
+
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString + "_" + fileURL.lastPathComponent)
+        do {
+            try FileManager.default.copyItem(at: fileURL, to: tempURL)
+        } catch {
+            Log.error(Log.importer, "Failed to copy audio file to temp: \(error)")
+            return nil
+        }
+
+        // Probe duration
+        let asset = AVURLAsset(url: tempURL)
+        let duration: Int
+        if let cmDuration = try? await asset.load(.duration), cmDuration.seconds.isFinite {
+            duration = Int(cmDuration.seconds)
+        } else {
+            duration = 0
+        }
+
+        let title = fileURL.deletingPathExtension().lastPathComponent
+        return importAudioRecording(from: tempURL, duration: duration, title: title)
+    }
+
     /// Import an audio recording into managed storage.
     /// - Parameters:
     ///   - sourceURL: Path to the audio file (typically a temp M4A).
