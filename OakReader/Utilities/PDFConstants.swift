@@ -249,6 +249,7 @@ enum AppExtension: String, CaseIterable, Identifiable {
 }
 
 enum LibraryDetailTab: String, CaseIterable, Identifiable {
+    case chat
     case metadata
     case notes
 
@@ -256,6 +257,7 @@ enum LibraryDetailTab: String, CaseIterable, Identifiable {
 
     var systemImage: String {
         switch self {
+        case .chat: return "bubble.left.and.text.bubble.right"
         case .metadata: return "tablecells"
         case .notes: return "note.text"
         }
@@ -263,28 +265,40 @@ enum LibraryDetailTab: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
+        case .chat: return "AI Chat"
         case .metadata: return "Metadata"
         case .notes: return "Notes"
         }
     }
 }
 
-enum WorkspaceStudioTab: String, CaseIterable, Identifiable {
+enum StudioAction: String, CaseIterable, Identifiable {
     case notes
+    case summary
+    case studyGuide
+    case mindMap
 
     var id: String { rawValue }
 
     var systemImage: String {
         switch self {
         case .notes: return "note.text"
+        case .summary: return "doc.text"
+        case .studyGuide: return "book"
+        case .mindMap: return "point.3.connected.trianglepath.dotted"
         }
     }
 
     var label: String {
         switch self {
         case .notes: return "Notes"
+        case .summary: return "Summary"
+        case .studyGuide: return "Study Guide"
+        case .mindMap: return "Mind Map"
         }
     }
+
+    var isAvailable: Bool { self == .notes }
 }
 
 enum CompressionQuality: String, CaseIterable, Identifiable {
