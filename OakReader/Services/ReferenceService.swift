@@ -20,7 +20,7 @@ struct ReferenceService {
 
     // MARK: - Save
 
-    func saveMetadata(_ cslItem: CSLItem, forItemId itemId: String) throws {
+    func saveMetadata(_ cslItem: CSLItem, forItemId itemId: String, extra: String? = nil) throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         let jsonData = try encoder.encode(cslItem)
@@ -29,6 +29,12 @@ struct ReferenceService {
         }
 
         let now = Date().iso8601String
+
+        // Extract identifiers from CSL fields and extra
+        let isbn = cslItem.ISBN
+        let issn = cslItem.ISSN
+        let pmid = Self.extractPMID(from: cslItem, extra: extra)
+        let arxivId = Self.extractArXivID(from: cslItem, extra: extra)
 
         try database.dbQueue.write { db in
             // Check if record exists
@@ -44,6 +50,10 @@ struct ReferenceService {
                 year: cslItem.issued?.year,
                 containerTitle: cslItem.containerTitle,
                 abstract: cslItem.abstract,
+                pmid: pmid,
+                arxivId: arxivId,
+                isbn: isbn,
+                issn: issn,
                 createdAt: existing?.createdAt ?? now,
                 updatedAt: now
             )
@@ -67,11 +77,81 @@ struct ReferenceService {
                     arguments: [title, now, itemId]
                 )
             }
+
+            // Save extra field to items table
+            if let extra, !extra.isEmpty {
+                try db.execute(
+                    sql: "UPDATE items SET extra = ?, updated_at = ? WHERE id = ?",
+                    arguments: [extra, now, itemId]
+                )
+            }
         }
 
         // Auto-assign cite key if none exists
         try? citeKeyService.assignCiteKey(forItemId: itemId)
     }
+
+    // MARK: - Extra Field Parsing
+
+    /// Parse `extra` for "Key: Value" lines and merge into CSL JSON (only fills empty fields).
+    static func mergeExtraFields(_ extra: String, into csl: inout CSLItem) {
+        let lines = extra.components(separatedBy: .newlines)
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard let colonIdx = trimmed.firstIndex(of: ":") else { continue }
+            let key = trimmed[trimmed.startIndex..<colonIdx].trimmingCharacters(in: .whitespaces).lowercased()
+            let value = trimmed[trimmed.index(after: colonIdx)...].trimmingCharacters(in: .whitespaces)
+            guard !value.isEmpty else { continue }
+
+            // Map known extra keys to CSL field keys
+            if let cslKey = extraKeyToCSLField[key], csl[jsonKey: cslKey] == nil {
+                csl[jsonKey: cslKey] = value
+            }
+        }
+    }
+
+    /// Extract PMID from CSL note field or extra text.
+    static func extractPMID(from csl: CSLItem, extra: String?) -> String? {
+        for source in [extra, csl.note] {
+            guard let text = source else { continue }
+            for line in text.components(separatedBy: .newlines) {
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                if trimmed.lowercased().hasPrefix("pmid:") {
+                    let val = trimmed.dropFirst(5).trimmingCharacters(in: .whitespaces)
+                    if !val.isEmpty { return val }
+                }
+            }
+        }
+        return nil
+    }
+
+    /// Extract arXiv ID from CSL note field or extra text.
+    static func extractArXivID(from csl: CSLItem, extra: String?) -> String? {
+        for source in [extra, csl.note] {
+            guard let text = source else { continue }
+            for line in text.components(separatedBy: .newlines) {
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                let lower = trimmed.lowercased()
+                if lower.hasPrefix("arxiv:") {
+                    let val = trimmed.dropFirst(6).trimmingCharacters(in: .whitespaces)
+                    if !val.isEmpty { return val }
+                }
+            }
+        }
+        return nil
+    }
+
+    /// Mapping from extra field keys (lowercased) to CSL JSON wire keys.
+    private static let extraKeyToCSLField: [String: String] = [
+        "doi": "DOI",
+        "isbn": "ISBN",
+        "issn": "ISSN",
+        "volume": "volume",
+        "issue": "issue",
+        "pages": "page",
+        "publisher": "publisher",
+        "language": "language",
+    ]
 
     // MARK: - Delete
 

@@ -15,6 +15,17 @@ struct CSLFieldSpec: Hashable {
     }
 }
 
+/// Describes a date field to show for a CSL item type (beyond issued/accessed).
+struct CSLDateSpec: Hashable {
+    let key: String       // CSLItem property name: "submitted", "originalDate", "eventDate"
+    let label: String     // Display label
+
+    init(_ key: String, _ label: String) {
+        self.key = key
+        self.label = label
+    }
+}
+
 /// Describes a creator role to show for a CSL item type.
 struct CSLCreatorSpec: Hashable {
     let role: String      // CSL role key (used with getCreators/setCreators)
@@ -30,6 +41,13 @@ struct CSLCreatorSpec: Hashable {
 struct CSLTypeSpec {
     let fields: [CSLFieldSpec]
     let creators: [CSLCreatorSpec]
+    let dates: [CSLDateSpec]
+
+    init(fields: [CSLFieldSpec], creators: [CSLCreatorSpec], dates: [CSLDateSpec] = []) {
+        self.fields = fields
+        self.creators = creators
+        self.dates = dates
+    }
 }
 
 // MARK: - Registry
@@ -124,6 +142,9 @@ enum CSLTypeFieldRegistry {
                 creators: [
                     CSLCreatorSpec("author", "Author"),
                     CSLCreatorSpec("editor", "Editor"),
+                ],
+                dates: [
+                    CSLDateSpec("eventDate", "Event Date"),
                 ]
             )
 
@@ -257,6 +278,9 @@ enum CSLTypeFieldRegistry {
                 creators: [
                     CSLCreatorSpec("author", "Author"),
                     CSLCreatorSpec("editor", "Editor"),
+                ],
+                dates: [
+                    CSLDateSpec("submitted", "Submitted"),
                 ]
             )
 
@@ -304,6 +328,9 @@ enum CSLTypeFieldRegistry {
                 ],
                 creators: [
                     CSLCreatorSpec("author", "Presenter"),
+                ],
+                dates: [
+                    CSLDateSpec("eventDate", "Event Date"),
                 ]
             )
 

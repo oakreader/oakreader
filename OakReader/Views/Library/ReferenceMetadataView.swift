@@ -15,6 +15,8 @@ struct ReferenceMetadataView: View {
     @State private var accessedString: String = ""
     @State private var citeKeyText: String = ""
     @State private var citeKeyError: String?
+    @State private var extraText: String = ""
+    @State private var contextualDateStrings: [String: String] = [:]
 
     @State private var isLookingUp = false
     @State private var isExtracting = false
@@ -25,6 +27,8 @@ struct ReferenceMetadataView: View {
         case citeKey
         case field(String)
         case date, accessed
+        case contextualDate(String)
+        case extra
         case creatorFamily(String, Int)
         case creatorGiven(String, Int)
     }
@@ -152,9 +156,32 @@ struct ReferenceMetadataView: View {
                 ), field: .accessed)
             }
 
+            // Contextual date fields from type spec
+            ForEach(spec.dates, id: \.self) { dateSpec in
+                textRowBinding(dateSpec.label, text: Binding(
+                    get: { contextualDateStrings[dateSpec.key] ?? "" },
+                    set: { contextualDateStrings[dateSpec.key] = $0 }
+                ), field: .contextualDate(dateSpec.key))
+            }
+
             // Dynamic creator sections from type spec
             ForEach(spec.creators, id: \.self) { creatorSpec in
                 creatorSection(spec: creatorSpec)
+            }
+
+            // Extra field (monospaced, multiline)
+            gridRow("Extra") {
+                underlinedField {
+                    TextField("", text: $extraText, axis: .vertical)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 12, design: .monospaced))
+                        .lineLimit(2...8)
+                        .focused($focusedField, equals: .extra)
+                        .onSubmit { saveDebounced() }
+                        .onChange(of: focusedField) { old, new in
+                            if old == .extra && new != .extra { saveExtra() }
+                        }
+                }
             }
 
             Spacer().frame(height: 8)
@@ -448,6 +475,15 @@ struct ReferenceMetadataView: View {
         dateString = csl.issued?.year.map { "\($0)" } ?? ""
         accessedString = csl.accessed?.year.map { "\($0)" } ?? ""
 
+        // Contextual dates
+        contextualDateStrings = [:]
+        if let year = csl.eventDate?.year { contextualDateStrings["eventDate"] = "\(year)" }
+        if let year = csl.submitted?.year { contextualDateStrings["submitted"] = "\(year)" }
+        if let year = csl.originalDate?.year { contextualDateStrings["originalDate"] = "\(year)" }
+
+        // Extra
+        extraText = item.extra ?? ""
+
         // Load all creator arrays
         creatorValues = [:]
         for creatorSpec in spec.creators {
@@ -474,6 +510,17 @@ struct ReferenceMetadataView: View {
             csl.accessed = CSLDate(year: year)
         }
 
+        // Contextual dates
+        if let str = contextualDateStrings["eventDate"], let year = Int(str) {
+            csl.eventDate = CSLDate(year: year)
+        }
+        if let str = contextualDateStrings["submitted"], let year = Int(str) {
+            csl.submitted = CSLDate(year: year)
+        }
+        if let str = contextualDateStrings["originalDate"], let year = Int(str) {
+            csl.originalDate = CSLDate(year: year)
+        }
+
         // Set all creator arrays
         for (role, names) in creatorValues {
             let filtered = names.filter { !($0.family ?? "").isEmpty || !($0.given ?? "").isEmpty }
@@ -490,6 +537,21 @@ struct ReferenceMetadataView: View {
             store.invalidate()
         } catch {
             Log.error(Log.store, "Failed to save reference metadata: \(error)")
+        }
+    }
+
+    private func saveExtra() {
+        let trimmed = extraText.trimmingCharacters(in: .whitespacesAndNewlines)
+        do {
+            try store.database.dbQueue.write { db in
+                try db.execute(
+                    sql: "UPDATE items SET extra = ?, updated_at = ? WHERE id = ?",
+                    arguments: [trimmed.isEmpty ? nil : trimmed, Date().iso8601String, item.id.uuidString]
+                )
+            }
+            store.invalidate()
+        } catch {
+            Log.error(Log.store, "Failed to save extra field: \(error)")
         }
     }
 
