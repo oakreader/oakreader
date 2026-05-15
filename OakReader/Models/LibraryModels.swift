@@ -137,6 +137,11 @@ struct LibraryItem: Identifiable, Hashable {
 
     static func == (lhs: LibraryItem, rhs: LibraryItem) -> Bool {
         lhs.id == rhs.id
+            && lhs.title == rhs.title
+            && lhs.author == rhs.author
+            && lhs.propertyValues == rhs.propertyValues
+            && lhs.collections == rhs.collections
+            && lhs.citeKey == rhs.citeKey
     }
 
     func hash(into hasher: inout Hasher) {
