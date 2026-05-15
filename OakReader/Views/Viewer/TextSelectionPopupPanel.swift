@@ -191,7 +191,7 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
 
         if Preferences.shared.isExtensionEnabled(.translation) {
             let translateBtn = PopupIconButton(
-                systemImage: "character.bubble",
+                systemImage: "translate",
                 accessibilityLabel: "Translate"
             ) { [weak self] in
                 self?.translateSelection()

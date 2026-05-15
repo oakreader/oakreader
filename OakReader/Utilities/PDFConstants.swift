@@ -164,7 +164,7 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
         case .metadata: return "list.bullet.rectangle.portrait"
         case .aiChat: return "bubble.left.and.bubble.right"
         case .notes: return "note.text"
-        case .translation: return "character.bubble"
+        case .translation: return "translate"
         }
     }
 
@@ -208,7 +208,7 @@ enum AppExtension: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .notes: return "note.text"
-        case .translation: return "character.bubble"
+        case .translation: return "translate"
         case .xBookmarks: return "at"
         case .githubStars: return "star"
         }

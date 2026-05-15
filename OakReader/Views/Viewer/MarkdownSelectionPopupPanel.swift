@@ -153,7 +153,7 @@ class MarkdownSelectionPopupPanel: NSPanel, AppResignDismissable {
         // Group 2: Translate + Speak (only when DocumentViewModel is available)
         if viewModel != nil, Preferences.shared.isExtensionEnabled(.translation) {
             let translateBtn = PopupIconButton(
-                systemImage: "character.bubble",
+                systemImage: "translate",
                 accessibilityLabel: "Translate"
             ) { [weak self] in
                 self?.translateText()
