@@ -71,7 +71,7 @@ struct LibraryTableView: View {
         } rows: {
             ForEach(items, id: \.id) { item in
                 TableRow(item)
-                    .draggable(item.id.uuidString)
+                    .draggable(LibraryItemDragPayload(from: item))
             }
         }
         .tableStyle(.inset(alternatesRowBackgrounds: true))

@@ -301,7 +301,6 @@ struct AIChatView: View {
                 onPasteImage: { data in chatVM.addClipboardImage(data) },
                 contentHeight: $inputContentHeight,
                 slashItems: chatVM.chatSlashItems,
-                mentionItems: chatVM.chatMentionItems,
                 onActiveTokensChanged: { tokens in chatVM.activeTokens = tokens },
                 resetToken: chatVM.inputResetToken,
                 focusRef: inputFocusRef
@@ -375,7 +374,7 @@ struct AIChatView: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 18)
-                .stroke(Color.primary.opacity(0.10), lineWidth: 0.5)
+                .stroke(Color.primary.opacity(0.20), lineWidth: 1)
         )
         .padding(.horizontal, OakStyle.Spacing.sm)
         .padding(.vertical, OakStyle.Spacing.xs)

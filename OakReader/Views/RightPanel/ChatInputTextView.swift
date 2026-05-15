@@ -1,8 +1,9 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// A multi-line text input that sends on Enter and inserts a newline on Cmd+Enter.
 /// Reports its content height so the parent can size it to fit.
-/// Supports `/` slash commands and `@` context mentions via inline token chips.
+/// Supports `/` slash commands via inline token chips and drag-and-drop library references.
 struct ChatInputTextView: NSViewRepresentable {
     @Binding var text: String
     var placeholder: String = "Ask about this Document..."
@@ -12,8 +13,6 @@ struct ChatInputTextView: NSViewRepresentable {
 
     /// Items shown when the user types `/`.
     var slashItems: [ChatCompletionItem] = []
-    /// Items shown when the user types `@`.
-    var mentionItems: [ChatCompletionItem] = []
     /// Called whenever the set of active token chips changes.
     var onActiveTokensChanged: (([ChatCompletionItem]) -> Void)?
 
@@ -61,7 +60,6 @@ struct ChatInputTextView: NSViewRepresentable {
         textView.textContainer?.widthTracksTextView = true
 
         textView.slashItems = slashItems
-        textView.mentionItems = mentionItems
         textView.onTokensChanged = { tokens in
             context.coordinator.parent.onActiveTokensChanged?(tokens)
         }
@@ -104,7 +102,7 @@ struct ChatInputTextView: NSViewRepresentable {
             context.coordinator.isUpdating = false
         }
 
-        // Sync text from SwiftUI → NSTextView only when externally changed.
+        // Sync text from SwiftUI -> NSTextView only when externally changed.
         // Check plainText to avoid fighting with tokens while the user is composing.
         let currentPlain = textView.plainText()
         if currentPlain != text && !context.coordinator.isUpdating {
@@ -124,7 +122,6 @@ struct ChatInputTextView: NSViewRepresentable {
         textView.onSend = onSend
         textView.onPasteImage = onPasteImage
         textView.slashItems = slashItems
-        textView.mentionItems = mentionItems
         textView.onTokensChanged = { tokens in
             context.coordinator.parent.onActiveTokensChanged?(tokens)
         }
@@ -225,7 +222,6 @@ final class ChatNSTextView: NSTextView {
     // MARK: - Completion State
 
     var slashItems: [ChatCompletionItem] = []
-    var mentionItems: [ChatCompletionItem] = []
     var onTokensChanged: (([ChatCompletionItem]) -> Void)?
 
     private var completionPanel: ChatCompletionPanel?
@@ -238,6 +234,7 @@ final class ChatNSTextView: NSTextView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         insertionPointColor = .labelColor
+        registerForDraggedTypes([.libraryItemJSON, .string])
     }
 
     // MARK: - IME Composition
@@ -312,26 +309,19 @@ final class ChatNSTextView: NSTextView {
             return
         }
 
-        // Detect trigger characters — both "/" and "@" open a unified panel
+        // Detect "/" trigger for slash commands
         if let chars = event.characters, chars.count == 1,
            !event.modifierFlags.contains(.command) {
             let ch = chars.first!
-            let combinedItems = slashItems + mentionItems
             if ch == "/" {
                 // Only trigger at input start (no preceding text except whitespace/attachments)
                 let loc = selectedRange().location
                 if loc == 0 || isAtEffectiveStart(loc) {
-                    if !combinedItems.isEmpty && !hasSlashToken() {
+                    if !slashItems.isEmpty && !hasSlashToken() {
                         super.keyDown(with: event)
-                        showCompletionPanel(trigger: "/", items: combinedItems)
+                        showCompletionPanel(trigger: "/", items: slashItems)
                         return
                     }
-                }
-            } else if ch == "@" {
-                if !combinedItems.isEmpty {
-                    super.keyDown(with: event)
-                    showCompletionPanel(trigger: "@", items: combinedItems)
-                    return
                 }
             }
         }
@@ -373,6 +363,35 @@ final class ChatNSTextView: NSTextView {
         }
 
         super.paste(sender)
+    }
+
+    // MARK: - Drag and Drop (Library Items)
+
+    override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        let pb = sender.draggingPasteboard
+        if pb.availableType(from: [.libraryItemJSON]) != nil {
+            return .copy
+        }
+        return super.draggingEntered(sender)
+    }
+
+    override func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        let pb = sender.draggingPasteboard
+        if pb.availableType(from: [.libraryItemJSON]) != nil {
+            return .copy
+        }
+        return super.draggingUpdated(sender)
+    }
+
+    override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+        let pb = sender.draggingPasteboard
+        if let data = pb.data(forType: .libraryItemJSON),
+           let payload = try? JSONDecoder().decode(LibraryItemDragPayload.self, from: data) {
+            let completionItem = payload.toCompletionItem()
+            insertDroppedToken(completionItem)
+            return true
+        }
+        return super.performDragOperation(sender)
     }
 
     // MARK: - Completion Panel
@@ -439,7 +458,6 @@ final class ChatNSTextView: NSTextView {
         default:
             if let c = event.characters, !c.isEmpty {
                 if c == " " {
-                    // Allow spaces — library titles and notes are multi-word
                     super.keyDown(with: event)
                     updateCompletionFilter()
                     return true
@@ -476,6 +494,20 @@ final class ChatNSTextView: NSTextView {
         let curLoc = selectedRange().location
         let deleteRange = NSRange(location: startLoc, length: curLoc - startLoc)
 
+        insertTokenAttachment(item, replacingRange: deleteRange)
+    }
+
+    /// Insert a token from a drag-and-drop operation at the current insertion point.
+    private func insertDroppedToken(_ item: ChatCompletionItem) {
+        // Don't insert duplicate library references
+        if activeTokens().contains(where: { $0.id == item.id }) { return }
+
+        let curLoc = selectedRange().location
+        let insertRange = NSRange(location: curLoc, length: 0)
+        insertTokenAttachment(item, replacingRange: insertRange)
+    }
+
+    private func insertTokenAttachment(_ item: ChatCompletionItem, replacingRange range: NSRange) {
         // Need rich text temporarily to insert attachment
         let wasRichText = isRichText
         isRichText = true
@@ -492,8 +524,8 @@ final class ChatNSTextView: NSTextView {
         ]
         mutable.append(NSAttributedString(string: " ", attributes: spaceAttrs))
 
-        textStorage?.replaceCharacters(in: deleteRange, with: mutable)
-        setSelectedRange(NSRange(location: startLoc + mutable.length, length: 0))
+        textStorage?.replaceCharacters(in: range, with: mutable)
+        setSelectedRange(NSRange(location: range.location + mutable.length, length: 0))
 
         isRichText = wasRichText
 
@@ -580,4 +612,72 @@ final class ChatNSTextView: NSTextView {
         super.didChangeText()
         notifyTokensChanged()
     }
+}
+
+// MARK: - Drag Payload
+
+/// Lightweight Codable payload for dragging library items into the chat input.
+struct LibraryItemDragPayload: Codable, Transferable {
+    let storageKey: String
+    let title: String
+    let author: String
+    let citeKey: String?
+    let contentType: String
+    let pageCount: Int
+    let displayIcon: String
+
+    static var transferRepresentation: some TransferRepresentation {
+        CodableRepresentation(contentType: .libraryItemJSON)
+    }
+
+    init(from item: LibraryItem) {
+        self.storageKey = item.storageKey
+        self.title = item.title
+        self.author = item.author
+        self.citeKey = item.citeKey
+        self.contentType = item.contentType.rawValue
+        self.pageCount = item.pageCount
+        self.displayIcon = item.displayIcon
+    }
+
+    init(storageKey: String, title: String, author: String, citeKey: String?,
+         contentType: String, pageCount: Int, displayIcon: String) {
+        self.storageKey = storageKey
+        self.title = title
+        self.author = author
+        self.citeKey = citeKey
+        self.contentType = contentType
+        self.pageCount = pageCount
+        self.displayIcon = displayIcon
+    }
+
+    func toCompletionItem() -> ChatCompletionItem {
+        let label = citeKey ?? title
+        let desc = author.isEmpty ? title : "\(author) — \(title)"
+        return ChatCompletionItem(
+            id: "lib:\(storageKey)",
+            icon: displayIcon,
+            label: label,
+            description: desc,
+            kind: .libraryReference(ChatCompletionItem.LibraryRefPayload(
+                storageKey: storageKey,
+                title: title,
+                author: author,
+                citeKey: citeKey,
+                contentType: contentType,
+                pageCount: pageCount
+            )),
+            trigger: ""
+        )
+    }
+}
+
+// MARK: - Custom UTType for Library Items
+
+extension UTType {
+    static let libraryItemJSON = UTType(exportedAs: "com.oakreader.library-item")
+}
+
+extension NSPasteboard.PasteboardType {
+    static let libraryItemJSON = NSPasteboard.PasteboardType("com.oakreader.library-item")
 }
