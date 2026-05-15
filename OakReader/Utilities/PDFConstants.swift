@@ -161,7 +161,7 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
 
     var systemImage: String {
         switch self {
-        case .metadata: return "tablecells"
+        case .metadata: return "list.bullet.rectangle.portrait"
         case .aiChat: return "bubble.left.and.bubble.right"
         case .notes: return "note.text"
         case .translation: return "character.bubble"
@@ -248,6 +248,25 @@ enum AppExtension: String, CaseIterable, Identifiable {
     }
 }
 
+enum MetadataInspectorTab: String, CaseIterable, Identifiable {
+    case info
+    case reference
+
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .info: return "Info"
+        case .reference: return "Reference"
+        }
+    }
+    var systemImage: String {
+        switch self {
+        case .info: return "info.circle"
+        case .reference: return "text.book.closed"
+        }
+    }
+}
+
 enum LibraryDetailTab: String, CaseIterable, Identifiable {
     case chat
     case metadata
@@ -258,7 +277,7 @@ enum LibraryDetailTab: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .chat: return "bubble.left.and.text.bubble.right"
-        case .metadata: return "tablecells"
+        case .metadata: return "list.bullet.rectangle.portrait"
         case .notes: return "note.text"
         }
     }
