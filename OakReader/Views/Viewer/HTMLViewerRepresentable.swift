@@ -44,7 +44,7 @@ final class OakWebView: WKWebView {
 
 // MARK: - NSViewRepresentable
 
-/// NSViewRepresentable wrapper around WKWebView for rendering HTML snapshots.
+/// NSViewRepresentable wrapper around WKWebView for rendering HTML documents.
 struct HTMLViewerRepresentable: NSViewRepresentable {
     let viewModel: DocumentViewModel
 
@@ -152,8 +152,8 @@ struct HTMLViewerRepresentable: NSViewRepresentable {
         context.coordinator.setupScrollMonitor()
         context.coordinator.setupNotificationObservers()
 
-        // Load the HTML snapshot
-        if let snapshot = viewModel.webSnapshot {
+        // Load the HTML document
+        if let snapshot = viewModel.html {
             let storageDir = snapshot.htmlURL.deletingLastPathComponent()
             webView.loadFileURL(snapshot.htmlURL, allowingReadAccessTo: storageDir)
         }

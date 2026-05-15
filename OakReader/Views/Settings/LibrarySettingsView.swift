@@ -14,7 +14,7 @@ struct LibrarySettingsView: View {
         (SystemCollectionID.allItems, "All Items", "books.vertical"),
         (SystemCollectionID.recentlyRead, "Recently Read", "book"),
         (SystemCollectionID.pdfs, "PDFs", "doc.fill"),
-        (SystemCollectionID.webSnapshots, "Web", "globe"),
+        (SystemCollectionID.html, "Web", "globe"),
         (SystemCollectionID.videos, "Videos", "play.rectangle"),
     ]
 

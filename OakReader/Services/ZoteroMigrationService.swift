@@ -25,7 +25,7 @@ struct ZoteroMigrationProgress {
 struct ZoteroMigrationResult {
     var itemCount: Int = 0
     var pdfCount: Int = 0
-    var webSnapshotCount: Int = 0
+    var htmlCount: Int = 0
     var collectionCount: Int = 0
     var tagCount: Int = 0
     var noteCount: Int = 0
@@ -515,7 +515,7 @@ final class ZoteroMigrationService {
                             }
                         } else {
                             attPageCount = 1
-                            // Copy sibling files (images, CSS, JS) for web snapshots
+                            // Copy sibling files (images, CSS, JS) for HTML documents
                             copyDirectoryContents(
                                 from: srcURL.deletingLastPathComponent(),
                                 to: attDir,
@@ -573,14 +573,14 @@ final class ZoteroMigrationService {
                 Log.error(Log.zotero, "Failed to save citation for '\(title)': \(error)")
             }
 
-            // Enrich web snapshot metadata from HTML meta tags
+            // Enrich HTML document metadata from HTML meta tags
             if contentType == .html && fileCopied {
                 let destURL = CatalogDatabase.attachmentFileURL(
                     itemStorageKey: itemStorageKey,
                     attachmentStorageKey: attStorageKey,
                     fileName: attFileName
                 )
-                enrichWebSnapshotMetadata(htmlURL: destURL, itemId: docId.uuidString)
+                enrichHTMLMetadata(htmlURL: destURL, itemId: docId.uuidString)
             }
 
             itemMap[zItem.itemID] = docId.uuidString
@@ -589,7 +589,7 @@ final class ZoteroMigrationService {
             if fileCopied {
                 switch contentType {
                 case .pdf: result.pdfCount += 1
-                case .html: result.webSnapshotCount += 1
+                case .html: result.htmlCount += 1
                 default: break
                 }
             }
@@ -607,7 +607,7 @@ final class ZoteroMigrationService {
                     let coverData: Data?
                     switch capturedType {
                     case .html:
-                        coverData = await coverService.generateWebSnapshotCover(for: destURL)
+                        coverData = await coverService.generateHTMLCover(for: destURL)
                     default:
                         coverData = await coverService.generateCover(for: destURL)
                     }
@@ -748,7 +748,7 @@ final class ZoteroMigrationService {
         store.invalidate()
 
         Log.info(Log.zotero, "Migration complete: \(result.itemCount) items, \(result.pdfCount) PDFs, " +
-            "\(result.webSnapshotCount) web snapshots, \(result.collectionCount) collections, " +
+            "\(result.htmlCount) web pages, \(result.collectionCount) collections, " +
             "\(result.tagCount) tags, \(result.noteCount) notes, \(result.errors.count) errors")
         return result
     }
@@ -774,7 +774,7 @@ final class ZoteroMigrationService {
     }
 
     /// Copy all sibling files from a Zotero storage directory to the OakReader attachment directory.
-    /// This preserves relative links in web snapshots (images, CSS, JS referenced by the HTML).
+    /// This preserves relative links in HTML documents (images, CSS, JS referenced by the HTML).
     private func copyDirectoryContents(from sourceDir: URL, to destDir: URL, excluding fileName: String) {
         guard let contents = try? FileManager.default.contentsOfDirectory(
             at: sourceDir,
@@ -790,9 +790,9 @@ final class ZoteroMigrationService {
         }
     }
 
-    /// Supplement already-saved Zotero CSL data with HTML meta tags for web snapshots.
+    /// Supplement already-saved Zotero CSL data with HTML meta tags for HTML documents.
     /// Only fills in fields that are empty in the existing metadata.
-    private func enrichWebSnapshotMetadata(htmlURL: URL, itemId: String) {
+    private func enrichHTMLMetadata(htmlURL: URL, itemId: String) {
         guard let htmlString = try? String(contentsOf: htmlURL, encoding: .utf8) else { return }
 
         // Load existing metadata saved from Zotero fields
@@ -844,7 +844,7 @@ final class ZoteroMigrationService {
             do {
                 try referenceService.saveMetadata(csl, forItemId: itemId)
             } catch {
-                Log.error(Log.zotero, "Failed to enrich web snapshot metadata: \(error)")
+                Log.error(Log.zotero, "Failed to enrich HTML metadata: \(error)")
             }
         }
     }

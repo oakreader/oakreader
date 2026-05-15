@@ -235,7 +235,7 @@ struct LibraryTableToolbar: View {
                 let ext = url.pathExtension.lowercased()
                 let item: LibraryItem?
                 if ext == "html" || ext == "htm" {
-                    item = appState.importService.importWebSnapshot(from: url)
+                    item = appState.importService.importHTML(from: url)
                 } else if ext == "md" || ext == "markdown" {
                     item = appState.importService.importMarkdown(from: url)
                 } else {

@@ -1,11 +1,11 @@
 import Foundation
 
 extension ImportService {
-    // MARK: - Web Snapshot Import
+    // MARK: - HTML Import
 
-    /// Import an HTML web snapshot into managed storage.
+    /// Import an HTML document into managed storage.
     @discardableResult
-    func importWebSnapshot(
+    func importHTML(
         from sourceURL: URL,
         originalPageURL: URL? = nil,
         title: String? = nil,
@@ -38,7 +38,7 @@ extension ImportService {
 
             try FileManager.default.copyItem(at: sourceURL, to: destURL)
         } catch {
-            Log.error(Log.importer, "Failed to copy HTML snapshot: \(error)")
+            Log.error(Log.importer, "Failed to copy HTML document: \(error)")
             try? FileManager.default.removeItem(at: docDir)
             return nil
         }
@@ -102,7 +102,7 @@ extension ImportService {
         }
 
         // Auto-create reference metadata from HTML meta tags
-        createWebSnapshotMetadata(
+        createHTMLMetadata(
             htmlURL: destURL,
             itemId: docId.uuidString,
             resolvedTitle: resolvedTitle,
@@ -111,7 +111,7 @@ extension ImportService {
 
         // Generate cover thumbnail asynchronously
         Task {
-            if let coverData = await coverService.generateWebSnapshotCover(for: destURL) {
+            if let coverData = await coverService.generateHTMLCover(for: destURL) {
                 await MainActor.run {
                     store.updateCover(item, imageData: coverData)
                 }
@@ -134,9 +134,9 @@ extension ImportService {
         return item
     }
 
-    // MARK: - Web Snapshot Metadata Extraction
+    // MARK: - HTML Metadata Extraction
 
-    private func createWebSnapshotMetadata(
+    private func createHTMLMetadata(
         htmlURL: URL,
         itemId: String,
         resolvedTitle: String,
@@ -211,7 +211,7 @@ extension ImportService {
         do {
             try referenceService.saveMetadata(csl, forItemId: itemId)
         } catch {
-            Log.error(Log.importer, "Failed to save web snapshot reference metadata: \(error)")
+            Log.error(Log.importer, "Failed to save HTML reference metadata: \(error)")
         }
     }
 

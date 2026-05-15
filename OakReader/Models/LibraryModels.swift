@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Attachment
 
-/// A file attached to a library item (PDF, web snapshot, or embed).
+/// A file attached to a library item (PDF, HTML, or embed).
 struct Attachment: Identifiable, Hashable {
     let id: UUID
     let storageKey: String

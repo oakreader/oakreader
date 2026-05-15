@@ -7,7 +7,7 @@ import OakAgent
 @Observable
 class DocumentViewModel {
     weak var document: OakReaderDocument?
-    var webSnapshot: WebSnapshotDocument?
+    var html: HTMLDocument?
     var mediaDocument: MediaDocument?
     var markdownDocument: MarkdownDocument?
     /// Observable markdown content for reactive outline updates.
@@ -149,7 +149,7 @@ class DocumentViewModel {
     var hasDocument: Bool {
         switch contentType {
         case .pdf: return pdfDocument != nil
-        case .html: return webSnapshot != nil
+        case .html: return html != nil
         case .video: return mediaDocument != nil
         case .markdown: return markdownDocument != nil
         case .audio: return false
@@ -165,7 +165,7 @@ class DocumentViewModel {
         case .pdf:
             return document?.fileURL?.lastPathComponent ?? "Untitled"
         case .html:
-            return webSnapshot?.htmlURL.deletingPathExtension().lastPathComponent ?? "Untitled"
+            return html?.htmlURL.deletingPathExtension().lastPathComponent ?? "Untitled"
         case .video:
             return mediaDocument?.metadata.title ?? "Untitled"
         case .markdown:
@@ -198,8 +198,8 @@ class DocumentViewModel {
         state.sidebarMode = prefs.sidebarMode
     }
 
-    init(webSnapshot: WebSnapshotDocument) {
-        self.webSnapshot = webSnapshot
+    init(html: HTMLDocument) {
+        self.html = html
         self.contentType = .html
         self.state = DocumentState()
 

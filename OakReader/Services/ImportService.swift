@@ -3,7 +3,7 @@ import PDFKit
 import AppKit
 import CommonCrypto
 
-/// Handles PDF and web snapshot import: copy to managed storage, extract metadata, generate cover, insert into DB.
+/// Handles PDF and HTML import: copy to managed storage, extract metadata, generate cover, insert into DB.
 final class ImportService {
     let store: LibraryStore
     let coverService: LibraryCoverService

@@ -91,13 +91,13 @@ Architectural decisions made during OakReader development, extracted from 52 Cla
 ## Multi-Document-Type Architecture
 
 ### ADR-014: TabContent Enum for Multi-Document-Type Support
-- **Context**: Supporting both PDF and web snapshot documents in the tab system.
-- **Decision**: Replace `let document: OakReaderDocument` with a `TabContent` enum (`case pdf(OakReaderDocument)`, `case webSnapshot(WebSnapshotDocument)`) in `DocumentTab`.
+- **Context**: Supporting both PDF and HTML documents in the tab system.
+- **Decision**: Replace `let document: OakReaderDocument` with a `TabContent` enum (`case pdf(OakReaderDocument)`, `case html(HTMLDocument)`) in `DocumentTab`.
 - **Rationale**: Type-safe dispatching for viewer routing, file operations, and AI context extraction. Allows `ContentView` to use a simple `switch` to render the appropriate viewer.
 
 ### ADR-015: Unified "embed" Document Type for Live Content
 - **Context**: Separate `youtubeVideo` and `podcast` document types were overly specific. Podcast code was unused.
-- **Decision**: Replace both with a single `embed` type. Remove all podcast code. Chrome extension emits `type: "embed"` for YouTube pages. X.com/Twitter stays as `webSnapshot` (static content).
+- **Decision**: Replace both with a single `embed` type. Remove all podcast code. Chrome extension emits `type: "embed"` for YouTube pages. X.com/Twitter stays as `html` (static content).
 - **Alternatives Considered**: Keeping separate types (rejected — podcast support was premature/unused), treating embeds as snapshots with whitelisted domains (rejected — mixes offline/online semantics)
 - **Rationale**: Embeds are fundamentally different from snapshots: snapshots promise offline, self-contained content; embeds are live wrappers requiring internet. `embed` is generic and can accommodate future embed types.
 

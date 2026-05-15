@@ -18,8 +18,8 @@ actor LibraryCoverService {
         }
     }
 
-    /// Generate a cover thumbnail from a web snapshot HTML file using an offscreen WKWebView.
-    func generateWebSnapshotCover(for htmlURL: URL) async -> Data? {
+    /// Generate a cover thumbnail from an HTML document using an offscreen WKWebView.
+    func generateHTMLCover(for htmlURL: URL) async -> Data? {
         return await withCheckedContinuation { continuation in
             DispatchQueue.main.async {
                 let config = WKWebViewConfiguration()
@@ -29,7 +29,7 @@ actor LibraryCoverService {
                     snapshotConfig.rect = NSRect(x: 0, y: 0, width: 1024, height: 768)
                     webView.takeSnapshot(with: snapshotConfig) { image, error in
                         guard let image else {
-                            Log.error(Log.cover, "Web snapshot cover failed: \(error?.localizedDescription ?? "unknown")")
+                            Log.error(Log.cover, "HTML cover failed: \(error?.localizedDescription ?? "unknown")")
                             continuation.resume(returning: nil)
                             return
                         }

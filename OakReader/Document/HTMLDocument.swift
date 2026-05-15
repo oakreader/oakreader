@@ -1,8 +1,8 @@
 import Foundation
 
-/// Lightweight data holder for web snapshot HTML files.
-/// Not an NSDocument — snapshots are read-only, no autosave needed.
-final class WebSnapshotDocument {
+/// Lightweight data holder for HTML document files.
+/// Not an NSDocument — HTML documents are read-only, no autosave needed.
+final class HTMLDocument {
     let htmlURL: URL
     let sourceURL: URL?
 
