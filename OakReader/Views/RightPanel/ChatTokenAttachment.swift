@@ -22,7 +22,7 @@ final class ChatTokenAttachment: NSTextAttachment {
 private final class ChatTokenCell: NSTextAttachmentCell {
 
     private let item: ChatCompletionItem
-    private static let font = NSFont.systemFont(ofSize: 16, weight: .medium)
+    private static let font = NSFont.systemFont(ofSize: 16, weight: .regular)
     private static let iconSize: CGFloat = 18
     private static let hPad: CGFloat = 6
     private static let iconTextGap: CGFloat = 3
@@ -55,9 +55,20 @@ private final class ChatTokenCell: NSTextAttachmentCell {
     // MARK: - Drawing
 
     override func draw(withFrame cellFrame: NSRect, in controlView: NSView?) {
-        let accentColor = NSColor.controlAccentColor
+        let rawAccent = NSColor.controlAccentColor
+        let softAccent = rawAccent
+            .blended(withFraction: 0.25, of: .secondaryLabelColor) ?? rawAccent
 
-        // Icon
+        // Background fill + border
+        let bgRect = cellFrame.insetBy(dx: 0.5, dy: 0.5)
+        let path = NSBezierPath(roundedRect: bgRect, xRadius: Self.cornerRadius, yRadius: Self.cornerRadius)
+        softAccent.withAlphaComponent(0.08).setFill()
+        path.fill()
+        softAccent.withAlphaComponent(0.35).setStroke()
+        path.lineWidth = 1
+        path.stroke()
+
+        // Icon — tint to match label color
         let iconY = cellFrame.minY + (cellFrame.height - Self.iconSize) / 2
         let iconRect = NSRect(
             x: cellFrame.minX + Self.hPad,
@@ -68,16 +79,22 @@ private final class ChatTokenCell: NSTextAttachmentCell {
         let iconName = item.icon.hasSuffix(".fill") ? item.icon : "\(item.icon).fill"
         let resolvedName = NSImage(systemSymbolName: iconName, accessibilityDescription: nil) != nil ? iconName : item.icon
         if let image = NSImage(systemSymbolName: resolvedName, accessibilityDescription: item.label) {
-            let config = NSImage.SymbolConfiguration(pointSize: Self.iconSize, weight: .medium)
+            let config = NSImage.SymbolConfiguration(pointSize: Self.iconSize, weight: .regular)
             let configured = image.withSymbolConfiguration(config) ?? image
-            configured.draw(in: iconRect, from: .zero, operation: .sourceOver, fraction: 0.8)
+            let tinted = NSImage(size: iconRect.size, flipped: false) { drawRect in
+                configured.draw(in: drawRect, from: .zero, operation: .sourceOver, fraction: 1.0)
+                softAccent.set()
+                drawRect.fill(using: .sourceAtop)
+                return true
+            }
+            tinted.draw(in: iconRect)
         }
 
         // Label text
         let textX = iconRect.maxX + Self.iconTextGap
         let attrs: [NSAttributedString.Key: Any] = [
             .font: Self.font,
-            .foregroundColor: accentColor
+            .foregroundColor: softAccent
         ]
         let textSize = (item.label as NSString).size(withAttributes: attrs)
         let textY = cellFrame.minY + (cellFrame.height - textSize.height) / 2

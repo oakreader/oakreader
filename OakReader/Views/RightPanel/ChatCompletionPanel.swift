@@ -69,7 +69,7 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
         isOpaque = false
         backgroundColor = .clear
         level = .floating
-        hasShadow = true
+        hasShadow = false
         collectionBehavior = [.transient, .ignoresCycle]
 
         stackView.orientation = .vertical
@@ -310,8 +310,8 @@ private final class ChatCompletionRowView: NSView {
         icon.translatesAutoresizingMaskIntoConstraints = false
 
         let label = NSTextField(labelWithString: item.displayLabel)
-        label.font = .systemFont(ofSize: 13, weight: .semibold)
-        label.textColor = .labelColor
+        label.font = .systemFont(ofSize: 13, weight: .regular)
+        label.textColor = item.completionTint
         label.lineBreakMode = .byTruncatingTail
         label.translatesAutoresizingMaskIntoConstraints = false
         label.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
@@ -433,7 +433,8 @@ private extension ChatCompletionItem {
     var completionTint: NSColor {
         switch kind {
         case .installedSkill:
-            return .controlAccentColor
+            return NSColor.controlAccentColor
+                .blended(withFraction: 0.25, of: .secondaryLabelColor) ?? .controlAccentColor
         case .libraryReference:
             return .systemOrange
         case .noteReference:
