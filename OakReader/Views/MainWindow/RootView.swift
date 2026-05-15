@@ -30,12 +30,6 @@ struct RootView: View {
                         .allowsHitTesting(tab.id == appState.activeTabID)
                 }
 
-                // Workspace tabs — same Chrome-style pattern
-                ForEach(appState.workspaceTabs) { tab in
-                    WorkspaceRootView(viewModel: tab.viewModel, appState: appState)
-                        .opacity(tab.id == appState.activeTabID ? 1 : 0)
-                        .allowsHitTesting(tab.id == appState.activeTabID)
-                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

@@ -310,13 +310,6 @@
 		F1E2D3C4B5A6F7E8D9C0B1A7 /* SyncScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F7 /* SyncScheduler.swift */; };
 		F1E2D3C4B5A6F7E8D9C0B1A8 /* XBookmarksSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F8 /* XBookmarksSettingsView.swift */; };
 		F1E2D3C4B5A6F7E8D9C0B1A9 /* GitHubStarsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F9 /* GitHubStarsSettingsView.swift */; };
-		2DCF56A5DD5D7247AA845435 /* WorkspaceRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C513686655AF0E0CB0B2537 /* WorkspaceRootView.swift */; };
-		E9293F58C0577CC0ED0838BD /* WorkspaceSideNavView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C97C0B518442BD9A978CEA3 /* WorkspaceSideNavView.swift */; };
-		562A7522F5BC671657D5E632 /* WorkspaceSourcesPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B4E3D65F256266F15909B60 /* WorkspaceSourcesPanel.swift */; };
-		435232345FB22C000D9E5D6C /* WorkspaceStudioPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA89CCE5F624B3E7572B0156 /* WorkspaceStudioPanel.swift */; };
-		4D72FE87786730D16D1067DE /* WorkspaceTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4688C89B089113CBA90676A /* WorkspaceTab.swift */; };
-		DB37775E4A72332DBA38FF82 /* WorkspaceTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 360C179C8684A493F21CD5C8 /* WorkspaceTabView.swift */; };
-		A30FF74F2A34CE4F6F4C38BD /* WorkspaceViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13A74DA5685B234D04FBC5CC /* WorkspaceViewModel.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -623,13 +616,6 @@
 		A1B2C3D4E5F6A7B8C9D0E1F7 /* SyncScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncScheduler.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6A7B8C9D0E1F8 /* XBookmarksSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XBookmarksSettingsView.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6A7B8C9D0E1F9 /* GitHubStarsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubStarsSettingsView.swift; sourceTree = "<group>"; };
-		1C513686655AF0E0CB0B2537 /* WorkspaceRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceRootView.swift; sourceTree = "<group>"; };
-		1C97C0B518442BD9A978CEA3 /* WorkspaceSideNavView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceSideNavView.swift; sourceTree = "<group>"; };
-		0B4E3D65F256266F15909B60 /* WorkspaceSourcesPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceSourcesPanel.swift; sourceTree = "<group>"; };
-		AA89CCE5F624B3E7572B0156 /* WorkspaceStudioPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStudioPanel.swift; sourceTree = "<group>"; };
-		C4688C89B089113CBA90676A /* WorkspaceTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceTab.swift; sourceTree = "<group>"; };
-		360C179C8684A493F21CD5C8 /* WorkspaceTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceTabView.swift; sourceTree = "<group>"; };
-		13A74DA5685B234D04FBC5CC /* WorkspaceViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceViewModel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -750,7 +736,6 @@
 			children = (
 				59FB3A6F3A3AEC3676C0F0F6 /* DocumentTabView.swift */,
 				3EDAE070FD925FD55D45822B /* TabBarView.swift */,
-				360C179C8684A493F21CD5C8 /* WorkspaceTabView.swift */,
 			);
 			path = TabBar;
 			sourceTree = "<group>";
@@ -797,7 +782,6 @@
 				3BDAAF0C2708FE39C145A2CD /* TabBar */,
 				0F0E857C79D6C846BBFC6963 /* Viewer */,
 				40F35883F95E930F2AC4719F /* Watermark */,
-				1150C1B7220DBBB7F1BD6939 /* Workspace */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -976,7 +960,6 @@
 				3232D6BA9590F8C571CF9937 /* TranslationLanguage.swift */,
 				45878CC78A8E01ED0197FA6A /* VoiceSpeakerModels.swift */,
 				9B817EB306EBAFA044303568 /* WatermarkConfig.swift */,
-				C4688C89B089113CBA90676A /* WorkspaceTab.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -1174,7 +1157,6 @@
 				9AD6637B27FCDCEE2807929C /* ViewerViewModel.swift */,
 				7DA5745F0584DA9C6E3AD3BA /* VoiceViewModel.swift */,
 				2D1CCFEA748A76C70A2E4601 /* WatermarkViewModel.swift */,
-				13A74DA5685B234D04FBC5CC /* WorkspaceViewModel.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -1255,17 +1237,6 @@
 				4AF8923119F1FEC58431E571 /* ProgressOverlay.swift */,
 			);
 			path = Shared;
-			sourceTree = "<group>";
-		};
-		1150C1B7220DBBB7F1BD6939 /* Workspace */ = {
-			isa = PBXGroup;
-			children = (
-				1C513686655AF0E0CB0B2537 /* WorkspaceRootView.swift */,
-				1C97C0B518442BD9A978CEA3 /* WorkspaceSideNavView.swift */,
-				0B4E3D65F256266F15909B60 /* WorkspaceSourcesPanel.swift */,
-				AA89CCE5F624B3E7572B0156 /* WorkspaceStudioPanel.swift */,
-			);
-			path = Workspace;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -1713,13 +1684,6 @@
 				6A9B45CB67160400C30F813B /* WebSnapshotDocument.swift in Sources */,
 				B7331903124CC13A52A4FCEE /* WebSnapshotOverlayView.swift in Sources */,
 				F5D77E842407DAEF697F4E0F /* WebViewCoordinator.swift in Sources */,
-				2DCF56A5DD5D7247AA845435 /* WorkspaceRootView.swift in Sources */,
-				E9293F58C0577CC0ED0838BD /* WorkspaceSideNavView.swift in Sources */,
-				562A7522F5BC671657D5E632 /* WorkspaceSourcesPanel.swift in Sources */,
-				435232345FB22C000D9E5D6C /* WorkspaceStudioPanel.swift in Sources */,
-				4D72FE87786730D16D1067DE /* WorkspaceTab.swift in Sources */,
-				DB37775E4A72332DBA38FF82 /* WorkspaceTabView.swift in Sources */,
-				A30FF74F2A34CE4F6F4C38BD /* WorkspaceViewModel.swift in Sources */,
 				F1E2D3C4B5A6F7E8D9C0B1A3 /* XBookmarksAPIClient.swift in Sources */,
 				F1E2D3C4B5A6F7E8D9C0B1A8 /* XBookmarksSettingsView.swift in Sources */,
 				0633FC713F0937758EBE1E0C /* YouTubeSettingsView.swift in Sources */,

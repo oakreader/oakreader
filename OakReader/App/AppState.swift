@@ -82,7 +82,6 @@ final class AppState {
 
 
     var openTabs: [DocumentTab] = []
-    var workspaceTabs: [WorkspaceTab] = []
     var activeTabID: UUID?
     var window: NSWindow?
     var selectedLibraryItemIDs: Set<UUID> = []
@@ -92,12 +91,18 @@ final class AppState {
     var isLibrarySidebarVisible: Bool = true
     var libraryDetailTab: LibraryDetailTab? = .metadata
 
-    var activeWorkspaceTab: WorkspaceTab? {
-        guard let id = activeTabID else { return nil }
-        return workspaceTabs.first { $0.id == id }
+    // MARK: - Library Chat
+
+    private var _libraryChatVM: ChatViewModel?
+    var libraryChatVM: ChatViewModel {
+        if let vm = _libraryChatVM { return vm }
+        let vm = ChatViewModel()
+        vm.appState = self
+        vm.itemId = "library"
+        vm.sessionService = ConversationService(database: libraryStore.database)
+        _libraryChatVM = vm
+        return vm
     }
-
-
 
     private var autosaveTimer: Timer?
 
@@ -492,13 +497,6 @@ final class AppState {
     }
 
     func closeTab(_ tabID: UUID) {
-        // Try workspace tabs first
-        if let wsIndex = workspaceTabs.firstIndex(where: { $0.id == tabID }) {
-            closeWorkspaceTab(tabID)
-            _ = wsIndex // suppress unused warning
-            return
-        }
-
         guard let index = openTabs.firstIndex(where: { $0.id == tabID }) else { return }
         let tab = openTabs[index]
 
@@ -542,9 +540,7 @@ final class AppState {
     }
 
     func switchToTab(_ tabID: UUID) {
-        let found = openTabs.contains(where: { $0.id == tabID })
-            || workspaceTabs.contains(where: { $0.id == tabID })
-        guard found else { return }
+        guard openTabs.contains(where: { $0.id == tabID }) else { return }
         activeTabID = tabID
         updateWindowTitle()
     }
@@ -570,48 +566,9 @@ final class AppState {
         switchToTab(allIDs[prevIndex])
     }
 
-    /// All tab IDs in display order: document tabs then workspace tabs.
+    /// All tab IDs in display order.
     private var combinedTabIDs: [UUID] {
-        openTabs.map(\.id) + workspaceTabs.map(\.id)
-    }
-
-    // MARK: - Workspace Tab Operations
-
-    func openWorkspace(for collection: PDFCollection) {
-        // Dedup: switch to existing workspace for this collection
-        if let existing = workspaceTabs.first(where: { $0.collectionId == collection.id }) {
-            activeTabID = existing.id
-            updateWindowTitle()
-            return
-        }
-
-        let vm = WorkspaceViewModel(collectionId: collection.id)
-        vm.appState = self
-        vm.resolveSourceItems()
-
-        let tab = WorkspaceTab(
-            collectionId: collection.id,
-            title: collection.name,
-            viewModel: vm
-        )
-        workspaceTabs.append(tab)
-        activeTabID = tab.id
-        updateWindowTitle()
-    }
-
-    func closeWorkspaceTab(_ tabID: UUID) {
-        guard let index = workspaceTabs.firstIndex(where: { $0.id == tabID }) else { return }
-        workspaceTabs.remove(at: index)
-
-        if activeTabID == tabID {
-            let allTabs = combinedTabIDs
-            if allTabs.isEmpty {
-                activeTabID = nil
-            } else {
-                activeTabID = allTabs.first
-            }
-        }
-        updateWindowTitle()
+        openTabs.map(\.id)
     }
 
     // MARK: - Window

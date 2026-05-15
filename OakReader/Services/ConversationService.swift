@@ -30,13 +30,6 @@ struct ConversationService {
         }
     }
 
-    /// Fetch workspace conversations for a collection, ordered by updated_at descending.
-    /// Workspace sessions use the convention `itemId = "workspace:{collectionId}"`.
-    func fetchWorkspaceSessions(forCollectionId collectionId: UUID) throws -> [ConversationMeta] {
-        let itemId = "workspace:\(collectionId.uuidString)"
-        return try fetchSessions(forItemId: itemId)
-    }
-
     // MARK: - Create
 
     @discardableResult
