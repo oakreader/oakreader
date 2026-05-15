@@ -293,56 +293,80 @@ struct PDFContextProvider {
             }
         }
 
-        // Citation link format — document-type-aware, unified under oak://cite/
+        // Citation link instructions — MUST use oak://cite/{citeKey} for all refs
         if let doc = context.document, let ck = doc.citeKey {
+            let eck = xmlEscape(ck)
+
+            // Core rule (imperative, prominent)
+            parts.append("""
+                IMPORTANT — Citation links: Every reference to document content \
+                MUST be a clickable markdown link using the oak://cite/ scheme. \
+                Never write bare page numbers like "page 5" or "p. 5" — always \
+                wrap them in [link text](oak://cite/...). This applies to the \
+                current document AND any cross-document references.
+                """)
+
+            // Format + example per document type
             switch doc.contentType {
             case .pdf:
                 parts.append("""
-                    When citing content, use clickable citation links with the \
-                    oak://cite/ scheme. For this PDF, use: \
-                    [\(xmlEscape(doc.title)), p. N](oak://cite/\(xmlEscape(ck))?page=N) \
-                    where N is the 1-based page number. You can narrow to specific \
-                    text: [\(xmlEscape(doc.title)), p. N](oak://cite/\(xmlEscape(ck))?page=N&text=phrase). \
-                    Only cite pages you have actually read or found via search tools.
+                    This PDF's cite-key is "\(eck)". Citation format:
+                    [p. N](oak://cite/\(eck)?page=N)
+                    [p. N](oak://cite/\(eck)?page=N&text=phrase)
+
+                    Example — notice every page mention is a link:
+                    \"The transformer replaces recurrence with self-attention \
+                    ([p. 2](oak://cite/\(eck)?page=2)). The scaled dot-product \
+                    formula is defined on [p. 3](oak://cite/\(eck)?page=3), and \
+                    multi-head attention extends it on [p. 4](oak://cite/\(eck)?page=4).\"
                     """)
             case .html, .markdown:
                 parts.append("""
-                    When citing content, use clickable citation links with the \
-                    oak://cite/ scheme. For this document, cite by heading: \
-                    [\(xmlEscape(doc.title)), § Heading](oak://cite/\(xmlEscape(ck))?heading=HeadingText). \
-                    For inline references, cite by text: \
-                    [\(xmlEscape(doc.title)), "quoted"](oak://cite/\(xmlEscape(ck))?text=quoted+text). \
+                    This document's cite-key is "\(eck)". Citation format:
+                    [§ Heading](oak://cite/\(eck)?heading=HeadingText)
+                    ["quoted phrase"](oak://cite/\(eck)?text=quoted+text)
+
+                    Example:
+                    \"The API supports batch processing \
+                    ([§ Batch Endpoints](oak://cite/\(eck)?heading=Batch%20Endpoints)), \
+                    which the docs call 'fire-and-forget' \
+                    (["fire-and-forget"](oak://cite/\(eck)?text=fire-and-forget)).\"
+
                     Do not use page numbers — this document has no pages.
                     """)
             case .video, .audio:
                 parts.append("""
-                    When citing content, use clickable citation links with the \
-                    oak://cite/ scheme. For this media, cite by timestamp: \
-                    [\(xmlEscape(doc.title)), MM:SS](oak://cite/\(xmlEscape(ck))?time=SECONDS) \
-                    where SECONDS is the total seconds (e.g., 3:42 → time=222). \
+                    This media's cite-key is "\(eck)". Citation format:
+                    [MM:SS](oak://cite/\(eck)?time=SECONDS)
+
+                    Example:
+                    \"Gradient descent is introduced at \
+                    [12:30](oak://cite/\(eck)?time=750) and backpropagation \
+                    follows at [15:45](oak://cite/\(eck)?time=945).\"
+
                     Do not use page numbers — this is media content.
                     """)
             }
-        } else if let doc = context.document {
-            // No citeKey available — fallback without cite links
+
+            // Cross-document references
+            parts.append("""
+                For cross-document references (from search_semantic, \
+                search_library, or <referenced-documents> in the user message), \
+                use the target document's cite-key:
+                [citeKey, p. N](oak://cite/targetCiteKey?page=N)
+                For <doc> elements, use the `link` attribute as the base URL and \
+                append the appropriate anchor (?page=, ?heading=, ?text=, ?time=) \
+                based on the doc's `format` attribute.
+                For <note> elements, read them with the read tool using the \
+                provided path.
+                Only cite content you have actually read or found via tools.
+                """)
+        } else if context.document != nil {
             parts.append("""
                 This document has no citation key. You may reference content \
                 descriptively but cannot create clickable citation links.
                 """)
         }
-
-        // Cross-document citation instructions (always apply when referenced docs exist)
-        parts.append("""
-            When the user's message contains a <referenced-documents> block, \
-            use the `link` attribute from each <doc> element as the base URL. \
-            Choose the right anchor based on the doc's `format` attribute: \
-            for format="pdf" append ?page=N; \
-            for format="html" or "markdown" append ?heading=Text or ?text=Text; \
-            for format="video" or "audio" append ?time=SECONDS. \
-            For referenced <note> elements, read them with the read tool using \
-            the provided path. Only cite content you have actually read or found \
-            via search tools.
-            """)
 
         // Skill prompt (after context so the skill can reference it)
         if let skill {
