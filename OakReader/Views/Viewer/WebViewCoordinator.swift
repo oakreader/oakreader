@@ -1,7 +1,7 @@
 import Foundation
 import WebKit
 
-/// WKNavigationDelegate + WKScriptMessageHandler for the web snapshot viewer.
+/// WKNavigationDelegate + WKScriptMessageHandler for the HTML document viewer.
 /// Blocks external navigation, handles text selection events from injected JS,
 /// and shows a popup panel for selected text.
 final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {

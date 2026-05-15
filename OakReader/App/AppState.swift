@@ -7,7 +7,7 @@ import OakVoice
 
 enum TabContent {
     case pdf(OakReaderDocument)
-    case webSnapshot(WebSnapshotDocument)
+    case html(HTMLDocument)
     case media(MediaDocument)
     case markdown(MarkdownDocument)
 }
@@ -42,11 +42,11 @@ final class DocumentTab: Identifiable {
         self.storageKey = storageKey
     }
 
-    init(webSnapshot: WebSnapshotDocument, storageKey: String? = nil) {
+    init(html: HTMLDocument, storageKey: String? = nil) {
         self.id = UUID()
-        self.content = .webSnapshot(webSnapshot)
-        self.viewModel = DocumentViewModel(webSnapshot: webSnapshot)
-        self.title = webSnapshot.htmlURL.deletingPathExtension().lastPathComponent
+        self.content = .html(html)
+        self.viewModel = DocumentViewModel(html: html)
+        self.title = html.htmlURL.deletingPathExtension().lastPathComponent
         self.storageKey = storageKey
     }
 
@@ -90,6 +90,7 @@ final class AppState {
     var zoteroImportDataDir: URL?
     var isLibrarySidebarVisible: Bool = true
     var libraryDetailTab: LibraryDetailTab? = nil
+    var importNotification: String?
 
     // MARK: - Library Chat
 
@@ -191,7 +192,7 @@ final class AppState {
 
     // MARK: - Tab Operations
 
-    /// Open a document from a URL. Dispatches to PDF, web snapshot, or markdown based on file extension.
+    /// Open a document from a URL. Dispatches to PDF, HTML, or markdown based on file extension.
     func openDocument(url: URL) {
         let ext = url.pathExtension.lowercased()
         if ext == "html" || ext == "htm" {
@@ -279,15 +280,15 @@ final class AppState {
         }
     }
 
-    /// Open an HTML file as a web snapshot.
+    /// Open an HTML document.
     private func openHTMLDocument(url: URL) {
-        let item = importService.importWebSnapshot(from: url)
+        let item = importService.importHTML(from: url)
         let htmlURL = item?.fileURL ?? url
         let storageKey = item?.storageKey
 
         do {
-            let snapshot = try WebSnapshotDocument(htmlURL: htmlURL, sourceURL: item?.sourceURL)
-            let tab = DocumentTab(webSnapshot: snapshot, storageKey: storageKey)
+            let snapshot = try HTMLDocument(htmlURL: htmlURL, sourceURL: item?.sourceURL)
+            let tab = DocumentTab(html: snapshot, storageKey: storageKey)
             tab.viewModel.database = libraryStore.database
             tab.viewModel.referenceService = referenceService
             tab.viewModel.libraryStore = libraryStore
@@ -313,7 +314,7 @@ final class AppState {
     func openLibraryItem(_ item: LibraryItem) {
         switch item.contentType {
         case .html:
-            openWebSnapshotItem(item)
+            openHTMLItem(item)
         case .pdf:
             openPDFItem(item)
         case .video:
@@ -373,7 +374,7 @@ final class AppState {
         updateWindowTitle()
     }
 
-    private func openWebSnapshotItem(_ item: LibraryItem) {
+    private func openHTMLItem(_ item: LibraryItem) {
         let htmlURL = item.fileURL
         // Check if already open by storage key
         if let existing = openTabs.first(where: { $0.storageKey == item.storageKey }) {
@@ -383,7 +384,7 @@ final class AppState {
 
         guard FileManager.default.fileExists(atPath: htmlURL.path) else {
             let alert = NSAlert()
-            alert.messageText = "Cannot Open Web Snapshot"
+            alert.messageText = "Cannot Open Web Page"
             alert.informativeText = "The file \"\(item.title)\" could not be found in managed storage."
             alert.alertStyle = .warning
             alert.addButton(withTitle: "OK")
@@ -392,10 +393,10 @@ final class AppState {
         }
 
         do {
-            let snapshot = try WebSnapshotDocument(htmlURL: htmlURL, sourceURL: item.sourceURL)
+            let snapshot = try HTMLDocument(htmlURL: htmlURL, sourceURL: item.sourceURL)
             libraryStore.markOpened(item)
 
-            let tab = DocumentTab(webSnapshot: snapshot, storageKey: item.storageKey)
+            let tab = DocumentTab(html: snapshot, storageKey: item.storageKey)
             tab.viewModel.database = libraryStore.database
             tab.viewModel.referenceService = referenceService
             tab.viewModel.libraryStore = libraryStore
@@ -408,7 +409,7 @@ final class AppState {
             activeTabID = tab.id
             updateWindowTitle()
         } catch {
-            Log.error(Log.open, "Failed to open web snapshot: \(item.title) — \(error)")
+            Log.error(Log.open, "Failed to open HTML document: \(item.title) — \(error)")
             NSAlert(error: error).runModal()
         }
     }

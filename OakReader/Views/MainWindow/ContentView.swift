@@ -196,7 +196,7 @@ struct ContentView: View {
             ZStack {
                 HTMLViewerRepresentable(viewModel: viewModel)
                 if viewModel.state.editorMode == .snapshot {
-                    WebSnapshotOverlayView(viewModel: viewModel)
+                    HTMLOverlayView(viewModel: viewModel)
                 }
             }
         case .video:

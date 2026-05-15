@@ -328,7 +328,7 @@ final class SnapshotServer {
 
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            let item = self.importService.importWebSnapshot(
+            let item = self.importService.importHTML(
                 from: tempURL,
                 originalPageURL: originalURL,
                 title: payload.title,

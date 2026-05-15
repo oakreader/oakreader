@@ -4,7 +4,7 @@ import Foundation
 /// Aligned with Zotero's `attachmentContentType` (MIME-based), simplified to an enum.
 enum ContentType: String, Codable {
     case pdf        // application/pdf
-    case html       // text/html (web snapshots, web embeds)
+    case html       // text/html (HTML documents, web embeds)
     case markdown   // text/markdown
     case audio      // audio/*
     case video      // video/* (YouTube, etc.)

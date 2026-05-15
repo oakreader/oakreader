@@ -1,7 +1,7 @@
 import SwiftUI
 import WebKit
 
-struct WebSnapshotOverlayView: View {
+struct HTMLOverlayView: View {
     let viewModel: DocumentViewModel
 
     @State private var isDragging = false
@@ -12,7 +12,7 @@ struct WebSnapshotOverlayView: View {
     var body: some View {
         ZStack {
             // Transparent hit-test area that only captures drags, passes scroll events through
-            WebSnapshotHitTestView(
+            HTMLHitTestView(
                 isActive: viewModel.state.editorMode == .snapshot,
                 onDragChanged: { start, current in
                     if !isDragging {
@@ -63,7 +63,7 @@ struct WebSnapshotOverlayView: View {
 
         guard let window = NSApp.keyWindow,
               let webView = findWebView(in: window.contentView),
-              let hitTestView = findWebSnapshotHitTestView(in: window.contentView) else {
+              let hitTestView = findHTMLHitTestView(in: window.contentView) else {
             showSelection = false
             return
         }
@@ -145,11 +145,11 @@ struct WebSnapshotOverlayView: View {
         return nil
     }
 
-    private func findWebSnapshotHitTestView(in view: NSView?) -> WebSnapshotHitTestNSView? {
+    private func findHTMLHitTestView(in view: NSView?) -> HTMLHitTestNSView? {
         guard let view else { return nil }
-        if let hitView = view as? WebSnapshotHitTestNSView { return hitView }
+        if let hitView = view as? HTMLHitTestNSView { return hitView }
         for subview in view.subviews {
-            if let found = findWebSnapshotHitTestView(in: subview) { return found }
+            if let found = findHTMLHitTestView(in: subview) { return found }
         }
         return nil
     }
@@ -157,20 +157,20 @@ struct WebSnapshotOverlayView: View {
 
 // MARK: - SwiftUI wrapper
 
-private struct WebSnapshotHitTestView: NSViewRepresentable {
+private struct HTMLHitTestView: NSViewRepresentable {
     let isActive: Bool
     let onDragChanged: (_ start: CGPoint, _ current: CGPoint) -> Void
     let onDragEnded: (_ start: CGPoint, _ end: CGPoint) -> Void
 
-    func makeNSView(context: Context) -> WebSnapshotHitTestNSView {
-        let view = WebSnapshotHitTestNSView()
+    func makeNSView(context: Context) -> HTMLHitTestNSView {
+        let view = HTMLHitTestNSView()
         view.onDragChanged = onDragChanged
         view.onDragEnded = onDragEnded
         view.isActive = isActive
         return view
     }
 
-    func updateNSView(_ nsView: WebSnapshotHitTestNSView, context: Context) {
+    func updateNSView(_ nsView: HTMLHitTestNSView, context: Context) {
         nsView.onDragChanged = onDragChanged
         nsView.onDragEnded = onDragEnded
         nsView.updateActive(isActive)
@@ -182,7 +182,7 @@ private struct WebSnapshotHitTestView: NSViewRepresentable {
 /// Transparent overlay that uses an NSEvent monitor to capture mouse drags
 /// for area selection, while letting ALL other events (scroll, etc.) pass through
 /// to the WKWebView naturally.
-class WebSnapshotHitTestNSView: NSView {
+class HTMLHitTestNSView: NSView {
     var isActive = false
     var onDragChanged: ((_ start: CGPoint, _ current: CGPoint) -> Void)?
     var onDragEnded: ((_ start: CGPoint, _ end: CGPoint) -> Void)?

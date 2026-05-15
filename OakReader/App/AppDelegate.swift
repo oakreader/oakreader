@@ -22,6 +22,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.servicesProvider = self
+
         // Prewarm the emoji font so WebKit doesn't stall on first emoji render
         _ = CTFontCreateWithName("Apple Color Emoji" as CFString, 12, nil)
 
@@ -68,8 +70,78 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
-        guard urls.contains(where: { $0.scheme?.lowercased() == "oakreader" }) else { return }
-        showMainWindow()
+        for url in urls {
+            guard url.scheme?.lowercased() == "oakreader" else { continue }
+            handleOakReaderURL(url)
+        }
+    }
+
+    private func handleOakReaderURL(_ url: URL) {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            showMainWindow()
+            return
+        }
+
+        let queryItems = components.queryItems ?? []
+
+        switch components.host {
+        case "add":
+            guard let urlString = queryItems.first(where: { $0.name == "url" })?.value,
+                  let sourceURL = URL(string: urlString) else {
+                showMainWindow()
+                return
+            }
+            showMainWindow()
+            let collectionId = queryItems.first(where: { $0.name == "collection" })?.value
+                .flatMap { UUID(uuidString: $0) }
+            Task {
+                do {
+                    if sourceURL.isFileURL, sourceURL.hasDirectoryPath {
+                        let count = await appState.libraryStore.importFolder(
+                            sourceURL,
+                            importService: appState.importService
+                        )
+                        await MainActor.run {
+                            withAnimation {
+                                appState.importNotification = "Imported \(count) item\(count == 1 ? "" : "s") from \"\(sourceURL.lastPathComponent)\""
+                            }
+                            appState.switchToLibrary()
+                        }
+                    } else {
+                        let item: LibraryItem?
+                        if sourceURL.isFileURL {
+                            item = await appState.importService.importFileAsync(from: sourceURL)
+                        } else {
+                            item = try await appState.importService.importURL(sourceURL)
+                        }
+                        if let item {
+                            await MainActor.run {
+                                if let collectionId,
+                                   let collection = appState.libraryStore.collections.first(where: { $0.id == collectionId }) {
+                                    appState.libraryStore.addItem(item, to: collection)
+                                }
+                                withAnimation {
+                                    appState.importNotification = "Added \"\(item.title)\""
+                                }
+                            }
+                        }
+                    }
+                } catch {
+                    Log.error(Log.importer, "URL scheme import failed: \(error)")
+                }
+            }
+
+        case "library":
+            showMainWindow()
+            if let collectionId = queryItems.first(where: { $0.name == "collection" })?.value
+                .flatMap({ UUID(uuidString: $0) }) {
+                appState.libraryStore.selectedCollectionId = collectionId
+            }
+            appState.switchToLibrary()
+
+        default:
+            showMainWindow()
+        }
     }
 
     private func showMainWindow() {
@@ -252,6 +324,30 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             guard response == .OK else { return }
             for url in panel.urls {
                 self?.appState.openDocument(url: url)
+            }
+        }
+    }
+
+    @objc func importFolder(_ sender: Any?) {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.message = "Select a folder to import as a collection"
+        panel.prompt = "Import"
+        panel.begin { [weak self] response in
+            guard response == .OK, let folderURL = panel.url, let self else { return }
+            Task {
+                let count = await self.appState.libraryStore.importFolder(
+                    folderURL,
+                    importService: self.appState.importService
+                )
+                await MainActor.run {
+                    withAnimation {
+                        self.appState.importNotification = "Imported \(count) item\(count == 1 ? "" : "s") from \"\(folderURL.lastPathComponent)\""
+                    }
+                    self.appState.switchToLibrary()
+                }
             }
         }
     }
@@ -465,6 +561,88 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         alert.alertStyle = style
         alert.addButton(withTitle: "OK")
         alert.runModal()
+    }
+
+    // MARK: - Services Menu
+
+    @objc func addToOakReader(_ pboard: NSPasteboard, userData: String, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
+        // Try file paths first, then URL objects, then plain strings
+        var sourceURL: URL?
+        if let filenames = pboard.propertyList(forType: .init("NSFilenamesPboardType")) as? [String],
+           let first = filenames.first {
+            sourceURL = URL(fileURLWithPath: first)
+        } else if let urls = pboard.readObjects(forClasses: [NSURL.self]) as? [URL], let first = urls.first {
+            sourceURL = first
+        } else if let string = pboard.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines) {
+            sourceURL = URL(string: string)
+        }
+
+        guard let sourceURL else {
+            error.pointee = "No valid URL found in the selection." as NSString
+            return
+        }
+
+        showMainWindow()
+        Task {
+            if sourceURL.isFileURL, sourceURL.hasDirectoryPath {
+                let count = await appState.libraryStore.importFolder(
+                    sourceURL,
+                    importService: appState.importService
+                )
+                await MainActor.run {
+                    withAnimation {
+                        appState.importNotification = "Imported \(count) item\(count == 1 ? "" : "s") from \"\(sourceURL.lastPathComponent)\""
+                    }
+                    appState.switchToLibrary()
+                }
+            } else {
+                let item: LibraryItem?
+                if sourceURL.isFileURL {
+                    item = await appState.importService.importFileAsync(from: sourceURL)
+                } else {
+                    item = try? await appState.importService.importURL(sourceURL)
+                }
+                if let item {
+                    await MainActor.run {
+                        withAnimation {
+                            appState.importNotification = "Added \"\(item.title)\""
+                        }
+                    }
+                } else {
+                    Log.error(Log.importer, "Services import failed for \(sourceURL)")
+                }
+            }
+        }
+    }
+
+    // MARK: - Share
+
+    @objc func shareCurrentItem(_ sender: Any?) {
+        var shareItems: [Any] = []
+        if let tab = appState.activeTab {
+            switch tab.content {
+            case .pdf(let doc):
+                if let fileURL = doc.fileURL { shareItems.append(fileURL) }
+            case .html(let doc):
+                if let sourceURL = doc.sourceURL {
+                    shareItems.append(sourceURL)
+                } else {
+                    shareItems.append(doc.htmlURL)
+                }
+            case .media(let doc):
+                shareItems.append(doc.sourceURL)
+            case .markdown(let doc):
+                shareItems.append(doc.fileURL)
+            }
+        } else if let item = appState.selectedLibraryItem {
+            if let sourceURL = item.sourceURL {
+                shareItems.append(sourceURL)
+            } else {
+                shareItems.append(item.fileURL)
+            }
+        }
+        guard !shareItems.isEmpty else { return }
+        SharingService.share(items: shareItems)
     }
 
     // MARK: - Menu Action Dispatch

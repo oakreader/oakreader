@@ -24,7 +24,7 @@ enum URLImportError: LocalizedError {
         case .archiverUnavailable:
             return "monolith is not installed. Install it with `brew install monolith`."
         case .archiverFailed(let message):
-            return "Web snapshot failed: \(message)"
+            return "Web page failed: \(message)"
         case .importFailed:
             return "Import failed"
         }
@@ -38,7 +38,7 @@ extension ImportService {
     func importFile(from sourceURL: URL) -> LibraryItem? {
         let ext = sourceURL.pathExtension.lowercased()
         if ext == "html" || ext == "htm" {
-            return importWebSnapshot(from: sourceURL)
+            return importHTML(from: sourceURL)
         } else if ext == "md" || ext == "markdown" {
             return importMarkdown(from: sourceURL)
         } else if ext == "pdf" {
@@ -47,11 +47,21 @@ extension ImportService {
         return nil
     }
 
+    /// Import a local file, including audio. Returns the item asynchronously for types that need it.
+    @discardableResult
+    func importFileAsync(from sourceURL: URL) async -> LibraryItem? {
+        let ext = sourceURL.pathExtension.lowercased()
+        if Self.audioExtensions.contains(ext) {
+            return await importAudioFile(from: sourceURL)
+        }
+        return await MainActor.run { importFile(from: sourceURL) }
+    }
+
     // MARK: - URL Imports
 
     /// Import a remote URL into the library.
     /// - PDF URLs are downloaded and imported as PDFs.
-    /// - HTML pages are archived with monolith, converted to `content.md`, and imported as web snapshots.
+    /// - HTML pages are archived with monolith, converted to `content.md`, and imported as HTML documents.
     /// - YouTube/X links use the existing embed importer when possible.
     @discardableResult
     func importURL(_ sourceURL: URL, options: URLImportOptions = URLImportOptions()) async throws -> LibraryItem? {
@@ -140,7 +150,7 @@ extension ImportService {
         let markdown = await markdownFromHTML(htmlURL: htmlURL)
 
         let item = await MainActor.run {
-            importWebSnapshot(
+            importHTML(
                 from: htmlURL,
                 originalPageURL: sourceURL,
                 title: title,

@@ -72,7 +72,7 @@ struct PDFContextProvider {
                 currentPageText = ""
             }
         case .html:
-            if let snapshot = vm.webSnapshot {
+            if let snapshot = vm.html {
                 // Prefer markdown saved by browser extension alongside the HTML
                 let mdURL = snapshot.htmlURL.deletingLastPathComponent()
                     .appendingPathComponent("content.md")

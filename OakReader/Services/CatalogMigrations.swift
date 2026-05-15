@@ -90,7 +90,7 @@ extension CatalogDatabase {
                  #"{"match":"all","conditions":[{"field":"last_opened_at","op":"within_days","value":"14"}]}"#),
                 (SystemCollectionID.pdfs.uuidString, "PDFs", "doc.fill", 2,
                  #"{"match":"all","conditions":[{"field":"content_type","op":"eq","value":"pdf"}]}"#),
-                (SystemCollectionID.webSnapshots.uuidString, "Web", "globe", 3,
+                (SystemCollectionID.html.uuidString, "Web", "globe", 3,
                  #"{"match":"all","conditions":[{"field":"content_type","op":"eq","value":"html"}]}"#),
                 (SystemCollectionID.videos.uuidString, "Videos", "play.rectangle", 4,
                  #"{"match":"all","conditions":[{"field":"content_type","op":"eq","value":"video"}]}"#),

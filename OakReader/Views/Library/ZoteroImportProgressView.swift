@@ -95,7 +95,7 @@ struct ZoteroImportProgressView: View {
             VStack(spacing: 6) {
                 statRow("Items", count: result.itemCount)
                 statRow("PDFs copied", count: result.pdfCount)
-                statRow("Web snapshots", count: result.webSnapshotCount)
+                statRow("Web pages", count: result.htmlCount)
                 statRow("Collections", count: result.collectionCount)
                 statRow("Tags", count: result.tagCount)
                 statRow("Notes", count: result.noteCount)

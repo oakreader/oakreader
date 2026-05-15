@@ -71,7 +71,7 @@ final class SemanticIndexService: @unchecked Sendable {
         case "pdf":
             chunks += extractPDFChunks(pdfURL: fileURL)
         case "html":
-            chunks += extractWebSnapshotChunks(attachmentDir: attDir, htmlURL: fileURL)
+            chunks += extractHTMLChunks(attachmentDir: attDir, htmlURL: fileURL)
         case "markdown":
             chunks += extractMarkdownChunks(fileURL: fileURL)
         case "video":
@@ -113,8 +113,8 @@ final class SemanticIndexService: @unchecked Sendable {
         return chunks
     }
 
-    /// Extract chunks from a web snapshot: prefer content.md (heading-aware), fall back to HTML.
-    private func extractWebSnapshotChunks(attachmentDir: URL, htmlURL: URL) -> [ContentChunker.Chunk] {
+    /// Extract chunks from an HTML document: prefer content.md (heading-aware), fall back to HTML.
+    private func extractHTMLChunks(attachmentDir: URL, htmlURL: URL) -> [ContentChunker.Chunk] {
         let mdURL = attachmentDir.appendingPathComponent("content.md")
 
         if let md = try? String(contentsOf: mdURL, encoding: .utf8), !md.isEmpty {
@@ -445,7 +445,7 @@ final class SemanticIndexService: @unchecked Sendable {
             case "pdf":
                 chunks += extractPDFChunks(pdfURL: fileURL)
             case "html":
-                chunks += extractWebSnapshotChunks(attachmentDir: attDir, htmlURL: fileURL)
+                chunks += extractHTMLChunks(attachmentDir: attDir, htmlURL: fileURL)
             case "markdown":
                 chunks += extractMarkdownChunks(fileURL: fileURL)
             case "video":

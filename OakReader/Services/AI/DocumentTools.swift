@@ -131,7 +131,7 @@ struct ReadDocumentTool: AgentTool, Sendable {
         case .markdown, .video:
             return readTextFile(url: url)
         case .html:
-            return readWebSnapshot(url: url)
+            return readHTML(url: url)
         case .audio:
             return .error("Audio documents do not support text reading.")
         }
@@ -176,7 +176,7 @@ struct ReadDocumentTool: AgentTool, Sendable {
         return .success(String(content.prefix(50_000)))
     }
 
-    private func readWebSnapshot(url: URL) -> ToolOutput {
+    private func readHTML(url: URL) -> ToolOutput {
         // Prefer the markdown version saved by the browser extension (content.md alongside HTML)
         let mdURL = url.deletingLastPathComponent().appendingPathComponent("content.md")
         if let markdown = try? String(contentsOf: mdURL, encoding: .utf8), !markdown.isEmpty {
@@ -185,11 +185,11 @@ struct ReadDocumentTool: AgentTool, Sendable {
 
         // Fall back to proper HTML parsing via XMLDocument
         guard let data = try? Data(contentsOf: url) else {
-            return .error("Failed to read web snapshot at \(filePath)")
+            return .error("Failed to read web page at \(filePath)")
         }
         let text = HTMLTextExtractor.extractText(from: data)
         if text.isEmpty {
-            return .error("Failed to extract text from web snapshot")
+            return .error("Failed to extract text from web page")
         }
         return .success(String(text.prefix(50_000)))
     }
@@ -240,7 +240,7 @@ struct SearchDocumentTool: AgentTool, Sendable {
         case .markdown, .video:
             return searchTextFile(url: url, query: query, maxResults: maxResults)
         case .html:
-            return searchWebSnapshot(url: url, query: query, maxResults: maxResults)
+            return searchHTML(url: url, query: query, maxResults: maxResults)
         case .audio:
             return .error("Audio documents do not support text search.")
         }
@@ -283,7 +283,7 @@ struct SearchDocumentTool: AgentTool, Sendable {
         return searchPlainText(content, query: query, maxResults: maxResults)
     }
 
-    private func searchWebSnapshot(url: URL, query: String, maxResults: Int) -> ToolOutput {
+    private func searchHTML(url: URL, query: String, maxResults: Int) -> ToolOutput {
         // Prefer markdown version if available
         let mdURL = url.deletingLastPathComponent().appendingPathComponent("content.md")
         if let markdown = try? String(contentsOf: mdURL, encoding: .utf8), !markdown.isEmpty {
@@ -291,7 +291,7 @@ struct SearchDocumentTool: AgentTool, Sendable {
         }
 
         guard let data = try? Data(contentsOf: url) else {
-            return .error("Failed to read web snapshot at \(filePath)")
+            return .error("Failed to read web page at \(filePath)")
         }
         let text = HTMLTextExtractor.extractText(from: data)
         return searchPlainText(text, query: query, maxResults: maxResults)

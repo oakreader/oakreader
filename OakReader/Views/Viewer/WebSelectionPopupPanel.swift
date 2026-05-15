@@ -3,7 +3,7 @@ import WebKit
 
 // MARK: - Web Text Selection Popup Panel
 
-/// Horizontal toolbar popup for text selected in web snapshot viewers.
+/// Horizontal toolbar popup for text selected in HTML document viewers.
 /// Matches the PDF text selection popup style with highlight, chat, note, translate, copy.
 class WebSelectionPopupPanel: NSPanel, AppResignDismissable {
     private(set) static var current: WebSelectionPopupPanel?
@@ -337,7 +337,7 @@ class WebSelectionPopupPanel: NSPanel, AppResignDismissable {
     }
 
     private func addToNote() {
-        viewModel.notes.addTextToNote(selectedText, pageIndex: nil, source: "Web Snapshot")
+        viewModel.notes.addTextToNote(selectedText, pageIndex: nil, source: "Web Page")
         viewModel.state.rightPanelMode = .notes
         dismiss()
     }
@@ -376,7 +376,7 @@ class WebSelectionPopupPanel: NSPanel, AppResignDismissable {
 
 // MARK: - Web Area Selection Popup Panel
 
-/// Popup for area captures in the web snapshot viewer.
+/// Popup for area captures in the HTML document viewer.
 /// Offers "Add to Chat" and "Copy Image".
 class WebAreaPopupPanel: NSPanel, AppResignDismissable {
     private static var current: WebAreaPopupPanel?
@@ -516,7 +516,7 @@ class WebAreaPopupPanel: NSPanel, AppResignDismissable {
     }
 
     private func addToNote() {
-        viewModel.notes.addImageToNote(imageData, pageIndex: nil, source: "Web Snapshot")
+        viewModel.notes.addImageToNote(imageData, pageIndex: nil, source: "Web Page")
         viewModel.state.rightPanelMode = .notes
         dismiss()
     }
