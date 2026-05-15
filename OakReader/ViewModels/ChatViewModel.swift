@@ -32,6 +32,9 @@ class ChatViewModel {
     var errorMessage: String?
     var pendingToolConfirmation: PendingConfirmation?
 
+    /// Scoped sources from workspace — auto-injected into every message.
+    var scopedSources: [ChatCompletionItem.LibraryRefPayload] = []
+
     // Session
     var sessionId: UUID = UUID()
     var sessions: [ConversationMeta] = []
@@ -178,10 +181,15 @@ class ChatViewModel {
         let sendText = text.isEmpty ? (effectiveSkill?.name ?? "Go") : text
         var userContent = effectiveSkill.map { Self.contentWithSkillTag(skillId: $0.id, text: text) } ?? sendText
 
-        // Extract library/note reference tokens and append XML block
-        let libraryRefs = tokens.compactMap { token -> ChatCompletionItem.LibraryRefPayload? in
+        // Extract library/note reference tokens and merge with scoped sources
+        var libraryRefs = tokens.compactMap { token -> ChatCompletionItem.LibraryRefPayload? in
             if case .libraryReference(let p) = token.kind { return p }
             return nil
+        }
+        // Merge workspace scoped sources (dedup by storageKey)
+        let existingKeys = Set(libraryRefs.map(\.storageKey))
+        for ref in scopedSources where !existingKeys.contains(ref.storageKey) {
+            libraryRefs.append(ref)
         }
         let noteRefs = tokens.compactMap { token -> ChatCompletionItem.NoteRefPayload? in
             if case .noteReference(let p) = token.kind { return p }

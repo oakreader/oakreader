@@ -1,26 +1,26 @@
 import SwiftUI
 
-struct LibrarySideNavView: View {
-    @Binding var tab: LibraryDetailTab?
+struct WorkspaceSideNavView: View {
+    @Binding var studioTab: WorkspaceStudioTab?
 
     var body: some View {
         VStack(spacing: 2) {
-            ForEach(LibraryDetailTab.allCases) { mode in
+            ForEach(WorkspaceStudioTab.allCases) { tab in
                 Button {
-                    if tab == mode {
-                        tab = nil
+                    if studioTab == tab {
+                        studioTab = nil
                     } else {
-                        tab = mode
+                        studioTab = tab
                     }
                 } label: {
-                    Image(systemName: mode.systemImage)
+                    Image(systemName: tab.systemImage)
                         .font(.system(size: OakStyle.Font.icon))
                         .frame(width: OakStyle.Size.buttonStandard, height: OakStyle.Size.buttonStandard)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(tab == mode ? Color.accentColor : Color(nsColor: .labelColor))
-                .help(mode.label)
+                .foregroundStyle(studioTab == tab ? Color.accentColor : Color(nsColor: .labelColor))
+                .help(tab.label)
             }
 
             Spacer()
