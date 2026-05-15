@@ -58,7 +58,7 @@ struct ChatCompletionItem: Identifiable, Equatable {
     // MARK: - Factory - Library Reference (for drag-and-drop)
 
     static func libraryReference(from item: LibraryItem) -> ChatCompletionItem {
-        let label = item.citeKey ?? item.title
+        let label = item.title
         let desc = item.author.isEmpty ? item.title : "\(item.author) — \(item.title)"
         return ChatCompletionItem(
             id: "lib:\(item.storageKey)",

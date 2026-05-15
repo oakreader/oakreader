@@ -393,12 +393,12 @@ class ChatViewModel {
     }
 
     /// Build a tool confirmation callback based on the permission level.
-    /// - `auto`: returns nil (no confirmation needed)
+    /// - `full`: returns nil (no confirmation needed — full permission)
     /// - `smart`: auto-approves `.readOnly`, asks for `.write`/`.dangerous`
-    /// - `full`: asks for everything
+    /// - `restricted`: asks for everything
     private func makeToolConfirmation(level: AgentPermissionLevel) -> (@Sendable (ToolCall, ToolCategory) async -> Bool)? {
         switch level {
-        case .auto:
+        case .full:
             return nil
         case .smart:
             return { [weak self] call, category in
@@ -411,7 +411,7 @@ class ChatViewModel {
                     }
                 }
             }
-        case .full:
+        case .restricted:
             return { [weak self] call, category in
                 await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
                     let pending = PendingConfirmation(toolCall: call, category: category, continuation: continuation)
