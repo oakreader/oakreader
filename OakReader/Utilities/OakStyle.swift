@@ -177,6 +177,39 @@ enum OakStyle {
         }
     }
 
+    // MARK: - Chat Typography
+    //
+    // Inspired by Bridge.app's type scale: precise weight ladder and
+    // size contrast to create clear visual hierarchy in chat UI.
+
+    enum ChatFont {
+        /// Chat message body — respects user's font family.
+        /// Weight .regular (400) for comfortable reading.
+        static var messageBody: SwiftUI.Font {
+            Font.styled(size: max(Font.body, 14), weight: .regular)
+        }
+        /// Chat header title — weight .semibold (600) for clear hierarchy.
+        static var headerTitle: SwiftUI.Font {
+            .system(size: 16, weight: .semibold)
+        }
+        /// Chat model switcher label — weight .medium (500) for interactive elements.
+        static var modelLabel: SwiftUI.Font {
+            Font.styled(size: 13, weight: .medium)
+        }
+        /// Badge / chip label (skill, reference) — medium weight, smaller size.
+        static var badge: SwiftUI.Font {
+            Font.styled(size: 12, weight: .medium)
+        }
+        /// Small metadata / caption in chat — light weight for de-emphasis.
+        static var meta: SwiftUI.Font {
+            Font.styled(size: 11, weight: .light)
+        }
+        /// Action button icon size.
+        static let actionIconSize: CGFloat = 12
+        /// Streaming indicator bar height.
+        static let streamingBarHeight: CGFloat = 16
+    }
+
     // MARK: - Spacing
 
     enum Spacing {

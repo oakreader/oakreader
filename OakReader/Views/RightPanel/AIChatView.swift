@@ -57,10 +57,10 @@ struct AIChatView: View {
         HStack(spacing: 8) {
             if chatVM.showHistory {
                 Text("History")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(OakStyle.ChatFont.headerTitle)
             } else {
                 Text("AI Chat")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(OakStyle.ChatFont.headerTitle)
             }
 
             Spacer()
@@ -88,22 +88,30 @@ struct AIChatView: View {
 
     // MARK: - Empty State
 
+    @State private var emptyStateAppeared = false
+
     private var emptyState: some View {
         VStack(spacing: 12) {
             Spacer()
             Image(systemName: "bubble.left.and.text.bubble.right")
                 .font(.system(size: 40))
                 .foregroundStyle(.tertiary)
+                .scaleEffect(emptyStateAppeared ? 1.0 : 0.8)
+                .opacity(emptyStateAppeared ? 1.0 : 0)
             Text(chatVM.parent != nil ? "Ask about this Document" : "Ask anything")
-                .font(.system(size: 16, weight: .semibold))
+                .font(OakStyle.ChatFont.headerTitle)
                 .foregroundStyle(.secondary)
+                .offset(y: emptyStateAppeared ? 0 : 6)
+                .opacity(emptyStateAppeared ? 1.0 : 0)
             Text(chatVM.parent != nil
                  ? "Ask questions, get summaries, or find information in your document."
                  : "Ask questions or chat with AI — no document needed.")
-                .font(.system(size: 14))
+                .font(OakStyle.Font.styled(size: 14))
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, OakStyle.Spacing.lg)
+                .offset(y: emptyStateAppeared ? 0 : 6)
+                .opacity(emptyStateAppeared ? 1.0 : 0)
 
             if chatVM.selectedSkill != nil {
                 Text("Skill: \(chatVM.selectedSkill!.name)")
@@ -115,6 +123,14 @@ struct AIChatView: View {
             }
 
             Spacer()
+        }
+        .onAppear {
+            withAnimation(.spring(duration: 0.5, bounce: 0.2).delay(0.1)) {
+                emptyStateAppeared = true
+            }
+        }
+        .onDisappear {
+            emptyStateAppeared = false
         }
     }
 
@@ -144,12 +160,21 @@ struct AIChatView: View {
                             }
                         )
                             .id(turn.id)
+                            .transition(
+                                .asymmetric(
+                                    insertion: .move(edge: .bottom)
+                                        .combined(with: .opacity)
+                                        .combined(with: .scale(scale: 0.98, anchor: turn.role == .user ? .trailing : .leading)),
+                                    removal: .opacity
+                                )
+                            )
                     }
                     // Invisible anchor at the very bottom — more reliable
                     // than scrolling to the last turn whose height is still growing.
                     Color.clear.frame(height: 1).id("bottom")
                 }
                 .padding(OakStyle.Spacing.sm)
+                .animation(.spring(duration: 0.35, bounce: 0.15), value: chatVM.turns.count)
                 .background(
                     GeometryReader { inner in
                         Color.clear
@@ -371,7 +396,7 @@ struct AIChatView: View {
         } label: {
             HStack(spacing: 3) {
                 Text(currentModelName)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(OakStyle.ChatFont.modelLabel)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                 Image(systemName: "chevron.up.chevron.down")
