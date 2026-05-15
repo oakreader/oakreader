@@ -277,9 +277,9 @@ struct LibrarySidebarPanel: View {
         } label: {
             HStack(spacing: OakStyle.Spacing.xxs) {
                 if let opt = selectedOption {
-                    Image(systemName: "circle.fill")
-                        .font(.system(size: 8))
-                        .foregroundStyle(Color(hex: opt.colorHex))
+                    Circle()
+                        .fill(Color(hex: opt.colorHex))
+                        .frame(width: 8, height: 8)
                     Text(opt.name)
                         .font(.system(size: 13))
                 } else {

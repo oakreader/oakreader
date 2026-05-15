@@ -78,7 +78,7 @@ struct AIChatView: View {
 
             Spacer()
 
-            OakToolButton(systemImage: "plus.bubble", tooltip: "New Chat") {
+            OakToolButton(systemImage: "bubble.left", tooltip: "New Chat") {
                 chatVM.newSession()
             }
 
