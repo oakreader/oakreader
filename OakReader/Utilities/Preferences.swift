@@ -90,6 +90,7 @@ final class Preferences {
         static let agentPermissionLevel = "agentPermissionLevel"
         // Thinking budget
         static let thinkingBudget = "thinkingBudget"
+        static let thinkingEffort = "thinkingEffort"
         // Global font
         static let globalFontFamily = "globalFontFamily"
         static let globalFontSize = "globalFontSize"
@@ -567,6 +568,12 @@ final class Preferences {
             return value > 0 ? value : 10000
         }
         set { defaults.set(newValue, forKey: Keys.thinkingBudget) }
+    }
+
+    /// Thinking effort level for adaptive-thinking models ("low", "medium", "high").
+    var thinkingEffort: String {
+        get { defaults.string(forKey: Keys.thinkingEffort) ?? "high" }
+        set { defaults.set(newValue, forKey: Keys.thinkingEffort) }
     }
 
     /// Migrate old binary `agentRequireConfirmation` → 3-level permission.

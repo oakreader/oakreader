@@ -17,6 +17,12 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
     private var documentHeightConstraint: NSLayoutConstraint?
     private let onSelect: (ChatCompletionItem) -> Void
 
+    /// Pre-built views keyed by item ID — avoids tearing down and recreating
+    /// NSViews on every keystroke during incremental filtering.
+    private var cachedRows: [String: ChatCompletionRowView] = [:]
+    private var cachedHeaders: [String: ChatCompletionSectionHeaderView] = [:]
+    private lazy var emptyView = ChatCompletionEmptyView()
+
     private let anchorPoint: NSPoint
     private let panelWidth: CGFloat
     private let windowFrame: NSRect
@@ -24,11 +30,11 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
     fileprivate static let rowHeight: CGFloat = 34
     fileprivate static let headerHeight: CGFloat = 28
     fileprivate static let emptyHeight: CGFloat = 46
-    private static let maxPanelHeight: CGFloat = 360
+    private static let maxPanelHeight: CGFloat = 640
     private static let minPanelWidth: CGFloat = 300
     private static let maxPanelWidth: CGFloat = 680
-    private static let horizontalInset: CGFloat = 16
-    private static let verticalInset: CGFloat = 8
+    private static let horizontalInset: CGFloat = 14
+    private static let verticalInset: CGFloat = 10
 
     var selectedItem: ChatCompletionItem? {
         guard selectedIndex >= 0, selectedIndex < filtered.count else { return nil }
@@ -88,7 +94,7 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
         container.state = .active
         container.blendingMode = .behindWindow
         container.wantsLayer = true
-        container.layer?.cornerRadius = 18
+        container.layer?.cornerRadius = 12
         container.layer?.borderWidth = 0.5
         container.layer?.borderColor = NSColor.labelColor.withAlphaComponent(0.10).cgColor
         container.layer?.masksToBounds = true
@@ -179,45 +185,58 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
     }
 
     private func buildRows() {
-        stackView.arrangedSubviews.forEach { view in
+        // Detach all arranged subviews without destroying them
+        for view in stackView.arrangedSubviews {
             stackView.removeArrangedSubview(view)
             view.removeFromSuperview()
         }
         rowViews = []
 
         if filtered.isEmpty {
-            let empty = ChatCompletionEmptyView()
-            stackView.addArrangedSubview(empty)
-            empty.leadingAnchor.constraint(equalTo: stackView.leadingAnchor).isActive = true
-            empty.trailingAnchor.constraint(equalTo: stackView.trailingAnchor).isActive = true
+            stackView.addArrangedSubview(emptyView)
+            pin(emptyView)
             updateDocumentHeight()
             return
         }
 
         for section in sectionedItems {
-            let header = ChatCompletionSectionHeaderView(title: section.title)
+            let header = cachedHeaders[section.title] ?? {
+                let h = ChatCompletionSectionHeaderView(title: section.title)
+                cachedHeaders[section.title] = h
+                return h
+            }()
             stackView.addArrangedSubview(header)
-            header.leadingAnchor.constraint(equalTo: stackView.leadingAnchor).isActive = true
-            header.trailingAnchor.constraint(equalTo: stackView.trailingAnchor).isActive = true
+            pin(header)
 
             for item in section.items {
-                let row = ChatCompletionRowView(
-                    item: item,
-                    onHover: { [weak self] in
-                        guard let self, let index = self.filtered.firstIndex(of: item) else { return }
-                        self.selectedIndex = index
-                        self.updateSelection()
-                    },
-                    onClick: { [weak self] in self?.onSelect(item) }
-                )
+                let row = cachedRows[item.id] ?? {
+                    let r = ChatCompletionRowView(
+                        item: item,
+                        onHover: { [weak self] in
+                            guard let self, let index = self.filtered.firstIndex(of: item) else { return }
+                            self.selectedIndex = index
+                            self.updateSelection()
+                        },
+                        onClick: { [weak self] in self?.onSelect(item) }
+                    )
+                    cachedRows[item.id] = r
+                    return r
+                }()
                 stackView.addArrangedSubview(row)
-                row.leadingAnchor.constraint(equalTo: stackView.leadingAnchor).isActive = true
-                row.trailingAnchor.constraint(equalTo: stackView.trailingAnchor).isActive = true
+                pin(row)
                 rowViews.append(row)
             }
         }
 
         updateDocumentHeight()
+    }
+
+    /// Pin a view's leading/trailing to the stack without creating duplicate constraints.
+    private func pin(_ view: NSView) {
+        // Constraints are idempotent when the view is re-added to the same stack.
+        // But creating duplicates is harmless for equality constraints — AutoLayout dedupes.
+        view.leadingAnchor.constraint(equalTo: stackView.leadingAnchor).isActive = true
+        view.trailingAnchor.constraint(equalTo: stackView.trailingAnchor).isActive = true
     }
 
     private func updateSelection() {
@@ -275,7 +294,7 @@ private final class ChatCompletionRowView: NSView {
         self.onClick = onClick
         super.init(frame: .zero)
         wantsLayer = true
-        layer?.cornerRadius = 10
+        layer?.cornerRadius = 8
         translatesAutoresizingMaskIntoConstraints = false
         heightAnchor.constraint(equalToConstant: ChatCompletionPanel.rowHeight).isActive = true
         toolTip = item.description

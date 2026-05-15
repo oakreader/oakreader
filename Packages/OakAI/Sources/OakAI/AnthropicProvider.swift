@@ -27,7 +27,7 @@ public struct AnthropicProvider: LLMProviderService {
         maxTokens: Int,
         tools: [ToolDefinition]?
     ) -> AsyncThrowingStream<StreamChunk, Error> {
-        sendMessage(messages: messages, model: model, systemPrompt: systemPrompt, maxTokens: maxTokens, tools: tools, thinkingBudget: nil)
+        sendMessage(messages: messages, model: model, systemPrompt: systemPrompt, maxTokens: maxTokens, tools: tools, thinkingBudget: nil, thinkingEffort: nil)
     }
 
     public func sendMessage(
@@ -36,7 +36,8 @@ public struct AnthropicProvider: LLMProviderService {
         systemPrompt: String?,
         maxTokens: Int,
         tools: [ToolDefinition]?,
-        thinkingBudget: Int?
+        thinkingBudget: Int?,
+        thinkingEffort: String?
     ) -> AsyncThrowingStream<StreamChunk, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
@@ -56,7 +57,8 @@ public struct AnthropicProvider: LLMProviderService {
                         systemPrompt: systemPrompt,
                         maxTokens: maxTokens,
                         tools: tools,
-                        thinkingBudget: thinkingBudget
+                        thinkingBudget: thinkingBudget,
+                        thinkingEffort: thinkingEffort
                     )
                     request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
@@ -68,7 +70,8 @@ public struct AnthropicProvider: LLMProviderService {
                     guard httpResponse.statusCode == 200 else {
                         var errorBody = ""
                         for try await line in bytes.lines { errorBody += line }
-                        continuation.finish(throwing: LLMProviderError.invalidResponse(httpResponse.statusCode))
+                        let detail = Self.extractErrorMessage(errorBody) ?? "status \(httpResponse.statusCode)"
+                        continuation.finish(throwing: LLMProviderError.invalidResponse(httpResponse.statusCode, detail))
                         return
                     }
 
@@ -83,26 +86,56 @@ public struct AnthropicProvider: LLMProviderService {
         }
     }
 
+    /// Models that support adaptive thinking (type: "adaptive" + output_config.effort)
+    /// instead of budget-based thinking (type: "enabled" + budget_tokens).
+    private static func supportsAdaptiveThinking(_ modelId: String) -> Bool {
+        modelId.contains("opus-4-6") || modelId.contains("opus-4.6") ||
+        modelId.contains("opus-4-7") || modelId.contains("opus-4.7") ||
+        modelId.contains("sonnet-4-6") || modelId.contains("sonnet-4.6")
+    }
+
     private func buildRequestBody(
         messages: [LLMMessage],
         model: String,
         systemPrompt: String?,
         maxTokens: Int,
         tools: [ToolDefinition]?,
-        thinkingBudget: Int? = nil
+        thinkingBudget: Int? = nil,
+        thinkingEffort: String? = nil
     ) -> [String: Any] {
+        let useAdaptive = Self.supportsAdaptiveThinking(model)
+
+        // For budget-based thinking, max_tokens must be > budget_tokens.
+        var effectiveMaxTokens = maxTokens
+        if let budget = thinkingBudget, budget > 0, !useAdaptive {
+            effectiveMaxTokens = max(maxTokens, budget + 1024)
+        }
+
         var body: [String: Any] = [
             "model": model,
-            "max_tokens": maxTokens,
+            "max_tokens": effectiveMaxTokens,
             "stream": true,
         ]
 
         // Extended thinking support
         if let budget = thinkingBudget, budget > 0 {
-            body["thinking"] = [
-                "type": "enabled",
-                "budget_tokens": budget,
-            ] as [String: Any]
+            let effort = thinkingEffort ?? "high"
+            if useAdaptive {
+                // Opus 4.6+, Sonnet 4.6: adaptive thinking with effort level
+                body["thinking"] = [
+                    "type": "adaptive",
+                    "display": "summarized",
+                ] as [String: Any]
+                body["output_config"] = [
+                    "effort": effort,
+                ] as [String: Any]
+            } else {
+                // Older models: budget-based thinking
+                body["thinking"] = [
+                    "type": "enabled",
+                    "budget_tokens": budget,
+                ] as [String: Any]
+            }
         }
 
         if let system = systemPrompt {
@@ -281,5 +314,15 @@ public struct AnthropicProvider: LLMProviderService {
             result[key] = "\(value)"
         }
         return result
+    }
+
+    /// Extract human-readable message from Anthropic error JSON.
+    private static func extractErrorMessage(_ body: String) -> String? {
+        guard let data = body.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let error = json["error"] as? [String: Any],
+              let message = error["message"] as? String
+        else { return nil }
+        return message
     }
 }

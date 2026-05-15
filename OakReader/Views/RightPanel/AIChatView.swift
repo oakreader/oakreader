@@ -329,7 +329,7 @@ struct AIChatView: View {
                 .buttonStyle(.plain)
                 .help("Add attachment")
 
-                modelSwitcher
+                settingsMenu
 
                 Spacer()
 
@@ -377,31 +377,80 @@ struct AIChatView: View {
         .padding(.vertical, OakStyle.Spacing.xs)
     }
 
-    // MARK: - Model Switcher
+    // MARK: - Config Menu
 
     private var currentModelName: String {
         let config = chatVM.config
         return config.modelInfo?.name ?? config.model
     }
 
-    private var modelSwitcher: some View {
+    @State private var settingsEffort: String = Preferences.shared.thinkingEffort
+    @State private var settingsPermission: AgentPermissionLevel = Preferences.shared.agentPermissionLevel
+
+    private var settingsMenu: some View {
         let prefs = Preferences.shared
         let providerInfo = ProviderRegistry.shared.provider(for: prefs.aiProviderId)
         let models = providerInfo?.models ?? []
         let currentModel = chatVM.config.model
+        let currentModelInfo = providerInfo?.models.first { $0.id == currentModel }
 
         return Menu {
-            ForEach(models) { model in
-                Button(action: {
-                    prefs.aiModel = model.id
-                }) {
-                    HStack {
-                        Text(model.name)
-                        if model.id == currentModel {
-                            Image(systemName: "checkmark")
+            // Model submenu
+            Menu {
+                ForEach(models) { model in
+                    Button(action: {
+                        prefs.aiModel = model.id
+                    }) {
+                        HStack {
+                            Text(model.name)
+                            if model.id == currentModel {
+                                Image(systemName: "checkmark")
+                            }
                         }
                     }
                 }
+            } label: {
+                Label("Model", systemImage: "cpu")
+            }
+
+            // Thinking effort submenu — only for reasoning models
+            if currentModelInfo?.reasoning == true {
+                Menu {
+                    ForEach(["low", "medium", "high"], id: \.self) { level in
+                        Button(action: {
+                            prefs.thinkingEffort = level
+                            settingsEffort = level
+                        }) {
+                            HStack {
+                                Text(level.capitalized)
+                                if settingsEffort == level {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    Label("Thinking", systemImage: "brain")
+                }
+            }
+
+            // Tool approval submenu
+            Menu {
+                ForEach(AgentPermissionLevel.allCases) { level in
+                    Button(action: {
+                        prefs.agentPermissionLevel = level
+                        settingsPermission = level
+                    }) {
+                        HStack {
+                            Text(level.label)
+                            if settingsPermission == level {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            } label: {
+                Label("Tools", systemImage: "wrench")
             }
         } label: {
             HStack(spacing: 3) {
@@ -417,7 +466,7 @@ struct AIChatView: View {
             .padding(.vertical, 4)
         }
         .buttonStyle(.plain)
-        .help("Switch model")
+        .help("Model & settings")
     }
 
     // MARK: - Error Banner

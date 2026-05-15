@@ -68,6 +68,8 @@ public struct ProviderConfig: Codable, Sendable {
     public var model: String
     /// Extended thinking token budget. `nil` disables thinking.
     public var thinkingBudget: Int?
+    /// Effort level for adaptive thinking ("low", "medium", "high").
+    public var thinkingEffort: String?
 
     /// Resolved model info — maxTokens come from here, not user config.
     public var modelInfo: ModelInfo? {
@@ -81,11 +83,13 @@ public struct ProviderConfig: Codable, Sendable {
     public init(
         providerId: String = "anthropic",
         model: String? = nil,
-        thinkingBudget: Int? = nil
+        thinkingBudget: Int? = nil,
+        thinkingEffort: String? = nil
     ) {
         self.providerId = providerId
         self.model = model ?? ProviderRegistry.shared.provider(for: providerId)?.defaultModelId ?? ""
         self.thinkingBudget = thinkingBudget
+        self.thinkingEffort = thinkingEffort
     }
 
     // Backward-compatible coding: "provider" key maps to providerId
@@ -93,6 +97,7 @@ public struct ProviderConfig: Codable, Sendable {
         case providerId = "provider"
         case model
         case thinkingBudget
+        case thinkingEffort
     }
 
     public init(from decoder: Decoder) throws {
@@ -100,5 +105,6 @@ public struct ProviderConfig: Codable, Sendable {
         providerId = try container.decode(String.self, forKey: .providerId)
         model = try container.decode(String.self, forKey: .model)
         thinkingBudget = try container.decodeIfPresent(Int.self, forKey: .thinkingBudget)
+        thinkingEffort = try container.decodeIfPresent(String.self, forKey: .thinkingEffort)
     }
 }

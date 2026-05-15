@@ -557,7 +557,7 @@ final class ChatNSTextView: NSTextView {
         let inputRect = sourceView.convert(sourceView.bounds, to: nil)
         let composerHorizontalPadding: CGFloat = 14
         let composerTopPadding: CGFloat = 12
-        let popupGap: CGFloat = 10
+        let popupGap: CGFloat = 8
         let anchor = NSPoint(
             x: inputRect.minX - composerHorizontalPadding,
             y: inputRect.maxY + composerTopPadding + popupGap

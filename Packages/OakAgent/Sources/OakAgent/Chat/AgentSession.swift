@@ -26,6 +26,7 @@ public actor AgentSession {
         agentSkills: [AgentSkill] = [],
         maxIterations: Int = 10,
         thinkingBudget: Int? = nil,
+        thinkingEffort: String? = nil,
         toolConfirmation: (@Sendable (ToolCall, ToolCategory) async -> Bool)? = nil
     ) -> AsyncThrowingStream<SessionEvent, Error> {
         AsyncThrowingStream { continuation in
@@ -86,7 +87,8 @@ public actor AgentSession {
                             systemPrompt: finalPrompt,
                             maxTokens: config.maxTokens,
                             tools: toolDefs,
-                            thinkingBudget: thinkingBudget
+                            thinkingBudget: thinkingBudget,
+                            thinkingEffort: thinkingEffort
                         )
 
                         var assistantTurn = Turn(
