@@ -392,6 +392,12 @@ private struct CollectionRowView: View {
                 isDropTargeted = targeted && !collection.isSmart
             }
             .contextMenu {
+                Button {
+                    appState.openWorkspace(for: collection)
+                } label: {
+                    Label("Open AI Workspace", systemImage: "sparkles")
+                }
+                Divider()
                 if collection.isSmart && !collection.isSystem {
                     Button { editingSmartCollection = collection } label: {
                         Label("Edit Smart Collection...", systemImage: "slider.horizontal.3")
