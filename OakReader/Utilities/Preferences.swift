@@ -2,6 +2,36 @@ import Foundation
 import OakAI
 import PDFKit
 
+// MARK: - Agent Permission Level
+
+/// Controls when tool calls require user confirmation.
+enum AgentPermissionLevel: String, CaseIterable, Identifiable {
+    /// No confirmation — all tools run freely.
+    case auto
+    /// Read-only tools auto-approved; write/dangerous require confirmation.
+    case smart
+    /// Everything requires confirmation.
+    case full
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .auto: "Auto"
+        case .smart: "Smart"
+        case .full: "Full"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .auto: "All tools run without asking"
+        case .smart: "Read tools auto-approved, write tools ask"
+        case .full: "All tools require approval"
+        }
+    }
+}
+
 final class Preferences {
     static let shared = Preferences()
 
@@ -57,6 +87,9 @@ final class Preferences {
         static let agentReadFileEnabled = "agentReadFileEnabled"
         static let agentWriteFileEnabled = "agentWriteFileEnabled"
         static let agentRequireConfirmation = "agentRequireConfirmation"
+        static let agentPermissionLevel = "agentPermissionLevel"
+        // Thinking budget
+        static let thinkingBudget = "thinkingBudget"
         // Global font
         static let globalFontFamily = "globalFontFamily"
         static let globalFontSize = "globalFontSize"
@@ -107,6 +140,7 @@ final class Preferences {
     private init() {
         registerDefaults()
         migrateNoteEditorFontOverride()
+        migrateAgentPermissionLevel()
     }
 
     private func registerDefaults() {
@@ -141,6 +175,8 @@ final class Preferences {
             Keys.agentReadFileEnabled: true,
             Keys.agentWriteFileEnabled: true,
             Keys.agentRequireConfirmation: true,
+            Keys.agentPermissionLevel: AgentPermissionLevel.smart.rawValue,
+            Keys.thinkingBudget: 10000,
             Keys.appearanceMode: "system",
         ])
     }
@@ -515,6 +551,34 @@ final class Preferences {
     var agentRequireConfirmation: Bool {
         get { defaults.bool(forKey: Keys.agentRequireConfirmation) }
         set { defaults.set(newValue, forKey: Keys.agentRequireConfirmation) }
+    }
+
+    var agentPermissionLevel: AgentPermissionLevel {
+        get {
+            AgentPermissionLevel(rawValue: defaults.string(forKey: Keys.agentPermissionLevel) ?? "") ?? .smart
+        }
+        set { defaults.set(newValue.rawValue, forKey: Keys.agentPermissionLevel) }
+    }
+
+    /// Extended thinking token budget for reasoning models.
+    var thinkingBudget: Int {
+        get {
+            let value = defaults.integer(forKey: Keys.thinkingBudget)
+            return value > 0 ? value : 10000
+        }
+        set { defaults.set(newValue, forKey: Keys.thinkingBudget) }
+    }
+
+    /// Migrate old binary `agentRequireConfirmation` → 3-level permission.
+    private func migrateAgentPermissionLevel() {
+        let migrationKey = "agentPermissionLevelMigrated"
+        guard !defaults.bool(forKey: migrationKey) else { return }
+        defaults.set(true, forKey: migrationKey)
+
+        // Only migrate if the old key was explicitly set
+        guard defaults.object(forKey: Keys.agentRequireConfirmation) != nil else { return }
+        let oldValue = defaults.bool(forKey: Keys.agentRequireConfirmation)
+        agentPermissionLevel = oldValue ? .full : .auto
     }
 
     // MARK: - Voice AI Preferences

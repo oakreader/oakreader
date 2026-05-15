@@ -25,7 +25,8 @@ public actor AgentSession {
         toolContext: ToolExecutionContext? = nil,
         agentSkills: [AgentSkill] = [],
         maxIterations: Int = 10,
-        toolConfirmation: (@Sendable (ToolCall) async -> Bool)? = nil
+        thinkingBudget: Int? = nil,
+        toolConfirmation: (@Sendable (ToolCall, ToolCategory) async -> Bool)? = nil
     ) -> AsyncThrowingStream<SessionEvent, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
@@ -84,7 +85,8 @@ public actor AgentSession {
                             model: config.model,
                             systemPrompt: finalPrompt,
                             maxTokens: config.maxTokens,
-                            tools: toolDefs
+                            tools: toolDefs,
+                            thinkingBudget: thinkingBudget
                         )
 
                         var assistantTurn = Turn(
@@ -101,6 +103,13 @@ public actor AgentSession {
                             case .delta(let text):
                                 assistantTurn.content += text
                                 continuation.yield(.delta(text))
+                            case .thinking(let text):
+                                if assistantTurn.thinking == nil {
+                                    assistantTurn.thinking = text
+                                } else {
+                                    assistantTurn.thinking! += text
+                                }
+                                continuation.yield(.thinkingDelta(text))
                             case .toolUse(let toolCall):
                                 toolCalls.append(toolCall)
                             case .finished(let reason):
@@ -126,10 +135,11 @@ public actor AgentSession {
 
                                 // If confirmation callback is set, ask for approval
                                 if let confirmationCallback = toolConfirmation {
+                                    let toolCategory = toolsByName[call.name]?.category ?? .readOnly
                                     record.status = .pending
                                     continuation.yield(.toolUsePending(record))
 
-                                    let approved = await confirmationCallback(call)
+                                    let approved = await confirmationCallback(call, toolCategory)
                                     if !approved {
                                         record.status = .denied
                                         record.result = "User denied tool execution."

@@ -27,6 +27,17 @@ public struct AnthropicProvider: LLMProviderService {
         maxTokens: Int,
         tools: [ToolDefinition]?
     ) -> AsyncThrowingStream<StreamChunk, Error> {
+        sendMessage(messages: messages, model: model, systemPrompt: systemPrompt, maxTokens: maxTokens, tools: tools, thinkingBudget: nil)
+    }
+
+    public func sendMessage(
+        messages: [LLMMessage],
+        model: String,
+        systemPrompt: String?,
+        maxTokens: Int,
+        tools: [ToolDefinition]?,
+        thinkingBudget: Int?
+    ) -> AsyncThrowingStream<StreamChunk, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
@@ -44,7 +55,8 @@ public struct AnthropicProvider: LLMProviderService {
                         messages: messages, model: model,
                         systemPrompt: systemPrompt,
                         maxTokens: maxTokens,
-                        tools: tools
+                        tools: tools,
+                        thinkingBudget: thinkingBudget
                     )
                     request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
@@ -76,13 +88,22 @@ public struct AnthropicProvider: LLMProviderService {
         model: String,
         systemPrompt: String?,
         maxTokens: Int,
-        tools: [ToolDefinition]?
+        tools: [ToolDefinition]?,
+        thinkingBudget: Int? = nil
     ) -> [String: Any] {
         var body: [String: Any] = [
             "model": model,
             "max_tokens": maxTokens,
             "stream": true,
         ]
+
+        // Extended thinking support
+        if let budget = thinkingBudget, budget > 0 {
+            body["thinking"] = [
+                "type": "enabled",
+                "budget_tokens": budget,
+            ] as [String: Any]
+        }
 
         if let system = systemPrompt {
             body["system"] = system
@@ -161,6 +182,7 @@ public struct AnthropicProvider: LLMProviderService {
         var currentToolId: String?
         var currentToolName: String?
         var currentToolInput = ""
+        var isThinkingBlock = false
 
         for try await line in bytes.lines {
             guard !Task.isCancelled else {
@@ -178,18 +200,27 @@ public struct AnthropicProvider: LLMProviderService {
             switch type {
             case "content_block_start":
                 if let contentBlock = json["content_block"] as? [String: Any],
-                   let blockType = contentBlock["type"] as? String,
-                   blockType == "tool_use"
+                   let blockType = contentBlock["type"] as? String
                 {
-                    currentToolId = contentBlock["id"] as? String
-                    currentToolName = contentBlock["name"] as? String
-                    currentToolInput = ""
+                    switch blockType {
+                    case "tool_use":
+                        currentToolId = contentBlock["id"] as? String
+                        currentToolName = contentBlock["name"] as? String
+                        currentToolInput = ""
+                        isThinkingBlock = false
+                    case "thinking":
+                        isThinkingBlock = true
+                    default:
+                        isThinkingBlock = false
+                    }
                 }
 
             case "content_block_delta":
                 if let delta = json["delta"] as? [String: Any] {
                     let deltaType = delta["type"] as? String
-                    if deltaType == "text_delta", let text = delta["text"] as? String {
+                    if deltaType == "thinking_delta", let text = delta["thinking"] as? String {
+                        continuation.yield(.thinking(text))
+                    } else if deltaType == "text_delta", let text = delta["text"] as? String {
                         continuation.yield(.delta(text))
                     } else if deltaType == "input_json_delta",
                               let partial = delta["partial_json"] as? String
@@ -199,7 +230,9 @@ public struct AnthropicProvider: LLMProviderService {
                 }
 
             case "content_block_stop":
-                if let toolId = currentToolId, let toolName = currentToolName {
+                if isThinkingBlock {
+                    isThinkingBlock = false
+                } else if let toolId = currentToolId, let toolName = currentToolName {
                     let input = parseToolInput(currentToolInput)
                     let toolCall = ToolCall(id: toolId, name: toolName, input: input)
                     continuation.yield(.toolUse(toolCall))

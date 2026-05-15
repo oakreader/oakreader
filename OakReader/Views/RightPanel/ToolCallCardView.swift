@@ -3,8 +3,6 @@ import OakAgent
 
 struct ToolCallCardView: View {
     let record: ToolUseRecord
-    var onApprove: (() -> Void)?
-    var onDeny: (() -> Void)?
 
     @State private var isExpanded = false
 
@@ -55,36 +53,6 @@ struct ToolCallCardView: View {
             }
             .buttonStyle(.plain)
 
-            // Confirmation buttons
-            if record.status == .pending {
-                Divider()
-                    .padding(.horizontal, 8)
-
-                HStack(spacing: 8) {
-                    Button {
-                        onApprove?()
-                    } label: {
-                        Label("Approve", systemImage: "checkmark.circle")
-                            .font(.system(size: 11, weight: .medium))
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.green)
-                    .controlSize(.small)
-
-                    Button {
-                        onDeny?()
-                    } label: {
-                        Label("Deny", systemImage: "xmark.circle")
-                            .font(.system(size: 11, weight: .medium))
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(.red)
-                    .controlSize(.small)
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-            }
-
             // Expanded result
             if isExpanded, let result = record.result {
                 Divider()
@@ -117,9 +85,14 @@ struct ToolCallCardView: View {
     private var statusView: some View {
         switch record.status {
         case .pending:
-            Image(systemName: "questionmark.circle.fill")
-                .font(.system(size: 11))
-                .foregroundStyle(.orange)
+            HStack(spacing: 3) {
+                ProgressView()
+                    .controlSize(.mini)
+                    .frame(width: 10, height: 10)
+                Text("Awaiting approval")
+                    .font(.system(size: 10, weight: .medium))
+            }
+            .foregroundStyle(.orange)
         case .executing:
             ProgressView()
                 .controlSize(.mini)

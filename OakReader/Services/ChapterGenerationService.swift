@@ -231,6 +231,7 @@ final class ChapterGenerationService {
             for try await chunk in stream {
                 switch chunk {
                 case .delta(let text): fullResponse += text
+                case .thinking: break
                 case .toolUse: break
                 case .finished: break
                 case .error(let msg):
@@ -520,6 +521,8 @@ final class ChapterGenerationService {
                 switch chunk {
                 case .delta(let text):
                     fullResponse += text
+                case .thinking:
+                    break
                 case .toolUse:
                     break
                 case .finished:

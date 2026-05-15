@@ -84,7 +84,10 @@ struct AISettingsView: View {
     @State private var agentToolsEnabled: Bool
     @State private var agentReadFileEnabled: Bool
     @State private var agentWriteFileEnabled: Bool
-    @State private var agentRequireConfirmation: Bool
+    @State private var agentPermissionLevel: AgentPermissionLevel
+
+    // Thinking
+    @State private var thinkingBudget: Int
 
     // Model download states (shared with LocalModelsSettingsView)
     let modelStates: SharedModelStates
@@ -149,7 +152,10 @@ struct AISettingsView: View {
         _agentToolsEnabled = State(initialValue: prefs.agentToolsEnabled)
         _agentReadFileEnabled = State(initialValue: prefs.agentReadFileEnabled)
         _agentWriteFileEnabled = State(initialValue: prefs.agentWriteFileEnabled)
-        _agentRequireConfirmation = State(initialValue: prefs.agentRequireConfirmation)
+        _agentPermissionLevel = State(initialValue: prefs.agentPermissionLevel)
+
+        // Thinking
+        _thinkingBudget = State(initialValue: prefs.thinkingBudget)
     }
 
     /// Find which configured provider owns a given model ID.
@@ -290,6 +296,24 @@ struct AISettingsView: View {
                         LabeledContent("Vision", value: info.supportsVision ? "Yes" : "No")
                         LabeledContent("Reasoning", value: info.reasoning ? "Yes" : "No")
                     }
+                }
+            }
+
+            // Thinking budget — only shown when the selected model supports reasoning
+            if let provider = ProviderRegistry.shared.provider(for: chatProviderId),
+               let info = provider.models.first(where: { $0.id == chatModel }),
+               info.reasoning {
+                Section("Extended Thinking") {
+                    Stepper(
+                        "Budget: \(formatTokens(thinkingBudget)) tokens",
+                        value: $thinkingBudget,
+                        in: 1000...128000,
+                        step: 1000
+                    )
+
+                    Text("Token budget for model reasoning. Higher values allow deeper thinking but increase latency and cost.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
         }
@@ -468,10 +492,14 @@ struct AISettingsView: View {
                 Toggle("Write File", isOn: $agentWriteFileEnabled)
                     .disabled(!agentToolsEnabled)
 
-                Toggle("Require Confirmation", isOn: $agentRequireConfirmation)
-                    .disabled(!agentToolsEnabled)
+                Picker("Confirmation", selection: $agentPermissionLevel) {
+                    ForEach(AgentPermissionLevel.allCases) { level in
+                        Text(level.label).tag(level)
+                    }
+                }
+                .disabled(!agentToolsEnabled)
 
-                Text("When enabled, the AI will ask for your approval before executing tools.")
+                Text(agentPermissionLevel.description)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -640,6 +668,9 @@ struct AISettingsView: View {
         prefs.agentToolsEnabled = agentToolsEnabled
         prefs.agentReadFileEnabled = agentReadFileEnabled
         prefs.agentWriteFileEnabled = agentWriteFileEnabled
-        prefs.agentRequireConfirmation = agentRequireConfirmation
+        prefs.agentPermissionLevel = agentPermissionLevel
+
+        // Thinking
+        prefs.thinkingBudget = thinkingBudget
     }
 }
