@@ -1,5 +1,4 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 /// A multi-line text input that sends on Enter and inserts a newline on Cmd+Enter.
 /// Reports its content height so the parent can size it to fit.
@@ -237,7 +236,6 @@ final class ChatNSTextView: NSTextView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         insertionPointColor = .labelColor
-        registerForDraggedTypes([.string])
     }
 
     // MARK: - IME Composition
@@ -367,10 +365,6 @@ final class ChatNSTextView: NSTextView {
 
         super.paste(sender)
     }
-
-    // MARK: - Drag and Drop
-    // Library item drops are handled by SwiftUI's .dropDestination on the
-    // input bar (AIChatView). NSTextView only handles plain-text drops.
 
     // MARK: - Completion Panel
 
@@ -592,70 +586,3 @@ final class ChatNSTextView: NSTextView {
     }
 }
 
-// MARK: - Drag Payload
-
-/// Lightweight Codable payload for dragging library items into the chat input.
-struct LibraryItemDragPayload: Codable, Transferable {
-    let storageKey: String
-    let title: String
-    let author: String
-    let citeKey: String?
-    let contentType: String
-    let pageCount: Int
-    let displayIcon: String
-
-    static var transferRepresentation: some TransferRepresentation {
-        CodableRepresentation(contentType: .libraryItemJSON)
-    }
-
-    init(from item: LibraryItem) {
-        self.storageKey = item.storageKey
-        self.title = item.title
-        self.author = item.author
-        self.citeKey = item.citeKey
-        self.contentType = item.contentType.rawValue
-        self.pageCount = item.pageCount
-        self.displayIcon = item.displayIcon
-    }
-
-    init(storageKey: String, title: String, author: String, citeKey: String?,
-         contentType: String, pageCount: Int, displayIcon: String) {
-        self.storageKey = storageKey
-        self.title = title
-        self.author = author
-        self.citeKey = citeKey
-        self.contentType = contentType
-        self.pageCount = pageCount
-        self.displayIcon = displayIcon
-    }
-
-    func toCompletionItem() -> ChatCompletionItem {
-        let label = citeKey ?? title
-        let desc = author.isEmpty ? title : "\(author) — \(title)"
-        return ChatCompletionItem(
-            id: "lib:\(storageKey)",
-            icon: displayIcon,
-            label: label,
-            description: desc,
-            kind: .libraryReference(ChatCompletionItem.LibraryRefPayload(
-                storageKey: storageKey,
-                title: title,
-                author: author,
-                citeKey: citeKey,
-                contentType: contentType,
-                pageCount: pageCount
-            )),
-            trigger: ""
-        )
-    }
-}
-
-// MARK: - Custom UTType for Library Items
-
-extension UTType {
-    static let libraryItemJSON = UTType(exportedAs: "com.oakreader.library-item")
-}
-
-extension NSPasteboard.PasteboardType {
-    static let libraryItemJSON = NSPasteboard.PasteboardType("com.oakreader.library-item")
-}
