@@ -6,28 +6,37 @@ import PDFKit
 
 /// Controls when tool calls require user confirmation.
 enum AgentPermissionLevel: String, CaseIterable, Identifiable {
-    /// No confirmation — all tools run freely.
-    case auto
-    /// Read-only tools auto-approved; write/dangerous require confirmation.
-    case smart
-    /// Everything requires confirmation.
+    /// Full permission — all tools run freely.
     case full
+    /// Smart permission — read-only tools auto-approved; write/dangerous require confirmation.
+    case smart
+    /// Restricted permission — every tool call requires confirmation.
+    case restricted
 
     var id: String { rawValue }
 
     var label: String {
         switch self {
-        case .auto: "Auto"
-        case .smart: "Smart"
-        case .full: "Full"
+        case .full: "Full Access"
+        case .smart: "Smart Approval"
+        case .restricted: "Always Ask"
         }
     }
 
     var description: String {
         switch self {
-        case .auto: "All tools run without asking"
+        case .full: "All tools run without asking"
         case .smart: "Read tools auto-approved, write tools ask"
-        case .full: "All tools require approval"
+        case .restricted: "Every tool call requires approval"
+        }
+    }
+
+    /// Map legacy rawValues persisted before the rename.
+    init?(legacyRawValue: String) {
+        switch legacyRawValue {
+        case "auto": self = .full
+        case "full": self = .restricted
+        default: return nil
         }
     }
 }
@@ -553,7 +562,10 @@ final class Preferences {
 
     var agentPermissionLevel: AgentPermissionLevel {
         get {
-            AgentPermissionLevel(rawValue: defaults.string(forKey: Keys.agentPermissionLevel) ?? "") ?? .smart
+            let raw = defaults.string(forKey: Keys.agentPermissionLevel) ?? ""
+            return AgentPermissionLevel(rawValue: raw)
+                ?? AgentPermissionLevel(legacyRawValue: raw)
+                ?? .smart
         }
         set { defaults.set(newValue.rawValue, forKey: Keys.agentPermissionLevel) }
     }
@@ -582,7 +594,7 @@ final class Preferences {
         // Only migrate if the old key was explicitly set
         guard defaults.object(forKey: Keys.agentRequireConfirmation) != nil else { return }
         let oldValue = defaults.bool(forKey: Keys.agentRequireConfirmation)
-        agentPermissionLevel = oldValue ? .full : .auto
+        agentPermissionLevel = oldValue ? .restricted : .full
     }
 
     // MARK: - Voice AI Preferences
