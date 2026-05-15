@@ -6,6 +6,7 @@ struct LibrarySidebarPanel: View {
     @Bindable var appState: AppState
 
     @State private var notesVM: NotesViewModel?
+    @State private var metadataTab: MetadataInspectorTab = .info
 
     private var store: LibraryStore { appState.libraryStore }
 
@@ -19,19 +20,17 @@ struct LibrarySidebarPanel: View {
                     NotePanelView(notesVM: notesVM)
                 }
             } else if appState.libraryDetailTab == .metadata {
-                HStack {
-                    Text("Metadata")
-                        .font(.system(size: 16, weight: .semibold))
-                    Spacer()
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-
+                metadataTabPicker
                 ScrollView {
                     VStack(alignment: .leading, spacing: 1) {
-                        infoTabContent
+                        switch metadataTab {
+                        case .info:
+                            infoTabContent
+                        case .reference:
+                            referenceTabContent
+                        }
                     }
-                    .padding(8)
+                    .padding(OakStyle.Spacing.sm)
                 }
             }
         }
@@ -57,22 +56,26 @@ struct LibrarySidebarPanel: View {
     private var infoTabContent: some View {
         coverSection
 
-        sectionView(title: "Properties", icon: "tag.fill", iconColor: Color(hex: "E5A540")) {
-            propertiesContent
-        }
+        sectionHeader("PROPERTIES")
+        propertiesContent
+            .padding(.horizontal, OakStyle.Spacing.xs)
 
-        sectionView(title: "Collections", icon: "folder.fill", iconColor: Color(hex: "59ADC4")) {
-            collectionsContent
-        }
+        sectionHeader("COLLECTIONS")
+        collectionsContent
+            .padding(.horizontal, OakStyle.Spacing.xs)
 
-        metadataSection
+        sectionHeader("FILE")
+        infoGrid
+            .padding(.horizontal, OakStyle.Spacing.xs)
+    }
 
-        sectionView(title: "File", icon: "doc.fill", iconColor: Color(hex: "8E8E93")) {
-            infoGrid
-        }
+    @ViewBuilder
+    private var referenceTabContent: some View {
+        coverSection
 
-        actionsSection
-            .padding(.top, 8)
+        sectionHeader("REFERENCE")
+        referenceContent
+            .padding(.horizontal, OakStyle.Spacing.xs)
     }
 
     // MARK: - Notes VM
@@ -84,36 +87,48 @@ struct LibrarySidebarPanel: View {
         )
     }
 
-    // MARK: - Section wrapper (OakReader collapsible section style)
+    // MARK: - Metadata tab picker
 
-    @ViewBuilder
-    private func sectionView<Content: View>(
-        title: String,
-        icon: String,
-        iconColor: Color,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            // Section header — OakReader: icon + semibold title, secondary color
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.system(size: 13))
-                    .foregroundStyle(iconColor)
-                Text(title)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Color.primary.opacity(0.55))
+    private var metadataTabPicker: some View {
+        HStack(spacing: 2) {
+            ForEach(MetadataInspectorTab.allCases) { tab in
+                let selected = metadataTab == tab
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        metadataTab = tab
+                    }
+                } label: {
+                    Label(tab.label, systemImage: tab.systemImage)
+                        .font(.system(size: 12))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 24)
+                        .foregroundStyle(selected ? .primary : .secondary)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(selected ? Color(nsColor: .textBackgroundColor) : .clear)
+                                .shadow(color: selected ? .black.opacity(0.12) : .clear, radius: 2, y: 1)
+                        )
+                        .contentShape(RoundedRectangle(cornerRadius: 6))
+                }
+                .buttonStyle(.plain)
             }
-            .padding(.vertical, 4)
-
-            content()
         }
-        .padding(.horizontal, 8)
+        .padding(.horizontal, 3)
         .padding(.vertical, 4)
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(Color.primary.opacity(0.05))
-                .frame(height: 1)
-        }
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
+        .padding(.horizontal, OakStyle.Spacing.sm)
+        .padding(.vertical, OakStyle.Spacing.xs)
+    }
+
+    // MARK: - Section header
+
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(OakStyle.Colors.textSecondary)
+            .padding(.horizontal, OakStyle.Spacing.xs)
+            .padding(.top, OakStyle.Spacing.sm)
+            .padding(.bottom, OakStyle.Spacing.xxs)
     }
 
     // MARK: - Cover
@@ -127,50 +142,36 @@ struct LibrarySidebarPanel: View {
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .frame(maxHeight: 160)
-                    .cornerRadius(4)
+                    .cornerRadius(OakStyle.Radius.small)
                     .shadow(color: .black.opacity(0.15), radius: 3, y: 1)
                 Spacer()
             }
-            .padding(8)
+            .padding(OakStyle.Spacing.xs)
         }
     }
 
     // MARK: - Reference
 
     @ViewBuilder
-    private var metadataSection: some View {
+    private var referenceContent: some View {
         if item.referenceMetadata != nil {
-            sectionView(title: "Reference", icon: "text.book.closed.fill", iconColor: Color(hex: "4072E5")) {
-                ReferenceMetadataView(
-                    item: item,
-                    store: store,
-                    referenceService: appState.referenceService
-                )
-            }
+            ReferenceMetadataView(
+                item: item,
+                store: store,
+                referenceService: appState.referenceService
+            )
         } else {
-            sectionView(title: "Reference", icon: "text.book.closed.fill", iconColor: Color(hex: "4072E5")) {
-                HStack(spacing: 8) {
-                    Text("No reference data")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color.primary.opacity(0.25))
+            HStack(spacing: OakStyle.Spacing.xs) {
+                Text("No reference data")
+                    .font(.system(size: OakStyle.Font.caption))
+                    .foregroundStyle(OakStyle.Colors.textQuaternary)
 
-                    Spacer()
+                Spacer()
 
-                    Button {
-                        createEmptyMetadataForItem()
-                    } label: {
-                        HStack(spacing: 2) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 10, weight: .bold))
-                            Text("Add")
-                                .font(.system(size: 12))
-                        }
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(RoundedRectangle(cornerRadius: 5).fill(Color.primary.opacity(0.05)))
-                    }
-                    .buttonStyle(.plain)
+                Button("Add") {
+                    createEmptyMetadataForItem()
                 }
+                .controlSize(.small)
             }
         }
     }
@@ -193,30 +194,18 @@ struct LibrarySidebarPanel: View {
 
     @ViewBuilder
     private var infoGrid: some View {
-        Grid(alignment: .topLeading, horizontalSpacing: 8, verticalSpacing: 2) {
-            infoGridRow("File", value: item.fileName)
-            infoGridRow("Pages", value: "\(item.pageCount)")
-            infoGridRow("Size", value: ByteCountFormatter.string(fromByteCount: item.fileSize, countStyle: .file))
-            infoGridRow("Added", value: item.dateAdded.formatted(date: .abbreviated, time: .omitted))
+        VStack(alignment: .leading, spacing: OakStyle.Spacing.xxs) {
+            LabeledContent("File", value: item.fileName)
+            LabeledContent("Pages", value: "\(item.pageCount)")
+            LabeledContent("Size", value: ByteCountFormatter.string(fromByteCount: item.fileSize, countStyle: .file))
+            LabeledContent("Added", value: item.dateAdded.formatted(date: .abbreviated, time: .omitted))
             if let lastOpened = item.lastOpenedAt {
-                infoGridRow("Opened", value: lastOpened.formatted(date: .abbreviated, time: .omitted))
+                LabeledContent("Opened", value: lastOpened.formatted(date: .abbreviated, time: .omitted))
             }
         }
-    }
-
-    private func infoGridRow(_ label: String, value: String) -> some View {
-        GridRow {
-            Text(label)
-                .font(.system(size: 13))
-                .foregroundStyle(Color.primary.opacity(0.55))
-                .gridColumnAlignment(.trailing)
-
-            Text(value)
-                .font(.system(size: 13))
-                .lineLimit(2)
-                .textSelection(.enabled)
-                .gridColumnAlignment(.leading)
-        }
+        .font(.system(size: OakStyle.Font.caption))
+        .foregroundStyle(OakStyle.Colors.textSecondary)
+        .textSelection(.enabled)
     }
 
     // MARK: - Properties
@@ -224,39 +213,22 @@ struct LibrarySidebarPanel: View {
     @ViewBuilder
     private var propertiesContent: some View {
         let selectProperties = store.properties.filter { $0.type == .multiSelect || $0.type == .singleSelect }
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: OakStyle.Spacing.sm) {
             ForEach(selectProperties) { property in
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: OakStyle.Spacing.xxs) {
                     Text(property.name)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color.primary.opacity(0.55))
+                        .font(.system(size: OakStyle.Font.caption, weight: .semibold))
+                        .foregroundStyle(OakStyle.Colors.textSecondary)
 
-                    FlowLayout(spacing: 4) {
+                    FlowLayout(spacing: OakStyle.Spacing.xxs) {
                         let assignedValues = item.propertyValues.filter { $0.propertyId == property.id }
                         ForEach(assignedValues) { pv in
                             if let opt = pv.option {
-                                HStack(spacing: 4) {
-                                    RoundedRectangle(cornerRadius: 2)
-                                        .fill(Color(hex: opt.colorHex))
-                                        .frame(width: 10, height: 10)
-                                    Text(opt.name)
-                                        .font(.system(size: 12))
-                                    Button {
-                                        store.removeItemSelectValue(item: item, property: property, option: opt)
-                                    } label: {
-                                        Image(systemName: "xmark")
-                                            .font(.system(size: 8, weight: .bold))
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 3)
-                                .background(RoundedRectangle(cornerRadius: 5).fill(Color(hex: opt.colorHex).opacity(0.15)))
+                                tagToken(opt, property: property)
                             }
                         }
 
-                        // Add option button
+                        // Add option menu — icon-only compact button
                         Menu {
                             PropertyOptionAssignmentMenuItems(
                                 item: item,
@@ -265,15 +237,14 @@ struct LibrarySidebarPanel: View {
                                 mode: .addUnassigned
                             )
                         } label: {
-                            HStack(spacing: 2) {
-                                Image(systemName: "plus")
-                                    .font(.system(size: 10, weight: .bold))
-                                Text("Add")
-                                    .font(.system(size: 12))
-                            }
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 3)
-                            .background(RoundedRectangle(cornerRadius: 5).fill(Color.primary.opacity(0.05)))
+                            Image(systemName: "plus")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(OakStyle.Colors.textSecondary)
+                                .frame(width: 20, height: 20)
+                                .background(
+                                    RoundedRectangle(cornerRadius: OakStyle.Radius.small)
+                                        .fill(OakStyle.Colors.buttonBackground)
+                                )
                         }
                         .menuStyle(.borderlessButton)
                         .fixedSize()
@@ -283,65 +254,49 @@ struct LibrarySidebarPanel: View {
         }
     }
 
+    @ViewBuilder
+    private func tagToken(_ opt: PropertyOption, property: PropertyDefinition) -> some View {
+        HStack(spacing: OakStyle.Spacing.xxs) {
+            Circle()
+                .fill(Color(hex: opt.colorHex))
+                .frame(width: 8, height: 8)
+            Text(opt.name)
+                .font(.system(size: OakStyle.Font.caption))
+        }
+        .padding(.horizontal, OakStyle.Spacing.xs)
+        .padding(.vertical, 3)
+        .background(
+            RoundedRectangle(cornerRadius: OakStyle.Radius.small)
+                .fill(Color(hex: opt.colorHex).opacity(0.12))
+        )
+        .contextMenu {
+            Button("Remove", role: .destructive) {
+                store.removeItemSelectValue(item: item, property: property, option: opt)
+            }
+        }
+    }
+
     // MARK: - Collections
 
     @ViewBuilder
     private var collectionsContent: some View {
         if item.collections.isEmpty {
-            Text("Not in any collection")
-                .font(.system(size: 13))
-                .foregroundStyle(Color.primary.opacity(0.25))
+            Text("None")
+                .font(.system(size: OakStyle.Font.caption))
+                .foregroundStyle(OakStyle.Colors.textQuaternary)
         } else {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: OakStyle.Spacing.xxs) {
                 ForEach(item.collections, id: \.id) { collection in
-                    HStack(spacing: 5) {
+                    HStack(spacing: OakStyle.Spacing.xxs) {
                         Image(systemName: collection.icon)
-                            .font(.system(size: 12))
-                            .foregroundStyle(Color.primary.opacity(0.55))
+                            .font(.system(size: OakStyle.Font.caption))
+                            .foregroundStyle(OakStyle.Colors.textSecondary)
                         Text(collection.name)
-                            .font(.system(size: 13))
+                            .font(.system(size: OakStyle.Font.caption))
                     }
                 }
             }
         }
-    }
-
-    // MARK: - Actions
-
-    @ViewBuilder
-    private var actionsSection: some View {
-        VStack(spacing: 6) {
-            Button {
-                appState.openLibraryItem(item)
-            } label: {
-                Label("Open", systemImage: "doc.viewfinder")
-                    .font(.system(size: 14))
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.regular)
-
-            Button {
-                NSWorkspace.shared.activateFileViewerSelecting([item.fileURL])
-            } label: {
-                Label("Reveal in Finder", systemImage: "folder")
-                    .font(.system(size: 13))
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-
-            Button(role: .destructive) {
-                store.removeItem(item)
-            } label: {
-                Label("Remove from Library", systemImage: "trash")
-                    .font(.system(size: 13))
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-        }
-        .padding(.horizontal, 8)
     }
 }
 
