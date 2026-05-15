@@ -1,74 +1,9 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// L-shaped filled border: 1px top + left edges with a rounded top-left corner.
-/// Uses a filled path instead of stroke so it renders fully inside the view bounds.
-struct TopLeftBorderFill: Shape {
-    let radius: CGFloat
-    let thickness: CGFloat
-
-    func path(in rect: CGRect) -> Path {
-        let t = thickness
-        let r = radius
-        var path = Path()
-
-        // Outer edge
-        path.move(to: CGPoint(x: rect.maxX, y: 0))
-        path.addLine(to: CGPoint(x: r, y: 0))
-        path.addArc(center: CGPoint(x: r, y: r), radius: r,
-                     startAngle: .degrees(-90), endAngle: .degrees(180), clockwise: true)
-        path.addLine(to: CGPoint(x: 0, y: rect.maxY))
-
-        // Inner edge (back up)
-        path.addLine(to: CGPoint(x: t, y: rect.maxY))
-        path.addLine(to: CGPoint(x: t, y: r))
-        path.addArc(center: CGPoint(x: r, y: r), radius: r - t,
-                     startAngle: .degrees(180), endAngle: .degrees(-90), clockwise: false)
-        path.addLine(to: CGPoint(x: rect.maxX, y: t))
-        path.closeSubpath()
-
-        return path
-    }
-}
-
-/// L-shaped filled border: 1px top + right edges with a rounded top-right corner.
-struct TopRightBorderFill: Shape {
-    let radius: CGFloat
-    let thickness: CGFloat
-
-    func path(in rect: CGRect) -> Path {
-        let t = thickness
-        let r = radius
-        var path = Path()
-
-        // Outer edge
-        path.move(to: CGPoint(x: 0, y: 0))
-        path.addLine(to: CGPoint(x: rect.maxX - r, y: 0))
-        path.addArc(center: CGPoint(x: rect.maxX - r, y: r), radius: r,
-                     startAngle: .degrees(-90), endAngle: .degrees(0), clockwise: false)
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
-
-        // Inner edge (back up)
-        path.addLine(to: CGPoint(x: rect.maxX - t, y: rect.maxY))
-        path.addLine(to: CGPoint(x: rect.maxX - t, y: r))
-        path.addArc(center: CGPoint(x: rect.maxX - r, y: r), radius: r - t,
-                     startAngle: .degrees(0), endAngle: .degrees(-90), clockwise: true)
-        path.addLine(to: CGPoint(x: 0, y: t))
-        path.closeSubpath()
-
-        return path
-    }
-}
-
 // 3-pane layout: sidebar, table, detail panel
 struct LibraryRootView: View {
     @Bindable var appState: AppState
-
-    @State private var detailPanelWidth: CGFloat?
-    @GestureState private var detailPanelDragTranslation: CGFloat = 0
-
-    private static let splitDividerWidth: CGFloat = 11
-    private static let detailPanelMinWidth: CGFloat = 480
 
     private var store: LibraryStore { appState.libraryStore }
 
@@ -84,28 +19,19 @@ struct LibraryRootView: View {
             // Middle + Right panes (golden ratio: table ≥ 0.382, detail ≤ 0.618)
             GeometryReader { geo in
                 let available = geo.size.width
-                let splitAvailable = splitAvailableWidth(for: available)
-                let tableMin = splitAvailable * 0.382
-                let detailWidth = resolvedDetailPanelWidth(
-                    for: available,
-                    dragTranslation: detailPanelDragTranslation
-                )
+                let tableMin = available * 0.382
+                let detailMax = available * 0.618
 
-                HStack(spacing: 0) {
-                    tablePane
+                HSplitView {
+                    tablePane(hasTrailingCorner: appState.libraryDetailTab == nil)
                         .frame(minWidth: tableMin, maxWidth: .infinity, maxHeight: .infinity)
-
                     // Detail content panel (only when a tab is selected)
                     if appState.libraryDetailTab != nil {
-                        splitDivider(available: available)
-
                         detailContentPanel
-                            .frame(width: detailWidth)
+                            .frame(minWidth: 480, idealWidth: available * 0.382, maxWidth: detailMax)
                     }
                 }
-                .background(libraryChromeBackground)
             }
-            .background(libraryChromeBackground)
 
             // Side navigation strip — always visible, outside the resizable content panes.
             LibrarySideNavView(tab: $appState.libraryDetailTab)
@@ -118,109 +44,57 @@ struct LibraryRootView: View {
         Color(nsColor: .controlBackgroundColor)
     }
 
-    private var tablePane: some View {
-        VStack(spacing: 0) {
-            LibraryTableToolbar(appState: appState)
-            Divider()
-            LibraryTableView(appState: appState, selection: $appState.selectedLibraryItemIDs)
-        }
-        .background(Color(nsColor: .controlBackgroundColor))
-        .clipShape(UnevenRoundedRectangle(
-            topLeadingRadius: OakStyle.Radius.standard,
-            bottomLeadingRadius: 0,
-            bottomTrailingRadius: 0,
-            topTrailingRadius: appState.libraryDetailTab == nil ? OakStyle.Radius.standard : 0
-        ))
-        .overlay(
-            TopLeftBorderFill(radius: OakStyle.Radius.standard, thickness: 1)
-                .fill(Color(nsColor: .separatorColor))
-        )
-        .overlay(alignment: .topTrailing) {
-            if appState.libraryDetailTab == nil {
-                TopRightBorderFill(radius: OakStyle.Radius.standard, thickness: 1)
-                    .fill(Color(nsColor: .separatorColor))
+    private func tablePane(hasTrailingCorner: Bool) -> some View {
+        ZStack {
+            libraryChromeBackground
+
+            let paneShape = UnevenRoundedRectangle(
+                topLeadingRadius: OakStyle.Radius.standard,
+                bottomLeadingRadius: 0,
+                bottomTrailingRadius: 0,
+                topTrailingRadius: hasTrailingCorner ? OakStyle.Radius.standard : 0
+            )
+
+            VStack(spacing: 0) {
+                LibraryTableToolbar(appState: appState)
+                Divider()
+                LibraryTableView(appState: appState, selection: $appState.selectedLibraryItemIDs)
             }
+            .background(Color(nsColor: .controlBackgroundColor), in: paneShape)
+            .clipShape(paneShape)
         }
     }
 
     @ViewBuilder
     private var detailContentPanel: some View {
-        VStack(spacing: 0) {
-            if store.isDuplicatesSelected {
-                DuplicatesMergePane(appState: appState)
-            } else if let item = selectedItemInCurrentFilter {
-                LibrarySidebarPanel(item: item, appState: appState)
-            } else {
-                LibraryCollectionSidebarPanel(appState: appState)
+        ZStack {
+            libraryChromeBackground
+
+            let paneShape = UnevenRoundedRectangle(
+                topLeadingRadius: 0,
+                bottomLeadingRadius: 0,
+                bottomTrailingRadius: 0,
+                topTrailingRadius: OakStyle.Radius.standard
+            )
+
+            VStack(spacing: 0) {
+                if store.isDuplicatesSelected {
+                    DuplicatesMergePane(appState: appState)
+                } else if let item = selectedItemInCurrentFilter {
+                    LibrarySidebarPanel(item: item, appState: appState)
+                } else {
+                    LibraryCollectionSidebarPanel(appState: appState)
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(nsColor: .textBackgroundColor), in: paneShape)
+            .clipShape(paneShape)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .textBackgroundColor))
-        .clipShape(UnevenRoundedRectangle(
-            topLeadingRadius: 0,
-            bottomLeadingRadius: 0,
-            bottomTrailingRadius: 0,
-            topTrailingRadius: OakStyle.Radius.standard
-        ))
-        .overlay(
-            TopRightBorderFill(radius: OakStyle.Radius.standard, thickness: 1)
-                .fill(Color(nsColor: .separatorColor))
-        )
     }
 
     private var selectedItemInCurrentFilter: LibraryItem? {
         guard let id = appState.selectedLibraryItemIDs.first else { return nil }
         return store.filteredItems.first { $0.id == id }
-    }
-
-    private func splitAvailableWidth(for available: CGFloat) -> CGFloat {
-        guard appState.libraryDetailTab != nil else { return available }
-        return max(available - Self.splitDividerWidth, 0)
-    }
-
-    private func detailPanelWidthRange(for available: CGFloat) -> ClosedRange<CGFloat> {
-        let splitAvailable = splitAvailableWidth(for: available)
-        let tableMin = splitAvailable * 0.382
-        let detailMax = max(splitAvailable - tableMin, 0)
-        let detailMin = min(Self.detailPanelMinWidth, detailMax)
-        return detailMin...detailMax
-    }
-
-    private func resolvedDetailPanelWidth(for available: CGFloat, dragTranslation: CGFloat = 0) -> CGFloat {
-        let range = detailPanelWidthRange(for: available)
-        let idealWidth = splitAvailableWidth(for: available) * 0.382
-        let baseWidth = min(max(detailPanelWidth ?? idealWidth, range.lowerBound), range.upperBound)
-        return min(max(baseWidth - dragTranslation, range.lowerBound), range.upperBound)
-    }
-
-    private func splitDivider(available: CGFloat) -> some View {
-        libraryChromeBackground
-            .frame(width: Self.splitDividerWidth)
-            .overlay(
-                Rectangle()
-                    .fill(Color(nsColor: .separatorColor))
-                    .frame(width: 1)
-            )
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .updating($detailPanelDragTranslation) { value, state, _ in
-                        state = value.translation.width
-                    }
-                    .onEnded { value in
-                        detailPanelWidth = resolvedDetailPanelWidth(
-                            for: available,
-                            dragTranslation: value.translation.width
-                        )
-                    }
-            )
-            .onHover { hovering in
-                if hovering {
-                    NSCursor.resizeLeftRight.set()
-                } else {
-                    NSCursor.arrow.set()
-                }
-            }
     }
 
 }

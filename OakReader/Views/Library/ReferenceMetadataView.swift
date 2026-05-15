@@ -33,7 +33,7 @@ struct ReferenceMetadataView: View {
         case creatorGiven(String, Int)
     }
 
-    private let labelWidth: CGFloat = 80
+    private let labelWidth: CGFloat = 90
 
     var body: some View {
         if item.referenceMetadata != nil {
@@ -103,7 +103,7 @@ struct ReferenceMetadataView: View {
                     }
                 }
                 .labelsHidden()
-                .controlSize(.small)
+                .controlSize(.regular)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .onChange(of: cslType) { _, _ in saveDebounced() }
             }
@@ -114,7 +114,7 @@ struct ReferenceMetadataView: View {
                     underlinedField {
                         TextField("", text: $citeKeyText)
                             .textFieldStyle(.plain)
-                            .font(.system(size: 13, design: .monospaced))
+                            .font(.system(size: 14, design: .monospaced))
                             .focused($focusedField, equals: .citeKey)
                             .onSubmit { saveCiteKey() }
                             .onChange(of: focusedField) { old, new in
@@ -123,7 +123,7 @@ struct ReferenceMetadataView: View {
                     }
                     if let error = citeKeyError {
                         Text(error)
-                            .font(.system(size: 10))
+                            .font(.system(size: 11))
                             .foregroundStyle(.red)
                     }
                 }
@@ -174,7 +174,7 @@ struct ReferenceMetadataView: View {
                 underlinedField {
                     TextField("", text: $extraText, axis: .vertical)
                         .textFieldStyle(.plain)
-                        .font(.system(size: 12, design: .monospaced))
+                        .font(.system(size: 13, design: .monospaced))
                         .lineLimit(2...8)
                         .focused($focusedField, equals: .extra)
                         .onSubmit { saveDebounced() }
@@ -203,9 +203,9 @@ struct ReferenceMetadataView: View {
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "doc.on.doc")
-                            .font(.system(size: 11))
-                        Text("Copy Citation")
                             .font(.system(size: 12))
+                        Text("Copy Citation")
+                            .font(.system(size: 13))
                     }
                 }
                 .menuStyle(.borderlessButton)
@@ -213,7 +213,7 @@ struct ReferenceMetadataView: View {
             }
             .padding(.horizontal, 4)
         }
-        .font(.system(size: 13))
+        .font(.system(size: 14))
     }
 
     // MARK: - Dynamic Field Rows
@@ -397,7 +397,7 @@ struct ReferenceMetadataView: View {
     ) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(label)
-                .font(.system(size: 13))
+                .font(.system(size: 14))
                 .foregroundStyle(.secondary)
                 .frame(width: labelWidth, alignment: .trailing)
                 .lineLimit(1)
@@ -405,7 +405,7 @@ struct ReferenceMetadataView: View {
             content()
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.vertical, 5)
+        .padding(.vertical, 6)
         .padding(.horizontal, 4)
     }
 
@@ -435,7 +435,7 @@ struct ReferenceMetadataView: View {
             .padding(.bottom, 2)
             .overlay(alignment: .bottom) {
                 Rectangle()
-                    .fill(Color.primary.opacity(0.08))
+                    .fill(Color.primary.opacity(0.10))
                     .frame(height: 1)
             }
     }
@@ -443,9 +443,9 @@ struct ReferenceMetadataView: View {
     private func circleButton(_ icon: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.system(size: 9, weight: .bold))
+                .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(.tertiary)
-                .frame(width: 16, height: 16)
+                .frame(width: 18, height: 18)
                 .background(Circle().fill(Color.primary.opacity(0.05)))
         }
         .buttonStyle(.borderless)
