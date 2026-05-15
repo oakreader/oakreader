@@ -80,8 +80,8 @@ struct ChatBubbleView: View {
                                 }
                             }
                             .onHover { isCopyHovered = $0 }
-                            .animation(.easeInOut(duration: 0.15), value: showCopied)
-                            .animation(.easeInOut(duration: 0.15), value: isCopyHovered)
+                            .animation(.spring(duration: 0.25, bounce: 0.3), value: showCopied)
+                            .animation(.spring(duration: 0.2, bounce: 0.2), value: isCopyHovered)
 
                             if onSaveToNote != nil {
                                 actionButton(
@@ -93,9 +93,9 @@ struct ChatBubbleView: View {
                                     saveToNote()
                                 }
                                 .onHover { isSaveHovered = $0 }
-                                .animation(.easeInOut(duration: 0.15), value: showSaved)
-                                .animation(.easeInOut(duration: 0.15), value: showSaveFailed)
-                                .animation(.easeInOut(duration: 0.15), value: isSaveHovered)
+                                .animation(.spring(duration: 0.25, bounce: 0.3), value: showSaved)
+                                .animation(.spring(duration: 0.25, bounce: 0.3), value: showSaveFailed)
+                                .animation(.spring(duration: 0.2, bounce: 0.2), value: isSaveHovered)
                             }
                         }
                     }
@@ -105,7 +105,7 @@ struct ChatBubbleView: View {
             }
             .clipped()
             .onHover { isHovered = $0 }
-            .animation(.easeInOut(duration: 0.15), value: isHovered)
+            .animation(.spring(duration: 0.2, bounce: 0.15), value: isHovered)
             .onChange(of: turn.content) { _, newContent in
                 if turn.isStreaming && turn.role == .assistant {
                     reveal.push(newContent)
@@ -138,7 +138,7 @@ struct ChatBubbleView: View {
         let base = StructuredText(markdown: renderedContent, syntaxExtensions: [.math])
             .textual.headingStyle(ChatHeadingStyle())
             .textual.textSelection(.enabled)
-            .font(.body)
+            .font(OakStyle.ChatFont.messageBody)
 
         if turn.role == .assistant {
             base
@@ -330,10 +330,10 @@ struct ChatBubbleView: View {
         }
         return HStack(spacing: 3) {
             Image(systemName: skill?.icon ?? "sparkles")
-                .font(.system(size: 13, weight: .medium))
+                .font(OakStyle.ChatFont.modelLabel)
                 .opacity(0.8)
             Text(skillId)
-                .font(.system(size: 13, weight: .medium))
+                .font(OakStyle.ChatFont.modelLabel)
         }
         .foregroundStyle(Color.accentColor)
         .fixedSize()
@@ -342,10 +342,10 @@ struct ChatBubbleView: View {
     private func referenceBadge(_ title: String, icon: String) -> some View {
         HStack(spacing: 3) {
             Image(systemName: icon)
-                .font(.system(size: 12, weight: .medium))
+                .font(OakStyle.ChatFont.badge)
                 .opacity(0.8)
             Text(title)
-                .font(.system(size: 12, weight: .medium))
+                .font(OakStyle.ChatFont.badge)
                 .lineLimit(1)
         }
         .foregroundStyle(Color.orange)
@@ -379,7 +379,7 @@ struct ChatBubbleView: View {
     ) -> some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 12))
+                .font(.system(size: OakStyle.ChatFont.actionIconSize))
                 .foregroundStyle(foregroundStyle)
                 .frame(width: 24, height: 24)
                 .background(
@@ -551,22 +551,52 @@ private extension String {
     }
 }
 
-// MARK: - Streaming Cursor (Alma-style pulsing caret)
+// MARK: - Streaming Cursor (Waveform bars inspired by Bridge)
+//
+// Five vertical bars with staggered pulse animations, creating a
+// rippling "thinking" indicator that feels alive without being distracting.
 
 private struct StreamingCursor: View {
-    @State private var pulsing = false
+    private static let barCount = 5
+    private static let barWidth: CGFloat = 2.5
+    private static let barSpacing: CGFloat = 2
+    private static let minHeight: CGFloat = 3
+    private static let maxHeight: CGFloat = OakStyle.ChatFont.streamingBarHeight
+    private static let cycleDuration: Double = 1.2
+
+    @State private var animating = false
 
     var body: some View {
-        Text("▎")
-            .font(.system(size: 16, weight: .regular))
-            .foregroundStyle(Color.accentColor)
-            .opacity(pulsing ? 0.9 : 0.4)
-            .scaleEffect(y: pulsing ? 1.05 : 1.0)
-            .animation(
-                .easeInOut(duration: 0.6).repeatForever(autoreverses: true),
-                value: pulsing
-            )
-            .onAppear { pulsing = true }
+        HStack(spacing: Self.barSpacing) {
+            ForEach(0..<Self.barCount, id: \.self) { index in
+                Capsule()
+                    .fill(Color.accentColor)
+                    .frame(width: Self.barWidth, height: barHeight(for: index))
+                    .opacity(barOpacity(for: index))
+            }
+        }
+        .frame(height: Self.maxHeight)
+        .animation(
+            .easeInOut(duration: Self.cycleDuration).repeatForever(autoreverses: true),
+            value: animating
+        )
+        .onAppear { animating = true }
+    }
+
+    private func barHeight(for index: Int) -> CGFloat {
+        let phase = Double(index) / Double(Self.barCount)
+        let base = animating ? 1.0 : phase
+        // Stagger: middle bars are tallest when animating
+        let center = Double(Self.barCount - 1) / 2.0
+        let proximity = 1.0 - abs(Double(index) - center) / center
+        let height = animating
+            ? Self.minHeight + (Self.maxHeight - Self.minHeight) * proximity
+            : Self.minHeight + (Self.maxHeight - Self.minHeight) * (1.0 - proximity) * 0.5
+        return max(Self.minHeight, height * (animating ? (0.6 + 0.4 * base) : 0.5))
+    }
+
+    private func barOpacity(for index: Int) -> Double {
+        animating ? (0.5 + 0.5 * (Double(index) / Double(Self.barCount - 1))) : 0.3
     }
 }
 
