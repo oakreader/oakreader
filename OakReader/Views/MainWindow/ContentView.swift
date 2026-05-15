@@ -21,7 +21,7 @@ struct ContentView: View {
             let maxRightPanel = geometry.size.width * 0.6
 
             HStack(spacing: 0) {
-                // Sidebar + Content wrapped together for unified corner radius
+                // Sidebar + content wrapped together for the pane corner beside SideNav.
                 HStack(spacing: 0) {
                     // Left sidebar — full height
                     if viewModel.state.isSidebarVisible {
@@ -89,8 +89,16 @@ struct ContentView: View {
                     ))
                 }
             }
+            .clipShape(
+                UnevenRoundedRectangle(
+                    topLeadingRadius: 2,
+                    bottomLeadingRadius: 0,
+                    bottomTrailingRadius: 0,
+                    topTrailingRadius: OakStyle.Radius.standard
+                )
+            )
         }
-        .background(OakStyle.Colors.tabBarBackground)
+        .background(Color(nsColor: .controlBackgroundColor))
         .alert("Error", isPresented: Binding(
             get: { viewModel.state.showError },
             set: { viewModel.state.showError = $0 }
