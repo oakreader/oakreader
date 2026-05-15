@@ -142,15 +142,27 @@ actor EmbeddingService {
 
             let attentionMask = paddedInputIds .!= MLXArray(padTokenId)
 
-            let output = model(
-                paddedInputIds,
-                positionIds: nil,
-                tokenTypeIds: nil,
-                attentionMask: attentionMask
-            )
+            // Wrap MLX computation in withErrorHandler to catch C++ errors
+            // instead of letting them hit fatalError in ErrorHandler.dispatch.
+            var mlxErrorMessage: String?
+            let embeddings = ErrorHandler.shared.withErrorHandler({ message in
+                mlxErrorMessage = message
+            }) {
+                let output = model(
+                    paddedInputIds,
+                    positionIds: nil,
+                    tokenTypeIds: nil,
+                    attentionMask: attentionMask
+                )
+                let emb = pooling(output, mask: attentionMask, normalize: true)
+                eval(emb)
+                return emb
+            }
 
-            let embeddings = pooling(output, mask: attentionMask, normalize: true)
-            eval(embeddings)
+            if let mlxErrorMessage {
+                throw EmbeddingError.mlxError(mlxErrorMessage)
+            }
+
             return embeddings.map { $0.asArray(Float.self) }
         }
 
@@ -172,11 +184,13 @@ actor EmbeddingService {
     enum EmbeddingError: Error, LocalizedError {
         case modelNotLoaded
         case emptyResult
+        case mlxError(String)
 
         var errorDescription: String? {
             switch self {
             case .modelNotLoaded: return "Embedding model not loaded"
             case .emptyResult: return "Embedding produced no results"
+            case .mlxError(let message): return "MLX error: \(message)"
             }
         }
     }
