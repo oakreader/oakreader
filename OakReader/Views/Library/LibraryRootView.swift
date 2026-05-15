@@ -75,31 +75,37 @@ struct LibraryRootView: View {
                     .background(OakStyle.Colors.sidebarBackground)
             }
 
-            // Middle + Right in HSplitView
-            HSplitView {
-                // Table — rounded top-left corner, top + left border only
-                VStack(spacing: 0) {
-                    LibraryTableToolbar(appState: appState)
-                    Divider()
-                    LibraryTableView(appState: appState, selection: $appState.selectedLibraryItemIDs)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color(nsColor: .controlBackgroundColor))
-                .clipShape(UnevenRoundedRectangle(
-                    topLeadingRadius: OakStyle.Radius.standard,
-                    bottomLeadingRadius: 0,
-                    bottomTrailingRadius: 0,
-                    topTrailingRadius: 0
-                ))
-                .overlay(
-                    TopLeftBorderFill(radius: OakStyle.Radius.standard, thickness: 1)
-                        .fill(Color(nsColor: .separatorColor))
-                )
+            // Middle + Right in HSplitView (golden ratio: table ≥ 0.382, detail ≤ 0.618)
+            GeometryReader { geo in
+                let available = geo.size.width
+                let tableMin = available * 0.382
+                let detailMax = available * 0.618
 
-                // Detail content panel (only when a tab is selected)
-                if appState.libraryDetailTab != nil {
-                    detailContentPanel
-                        .frame(minWidth: 200, idealWidth: 358, maxWidth: 800)
+                HSplitView {
+                    // Table — rounded top-left corner, top + left border only
+                    VStack(spacing: 0) {
+                        LibraryTableToolbar(appState: appState)
+                        Divider()
+                        LibraryTableView(appState: appState, selection: $appState.selectedLibraryItemIDs)
+                    }
+                    .frame(minWidth: tableMin, maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(nsColor: .controlBackgroundColor))
+                    .clipShape(UnevenRoundedRectangle(
+                        topLeadingRadius: OakStyle.Radius.standard,
+                        bottomLeadingRadius: 0,
+                        bottomTrailingRadius: 0,
+                        topTrailingRadius: 0
+                    ))
+                    .overlay(
+                        TopLeftBorderFill(radius: OakStyle.Radius.standard, thickness: 1)
+                            .fill(Color(nsColor: .separatorColor))
+                    )
+
+                    // Detail content panel (only when a tab is selected)
+                    if appState.libraryDetailTab != nil {
+                        detailContentPanel
+                            .frame(minWidth: 200, idealWidth: available * 0.382, maxWidth: detailMax)
+                    }
                 }
             }
 
@@ -162,6 +168,8 @@ private struct LibraryCollectionSidebarPanel: View {
 
     var body: some View {
         switch appState.libraryDetailTab {
+        case .chat:
+            AIChatView(chatVM: appState.libraryChatVM)
         case .notes:
             CollectionNotesPanelView(
                 appState: appState,
