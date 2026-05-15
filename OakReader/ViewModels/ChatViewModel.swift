@@ -97,43 +97,6 @@ class ChatViewModel {
         )
     }
 
-    /// Cached mention items — rebuilt only when the library revision changes.
-    private var cachedMentionItems: [ChatCompletionItem]?
-    private var cachedMentionRevision: Int = -1
-    private var cachedMentionHasDocument: Bool?
-
-    /// Items shown in the `@` mention completion panel.
-    @MainActor
-    var chatMentionItems: [ChatCompletionItem] {
-        let store = parent?.libraryStore ?? appState?.libraryStore
-        let currentRevision = store?.revision ?? 0
-        let hasDoc = parent != nil
-
-        if let cached = cachedMentionItems,
-           cachedMentionRevision == currentRevision,
-           cachedMentionHasDocument == hasDoc {
-            return cached
-        }
-
-        var items = ChatCompletionItem.mentionItems(hasDocument: hasDoc)
-
-        if let store {
-            items += ChatCompletionItem.libraryItems(from: store.items)
-        }
-
-        if let db = parent?.database, let storageKey = parent?.itemStorageKey {
-            let noteService = NoteService(database: db)
-            if let notes = try? noteService.fetchNotes(forItemId: storageKey) {
-                items += ChatCompletionItem.noteItems(from: notes, database: db)
-            }
-        }
-
-        cachedMentionItems = items
-        cachedMentionRevision = currentRevision
-        cachedMentionHasDocument = hasDoc
-        return items
-    }
-
     // MARK: - Send Message
 
     @MainActor
@@ -165,15 +128,6 @@ class ChatViewModel {
             }
         }.first
 
-        // Extract broadest context mode from @mention tokens
-        let tokenContextMode: ContextMode? = tokens.lazy.compactMap { $0.contextMode }
-            .sorted { lhs, rhs in
-                // fullDocument > currentPage > selectedText > none
-                let order: [ContextMode: Int] = [.fullDocument: 0, .currentPage: 1, .selectedText: 2, .none: 3]
-                return (order[lhs] ?? 3) < (order[rhs] ?? 3)
-            }
-            .first
-
         let effectiveSkill = tokenSkill ?? taggedSkill ?? selectedSkill
         let sendText = text.isEmpty ? (effectiveSkill?.name ?? "Go") : text
         var userContent = effectiveSkill.map { Self.contentWithSkillTag(skillId: $0.id, text: text) } ?? sendText
@@ -197,7 +151,7 @@ class ChatViewModel {
         persistSessionMetadata(firstUserMessage: sendText)
 
         // Build enriched context snapshot
-        let contextMode = tokenContextMode ?? effectiveSkill?.contextMode ?? .currentPage
+        let contextMode = effectiveSkill?.contextMode ?? .currentPage
         let snapshot = PDFContextProvider.buildContextSnapshot(
             from: parent,
             appState: parent?.appState ?? appState,
