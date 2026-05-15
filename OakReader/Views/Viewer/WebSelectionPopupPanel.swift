@@ -108,6 +108,7 @@ class WebSelectionPopupPanel: NSPanel, AppResignDismissable {
         level = .floating
         hasShadow = true
         ignoresMouseEvents = false
+        appearance = NSAppearance(named: .aqua)
 
         let content = buildContentView()
         self.contentView = content
@@ -277,6 +278,7 @@ class WebSelectionPopupPanel: NSPanel, AppResignDismissable {
         panel.level = .floating
         panel.hasShadow = true
         panel.ignoresMouseEvents = false
+        panel.appearance = NSAppearance(named: .aqua)
         panel.contentView = container
 
         let contentSize = container.fittingSize
@@ -427,6 +429,7 @@ class WebAreaPopupPanel: NSPanel, AppResignDismissable {
         level = .floating
         hasShadow = true
         ignoresMouseEvents = false
+        appearance = NSAppearance(named: .aqua)
 
         let content = buildContentView()
         self.contentView = content
