@@ -403,8 +403,13 @@ enum CitationFormatter {
     private static func formatAPAAuthors(_ authors: [CSLName]) -> String {
         let formatted = authors.map { name -> String in
             if let lit = name.literal, !lit.isEmpty { return lit }
+            var familyPart = ""
+            if let ndp = name.nonDroppingParticle, !ndp.isEmpty { familyPart += ndp + " " }
+            familyPart += name.family ?? ""
             let initial = (name.given ?? "").isEmpty ? "" : " \(name.given!.prefix(1))."
-            return (name.family ?? "") + initial
+            var result = familyPart + initial
+            if let sfx = name.suffix, !sfx.isEmpty { result += ", \(sfx)" }
+            return result
         }
 
         switch formatted.count {
@@ -420,9 +425,14 @@ enum CitationFormatter {
     private static func formatMLAAuthors(_ authors: [CSLName]) -> String {
         let formatted = authors.enumerated().map { (i, name) -> String in
             if let lit = name.literal, !lit.isEmpty { return lit }
+            var familyPart = ""
+            if let ndp = name.nonDroppingParticle, !ndp.isEmpty { familyPart += ndp + " " }
+            familyPart += name.family ?? ""
             if i == 0 {
                 // First author: Last, First
-                return [(name.family ?? ""), (name.given ?? "")].filter { !$0.isEmpty }.joined(separator: ", ")
+                var result = [familyPart, name.given ?? ""].filter { !$0.isEmpty }.joined(separator: ", ")
+                if let sfx = name.suffix, !sfx.isEmpty { result += ", \(sfx)" }
+                return result
             } else {
                 // Subsequent: First Last
                 return name.fullDisplayString
@@ -445,8 +455,13 @@ enum CitationFormatter {
     private static func formatChicagoAuthors(_ authors: [CSLName]) -> String {
         let formatted = authors.enumerated().map { (i, name) -> String in
             if let lit = name.literal, !lit.isEmpty { return lit }
+            var familyPart = ""
+            if let ndp = name.nonDroppingParticle, !ndp.isEmpty { familyPart += ndp + " " }
+            familyPart += name.family ?? ""
             if i == 0 {
-                return [(name.family ?? ""), (name.given ?? "")].filter { !$0.isEmpty }.joined(separator: ", ")
+                var result = [familyPart, name.given ?? ""].filter { !$0.isEmpty }.joined(separator: ", ")
+                if let sfx = name.suffix, !sfx.isEmpty { result += ", \(sfx)" }
+                return result
             } else {
                 return name.fullDisplayString
             }
@@ -540,12 +555,22 @@ enum CitationFormatter {
 
     private static func bibTeXName(_ name: CSLName) -> String {
         if let lit = name.literal, !lit.isEmpty { return "{\(lit)}" }
-        return [(name.family ?? ""), (name.given ?? "")].filter { !$0.isEmpty }.joined(separator: ", ")
+        var familyPart = ""
+        if let ndp = name.nonDroppingParticle, !ndp.isEmpty { familyPart += ndp + " " }
+        familyPart += name.family ?? ""
+        var parts = [familyPart, name.given ?? ""].filter { !$0.isEmpty }
+        if let sfx = name.suffix, !sfx.isEmpty { parts.append(sfx) }
+        return parts.joined(separator: ", ")
     }
 
     private static func risName(_ name: CSLName) -> String {
         if let lit = name.literal, !lit.isEmpty { return lit }
-        return [(name.family ?? ""), (name.given ?? "")].filter { !$0.isEmpty }.joined(separator: ", ")
+        var familyPart = ""
+        if let ndp = name.nonDroppingParticle, !ndp.isEmpty { familyPart += ndp + " " }
+        familyPart += name.family ?? ""
+        var result = [familyPart, name.given ?? ""].filter { !$0.isEmpty }.joined(separator: ", ")
+        if let sfx = name.suffix, !sfx.isEmpty { result += ", \(sfx)" }
+        return result
     }
 
     private static func cslTypeFromBibTeX(_ bibtex: String) -> String {

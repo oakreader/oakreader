@@ -313,6 +313,7 @@
 		F1E2D3C4B5A6F7E8D9C0B1A3 /* XBookmarksAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F3 /* XBookmarksAPIClient.swift */; };
 		F1E2D3C4B5A6F7E8D9C0B1A4 /* GitHubStarsAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F4 /* GitHubStarsAPIClient.swift */; };
 		F1E2D3C4B5A6F7E8D9C0B1A5 /* ImportService+XBookmarks.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F5 /* ImportService+XBookmarks.swift */; };
+		C3D4E5F6A7B8C9D0E1F2A3B4 /* ItemRelationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F6A7B8C9D0E1F2A3 /* ItemRelationService.swift */; };
 		F1E2D3C4B5A6F7E8D9C0B1A6 /* ImportService+GitHubStars.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F6 /* ImportService+GitHubStars.swift */; };
 		F1E2D3C4B5A6F7E8D9C0B1A7 /* SyncScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F7 /* SyncScheduler.swift */; };
 		F1E2D3C4B5A6F7E8D9C0B1A8 /* XBookmarksSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F8 /* XBookmarksSettingsView.swift */; };
@@ -626,6 +627,7 @@
 		A1B2C3D4E5F6A7B8C9D0E1F3 /* XBookmarksAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XBookmarksAPIClient.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6A7B8C9D0E1F4 /* GitHubStarsAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubStarsAPIClient.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6A7B8C9D0E1F5 /* ImportService+XBookmarks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ImportService+XBookmarks.swift"; sourceTree = "<group>"; };
+		B2C3D4E5F6A7B8C9D0E1F2A3 /* ItemRelationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItemRelationService.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6A7B8C9D0E1F6 /* ImportService+GitHubStars.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ImportService+GitHubStars.swift"; sourceTree = "<group>"; };
 		A1B2C3D4E5F6A7B8C9D0E1F7 /* SyncScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncScheduler.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6A7B8C9D0E1F8 /* XBookmarksSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XBookmarksSettingsView.swift; sourceTree = "<group>"; };
@@ -887,6 +889,7 @@
 				7A53DB1545CD8F422041F4E0 /* ImportService+WebSnapshot.swift */,
 				934AA4CACF59EBC2442C629C /* ImportService+URL.swift */,
 				A1B2C3D4E5F6A7B8C9D0E1F5 /* ImportService+XBookmarks.swift */,
+				B2C3D4E5F6A7B8C9D0E1F2A3 /* ItemRelationService.swift */,
 				CE52226111AD1C0257F4BB64 /* LibraryCitationExport.swift */,
 				412451D7D488F2DCEF2F1CF2 /* LibraryCollectionStore.swift */,
 				213E072D4DBDA107DB9C8194 /* LibraryCoverService.swift */,
@@ -1566,6 +1569,7 @@
 				B1FE1232C2E15AF345399697 /* ImportService+PDF.swift in Sources */,
 				2812DC3E0BCC920B261B8B78 /* ImportService+WebSnapshot.swift in Sources */,
 				F1E2D3C4B5A6F7E8D9C0B1A5 /* ImportService+XBookmarks.swift in Sources */,
+				C3D4E5F6A7B8C9D0E1F2A3B4 /* ItemRelationService.swift in Sources */,
 				AB825F7A04D8D1E0031F43C9 /* ImportService+URL.swift in Sources */,
 				72FFBBCEF5CDB8829ECB25DB /* ImportService.swift in Sources */,
 				F352CAC7A2DA675416A9F5C0 /* ImportSheet.swift in Sources */,

@@ -163,8 +163,19 @@ struct CiteKeyService {
     // MARK: - Helpers
 
     /// Extract the first author's family name from a CSLItem, processed for use in a cite key.
+    /// Includes non-dropping particle (e.g., "von Neumann" → "vonneumann").
     static func extractAuthorKey(csl: CSLItem) -> String {
         guard let firstAuthor = csl.author?.first else { return "" }
+
+        // When the name has an explicit non-dropping particle, include it directly
+        // without going through particle-stripping logic.
+        if let ndp = firstAuthor.nonDroppingParticle, !ndp.isEmpty {
+            let familyPart = firstAuthor.family ?? ""
+            let combined = ndp + familyPart
+            let latin = transliterate(combined)
+            return alphanumericOnly(latin.lowercased())
+        }
+
         let name = firstAuthor.family ?? firstAuthor.literal ?? ""
         return processAuthorName(name)
     }

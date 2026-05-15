@@ -96,7 +96,7 @@ enum ZoteroFieldMapping {
         "archive":              "archive",
         "callNumber":           "call-number",
         "rights":               "note",
-        "extra":                "note",
+        // "extra" is routed to items.extra column, not CSL note — see ZoteroMigrationService
     ]
 
     // MARK: - Creator Type Mapping (Zotero creatorType -> CSL role)

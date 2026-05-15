@@ -71,15 +71,15 @@ struct SearchLibraryTool: AgentTool, Sendable {
                     }
                 }
 
-                // 1b. Abstract search — all words must appear (uses extracted column)
-                if words.count <= 5 {
-                    let absConditions = words.map { _ in "c.abstract LIKE ?" }.joined(separator: " AND ")
-                    let absSQL = """
+                // 1b. Abstract + container_title search via FTS5 (sub-ms, uses inverted index)
+                let citationFtsQuery = Self.buildFTSQuery(words: words)
+                if !citationFtsQuery.isEmpty {
+                    let citFtsSQL = """
                         SELECT c.item_id FROM citations c
-                        WHERE c.abstract IS NOT NULL AND (\(absConditions))
+                        JOIN citations_fts ON citations_fts.rowid = c.rowid
+                        WHERE citations_fts MATCH ?
                         """
-                    let absArgs = words.map { "%\($0)%" }
-                    for row in try Row.fetchAll(db, sql: absSQL, arguments: StatementArguments(absArgs)) {
+                    for row in try Row.fetchAll(db, sql: citFtsSQL, arguments: [citationFtsQuery]) {
                         matchingIds.insert(row["item_id"] as String)
                     }
                 }
@@ -92,7 +92,8 @@ struct SearchLibraryTool: AgentTool, Sendable {
                     matchingIds.insert(row["item_id"] as String)
                 }
 
-                // 1d. Journal name search (indexed column)
+                // 1d. Journal name search — covered by citations_fts above;
+                // keep LIKE fallback for exact substring matches FTS might miss
                 for row in try Row.fetchAll(db, sql: """
                     SELECT item_id FROM citations WHERE container_title LIKE ?
                     """, arguments: [fullPattern]) {

@@ -46,9 +46,9 @@ enum CSLFieldKey: String, CaseIterable, Hashable {
 enum CSLCreatorRole: String, CaseIterable, Hashable {
     case author, editor, translator, director, illustrator, composer
     case recipient, interviewer, compiler, curator, guest, host
-    case narrator, organizer, performer, producer
+    case narrator, organizer, performer, producer, chair
     case collectionEditor, reviewedAuthor, containerAuthor
-    case editorialDirector, executiveProducer, scriptWriter
+    case editorialDirector, executiveProducer, scriptWriter, originalAuthor
 
     var jsonKey: String {
         switch self {
@@ -58,6 +58,7 @@ enum CSLCreatorRole: String, CaseIterable, Hashable {
         case .editorialDirector:    return "editorial-director"
         case .executiveProducer:    return "executive-producer"
         case .scriptWriter:         return "script-writer"
+        case .originalAuthor:       return "original-author"
         default:                    return rawValue
         }
     }
@@ -86,6 +87,8 @@ enum CSLCreatorRole: String, CaseIterable, Hashable {
         case .performer:            return "Performer"
         case .producer:             return "Producer"
         case .scriptWriter:         return "Scriptwriter"
+        case .chair:                return "Chair"
+        case .originalAuthor:       return "Original Author"
         }
     }
 
@@ -109,6 +112,9 @@ struct CSLItem: Hashable {
     var creators: [CSLCreatorRole: [CSLName]] = [:]
     var issued: CSLDate?
     var accessed: CSLDate?
+    var submitted: CSLDate?
+    var originalDate: CSLDate?
+    var eventDate: CSLDate?
 
     init(type: String) { self.type = type }
 
@@ -393,6 +399,9 @@ extension CSLItem: Codable {
         }
         issued = try? container.decode(CSLDate.self, forKey: DynamicCodingKey("issued"))
         accessed = try? container.decode(CSLDate.self, forKey: DynamicCodingKey("accessed"))
+        submitted = try? container.decode(CSLDate.self, forKey: DynamicCodingKey("submitted"))
+        originalDate = try? container.decode(CSLDate.self, forKey: DynamicCodingKey("original-date"))
+        eventDate = try? container.decode(CSLDate.self, forKey: DynamicCodingKey("event-date"))
     }
 
     func encode(to encoder: Encoder) throws {
@@ -406,6 +415,9 @@ extension CSLItem: Codable {
         }
         if let issued { try container.encode(issued, forKey: DynamicCodingKey("issued")) }
         if let accessed { try container.encode(accessed, forKey: DynamicCodingKey("accessed")) }
+        if let submitted { try container.encode(submitted, forKey: DynamicCodingKey("submitted")) }
+        if let originalDate { try container.encode(originalDate, forKey: DynamicCodingKey("original-date")) }
+        if let eventDate { try container.encode(eventDate, forKey: DynamicCodingKey("event-date")) }
     }
 }
 
@@ -458,16 +470,45 @@ struct CSLName: Codable, Hashable {
     var family: String?
     var given: String?
     var literal: String?
+    var droppingParticle: String?
+    var nonDroppingParticle: String?
+    var suffix: String?
 
-    var displayString: String {
-        if let lit = literal, !lit.isEmpty { return lit }
-        let initial = (given ?? "").isEmpty ? "" : "\(given!.prefix(1))."
-        return [(family ?? ""), initial].filter { !$0.isEmpty }.joined(separator: ", ")
+    enum CodingKeys: String, CodingKey {
+        case family, given, literal, suffix
+        case droppingParticle = "dropping-particle"
+        case nonDroppingParticle = "non-dropping-particle"
     }
 
+    /// Short display: "van Beethoven, L." or "de la Cruz, M., Jr."
+    var displayString: String {
+        if let lit = literal, !lit.isEmpty { return lit }
+        var familyPart = ""
+        if let ndp = nonDroppingParticle, !ndp.isEmpty {
+            familyPart += ndp + " "
+        }
+        familyPart += family ?? ""
+        let initial = (given ?? "").isEmpty ? "" : "\(given!.prefix(1))."
+        var result = [familyPart, initial].filter { !$0.isEmpty }.joined(separator: ", ")
+        if let sfx = suffix, !sfx.isEmpty {
+            result += ", \(sfx)"
+        }
+        return result
+    }
+
+    /// Full display: "Ludwig van Beethoven" or "Maria de la Cruz, Jr."
     var fullDisplayString: String {
         if let lit = literal, !lit.isEmpty { return lit }
-        return [(given ?? ""), (family ?? "")].filter { !$0.isEmpty }.joined(separator: " ")
+        var parts: [String] = []
+        if let g = given, !g.isEmpty { parts.append(g) }
+        if let dp = droppingParticle, !dp.isEmpty { parts.append(dp) }
+        if let ndp = nonDroppingParticle, !ndp.isEmpty { parts.append(ndp) }
+        if let f = family, !f.isEmpty { parts.append(f) }
+        var result = parts.joined(separator: " ")
+        if let sfx = suffix, !sfx.isEmpty {
+            result += ", \(sfx)"
+        }
+        return result
     }
 }
 

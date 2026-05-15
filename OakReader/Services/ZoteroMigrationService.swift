@@ -414,11 +414,17 @@ final class ZoteroMigrationService {
             let cslType = ZoteroFieldMapping.itemTypeToCSL[zItem.typeName] ?? "document"
             var cslItem = CSLItem(type: cslType)
 
+            var extraText: String?
             for field in fields {
+                // Route Zotero "extra" to items.extra column, not CSL note
+                if field.fieldName == "extra" {
+                    extraText = field.value
+                    continue
+                }
                 guard let cslField = ZoteroFieldMapping.fieldToCSL[field.fieldName] else { continue }
                 switch cslField {
                 case "note":
-                    // Append multiple note-mapped fields (rights, extra)
+                    // Append note-mapped fields (e.g., rights)
                     if let existing = cslItem.note, !existing.isEmpty {
                         cslItem.note = existing + "\n" + field.value
                     } else {
@@ -432,6 +438,11 @@ final class ZoteroMigrationService {
                     // All other fields: set by CSL JSON key directly
                     cslItem[jsonKey: cslField] = field.value
                 }
+            }
+
+            // Merge extra field CSL pairs into CSL item (only fills empty fields)
+            if let extra = extraText {
+                ReferenceService.mergeExtraFields(extra, into: &cslItem)
             }
 
             // Creators — route to specific CSL role arrays
@@ -529,7 +540,8 @@ final class ZoteroMigrationService {
                 createdAt: now,
                 updatedAt: now,
                 source: "zotero",
-                sourceKey: zItem.key
+                sourceKey: zItem.key,
+                extra: extraText
             )
 
             let attRecord = AttachmentRecord(
@@ -554,9 +566,9 @@ final class ZoteroMigrationService {
                 continue
             }
 
-            // Save citation metadata
+            // Save citation metadata (with extra for PMID/arXiv extraction)
             do {
-                try referenceService.saveMetadata(cslItem, forItemId: docId.uuidString)
+                try referenceService.saveMetadata(cslItem, forItemId: docId.uuidString, extra: extraText)
             } catch {
                 Log.error(Log.zotero, "Failed to save citation for '\(title)': \(error)")
             }
