@@ -113,8 +113,8 @@ class DocumentViewModel {
         return vm
     }
 
-    /// Shared character list view model, set externally by AppState when creating the tab.
-    var characterListVM: CharacterListViewModel?
+    /// Shared voice call list view model, set externally by AppState when creating the tab.
+    var callListVM: VoiceCallListViewModel?
 
     /// The item-level storage key, set externally by AppState when creating the tab.
     var itemStorageKey: String?

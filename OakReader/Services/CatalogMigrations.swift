@@ -286,7 +286,7 @@ extension CatalogDatabase {
             }
             try db.create(index: "idx_voice_calls_character_id", on: "voice_calls", columns: ["character_id"])
 
-            // Seed default character
+            // Seed default character (v10 migration drops this table)
             let characterId = UUID().uuidString
             let now = Date().iso8601String
             try db.execute(sql: """
@@ -294,16 +294,13 @@ extension CatalogDatabase {
                 VALUES (?, ?, 'Oak', 0, ?, ?)
             """, arguments: [characterId, localUserId, now, now])
 
-            if let uuid = UUID(uuidString: characterId) {
-                let configURL = CatalogDatabase.characterConfigURL(characterId: uuid)
-                let fm = FileManager.default
-                try fm.createDirectory(at: configURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-                let config = CharacterConfig.default
-                let encoder = JSONEncoder()
-                encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-                let data = try encoder.encode(config)
-                try data.write(to: configURL)
-            }
+            // swiftlint:disable:next line_length
+            let configJSON = ##"{"avatar":{"colorHex":"#5FB236","type":"color"},"language":"en","llmModel":"","referenceAudio":{"path":"","text":""},"systemPrompt":"","ttsVoice":{"modelId":"","provider":"","voiceId":""}}"##
+            let charsDir = CatalogDatabase.dataDirectory.appendingPathComponent("characters", isDirectory: true)
+            let fm = FileManager.default
+            try fm.createDirectory(at: charsDir, withIntermediateDirectories: true)
+            let configURL = charsDir.appendingPathComponent("\(characterId).json")
+            try configJSON.data(using: .utf8)?.write(to: configURL)
         }
 
         // MARK: v8 — Full-Text Search & Storage
@@ -374,6 +371,29 @@ extension CatalogDatabase {
                 t.column("abstract")
                 t.column("container_title")
             }
+        }
+
+        // MARK: v10 — Remove Characters, simplify Voice Calls
+
+        migrator.registerMigration("v10-voice-agent") { db in
+            // Recreate voice_calls without character_id
+            try db.create(table: "voice_calls_new") { t in
+                t.column("id", .text).primaryKey()
+                t.column("title", .text).notNull().defaults(to: "")
+                t.column("turn_count", .integer).notNull().defaults(to: 0)
+                t.column("duration_seconds", .double).notNull().defaults(to: 0)
+                t.column("created_at", .text).notNull()
+                t.column("updated_at", .text).notNull()
+            }
+            try db.execute(sql: """
+                INSERT INTO voice_calls_new (id, title, turn_count, duration_seconds, created_at, updated_at)
+                SELECT id, title, turn_count, duration_seconds, created_at, updated_at FROM voice_calls
+            """)
+            try db.drop(table: "voice_calls")
+            try db.rename(table: "voice_calls_new", to: "voice_calls")
+
+            // Drop characters table
+            try db.drop(table: "characters")
         }
 
         return migrator

@@ -319,32 +319,12 @@ struct ItemRelationRecord: Codable, FetchableRecord, MutablePersistableRecord, H
     }
 }
 
-// MARK: - Characters
-
-struct CharacterRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable {
-    static let databaseTableName = "characters"
-
-    var id: String
-    var userId: String
-    var name: String
-    var sortOrder: Int
-    var createdAt: String
-    var updatedAt: String
-
-    enum CodingKeys: String, CodingKey, ColumnExpression {
-        case id, name
-        case userId = "user_id"
-        case sortOrder = "sort_order"
-        case createdAt = "created_at"
-        case updatedAt = "updated_at"
-    }
-}
+// MARK: - Voice Calls
 
 struct VoiceCallRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable {
     static let databaseTableName = "voice_calls"
 
     var id: String
-    var characterId: String
     var title: String
     var turnCount: Int
     var durationSeconds: Double
@@ -353,7 +333,6 @@ struct VoiceCallRecord: Codable, FetchableRecord, MutablePersistableRecord, Hash
 
     enum CodingKeys: String, CodingKey, ColumnExpression {
         case id, title
-        case characterId = "character_id"
         case turnCount = "turn_count"
         case durationSeconds = "duration_seconds"
         case createdAt = "created_at"

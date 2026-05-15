@@ -109,6 +109,7 @@ final class Preferences {
         static let voiceInputDeviceUID = "voiceInputDeviceUID"
         static let voiceOutputDeviceUID = "voiceOutputDeviceUID"
         static let hfEndpoint = "hfEndpoint"
+        static let voiceAgentSystemPrompt = "voiceAgentSystemPrompt"
         // ElevenLabs cloud providers
         static let voiceSTTProvider = "voiceSTTProvider"
         static let voiceTTSProvider = "voiceTTSProvider"
@@ -654,6 +655,12 @@ final class Preferences {
     var voiceOutputDeviceUID: String {
         get { defaults.string(forKey: Keys.voiceOutputDeviceUID) ?? "" }
         set { defaults.set(newValue, forKey: Keys.voiceOutputDeviceUID) }
+    }
+
+    /// Custom system prompt for the voice agent.
+    var voiceAgentSystemPrompt: String {
+        get { defaults.string(forKey: Keys.voiceAgentSystemPrompt) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.voiceAgentSystemPrompt) }
     }
 
     /// Custom HuggingFace endpoint URL (e.g. "https://hf-mirror.com" for China).

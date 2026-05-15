@@ -416,19 +416,9 @@ struct AIChatView: View {
             // Thinking effort submenu — only for reasoning models
             if currentModelInfo?.reasoning == true {
                 Menu {
-                    ForEach(["low", "medium", "high"], id: \.self) { level in
-                        Button(action: {
-                            prefs.thinkingEffort = level
-                            settingsEffort = level
-                        }) {
-                            HStack {
-                                Text(level.capitalized)
-                                if settingsEffort == level {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                    }
+                    effortButton("Low", key: "low", prefs: prefs)
+                    effortButton("Medium", key: "medium", prefs: prefs)
+                    effortButton("High", key: "high", prefs: prefs)
                 } label: {
                     Label("Thinking", systemImage: "brain")
                 }
@@ -467,6 +457,20 @@ struct AIChatView: View {
         }
         .buttonStyle(.plain)
         .help("Model & settings")
+    }
+
+    private func effortButton(_ label: String, key: String, prefs: Preferences) -> some View {
+        Button {
+            prefs.thinkingEffort = key
+            settingsEffort = key
+        } label: {
+            HStack {
+                Text(label).frame(minWidth: 160, alignment: .leading)
+                if settingsEffort == key {
+                    Image(systemName: "checkmark")
+                }
+            }
+        }
     }
 
     // MARK: - Error Banner
