@@ -66,6 +66,8 @@ public enum ModelRegistry {
 public struct ProviderConfig: Codable, Sendable {
     public var providerId: String
     public var model: String
+    /// Extended thinking token budget. `nil` disables thinking.
+    public var thinkingBudget: Int?
 
     /// Resolved model info — maxTokens come from here, not user config.
     public var modelInfo: ModelInfo? {
@@ -78,15 +80,25 @@ public struct ProviderConfig: Codable, Sendable {
 
     public init(
         providerId: String = "anthropic",
-        model: String? = nil
+        model: String? = nil,
+        thinkingBudget: Int? = nil
     ) {
         self.providerId = providerId
         self.model = model ?? ProviderRegistry.shared.provider(for: providerId)?.defaultModelId ?? ""
+        self.thinkingBudget = thinkingBudget
     }
 
     // Backward-compatible coding: "provider" key maps to providerId
     private enum CodingKeys: String, CodingKey {
         case providerId = "provider"
         case model
+        case thinkingBudget
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        providerId = try container.decode(String.self, forKey: .providerId)
+        model = try container.decode(String.self, forKey: .model)
+        thinkingBudget = try container.decodeIfPresent(Int.self, forKey: .thinkingBudget)
     }
 }

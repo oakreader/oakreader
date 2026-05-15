@@ -3,6 +3,7 @@ import Foundation
 /// Shell command execution with configurable timeout.
 public struct BashTool: AgentTool {
     public let name = "bash"
+    public let category: ToolCategory = .dangerous
     public let description = "Execute a bash command. The command runs in the working directory. Use this for git operations, running tests, installing packages, and other terminal tasks."
 
     public var inputSchema: [String: Any] {

@@ -44,6 +44,8 @@ actor RecordingSummaryService {
                 switch chunk {
                 case .delta(let text):
                     responseText += text
+                case .thinking:
+                    break
                 case .finished, .error:
                     break
                 case .toolUse:

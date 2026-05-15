@@ -17,6 +17,15 @@ public protocol LLMProviderService: Sendable {
         maxTokens: Int,
         tools: [ToolDefinition]?
     ) -> AsyncThrowingStream<StreamChunk, Error>
+
+    func sendMessage(
+        messages: [LLMMessage],
+        model: String,
+        systemPrompt: String?,
+        maxTokens: Int,
+        tools: [ToolDefinition]?,
+        thinkingBudget: Int?
+    ) -> AsyncThrowingStream<StreamChunk, Error>
 }
 
 extension LLMProviderService {
@@ -29,6 +38,18 @@ extension LLMProviderService {
     ) -> AsyncThrowingStream<StreamChunk, Error> {
         // Default: ignore tools and delegate to the base method
         sendMessage(messages: messages, model: model, systemPrompt: systemPrompt, maxTokens: maxTokens)
+    }
+
+    public func sendMessage(
+        messages: [LLMMessage],
+        model: String,
+        systemPrompt: String?,
+        maxTokens: Int,
+        tools: [ToolDefinition]?,
+        thinkingBudget: Int?
+    ) -> AsyncThrowingStream<StreamChunk, Error> {
+        // Default: ignore thinkingBudget and delegate
+        sendMessage(messages: messages, model: model, systemPrompt: systemPrompt, maxTokens: maxTokens, tools: tools)
     }
 }
 

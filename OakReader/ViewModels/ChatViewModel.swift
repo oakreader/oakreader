@@ -10,6 +10,7 @@ struct CitationAnchor {
 
 struct PendingConfirmation {
     let toolCall: ToolCall
+    let category: ToolCategory
     let continuation: CheckedContinuation<Bool, Never>
 }
 
@@ -75,9 +76,13 @@ class ChatViewModel {
         let prefs = Preferences.shared
         let pid = prefs.aiProviderId
         let defaultModel = ProviderRegistry.shared.provider(for: pid)?.defaultModelId ?? ""
+        let modelId = prefs.aiModel.isEmpty ? defaultModel : prefs.aiModel
+        let modelInfo = ProviderRegistry.shared.provider(for: pid)?.models.first { $0.id == modelId }
+        let budget = modelInfo?.reasoning == true ? prefs.thinkingBudget : nil
         return ProviderConfig(
             providerId: pid,
-            model: prefs.aiModel.isEmpty ? defaultModel : prefs.aiModel
+            model: modelId,
+            thinkingBudget: budget
         )
     }
 
@@ -275,10 +280,11 @@ class ChatViewModel {
             effectiveToolContext = nil
         }
 
-        let requireConfirmation = prefs.agentRequireConfirmation
+        let permissionLevel = prefs.agentPermissionLevel
 
         // Load file-based agent skills from standard directories
         let agentSkills = Self.loadAgentSkills()
+        let thinkingBudget = currentConfig.thinkingBudget
 
         streamTask = Task { @MainActor [weak self] in
             do {
@@ -293,7 +299,8 @@ class ChatViewModel {
                     tools: currentTools,
                     toolContext: effectiveToolContext,
                     agentSkills: agentSkills,
-                    toolConfirmation: requireConfirmation ? self?.makeToolConfirmation() : nil
+                    thinkingBudget: thinkingBudget,
+                    toolConfirmation: self?.makeToolConfirmation(level: permissionLevel)
                 )
 
                 var assistantTurnId: UUID?
@@ -311,6 +318,27 @@ class ChatViewModel {
                                 role: .assistant,
                                 content: delta,
                                 isStreaming: true
+                            )
+                            assistantTurnId = newTurn.id
+                            turns.append(newTurn)
+                        }
+
+                    case .thinkingDelta(let text):
+                        if let id = assistantTurnId,
+                           let idx = turns.lastIndex(where: { $0.id == id })
+                        {
+                            if turns[idx].thinking == nil {
+                                turns[idx].thinking = text
+                            } else {
+                                turns[idx].thinking! += text
+                            }
+                        } else {
+                            // First thinking delta — create assistant turn placeholder
+                            let newTurn = Turn(
+                                role: .assistant,
+                                content: "",
+                                isStreaming: true,
+                                thinking: text
                             )
                             assistantTurnId = newTurn.id
                             turns.append(newTurn)
@@ -351,6 +379,9 @@ class ChatViewModel {
                             turns[idx].content = turn.content
                             turns[idx].isStreaming = false
                             turns[idx].toolUses = turn.toolUses
+                            if let thinking = turn.thinking {
+                                turns[idx].thinking = thinking
+                            }
 
                             // If this turn had tool uses, reset assistantTurnId
                             // so the next loop iteration creates a new bubble
@@ -401,12 +432,32 @@ class ChatViewModel {
         pending.continuation.resume(returning: false)
     }
 
-    private func makeToolConfirmation() -> @Sendable (ToolCall) async -> Bool {
-        return { [weak self] call in
-            await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
-                let pending = PendingConfirmation(toolCall: call, continuation: continuation)
-                DispatchQueue.main.async {
-                    self?.pendingToolConfirmation = pending
+    /// Build a tool confirmation callback based on the permission level.
+    /// - `auto`: returns nil (no confirmation needed)
+    /// - `smart`: auto-approves `.readOnly`, asks for `.write`/`.dangerous`
+    /// - `full`: asks for everything
+    private func makeToolConfirmation(level: AgentPermissionLevel) -> (@Sendable (ToolCall, ToolCategory) async -> Bool)? {
+        switch level {
+        case .auto:
+            return nil
+        case .smart:
+            return { [weak self] call, category in
+                // Read-only tools auto-approved in smart mode
+                if category == .readOnly { return true }
+                return await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+                    let pending = PendingConfirmation(toolCall: call, category: category, continuation: continuation)
+                    DispatchQueue.main.async {
+                        self?.pendingToolConfirmation = pending
+                    }
+                }
+            }
+        case .full:
+            return { [weak self] call, category in
+                await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+                    let pending = PendingConfirmation(toolCall: call, category: category, continuation: continuation)
+                    DispatchQueue.main.async {
+                        self?.pendingToolConfirmation = pending
+                    }
                 }
             }
         }

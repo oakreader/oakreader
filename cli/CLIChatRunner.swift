@@ -32,6 +32,8 @@ struct CLIChatRunner {
             case .delta(let text):
                 print(text, terminator: "")
                 fflush(stdout)
+            case .thinkingDelta:
+                break
             case .toolUseStarted, .toolUsePending, .toolUseCompleted:
                 break
             case .finished(let turn):
@@ -95,6 +97,8 @@ struct CLIChatRunner {
                     case .delta(let text):
                         print(text, terminator: "")
                         fflush(stdout)
+                    case .thinkingDelta:
+                        break
                     case .toolUseStarted, .toolUsePending, .toolUseCompleted:
                         break
                     case .finished(let turn):

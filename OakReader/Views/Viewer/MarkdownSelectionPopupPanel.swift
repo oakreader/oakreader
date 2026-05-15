@@ -318,6 +318,8 @@ class MarkdownSelectionPopupPanel: NSPanel, AppResignDismissable {
                     switch chunk {
                     case .delta(let delta):
                         result += delta
+                    case .thinking:
+                        break
                     case .toolUse:
                         break
                     case .finished:

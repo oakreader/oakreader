@@ -89,6 +89,8 @@ public final class ChatEngineBridge: LLMService, @unchecked Sendable {
                                 }
                                 continuation.finish(throwing: error)
                                 return
+                            case .thinkingDelta:
+                                break
                             case .finished, .toolUseStarted, .toolUsePending, .toolUseCompleted:
                                 break
                             }

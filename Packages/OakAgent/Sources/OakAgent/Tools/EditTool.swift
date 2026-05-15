@@ -3,6 +3,7 @@ import Foundation
 /// Precise string replacement within a file.
 public struct EditTool: AgentTool {
     public let name = "edit"
+    public let category: ToolCategory = .write
     public let description = "Perform an exact string replacement in a file. Provide the old string to find and the new string to replace it with. The old_string must match exactly one location in the file."
 
     public var inputSchema: [String: Any] {

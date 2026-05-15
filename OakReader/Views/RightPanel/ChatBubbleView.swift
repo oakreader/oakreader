@@ -5,8 +5,6 @@ import Textual
 struct ChatBubbleView: View {
     let turn: Turn
     var onSaveToNote: ((Turn) -> Bool)?
-    var onApproveToolCall: (() -> Void)?
-    var onDenyToolCall: (() -> Void)?
     var onOpenCitation: ((String, CitationAnchor) -> Void)?
 
     @State private var isHovered = false
@@ -30,14 +28,18 @@ struct ChatBubbleView: View {
                         FannedAttachmentStack(attachments: turn.attachments)
                     }
 
+                    // Extended thinking disclosure
+                    if turn.role == .assistant, let thinking = turn.thinking, !thinking.isEmpty {
+                        ThinkingDisclosureView(
+                            thinking: thinking,
+                            isStreaming: turn.isStreaming && turn.content.isEmpty
+                        )
+                    }
+
                     // Tool call cards for assistant messages
                     if turn.role == .assistant && !turn.toolUses.isEmpty {
                         ForEach(turn.toolUses) { record in
-                            ToolCallCardView(
-                                record: record,
-                                onApprove: record.status == .pending ? onApproveToolCall : nil,
-                                onDeny: record.status == .pending ? onDenyToolCall : nil
-                            )
+                            ToolCallCardView(record: record)
                         }
                     }
 
@@ -553,6 +555,104 @@ private extension String {
             searchRange = range.upperBound..<endIndex
         }
         return count
+    }
+}
+
+// MARK: - Thinking Disclosure View
+
+/// Collapsible section showing extended thinking content from reasoning models.
+/// Collapsed by default. Shows elapsed time and a chevron toggle.
+private struct ThinkingDisclosureView: View {
+    let thinking: String
+    /// True while the model is still in the thinking phase (no text content yet).
+    let isStreaming: Bool
+
+    @State private var isExpanded = false
+    @State private var streamStartTime = Date()
+    @State private var elapsedSeconds: Int = 0
+    @State private var timer: Timer?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                        .animation(.easeInOut(duration: 0.2), value: isExpanded)
+
+                    if isStreaming {
+                        Text("Thinking...")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("Thought for \(elapsedSeconds)s")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if isStreaming {
+                        ProgressView()
+                            .controlSize(.mini)
+                            .frame(width: 10, height: 10)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            .padding(.vertical, 4)
+            .padding(.horizontal, 4)
+
+            // Content
+            if isExpanded {
+                Text(thinking)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary.opacity(0.75))
+                    .textSelection(.enabled)
+                    .padding(.leading, 8)
+                    .padding(.vertical, 4)
+                    .overlay(alignment: .leading) {
+                        Rectangle()
+                            .fill(Color.secondary.opacity(0.2))
+                            .frame(width: 2)
+                    }
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .onAppear {
+            streamStartTime = Date()
+            if isStreaming {
+                startTimer()
+            } else {
+                // Estimate from thinking content length (rough: ~10 chars/sec)
+                elapsedSeconds = max(1, thinking.count / 10)
+            }
+        }
+        .onChange(of: isStreaming) { _, streaming in
+            if !streaming {
+                stopTimer()
+                elapsedSeconds = max(1, Int(Date().timeIntervalSince(streamStartTime)))
+            }
+        }
+        .onDisappear {
+            stopTimer()
+        }
+    }
+
+    private func startTimer() {
+        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
+            elapsedSeconds = Int(Date().timeIntervalSince(streamStartTime))
+        }
+    }
+
+    private func stopTimer() {
+        timer?.invalidate()
+        timer = nil
     }
 }
 

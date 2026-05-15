@@ -80,6 +80,8 @@ public actor Agent {
                         case .delta(let text):
                             responseText += text
                             continuation.yield(.delta(text))
+                        case .thinking:
+                            break // Agent does not use thinking
                         case .toolUse(let toolCall):
                             toolCalls.append(toolCall)
                         case .finished:

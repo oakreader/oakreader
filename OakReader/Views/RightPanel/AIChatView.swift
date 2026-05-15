@@ -47,6 +47,18 @@ struct AIChatView: View {
                 errorBanner(error)
             }
 
+            // Sticky tool confirmation bar
+            if let pending = chatVM.pendingToolConfirmation {
+                ToolConfirmationBar(
+                    confirmation: pending,
+                    onApprove: { chatVM.approveToolCall() },
+                    onDeny: { chatVM.denyToolCall() }
+                )
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .animation(.spring(duration: 0.3, bounce: 0.15), value: chatVM.pendingToolConfirmation != nil)
+                .padding(.bottom, 4)
+            }
+
             inputBar
         }
     }
@@ -153,8 +165,6 @@ struct AIChatView: View {
                         ChatBubbleView(
                             turn: turn,
                             onSaveToNote: onSaveAssistantResponse,
-                            onApproveToolCall: { chatVM.approveToolCall() },
-                            onDenyToolCall: { chatVM.denyToolCall() },
                             onOpenCitation: { citeKey, anchor in
                                 chatVM.openCitation(citeKey: citeKey, anchor: anchor)
                             }

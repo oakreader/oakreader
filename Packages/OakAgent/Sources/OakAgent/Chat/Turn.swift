@@ -12,6 +12,8 @@ public struct Turn: Identifiable, Codable, Sendable {
     public var error: String?
     public var attachments: [TurnAttachment]
     public var toolUses: [ToolUseRecord]
+    /// Extended thinking content from reasoning models.
+    public var thinking: String?
 
     public enum Role: String, Codable, Sendable {
         case user, assistant, system
@@ -26,7 +28,8 @@ public struct Turn: Identifiable, Codable, Sendable {
         metadata: [String: String] = [:],
         error: String? = nil,
         attachments: [TurnAttachment] = [],
-        toolUses: [ToolUseRecord] = []
+        toolUses: [ToolUseRecord] = [],
+        thinking: String? = nil
     ) {
         self.id = id
         self.role = role
@@ -37,6 +40,7 @@ public struct Turn: Identifiable, Codable, Sendable {
         self.error = error
         self.attachments = attachments
         self.toolUses = toolUses
+        self.thinking = thinking
     }
 
     // Custom Decodable for backward compatibility with old JSONL files
@@ -51,6 +55,7 @@ public struct Turn: Identifiable, Codable, Sendable {
         error = try container.decodeIfPresent(String.self, forKey: .error)
         attachments = try container.decodeIfPresent([TurnAttachment].self, forKey: .attachments) ?? []
         toolUses = try container.decodeIfPresent([ToolUseRecord].self, forKey: .toolUses) ?? []
+        thinking = try container.decodeIfPresent(String.self, forKey: .thinking)
 
         // Backward compat: decode `metadata` dict, or fall back to legacy `skill` string
         if let meta = try container.decodeIfPresent([String: String].self, forKey: .metadata) {
@@ -64,7 +69,7 @@ public struct Turn: Identifiable, Codable, Sendable {
 
     // Coding keys include legacy `skill` for backward-compatible decoding
     private enum CodingKeys: String, CodingKey {
-        case id, role, content, timestamp, isStreaming, metadata, error, attachments, toolUses, skill
+        case id, role, content, timestamp, isStreaming, metadata, error, attachments, toolUses, skill, thinking
     }
 
     // Custom encode to only write `metadata` (not the legacy `skill` key)
@@ -79,6 +84,7 @@ public struct Turn: Identifiable, Codable, Sendable {
         try container.encodeIfPresent(error, forKey: .error)
         try container.encode(attachments, forKey: .attachments)
         try container.encode(toolUses, forKey: .toolUses)
+        try container.encodeIfPresent(thinking, forKey: .thinking)
     }
 }
 
