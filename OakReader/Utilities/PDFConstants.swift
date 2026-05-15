@@ -291,35 +291,6 @@ enum LibraryDetailTab: String, CaseIterable, Identifiable {
     }
 }
 
-enum StudioAction: String, CaseIterable, Identifiable {
-    case notes
-    case summary
-    case studyGuide
-    case mindMap
-
-    var id: String { rawValue }
-
-    var systemImage: String {
-        switch self {
-        case .notes: return "note.text"
-        case .summary: return "doc.text"
-        case .studyGuide: return "book"
-        case .mindMap: return "point.3.connected.trianglepath.dotted"
-        }
-    }
-
-    var label: String {
-        switch self {
-        case .notes: return "Notes"
-        case .summary: return "Summary"
-        case .studyGuide: return "Study Guide"
-        case .mindMap: return "Mind Map"
-        }
-    }
-
-    var isAvailable: Bool { self == .notes }
-}
-
 enum CompressionQuality: String, CaseIterable, Identifiable {
     case low
     case medium
