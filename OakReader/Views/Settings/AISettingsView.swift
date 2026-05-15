@@ -7,7 +7,7 @@ struct AISettingsView: View {
 
     enum Category: String, Hashable, Identifiable {
         case chat, voiceLLM
-        case embedding, transcribe, tts, vad
+        case embedding, transcribe, tts
         case agentTools
 
         var id: String { rawValue }
@@ -19,7 +19,6 @@ struct AISettingsView: View {
             case .embedding: "Embedding"
             case .transcribe: "Transcribe"
             case .tts: "TTS"
-            case .vad: "VAD"
             case .agentTools: "Tools"
             }
         }
@@ -31,14 +30,13 @@ struct AISettingsView: View {
             case .embedding: "magnifyingglass"
             case .transcribe: "mic"
             case .tts: "speaker.wave.2"
-            case .vad: "waveform"
             case .agentTools: "wrench.and.screwdriver"
             }
         }
     }
 
     private static let llmCategories: [Category] = [.chat, .voiceLLM]
-    private static let onDeviceCategories: [Category] = [.embedding, .transcribe, .tts, .vad]
+    private static let onDeviceCategories: [Category] = [.embedding, .transcribe, .tts]
     private static let agentCategories: [Category] = [.agentTools]
 
     // MARK: - State
@@ -58,7 +56,7 @@ struct AISettingsView: View {
     @State private var embeddingModel: String
     @State private var sttModel: String
     @State private var ttsModel: String
-    @State private var vadModel: String
+
 
     // STT/TTS provider type
     @State private var sttProvider: String
@@ -105,13 +103,10 @@ struct AISettingsView: View {
         // On-device models
         let defaultSTT = KnownModels.stt.first?.repo ?? ""
         let defaultTTS = KnownModels.tts.first?.repo ?? ""
-        let defaultVAD = KnownModels.vad.first?.repo ?? ""
         let defaultEmbedding = KnownModels.embedding.first?.repo ?? ""
         _embeddingModel = State(initialValue: prefs.embeddingModel.isEmpty ? defaultEmbedding : prefs.embeddingModel)
         _sttModel = State(initialValue: prefs.voiceSTTModel.isEmpty ? defaultSTT : prefs.voiceSTTModel)
         _ttsModel = State(initialValue: prefs.voiceTTSModel.isEmpty ? defaultTTS : prefs.voiceTTSModel)
-        _vadModel = State(initialValue: prefs.voiceVADModel.isEmpty ? defaultVAD : prefs.voiceVADModel)
-
         // STT/TTS provider type
         _sttProvider = State(initialValue: prefs.voiceSTTProvider)
         _ttsProvider = State(initialValue: prefs.voiceTTSProvider)
@@ -226,7 +221,6 @@ struct AISettingsView: View {
         case .embedding: localModelPanel(binding: $embeddingModel, knownModels: KnownModels.embedding)
         case .transcribe: transcribePanel
         case .tts: ttsPanel
-        case .vad: localModelPanel(binding: $vadModel, knownModels: KnownModels.vad)
         case .agentTools: agentToolsPanel
         }
     }
@@ -555,7 +549,7 @@ struct AISettingsView: View {
         return "\(count)"
     }
 
-    private var allRepos: [String] { [sttModel, ttsModel, vadModel, embeddingModel] }
+    private var allRepos: [String] { [sttModel, ttsModel, embeddingModel] }
 
     private func save() {
         let prefs = Preferences.shared
@@ -572,7 +566,6 @@ struct AISettingsView: View {
         prefs.embeddingModel = embeddingModel
         prefs.voiceSTTModel = sttModel
         prefs.voiceTTSModel = ttsModel
-        prefs.voiceVADModel = vadModel
 
         // STT/TTS providers
         prefs.voiceSTTProvider = sttProvider
