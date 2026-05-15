@@ -57,8 +57,4 @@ struct SecuritySettings: Equatable {
         return options
     }
 
-    mutating func clearPasswords() {
-        openPassword = nil
-        permissionsPassword = nil
-    }
 }
