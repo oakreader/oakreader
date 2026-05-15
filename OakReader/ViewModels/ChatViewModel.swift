@@ -32,6 +32,9 @@ class ChatViewModel {
     var errorMessage: String?
     var pendingToolConfirmation: PendingConfirmation?
 
+    /// Set by external actions (e.g. context menu "Add to Chat") and consumed by AIChatView.
+    var pendingLibraryRef: LibraryItem?
+
     // Session
     var sessionId: UUID = UUID()
     var sessions: [ConversationMeta] = []

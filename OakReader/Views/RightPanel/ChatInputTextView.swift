@@ -29,6 +29,9 @@ struct ChatInputTextView: NSViewRepresentable {
             guard let textView else { return }
             textView.window?.makeFirstResponder(textView)
         }
+        func insertDroppedToken(_ item: ChatCompletionItem) {
+            textView?.insertDroppedToken(item)
+        }
     }
 
     let focusRef: FocusRef
@@ -234,7 +237,7 @@ final class ChatNSTextView: NSTextView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         insertionPointColor = .labelColor
-        registerForDraggedTypes([.libraryItemJSON, .string])
+        registerForDraggedTypes([.string])
     }
 
     // MARK: - IME Composition
@@ -365,34 +368,9 @@ final class ChatNSTextView: NSTextView {
         super.paste(sender)
     }
 
-    // MARK: - Drag and Drop (Library Items)
-
-    override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
-        let pb = sender.draggingPasteboard
-        if pb.availableType(from: [.libraryItemJSON]) != nil {
-            return .copy
-        }
-        return super.draggingEntered(sender)
-    }
-
-    override func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation {
-        let pb = sender.draggingPasteboard
-        if pb.availableType(from: [.libraryItemJSON]) != nil {
-            return .copy
-        }
-        return super.draggingUpdated(sender)
-    }
-
-    override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
-        let pb = sender.draggingPasteboard
-        if let data = pb.data(forType: .libraryItemJSON),
-           let payload = try? JSONDecoder().decode(LibraryItemDragPayload.self, from: data) {
-            let completionItem = payload.toCompletionItem()
-            insertDroppedToken(completionItem)
-            return true
-        }
-        return super.performDragOperation(sender)
-    }
+    // MARK: - Drag and Drop
+    // Library item drops are handled by SwiftUI's .dropDestination on the
+    // input bar (AIChatView). NSTextView only handles plain-text drops.
 
     // MARK: - Completion Panel
 
@@ -498,7 +476,7 @@ final class ChatNSTextView: NSTextView {
     }
 
     /// Insert a token from a drag-and-drop operation at the current insertion point.
-    private func insertDroppedToken(_ item: ChatCompletionItem) {
+    func insertDroppedToken(_ item: ChatCompletionItem) {
         // Don't insert duplicate library references
         if activeTokens().contains(where: { $0.id == item.id }) { return }
 

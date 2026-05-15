@@ -113,6 +113,12 @@ struct LibraryTableView: View {
                 }
             }
 
+            Button {
+                appState.libraryChatVM.pendingLibraryRef = item
+            } label: {
+                Label("Add to Chat", systemImage: "bubble.left.and.text.bubble.right")
+            }
+
             // Property assignments via context menu
             let selectProperties = store.properties.filter { $0.type == .multiSelect || $0.type == .singleSelect }
             if !selectProperties.isEmpty {

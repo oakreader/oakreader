@@ -142,26 +142,14 @@ actor EmbeddingService {
 
             let attentionMask = paddedInputIds .!= MLXArray(padTokenId)
 
-            // Wrap MLX computation in withErrorHandler to catch C++ errors
-            // instead of letting them hit fatalError in ErrorHandler.dispatch.
-            var mlxErrorMessage: String?
-            let embeddings = ErrorHandler.shared.withErrorHandler({ message in
-                mlxErrorMessage = message
-            }) {
-                let output = model(
-                    paddedInputIds,
-                    positionIds: nil,
-                    tokenTypeIds: nil,
-                    attentionMask: attentionMask
-                )
-                let emb = pooling(output, mask: attentionMask, normalize: true)
-                eval(emb)
-                return emb
-            }
-
-            if let mlxErrorMessage {
-                throw EmbeddingError.mlxError(mlxErrorMessage)
-            }
+            let output = model(
+                paddedInputIds,
+                positionIds: nil,
+                tokenTypeIds: nil,
+                attentionMask: attentionMask
+            )
+            let embeddings = pooling(output, mask: attentionMask, normalize: true)
+            eval(embeddings)
 
             return embeddings.map { $0.asArray(Float.self) }
         }
