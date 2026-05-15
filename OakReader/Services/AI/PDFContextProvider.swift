@@ -18,6 +18,20 @@ struct PDFContextProvider {
         let collectionName = collection?.name
         let collectionItemCount = collection?.itemCount
 
+        // Collect items in the active collection (up to 50 for prompt size)
+        let collectionItems: [ChatContextSnapshot.CollectionItemSummary]
+        if collection != nil, let store = appState?.libraryStore {
+            collectionItems = store.filteredItems.prefix(50).map {
+                ChatContextSnapshot.CollectionItemSummary(
+                    title: $0.title,
+                    author: $0.author,
+                    citeKey: $0.citeKey
+                )
+            }
+        } else {
+            collectionItems = []
+        }
+
         let openTabTitles = appState?.openTabs.map(\.title) ?? []
         let activeTabTitle = appState?.activeTab?.title
 
@@ -32,6 +46,7 @@ struct PDFContextProvider {
         return ChatContextSnapshot(
             activeCollectionName: collectionName,
             activeCollectionItemCount: collectionItemCount,
+            activeCollectionItems: collectionItems,
             openTabTitles: openTabTitles,
             activeTabTitle: activeTabTitle,
             document: docContext
@@ -173,7 +188,20 @@ struct PDFContextProvider {
         var appContextParts: [String] = []
         if let name = context.activeCollectionName {
             let countAttr = context.activeCollectionItemCount.map { " items=\"\($0)\"" } ?? ""
-            appContextParts.append("  <active-collection name=\"\(xmlEscape(name))\"\(countAttr) />")
+            if context.activeCollectionItems.isEmpty {
+                appContextParts.append("  <active-collection name=\"\(xmlEscape(name))\"\(countAttr) />")
+            } else {
+                var lines: [String] = []
+                lines.append("  <active-collection name=\"\(xmlEscape(name))\"\(countAttr)>")
+                for item in context.activeCollectionItems {
+                    var attrs = "title=\"\(xmlEscape(item.title))\""
+                    if !item.author.isEmpty { attrs += " author=\"\(xmlEscape(item.author))\"" }
+                    if let ck = item.citeKey { attrs += " cite-key=\"\(xmlEscape(ck))\"" }
+                    lines.append("    <item \(attrs) />")
+                }
+                lines.append("  </active-collection>")
+                appContextParts.append(lines.joined(separator: "\n"))
+            }
         }
         if !context.openTabTitles.isEmpty {
             var tabLines: [String] = []

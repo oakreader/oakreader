@@ -6,8 +6,15 @@ struct ChatContextSnapshot: Sendable {
     // App-level context (always available)
     let activeCollectionName: String?
     let activeCollectionItemCount: Int?
+    let activeCollectionItems: [CollectionItemSummary]
     let openTabTitles: [String]
     let activeTabTitle: String?
+
+    struct CollectionItemSummary: Sendable {
+        let title: String
+        let author: String
+        let citeKey: String?
+    }
 
     // Document context (nil for library-scoped chat)
     let document: DocumentContext?
