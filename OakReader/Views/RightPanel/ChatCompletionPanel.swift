@@ -434,7 +434,7 @@ private extension ChatCompletionItem {
         switch kind {
         case .installedSkill:
             return NSColor.controlAccentColor
-                .blended(withFraction: 0.25, of: .secondaryLabelColor) ?? .controlAccentColor
+                .blended(withFraction: 0.5, of: .tertiaryLabelColor) ?? .controlAccentColor
         case .libraryReference:
             return .systemOrange
         case .noteReference:
