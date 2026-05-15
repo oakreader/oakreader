@@ -99,13 +99,11 @@ final class Preferences {
         static let voiceSTTModel = "voiceSTTModel"
         static let voiceTTSModel = "voiceTTSModel"
         static let voiceVADModel = "voiceVADModel"
-        static let voiceTurnDetectorEnabled = "voiceTurnDetectorEnabled"
         static let voiceTTSVoice = "voiceTTSVoice"
         static let voiceReferenceAudioPath = "voiceReferenceAudioPath"
         static let voiceReferenceText = "voiceReferenceText"
         static let voiceLLMModel = "voiceLLMModel"
         static let voiceLanguage = "voiceLanguage"
-        static let voiceLiveTranscription = "voiceLiveTranscription"
         static let voiceInputDeviceUID = "voiceInputDeviceUID"
         static let voiceOutputDeviceUID = "voiceOutputDeviceUID"
         static let hfEndpoint = "hfEndpoint"
@@ -115,7 +113,6 @@ final class Preferences {
         static let elevenLabsAPIKey = "elevenLabsAPIKey"
         static let elevenLabsVoiceId = "elevenLabsVoiceId"
         static let elevenLabsTTSModelId = "elevenLabsTTSModelId"
-        static let elevenLabsSTTModelId = "elevenLabsSTTModelId"
         // Disabled models
         static let disabledModelIds = "disabledModelIds"
         // Embedding
@@ -605,11 +602,6 @@ final class Preferences {
         set { defaults.set(newValue, forKey: Keys.voiceVADModel) }
     }
 
-    var voiceTurnDetectorEnabled: Bool {
-        get { defaults.object(forKey: Keys.voiceTurnDetectorEnabled) as? Bool ?? true }
-        set { defaults.set(newValue, forKey: Keys.voiceTurnDetectorEnabled) }
-    }
-
     var voiceTTSVoice: String {
         get { defaults.string(forKey: Keys.voiceTTSVoice) ?? "" }
         set { defaults.set(newValue, forKey: Keys.voiceTTSVoice) }
@@ -636,12 +628,6 @@ final class Preferences {
     var voiceLanguage: String {
         get { defaults.string(forKey: Keys.voiceLanguage) ?? "en" }
         set { defaults.set(newValue, forKey: Keys.voiceLanguage) }
-    }
-
-    /// Enable live (streaming) transcription during speech. Defaults to true.
-    var voiceLiveTranscription: Bool {
-        get { defaults.object(forKey: Keys.voiceLiveTranscription) as? Bool ?? true }
-        set { defaults.set(newValue, forKey: Keys.voiceLiveTranscription) }
     }
 
     /// Persistent UID of the selected input (microphone) device. Empty = system default.
@@ -722,12 +708,6 @@ final class Preferences {
     var elevenLabsTTSModelId: String {
         get { defaults.string(forKey: Keys.elevenLabsTTSModelId) ?? "eleven_turbo_v2_5" }
         set { defaults.set(newValue, forKey: Keys.elevenLabsTTSModelId) }
-    }
-
-    /// ElevenLabs STT model ID.
-    var elevenLabsSTTModelId: String {
-        get { defaults.string(forKey: Keys.elevenLabsSTTModelId) ?? "scribe_v2_realtime" }
-        set { defaults.set(newValue, forKey: Keys.elevenLabsSTTModelId) }
     }
 
     var voiceReferenceAudioURL: URL? {
