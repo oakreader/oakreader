@@ -56,15 +56,14 @@ struct LibrarySidebarPanel: View {
     private var infoTabContent: some View {
         coverSection
 
-        sectionHeader("PROPERTIES")
         propertiesContent
             .padding(.horizontal, OakStyle.Spacing.xs)
 
-        sectionHeader("COLLECTIONS")
+        sectionHeader("Collections")
         collectionsContent
             .padding(.horizontal, OakStyle.Spacing.xs)
 
-        sectionHeader("FILE")
+        sectionHeader("File")
         infoGrid
             .padding(.horizontal, OakStyle.Spacing.xs)
     }
@@ -73,7 +72,7 @@ struct LibrarySidebarPanel: View {
     private var referenceTabContent: some View {
         coverSection
 
-        sectionHeader("REFERENCE")
+        sectionHeader("Reference")
         referenceContent
             .padding(.horizontal, OakStyle.Spacing.xs)
     }
@@ -124,10 +123,10 @@ struct LibrarySidebarPanel: View {
 
     private func sectionHeader(_ title: String) -> some View {
         Text(title)
-            .font(.system(size: 11, weight: .medium))
+            .font(.system(size: 13, weight: .semibold))
             .foregroundStyle(OakStyle.Colors.textSecondary)
             .padding(.horizontal, OakStyle.Spacing.xs)
-            .padding(.top, OakStyle.Spacing.sm)
+            .padding(.top, OakStyle.Spacing.md)
             .padding(.bottom, OakStyle.Spacing.xxs)
     }
 
@@ -141,9 +140,17 @@ struct LibrarySidebarPanel: View {
                 Image(nsImage: nsImage)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(maxHeight: 160)
+                    .frame(maxHeight: 220)
                     .cornerRadius(OakStyle.Radius.small)
-                    .shadow(color: .black.opacity(0.15), radius: 3, y: 1)
+                    .background(
+                        RoundedRectangle(cornerRadius: OakStyle.Radius.small)
+                            .fill(Color(nsColor: .textBackgroundColor))
+                            .shadow(color: .black.opacity(0.25), radius: 6, y: 3)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: OakStyle.Radius.small)
+                            .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+                    )
                 Spacer()
             }
             .padding(OakStyle.Spacing.xs)
@@ -163,7 +170,7 @@ struct LibrarySidebarPanel: View {
         } else {
             HStack(spacing: OakStyle.Spacing.xs) {
                 Text("No reference data")
-                    .font(.system(size: OakStyle.Font.caption))
+                    .font(.system(size: 13))
                     .foregroundStyle(OakStyle.Colors.textQuaternary)
 
                 Spacer()
@@ -203,7 +210,7 @@ struct LibrarySidebarPanel: View {
                 LabeledContent("Opened", value: lastOpened.formatted(date: .abbreviated, time: .omitted))
             }
         }
-        .font(.system(size: OakStyle.Font.caption))
+        .font(.system(size: 14))
         .foregroundStyle(OakStyle.Colors.textSecondary)
         .textSelection(.enabled)
     }
@@ -213,44 +220,112 @@ struct LibrarySidebarPanel: View {
     @ViewBuilder
     private var propertiesContent: some View {
         let selectProperties = store.properties.filter { $0.type == .multiSelect || $0.type == .singleSelect }
-        VStack(alignment: .leading, spacing: OakStyle.Spacing.sm) {
+        VStack(alignment: .leading, spacing: 20) {
             ForEach(selectProperties) { property in
-                VStack(alignment: .leading, spacing: OakStyle.Spacing.xxs) {
+                VStack(alignment: .leading, spacing: OakStyle.Spacing.xs) {
                     Text(property.name)
-                        .font(.system(size: OakStyle.Font.caption, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(OakStyle.Colors.textSecondary)
 
-                    FlowLayout(spacing: OakStyle.Spacing.xxs) {
-                        let assignedValues = item.propertyValues.filter { $0.propertyId == property.id }
-                        ForEach(assignedValues) { pv in
-                            if let opt = pv.option {
-                                tagToken(opt, property: property)
-                            }
-                        }
-
-                        // Add option menu — icon-only compact button
-                        Menu {
-                            PropertyOptionAssignmentMenuItems(
-                                item: item,
-                                property: property,
-                                store: store,
-                                mode: .addUnassigned
-                            )
-                        } label: {
-                            Image(systemName: "plus")
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(OakStyle.Colors.textSecondary)
-                                .frame(width: 20, height: 20)
-                                .background(
-                                    RoundedRectangle(cornerRadius: OakStyle.Radius.small)
-                                        .fill(OakStyle.Colors.buttonBackground)
-                                )
-                        }
-                        .menuStyle(.borderlessButton)
-                        .fixedSize()
+                    if property.type == .singleSelect {
+                        singleSelectPicker(property)
+                    } else {
+                        multiSelectTags(property)
                     }
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func singleSelectPicker(_ property: PropertyDefinition) -> some View {
+        let assignedValues = item.propertyValues.filter { $0.propertyId == property.id }
+        let selectedOption = assignedValues.first?.option
+
+        Menu {
+            // "None" option to clear
+            Button {
+                if let current = selectedOption {
+                    store.removeItemSelectValue(item: item, property: property, option: current)
+                }
+            } label: {
+                if selectedOption == nil {
+                    Label("None", systemImage: "checkmark")
+                } else {
+                    Text("None")
+                }
+            }
+
+            Divider()
+
+            ForEach(property.options) { opt in
+                Button {
+                    // Remove current, then set new
+                    if let current = selectedOption {
+                        store.removeItemSelectValue(item: item, property: property, option: current)
+                    }
+                    store.setItemSelectValue(item: item, property: property, option: opt)
+                } label: {
+                    Label {
+                        Text(opt.name)
+                    } icon: {
+                        Image(systemName: selectedOption?.id == opt.id ? "checkmark.circle.fill" : "circle.fill")
+                    }
+                }
+                .tint(Color(hex: opt.colorHex))
+            }
+        } label: {
+            HStack(spacing: OakStyle.Spacing.xxs) {
+                if let opt = selectedOption {
+                    Image(systemName: "circle.fill")
+                        .font(.system(size: 8))
+                        .foregroundStyle(Color(hex: opt.colorHex))
+                    Text(opt.name)
+                        .font(.system(size: 13))
+                } else {
+                    Text("None")
+                        .font(.system(size: 13))
+                        .foregroundStyle(OakStyle.Colors.textQuaternary)
+                }
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+    }
+
+    @ViewBuilder
+    private func multiSelectTags(_ property: PropertyDefinition) -> some View {
+        FlowLayout(spacing: OakStyle.Spacing.xxs) {
+            let assignedValues = item.propertyValues.filter { $0.propertyId == property.id }
+            ForEach(assignedValues) { pv in
+                if let opt = pv.option {
+                    tagToken(opt, property: property)
+                }
+            }
+
+            // Add option menu — icon-only compact button
+            Menu {
+                PropertyOptionAssignmentMenuItems(
+                    item: item,
+                    property: property,
+                    store: store,
+                    mode: .toggleAssigned
+                )
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(OakStyle.Colors.textSecondary)
+                    .frame(width: 20, height: 20)
+                    .background(
+                        RoundedRectangle(cornerRadius: OakStyle.Radius.small)
+                            .fill(OakStyle.Colors.buttonBackground)
+                    )
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
         }
     }
 
@@ -261,7 +336,7 @@ struct LibrarySidebarPanel: View {
                 .fill(Color(hex: opt.colorHex))
                 .frame(width: 8, height: 8)
             Text(opt.name)
-                .font(.system(size: OakStyle.Font.caption))
+                .font(.system(size: 13))
         }
         .padding(.horizontal, OakStyle.Spacing.xs)
         .padding(.vertical, 3)
@@ -282,17 +357,17 @@ struct LibrarySidebarPanel: View {
     private var collectionsContent: some View {
         if item.collections.isEmpty {
             Text("None")
-                .font(.system(size: OakStyle.Font.caption))
+                .font(.system(size: 13))
                 .foregroundStyle(OakStyle.Colors.textQuaternary)
         } else {
             VStack(alignment: .leading, spacing: OakStyle.Spacing.xxs) {
                 ForEach(item.collections, id: \.id) { collection in
                     HStack(spacing: OakStyle.Spacing.xxs) {
                         Image(systemName: collection.icon)
-                            .font(.system(size: OakStyle.Font.caption))
+                            .font(.system(size: 13))
                             .foregroundStyle(OakStyle.Colors.textSecondary)
                         Text(collection.name)
-                            .font(.system(size: OakStyle.Font.caption))
+                            .font(.system(size: 13))
                     }
                 }
             }
