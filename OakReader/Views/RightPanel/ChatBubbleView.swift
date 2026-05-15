@@ -200,11 +200,16 @@ struct ChatBubbleView: View {
                     base
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
             .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(bubbleColor)
+                UnevenRoundedRectangle(
+                    topLeadingRadius: 16,
+                    bottomLeadingRadius: 16,
+                    bottomTrailingRadius: 4,
+                    topTrailingRadius: 16
+                )
+                .fill(bubbleColor)
             )
             .foregroundStyle(Color(nsColor: .labelColor))
         }
@@ -213,9 +218,9 @@ struct ChatBubbleView: View {
     private var bubbleColor: Color {
         switch turn.role {
         case .user:
-            return Color.accentColor.opacity(0.15)
+            return Color.accentColor.opacity(0.12)
         case .assistant, .system:
-            return Color(nsColor: .controlBackgroundColor)
+            return Color(nsColor: .controlBackgroundColor).opacity(0.6)
         }
     }
 
@@ -551,52 +556,83 @@ private extension String {
     }
 }
 
-// MARK: - Streaming Cursor (Waveform bars inspired by Bridge)
+// MARK: - Streaming Cursor (Spinning Grid with Glow)
 //
-// Five vertical bars with staggered pulse animations, creating a
-// rippling "thinking" indicator that feels alive without being distracting.
+// 3×3 dot grid where dots light up sequentially around the perimeter
+// in a clockwise loop, each with a soft glow halo when active.
+// Sequence: 0→1→2→5→8→7→6→3 (outer ring), center dot pulses gently.
 
 private struct StreamingCursor: View {
-    private static let barCount = 5
-    private static let barWidth: CGFloat = 2.5
-    private static let barSpacing: CGFloat = 2
-    private static let minHeight: CGFloat = 3
-    private static let maxHeight: CGFloat = OakStyle.ChatFont.streamingBarHeight
-    private static let cycleDuration: Double = 1.2
+    private static let dotSize: CGFloat = 2.5
+    private static let spacing: CGFloat = 2.5
+    private static let glowRadius: CGFloat = 2.5
+    // Perimeter traversal order (clockwise from top-left)
+    private static let sequence: [Int] = [0, 1, 2, 5, 8, 7, 6, 3]
+    private static let cycleDuration: Double = 1.0
 
-    @State private var animating = false
+    @State private var step: Int = 0
+    @State private var centerPulse = false
 
     var body: some View {
-        HStack(spacing: Self.barSpacing) {
-            ForEach(0..<Self.barCount, id: \.self) { index in
-                Capsule()
-                    .fill(Color.accentColor)
-                    .frame(width: Self.barWidth, height: barHeight(for: index))
-                    .opacity(barOpacity(for: index))
+        let gridSize = Self.dotSize * 3 + Self.spacing * 2
+
+        ZStack {
+            // 3×3 grid
+            VStack(spacing: Self.spacing) {
+                ForEach(0..<3, id: \.self) { row in
+                    HStack(spacing: Self.spacing) {
+                        ForEach(0..<3, id: \.self) { col in
+                            let index = row * 3 + col
+                            let isCenter = index == 4
+                            let activeLevel = isCenter
+                                ? 0.0
+                                : trailIntensity(for: index)
+
+                            Circle()
+                                .fill(Color.accentColor)
+                                .frame(width: Self.dotSize, height: Self.dotSize)
+                                .opacity(isCenter ? (centerPulse ? 0.4 : 0.15) : (0.12 + 0.5 * activeLevel))
+                                .scaleEffect(isCenter ? (centerPulse ? 1.1 : 0.9) : (0.7 + 0.3 * activeLevel))
+                                .shadow(
+                                    color: Color.accentColor.opacity(activeLevel * 0.4),
+                                    radius: Self.glowRadius * activeLevel
+                                )
+                        }
+                    }
+                }
             }
         }
-        .frame(height: Self.maxHeight)
-        .animation(
-            .easeInOut(duration: Self.cycleDuration).repeatForever(autoreverses: true),
-            value: animating
-        )
-        .onAppear { animating = true }
+        .frame(width: gridSize, height: gridSize)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
+                centerPulse = true
+            }
+            startSpinning()
+        }
     }
 
-    private func barHeight(for index: Int) -> CGFloat {
-        let phase = Double(index) / Double(Self.barCount)
-        let base = animating ? 1.0 : phase
-        // Stagger: middle bars are tallest when animating
-        let center = Double(Self.barCount - 1) / 2.0
-        let proximity = 1.0 - abs(Double(index) - center) / center
-        let height = animating
-            ? Self.minHeight + (Self.maxHeight - Self.minHeight) * proximity
-            : Self.minHeight + (Self.maxHeight - Self.minHeight) * (1.0 - proximity) * 0.5
-        return max(Self.minHeight, height * (animating ? (0.6 + 0.4 * base) : 0.5))
+    /// Returns 1.0 for the head dot, fading trail for the 2 behind it, 0 for the rest.
+    private func trailIntensity(for gridIndex: Int) -> Double {
+        guard let seqPos = Self.sequence.firstIndex(of: gridIndex) else { return 0 }
+        let count = Self.sequence.count
+        let headPos = step % count
+        // Distance behind the head (wrapping)
+        let distance = (headPos - seqPos + count) % count
+        switch distance {
+        case 0: return 1.0   // head
+        case 1: return 0.5   // trail 1
+        case 2: return 0.2   // trail 2
+        default: return 0.0
+        }
     }
 
-    private func barOpacity(for index: Int) -> Double {
-        animating ? (0.5 + 0.5 * (Double(index) / Double(Self.barCount - 1))) : 0.3
+    private func startSpinning() {
+        let interval = Self.cycleDuration / Double(Self.sequence.count)
+        Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { _ in
+            withAnimation(.easeOut(duration: interval * 0.9)) {
+                step += 1
+            }
+        }
     }
 }
 
