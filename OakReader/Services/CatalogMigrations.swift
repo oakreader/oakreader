@@ -7,8 +7,9 @@ extension CatalogDatabase {
     static var migrator: DatabaseMigrator {
         var migrator = DatabaseMigrator()
 
-        migrator.registerMigration("v1-greenfield") { db in
-            // Items (bibliographic references)
+        // MARK: v1 — Items & Attachments
+
+        migrator.registerMigration("v1-items-attachments") { db in
             try db.create(table: "items") { t in
                 t.column("id", .text).primaryKey()
                 t.column("user_id", .text).notNull()
@@ -17,26 +18,27 @@ extension CatalogDatabase {
                 t.column("author", .text).notNull().defaults(to: "")
                 t.column("is_favorite", .integer).notNull().defaults(to: false)
                 t.column("last_opened_at", .text)
+                t.column("last_position", .double)
                 t.column("sync_status", .text).notNull().defaults(to: "local")
+                t.column("cite_key", .text)
+                t.column("source", .text)
+                t.column("source_key", .text)
                 t.column("created_at", .text).notNull()
                 t.column("updated_at", .text).notNull()
-                t.column("cite_key", .text)
             }
-            try db.create(
-                index: "idx_items_cite_key",
-                on: "items",
-                columns: ["cite_key"],
-                unique: true,
-                ifNotExists: true
-            )
+            try db.create(index: "idx_items_cite_key", on: "items", columns: ["cite_key"], unique: true, ifNotExists: true)
+            try db.execute(sql: """
+                CREATE UNIQUE INDEX idx_items_source ON items(source, source_key)
+                WHERE source IS NOT NULL AND source_key IS NOT NULL
+            """)
 
-            // Attachments (files belonging to items)
             try db.create(table: "attachments") { t in
                 t.column("id", .text).primaryKey()
                 t.column("item_id", .text).notNull().references("items", onDelete: .cascade)
                 t.column("storage_key", .text).notNull().unique()
                 t.column("file_name", .text).notNull()
-                t.column("attachment_type", .text).notNull().defaults(to: "pdf")
+                t.column("content_type", .text).notNull().defaults(to: "pdf")
+                t.column("link_mode", .text).notNull().defaults(to: "importedFile")
                 t.column("source_url", .text)
                 t.column("file_size", .integer).notNull().defaults(to: 0)
                 t.column("page_count", .integer).notNull().defaults(to: 0)
@@ -45,8 +47,11 @@ extension CatalogDatabase {
                 t.column("updated_at", .text).notNull()
             }
             try db.create(index: "idx_attachments_item_id", on: "attachments", columns: ["item_id"])
+        }
 
-            // Collections (with smart collection support)
+        // MARK: v2 — Collections
+
+        migrator.registerMigration("v2-collections") { db in
             try db.create(table: "collections") { t in
                 t.column("id", .text).primaryKey()
                 t.column("user_id", .text).notNull()
@@ -57,29 +62,66 @@ extension CatalogDatabase {
                 t.column("is_smart", .integer).notNull().defaults(to: false)
                 t.column("is_system", .integer).notNull().defaults(to: false)
                 t.column("filter_rules", .text)
+                t.column("source", .text)
+                t.column("source_key", .text)
                 t.column("created_at", .text).notNull()
                 t.column("updated_at", .text).notNull()
             }
+            try db.execute(sql: """
+                CREATE UNIQUE INDEX idx_collections_source ON collections(source, source_key)
+                WHERE source IS NOT NULL AND source_key IS NOT NULL
+            """)
 
-            // Many-to-many: item <-> collection (was: document_collections)
             try db.create(table: "collection_items") { t in
                 t.column("item_id", .text).notNull().references("items", onDelete: .cascade)
                 t.column("collection_id", .text).notNull().references("collections", onDelete: .cascade)
                 t.column("created_at", .text).notNull()
                 t.primaryKey(["item_id", "collection_id"])
             }
+            try db.create(index: "idx_collection_items_collection_id", on: "collection_items", columns: ["collection_id"], ifNotExists: true)
 
-            // Properties (NEW)
+            // Seed system smart collections
+            let now = Date().iso8601String
+            // swiftlint:disable:next large_tuple
+            let systemCollections: [(id: String, name: String, icon: String, order: Int, rules: String?)] = [
+                (SystemCollectionID.allItems.uuidString, "All Items", "books.vertical", 0,
+                 #"{"match":"all","conditions":[]}"#),
+                (SystemCollectionID.recentlyRead.uuidString, "Recently Read", "book", 1,
+                 #"{"match":"all","conditions":[{"field":"last_opened_at","op":"within_days","value":"14"}]}"#),
+                (SystemCollectionID.pdfs.uuidString, "PDFs", "doc.fill", 2,
+                 #"{"match":"all","conditions":[{"field":"content_type","op":"eq","value":"pdf"}]}"#),
+                (SystemCollectionID.webSnapshots.uuidString, "Web", "globe", 3,
+                 #"{"match":"all","conditions":[{"field":"content_type","op":"eq","value":"html"}]}"#),
+                (SystemCollectionID.videos.uuidString, "Videos", "play.rectangle", 4,
+                 #"{"match":"all","conditions":[{"field":"content_type","op":"eq","value":"video"}]}"#),
+                (SystemCollectionID.notes.uuidString, "Notes", "doc.text", 5,
+                 #"{"match":"all","conditions":[{"field":"content_type","op":"eq","value":"markdown"}]}"#),
+                (SystemCollectionID.duplicates.uuidString, "Duplicates", "square.on.square", 6, nil),
+                (SystemCollectionID.xBookmarks.uuidString, "X Bookmarks", "icon-x", 7,
+                 #"{"match":"all","conditions":[{"field":"source","op":"eq","value":"x_bookmarks"}]}"#),
+                (SystemCollectionID.githubStars.uuidString, "GitHub Stars", "icon-github", 8,
+                 #"{"match":"all","conditions":[{"field":"source","op":"eq","value":"github_stars"}]}"#),
+            ]
+            for sc in systemCollections {
+                try db.execute(sql: """
+                    INSERT INTO collections (id, user_id, name, icon, sort_order, parent_id, is_smart, is_system, filter_rules, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, NULL, 1, 1, ?, ?, ?)
+                """, arguments: [sc.id, localUserId, sc.name, sc.icon, sc.order, sc.rules, now, now])
+            }
+        }
+
+        // MARK: v3 — Properties
+
+        migrator.registerMigration("v3-properties") { db in
             try db.create(table: "properties") { t in
                 t.column("id", .text).primaryKey()
                 t.column("name", .text).notNull()
-                t.column("type", .text).notNull()       // multi_select, single_select, number, text
+                t.column("type", .text).notNull()
                 t.column("icon", .text).notNull().defaults(to: "tag")
                 t.column("position", .integer).notNull().defaults(to: 0)
                 t.column("is_system", .integer).notNull().defaults(to: false)
             }
 
-            // Property options (for select-type properties)
             try db.create(table: "property_options") { t in
                 t.column("id", .text).primaryKey()
                 t.column("property_id", .text).notNull().references("properties", onDelete: .cascade)
@@ -89,7 +131,6 @@ extension CatalogDatabase {
             }
             try db.create(index: "idx_property_options_property_id", on: "property_options", columns: ["property_id"])
 
-            // Item property values (junction: item <-> property, replaces document_tags)
             try db.create(table: "item_property_values") { t in
                 t.column("id", .text).primaryKey()
                 t.column("item_id", .text).notNull().references("items", onDelete: .cascade)
@@ -100,7 +141,52 @@ extension CatalogDatabase {
             try db.create(index: "idx_item_property_values_item", on: "item_property_values", columns: ["item_id"])
             try db.create(index: "idx_item_property_values_property", on: "item_property_values", columns: ["property_id"])
 
-            // Conversations (was: chat_sessions)
+            // Seed system properties
+            let tagsPropertyId = UUID().uuidString
+            try db.execute(sql: """
+                INSERT INTO properties (id, name, type, icon, position, is_system)
+                VALUES (?, 'Tags', 'multi_select', 'tag', 0, 1)
+            """, arguments: [tagsPropertyId])
+
+            // swiftlint:disable:next large_tuple
+            let tagOptions: [(name: String, color: String, pos: Int)] = [
+                ("Important", "FF6666", 0), ("To Read", "2EA8E5", 1),
+                ("In Progress", "FF8C19", 2), ("Reviewed", "5FB236", 3),
+            ]
+            for opt in tagOptions {
+                try db.execute(sql: """
+                    INSERT INTO property_options (id, property_id, name, color_hex, position)
+                    VALUES (?, ?, ?, ?, ?)
+                """, arguments: [UUID().uuidString, tagsPropertyId, opt.name, opt.color, opt.pos])
+            }
+
+            let statusPropertyId = UUID().uuidString
+            try db.execute(sql: """
+                INSERT INTO properties (id, name, type, icon, position, is_system)
+                VALUES (?, 'Status', 'single_select', 'circle.dotted', 1, 1)
+            """, arguments: [statusPropertyId])
+
+            // swiftlint:disable:next large_tuple
+            let statusOptions: [(name: String, color: String, pos: Int)] = [
+                ("Unread", "999999", 0), ("Reading", "2EA8E5", 1),
+                ("Completed", "5FB236", 2), ("Archived", "A28AE5", 3),
+            ]
+            for opt in statusOptions {
+                try db.execute(sql: """
+                    INSERT INTO property_options (id, property_id, name, color_hex, position)
+                    VALUES (?, ?, ?, ?, ?)
+                """, arguments: [UUID().uuidString, statusPropertyId, opt.name, opt.color, opt.pos])
+            }
+
+            try db.execute(sql: """
+                INSERT INTO properties (id, name, type, icon, position, is_system)
+                VALUES (?, 'Rating', 'number', 'star', 2, 1)
+            """, arguments: [UUID().uuidString])
+        }
+
+        // MARK: v4 — Notes & Conversations
+
+        migrator.registerMigration("v4-notes-conversations") { db in
             try db.create(table: "conversations") { t in
                 t.column("id", .text).primaryKey()
                 t.column("user_id", .text).notNull()
@@ -111,7 +197,6 @@ extension CatalogDatabase {
                 t.column("updated_at", .text).notNull()
             }
 
-            // Notes (document_id → item_id)
             try db.create(table: "notes") { t in
                 t.column("id", .text).primaryKey()
                 t.column("user_id", .text).notNull()
@@ -122,8 +207,11 @@ extension CatalogDatabase {
                 t.column("updated_at", .text).notNull()
             }
             try db.create(index: "idx_notes_item_id", on: "notes", columns: ["item_id"])
+        }
 
-            // Citations (was: reference_metadata)
+        // MARK: v5 — Citations
+
+        migrator.registerMigration("v5-citations") { db in
             try db.create(table: "citations") { t in
                 t.column("item_id", .text).primaryKey()
                     .references("items", onDelete: .cascade)
@@ -132,152 +220,19 @@ extension CatalogDatabase {
                 t.column("doi", .text)
                 t.column("year", .integer)
                 t.column("container_title", .text)
+                t.column("abstract", .text)
                 t.column("created_at", .text).notNull()
                 t.column("updated_at", .text).notNull()
             }
             try db.create(index: "idx_citations_doi", on: "citations", columns: ["doi"], ifNotExists: true)
             try db.create(index: "idx_citations_year", on: "citations", columns: ["year"], ifNotExists: true)
             try db.create(index: "idx_citations_type", on: "citations", columns: ["csl_type"], ifNotExists: true)
-
-            // FTS5 full-text search
-            try db.create(virtualTable: "items_fts", using: FTS5()) { t in
-                t.synchronize(withTable: "items")
-                t.tokenizer = .unicode61()
-                t.column("title")
-                t.column("author")
-            }
-
-            // MARK: - Seed System Properties
-
-            // Tags property (multi_select)
-            let tagsPropertyId = UUID().uuidString
-            try db.execute(sql: """
-                INSERT INTO properties (id, name, type, icon, position, is_system)
-                VALUES (?, 'Tags', 'multi_select', 'tag', 0, 1)
-            """, arguments: [tagsPropertyId])
-
-            // swiftlint:disable:next large_tuple
-            let tagOptions: [(name: String, color: String, pos: Int)] = [
-                ("Important", "FF6666", 0),
-                ("To Read", "2EA8E5", 1),
-                ("In Progress", "FF8C19", 2),
-                ("Reviewed", "5FB236", 3),
-            ]
-            for opt in tagOptions {
-                try db.execute(sql: """
-                    INSERT INTO property_options (id, property_id, name, color_hex, position)
-                    VALUES (?, ?, ?, ?, ?)
-                """, arguments: [UUID().uuidString, tagsPropertyId, opt.name, opt.color, opt.pos])
-            }
-
-            // Status property (single_select)
-            let statusPropertyId = UUID().uuidString
-            try db.execute(sql: """
-                INSERT INTO properties (id, name, type, icon, position, is_system)
-                VALUES (?, 'Status', 'single_select', 'circle.dotted', 1, 1)
-            """, arguments: [statusPropertyId])
-
-            // swiftlint:disable:next large_tuple
-            let statusOptions: [(name: String, color: String, pos: Int)] = [
-                ("Unread", "999999", 0),
-                ("Reading", "2EA8E5", 1),
-                ("Completed", "5FB236", 2),
-                ("Archived", "A28AE5", 3),
-            ]
-            for opt in statusOptions {
-                try db.execute(sql: """
-                    INSERT INTO property_options (id, property_id, name, color_hex, position)
-                    VALUES (?, ?, ?, ?, ?)
-                """, arguments: [UUID().uuidString, statusPropertyId, opt.name, opt.color, opt.pos])
-            }
-
-            // Rating property (number, no options)
-            let ratingPropertyId = UUID().uuidString
-            try db.execute(sql: """
-                INSERT INTO properties (id, name, type, icon, position, is_system)
-                VALUES (?, 'Rating', 'number', 'star', 2, 1)
-            """, arguments: [ratingPropertyId])
-
-            // MARK: - Seed System Smart Collections
-
-            let now = Date().iso8601String
-            // swiftlint:disable:next large_tuple
-            let systemCollections: [(id: String, name: String, icon: String, order: Int, rules: String)] = [
-                (SystemCollectionID.allItems.uuidString, "All Items", "books.vertical", 0,
-                 #"{"match":"all","conditions":[]}"#),
-                (SystemCollectionID.recentlyRead.uuidString, "Recently Read", "book", 1,
-                 #"{"match":"all","conditions":[{"field":"last_opened_at","op":"within_days","value":"14"}]}"#),
-                (SystemCollectionID.pdfs.uuidString, "PDFs", "doc.fill", 2,
-                 #"{"match":"all","conditions":[{"field":"item_type","op":"eq","value":"pdf"}]}"#),
-                (SystemCollectionID.webSnapshots.uuidString, "Web", "globe", 3,
-                 #"{"match":"all","conditions":[{"field":"item_type","op":"eq","value":"webSnapshot"}]}"#),
-                (SystemCollectionID.videos.uuidString, "Videos", "play.rectangle", 4,
-                 #"{"match":"all","conditions":[{"field":"item_type","op":"eq","value":"embed"}]}"#),
-            ]
-            for sc in systemCollections {
-                try db.execute(sql: """
-                    INSERT INTO collections (id, user_id, name, icon, sort_order, parent_id, is_smart, is_system, filter_rules, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, NULL, 1, 1, ?, ?, ?)
-                """, arguments: [sc.id, localUserId, sc.name, sc.icon, sc.order, sc.rules, now, now])
-            }
+            try db.create(index: "idx_citations_container_title", on: "citations", columns: ["container_title"], ifNotExists: true)
         }
 
-        migrator.registerMigration("v2-remove-inbox") { db in
-            // Drop is_inbox column (SQLite requires table rebuild)
-            if try db.columns(in: "items").contains(where: { $0.name == "is_inbox" }) {
-                try db.alter(table: "items") { t in
-                    t.drop(column: "is_inbox")
-                }
-            }
+        // MARK: v6 — Annotations
 
-            // Delete the Inbox system collection
-            let inboxId = "00000000-0000-0000-0000-000000000001"
-            try db.execute(sql: "DELETE FROM collections WHERE id = ?", arguments: [inboxId])
-
-            // Shift sort orders
-            let reorder: [(id: String, order: Int)] = [
-                ("00000000-0000-0000-0000-000000000002", 0), // All Items
-                ("00000000-0000-0000-0000-000000000005", 1), // PDFs
-                ("00000000-0000-0000-0000-000000000006", 2), // Web
-                ("00000000-0000-0000-0000-000000000007", 3), // Videos
-            ]
-            for entry in reorder {
-                try db.execute(
-                    sql: "UPDATE collections SET sort_order = ? WHERE id = ?",
-                    arguments: [entry.order, entry.id]
-                )
-            }
-        }
-
-        migrator.registerMigration("v3-recently-read") { db in
-            let now = Date().iso8601String
-            let rules = #"{"match":"all","conditions":[{"field":"last_opened_at","op":"within_days","value":"14"}]}"#
-            try db.execute(sql: """
-                INSERT OR IGNORE INTO collections (id, user_id, name, icon, sort_order, parent_id, is_smart, is_system, filter_rules, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, NULL, 1, 1, ?, ?, ?)
-            """, arguments: [SystemCollectionID.recentlyRead.uuidString, localUserId, "Recently Read", "book", 2, rules, now, now])
-
-            // Shift sort orders for collections after Recently Read
-            let reorder: [(id: String, order: Int)] = [
-                (SystemCollectionID.pdfs.uuidString, 3),
-                (SystemCollectionID.webSnapshots.uuidString, 4),
-                (SystemCollectionID.videos.uuidString, 5),
-            ]
-            for entry in reorder {
-                try db.execute(
-                    sql: "UPDATE collections SET sort_order = ? WHERE id = ?",
-                    arguments: [entry.order, entry.id]
-                )
-            }
-        }
-
-        migrator.registerMigration("v3-last-position") { db in
-            try db.alter(table: "items") { t in
-                t.add(column: "last_position", .double)
-            }
-        }
-
-        migrator.registerMigration("v4-annotations") { db in
+        migrator.registerMigration("v6-annotations") { db in
             try db.create(table: "annotations") { t in
                 t.column("id", .text).primaryKey()
                 t.column("user_id", .text).notNull()
@@ -308,7 +263,9 @@ extension CatalogDatabase {
             """)
         }
 
-        migrator.registerMigration("v5-characters") { db in
+        // MARK: v7 — Characters & Voice Calls
+
+        migrator.registerMigration("v7-characters") { db in
             try db.create(table: "characters") { t in
                 t.column("id", .text).primaryKey()
                 t.column("user_id", .text).notNull()
@@ -329,7 +286,7 @@ extension CatalogDatabase {
             }
             try db.create(index: "idx_voice_calls_character_id", on: "voice_calls", columns: ["character_id"])
 
-            // Seed default character (DB row + JSON config file)
+            // Seed default character
             let characterId = UUID().uuidString
             let now = Date().iso8601String
             try db.execute(sql: """
@@ -337,7 +294,6 @@ extension CatalogDatabase {
                 VALUES (?, ?, 'Oak', 0, ?, ?)
             """, arguments: [characterId, localUserId, now, now])
 
-            // Write default config JSON
             if let uuid = UUID(uuidString: characterId) {
                 let configURL = CatalogDatabase.characterConfigURL(characterId: uuid)
                 let fm = FileManager.default
@@ -350,477 +306,74 @@ extension CatalogDatabase {
             }
         }
 
-        migrator.registerMigration("v6-markdown-notes") { db in
-            let now = Date().iso8601String
-            let rules = #"{"match":"all","conditions":[{"field":"item_type","op":"eq","value":"markdown"}]}"#
-            try db.execute(sql: """
-                INSERT OR IGNORE INTO collections (id, user_id, name, icon, sort_order, parent_id, is_smart, is_system, filter_rules, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, NULL, 1, 1, ?, ?, ?)
-            """, arguments: [SystemCollectionID.notes.uuidString, localUserId, "Notes", "doc.text", 6, rules, now, now])
-        }
+        // MARK: v8 — Full-Text Search & Storage
 
-        migrator.registerMigration("v7-centralized-user-storage") { db in
+        migrator.registerMigration("v8-search-storage") { db in
+            try db.create(virtualTable: "items_fts", using: FTS5()) { t in
+                t.synchronize(withTable: "items")
+                t.tokenizer = .unicode61()
+                t.column("title")
+                t.column("author")
+            }
+
+            // Ensure storage directories exist
             let fm = FileManager.default
-
-            func ensureDirectory(_ url: URL) throws {
-                try fm.createDirectory(at: url, withIntermediateDirectories: true)
-            }
-
-            func moveItemIfDestinationMissing(from source: URL, to destination: URL) throws {
-                guard fm.fileExists(atPath: source.path) else { return }
-                try ensureDirectory(destination.deletingLastPathComponent())
-                guard !fm.fileExists(atPath: destination.path) else { return }
-                try fm.moveItem(at: source, to: destination)
-            }
-
-            func availableURL(for url: URL) -> URL {
-                guard fm.fileExists(atPath: url.path) else { return url }
-
-                let parent = url.deletingLastPathComponent()
-                let name = url.deletingPathExtension().lastPathComponent
-                let ext = url.pathExtension
-                var index = 2
-                while true {
-                    let candidateName = ext.isEmpty ? "\(name)-\(index)" : "\(name)-\(index).\(ext)"
-                    let candidate = parent.appendingPathComponent(candidateName)
-                    if !fm.fileExists(atPath: candidate.path) {
-                        return candidate
-                    }
-                    index += 1
-                }
-            }
-
-            func moveChildren(from source: URL, to destination: URL) throws {
-                guard fm.fileExists(atPath: source.path) else { return }
-                try ensureDirectory(destination)
-
-                let children = try fm.contentsOfDirectory(
-                    at: source,
-                    includingPropertiesForKeys: nil,
-                    options: [.skipsHiddenFiles]
-                )
-                for child in children {
-                    let target = availableURL(for: destination.appendingPathComponent(child.lastPathComponent))
-                    try fm.moveItem(at: child, to: target)
-                }
-            }
-
-            func removeEmptyDirectory(_ url: URL) {
-                guard fm.fileExists(atPath: url.path),
-                      let children = try? fm.contentsOfDirectory(atPath: url.path),
-                      children.isEmpty else { return }
-                try? fm.removeItem(at: url)
-            }
-
-            try ensureDirectory(CatalogDatabase.storageDirectory)
-            try ensureDirectory(CatalogDatabase.notesDirectory)
-            try ensureDirectory(CatalogDatabase.notesAttachmentsDirectory)
-            try ensureDirectory(CatalogDatabase.chatsDirectory)
-            try ensureDirectory(CatalogDatabase.chatAttachmentsDirectory)
-            try ensureDirectory(CatalogDatabase.callsDirectory)
-
-            let itemRows = try Row.fetchAll(db, sql: "SELECT id, storage_key FROM items")
-            for row in itemRows {
-                let itemId: String = row["id"]
-                let storageKey: String = row["storage_key"]
-                let itemDirectory = CatalogDatabase.documentDirectory(storageKey: storageKey)
-
-                // Older builds used storage/{itemKey}/files/{attachmentKey}/.
-                let legacyFilesDirectory = itemDirectory.appendingPathComponent("files", isDirectory: true)
-                let currentAttachmentsDirectory = itemDirectory.appendingPathComponent("attachments", isDirectory: true)
-                try moveChildren(from: legacyFilesDirectory, to: currentAttachmentsDirectory)
-                removeEmptyDirectory(legacyFilesDirectory)
-
-                // Older builds kept markdown notes under each item.
-                let legacyNotesDirectory = itemDirectory.appendingPathComponent("notes", isDirectory: true)
-                let noteRows = try Row.fetchAll(
-                    db,
-                    sql: "SELECT id FROM notes WHERE item_id = ?",
-                    arguments: [itemId]
-                )
-                for noteRow in noteRows {
-                    let noteId: String = noteRow["id"]
-                    let source = legacyNotesDirectory.appendingPathComponent("\(noteId).md")
-                    let destination = CatalogDatabase.notesDirectory.appendingPathComponent("\(noteId).md")
-                    try moveItemIfDestinationMissing(from: source, to: destination)
-                }
-
-                let legacyNoteAttachmentsDirectory = legacyNotesDirectory.appendingPathComponent("attachments", isDirectory: true)
-                try moveChildren(from: legacyNoteAttachmentsDirectory, to: CatalogDatabase.notesAttachmentsDirectory)
-                removeEmptyDirectory(legacyNoteAttachmentsDirectory)
-                removeEmptyDirectory(legacyNotesDirectory)
-
-                // Older builds kept chat JSONL files under storage/{itemKey}/sessions/.
-                let legacySessionsDirectory = itemDirectory.appendingPathComponent("sessions", isDirectory: true)
-                let conversationRows = try Row.fetchAll(
-                    db,
-                    sql: "SELECT id FROM conversations WHERE item_id = ?",
-                    arguments: [itemId]
-                )
-                for conversationRow in conversationRows {
-                    let sessionId: String = conversationRow["id"]
-                    let source = legacySessionsDirectory.appendingPathComponent("\(sessionId).jsonl")
-                    let destination = CatalogDatabase.chatsDirectory.appendingPathComponent("\(sessionId).jsonl")
-                    try moveItemIfDestinationMissing(from: source, to: destination)
-
-                    if let uuid = UUID(uuidString: sessionId) {
-                        let legacyAttachmentDirectory = legacySessionsDirectory
-                            .appendingPathComponent("\(sessionId)_attachments", isDirectory: true)
-                        try moveChildren(
-                            from: legacyAttachmentDirectory,
-                            to: CatalogDatabase.chatAttachmentDirectory(sessionId: uuid)
-                        )
-                        removeEmptyDirectory(legacyAttachmentDirectory)
-                    }
-                }
-                removeEmptyDirectory(legacySessionsDirectory)
-            }
-
-            // Earlier library-wide chat sessions lived under ~/OakReader/chat_sessions/.
-            let legacyChatSessionsDirectory = CatalogDatabase.dataDirectory
-                .appendingPathComponent("chat_sessions", isDirectory: true)
-            let libraryConversationRows = try Row.fetchAll(
-                db,
-                sql: "SELECT id FROM conversations WHERE item_id IS NULL"
-            )
-            for conversationRow in libraryConversationRows {
-                let sessionId: String = conversationRow["id"]
-                let source = legacyChatSessionsDirectory.appendingPathComponent("\(sessionId).jsonl")
-                let destination = CatalogDatabase.chatsDirectory.appendingPathComponent("\(sessionId).jsonl")
-                try moveItemIfDestinationMissing(from: source, to: destination)
-
-                if let uuid = UUID(uuidString: sessionId) {
-                    let legacyAttachmentDirectory = legacyChatSessionsDirectory
-                        .appendingPathComponent("\(sessionId)_attachments", isDirectory: true)
-                    try moveChildren(
-                        from: legacyAttachmentDirectory,
-                        to: CatalogDatabase.chatAttachmentDirectory(sessionId: uuid)
-                    )
-                    removeEmptyDirectory(legacyAttachmentDirectory)
-                }
-            }
-            removeEmptyDirectory(legacyChatSessionsDirectory)
-
-            // Rename voice-calls to calls without assuming calls/ is empty.
-            let legacyCallsDirectory = CatalogDatabase.dataDirectory
-                .appendingPathComponent("voice-calls", isDirectory: true)
-            try moveChildren(from: legacyCallsDirectory, to: CatalogDatabase.callsDirectory)
-            removeEmptyDirectory(legacyCallsDirectory)
-        }
-
-        migrator.registerMigration("v8-scope-attachment-directories") { db in
-            let fm = FileManager.default
-
-            func ensureDirectory(_ url: URL) throws {
-                try fm.createDirectory(at: url, withIntermediateDirectories: true)
-            }
-
-            func availableURL(for url: URL) -> URL {
-                guard fm.fileExists(atPath: url.path) else { return url }
-
-                let parent = url.deletingLastPathComponent()
-                let name = url.deletingPathExtension().lastPathComponent
-                let ext = url.pathExtension
-                var index = 2
-                while true {
-                    let candidateName = ext.isEmpty ? "\(name)-\(index)" : "\(name)-\(index).\(ext)"
-                    let candidate = parent.appendingPathComponent(candidateName)
-                    if !fm.fileExists(atPath: candidate.path) {
-                        return candidate
-                    }
-                    index += 1
-                }
-            }
-
-            func moveChildren(from source: URL, to destination: URL) throws {
-                guard fm.fileExists(atPath: source.path) else { return }
-                try ensureDirectory(destination)
-
-                let children = try fm.contentsOfDirectory(
-                    at: source,
-                    includingPropertiesForKeys: nil,
-                    options: [.skipsHiddenFiles]
-                )
-                for child in children {
-                    let target = availableURL(for: destination.appendingPathComponent(child.lastPathComponent))
-                    try fm.moveItem(at: child, to: target)
-                }
-            }
-
-            func removeEmptyDirectory(_ url: URL) {
-                guard fm.fileExists(atPath: url.path),
-                      let children = try? fm.contentsOfDirectory(atPath: url.path),
-                      children.isEmpty else { return }
-                try? fm.removeItem(at: url)
-            }
-
-            try ensureDirectory(CatalogDatabase.notesAttachmentsDirectory)
-            try ensureDirectory(CatalogDatabase.chatAttachmentsDirectory)
-
-            // Move old flat note attachment files to notes/attachments/{noteId}/ and
-            // rewrite markdown links from attachments/file.png to attachments/{noteId}/file.png.
-            let rootNoteAttachmentURLs = try fm.contentsOfDirectory(
-                at: CatalogDatabase.notesAttachmentsDirectory,
-                includingPropertiesForKeys: [.isDirectoryKey],
-                options: [.skipsHiddenFiles]
-            ).filter { url in
-                let values = try? url.resourceValues(forKeys: [.isDirectoryKey])
-                return values?.isDirectory != true
-            }
-
-            if !rootNoteAttachmentURLs.isEmpty {
-                let noteRows = try Row.fetchAll(db, sql: "SELECT id FROM notes")
-                for noteRow in noteRows {
-                    let noteId: String = noteRow["id"]
-                    guard let noteUUID = UUID(uuidString: noteId) else { continue }
-
-                    let noteURL = CatalogDatabase.noteFileURL(noteId: noteUUID)
-                    guard fm.fileExists(atPath: noteURL.path),
-                          var content = try? String(contentsOf: noteURL, encoding: .utf8)
-                    else { continue }
-
-                    var didRewrite = false
-                    let noteAttachmentDirectory = CatalogDatabase.noteAttachmentDirectory(noteId: noteUUID)
-                    for attachmentURL in rootNoteAttachmentURLs {
-                        let fileName = attachmentURL.lastPathComponent
-                        let oldReference = "attachments/\(fileName)"
-                        guard content.contains(oldReference) else { continue }
-
-                        try ensureDirectory(noteAttachmentDirectory)
-                        let destination = noteAttachmentDirectory.appendingPathComponent(fileName)
-                        if !fm.fileExists(atPath: destination.path) {
-                            try fm.copyItem(at: attachmentURL, to: destination)
-                        }
-                        content = content.replacingOccurrences(
-                            of: oldReference,
-                            with: "attachments/\(noteId)/\(fileName)"
-                        )
-                        didRewrite = true
-                    }
-
-                    if didRewrite {
-                        try content.write(to: noteURL, atomically: true, encoding: .utf8)
-                    }
-                }
-
-                let legacyDirectory = CatalogDatabase.notesAttachmentsDirectory
-                    .appendingPathComponent("_legacy", isDirectory: true)
-                for attachmentURL in rootNoteAttachmentURLs where fm.fileExists(atPath: attachmentURL.path) {
-                    let destination = availableURL(for: legacyDirectory.appendingPathComponent(attachmentURL.lastPathComponent))
-                    try ensureDirectory(legacyDirectory)
-                    try fm.moveItem(at: attachmentURL, to: destination)
-                }
-            }
-
-            // Move old chats/{sessionId}_attachments folders to chats/attachments/{sessionId}/.
-            let chatRootChildren = try fm.contentsOfDirectory(
-                at: CatalogDatabase.chatsDirectory,
-                includingPropertiesForKeys: [.isDirectoryKey],
-                options: [.skipsHiddenFiles]
-            )
-            for child in chatRootChildren {
-                let values = try? child.resourceValues(forKeys: [.isDirectoryKey])
-                guard values?.isDirectory == true else { continue }
-
-                let name = child.lastPathComponent
-                guard name.hasSuffix("_attachments") else { continue }
-
-                let sessionId = String(name.dropLast("_attachments".count))
-                guard let uuid = UUID(uuidString: sessionId) else { continue }
-
-                try moveChildren(from: child, to: CatalogDatabase.chatAttachmentDirectory(sessionId: uuid))
-                removeEmptyDirectory(child)
+            for dir in [storageDirectory, notesDirectory, notesAttachmentsDirectory, chatsDirectory, chatAttachmentsDirectory, callsDirectory] {
+                try fm.createDirectory(at: dir, withIntermediateDirectories: true)
             }
         }
 
-        migrator.registerMigration("v9-import-source") { db in
+        // MARK: v9 — Citation Enhancements
+
+        migrator.registerMigration("v9-citation-enhancements") { db in
+            // Add extra column to items
             try db.alter(table: "items") { t in
-                t.add(column: "source", .text)
-                t.add(column: "source_key", .text)
-            }
-            try db.execute(sql: """
-                CREATE UNIQUE INDEX idx_items_source ON items(source, source_key)
-                WHERE source IS NOT NULL AND source_key IS NOT NULL
-            """)
-
-            try db.alter(table: "collections") { t in
-                t.add(column: "source", .text)
-                t.add(column: "source_key", .text)
-            }
-            try db.execute(sql: """
-                CREATE UNIQUE INDEX idx_collections_source ON collections(source, source_key)
-                WHERE source IS NOT NULL AND source_key IS NOT NULL
-            """)
-        }
-
-        migrator.registerMigration("v10-collection-items-index") { db in
-            try db.create(
-                index: "idx_collection_items_collection_id",
-                on: "collection_items",
-                columns: ["collection_id"],
-                ifNotExists: true
-            )
-        }
-
-        // Regenerate all cite keys using the improved {auth}{TitleWords}{year} formula.
-        migrator.registerMigration("v11-regenerate-cite-keys") { db in
-            let rows = try Row.fetchAll(db, sql: """
-                SELECT i.id, i.title, i.author, c.csl_json, c.year
-                FROM items i
-                LEFT JOIN citations c ON c.item_id = i.id
-            """)
-
-            // Collect all new keys first, then resolve collisions
-            var usedKeys: [String: Int] = [:]  // base → count
-
-            struct PendingKey {
-                let itemId: String
-                let base: String
-            }
-            var pending: [PendingKey] = []
-
-            for row in rows {
-                let itemId: String = row["id"]
-                let title: String = row["title"]
-                let author: String = row["author"]
-                let cslJson: String? = row["csl_json"]
-                let year: Int? = row["year"]
-
-                let base: String
-                if let json = cslJson,
-                   let data = json.data(using: .utf8),
-                   let csl = try? JSONDecoder().decode(CSLItem.self, from: data)
-                {
-                    let authorPart = CiteKeyService.extractAuthorKey(csl: csl)
-                    let titlePart = CiteKeyService.extractTitleWords(csl: csl)
-                    let yearPart = csl.issued?.year.map { "\($0)" } ?? ""
-                    if authorPart.isEmpty, !titlePart.isEmpty {
-                        base = CiteKeyService.lowercaseFirstWord(titlePart) + yearPart
-                    } else {
-                        base = authorPart + titlePart + yearPart
-                    }
-                } else {
-                    let authorPart = CiteKeyService.processAuthorName(author)
-                    let titlePart = title.isEmpty ? "" : CiteKeyService.extractTitleWordsFromString(title)
-                    let yearPart = year.map { "\($0)" } ?? ""
-                    if authorPart.isEmpty, !titlePart.isEmpty {
-                        base = CiteKeyService.lowercaseFirstWord(titlePart) + yearPart
-                    } else {
-                        base = authorPart + titlePart + yearPart
-                    }
-                }
-
-                guard !base.isEmpty else { continue }
-                pending.append(PendingKey(itemId: itemId, base: base))
-                usedKeys[base, default: 0] += 1
+                t.add(column: "extra", .text)
             }
 
-            // Track suffix counters per base for collision resolution
-            var suffixCounters: [String: Int] = [:]
-            let now = Date().iso8601String
-
-            for entry in pending {
-                let candidate: String
-                if usedKeys[entry.base, default: 0] <= 1 {
-                    candidate = entry.base
-                } else {
-                    let idx = suffixCounters[entry.base, default: 0]
-                    if idx == 0 {
-                        candidate = entry.base
-                    } else {
-                        candidate = entry.base + String(UnicodeScalar(UInt8(96 + idx)))
-                    }
-                    suffixCounters[entry.base] = idx + 1
-                }
-
-                try db.execute(
-                    sql: "UPDATE items SET cite_key = ?, updated_at = ? WHERE id = ?",
-                    arguments: [candidate, now, entry.itemId]
-                )
-            }
-        }
-
-        migrator.registerMigration("v12-duplicates-collection") { db in
-            let now = Date().iso8601String
-            try db.execute(sql: """
-                INSERT OR IGNORE INTO collections (id, user_id, name, icon, sort_order, parent_id, is_smart, is_system, filter_rules, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, NULL, 1, 1, NULL, ?, ?)
-            """, arguments: [SystemCollectionID.duplicates.uuidString, localUserId, "Duplicates", "square.on.square", 7, now, now])
-        }
-
-        migrator.registerMigration("v13-search-index") { db in
-            // Add abstract column to citations for direct search (avoids JSON parsing)
+            // Add identifier columns to citations
             try db.alter(table: "citations") { t in
-                t.add(column: "abstract", .text)
+                t.add(column: "pmid", .text)
+                t.add(column: "arxiv_id", .text)
+                t.add(column: "isbn", .text)
+                t.add(column: "issn", .text)
             }
 
-            // Populate abstract from existing csl_json
+            // Partial indexes on identifier columns
             try db.execute(sql: """
-                UPDATE citations
-                SET abstract = json_extract(csl_json, '$.abstract')
-                WHERE json_valid(csl_json) AND json_extract(csl_json, '$.abstract') IS NOT NULL
+                CREATE INDEX idx_citations_pmid ON citations(pmid) WHERE pmid IS NOT NULL
+            """)
+            try db.execute(sql: """
+                CREATE INDEX idx_citations_arxiv_id ON citations(arxiv_id) WHERE arxiv_id IS NOT NULL
+            """)
+            try db.execute(sql: """
+                CREATE INDEX idx_citations_isbn ON citations(isbn) WHERE isbn IS NOT NULL
+            """)
+            try db.execute(sql: """
+                CREATE INDEX idx_citations_issn ON citations(issn) WHERE issn IS NOT NULL
             """)
 
-            // Index on container_title for journal searches
-            try db.create(
-                index: "idx_citations_container_title",
-                on: "citations",
-                columns: ["container_title"],
-                ifNotExists: true
-            )
-        }
-
-        migrator.registerMigration("v14-semantic-chunks") { db in
-            try db.create(table: "semantic_chunks") { t in
+            // Item relations table
+            try db.create(table: "item_relations") { t in
                 t.column("id", .text).primaryKey()
-                t.column("item_id", .text).notNull().references("items", onDelete: .cascade)
-                t.column("chunk_type", .text).notNull()    // "abstract" or "page"
-                t.column("page_start", .integer)
-                t.column("page_end", .integer)
-                t.column("token_count", .integer)
+                t.column("source_item_id", .text).notNull().references("items", onDelete: .cascade)
+                t.column("target_item_id", .text).notNull().references("items", onDelete: .cascade)
+                t.column("relation_type", .text).notNull()
                 t.column("created_at", .text).notNull()
-                t.column("embedding", .blob)               // raw Float32 bytes
-                t.column("embedding_dim", .integer)         // e.g. 1024
-                t.column("chunk_text", .text)               // original text for excerpts
-                t.column("embedding_model", .text)          // e.g. "mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ"
-                t.column("embedding_provider", .text)       // "local" or future cloud providers
             }
-            try db.create(index: "idx_semantic_chunks_item_id", on: "semantic_chunks", columns: ["item_id"])
-        }
+            try db.execute(sql: """
+                CREATE UNIQUE INDEX idx_item_relations_unique
+                ON item_relations(source_item_id, target_item_id, relation_type)
+            """)
+            try db.create(index: "idx_item_relations_target", on: "item_relations", columns: ["target_item_id"])
 
-        migrator.registerMigration("v15-remove-semantic-chunks") { db in
-            // Semantic chunks are now stored in the separate semantic.db file.
-            if try db.tableExists("semantic_chunks") {
-                try db.drop(table: "semantic_chunks")
+            // FTS5 on citations (abstract + container_title)
+            try db.create(virtualTable: "citations_fts", using: FTS5()) { t in
+                t.synchronize(withTable: "citations")
+                t.tokenizer = .unicode61()
+                t.column("abstract")
+                t.column("container_title")
             }
-        }
-
-        migrator.registerMigration("v16-sync-source-collections") { db in
-            let now = Date().iso8601String
-            // X Bookmarks: filter by source == "x_bookmarks"
-            try db.execute(sql: """
-                INSERT OR IGNORE INTO collections (id, user_id, name, icon, sort_order, parent_id, is_smart, is_system, filter_rules, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, NULL, 1, 1, ?, ?, ?)
-            """, arguments: [
-                SystemCollectionID.xBookmarks.uuidString, localUserId, "X Bookmarks", "icon-x", 8,
-                #"{"match":"all","conditions":[{"field":"source","op":"eq","value":"x_bookmarks"}]}"#, now, now
-            ])
-            // GitHub Stars: filter by source == "github_stars"
-            try db.execute(sql: """
-                INSERT OR IGNORE INTO collections (id, user_id, name, icon, sort_order, parent_id, is_smart, is_system, filter_rules, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, NULL, 1, 1, ?, ?, ?)
-            """, arguments: [
-                SystemCollectionID.githubStars.uuidString, localUserId, "GitHub Stars", "icon-github", 9,
-                #"{"match":"all","conditions":[{"field":"source","op":"eq","value":"github_stars"}]}"#, now, now
-            ])
-
-            // Fix icon for databases created before icon-github was used
-            try db.execute(sql: """
-                UPDATE collections SET icon = 'icon-github' WHERE id = ? AND icon != 'icon-github'
-            """, arguments: [SystemCollectionID.githubStars.uuidString])
-            try db.execute(sql: """
-                UPDATE collections SET icon = 'icon-x' WHERE id = ? AND icon != 'icon-x'
-            """, arguments: [SystemCollectionID.xBookmarks.uuidString])
         }
 
         return migrator

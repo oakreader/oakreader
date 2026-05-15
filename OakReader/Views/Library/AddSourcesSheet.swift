@@ -248,7 +248,7 @@ struct AddSourcesSheet: View {
             let item = appState.importService.importFile(from: url)
             if let item {
                 assignToSelectedCollection(item)
-                updateRow(ids[index], title: item.title, status: .success, detail: item.itemType.label)
+                updateRow(ids[index], title: item.title, status: .success, detail: item.contentType.label)
             } else {
                 updateRow(ids[index], status: .failure, detail: "Unsupported or failed file")
             }
@@ -274,7 +274,7 @@ struct AddSourcesSheet: View {
                 let item = try await appState.importService.importURL(url)
                 if let item {
                     assignToSelectedCollection(item)
-                    updateRow(ids[index], title: item.title, status: .success, detail: item.itemType.label)
+                    updateRow(ids[index], title: item.title, status: .success, detail: item.contentType.label)
                 } else {
                     updateRow(ids[index], status: .failure, detail: "Import failed")
                 }

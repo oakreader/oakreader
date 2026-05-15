@@ -38,7 +38,7 @@ struct FilterCondition: Codable, Hashable, Identifiable {
 }
 
 enum FilterField: String, Codable, CaseIterable {
-    case itemType = "item_type"
+    case contentType = "content_type"
     case lastOpenedAt = "last_opened_at"
     case createdAt = "created_at"
     case title

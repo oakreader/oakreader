@@ -19,6 +19,7 @@ struct ItemRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable 
     var lastPosition: Double?
     var source: String?
     var sourceKey: String?
+    var extra: String?
 
     enum CodingKeys: String, CodingKey, ColumnExpression {
         case id
@@ -33,6 +34,7 @@ struct ItemRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable 
         case lastPosition = "last_position"
         case source
         case sourceKey = "source_key"
+        case extra
     }
 }
 
@@ -43,7 +45,8 @@ struct AttachmentRecord: Codable, FetchableRecord, MutablePersistableRecord, Has
     var itemId: String
     var storageKey: String
     var fileName: String
-    var attachmentType: String
+    var contentType: String
+    var linkMode: String
     var sourceURL: String?
     var fileSize: Int64
     var pageCount: Int
@@ -56,7 +59,8 @@ struct AttachmentRecord: Codable, FetchableRecord, MutablePersistableRecord, Has
         case itemId = "item_id"
         case storageKey = "storage_key"
         case fileName = "file_name"
-        case attachmentType = "attachment_type"
+        case contentType = "content_type"
+        case linkMode = "link_mode"
         case sourceURL = "source_url"
         case fileSize = "file_size"
         case pageCount = "page_count"
@@ -227,6 +231,10 @@ struct CitationRecord: Codable, FetchableRecord, MutablePersistableRecord, Hasha
     var year: Int?
     var containerTitle: String?
     var abstract: String?
+    var pmid: String?
+    var arxivId: String?
+    var isbn: String?
+    var issn: String?
     var createdAt: String
     var updatedAt: String
 
@@ -237,6 +245,9 @@ struct CitationRecord: Codable, FetchableRecord, MutablePersistableRecord, Hasha
         case doi, year
         case containerTitle = "container_title"
         case abstract
+        case pmid
+        case arxivId = "arxiv_id"
+        case isbn, issn
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
@@ -285,6 +296,26 @@ struct AnnotationRecord: Codable, FetchableRecord, MutablePersistableRecord, Has
         case createdAt = "created_at"
         case updatedAt = "updated_at"
         case deletedAt = "deleted_at"
+    }
+}
+
+// MARK: - Item Relations
+
+struct ItemRelationRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable {
+    static let databaseTableName = "item_relations"
+
+    var id: String
+    var sourceItemId: String
+    var targetItemId: String
+    var relationType: String
+    var createdAt: String
+
+    enum CodingKeys: String, CodingKey, ColumnExpression {
+        case id
+        case sourceItemId = "source_item_id"
+        case targetItemId = "target_item_id"
+        case relationType = "relation_type"
+        case createdAt = "created_at"
     }
 }
 

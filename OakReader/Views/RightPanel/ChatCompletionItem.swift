@@ -17,7 +17,7 @@ struct ChatCompletionItem: Identifiable, Equatable {
         let title: String
         let author: String
         let citeKey: String?
-        let itemType: String
+        let contentType: String
         let pageCount: Int
     }
 
@@ -124,7 +124,7 @@ struct ChatCompletionItem: Identifiable, Equatable {
                     title: item.title,
                     author: item.author,
                     citeKey: item.citeKey,
-                    itemType: item.itemType.rawValue,
+                    contentType: item.contentType.rawValue,
                     pageCount: item.pageCount
                 )),
                 trigger: "@"

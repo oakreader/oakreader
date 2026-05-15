@@ -8,7 +8,8 @@ struct Attachment: Identifiable, Hashable {
     let storageKey: String
     let itemStorageKey: String
     var fileName: String
-    var attachmentType: ItemType
+    var contentType: ContentType
+    var linkMode: LinkMode
     var sourceURL: URL?
     var fileSize: Int64
     var pageCount: Int
@@ -17,16 +18,19 @@ struct Attachment: Identifiable, Hashable {
     /// File URL within managed storage.
     var fileURL: URL {
         let dir = CatalogDatabase.attachmentDirectory(itemStorageKey: itemStorageKey, attachmentStorageKey: storageKey)
-        switch attachmentType {
+        switch contentType {
         case .pdf:
             let namedURL = dir.appendingPathComponent(fileName)
             if FileManager.default.fileExists(atPath: namedURL.path) {
                 return namedURL
             }
             return dir.appendingPathComponent("document.pdf")
-        case .webSnapshot:
+        case .html:
+            if linkMode == .linkedURL {
+                return dir.appendingPathComponent("metadata.json")
+            }
             return dir.appendingPathComponent(fileName)
-        case .embed:
+        case .video:
             return dir.appendingPathComponent("metadata.json")
         case .markdown:
             return dir.appendingPathComponent(fileName)
@@ -42,10 +46,10 @@ struct Attachment: Identifiable, Hashable {
 
     /// Icon name resolved from attachment type and source URL domain.
     var icon: String {
-        if attachmentType == .pdf && sourceURL != nil {
+        if contentType == .pdf && sourceURL != nil {
             return "globe"
         }
-        if attachmentType == .embed, let host = sourceURL?.host?.lowercased() {
+        if linkMode == .linkedURL, let host = sourceURL?.host?.lowercased() {
             if host.contains("youtube.com") || host.contains("youtu.be") {
                 return "play.rectangle"
             }
@@ -54,7 +58,7 @@ struct Attachment: Identifiable, Hashable {
             }
             return "link"
         }
-        return attachmentType.icon
+        return contentType.icon
     }
 
     /// Cover image URL for this attachment.
@@ -67,7 +71,8 @@ struct Attachment: Identifiable, Hashable {
         self.storageKey = record.storageKey
         self.itemStorageKey = itemStorageKey
         self.fileName = record.fileName
-        self.attachmentType = ItemType(rawValue: record.attachmentType) ?? .pdf
+        self.contentType = ContentType(rawValue: record.contentType) ?? .pdf
+        self.linkMode = LinkMode(rawValue: record.linkMode) ?? .importedFile
         self.sourceURL = record.sourceURL.flatMap { URL(string: $0) }
         self.fileSize = record.fileSize
         self.pageCount = record.pageCount
@@ -91,6 +96,7 @@ struct LibraryItem: Identifiable, Hashable {
     var lastPosition: Double?
     var source: String?
     var sourceKey: String?
+    var extra: String?
 
     // Attachments (files belonging to this item)
     var attachments: [Attachment]
@@ -107,11 +113,11 @@ struct LibraryItem: Identifiable, Hashable {
         attachments.first { $0.isPrimary } ?? attachments.first
     }
 
-    var itemType: ItemType { primaryAttachment?.attachmentType ?? .pdf }
+    var contentType: ContentType { primaryAttachment?.contentType ?? .pdf }
 
     /// Icon based on reference metadata CSL type when available, falling back to attachment type icon.
     var displayIcon: String {
-        referenceMetadata?.displayType?.icon ?? itemType.icon
+        referenceMetadata?.displayType?.icon ?? contentType.icon
     }
 
     var fileName: String { primaryAttachment?.fileName ?? "" }
@@ -152,6 +158,7 @@ struct LibraryItem: Identifiable, Hashable {
         self.lastPosition = record.lastPosition
         self.source = record.source
         self.sourceKey = record.sourceKey
+        self.extra = record.extra
         self.attachments = attachments
         self.propertyValues = propertyValues
         self.collections = collections

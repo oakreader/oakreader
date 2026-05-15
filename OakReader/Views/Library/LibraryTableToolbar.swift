@@ -14,10 +14,10 @@ struct LibraryTableToolbar: View {
         store.properties.first { $0.name == "Status" && $0.isSystem }
     }
 
-    private let filterableTypes: [(type: ItemType, label: String)] = [
+    private let filterableTypes: [(type: ContentType, label: String)] = [
         (.pdf, "PDF"),
-        (.webSnapshot, "Web"),
-        (.embed, "Embed"),
+        (.html, "Web"),
+        (.video, "Embed"),
         (.markdown, "Note"),
         (.audio, "Audio"),
     ]

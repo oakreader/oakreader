@@ -139,11 +139,8 @@ struct AIChatView: View {
                             onSaveToNote: onSaveAssistantResponse,
                             onApproveToolCall: { chatVM.approveToolCall() },
                             onDenyToolCall: { chatVM.denyToolCall() },
-                            onNavigateToPage: { pageIndex in
-                                chatVM.parent?.viewer.goToPage(pageIndex)
-                            },
-                            onOpenCitation: { citeKey, pageIndex in
-                                chatVM.openCitation(citeKey: citeKey, pageIndex: pageIndex)
+                            onOpenCitation: { citeKey, anchor in
+                                chatVM.openCitation(citeKey: citeKey, anchor: anchor)
                             }
                         )
                             .id(turn.id)

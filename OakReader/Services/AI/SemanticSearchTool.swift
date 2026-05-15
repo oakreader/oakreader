@@ -54,7 +54,7 @@ struct SemanticSearchTool: AgentTool, Sendable {
                 let placeholders = itemIds.map { _ in "?" }.joined(separator: ",")
                 let rows = try Row.fetchAll(db, sql: """
                     SELECT i.id, i.title, i.author, i.cite_key,
-                           a.attachment_type, a.page_count,
+                           a.content_type, a.page_count,
                            c.year, c.doi, c.container_title
                     FROM items i
                     LEFT JOIN attachments a ON a.item_id = i.id AND a.is_primary = 1
@@ -69,7 +69,7 @@ struct SemanticSearchTool: AgentTool, Sendable {
                         title: row["title"],
                         author: row["author"],
                         citeKey: row["cite_key"],
-                        attachmentType: row["attachment_type"],
+                        contentType: row["content_type"],
                         pageCount: row["page_count"],
                         year: row["year"],
                         doi: row["doi"],
@@ -106,7 +106,7 @@ struct SemanticSearchTool: AgentTool, Sendable {
 
             var info: [String] = []
             if let y = meta?.year { info.append("Year: \(y)") }
-            if let at = meta?.attachmentType, let pc = meta?.pageCount {
+            if let at = meta?.contentType, let pc = meta?.pageCount {
                 info.append("\(at), \(pc) pages")
             }
             info.append("Score: \(String(format: "%.2f", r.score))")
@@ -140,7 +140,7 @@ struct SemanticSearchTool: AgentTool, Sendable {
         let title: String
         let author: String
         let citeKey: String?
-        let attachmentType: String?
+        let contentType: String?
         let pageCount: Int?
         let year: Int?
         let doi: String?

@@ -10,6 +10,8 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessageH
 
     private var mouseMonitor: Any?
     private var scrollMonitor: Any?
+    private var headingObserver: NSObjectProtocol?
+    private var findTextObserver: NSObjectProtocol?
 
     init(viewModel: DocumentViewModel) {
         self.viewModel = viewModel
@@ -18,6 +20,7 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessageH
     deinit {
         removeMouseMonitor()
         removeScrollMonitor()
+        removeNotificationObservers()
     }
 
     // MARK: - Active State
@@ -28,6 +31,73 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessageH
             if scrollMonitor == nil { setupScrollMonitor() }
         } else {
             removeScrollMonitor()
+        }
+    }
+
+    // MARK: - Notification Observers
+
+    func setupNotificationObservers() {
+        removeNotificationObservers()
+
+        headingObserver = NotificationCenter.default.addObserver(
+            forName: .webViewScrollToHeading,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let heading = notification.object as? String,
+                  let webView = self?.webView else { return }
+            let escapedHeading = heading
+                .replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "'", with: "\\'")
+                .replacingOccurrences(of: "\n", with: "\\n")
+            let js = """
+            (function() {
+                // Try by ID first (set by setupHeaderAnchors)
+                var el = document.getElementById('\(escapedHeading)');
+                if (!el) {
+                    // Fallback: search heading text content
+                    var headings = document.querySelectorAll('h1,h2,h3,h4,h5,h6');
+                    for (var i = 0; i < headings.length; i++) {
+                        if (headings[i].textContent.trim() === '\(escapedHeading)') {
+                            el = headings[i]; break;
+                        }
+                    }
+                }
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            })();
+            """
+            webView.evaluateJavaScript(js, completionHandler: nil)
+        }
+
+        findTextObserver = NotificationCenter.default.addObserver(
+            forName: .webViewFindText,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let text = notification.object as? String,
+                  let webView = self?.webView else { return }
+            let escapedText = text
+                .replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "'", with: "\\'")
+                .replacingOccurrences(of: "\n", with: "\\n")
+            let js = """
+            (function() {
+                window.getSelection().removeAllRanges();
+                window.find('\(escapedText)', false, false, true);
+            })();
+            """
+            webView.evaluateJavaScript(js, completionHandler: nil)
+        }
+    }
+
+    private func removeNotificationObservers() {
+        if let obs = headingObserver {
+            NotificationCenter.default.removeObserver(obs)
+            headingObserver = nil
+        }
+        if let obs = findTextObserver {
+            NotificationCenter.default.removeObserver(obs)
+            findTextObserver = nil
         }
     }
 
@@ -312,4 +382,11 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessageH
             mouseMonitor = nil
         }
     }
+}
+
+// MARK: - Notification Names
+
+extension Notification.Name {
+    static let webViewScrollToHeading = Notification.Name("webViewScrollToHeading")
+    static let webViewFindText = Notification.Name("webViewFindText")
 }

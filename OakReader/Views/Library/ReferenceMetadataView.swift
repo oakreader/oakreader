@@ -61,7 +61,7 @@ struct ReferenceMetadataView: View {
         guard !isExtracting else { return }
         isExtracting = true
         Task {
-            if item.itemType == .pdf {
+            if item.contentType == .pdf {
                 if let foundDOI = DOIExtractorService.extractDOI(from: item.fileURL) {
                     do {
                         let cslItem = try await CrossRefService.fetchMetadata(doi: foundDOI)

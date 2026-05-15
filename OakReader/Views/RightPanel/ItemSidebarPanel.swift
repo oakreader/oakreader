@@ -91,7 +91,7 @@ struct ItemSidebarPanel: View {
 
         Task {
             // Try DOI extraction for PDFs
-            if item.itemType == .pdf {
+            if item.contentType == .pdf {
                 if let doi = DOIExtractorService.extractDOI(from: item.fileURL) {
                     do {
                         let cslItem = try await CrossRefService.fetchMetadata(doi: doi)

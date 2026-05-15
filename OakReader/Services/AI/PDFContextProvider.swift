@@ -49,14 +49,14 @@ struct PDFContextProvider {
         let currentPageIndex = vm.state.currentPageIndex
         let pageCount = vm.pageCount
 
-        switch vm.itemType {
+        switch vm.contentType {
         case .pdf:
             if let pdfDoc = vm.pdfDocument, let page = pdfDoc.page(at: currentPageIndex) {
                 currentPageText = textExtractor.extractText(from: page)
             } else {
                 currentPageText = ""
             }
-        case .webSnapshot:
+        case .html:
             if let snapshot = vm.webSnapshot {
                 // Prefer markdown saved by browser extension alongside the HTML
                 let mdURL = snapshot.htmlURL.deletingLastPathComponent()
@@ -73,7 +73,7 @@ struct PDFContextProvider {
             } else {
                 currentPageText = ""
             }
-        case .embed:
+        case .video:
             if let media = vm.mediaDocument {
                 if let url = media.transcriptURL,
                    let text = try? String(contentsOf: url, encoding: .utf8) {
@@ -128,7 +128,7 @@ struct PDFContextProvider {
         return ChatContextSnapshot.DocumentContext(
             fileName: vm.fileName,
             filePath: filePath,
-            itemType: vm.itemType,
+            contentType: vm.contentType,
             pageCount: pageCount,
             currentPageIndex: currentPageIndex,
             currentPageText: currentPageText,
@@ -247,7 +247,7 @@ struct PDFContextProvider {
 
             let docBlock = docParts.joined(separator: "\n")
             parts.append(
-                "<document type=\"\(xmlEscape(doc.itemType.rawValue))\" pages=\"\(doc.pageCount)\">\n\(docBlock)\n</document>"
+                "<document type=\"\(xmlEscape(doc.contentType.rawValue))\" pages=\"\(doc.pageCount)\">\n\(docBlock)\n</document>"
             )
 
             // Tool usage hint
@@ -265,16 +265,54 @@ struct PDFContextProvider {
             }
         }
 
-        // Citation link format — outside document block so it applies to library-level chat too
+        // Citation link format — document-type-aware, unified under oak://cite/
+        if let doc = context.document, let ck = doc.citeKey {
+            switch doc.contentType {
+            case .pdf:
+                parts.append("""
+                    When citing content, use clickable citation links with the \
+                    oak://cite/ scheme. For this PDF, use: \
+                    [\(xmlEscape(doc.title)), p. N](oak://cite/\(xmlEscape(ck))?page=N) \
+                    where N is the 1-based page number. You can narrow to specific \
+                    text: [\(xmlEscape(doc.title)), p. N](oak://cite/\(xmlEscape(ck))?page=N&text=phrase). \
+                    Only cite pages you have actually read or found via search tools.
+                    """)
+            case .html, .markdown:
+                parts.append("""
+                    When citing content, use clickable citation links with the \
+                    oak://cite/ scheme. For this document, cite by heading: \
+                    [\(xmlEscape(doc.title)), § Heading](oak://cite/\(xmlEscape(ck))?heading=HeadingText). \
+                    For inline references, cite by text: \
+                    [\(xmlEscape(doc.title)), "quoted"](oak://cite/\(xmlEscape(ck))?text=quoted+text). \
+                    Do not use page numbers — this document has no pages.
+                    """)
+            case .video, .audio:
+                parts.append("""
+                    When citing content, use clickable citation links with the \
+                    oak://cite/ scheme. For this media, cite by timestamp: \
+                    [\(xmlEscape(doc.title)), MM:SS](oak://cite/\(xmlEscape(ck))?time=SECONDS) \
+                    where SECONDS is the total seconds (e.g., 3:42 → time=222). \
+                    Do not use page numbers — this is media content.
+                    """)
+            }
+        } else if let doc = context.document {
+            // No citeKey available — fallback without cite links
+            parts.append("""
+                This document has no citation key. You may reference content \
+                descriptively but cannot create clickable citation links.
+                """)
+        }
+
+        // Cross-document citation instructions (always apply when referenced docs exist)
         parts.append("""
-            When referencing specific pages from the current document, use \
-            clickable citation links: [p. N](oak://page/N) where N is the \
-            1-based page number. When the user's message contains a \
-            <referenced-documents> block, use the `link` attribute from each \
-            <doc> element to create citation links, appending ?page=N when \
-            citing a specific page: [citeKey, p. N](oak://cite/citeKey?page=N). \
+            When the user's message contains a <referenced-documents> block, \
+            use the `link` attribute from each <doc> element as the base URL. \
+            Choose the right anchor based on the doc's `format` attribute: \
+            for format="pdf" append ?page=N; \
+            for format="html" or "markdown" append ?heading=Text or ?text=Text; \
+            for format="video" or "audio" append ?time=SECONDS. \
             For referenced <note> elements, read them with the read tool using \
-            the provided path. Only cite pages you have actually read or found \
+            the provided path. Only cite content you have actually read or found \
             via search tools.
             """)
 

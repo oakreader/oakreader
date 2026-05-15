@@ -165,7 +165,7 @@ final class LibraryStore {
             results = results.filter { item in
                 // Type filter: item matches any selected type (OR)
                 if !selectedTypes.isEmpty {
-                    guard selectedTypes.contains(item.itemType.rawValue) else { return false }
+                    guard selectedTypes.contains(item.contentType.rawValue) else { return false }
                 }
                 // Tag filter: item has any selected tag option (OR)
                 if !selectedTagOptionIds.isEmpty {
@@ -222,13 +222,13 @@ final class LibraryStore {
 
     private func evaluateCondition(_ condition: FilterCondition, against item: LibraryItem) -> Bool {
         switch condition.field {
-        case .itemType:
+        case .contentType:
             // Match if any attachment has the specified type
-            let hasType = item.attachments.contains { $0.attachmentType.rawValue == condition.value }
+            let hasType = item.attachments.contains { $0.contentType.rawValue == condition.value }
             switch condition.op {
             case .eq: return hasType
             case .neq: return !hasType
-            default: return matchString(item.itemType.rawValue, op: condition.op, value: condition.value)
+            default: return matchString(item.contentType.rawValue, op: condition.op, value: condition.value)
             }
         case .lastOpenedAt:
             guard let date = item.lastOpenedAt else { return false }

@@ -12,7 +12,7 @@ class DocumentViewModel {
     var markdownDocument: MarkdownDocument?
     /// Observable markdown content for reactive outline updates.
     var markdownContent: String = ""
-    var itemType: ItemType
+    var contentType: ContentType
     var state: DocumentState
     /// Database reference, set by AppState when the tab is created.
     var database: CatalogDatabase?
@@ -140,36 +140,36 @@ class DocumentViewModel {
     }
 
     var pageCount: Int {
-        switch itemType {
+        switch contentType {
         case .pdf: return pdfDocument?.pageCount ?? 0
-        case .webSnapshot: return 1
-        case .embed: return 1
+        case .html: return 1
+        case .video: return 1
         case .markdown: return 1
         case .audio: return 1
         }
     }
 
     var hasDocument: Bool {
-        switch itemType {
+        switch contentType {
         case .pdf: return pdfDocument != nil
-        case .webSnapshot: return webSnapshot != nil
-        case .embed: return mediaDocument != nil
+        case .html: return webSnapshot != nil
+        case .video: return mediaDocument != nil
         case .markdown: return markdownDocument != nil
         case .audio: return false
         }
     }
 
     var usesMediaSidebar: Bool {
-        itemType == .embed && mediaDocument?.metadata.resolvedEmbedType == .youtube
+        contentType == .video && mediaDocument?.metadata.resolvedEmbedType == .youtube
     }
 
     var fileName: String {
-        switch itemType {
+        switch contentType {
         case .pdf:
             return document?.fileURL?.lastPathComponent ?? "Untitled"
-        case .webSnapshot:
+        case .html:
             return webSnapshot?.htmlURL.deletingPathExtension().lastPathComponent ?? "Untitled"
-        case .embed:
+        case .video:
             return mediaDocument?.metadata.title ?? "Untitled"
         case .markdown:
             return markdownDocument?.fileURL.deletingPathExtension().lastPathComponent ?? "Untitled"
@@ -191,7 +191,7 @@ class DocumentViewModel {
 
     init(document: OakReaderDocument) {
         self.document = document
-        self.itemType = .pdf
+        self.contentType = .pdf
         self.state = DocumentState()
 
         let prefs = Preferences.shared
@@ -203,7 +203,7 @@ class DocumentViewModel {
 
     init(webSnapshot: WebSnapshotDocument) {
         self.webSnapshot = webSnapshot
-        self.itemType = .webSnapshot
+        self.contentType = .html
         self.state = DocumentState()
 
         let prefs = Preferences.shared
@@ -215,7 +215,7 @@ class DocumentViewModel {
 
     init(media: MediaDocument) {
         self.mediaDocument = media
-        self.itemType = .embed
+        self.contentType = .video
         self.state = DocumentState()
         state.isSidebarVisible = media.metadata.resolvedEmbedType == .youtube
         state.mediaSidebarMode = .outline
@@ -223,7 +223,7 @@ class DocumentViewModel {
 
     init(markdown: MarkdownDocument) {
         self.markdownDocument = markdown
-        self.itemType = .markdown
+        self.contentType = .markdown
         self.state = DocumentState()
         state.isSidebarVisible = true
     }

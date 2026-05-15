@@ -79,7 +79,8 @@ extension ImportService {
             itemId: docId.uuidString,
             storageKey: attStorageKey,
             fileName: sourceURL.lastPathComponent,
-            attachmentType: ItemType.webSnapshot.rawValue,
+            contentType: ContentType.html.rawValue,
+            linkMode: LinkMode.importedURL.rawValue,
             sourceURL: originalPageURL?.absoluteString,
             fileSize: fileSize,
             pageCount: 1,
@@ -122,7 +123,7 @@ extension ImportService {
             Task {
                 await service.indexItem(
                     itemId: docId.uuidString,
-                    attachmentType: ItemType.webSnapshot.rawValue,
+                    contentType: ContentType.html.rawValue,
                     storageKey: itemStorageKey,
                     attStorageKey: attStorageKey,
                     fileName: sourceURL.lastPathComponent

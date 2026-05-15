@@ -16,7 +16,7 @@ struct ChatContextSnapshot: Sendable {
         // File info
         let fileName: String
         let filePath: String
-        let itemType: ItemType
+        let contentType: ContentType
         let pageCount: Int
         let currentPageIndex: Int
         let currentPageText: String

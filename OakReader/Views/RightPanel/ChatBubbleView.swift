@@ -7,8 +7,7 @@ struct ChatBubbleView: View {
     var onSaveToNote: ((Turn) -> Bool)?
     var onApproveToolCall: (() -> Void)?
     var onDenyToolCall: (() -> Void)?
-    var onNavigateToPage: ((Int) -> Void)?
-    var onOpenCitation: ((String, Int?) -> Void)?
+    var onOpenCitation: ((String, CitationAnchor) -> Void)?
 
     @State private var isHovered = false
     @State private var isCopyHovered = false
@@ -146,19 +145,36 @@ struct ChatBubbleView: View {
                 .environment(\.openURL, OpenURLAction { url in
                     guard url.scheme == "oak" else { return .systemAction }
 
+                    // Backward compat: oak://page/N → treat as current-doc page citation
                     if url.host == "page",
                        let pageStr = url.pathComponents.dropFirst().first,
                        let page = Int(pageStr) {
-                        onNavigateToPage?(page - 1)
+                        onOpenCitation?("", CitationAnchor(page: page - 1))
                         return .handled
                     }
 
                     if url.host == "cite",
                        let citeKey = url.pathComponents.dropFirst().first {
-                        let page = URLComponents(url: url, resolvingAgainstBaseURL: false)?
-                            .queryItems?.first(where: { $0.name == "page" })
-                            .flatMap { Int($0.value ?? "") }
-                        onOpenCitation?(citeKey, page.map { $0 - 1 })
+                        let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+                        let queryItems = components?.queryItems ?? []
+
+                        var anchor = CitationAnchor()
+                        for item in queryItems {
+                            switch item.name {
+                            case "page":
+                                if let v = item.value, let p = Int(v) { anchor.page = p - 1 }
+                            case "heading":
+                                anchor.heading = item.value?.removingPercentEncoding ?? item.value
+                            case "time":
+                                if let v = item.value, let t = Double(v) { anchor.time = t }
+                            case "text":
+                                anchor.text = item.value?.removingPercentEncoding ?? item.value
+                            default:
+                                break
+                            }
+                        }
+
+                        onOpenCitation?(citeKey, anchor)
                         return .handled
                     }
 
