@@ -384,10 +384,14 @@ struct AIChatView: View {
     // MARK: - Config Menu
 
     private var currentModelName: String {
-        let config = chatVM.config
-        return config.modelInfo?.name ?? config.model
+        let prefs = Preferences.shared
+        let pid = prefs.aiProviderId
+        let provider = ProviderRegistry.shared.provider(for: pid)
+        let modelId = settingsModel.isEmpty ? (provider?.defaultModelId ?? "") : settingsModel
+        return provider?.models.first { $0.id == modelId }?.name ?? modelId
     }
 
+    @State private var settingsModel: String = Preferences.shared.aiModel
     @State private var settingsEffort: String = Preferences.shared.thinkingEffort
     @State private var settingsPermission: AgentPermissionLevel = Preferences.shared.agentPermissionLevel
 
@@ -395,7 +399,7 @@ struct AIChatView: View {
         let prefs = Preferences.shared
         let providerInfo = ProviderRegistry.shared.provider(for: prefs.aiProviderId)
         let models = providerInfo?.models ?? []
-        let currentModel = chatVM.config.model
+        let currentModel = settingsModel.isEmpty ? (providerInfo?.defaultModelId ?? "") : settingsModel
         let currentModelInfo = providerInfo?.models.first { $0.id == currentModel }
 
         return Menu {
@@ -404,6 +408,7 @@ struct AIChatView: View {
                 ForEach(models) { model in
                     Button(action: {
                         prefs.aiModel = model.id
+                        settingsModel = model.id
                     }) {
                         HStack {
                             Text(model.name)

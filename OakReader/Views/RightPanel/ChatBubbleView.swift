@@ -562,6 +562,8 @@ private extension String {
 
 /// Collapsible section showing extended thinking content from reasoning models.
 /// Collapsed by default. Shows elapsed time and a chevron toggle.
+/// While streaming, the label uses a smooth gradient shimmer animation
+/// inspired by Apple's boot screen text rendering.
 private struct ThinkingDisclosureView: View {
     let thinking: String
     /// True while the model is still in the thinking phase (no text content yet).
@@ -571,6 +573,7 @@ private struct ThinkingDisclosureView: View {
     @State private var streamStartTime = Date()
     @State private var elapsedSeconds: Int = 0
     @State private var timer: Timer?
+    @State private var shimmerPhase: CGFloat = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -588,19 +591,11 @@ private struct ThinkingDisclosureView: View {
                         .animation(.easeInOut(duration: 0.2), value: isExpanded)
 
                     if isStreaming {
-                        Text("Thinking...")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.secondary)
+                        shimmerText("Thinking...")
                     } else {
                         Text("Thought for \(elapsedSeconds)s")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(OakStyle.ChatFont.meta)
                             .foregroundStyle(.secondary)
-                    }
-
-                    if isStreaming {
-                        ProgressView()
-                            .controlSize(.mini)
-                            .frame(width: 10, height: 10)
                     }
                 }
             }
@@ -611,7 +606,7 @@ private struct ThinkingDisclosureView: View {
             // Content
             if isExpanded {
                 Text(thinking)
-                    .font(.system(size: 11))
+                    .font(OakStyle.ChatFont.messageBody)
                     .foregroundStyle(.secondary.opacity(0.75))
                     .textSelection(.enabled)
                     .padding(.leading, 8)
@@ -628,8 +623,8 @@ private struct ThinkingDisclosureView: View {
             streamStartTime = Date()
             if isStreaming {
                 startTimer()
+                startShimmer()
             } else {
-                // Estimate from thinking content length (rough: ~10 chars/sec)
                 elapsedSeconds = max(1, thinking.count / 10)
             }
         }
@@ -641,6 +636,39 @@ private struct ThinkingDisclosureView: View {
         }
         .onDisappear {
             stopTimer()
+        }
+    }
+
+    /// A text label with a smooth horizontal gradient shimmer that sweeps
+    /// across like Apple's boot screen handwriting reveal.
+    @ViewBuilder
+    private func shimmerText(_ label: String) -> some View {
+        Text(label)
+            .font(OakStyle.ChatFont.meta)
+            .foregroundStyle(.secondary)
+            .overlay {
+                LinearGradient(
+                    stops: [
+                        .init(color: .clear, location: max(0, shimmerPhase - 0.3)),
+                        .init(color: .primary.opacity(0.5), location: shimmerPhase),
+                        .init(color: .clear, location: min(1, shimmerPhase + 0.3)),
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .mask {
+                    Text(label)
+                        .font(OakStyle.ChatFont.meta)
+                }
+            }
+    }
+
+    private func startShimmer() {
+        withAnimation(
+            .easeInOut(duration: 1.8)
+            .repeatForever(autoreverses: false)
+        ) {
+            shimmerPhase = 1.3
         }
     }
 
