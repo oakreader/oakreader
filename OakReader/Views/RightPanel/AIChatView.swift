@@ -21,14 +21,15 @@ struct AIChatView: View {
         }
         .animation(.easeInOut(duration: 0.2), value: chatVM.showHistory)
         .onAppear {
-            // Auto-focus the chat input when the AI chat panel opens.
-            // Delayed so the NSTextView is attached to its NSWindow before
-            // we call makeFirstResponder (otherwise textView.window is nil
-            // and the call silently no-ops, leaving keystrokes to hit the
-            // toolbar responder chain — e.g. triggering the search field).
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 inputFocusRef.focus()
             }
+        }
+        .onChange(of: chatVM.pendingLibraryRef?.id) { _, newId in
+            guard newId != nil, let item = chatVM.pendingLibraryRef else { return }
+            chatVM.pendingLibraryRef = nil
+            let token = ChatCompletionItem.libraryReference(from: item)
+            inputFocusRef.insertDroppedToken(token)
         }
     }
 
@@ -400,22 +401,32 @@ struct AIChatView: View {
         let models = providerInfo?.models ?? []
         let currentModel = settingsModel.isEmpty ? (providerInfo?.defaultModelId ?? "") : settingsModel
         let currentModelInfo = providerInfo?.models.first { $0.id == currentModel }
+        let modelSelection = Binding<String>(
+            get: { currentModel },
+            set: { newValue in
+                prefs.aiModel = newValue
+                settingsModel = newValue
+            }
+        )
+        let effortSelection = Binding<String>(
+            get: { settingsEffort },
+            set: { newValue in
+                prefs.thinkingEffort = newValue
+                settingsEffort = newValue
+            }
+        )
+        let permissionSelection = Binding<AgentPermissionLevel>(
+            get: { settingsPermission },
+            set: { newValue in
+                prefs.agentPermissionLevel = newValue
+                settingsPermission = newValue
+            }
+        )
 
         return Menu {
-            // Model submenu
-            Menu {
+            Picker(selection: modelSelection) {
                 ForEach(models) { model in
-                    Button(action: {
-                        prefs.aiModel = model.id
-                        settingsModel = model.id
-                    }) {
-                        HStack {
-                            Text(model.name)
-                            if model.id == currentModel {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
+                    Text(model.name).tag(model.id)
                 }
             } label: {
                 Label("Model", systemImage: "cpu")
@@ -423,30 +434,18 @@ struct AIChatView: View {
 
             // Thinking effort submenu — only for reasoning models
             if currentModelInfo?.reasoning == true {
-                Menu {
-                    effortButton("Low", key: "low", prefs: prefs)
-                    effortButton("Medium", key: "medium", prefs: prefs)
-                    effortButton("High", key: "high", prefs: prefs)
+                Picker(selection: effortSelection) {
+                    Text("Low").tag("low")
+                    Text("Medium").tag("medium")
+                    Text("High").tag("high")
                 } label: {
                     Label("Thinking", systemImage: "brain")
                 }
             }
 
-            // Tool approval submenu
-            Menu {
+            Picker(selection: permissionSelection) {
                 ForEach(AgentPermissionLevel.allCases) { level in
-                    Button(action: {
-                        prefs.agentPermissionLevel = level
-                        settingsPermission = level
-                    }) {
-                        HStack {
-                            Text(level.label)
-                                .frame(minWidth: 160, alignment: .leading)
-                            if settingsPermission == level {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
+                    Text(level.label).tag(level)
                 }
             } label: {
                 Label("Tools", systemImage: "wrench")
@@ -470,20 +469,6 @@ struct AIChatView: View {
         }
         .buttonStyle(.plain)
         .help("Model & settings")
-    }
-
-    private func effortButton(_ label: String, key: String, prefs: Preferences) -> some View {
-        Button {
-            prefs.thinkingEffort = key
-            settingsEffort = key
-        } label: {
-            HStack {
-                Text(label).frame(minWidth: 160, alignment: .leading)
-                if settingsEffort == key {
-                    Image(systemName: "checkmark")
-                }
-            }
-        }
     }
 
     // MARK: - Error Banner
