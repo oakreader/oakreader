@@ -315,7 +315,7 @@ extension CatalogDatabase {
 
             // Ensure storage directories exist
             let fm = FileManager.default
-            for dir in [storageDirectory, notesDirectory, notesAttachmentsDirectory, chatsDirectory, chatAttachmentsDirectory, callsDirectory] {
+            for dir in [storageDirectory, notesDirectory, notesAttachmentsDirectory, chatsDirectory, chatAttachmentsDirectory] {
                 try fm.createDirectory(at: dir, withIntermediateDirectories: true)
             }
         }
@@ -373,26 +373,10 @@ extension CatalogDatabase {
             }
         }
 
-        // MARK: v10 — Remove Characters, simplify Voice Calls
+        // MARK: v10 — Remove Characters & Voice Calls
 
         migrator.registerMigration("v10-voice-agent") { db in
-            // Recreate voice_calls without character_id
-            try db.create(table: "voice_calls_new") { t in
-                t.column("id", .text).primaryKey()
-                t.column("title", .text).notNull().defaults(to: "")
-                t.column("turn_count", .integer).notNull().defaults(to: 0)
-                t.column("duration_seconds", .double).notNull().defaults(to: 0)
-                t.column("created_at", .text).notNull()
-                t.column("updated_at", .text).notNull()
-            }
-            try db.execute(sql: """
-                INSERT INTO voice_calls_new (id, title, turn_count, duration_seconds, created_at, updated_at)
-                SELECT id, title, turn_count, duration_seconds, created_at, updated_at FROM voice_calls
-            """)
             try db.drop(table: "voice_calls")
-            try db.rename(table: "voice_calls_new", to: "voice_calls")
-
-            // Drop characters table
             try db.drop(table: "characters")
         }
 

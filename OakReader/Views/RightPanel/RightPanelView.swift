@@ -16,15 +16,6 @@ struct RightPanelContentView: View {
                         chatVM: viewModel.chat,
                         onSaveAssistantResponse: saveAssistantResponseAction
                     )
-                case .voiceChat:
-                    if let callListVM = viewModel.callListVM {
-                        VoicePanelContainerView(
-                            callListVM: callListVM,
-                            voiceVM: viewModel.voice
-                        )
-                    } else {
-                        VoiceChatView(voiceVM: viewModel.voice)
-                    }
                 case .notes:
                     if Preferences.shared.isExtensionEnabled(.notes) {
                         NotePanelView(notesVM: viewModel.notes)

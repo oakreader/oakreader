@@ -1,5 +1,5 @@
 import SwiftUI
-import OakVoiceAI
+import OakVoice
 
 /// Unified settings view with left sidebar list navigation.
 struct SettingsView: View {
@@ -12,7 +12,6 @@ struct SettingsView: View {
         case aiSettings
         case localModels
         case audio
-        case voiceAgent
         case extensions
         case skills
         case youtube
@@ -32,7 +31,6 @@ struct SettingsView: View {
             case .aiSettings: return "AI Settings"
             case .localModels: return "Local Models"
             case .audio: return "Audio"
-            case .voiceAgent: return "Voice Agent"
             case .extensions: return "Extensions"
             case .skills: return "Skills"
             case .youtube: return "YouTube"
@@ -51,7 +49,6 @@ struct SettingsView: View {
             case .aiSettings: return "cpu"
             case .localModels: return "arrow.down.circle"
             case .audio: return "speaker.wave.2"
-            case .voiceAgent: return "waveform.circle"
             case .extensions: return "square.grid.2x2"
             case .skills: return "hammer"
             case .youtube: return "play.rectangle"
@@ -89,7 +86,7 @@ struct SettingsView: View {
     }
 
     /// Fixed tabs that always appear.
-    private static let fixedTabs: [Tab] = [.general, .library, .ai, .aiSettings, .audio, .skills, .voiceAgent, .extensions, .youtube]
+    private static let fixedTabs: [Tab] = [.general, .library, .ai, .aiSettings, .audio, .skills, .extensions, .youtube]
 
     @State private var selectedTab: Tab = .general
     @State private var visibleTabs: [Tab] = Self.buildVisibleTabs()
@@ -165,8 +162,6 @@ struct SettingsView: View {
             EmptyView() // Moved under AI Providers
         case .audio:
             AudioSettingsView()
-        case .voiceAgent:
-            VoiceAgentSettingsView()
         case .extensions:
             AppExtensionSettingsView()
         case .skills:

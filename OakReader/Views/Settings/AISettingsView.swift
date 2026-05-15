@@ -1,6 +1,6 @@
 import SwiftUI
 import OakAgent
-import OakVoiceAI
+import OakVoice
 
 struct AISettingsView: View {
     // MARK: - Sidebar Category

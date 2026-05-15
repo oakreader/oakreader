@@ -153,7 +153,6 @@ enum LibrarySidebarMode: String, CaseIterable, Identifiable {
 
 enum RightPanelMode: String, CaseIterable, Identifiable {
     case aiChat
-    case voiceChat
     case notes
     case metadata
     case translation
@@ -164,7 +163,6 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
         switch self {
         case .metadata: return "tablecells"
         case .aiChat: return "bubble.left.and.bubble.right"
-        case .voiceChat: return "waveform"
         case .notes: return "note.text"
         case .translation: return "character.bubble"
         }
@@ -174,7 +172,6 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
         switch self {
         case .metadata: return "Metadata"
         case .aiChat: return "AI Chat"
-        case .voiceChat: return "Voice AI"
         case .notes: return "Notes"
         case .translation: return "Translation"
         }
@@ -252,8 +249,6 @@ enum AppExtension: String, CaseIterable, Identifiable {
 }
 
 enum LibraryDetailTab: String, CaseIterable, Identifiable {
-    case chat
-    case voiceChat
     case metadata
     case notes
 
@@ -263,8 +258,6 @@ enum LibraryDetailTab: String, CaseIterable, Identifiable {
         switch self {
         case .metadata: return "tablecells"
         case .notes: return "note.text"
-        case .chat: return "bubble.left.and.bubble.right"
-        case .voiceChat: return "waveform"
         }
     }
 
@@ -272,8 +265,24 @@ enum LibraryDetailTab: String, CaseIterable, Identifiable {
         switch self {
         case .metadata: return "Metadata"
         case .notes: return "Notes"
-        case .chat: return "Chat"
-        case .voiceChat: return "Voice AI"
+        }
+    }
+}
+
+enum WorkspaceStudioTab: String, CaseIterable, Identifiable {
+    case notes
+
+    var id: String { rawValue }
+
+    var systemImage: String {
+        switch self {
+        case .notes: return "note.text"
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .notes: return "Notes"
         }
     }
 }

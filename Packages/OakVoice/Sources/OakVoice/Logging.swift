@@ -1,6 +1,6 @@
 import os
 
-/// Centralized logging for OakVoiceAI with an injectable sink for file logging.
+/// Centralized logging for OakVoice with an injectable sink for file logging.
 ///
 /// The host app can set ``sink`` at startup to forward log messages to its own
 /// file writer (e.g. `LogFileWriter`). Without a sink, messages still go to
@@ -18,8 +18,8 @@ public enum VoiceAgentLog {
 
     // MARK: - Loggers
 
-    private static let sttLogger = Logger(subsystem: "OakVoiceAI", category: "stt")
-    private static let ttsLogger = Logger(subsystem: "OakVoiceAI", category: "tts")
+    private static let sttLogger = Logger(subsystem: "OakVoice", category: "stt")
+    private static let ttsLogger = Logger(subsystem: "OakVoice", category: "tts")
 
     // MARK: - STT
 

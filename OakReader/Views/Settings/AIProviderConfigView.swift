@@ -1,6 +1,6 @@
 import SwiftUI
 import OakAgent
-import OakVoiceAI
+import OakVoice
 
 // MARK: - Provider Config View (Right Panel)
 

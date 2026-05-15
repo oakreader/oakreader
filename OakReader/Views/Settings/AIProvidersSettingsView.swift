@@ -1,6 +1,6 @@
 import SwiftUI
 import OakAgent
-import OakVoiceAI
+import OakVoice
 
 struct AIProvidersSettingsView: View {
     /// Sentinel ID for ElevenLabs (not in ProviderRegistry).

@@ -1,5 +1,5 @@
 import SwiftUI
-import OakVoiceAI
+import OakVoice
 
 struct LocalModelsSettingsView: View {
     // MARK: - Sidebar selection
