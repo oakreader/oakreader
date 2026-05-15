@@ -1,10 +1,9 @@
 import SwiftUI
 import UniformTypeIdentifiers
-import OakAgent
 
 /// L-shaped filled border: 1px top + left edges with a rounded top-left corner.
 /// Uses a filled path instead of stroke so it renders fully inside the view bounds.
-private struct TopLeftBorderFill: Shape {
+struct TopLeftBorderFill: Shape {
     let radius: CGFloat
     let thickness: CGFloat
 
@@ -113,19 +112,7 @@ struct LibraryRootView: View {
     @ViewBuilder
     private var detailContentPanel: some View {
         VStack(spacing: 0) {
-            if appState.libraryDetailTab == .chat {
-                AIChatView(
-                    chatVM: appState.libraryChatVM,
-                    onSaveAssistantResponse: librarySaveAssistantResponseAction
-                )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if appState.libraryDetailTab == .voiceChat {
-                VoicePanelContainerView(
-                    callListVM: appState.callListVM,
-                    voiceVM: appState.libraryVoiceVM
-                )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if store.isDuplicatesSelected {
+            if store.isDuplicatesSelected {
                 DuplicatesMergePane(appState: appState)
             } else if let item = selectedItemInCurrentFilter {
                 LibrarySidebarPanel(item: item, appState: appState)
@@ -147,25 +134,11 @@ struct LibraryRootView: View {
         )
     }
 
-    private var librarySaveAssistantResponseAction: ((Turn) -> Bool)? {
-        guard Preferences.shared.isExtensionEnabled(.notes) else { return nil }
-        return saveAssistantResponseToSelectedNote
-    }
-
     private var selectedItemInCurrentFilter: LibraryItem? {
         guard let id = appState.selectedLibraryItemIDs.first else { return nil }
         return store.filteredItems.first { $0.id == id }
     }
 
-    private func saveAssistantResponseToSelectedNote(_ turn: Turn) -> Bool {
-        guard let item = appState.selectedLibraryItem else { return false }
-
-        let notesVM = NotesViewModel(
-            database: store.database,
-            storageKey: item.storageKey
-        )
-        return notesVM.addChatResponseToNote(turn.content)
-    }
 }
 
 // MARK: - Collection Detail Panel
@@ -195,7 +168,7 @@ private struct LibraryCollectionSidebarPanel: View {
                 title: contextTitle,
                 items: items
             )
-        case .metadata, .chat, .voiceChat, nil:
+        case .metadata, nil:
             EmptyView()
         }
     }

@@ -1,7 +1,7 @@
 import Foundation
 import PDFKit
 import AppKit
-import OakVoiceAI
+import OakVoice
 
 // MARK: - Tab Content
 
@@ -82,6 +82,7 @@ final class AppState {
 
 
     var openTabs: [DocumentTab] = []
+    var workspaceTabs: [WorkspaceTab] = []
     var activeTabID: UUID?
     var window: NSWindow?
     var selectedLibraryItemIDs: Set<UUID> = []
@@ -89,34 +90,13 @@ final class AppState {
     var showZoteroImport: Bool = false
     var zoteroImportDataDir: URL?
     var isLibrarySidebarVisible: Bool = true
-    var libraryDetailTab: LibraryDetailTab? = .chat
+    var libraryDetailTab: LibraryDetailTab? = .metadata
 
-    private var _libraryChatVM: ChatViewModel?
-    var libraryChatVM: ChatViewModel {
-        if let vm = _libraryChatVM { return vm }
-        let vm = ChatViewModel()
-        vm.sessionService = ConversationService(database: libraryStore.database)
-        vm.appState = self
-        _libraryChatVM = vm
-        return vm
+    var activeWorkspaceTab: WorkspaceTab? {
+        guard let id = activeTabID else { return nil }
+        return workspaceTabs.first { $0.id == id }
     }
 
-    private var _libraryVoiceVM: VoiceViewModel?
-    var libraryVoiceVM: VoiceViewModel {
-        if let vm = _libraryVoiceVM { return vm }
-        let vm = VoiceViewModel()
-        _libraryVoiceVM = vm
-        return vm
-    }
-
-    private var _callListVM: VoiceCallListViewModel?
-    var callListVM: VoiceCallListViewModel {
-        if let vm = _callListVM { return vm }
-        let service = VoiceCallService(database: libraryStore.database)
-        let vm = VoiceCallListViewModel(service: service)
-        _callListVM = vm
-        return vm
-    }
 
 
     private var autosaveTimer: Timer?
@@ -259,7 +239,7 @@ final class AppState {
         tab.viewModel.appState = self
         tab.viewModel.itemStorageKey = storageKey
         tab.viewModel.attachmentId = item?.primaryAttachment?.id.uuidString
-        tab.viewModel.callListVM = callListVM
+
         // Use original filename (not "document.pdf" from managed storage)
         tab.title = item?.fileName ?? url.lastPathComponent
         NSDocumentController.shared.addDocument(doc)
@@ -283,7 +263,7 @@ final class AppState {
             let mdDoc = try MarkdownDocument(fileURL: url)
             let tab = DocumentTab(markdown: mdDoc, storageKey: nil)
             tab.viewModel.appState = self
-            tab.viewModel.callListVM = callListVM
+    
             tab.title = url.deletingPathExtension().lastPathComponent
             openTabs.append(tab)
             activeTabID = tab.id
@@ -309,7 +289,7 @@ final class AppState {
             tab.viewModel.appState = self
             tab.viewModel.itemStorageKey = storageKey
             tab.viewModel.attachmentId = item?.primaryAttachment?.id.uuidString
-        tab.viewModel.callListVM = callListVM
+
             tab.title = item?.title ?? url.deletingPathExtension().lastPathComponent
             openTabs.append(tab)
             activeTabID = tab.id
@@ -379,7 +359,7 @@ final class AppState {
         tab.viewModel.appState = self
         tab.viewModel.itemStorageKey = item.storageKey
         tab.viewModel.attachmentId = item.primaryAttachment?.id.uuidString
-        tab.viewModel.callListVM = callListVM
+
         // Use original filename from library item
         tab.title = item.fileName
         NSDocumentController.shared.addDocument(doc)
@@ -417,7 +397,7 @@ final class AppState {
             tab.viewModel.appState = self
             tab.viewModel.itemStorageKey = item.storageKey
             tab.viewModel.attachmentId = item.primaryAttachment?.id.uuidString
-        tab.viewModel.callListVM = callListVM
+
             tab.title = item.title
             openTabs.append(tab)
             activeTabID = tab.id
@@ -460,7 +440,7 @@ final class AppState {
             tab.viewModel.appState = self
             tab.viewModel.itemStorageKey = item.storageKey
             tab.viewModel.attachmentId = item.primaryAttachment?.id.uuidString
-        tab.viewModel.callListVM = callListVM
+
             tab.title = item.title
             openTabs.append(tab)
             activeTabID = tab.id
@@ -500,7 +480,7 @@ final class AppState {
             tab.viewModel.appState = self
             tab.viewModel.itemStorageKey = item.storageKey
             tab.viewModel.attachmentId = item.primaryAttachment?.id.uuidString
-            tab.viewModel.callListVM = callListVM
+    
             tab.title = item.title
             openTabs.append(tab)
             activeTabID = tab.id
@@ -512,6 +492,13 @@ final class AppState {
     }
 
     func closeTab(_ tabID: UUID) {
+        // Try workspace tabs first
+        if let wsIndex = workspaceTabs.firstIndex(where: { $0.id == tabID }) {
+            closeWorkspaceTab(tabID)
+            _ = wsIndex // suppress unused warning
+            return
+        }
+
         guard let index = openTabs.firstIndex(where: { $0.id == tabID }) else { return }
         let tab = openTabs[index]
 
@@ -539,11 +526,11 @@ final class AppState {
         openTabs.remove(at: index)
 
         if activeTabID == tabID {
-            if openTabs.isEmpty {
+            let allTabs = combinedTabIDs
+            if allTabs.isEmpty {
                 activeTabID = nil
             } else {
-                let newIndex = min(index, openTabs.count - 1)
-                activeTabID = openTabs[newIndex].id
+                activeTabID = allTabs.first
             }
         }
         updateWindowTitle()
@@ -555,7 +542,9 @@ final class AppState {
     }
 
     func switchToTab(_ tabID: UUID) {
-        guard openTabs.contains(where: { $0.id == tabID }) else { return }
+        let found = openTabs.contains(where: { $0.id == tabID })
+            || workspaceTabs.contains(where: { $0.id == tabID })
+        guard found else { return }
         activeTabID = tabID
         updateWindowTitle()
     }
@@ -566,19 +555,63 @@ final class AppState {
     }
 
     func nextTab() {
-        guard let currentID = activeTabID,
-              let currentIndex = openTabs.firstIndex(where: { $0.id == currentID }),
-              !openTabs.isEmpty else { return }
-        let nextIndex = (currentIndex + 1) % openTabs.count
-        switchToTab(openTabs[nextIndex].id)
+        let allIDs = combinedTabIDs
+        guard !allIDs.isEmpty, let currentID = activeTabID,
+              let currentIndex = allIDs.firstIndex(of: currentID) else { return }
+        let nextIndex = (currentIndex + 1) % allIDs.count
+        switchToTab(allIDs[nextIndex])
     }
 
     func previousTab() {
-        guard let currentID = activeTabID,
-              let currentIndex = openTabs.firstIndex(where: { $0.id == currentID }),
-              !openTabs.isEmpty else { return }
-        let prevIndex = (currentIndex - 1 + openTabs.count) % openTabs.count
-        switchToTab(openTabs[prevIndex].id)
+        let allIDs = combinedTabIDs
+        guard !allIDs.isEmpty, let currentID = activeTabID,
+              let currentIndex = allIDs.firstIndex(of: currentID) else { return }
+        let prevIndex = (currentIndex - 1 + allIDs.count) % allIDs.count
+        switchToTab(allIDs[prevIndex])
+    }
+
+    /// All tab IDs in display order: document tabs then workspace tabs.
+    private var combinedTabIDs: [UUID] {
+        openTabs.map(\.id) + workspaceTabs.map(\.id)
+    }
+
+    // MARK: - Workspace Tab Operations
+
+    func openWorkspace(for collection: PDFCollection) {
+        // Dedup: switch to existing workspace for this collection
+        if let existing = workspaceTabs.first(where: { $0.collectionId == collection.id }) {
+            activeTabID = existing.id
+            updateWindowTitle()
+            return
+        }
+
+        let vm = WorkspaceViewModel(collectionId: collection.id)
+        vm.appState = self
+        vm.resolveSourceItems()
+
+        let tab = WorkspaceTab(
+            collectionId: collection.id,
+            title: collection.name,
+            viewModel: vm
+        )
+        workspaceTabs.append(tab)
+        activeTabID = tab.id
+        updateWindowTitle()
+    }
+
+    func closeWorkspaceTab(_ tabID: UUID) {
+        guard let index = workspaceTabs.firstIndex(where: { $0.id == tabID }) else { return }
+        workspaceTabs.remove(at: index)
+
+        if activeTabID == tabID {
+            let allTabs = combinedTabIDs
+            if allTabs.isEmpty {
+                activeTabID = nil
+            } else {
+                activeTabID = allTabs.first
+            }
+        }
+        updateWindowTitle()
     }
 
     // MARK: - Window

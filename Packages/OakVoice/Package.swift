@@ -2,10 +2,10 @@
 import PackageDescription
 
 let package = Package(
-    name: "OakVoiceAI",
+    name: "OakVoice",
     platforms: [.macOS(.v15)],
     products: [
-        .library(name: "OakVoiceAI", targets: ["OakVoiceAI"])
+        .library(name: "OakVoice", targets: ["OakVoice"])
     ],
     dependencies: [
         .package(url: "https://github.com/Blaizzy/mlx-audio-swift", branch: "main"),
@@ -13,7 +13,7 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "OakVoiceAI",
+            name: "OakVoice",
             dependencies: [
                 .product(name: "MLXAudioSTT", package: "mlx-audio-swift"),
                 .product(name: "MLXAudioTTS", package: "mlx-audio-swift"),
@@ -21,7 +21,7 @@ let package = Package(
                 .product(name: "MLXAudioCore", package: "mlx-audio-swift"),
                 "OakAgent",
             ],
-            path: "Sources/OakVoiceAI"
+            path: "Sources/OakVoice"
         )
     ],
     swiftLanguageModes: [.v5]

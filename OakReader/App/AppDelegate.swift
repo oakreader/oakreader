@@ -4,7 +4,7 @@ import PDFKit
 import Sparkle
 import UniformTypeIdentifiers
 import SwiftUI
-import OakVoiceAI
+import OakVoice
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     let documentController = PDFDocumentController()
@@ -25,7 +25,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Prewarm the emoji font so WebKit doesn't stall on first emoji render
         _ = CTFontCreateWithName("Apple Color Emoji" as CFString, 12, nil)
 
-        // Forward OakVoiceAI logs to the shared log file
+        // Forward OakVoice logs to the shared log file
         VoiceAgentLog.sink = { level, category, message in
             LogFileWriter.shared.write(level: level, category: category, message: message)
         }

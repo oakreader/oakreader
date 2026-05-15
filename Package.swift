@@ -9,7 +9,7 @@ let package = Package(
     dependencies: [
         .package(path: "Packages/OakAI"),
         .package(path: "Packages/OakAgent"),
-        .package(path: "Packages/OakVoiceAI"),
+        .package(path: "Packages/OakVoice"),
         .package(url: "https://github.com/gonzalezreal/textual", from: "0.1.0"),
         .package(url: "https://github.com/groue/GRDB.swift", from: "7.0.0"),
         .package(url: "https://github.com/raspu/Highlightr.git", from: "2.3.0"),
@@ -32,7 +32,7 @@ let package = Package(
             name: "OakReader",
             dependencies: [
                 "OakAgent",
-                "OakVoiceAI",
+                "OakVoice",
                 "ObjCExceptionCatcher",
                 .product(name: "Textual", package: "textual"),
                 .product(name: "GRDB", package: "GRDB.swift"),

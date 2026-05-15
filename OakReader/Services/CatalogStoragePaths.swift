@@ -82,31 +82,6 @@ extension CatalogDatabase {
         chatAttachmentDirectory(sessionId: sessionId).appendingPathComponent(fileName)
     }
 
-    /// ~/OakReader/calls/
-    static var callsDirectory: URL {
-        dataDirectory.appendingPathComponent("calls", isDirectory: true)
-    }
-
-    /// ~/OakReader/calls/{callId}/
-    static func callDirectory(callId: String) -> URL {
-        callsDirectory.appendingPathComponent(callId, isDirectory: true)
-    }
-
-    /// ~/OakReader/calls/{callId}/transcript.jsonl
-    static func callTranscriptURL(callId: String) -> URL {
-        callDirectory(callId: callId).appendingPathComponent("transcript.jsonl")
-    }
-
-    /// ~/OakReader/calls/{callId}/audio/
-    static func callAudioDirectory(callId: String) -> URL {
-        callDirectory(callId: callId).appendingPathComponent("audio", isDirectory: true)
-    }
-
-    /// ~/OakReader/calls/{callId}/audio/turn-{turnIndex}-{role}.caf
-    static func callAudioURL(callId: String, turnIndex: Int, role: String) -> URL {
-        callAudioDirectory(callId: callId).appendingPathComponent("turn-\(turnIndex)-\(role).caf")
-    }
-
     static func createBaseDirectories() throws {
         try FileManager.default.createDirectory(at: dataDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: storageDirectory, withIntermediateDirectories: true)
@@ -115,7 +90,6 @@ extension CatalogDatabase {
         try FileManager.default.createDirectory(at: notesAttachmentsDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: chatsDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: chatAttachmentsDirectory, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: callsDirectory, withIntermediateDirectories: true)
     }
 
     // MARK: - Storage Key Generation

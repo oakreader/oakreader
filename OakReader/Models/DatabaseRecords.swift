@@ -319,23 +319,3 @@ struct ItemRelationRecord: Codable, FetchableRecord, MutablePersistableRecord, H
     }
 }
 
-// MARK: - Voice Calls
-
-struct VoiceCallRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable {
-    static let databaseTableName = "voice_calls"
-
-    var id: String
-    var title: String
-    var turnCount: Int
-    var durationSeconds: Double
-    var createdAt: String
-    var updatedAt: String
-
-    enum CodingKeys: String, CodingKey, ColumnExpression {
-        case id, title
-        case turnCount = "turn_count"
-        case durationSeconds = "duration_seconds"
-        case createdAt = "created_at"
-        case updatedAt = "updated_at"
-    }
-}

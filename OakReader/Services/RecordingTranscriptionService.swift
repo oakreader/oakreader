@@ -1,5 +1,5 @@
 import AVFoundation
-import OakVoiceAI
+import OakVoice
 
 /// Transcribes a recorded audio file using the on-device MLX STT model.
 @Observable
