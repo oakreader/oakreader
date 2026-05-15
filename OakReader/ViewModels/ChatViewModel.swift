@@ -78,11 +78,12 @@ class ChatViewModel {
         let defaultModel = ProviderRegistry.shared.provider(for: pid)?.defaultModelId ?? ""
         let modelId = prefs.aiModel.isEmpty ? defaultModel : prefs.aiModel
         let modelInfo = ProviderRegistry.shared.provider(for: pid)?.models.first { $0.id == modelId }
-        let budget = modelInfo?.reasoning == true ? prefs.thinkingBudget : nil
+        let isReasoning = modelInfo?.reasoning == true
         return ProviderConfig(
             providerId: pid,
             model: modelId,
-            thinkingBudget: budget
+            thinkingBudget: isReasoning ? prefs.thinkingBudget : nil,
+            thinkingEffort: isReasoning ? prefs.thinkingEffort : nil
         )
     }
 
@@ -285,6 +286,7 @@ class ChatViewModel {
         // Load file-based agent skills from standard directories
         let agentSkills = Self.loadAgentSkills()
         let thinkingBudget = currentConfig.thinkingBudget
+        let thinkingEffort = currentConfig.thinkingEffort
 
         streamTask = Task { @MainActor [weak self] in
             do {
@@ -300,6 +302,7 @@ class ChatViewModel {
                     toolContext: effectiveToolContext,
                     agentSkills: agentSkills,
                     thinkingBudget: thinkingBudget,
+                    thinkingEffort: thinkingEffort,
                     toolConfirmation: self?.makeToolConfirmation(level: permissionLevel)
                 )
 

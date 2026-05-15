@@ -24,7 +24,8 @@ public protocol LLMProviderService: Sendable {
         systemPrompt: String?,
         maxTokens: Int,
         tools: [ToolDefinition]?,
-        thinkingBudget: Int?
+        thinkingBudget: Int?,
+        thinkingEffort: String?
     ) -> AsyncThrowingStream<StreamChunk, Error>
 }
 
@@ -46,9 +47,10 @@ extension LLMProviderService {
         systemPrompt: String?,
         maxTokens: Int,
         tools: [ToolDefinition]?,
-        thinkingBudget: Int?
+        thinkingBudget: Int?,
+        thinkingEffort: String?
     ) -> AsyncThrowingStream<StreamChunk, Error> {
-        // Default: ignore thinkingBudget and delegate
+        // Default: ignore thinking params and delegate
         sendMessage(messages: messages, model: model, systemPrompt: systemPrompt, maxTokens: maxTokens, tools: tools)
     }
 }
@@ -58,7 +60,7 @@ extension LLMProviderService {
 public enum LLMProviderError: LocalizedError, Sendable {
     case missingAPIKey
     case unknownProvider(String)
-    case invalidResponse(Int)
+    case invalidResponse(Int, String? = nil)
     case decodingError(String)
     case streamError(String)
     case networkError(String)
@@ -68,7 +70,9 @@ public enum LLMProviderError: LocalizedError, Sendable {
         switch self {
         case .missingAPIKey: return "API key not configured. Open AI Settings to add your key."
         case .unknownProvider(let id): return "Unknown provider: \(id). Check AI Settings."
-        case .invalidResponse(let code): return "API returned status \(code)"
+        case .invalidResponse(let code, let detail):
+            if let detail { return "API error \(code): \(detail)" }
+            return "API returned status \(code)"
         case .decodingError(let msg): return "Failed to decode response: \(msg)"
         case .streamError(let msg): return "Stream error: \(msg)"
         case .networkError(let msg): return "Network error: \(msg)"
