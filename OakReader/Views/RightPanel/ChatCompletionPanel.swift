@@ -27,8 +27,8 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
     private let panelWidth: CGFloat
     private let windowFrame: NSRect
 
-    fileprivate static let rowHeight: CGFloat = 34
-    fileprivate static let headerHeight: CGFloat = 28
+    fileprivate static let rowHeight: CGFloat = 26
+    fileprivate static let headerHeight: CGFloat = 22
     fileprivate static let emptyHeight: CGFloat = 46
     private static let maxPanelHeight: CGFloat = 640
     private static let minPanelWidth: CGFloat = 300
@@ -92,7 +92,7 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
         let container = NSVisualEffectView()
         container.material = .popover
         container.state = .active
-        container.blendingMode = .behindWindow
+        container.blendingMode = .withinWindow
         container.wantsLayer = true
         container.layer?.cornerRadius = 12
         container.layer?.borderWidth = 0.5
@@ -294,7 +294,7 @@ private final class ChatCompletionRowView: NSView {
         self.onClick = onClick
         super.init(frame: .zero)
         wantsLayer = true
-        layer?.cornerRadius = 8
+        layer?.cornerRadius = 6
         translatesAutoresizingMaskIntoConstraints = false
         heightAnchor.constraint(equalToConstant: ChatCompletionPanel.rowHeight).isActive = true
         toolTip = item.description
@@ -306,20 +306,20 @@ private final class ChatCompletionRowView: NSView {
 
         let icon = NSImageView(frame: .zero)
         if let img = NSImage(systemSymbolName: item.icon, accessibilityDescription: item.label) {
-            icon.image = img.withSymbolConfiguration(.init(pointSize: 19, weight: .regular))
+            icon.image = img.withSymbolConfiguration(.init(pointSize: 14, weight: .regular))
             icon.contentTintColor = item.completionTint
         }
         icon.translatesAutoresizingMaskIntoConstraints = false
 
         let label = NSTextField(labelWithString: item.displayLabel)
-        label.font = .systemFont(ofSize: 14, weight: .semibold)
+        label.font = .systemFont(ofSize: 13, weight: .semibold)
         label.textColor = .labelColor
         label.lineBreakMode = .byTruncatingTail
         label.translatesAutoresizingMaskIntoConstraints = false
         label.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
 
         let desc = NSTextField(labelWithString: item.description)
-        desc.font = .systemFont(ofSize: 13)
+        desc.font = .systemFont(ofSize: 12)
         desc.textColor = .secondaryLabelColor
         desc.lineBreakMode = .byTruncatingTail
         desc.translatesAutoresizingMaskIntoConstraints = false
@@ -331,21 +331,21 @@ private final class ChatCompletionRowView: NSView {
         addSubview(desc)
 
         NSLayoutConstraint.activate([
-            iconShell.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
+            iconShell.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 6),
             iconShell.centerYAnchor.constraint(equalTo: centerYAnchor),
-            iconShell.widthAnchor.constraint(equalToConstant: 28),
-            iconShell.heightAnchor.constraint(equalToConstant: 28),
+            iconShell.widthAnchor.constraint(equalToConstant: 20),
+            iconShell.heightAnchor.constraint(equalToConstant: 20),
 
             icon.centerXAnchor.constraint(equalTo: iconShell.centerXAnchor),
             icon.centerYAnchor.constraint(equalTo: iconShell.centerYAnchor),
-            icon.widthAnchor.constraint(equalToConstant: 22),
-            icon.heightAnchor.constraint(equalToConstant: 22),
+            icon.widthAnchor.constraint(equalToConstant: 16),
+            icon.heightAnchor.constraint(equalToConstant: 16),
 
-            label.leadingAnchor.constraint(equalTo: iconShell.trailingAnchor, constant: 8),
+            label.leadingAnchor.constraint(equalTo: iconShell.trailingAnchor, constant: 6),
             label.centerYAnchor.constraint(equalTo: centerYAnchor),
 
-            desc.leadingAnchor.constraint(equalTo: label.trailingAnchor, constant: 10),
-            desc.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -10),
+            desc.leadingAnchor.constraint(equalTo: label.trailingAnchor, constant: 8),
+            desc.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -8),
             desc.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
     }
@@ -388,8 +388,8 @@ private final class ChatCompletionSectionHeaderView: NSView {
         heightAnchor.constraint(equalToConstant: ChatCompletionPanel.headerHeight).isActive = true
 
         let label = NSTextField(labelWithString: title)
-        label.font = .systemFont(ofSize: 13, weight: .regular)
-        label.textColor = .secondaryLabelColor
+        label.font = .systemFont(ofSize: 11, weight: .medium)
+        label.textColor = .tertiaryLabelColor
         label.translatesAutoresizingMaskIntoConstraints = false
         addSubview(label)
 
