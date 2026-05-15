@@ -1,7 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-// Library toolbar: height 41px, 28x28 buttons, 5px radius
+// Library toolbar: height 41px, 28x28 buttons, 6px radius
 struct LibraryTableToolbar: View {
     let appState: AppState
 
@@ -54,7 +54,7 @@ struct LibraryTableToolbar: View {
                 .padding(.horizontal, 7)
                 .padding(.vertical, 3)
                 .frame(height: 28)
-                .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 5))
+                .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 6))
 
                 Spacer()
 

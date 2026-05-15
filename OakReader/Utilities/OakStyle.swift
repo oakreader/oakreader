@@ -223,7 +223,7 @@ enum OakStyle {
     // MARK: - Radius
 
     enum Radius {
-        static let standard: CGFloat = 8
+        static let standard: CGFloat = 9
         static let small: CGFloat = 4
         static let concave: CGFloat = 10
     }

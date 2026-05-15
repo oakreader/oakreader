@@ -1,6 +1,6 @@
 import AppKit
 
-/// A floating, sectioned completion panel for `/` commands and `@` mentions.
+/// A floating, sectioned completion panel for `/` commands.
 /// The panel intentionally mirrors the chat composer width so the trigger UI
 /// feels connected to the input instead of appearing as a detached menu.
 final class ChatCompletionPanel: NSPanel, AppResignDismissable {
@@ -53,7 +53,7 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
         onSelect: @escaping (ChatCompletionItem) -> Void
     ) {
         self.allItems = items
-        self.filtered = items.filter { !$0.requiresQuery }
+        self.filtered = items
         self.anchorPoint = screenPoint
         self.panelWidth = min(max(requestedWidth, Self.minPanelWidth), Self.maxPanelWidth)
         self.windowFrame = windowFrame
@@ -89,14 +89,12 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
         documentView.addSubview(stackView)
         scrollView.documentView = documentView
 
-        let container = NSVisualEffectView()
-        container.material = .popover
-        container.state = .active
-        container.blendingMode = .withinWindow
+        let container = NSView()
         container.wantsLayer = true
+        container.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
         container.layer?.cornerRadius = 12
         container.layer?.borderWidth = 0.5
-        container.layer?.borderColor = NSColor.labelColor.withAlphaComponent(0.10).cgColor
+        container.layer?.borderColor = NSColor.labelColor.withAlphaComponent(0.12).cgColor
         container.layer?.masksToBounds = true
         container.addSubview(scrollView)
         contentView = container
@@ -141,7 +139,7 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
 
     func filter(query: String) {
         if query.isEmpty {
-            filtered = allItems.filter { !$0.requiresQuery }
+            filtered = allItems
         } else {
             filtered = allItems.filter { $0.matches(query: query) }
         }
@@ -271,7 +269,7 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
         let margin: CGFloat = 8
 
         // Cap height to available space above the anchor within the window
-        let maxAvailableHeight = anchorPoint.y - constraintRect.minY - margin * 2
+        let maxAvailableHeight = constraintRect.maxY - anchorPoint.y - margin * 2
         let height = min(contentHeight(), Self.maxPanelHeight, max(maxAvailableHeight, Self.emptyHeight + Self.verticalInset * 2))
 
         let maxX = constraintRect.maxX - panelWidth - margin
@@ -436,8 +434,6 @@ private extension ChatCompletionItem {
         switch kind {
         case .installedSkill:
             return .controlAccentColor
-        case .contextMention:
-            return .systemBlue
         case .libraryReference:
             return .systemOrange
         case .noteReference:
