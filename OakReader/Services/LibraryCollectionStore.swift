@@ -250,9 +250,16 @@ extension LibraryStore {
         }
     }
 
-    /// Import all PDFs and HTML files from a folder, creating a collection named after the folder.
+    /// Supported file extensions for folder import.
+    static let folderImportExtensions: Set<String> = {
+        var exts: Set<String> = ["pdf", "html", "htm", "md", "markdown"]
+        exts.formUnion(ImportService.audioExtensions)
+        return exts
+    }()
+
+    /// Import all supported files from a folder, creating a collection named after the folder.
     @discardableResult
-    func importFolder(_ folderURL: URL, importService: ImportService) -> Int {
+    func importFolder(_ folderURL: URL, importService: ImportService) async -> Int {
         let folderName = folderURL.lastPathComponent
         let collection = createCollection(name: folderName, icon: "folder.fill")
 
@@ -263,20 +270,18 @@ extension LibraryStore {
             options: [.skipsHiddenFiles]
         ) else { return 0 }
 
-        let supportedExtensions: Set<String> = ["pdf", "html", "htm", "md", "markdown"]
-        var count = 0
+        // Collect file URLs first (enumerator is not Sendable)
+        var fileURLs: [URL] = []
         for case let fileURL as URL in enumerator {
             let ext = fileURL.pathExtension.lowercased()
-            guard supportedExtensions.contains(ext) else { continue }
-
-            let item: LibraryItem?
-            if ext == "html" || ext == "htm" {
-                item = importService.importWebSnapshot(from: fileURL)
-            } else if ext == "md" || ext == "markdown" {
-                item = importService.importMarkdown(from: fileURL)
-            } else {
-                item = importService.importPDF(from: fileURL)
+            if Self.folderImportExtensions.contains(ext) {
+                fileURLs.append(fileURL)
             }
+        }
+
+        var count = 0
+        for fileURL in fileURLs {
+            let item = await importService.importFileAsync(from: fileURL)
             if let item {
                 addItem(item, to: collection)
                 count += 1

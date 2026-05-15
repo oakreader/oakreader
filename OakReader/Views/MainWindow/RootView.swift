@@ -38,6 +38,26 @@ struct RootView: View {
             // Reset cursor when switching tabs to prevent leaks from PDF/Web viewer cursor rects
             NSCursor.arrow.set()
         }
+        .overlay(alignment: .top) {
+            if let message = appState.importNotification {
+                Text(message)
+                    .font(.system(size: 13, weight: .medium))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                    .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
+                    .padding(.top, 48)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .onAppear {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                            withAnimation(.easeOut(duration: 0.3)) {
+                                appState.importNotification = nil
+                            }
+                        }
+                    }
+            }
+        }
+        .animation(.easeInOut(duration: 0.25), value: appState.importNotification)
         .sheet(isPresented: Binding(
             get: { appState.showZoteroImport },
             set: { appState.showZoteroImport = $0 }

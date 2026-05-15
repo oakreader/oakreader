@@ -75,8 +75,10 @@ struct LibrarySidebarView: View {
         panel.prompt = "Import"
 
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        let count = store.importFolder(url, importService: appState.importService)
-        Log.info(Log.ui, "Imported \(count) items from folder: \(url.lastPathComponent)")
+        Task {
+            let count = await store.importFolder(url, importService: appState.importService)
+            Log.info(Log.ui, "Imported \(count) items from folder: \(url.lastPathComponent)")
+        }
     }
 
     // MARK: - Smart Collection Row
