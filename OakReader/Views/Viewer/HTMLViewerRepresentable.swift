@@ -151,15 +151,6 @@ struct HTMLViewerRepresentable: NSViewRepresentable {
         context.coordinator.webView = webView
         context.coordinator.setupScrollMonitor()
 
-        // Disable WebKit's occlusion detection so it doesn't throttle
-        // requestAnimationFrame/timers when the web view is hidden in the
-        // tab ZStack (all tabs coexist but only one is visible at a time).
-        DispatchQueue.main.async {
-            if let window = webView.window {
-                window.setValue(false, forKey: "windowOcclusionDetectionEnabled")
-            }
-        }
-
         // Load the HTML snapshot
         if let snapshot = viewModel.webSnapshot {
             let storageDir = snapshot.htmlURL.deletingLastPathComponent()
