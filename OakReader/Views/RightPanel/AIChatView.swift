@@ -322,9 +322,13 @@ struct AIChatView: View {
                     }
                 } label: {
                     Image(systemName: "plus")
-                        .font(.system(size: 19, weight: .regular))
+                        .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(.secondary)
-                        .frame(width: 34, height: 34)
+                        .frame(width: 28, height: 28)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.primary.opacity(0.15), lineWidth: 0.5)
+                        )
                 }
                 .buttonStyle(.plain)
                 .help("Add attachment")
@@ -338,10 +342,10 @@ struct AIChatView: View {
                         ZStack {
                             Circle()
                                 .fill(Color.primary)
-                                .frame(width: 38, height: 38)
-                            RoundedRectangle(cornerRadius: 3)
+                                .frame(width: 28, height: 28)
+                            RoundedRectangle(cornerRadius: 2.5)
                                 .fill(Color(nsColor: .windowBackgroundColor))
-                                .frame(width: 12, height: 12)
+                                .frame(width: 10, height: 10)
                         }
                     }
                     .buttonStyle(.plain)
@@ -351,9 +355,9 @@ struct AIChatView: View {
                         ZStack {
                             Circle()
                                 .fill(inputHasText ? Color.primary : Color.gray.opacity(0.3))
-                                .frame(width: 38, height: 38)
+                                .frame(width: 28, height: 28)
                             Image(systemName: "arrow.up")
-                                .font(.system(size: 18, weight: .bold))
+                                .font(.system(size: 14, weight: .bold))
                                 .foregroundStyle(Color(nsColor: .windowBackgroundColor))
                         }
                     }
@@ -433,6 +437,7 @@ struct AIChatView: View {
                     }) {
                         HStack {
                             Text(level.label)
+                                .frame(minWidth: 160, alignment: .leading)
                             if settingsPermission == level {
                                 Image(systemName: "checkmark")
                             }
@@ -454,6 +459,10 @@ struct AIChatView: View {
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
+            .background(
+                Capsule()
+                    .stroke(Color.primary.opacity(0.15), lineWidth: 0.5)
+            )
         }
         .buttonStyle(.plain)
         .help("Model & settings")

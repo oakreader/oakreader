@@ -6,7 +6,7 @@ struct AISettingsView: View {
     // MARK: - Sidebar Category
 
     enum Category: String, Hashable, Identifiable {
-        case chat, translation, youtube, voiceLLM
+        case chat, voiceLLM
         case embedding, transcribe, tts, vad
         case agentTools
 
@@ -15,8 +15,6 @@ struct AISettingsView: View {
         var label: String {
             switch self {
             case .chat: "Chat"
-            case .translation: "Translation"
-            case .youtube: "YouTube Highlights"
             case .voiceLLM: "Voice Chat LLM"
             case .embedding: "Embedding"
             case .transcribe: "Transcribe"
@@ -29,8 +27,6 @@ struct AISettingsView: View {
         var icon: String {
             switch self {
             case .chat: "bubble.left"
-            case .translation: "character.book.closed"
-            case .youtube: "play.rectangle"
             case .voiceLLM: "mic.badge.plus"
             case .embedding: "magnifyingglass"
             case .transcribe: "mic"
@@ -41,7 +37,7 @@ struct AISettingsView: View {
         }
     }
 
-    private static let llmCategories: [Category] = [.chat, .translation, .youtube, .voiceLLM]
+    private static let llmCategories: [Category] = [.chat, .voiceLLM]
     private static let onDeviceCategories: [Category] = [.embedding, .transcribe, .tts, .vad]
     private static let agentCategories: [Category] = [.agentTools]
 
@@ -52,16 +48,6 @@ struct AISettingsView: View {
     // Chat LLM
     @State private var chatProviderId: String
     @State private var chatModel: String
-
-    // Translation
-    @State private var translationUseChatDefault: Bool
-    @State private var translationProviderId: String
-    @State private var translationModel: String
-
-    // YouTube
-    @State private var youtubeUseChatDefault: Bool
-    @State private var youtubeProviderId: String
-    @State private var youtubeModel: String
 
     // Voice Chat LLM
     @State private var voiceLLMUseChatDefault: Bool
@@ -107,22 +93,6 @@ struct AISettingsView: View {
         _chatProviderId = State(initialValue: pid)
         let defaultModel = ProviderRegistry.shared.provider(for: pid)?.defaultModelId ?? ""
         _chatModel = State(initialValue: prefs.aiModel.isEmpty ? defaultModel : prefs.aiModel)
-
-        // Translation – nil raw key means "use chat default"
-        let translationRaw = defaults.string(forKey: "translationAIProvider")
-        _translationUseChatDefault = State(initialValue: translationRaw == nil)
-        _translationProviderId = State(initialValue: prefs.translationAIProviderId)
-        let tm = prefs.translationAIModel
-        _translationModel = State(initialValue: tm.isEmpty
-            ? (ProviderRegistry.shared.provider(for: prefs.translationAIProviderId)?.defaultModelId ?? "") : tm)
-
-        // YouTube – nil raw key means "use chat default"
-        let youtubeRaw = defaults.string(forKey: "youtubeAIProvider")
-        _youtubeUseChatDefault = State(initialValue: youtubeRaw == nil)
-        _youtubeProviderId = State(initialValue: prefs.youtubeAIProviderId)
-        let ym = prefs.youtubeAIModel
-        _youtubeModel = State(initialValue: ym.isEmpty
-            ? (ProviderRegistry.shared.provider(for: prefs.youtubeAIProviderId)?.defaultModelId ?? "") : ym)
 
         // Voice Chat LLM – empty model means "use chat default"
         let vlm = prefs.voiceLLMModel
@@ -252,8 +222,6 @@ struct AISettingsView: View {
     private var detailPanel: some View {
         switch selectedCategory {
         case .chat: chatPanel
-        case .translation: translationPanel
-        case .youtube: youtubePanel
         case .voiceLLM: voiceLLMPanel
         case .embedding: localModelPanel(binding: $embeddingModel, knownModels: KnownModels.embedding)
         case .transcribe: transcribePanel
@@ -314,40 +282,6 @@ struct AISettingsView: View {
                     Text("Token budget for model reasoning. Higher values allow deeper thinking but increase latency and cost.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                }
-            }
-        }
-        .formStyle(.grouped)
-    }
-
-    // MARK: - Translation Panel
-
-    private var translationPanel: some View {
-        Form {
-            Section("Translation LLM") {
-                Toggle("Use Chat default", isOn: $translationUseChatDefault)
-
-                if translationUseChatDefault {
-                    chatDefaultLabel
-                } else {
-                    llmPickers(providerId: $translationProviderId, model: $translationModel)
-                }
-            }
-        }
-        .formStyle(.grouped)
-    }
-
-    // MARK: - YouTube Panel
-
-    private var youtubePanel: some View {
-        Form {
-            Section("YouTube Highlights LLM") {
-                Toggle("Use Chat default", isOn: $youtubeUseChatDefault)
-
-                if youtubeUseChatDefault {
-                    chatDefaultLabel
-                } else {
-                    llmPickers(providerId: $youtubeProviderId, model: $youtubeModel)
                 }
             }
         }
@@ -630,24 +564,6 @@ struct AISettingsView: View {
         // Chat
         prefs.aiProviderId = chatProviderId
         prefs.aiModel = chatModel
-
-        // Translation
-        if translationUseChatDefault {
-            defaults.removeObject(forKey: "translationAIProvider")
-            defaults.removeObject(forKey: "translationAIModel")
-        } else {
-            prefs.translationAIProviderId = translationProviderId
-            prefs.translationAIModel = translationModel
-        }
-
-        // YouTube
-        if youtubeUseChatDefault {
-            defaults.removeObject(forKey: "youtubeAIProvider")
-            defaults.removeObject(forKey: "youtubeAIModel")
-        } else {
-            prefs.youtubeAIProviderId = youtubeProviderId
-            prefs.youtubeAIModel = youtubeModel
-        }
 
         // Voice Chat LLM
         prefs.voiceLLMModel = voiceLLMUseChatDefault ? "" : voiceLLMModel

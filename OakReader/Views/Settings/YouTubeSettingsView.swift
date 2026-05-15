@@ -1,4 +1,5 @@
 import SwiftUI
+import OakAgent
 
 struct YouTubeSettingsView: View {
     // yt-dlp state
@@ -8,8 +9,28 @@ struct YouTubeSettingsView: View {
     @State private var installMessage: String?
     @State private var latestVersion: String?
 
+    // YouTube Highlights LLM
+    @State private var youtubeUseChatDefault: Bool
+    @State private var youtubeProviderId: String
+    @State private var youtubeModel: String
+
     // Prompt file state
     @State private var promptPreview: String = ""
+
+    private let store = ConfiguredProviderStore.shared
+
+    init() {
+        let prefs = Preferences.shared
+        let defaults = UserDefaults.standard
+
+        // YouTube LLM – nil raw key means "use chat default"
+        let youtubeRaw = defaults.string(forKey: "youtubeAIProvider")
+        _youtubeUseChatDefault = State(initialValue: youtubeRaw == nil)
+        _youtubeProviderId = State(initialValue: prefs.youtubeAIProviderId)
+        let ym = prefs.youtubeAIModel
+        _youtubeModel = State(initialValue: ym.isEmpty
+            ? (ProviderRegistry.shared.provider(for: prefs.youtubeAIProviderId)?.defaultModelId ?? "") : ym)
+    }
 
     private enum YtDlpStatus: Equatable {
         case unknown
@@ -21,9 +42,11 @@ struct YouTubeSettingsView: View {
     var body: some View {
         Form {
             ytDlpSection
+            llmSection
             chapterPromptSection
         }
         .formStyle(.grouped)
+        .onDisappear { saveLLM() }
         .onAppear {
             if ytDlpPath.isEmpty {
                 autoDetectYtDlp()
@@ -159,6 +182,68 @@ struct YouTubeSettingsView: View {
                 RoundedRectangle(cornerRadius: 6)
                     .fill(Color.primary.opacity(0.03))
             }
+    }
+
+    // MARK: - LLM Section
+
+    private var llmSection: some View {
+        Section("Highlights LLM") {
+            Toggle("Use Chat default", isOn: $youtubeUseChatDefault)
+
+            if youtubeUseChatDefault {
+                chatDefaultLabel
+            } else {
+                llmPickers
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var llmPickers: some View {
+        if store.configuredLLMProviders.isEmpty {
+            Text("Configure a provider in AI Providers first.")
+                .foregroundStyle(.secondary)
+        } else {
+            Picker("Provider", selection: $youtubeProviderId) {
+                ForEach(store.configuredLLMProviders) { p in
+                    Text(p.displayName).tag(p.id)
+                }
+            }
+            .onChange(of: youtubeProviderId) { _, newValue in
+                youtubeModel = ProviderRegistry.shared.provider(for: newValue)?.defaultModelId ?? ""
+            }
+
+            if let provider = ProviderRegistry.shared.provider(for: youtubeProviderId) {
+                Picker("Model", selection: $youtubeModel) {
+                    ForEach(provider.models) { m in
+                        Text(m.name).tag(m.id)
+                    }
+                }
+            }
+        }
+    }
+
+    private var chatDefaultLabel: some View {
+        let prefs = Preferences.shared
+        let pid = prefs.aiProviderId
+        let model = prefs.aiModel
+        let providerName = ProviderRegistry.shared.provider(for: pid)?.displayName ?? pid
+        let modelName = ProviderRegistry.shared.provider(for: pid)?.models.first(where: { $0.id == model })?.name ?? model
+        return LabeledContent("Using", value: "\(providerName) / \(modelName)")
+            .foregroundStyle(.secondary)
+    }
+
+    private func saveLLM() {
+        let prefs = Preferences.shared
+        let defaults = UserDefaults.standard
+
+        if youtubeUseChatDefault {
+            defaults.removeObject(forKey: "youtubeAIProvider")
+            defaults.removeObject(forKey: "youtubeAIModel")
+        } else {
+            prefs.youtubeAIProviderId = youtubeProviderId
+            prefs.youtubeAIModel = youtubeModel
+        }
     }
 
     // MARK: - yt-dlp Helpers
