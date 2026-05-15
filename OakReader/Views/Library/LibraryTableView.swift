@@ -1,10 +1,52 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+// MARK: - Library Table Row
+
+/// A row in the library table tree — either a parent item or one of its child attachments.
+/// Used with `DisclosureTableRow` to provide Zotero-style expand/collapse for multi-attachment items.
+struct LibraryRow: Identifiable {
+    let id: UUID
+    let parentItemId: UUID
+    let kind: Kind
+
+    enum Kind {
+        case item(LibraryItem)
+        case attachment(Attachment, parent: LibraryItem)
+    }
+
+    var isAttachment: Bool {
+        if case .attachment = kind { return true }
+        return false
+    }
+
+    /// The library item this row belongs to.
+    var libraryItem: LibraryItem {
+        switch kind {
+        case .item(let item): return item
+        case .attachment(_, let parent): return parent
+        }
+    }
+
+    static func parent(_ item: LibraryItem) -> LibraryRow {
+        LibraryRow(id: item.id, parentItemId: item.id, kind: .item(item))
+    }
+
+    static func child(_ attachment: Attachment, of item: LibraryItem) -> LibraryRow {
+        LibraryRow(id: attachment.id, parentItemId: item.id, kind: .attachment(attachment, parent: item))
+    }
+}
+
+// MARK: - Library Table View
+
 // Items table: white bg, 13px font, colored tag squares inline
 struct LibraryTableView: View {
     let appState: AppState
     @Binding var selection: Set<UUID>
+
+    @State private var tableSelection: Set<UUID> = []
+    @State private var transcriptionService = RecordingTranscriptionService()
+    @State private var transcribingItemId: UUID?
 
     private var store: LibraryStore { appState.libraryStore }
 
@@ -31,173 +73,340 @@ struct LibraryTableView: View {
         let items = store.filteredItems
         let groupMap = isDuplicatesMode ? store.duplicateGroupIndexMap : [:]
 
-        Table(of: LibraryItem.self, selection: $selection) {
-            TableColumn("Title") { item in
+        Table(of: LibraryRow.self, selection: $tableSelection) {
+            TableColumn("Title") { row in
                 HStack(spacing: 7) {
-                    if isDuplicatesMode, let groupIdx = groupMap[item.id] {
-                        Circle()
-                            .fill(duplicateGroupColor(groupIdx))
-                            .frame(width: 6, height: 6)
+                    switch row.kind {
+                    case .item(let item):
+                        if isDuplicatesMode, let groupIdx = groupMap[item.id] {
+                            Circle()
+                                .fill(duplicateGroupColor(groupIdx))
+                                .frame(width: 6, height: 6)
+                        }
+
+                        Image(systemName: item.displayIcon)
+                            .foregroundStyle(Color.primary.opacity(0.4))
+                            .font(.system(size: 14))
+                            .accessibilityLabel(item.primaryAttachment?.contentType.label ?? "Document")
+
+                        Text(item.title)
+                            .font(.system(size: 14))
+                            .lineLimit(1)
+
+                    case .attachment(let att, _):
+                        Image(systemName: att.icon)
+                            .foregroundStyle(Color.primary.opacity(0.3))
+                            .font(.system(size: 13))
+                            .accessibilityLabel(att.contentType.label)
+
+                        Text(att.fileName)
+                            .font(.system(size: 13))
+                            .foregroundStyle(Color.primary.opacity(0.7))
+                            .lineLimit(1)
                     }
-
-                    Image(systemName: item.displayIcon)
-                        .foregroundStyle(Color.primary.opacity(0.4))
-                        .font(.system(size: 14))
-                        .accessibilityLabel(item.primaryAttachment?.contentType.label ?? "Document")
-
-                    Text(item.title)
-                        .font(.system(size: 14))
-                        .lineLimit(1)
-
                 }
             }
             .width(min: 150, ideal: 300, max: .infinity)
 
-            TableColumn("Author") { item in
-                Text(item.author)
-                    .font(.system(size: 13))
-                    .lineLimit(1)
-                    .foregroundStyle(Color.primary.opacity(0.55))
+            TableColumn("Author") { row in
+                switch row.kind {
+                case .item(let item):
+                    Text(item.author)
+                        .font(.system(size: 13))
+                        .lineLimit(1)
+                        .foregroundStyle(Color.primary.opacity(0.55))
+                case .attachment(let att, _):
+                    Text(att.contentType.label)
+                        .font(.system(size: 12))
+                        .lineLimit(1)
+                        .foregroundStyle(Color.primary.opacity(0.4))
+                }
             }
             .width(min: 80, ideal: 150)
 
-            TableColumn(dateColumnTitle) { item in
-                Text(dateColumnValue(for: item), style: .date)
-                    .font(.system(size: 13))
-                    .foregroundStyle(Color.primary.opacity(0.55))
+            TableColumn(dateColumnTitle) { row in
+                switch row.kind {
+                case .item(let item):
+                    Text(dateColumnValue(for: item), style: .date)
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.primary.opacity(0.55))
+                case .attachment(let att, _):
+                    if att.fileSize > 0 {
+                        Text(ByteCountFormatter.string(fromByteCount: att.fileSize, countStyle: .file))
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color.primary.opacity(0.4))
+                    }
+                }
             }
             .width(min: 80, ideal: 120)
 
         } rows: {
             ForEach(items, id: \.id) { item in
-                TableRow(item)
+                if item.attachments.count > 1 {
+                    DisclosureTableRow(LibraryRow.parent(item)) {
+                        ForEach(item.attachments.sorted { a, b in
+                            if a.isPrimary != b.isPrimary { return a.isPrimary }
+                            return a.fileName.localizedStandardCompare(b.fileName) == .orderedAscending
+                        }) { attachment in
+                            TableRow(LibraryRow.child(attachment, of: item))
+                        }
+                    }
+                } else {
+                    TableRow(LibraryRow.parent(item))
+                }
             }
         }
         .tableStyle(.inset(alternatesRowBackgrounds: true))
         .contextMenu(forSelectionType: UUID.self) { ids in
             contextMenuItems(for: ids)
         } primaryAction: { ids in
-            openItems(ids)
+            openRows(ids)
         }
-        .onDrop(of: [.pdf, .html, .plainText], isTargeted: nil) { providers in
+        .onDrop(of: [.pdf, .html, .plainText, .audio, .fileURL], isTargeted: nil) { providers in
             handleDrop(providers)
             return true
         }
         .onHover { inside in
             if inside { NSCursor.arrow.set() }
         }
+        .onChange(of: tableSelection) { _, newValue in
+            let mapped = mapToItemIds(newValue)
+            if mapped != selection { selection = mapped }
+        }
+        .onChange(of: selection) { _, newValue in
+            if mapToItemIds(tableSelection) != newValue {
+                tableSelection = newValue
+            }
+        }
+    }
+
+    // MARK: - Selection Mapping
+
+    /// Maps row IDs (item or attachment) back to parent item IDs.
+    private func mapToItemIds(_ rowIds: Set<UUID>) -> Set<UUID> {
+        let items = store.filteredItems
+        var result = Set<UUID>()
+        for rowId in rowIds {
+            if items.contains(where: { $0.id == rowId }) {
+                result.insert(rowId)
+            } else {
+                for item in items where item.attachments.contains(where: { $0.id == rowId }) {
+                    result.insert(item.id)
+                    break
+                }
+            }
+        }
+        return result
+    }
+
+    /// Resolves a row ID to the parent LibraryItem.
+    private func resolveItem(for rowId: UUID) -> LibraryItem? {
+        let items = store.filteredItems
+        if let item = items.first(where: { $0.id == rowId }) { return item }
+        return items.first { $0.attachments.contains { $0.id == rowId } }
+    }
+
+    /// Resolves a row ID to an Attachment and its parent item, if it's an attachment row.
+    private func resolveAttachment(for rowId: UUID) -> (Attachment, LibraryItem)? {
+        for item in store.filteredItems {
+            if let att = item.attachments.first(where: { $0.id == rowId }) {
+                return (att, item)
+            }
+        }
+        return nil
     }
 
     // MARK: - Context Menu
 
     @ViewBuilder
     private func contextMenuItems(for ids: Set<UUID>) -> some View {
-        let selectedItems = store.filteredItems.filter { ids.contains($0.id) }
+        let items = store.filteredItems
+        let itemIds = ids.filter { id in items.contains { $0.id == id } }
+        let attachmentIds = ids.subtracting(itemIds)
 
-        if selectedItems.count == 1, let item = selectedItems.first {
-            Button { openItem(item) } label: {
-                Label("Open", systemImage: "doc.richtext")
+        if ids.isEmpty {
+            emptySelectionMenu()
+        } else if attachmentIds.count == 1, itemIds.isEmpty,
+                  let attId = attachmentIds.first,
+                  let (att, parentItem) = resolveAttachment(for: attId) {
+            attachmentContextMenu(att, parent: parentItem)
+        } else {
+            // Resolve all IDs to items (attachment IDs map to their parent item)
+            let allItemIds = mapToItemIds(ids)
+            let selectedItems = items.filter { allItemIds.contains($0.id) }
+
+            if selectedItems.count == 1, let item = selectedItems.first {
+                singleItemContextMenu(item)
+            } else if selectedItems.count > 1 {
+                multiItemContextMenu(selectedItems)
             }
+        }
+    }
 
-            Divider()
+    @ViewBuilder
+    private func attachmentContextMenu(_ att: Attachment, parent: LibraryItem) -> some View {
+        Button { openItem(parent) } label: {
+            Label("Open", systemImage: "doc.richtext")
+        }
 
-            let rootCollections = store.rootCollections.sorted(by: { $0.sortOrder < $1.sortOrder })
-            if !rootCollections.isEmpty {
-                Menu {
-                    ForEach(rootCollections) { collection in
-                        collectionMenuItem(for: item, collection: collection)
-                    }
-                } label: {
-                    Label("Add to Collection", systemImage: "folder.badge.plus")
+        Divider()
+
+        if let sourceURL = att.sourceURL {
+            Button { NSWorkspace.shared.open(sourceURL) } label: {
+                Label("View Source in Browser", systemImage: "safari")
+            }
+        }
+
+        Button { NSWorkspace.shared.activateFileViewerSelecting([att.fileURL]) } label: {
+            Label("Reveal in Finder", systemImage: "folder")
+        }
+
+        Button {
+            let shareItem: Any = att.sourceURL ?? att.fileURL
+            SharingService.share(items: [shareItem])
+        } label: {
+            Label("Share...", systemImage: "square.and.arrow.up")
+        }
+    }
+
+    @ViewBuilder
+    private func singleItemContextMenu(_ item: LibraryItem) -> some View {
+        Button { openItem(item) } label: {
+            Label("Open", systemImage: "doc.richtext")
+        }
+
+        Divider()
+
+        let rootCollections = store.rootCollections.sorted(by: { $0.sortOrder < $1.sortOrder })
+        if !rootCollections.isEmpty {
+            Menu {
+                ForEach(rootCollections) { collection in
+                    collectionMenuItem(for: item, collection: collection)
                 }
-            }
-
-            Button {
-                appState.libraryChatVM.pendingLibraryRef = item
             } label: {
-                Label("Add to Chat", systemImage: "bubble.left.and.text.bubble.right")
+                Label("Add to Collection", systemImage: "folder.badge.plus")
             }
+        }
 
-            // Property assignments via context menu
-            let selectProperties = store.properties.filter { $0.type == .multiSelect || $0.type == .singleSelect }
-            if !selectProperties.isEmpty {
-                ForEach(selectProperties) { property in
-                    Menu {
-                        PropertyOptionAssignmentMenuItems(
-                            item: item,
-                            property: property,
-                            store: store,
-                            mode: .toggleAssigned
-                        )
-                    } label: {
-                        Label(property.name, systemImage: "tag")
+        Button {
+            appState.libraryChatVM.pendingLibraryRef = item
+        } label: {
+            Label("Add to Chat", systemImage: "bubble.left.and.text.bubble.right")
+        }
+
+        if item.contentType == .audio {
+            Button {
+                transcribeAudioItem(item)
+            } label: {
+                Label("Transcribe", systemImage: "waveform")
+            }
+            .disabled(
+                Preferences.shared.voiceSTTModel.isEmpty
+                || transcribingItemId != nil
+            )
+        }
+
+        // Property assignments via context menu
+        let selectProperties = store.properties.filter { $0.type == .multiSelect || $0.type == .singleSelect }
+        if !selectProperties.isEmpty {
+            ForEach(selectProperties) { property in
+                Menu {
+                    PropertyOptionAssignmentMenuItems(
+                        item: item,
+                        property: property,
+                        store: store,
+                        mode: .toggleAssigned
+                    )
+                } label: {
+                    Label(property.name, systemImage: "tag")
+                }
+            }
+        }
+
+        // Citation
+        if item.referenceMetadata != nil {
+            Menu {
+                ForEach(CitationStyle.allCases) { style in
+                    Button(style.displayName) {
+                        store.copyCitation(item, style: style)
                     }
                 }
-            }
-
-            // Citation
-            if item.referenceMetadata != nil {
-                Menu {
-                    ForEach(CitationStyle.allCases) { style in
-                        Button(style.displayName) {
-                            store.copyCitation(item, style: style)
-                        }
-                    }
-                } label: {
-                    Label("Copy Citation", systemImage: "quote.opening")
-                }
-            }
-
-            Divider()
-
-            if let sourceURL = item.sourceURL {
-                Button { NSWorkspace.shared.open(sourceURL) } label: {
-                    Label("View Source in Browser", systemImage: "safari")
-                }
-            }
-
-            Button { NSWorkspace.shared.activateFileViewerSelecting([item.fileURL]) } label: {
-                Label("Reveal in Finder", systemImage: "folder")
-            }
-
-            Divider()
-
-            Button(role: .destructive) { store.removeItem(item) } label: {
-                Label("Remove from Library", systemImage: "trash")
-            }
-        } else if selectedItems.isEmpty {
-            Button {
-                createNewNote()
             } label: {
-                Label("Add Note", systemImage: "note.text.badge.plus")
+                Label("Copy Citation", systemImage: "quote.opening")
             }
-            Button {
-                importPDFs()
+        }
+
+        Divider()
+
+        if let sourceURL = item.sourceURL {
+            Button { NSWorkspace.shared.open(sourceURL) } label: {
+                Label("View Source in Browser", systemImage: "safari")
+            }
+        }
+
+        Button { NSWorkspace.shared.activateFileViewerSelecting([item.fileURL]) } label: {
+            Label("Reveal in Finder", systemImage: "folder")
+        }
+
+        Button {
+            let shareItem: Any = item.sourceURL ?? item.fileURL
+            SharingService.share(items: [shareItem])
+        } label: {
+            Label("Share...", systemImage: "square.and.arrow.up")
+        }
+
+        Divider()
+
+        Button(role: .destructive) { store.removeItem(item) } label: {
+            Label("Remove from Library", systemImage: "trash")
+        }
+    }
+
+    @ViewBuilder
+    private func multiItemContextMenu(_ selectedItems: [LibraryItem]) -> some View {
+        Button { for item in selectedItems { openItem(item) } } label: {
+            Label("Open \(selectedItems.count) Items", systemImage: "doc.richtext")
+        }
+
+        // Export citations for multi-select
+        let itemsWithRefs = selectedItems.filter { $0.referenceMetadata != nil }
+        if !itemsWithRefs.isEmpty {
+            Menu {
+                Button("BibTeX") { exportCitations(itemsWithRefs, format: .bibtex) }
+                Button("RIS") { exportCitations(itemsWithRefs, format: .ris) }
+                Button("CSL JSON") { exportCitations(itemsWithRefs, format: .cslJson) }
             } label: {
-                Label("Import File...", systemImage: "square.and.arrow.down")
+                Label("Export Citations", systemImage: "quote.opening")
             }
-        } else if selectedItems.count > 1 {
-            Button { for item in selectedItems { openItem(item) } } label: {
-                Label("Open \(selectedItems.count) Items", systemImage: "doc.richtext")
-            }
+        }
 
-            // Export citations for multi-select
-            let itemsWithRefs = selectedItems.filter { $0.referenceMetadata != nil }
-            if !itemsWithRefs.isEmpty {
-                Menu {
-                    Button("BibTeX") { exportCitations(itemsWithRefs, format: .bibtex) }
-                    Button("RIS") { exportCitations(itemsWithRefs, format: .ris) }
-                    Button("CSL JSON") { exportCitations(itemsWithRefs, format: .cslJson) }
-                } label: {
-                    Label("Export Citations", systemImage: "quote.opening")
-                }
+        let shareURLs: [Any] = selectedItems.compactMap { $0.sourceURL ?? $0.fileURL }
+        if !shareURLs.isEmpty {
+            Button {
+                SharingService.share(items: shareURLs)
+            } label: {
+                Label("Share \(shareURLs.count) Links", systemImage: "square.and.arrow.up")
             }
+        }
 
-            Divider()
+        Divider()
 
-            Button(role: .destructive) { for item in selectedItems { store.removeItem(item) } } label: {
-                Label("Remove \(selectedItems.count) Items", systemImage: "trash")
-            }
+        Button(role: .destructive) { for item in selectedItems { store.removeItem(item) } } label: {
+            Label("Remove \(selectedItems.count) Items", systemImage: "trash")
+        }
+    }
+
+    @ViewBuilder
+    private func emptySelectionMenu() -> some View {
+        Button {
+            createNewNote()
+        } label: {
+            Label("Add Note", systemImage: "note.text.badge.plus")
+        }
+        Button {
+            importPDFs()
+        } label: {
+            Label("Import File...", systemImage: "square.and.arrow.down")
         }
     }
 
@@ -234,9 +443,9 @@ struct LibraryTableView: View {
 
     // MARK: - Actions
 
-    private func openItems(_ ids: Set<UUID>) {
+    private func openRows(_ ids: Set<UUID>) {
         for id in ids {
-            if let item = store.filteredItems.first(where: { $0.id == id }) {
+            if let item = resolveItem(for: id) {
                 openItem(item)
             }
         }
@@ -246,29 +455,62 @@ struct LibraryTableView: View {
         appState.openLibraryItem(item)
     }
 
+    private func transcribeAudioItem(_ item: LibraryItem) {
+        guard let attachment = item.primaryAttachment else { return }
+        let sttModel = Preferences.shared.voiceSTTModel
+        guard !sttModel.isEmpty else { return }
+
+        transcribingItemId = item.id
+        Task {
+            do {
+                let text = try await transcriptionService.transcribe(
+                    audioURL: attachment.fileURL,
+                    sttModel: sttModel
+                )
+                let url = CatalogDatabase.attachmentTranscriptURL(
+                    itemStorageKey: attachment.itemStorageKey,
+                    attachmentStorageKey: attachment.storageKey
+                )
+                try text.write(to: url, atomically: true, encoding: .utf8)
+            } catch {
+                Log.error(Log.audio, "Transcription failed: \(error)")
+            }
+            transcribingItemId = nil
+        }
+    }
+
     private func importPDFs() {
-        var contentTypes: [UTType] = [.pdf, .html]
+        var contentTypes: [UTType] = [.pdf, .html, .audio]
         if let mdType = UTType(filenameExtension: "md") {
             contentTypes.append(mdType)
         }
         let panel = NSOpenPanel()
         panel.allowedContentTypes = contentTypes
+        panel.canChooseDirectories = true
         panel.allowsMultipleSelection = true
-        panel.message = "Select PDF, HTML, or Markdown files to add to your library"
+        panel.message = "Select files or folders to add to your library"
         panel.begin { response in
             guard response == .OK else { return }
-            for url in panel.urls {
-                let ext = url.pathExtension.lowercased()
-                let item: LibraryItem?
-                if ext == "html" || ext == "htm" {
-                    item = appState.importService.importWebSnapshot(from: url)
-                } else if ext == "md" || ext == "markdown" {
-                    item = appState.importService.importMarkdown(from: url)
-                } else {
-                    item = appState.importService.importPDF(from: url)
-                }
-                if let item, let collection = store.selectedCollection, !collection.isSmart {
-                    store.addItem(item, to: collection)
+            Task {
+                for url in panel.urls {
+                    var isDir: ObjCBool = false
+                    if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue {
+                        let count = await store.importFolder(url, importService: appState.importService)
+                        await MainActor.run {
+                            withAnimation {
+                                appState.importNotification = "Imported \(count) item\(count == 1 ? "" : "s") from \"\(url.lastPathComponent)\""
+                            }
+                        }
+                    } else {
+                        let item = await appState.importService.importFileAsync(from: url)
+                        if let item {
+                            await MainActor.run {
+                                if let collection = store.selectedCollection, !collection.isSmart {
+                                    store.addItem(item, to: collection)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -302,26 +544,33 @@ struct LibraryTableView: View {
 
     private func handleDrop(_ providers: [NSItemProvider]) {
         for provider in providers {
-            // Try PDF first, then HTML, then plain text (for .md files)
-            let types = [UTType.pdf.identifier, UTType.html.identifier, UTType.fileURL.identifier]
+            let types = [UTType.pdf.identifier, UTType.html.identifier, UTType.audio.identifier, UTType.fileURL.identifier]
             for typeId in types {
                 if provider.hasItemConformingToTypeIdentifier(typeId) {
                     provider.loadItem(forTypeIdentifier: typeId, options: nil) { data, _ in
                         guard let url = data as? URL else { return }
-                        DispatchQueue.main.async {
-                            let ext = url.pathExtension.lowercased()
-                            let item: LibraryItem?
-                            if ext == "html" || ext == "htm" {
-                                item = appState.importService.importWebSnapshot(from: url)
-                            } else if ext == "md" || ext == "markdown" {
-                                item = appState.importService.importMarkdown(from: url)
-                            } else if ext == "pdf" {
-                                item = appState.importService.importPDF(from: url)
-                            } else {
-                                item = nil
+                        // Check if it's a directory — import as collection
+                        var isDir: ObjCBool = false
+                        if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue {
+                            Task {
+                                let count = await store.importFolder(url, importService: appState.importService)
+                                await MainActor.run {
+                                    withAnimation {
+                                        appState.importNotification = "Imported \(count) item\(count == 1 ? "" : "s") from \"\(url.lastPathComponent)\""
+                                    }
+                                }
                             }
-                            if let item, let collection = store.selectedCollection, !collection.isSmart {
-                                store.addItem(item, to: collection)
+                            return
+                        }
+                        // Single file import
+                        Task {
+                            let item = await appState.importService.importFileAsync(from: url)
+                            if let item {
+                                await MainActor.run {
+                                    if let collection = store.selectedCollection, !collection.isSmart {
+                                        store.addItem(item, to: collection)
+                                    }
+                                }
                             }
                         }
                     }
