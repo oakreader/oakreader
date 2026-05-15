@@ -393,6 +393,11 @@ final class ChatNSTextView: NSTextView {
         ) { [weak self] item in
             self?.insertToken(item)
         }
+
+        // Attach as child so the panel moves with the main window when dragged.
+        if let panel = completionPanel, let parentWindow = window {
+            parentWindow.addChildWindow(panel, ordered: .above)
+        }
     }
 
     private func dismissCompletionPanel() {
