@@ -1,5 +1,6 @@
 import AVFoundation
 import CoreAudio
+import Synchronization
 
 /// Plays audio buffers through the system speakers using AVAudioEngine.
 public final class SpeakerOutput: AudioPlaybackService, @unchecked Sendable {
@@ -10,11 +11,11 @@ public final class SpeakerOutput: AudioPlaybackService, @unchecked Sendable {
 
     private let engine = AVAudioEngine()
     private let playerNode = AVAudioPlayerNode()
-    private let playbackState = LockedState(PlaybackState())
+    private let playbackState = Mutex(PlaybackState())
     private let deviceUID: String?
 
     public var isPlaying: Bool {
-        playbackState.value.isPlaying
+        playbackState.withLock { $0.isPlaying }
     }
 
     public init(deviceUID: String? = nil) {
