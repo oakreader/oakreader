@@ -1,42 +1,38 @@
 import SwiftUI
 
 struct VoicePanelContainerView: View {
-    let characterListVM: CharacterListViewModel
+    let callListVM: VoiceCallListViewModel
     let voiceVM: VoiceViewModel
 
     var body: some View {
         Group {
-            switch characterListVM.screen {
-            case .characterList:
-                CharacterListView(viewModel: characterListVM)
+            switch callListVM.screen {
+            case .callList:
+                VoiceCallMainView(viewModel: callListVM)
 
-            case .inCall(let character):
+            case .inCall:
                 VoiceChatView(
                     voiceVM: voiceVM,
                     onBack: {
                         voiceVM.stop()
-                        characterListVM.finalizeCall(turnCount: voiceVM.turns.count)
+                        callListVM.finalizeCall(turnCount: voiceVM.turns.count)
                         voiceVM.turns.removeAll()
-                        characterListVM.backToList()
+                        callListVM.backToMain()
                     },
-                    characterName: character.name
+                    characterName: "Voice AI"
                 )
                 .onAppear {
                     Task {
                         await voiceVM.start(
-                            character: character,
-                            callId: characterListVM.activeCall?.id.uuidString
+                            callId: callListVM.activeCall?.id.uuidString
                         )
                     }
                 }
 
-            case .callHistory(let character):
-                CallHistoryView(
-                    viewModel: characterListVM,
-                    character: character
-                )
+            case .callHistory:
+                CallHistoryView(viewModel: callListVM)
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: characterListVM.screen)
+        .animation(.easeInOut(duration: 0.2), value: callListVM.screen)
     }
 }

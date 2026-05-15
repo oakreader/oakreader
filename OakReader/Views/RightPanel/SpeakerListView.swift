@@ -1,25 +1,43 @@
 import SwiftUI
 
-struct CharacterListView: View {
-    let viewModel: CharacterListViewModel
+struct VoiceCallMainView: View {
+    let viewModel: VoiceCallListViewModel
+
     var body: some View {
         VStack(spacing: 0) {
             header
 
-            ScrollView {
-                LazyVStack(spacing: 8) {
-                    ForEach(viewModel.characters) { character in
-                        CharacterRow(
-                            character: character,
-                            onCall: { viewModel.startCall(character: character) },
-                            onHistory: { viewModel.showCallHistory(character: character) },
-                            onDelete: { viewModel.deleteCharacter(character) }
-                        )
-                    }
+            Spacer()
+
+            // Start call button
+            Button(action: { viewModel.startCall() }) {
+                HStack(spacing: 8) {
+                    Image(systemName: "phone.fill")
+                        .font(.system(size: 14))
+                    Text("Start Voice Call")
+                        .font(.system(size: 14, weight: .semibold))
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 10)
+                .background(Capsule().fill(.green))
             }
+            .buttonStyle(.plain)
+
+            Spacer()
+
+            // Call history link
+            Button(action: { viewModel.showCallHistory() }) {
+                HStack(spacing: 4) {
+                    Image(systemName: "clock")
+                        .font(.system(size: 12))
+                    Text("Call History")
+                        .font(.system(size: 13))
+                }
+                .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .padding(.bottom, 16)
         }
     }
 
@@ -32,73 +50,4 @@ struct CharacterListView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
     }
-
 }
-
-// MARK: - Character Row
-
-private struct CharacterRow: View {
-    let character: Character
-    let onCall: () -> Void
-    let onHistory: () -> Void
-    let onDelete: () -> Void
-
-    var body: some View {
-        HStack(spacing: 10) {
-            CharacterAvatarView(avatar: character.avatar, initials: character.initials, size: 40)
-
-            // Name + subtitle
-            VStack(alignment: .leading, spacing: 2) {
-                Text(character.name)
-                    .font(.system(size: 13, weight: .semibold))
-                    .lineLimit(1)
-                if let lastCall = character.lastCall {
-                    Text("\(lastCall.displayTitle) \u{2022} \(lastCall.formattedDuration)")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                } else {
-                    Text("No calls yet")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.tertiary)
-                }
-            }
-
-            Spacer()
-
-            // Call button
-            Button(action: onCall) {
-                Image(systemName: "phone.fill")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.white)
-                    .frame(width: 30, height: 30)
-                    .background(Circle().fill(.green))
-            }
-            .buttonStyle(.plain)
-            .help("Start call")
-
-            // History button
-            Button(action: onHistory) {
-                Image(systemName: "list.bullet")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 30, height: 30)
-                    .background(Circle().fill(Color(nsColor: .controlBackgroundColor)))
-            }
-            .buttonStyle(.plain)
-            .help("Call history")
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color(nsColor: .controlBackgroundColor))
-        )
-        .contextMenu {
-            Button(role: .destructive) { onDelete() } label: {
-                Label("Delete", systemImage: "trash")
-            }
-        }
-    }
-}
-

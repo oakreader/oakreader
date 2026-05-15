@@ -122,6 +122,23 @@ final class SemanticDatabase: @unchecked Sendable {
         }
     }
 
+    // MARK: - Index Stats
+
+    struct IndexStats {
+        let indexedItemCount: Int
+        let totalChunkCount: Int
+        let embeddingModel: String?
+    }
+
+    func indexStats() throws -> IndexStats {
+        try dbQueue.read { db in
+            let itemCount = try Int.fetchOne(db, sql: "SELECT COUNT(DISTINCT item_id) FROM chunks") ?? 0
+            let chunkCount = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM chunks") ?? 0
+            let model = try String.fetchOne(db, sql: "SELECT embedding_model FROM chunks LIMIT 1")
+            return IndexStats(indexedItemCount: itemCount, totalChunkCount: chunkCount, embeddingModel: model)
+        }
+    }
+
     // MARK: - FTS5 Search
 
     /// BM25 keyword search on chunk text. Returns rowids ordered by relevance.

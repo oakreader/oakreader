@@ -163,13 +163,14 @@ final class SemanticIndexService: @unchecked Sendable {
 
     // MARK: - Embed & Store
 
+    private static let batchSize = 64
+
     private func embedAndStore(itemId: String, chunks: [ContentChunker.Chunk], model: String) async {
         let now = Date().iso8601String
-        let batchSize = 32
         var totalIndexed = 0
 
-        for batchStart in stride(from: 0, to: chunks.count, by: batchSize) {
-            let batchEnd = min(batchStart + batchSize, chunks.count)
+        for batchStart in stride(from: 0, to: chunks.count, by: Self.batchSize) {
+            let batchEnd = min(batchStart + Self.batchSize, chunks.count)
             let batchChunks = Array(chunks[batchStart..<batchEnd])
             let batchTexts = batchChunks.map(\.text)
 
@@ -332,7 +333,7 @@ final class SemanticIndexService: @unchecked Sendable {
             return
         }
 
-        // Get all indexable items from catalog.db
+        // Get all indexable items from catalog.db, recently opened first
         let allItems: [UnindexedItem]
         do {
             allItems = try await catalogDBQueue.read { db in
@@ -341,6 +342,10 @@ final class SemanticIndexService: @unchecked Sendable {
                     FROM items i
                     JOIN attachments a ON a.item_id = i.id AND a.is_primary = 1
                     WHERE a.content_type IN ('pdf', 'html', 'markdown', 'video')
+                    ORDER BY
+                        CASE WHEN i.last_opened_at IS NOT NULL THEN 0 ELSE 1 END,
+                        i.last_opened_at DESC,
+                        i.created_at DESC
                     """)
                 return rows.map { row in
                     UnindexedItem(

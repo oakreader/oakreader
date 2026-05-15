@@ -45,7 +45,7 @@ class VoiceViewModel {
     // MARK: - Lifecycle
 
     @MainActor
-    func start(character: Character? = nil, callId: String? = nil) async {
+    func start(callId: String? = nil) async {
         guard pipeline == nil else { return }
         error = nil
         userTranscript = ""
@@ -58,30 +58,17 @@ class VoiceViewModel {
         let defaultTTS = KnownModels.tts.first?.repo ?? ""
         let defaultVAD = KnownModels.vad.first?.repo ?? ""
 
-        let transcription = character?.transcriptionSettings
-        let characterTTS = character?.ttsVoice
-        let sttRepo = !(transcription?.modelId ?? "").isEmpty
-            ? transcription!.modelId
-            : (prefs.voiceSTTModel.isEmpty ? defaultSTT : prefs.voiceSTTModel)
-        let ttsRepo = !(characterTTS?.modelId ?? "").isEmpty
-            ? characterTTS!.modelId
-            : (prefs.voiceTTSModel.isEmpty ? defaultTTS : prefs.voiceTTSModel)
+        let sttRepo = prefs.voiceSTTModel.isEmpty ? defaultSTT : prefs.voiceSTTModel
+        let ttsRepo = prefs.voiceTTSModel.isEmpty ? defaultTTS : prefs.voiceTTSModel
         let vadRepo = prefs.voiceVADModel.isEmpty ? defaultVAD : prefs.voiceVADModel
 
-        // Character-specific providers override global provider preferences.
-        let sttProviderRaw = !(transcription?.provider ?? "").isEmpty ? transcription!.provider : prefs.voiceSTTProvider
-        let ttsProviderRaw = !(characterTTS?.provider ?? "").isEmpty ? characterTTS!.provider : prefs.voiceTTSProvider
-        let sttProviderType = VoiceProviderType(rawValue: sttProviderRaw) ?? .onDevice
-        let ttsProviderType = VoiceProviderType(rawValue: ttsProviderRaw) ?? .onDevice
+        let sttProviderType = VoiceProviderType(rawValue: prefs.voiceSTTProvider) ?? .onDevice
+        let ttsProviderType = VoiceProviderType(rawValue: prefs.voiceTTSProvider) ?? .onDevice
 
-        // Character-specific voice overrides global preference.
-        let voice: String? = {
-            if let c = character, !c.ttsVoiceId.isEmpty { return c.ttsVoiceId }
-            return prefs.voiceTTSVoice.isEmpty ? nil : prefs.voiceTTSVoice
-        }()
+        let voice: String? = prefs.voiceTTSVoice.isEmpty ? nil : prefs.voiceTTSVoice
         let elevenLabsVoiceId = voice ?? prefs.elevenLabsVoiceId
-        let sttCloudModelId = !(transcription?.modelId ?? "").isEmpty ? transcription!.modelId : prefs.elevenLabsSTTModelId
-        let ttsCloudModelId = !(characterTTS?.modelId ?? "").isEmpty ? characterTTS!.modelId : prefs.elevenLabsTTSModelId
+        let sttCloudModelId = prefs.elevenLabsSTTModelId
+        let ttsCloudModelId = prefs.elevenLabsTTSModelId
 
         let modelManager = ModelManager.shared
 
@@ -106,7 +93,7 @@ class VoiceViewModel {
             }
         }
         if ttsProviderType == .elevenLabs && elevenLabsVoiceId.isEmpty {
-            self.error = "ElevenLabs Voice ID is required. Please set it in Settings → Voice or in the character."
+            self.error = "ElevenLabs Voice ID is required. Please set it in Settings → Voice."
             return
         }
 
@@ -117,11 +104,7 @@ class VoiceViewModel {
         let defaultModel = ProviderRegistry.shared.provider(for: pid)?.defaultModelId ?? ""
         let chatModel = prefs.aiModel.isEmpty ? defaultModel : prefs.aiModel
 
-        // Character-specific LLM model overrides global preference
-        let voiceModel: String = {
-            if let c = character, !c.llmModel.isEmpty { return c.llmModel }
-            return prefs.voiceLLMModel.isEmpty ? chatModel : prefs.voiceLLMModel
-        }()
+        let voiceModel = prefs.voiceLLMModel.isEmpty ? chatModel : prefs.voiceLLMModel
 
         let config = ProviderConfig(
             providerId: pid,
@@ -129,11 +112,7 @@ class VoiceViewModel {
         )
         let llm = ChatEngineBridge(chatEngine: chatEngine, config: config)
 
-        // Character-specific language overrides global preference
-        let language: String = {
-            if let c = character, !c.language.isEmpty { return c.language }
-            return prefs.voiceLanguage
-        }()
+        let language = prefs.voiceLanguage
 
         var pipelineConfig = PipelineConfig()
         pipelineConfig.models = VoiceModelConfig(
@@ -151,25 +130,17 @@ class VoiceViewModel {
             let displayName = VoiceLanguage(rawValue: language)?.displayName ?? language
             languageInstruction = "Respond in \(displayName). The user is speaking \(displayName)."
         }
-        let characterPrompt = character?.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let characterName = character?.name ?? ""
-        let identityLine: String
-        if !characterName.isEmpty && !characterPrompt.isEmpty {
-            identityLine = "You are \(characterName), a voice assistant in a reading app called OakReader."
-        } else {
-            identityLine = "You are a friendly voice assistant for a reading app called OakReader."
-        }
-        let characterInstruction = characterPrompt.isEmpty ? "" : """
+        let agentPrompt = prefs.voiceAgentSystemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        let identityLine = "You are a friendly voice assistant for a reading app called OakReader."
+        let agentInstruction = agentPrompt.isEmpty ? "" : """
 
-        Character system prompt:
-        \(characterPrompt)
-
-        The character prompt defines style and expertise, but it must not override evidence limits, safety, or the voice I/O contract below.
+        Additional instructions:
+        \(agentPrompt)
         """
         pipelineConfig.systemPrompt = """
         \(identityLine)
 
-        \(languageInstruction)\(characterInstruction)
+        \(languageInstruction)\(agentInstruction)
 
         Voice I/O contract:
         - Input is an automatic speech transcription, not polished typed text.
@@ -183,15 +154,8 @@ class VoiceViewModel {
         """
         pipelineConfig.language = language
 
-        // Character-specific reference audio overrides global preference
-        pipelineConfig.referenceAudioURL = {
-            if let c = character, let url = c.referenceAudioURL { return url }
-            return prefs.voiceReferenceAudioURL
-        }()
-        pipelineConfig.referenceText = {
-            if let c = character, !c.referenceAudio.text.isEmpty { return c.referenceAudio.text }
-            return prefs.voiceReferenceText.isEmpty ? nil : prefs.voiceReferenceText
-        }()
+        pipelineConfig.referenceAudioURL = prefs.voiceReferenceAudioURL
+        pipelineConfig.referenceText = prefs.voiceReferenceText.isEmpty ? nil : prefs.voiceReferenceText
 
         // Create STT provider based on setting
         let stt: any STTService

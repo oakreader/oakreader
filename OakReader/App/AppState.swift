@@ -109,12 +109,12 @@ final class AppState {
         return vm
     }
 
-    private var _characterListVM: CharacterListViewModel?
-    var characterListVM: CharacterListViewModel {
-        if let vm = _characterListVM { return vm }
-        let service = VoiceCharacterService(database: libraryStore.database)
-        let vm = CharacterListViewModel(service: service)
-        _characterListVM = vm
+    private var _callListVM: VoiceCallListViewModel?
+    var callListVM: VoiceCallListViewModel {
+        if let vm = _callListVM { return vm }
+        let service = VoiceCallService(database: libraryStore.database)
+        let vm = VoiceCallListViewModel(service: service)
+        _callListVM = vm
         return vm
     }
 
@@ -148,6 +148,21 @@ final class AppState {
         startAutosaveTimer()
 
         // Initialize semantic index service asynchronously
+        startSemanticIndexing(database: database)
+
+        // Listen for rebuild requests from settings
+        NotificationCenter.default.addObserver(
+            forName: .semanticIndexRebuildRequested,
+            object: nil,
+            queue: nil
+        ) { [weak self] _ in
+            guard let self else { return }
+            self.backgroundIndexTask?.cancel()
+            self.startSemanticIndexing(database: self.libraryStore.database)
+        }
+    }
+
+    private func startSemanticIndexing(database: CatalogDatabase) {
         backgroundIndexTask = Task {
             let defaultEmbedding = KnownModels.embedding.first?.repo ?? ""
             let embeddingRepo = Preferences.shared.embeddingModel.isEmpty
@@ -244,7 +259,7 @@ final class AppState {
         tab.viewModel.appState = self
         tab.viewModel.itemStorageKey = storageKey
         tab.viewModel.attachmentId = item?.primaryAttachment?.id.uuidString
-        tab.viewModel.characterListVM = characterListVM
+        tab.viewModel.callListVM = callListVM
         // Use original filename (not "document.pdf" from managed storage)
         tab.title = item?.fileName ?? url.lastPathComponent
         NSDocumentController.shared.addDocument(doc)
@@ -268,7 +283,7 @@ final class AppState {
             let mdDoc = try MarkdownDocument(fileURL: url)
             let tab = DocumentTab(markdown: mdDoc, storageKey: nil)
             tab.viewModel.appState = self
-            tab.viewModel.characterListVM = characterListVM
+            tab.viewModel.callListVM = callListVM
             tab.title = url.deletingPathExtension().lastPathComponent
             openTabs.append(tab)
             activeTabID = tab.id
@@ -294,7 +309,7 @@ final class AppState {
             tab.viewModel.appState = self
             tab.viewModel.itemStorageKey = storageKey
             tab.viewModel.attachmentId = item?.primaryAttachment?.id.uuidString
-        tab.viewModel.characterListVM = characterListVM
+        tab.viewModel.callListVM = callListVM
             tab.title = item?.title ?? url.deletingPathExtension().lastPathComponent
             openTabs.append(tab)
             activeTabID = tab.id
@@ -364,7 +379,7 @@ final class AppState {
         tab.viewModel.appState = self
         tab.viewModel.itemStorageKey = item.storageKey
         tab.viewModel.attachmentId = item.primaryAttachment?.id.uuidString
-        tab.viewModel.characterListVM = characterListVM
+        tab.viewModel.callListVM = callListVM
         // Use original filename from library item
         tab.title = item.fileName
         NSDocumentController.shared.addDocument(doc)
@@ -402,7 +417,7 @@ final class AppState {
             tab.viewModel.appState = self
             tab.viewModel.itemStorageKey = item.storageKey
             tab.viewModel.attachmentId = item.primaryAttachment?.id.uuidString
-        tab.viewModel.characterListVM = characterListVM
+        tab.viewModel.callListVM = callListVM
             tab.title = item.title
             openTabs.append(tab)
             activeTabID = tab.id
@@ -445,7 +460,7 @@ final class AppState {
             tab.viewModel.appState = self
             tab.viewModel.itemStorageKey = item.storageKey
             tab.viewModel.attachmentId = item.primaryAttachment?.id.uuidString
-        tab.viewModel.characterListVM = characterListVM
+        tab.viewModel.callListVM = callListVM
             tab.title = item.title
             openTabs.append(tab)
             activeTabID = tab.id
@@ -485,7 +500,7 @@ final class AppState {
             tab.viewModel.appState = self
             tab.viewModel.itemStorageKey = item.storageKey
             tab.viewModel.attachmentId = item.primaryAttachment?.id.uuidString
-            tab.viewModel.characterListVM = characterListVM
+            tab.viewModel.callListVM = callListVM
             tab.title = item.title
             openTabs.append(tab)
             activeTabID = tab.id

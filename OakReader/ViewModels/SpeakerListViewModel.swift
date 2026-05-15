@@ -1,15 +1,14 @@
 import Foundation
 
 enum VoicePanelScreen: Equatable {
-    case characterList
-    case inCall(Character)
-    case callHistory(Character)
+    case callList
+    case inCall
+    case callHistory
 }
 
 @Observable
-class CharacterListViewModel {
-    var characters: [Character] = []
-    var screen: VoicePanelScreen = .characterList
+class VoiceCallListViewModel {
+    var screen: VoicePanelScreen = .callList
     var callHistory: [VoiceCall] = []
 
     /// The active call record, created when entering a call and finalized on exit.
@@ -17,54 +16,38 @@ class CharacterListViewModel {
     /// Timestamp when the current call started, for duration tracking.
     var callStartTime: Date?
 
-    private let service: VoiceCharacterService
+    private let service: VoiceCallService
 
-    init(service: VoiceCharacterService) {
+    init(service: VoiceCallService) {
         self.service = service
-        loadCharacters()
-    }
-
-    // MARK: - Load
-
-    func loadCharacters() {
-        do {
-            var loaded = try service.fetchAllCharacters()
-            for i in loaded.indices {
-                loaded[i].lastCall = try service.fetchLastCall(forCharacterId: loaded[i].id)
-            }
-            characters = loaded
-        } catch {
-            Log.error(Log.characters,"Failed to load characters: \(error.localizedDescription)")
-        }
     }
 
     // MARK: - Navigation
 
-    func startCall(character: Character) {
+    func startCall() {
         do {
-            let call = try service.createCall(characterId: character.id)
+            let call = try service.createCall()
             activeCall = call
             callStartTime = Date()
-            screen = .inCall(character)
+            screen = .inCall
         } catch {
-            Log.error(Log.characters,"Failed to create call: \(error.localizedDescription)")
+            Log.error(Log.voice, "Failed to create call: \(error.localizedDescription)")
         }
     }
 
-    func showCallHistory(character: Character) {
+    func showCallHistory() {
         do {
-            callHistory = try service.fetchCalls(forCharacterId: character.id)
-            screen = .callHistory(character)
+            callHistory = try service.fetchAllCalls()
+            screen = .callHistory
         } catch {
-            Log.error(Log.characters,"Failed to load call history: \(error.localizedDescription)")
+            Log.error(Log.voice, "Failed to load call history: \(error.localizedDescription)")
         }
     }
 
-    func backToList() {
-        screen = .characterList
+    func backToMain() {
+        screen = .callList
         activeCall = nil
         callStartTime = nil
-        loadCharacters()
     }
 
     // MARK: - Call Lifecycle
@@ -81,44 +64,10 @@ class CharacterListViewModel {
                 durationSeconds: duration
             )
         } catch {
-            Log.error(Log.characters,"Failed to finalize call: \(error.localizedDescription)")
+            Log.error(Log.voice, "Failed to finalize call: \(error.localizedDescription)")
         }
         activeCall = nil
         callStartTime = nil
-    }
-
-    // MARK: - Character CRUD
-
-    @discardableResult
-    func addCharacter(name: String, language: String) -> Character? {
-        let colors = ["#5FB236", "#2EA8E5", "#FF8C19", "#A28AE5", "#FF6666", "#E5A02E", "#36B5A0"]
-        let color = colors[characters.count % colors.count]
-        do {
-            let character = try service.createCharacter(name: name, colorHex: color, language: language)
-            loadCharacters()
-            return character
-        } catch {
-            Log.error(Log.characters,"Failed to add character: \(error.localizedDescription)")
-            return nil
-        }
-    }
-
-    func deleteCharacter(_ character: Character) {
-        do {
-            try service.deleteCharacter(id: character.id)
-            loadCharacters()
-        } catch {
-            Log.error(Log.characters,"Failed to delete character: \(error.localizedDescription)")
-        }
-    }
-
-    func updateCharacter(_ character: Character) {
-        do {
-            try service.updateCharacter(character)
-            loadCharacters()
-        } catch {
-            Log.error(Log.characters,"Failed to update character: \(error.localizedDescription)")
-        }
     }
 
     // MARK: - Call History CRUD
@@ -128,7 +77,7 @@ class CharacterListViewModel {
             try service.deleteCall(id: call.id)
             callHistory.removeAll { $0.id == call.id }
         } catch {
-            Log.error(Log.characters,"Failed to delete call: \(error.localizedDescription)")
+            Log.error(Log.voice, "Failed to delete call: \(error.localizedDescription)")
         }
     }
 }
