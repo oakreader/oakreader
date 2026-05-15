@@ -16,9 +16,7 @@ struct TabBarView: View {
         HStack(spacing: 0) {
             // Sidebar toggle
             Button {
-                if let wsTab = appState.activeWorkspaceTab {
-                    wsTab.viewModel.isSourcesPanelVisible.toggle()
-                } else if let viewModel = appState.activeTab?.viewModel {
+                if let viewModel = appState.activeTab?.viewModel {
                     viewModel.state.isSidebarVisible.toggle()
                 } else {
                     appState.isLibrarySidebarVisible.toggle()
@@ -59,7 +57,7 @@ struct TabBarView: View {
             .help("Library: \(pinnedTabTitle)")
             .padding(.trailing, 8)
 
-            if !appState.openTabs.isEmpty || !appState.workspaceTabs.isEmpty {
+            if !appState.openTabs.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 0) {
                         ForEach(Array(appState.openTabs.enumerated()), id: \.element.id) { index, tab in
@@ -69,15 +67,6 @@ struct TabBarView: View {
                                 isFirst: index == 0,
                                 onSelect: { appState.switchToTab(tab.id) },
                                 onClose: { appState.closeTab(tab.id) }
-                            )
-                        }
-                        ForEach(Array(appState.workspaceTabs.enumerated()), id: \.element.id) { index, tab in
-                            WorkspaceTabView(
-                                tab: tab,
-                                isActive: tab.id == appState.activeTabID,
-                                isFirst: appState.openTabs.isEmpty && index == 0,
-                                onSelect: { appState.switchToTab(tab.id) },
-                                onClose: { appState.closeWorkspaceTab(tab.id) }
                             )
                         }
                     }
@@ -115,9 +104,6 @@ struct TabBarView: View {
     // MARK: - Sidebar Toggle
 
     private var sidebarToggleActive: Bool {
-        if let wsTab = appState.activeWorkspaceTab {
-            return wsTab.viewModel.isSourcesPanelVisible
-        }
         if let viewModel = appState.activeTab?.viewModel {
             return viewModel.state.isSidebarVisible
         }
