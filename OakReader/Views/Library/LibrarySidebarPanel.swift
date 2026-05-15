@@ -11,14 +11,12 @@ struct LibrarySidebarPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Tabbed content
             if appState.libraryDetailTab == .notes {
                 // NotePanelView manages its own scrolling
                 if let notesVM {
                     NotePanelView(notesVM: notesVM)
                 }
             } else if appState.libraryDetailTab == .metadata {
-                // Fixed header
                 HStack {
                     Text("Metadata")
                         .font(.system(size: 16, weight: .semibold))
