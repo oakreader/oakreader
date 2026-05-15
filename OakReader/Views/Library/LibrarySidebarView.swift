@@ -327,61 +327,59 @@ private struct CollectionRowView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Button {
+            HStack(spacing: 0) {
+                Spacer()
+                    .frame(width: CGFloat(depth) * 18)
+
+                Image(systemName: collection.icon == "folder" ? "folder.fill" : collection.icon)
+                    .font(.system(size: 13))
+                    .foregroundStyle(isSelected ? .primary : .secondary)
+                    .frame(width: 18)
+                    .padding(.trailing, 5)
+
+                Text(collection.name)
+                    .font(.system(size: 13, weight: isSelected ? .medium : .regular))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                Spacer()
+
+                if hasChildren {
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 14, height: 14)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            withAnimation(.easeInOut(duration: 0.15)) {
+                                if isExpanded {
+                                    expandedCollections.remove(collection.id)
+                                } else {
+                                    expandedCollections.insert(collection.id)
+                                }
+                            }
+                        }
+                }
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 5)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(isDropTargeted ? Color.accentColor.opacity(0.18) :
+                          isSelected ? Color.primary.opacity(0.08) : Color.clear)
+                    .padding(.horizontal, 12)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .strokeBorder(isDropTargeted ? Color.accentColor.opacity(0.5) : Color.clear, lineWidth: 1.5)
+                    .padding(.horizontal, 12)
+            )
+            .contentShape(Rectangle())
+            .onTapGesture {
                 store.selectCollection(collection.id)
                 appState.selectedLibraryItemIDs = []
                 appState.switchToLibrary()
-            } label: {
-                HStack(spacing: 0) {
-                    Spacer()
-                        .frame(width: CGFloat(depth) * 18)
-
-                    Image(systemName: collection.icon == "folder" ? "folder.fill" : collection.icon)
-                        .font(.system(size: 13))
-                        .foregroundStyle(isSelected ? .primary : .secondary)
-                        .frame(width: 18)
-                        .padding(.trailing, 5)
-
-                    Text(collection.name)
-                        .font(.system(size: 13, weight: isSelected ? .medium : .regular))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-
-                    Spacer()
-
-                    if hasChildren {
-                        Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 14, height: 14)
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                withAnimation(.easeInOut(duration: 0.15)) {
-                                    if isExpanded {
-                                        expandedCollections.remove(collection.id)
-                                    } else {
-                                        expandedCollections.insert(collection.id)
-                                    }
-                                }
-                            }
-                    }
-                }
-                .padding(.horizontal, 18)
-                .padding(.vertical, 5)
-                .background(
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(isDropTargeted ? Color.accentColor.opacity(0.18) :
-                              isSelected ? Color.primary.opacity(0.08) : Color.clear)
-                        .padding(.horizontal, 12)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .strokeBorder(isDropTargeted ? Color.accentColor.opacity(0.5) : Color.clear, lineWidth: 1.5)
-                        .padding(.horizontal, 12)
-                )
-                .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
             .dropDestination(for: String.self) { droppedIDs, _ in
                 guard !collection.isSmart else { return false }
                 for idString in droppedIDs {
