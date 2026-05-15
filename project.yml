@@ -13,8 +13,6 @@ packages:
     path: Packages/OakAgent
   OakAI:
     path: Packages/OakAI
-  OakVoiceAI:
-    path: Packages/OakVoiceAI
   Textual:
     url: https://github.com/gonzalezreal/textual
     from: "0.1.0"
@@ -67,7 +65,6 @@ targets:
     dependencies:
       - package: OakAI
       - package: OakAgent
-      - package: OakVoiceAI
       - package: Textual
       - package: GRDB
         product: GRDB
