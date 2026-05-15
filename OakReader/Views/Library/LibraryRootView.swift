@@ -121,7 +121,7 @@ struct LibraryRootView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if appState.libraryDetailTab == .voiceChat {
                 VoicePanelContainerView(
-                    characterListVM: appState.characterListVM,
+                    callListVM: appState.callListVM,
                     voiceVM: appState.libraryVoiceVM
                 )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -189,100 +189,15 @@ private struct LibraryCollectionSidebarPanel: View {
 
     var body: some View {
         switch appState.libraryDetailTab {
-        case .metadata:
-            CollectionMetadataPanelView(
-                appState: appState,
-                title: contextTitle,
-                items: items
-            )
         case .notes:
             CollectionNotesPanelView(
                 appState: appState,
                 title: contextTitle,
                 items: items
             )
-        case .chat, .voiceChat, nil:
+        case .metadata, .chat, .voiceChat, nil:
             EmptyView()
         }
-    }
-}
-
-private struct CollectionMetadataPanelView: View {
-    @Bindable var appState: AppState
-    let title: String
-    let items: [LibraryItem]
-
-    var body: some View {
-        VStack(spacing: 0) {
-            panelHeader("Metadata", subtitle: "\(items.count) items in \(title)")
-
-            if items.isEmpty {
-                emptyState(icon: "square.grid.2x2", title: "No Items", subtitle: "This collection has no items.")
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        ForEach(items) { item in
-                            Button {
-                                appState.selectedLibraryItemIDs = [item.id]
-                            } label: {
-                                CollectionMetadataRow(item: item)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.bottom, 8)
-                }
-            }
-        }
-    }
-}
-
-private struct CollectionMetadataRow: View {
-    let item: LibraryItem
-
-    private var metadataStatus: String {
-        item.referenceMetadata == nil ? "No reference data" : "Reference data"
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 6) {
-                Image(systemName: item.displayIcon)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-
-                Text(item.title)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-
-                Spacer()
-            }
-
-            HStack(spacing: 8) {
-                if !item.author.isEmpty {
-                    Text(item.author)
-                }
-                Text(item.dateAdded.formatted(date: .abbreviated, time: .omitted))
-                Text(ByteCountFormatter.string(fromByteCount: item.fileSize, countStyle: .file))
-            }
-            .font(.system(size: 11))
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
-
-            Text(metadataStatus)
-                .font(.system(size: 11))
-                .foregroundStyle(item.referenceMetadata == nil ? .tertiary : .secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 8)
-        .contentShape(Rectangle())
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(Color.clear)
-        )
     }
 }
 
