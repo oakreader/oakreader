@@ -1,6 +1,13 @@
 import Foundation
 import OakAgent
 
+struct CitationAnchor {
+    var page: Int?      // 0-based page index (already converted from 1-based)
+    var heading: String?
+    var time: Double?   // seconds
+    var text: String?   // text fragment to find & highlight
+}
+
 struct PendingConfirmation {
     let toolCall: ToolCall
     let continuation: CheckedContinuation<Bool, Never>
@@ -212,12 +219,12 @@ class ChatViewModel {
         if let doc = snapshot.document {
             tools.append(ReadDocumentTool(
                 filePath: doc.filePath,
-                documentType: doc.itemType,
+                documentType: doc.contentType,
                 pageCount: doc.pageCount
             ))
             tools.append(SearchDocumentTool(
                 filePath: doc.filePath,
-                documentType: doc.itemType,
+                documentType: doc.contentType,
                 pageCount: doc.pageCount
             ))
         }
@@ -407,16 +414,69 @@ class ChatViewModel {
 
     // MARK: - Citation Navigation
 
-    func openCitation(citeKey: String, pageIndex: Int?) {
+    func openCitation(citeKey: String, anchor: CitationAnchor) {
+        // Backward compat: empty citeKey means current document (oak://page/N)
+        if citeKey.isEmpty {
+            if let vm = parent {
+                navigateInPlace(vm: vm, anchor: anchor)
+            }
+            return
+        }
+
+        // Check if the citeKey matches the current document
+        let currentCiteKey = parent?.libraryItem?.citeKey
+        if let currentCiteKey, currentCiteKey == citeKey, let vm = parent {
+            navigateInPlace(vm: vm, anchor: anchor)
+            return
+        }
+
+        // Cross-document: find item in library, open it, then navigate
         guard let appState else { return }
         let store = appState.libraryStore
-
         guard let item = store.findItem(byCiteKey: citeKey) else { return }
         appState.openLibraryItem(item)
 
-        if let pageIndex {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                appState.activeTab?.viewModel.viewer.goToPage(pageIndex)
+        // Delay navigation until the new tab loads
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            guard let tab = appState.activeTab else { return }
+            self.navigateInPlace(vm: tab.viewModel, anchor: anchor)
+        }
+    }
+
+    private func navigateInPlace(vm: DocumentViewModel, anchor: CitationAnchor) {
+        switch vm.contentType {
+        case .pdf:
+            if let page = anchor.page {
+                vm.viewer.goToPage(page)
+            }
+            if let text = anchor.text {
+                // Search for text within the PDF (optionally narrowed by page)
+                Task { @MainActor in
+                    await vm.viewer.search(query: text)
+                }
+            }
+
+        case .html, .markdown:
+            if let heading = anchor.heading {
+                NotificationCenter.default.post(
+                    name: .webViewScrollToHeading, object: heading
+                )
+            } else if let text = anchor.text {
+                NotificationCenter.default.post(
+                    name: .webViewFindText, object: text
+                )
+            }
+
+        case .video, .audio:
+            if let time = anchor.time {
+                vm.media.requestSeek(seconds: time)
+            } else if let text = anchor.text {
+                // Search transcript entries for matching text, seek to that offset
+                if let entry = vm.media.transcriptEntries.first(where: {
+                    $0.text.localizedCaseInsensitiveContains(text)
+                }) {
+                    vm.media.requestSeek(seconds: entry.offset)
+                }
             }
         }
     }
@@ -602,6 +662,7 @@ class ChatViewModel {
             lines.append(
                 "  <doc cite-key=\"\(xmlEsc(ck))\" title=\"\(xmlEsc(ref.title))\" "
                 + "author=\"\(xmlEsc(ref.author))\" pages=\"\(ref.pageCount)\" "
+                + "format=\"\(xmlEsc(ref.contentType))\" "
                 + "link=\"oak://cite/\(xmlEsc(ck))\" />"
             )
         }

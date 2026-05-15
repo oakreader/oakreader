@@ -38,7 +38,7 @@ struct ContentView: View {
 
                     // Main content column
                     VStack(spacing: 0) {
-                        if viewModel.itemType == .embed {
+                        if viewModel.contentType == .video {
                             Spacer().frame(height: 8)
                         }
 
@@ -130,7 +130,7 @@ struct ContentView: View {
 
     @ViewBuilder
     private var sidebarContentView: some View {
-        if viewModel.itemType == .markdown {
+        if viewModel.contentType == .markdown {
             MarkdownOutlineSidebarView(viewModel: viewModel)
         } else if viewModel.usesMediaSidebar {
             MediaSidebarView(viewModel: viewModel)
@@ -175,7 +175,7 @@ struct ContentView: View {
 
     @ViewBuilder
     private var mainContentView: some View {
-        switch viewModel.itemType {
+        switch viewModel.contentType {
         case .pdf:
             ZStack {
                 PDFViewerRepresentable(viewModel: viewModel)
@@ -184,14 +184,14 @@ struct ContentView: View {
                     SnapshotOverlayView(viewModel: viewModel)
                 }
             }
-        case .webSnapshot:
+        case .html:
             ZStack {
                 HTMLViewerRepresentable(viewModel: viewModel)
                 if viewModel.state.editorMode == .snapshot {
                     WebSnapshotOverlayView(viewModel: viewModel)
                 }
             }
-        case .embed:
+        case .video:
             ZStack {
                 if viewModel.mediaDocument?.metadata.resolvedEmbedType == .youtube {
                     MediaViewerView(viewModel: viewModel)

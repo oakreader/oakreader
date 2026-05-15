@@ -311,12 +311,12 @@ final class AppState {
 
     /// Open a library item directly (already imported). Dispatches by document type.
     func openLibraryItem(_ item: LibraryItem) {
-        switch item.itemType {
-        case .webSnapshot:
+        switch item.contentType {
+        case .html:
             openWebSnapshotItem(item)
         case .pdf:
             openPDFItem(item)
-        case .embed:
+        case .video:
             openMediaItem(item)
         case .markdown:
             openMarkdownItem(item)
@@ -426,7 +426,7 @@ final class AppState {
 
         guard FileManager.default.fileExists(atPath: metadataURL.path) else {
             let alert = NSAlert()
-            alert.messageText = "Cannot Open \(item.itemType.label)"
+            alert.messageText = "Cannot Open \(item.contentType.label)"
             alert.informativeText = "The metadata for \"\(item.title)\" could not be found."
             alert.alertStyle = .warning
             alert.addButton(withTitle: "OK")

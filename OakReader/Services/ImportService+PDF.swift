@@ -90,7 +90,8 @@ extension ImportService {
             itemId: docId.uuidString,
             storageKey: attStorageKey,
             fileName: sourceURL.lastPathComponent,
-            attachmentType: ItemType.pdf.rawValue,
+            contentType: ContentType.pdf.rawValue,
+            linkMode: LinkMode.importedFile.rawValue,
             sourceURL: webSourceURL?.absoluteString,
             fileSize: fileSize,
             pageCount: pageCount,
@@ -123,7 +124,7 @@ extension ImportService {
             Task {
                 await service.indexItem(
                     itemId: docId.uuidString,
-                    attachmentType: ItemType.pdf.rawValue,
+                    contentType: ContentType.pdf.rawValue,
                     storageKey: itemStorageKey,
                     attStorageKey: attStorageKey,
                     fileName: sourceURL.lastPathComponent

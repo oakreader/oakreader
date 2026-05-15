@@ -107,7 +107,7 @@ struct ReadDocumentTool: AgentTool, Sendable {
         "3,7,12" for specific pages, or omit for the current page.
         """
     let filePath: String
-    let documentType: ItemType
+    let documentType: ContentType
     let pageCount: Int
 
     var inputSchema: [String: Any] {
@@ -128,9 +128,9 @@ struct ReadDocumentTool: AgentTool, Sendable {
         switch documentType {
         case .pdf:
             return readPDF(url: url, pagesParam: input["pages"])
-        case .markdown, .embed:
+        case .markdown, .video:
             return readTextFile(url: url)
-        case .webSnapshot:
+        case .html:
             return readWebSnapshot(url: url)
         case .audio:
             return .error("Audio documents do not support text reading.")
@@ -206,7 +206,7 @@ struct SearchDocumentTool: AgentTool, Sendable {
         entire document.
         """
     let filePath: String
-    let documentType: ItemType
+    let documentType: ContentType
     let pageCount: Int
 
     var inputSchema: [String: Any] {
@@ -237,9 +237,9 @@ struct SearchDocumentTool: AgentTool, Sendable {
         switch documentType {
         case .pdf:
             return searchPDF(url: url, query: query, maxResults: maxResults)
-        case .markdown, .embed:
+        case .markdown, .video:
             return searchTextFile(url: url, query: query, maxResults: maxResults)
-        case .webSnapshot:
+        case .html:
             return searchWebSnapshot(url: url, query: query, maxResults: maxResults)
         case .audio:
             return .error("Audio documents do not support text search.")

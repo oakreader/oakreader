@@ -150,6 +150,7 @@ struct HTMLViewerRepresentable: NSViewRepresentable {
         webView.coordinator = context.coordinator
         context.coordinator.webView = webView
         context.coordinator.setupScrollMonitor()
+        context.coordinator.setupNotificationObservers()
 
         // Load the HTML snapshot
         if let snapshot = viewModel.webSnapshot {

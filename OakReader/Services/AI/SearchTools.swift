@@ -118,7 +118,7 @@ struct SearchLibraryTool: AgentTool, Sendable {
                 let detailSQL = """
                     SELECT i.id, i.title, i.author, i.storage_key, i.cite_key,
                            i.last_opened_at,
-                           a.attachment_type, a.page_count, a.file_name,
+                           a.content_type, a.page_count, a.file_name,
                            a.storage_key AS att_storage_key,
                            c.csl_type, c.year, c.doi, c.container_title, c.abstract,
                            (SELECT GROUP_CONCAT(po.name, ', ')
@@ -149,7 +149,7 @@ struct SearchLibraryTool: AgentTool, Sendable {
                         title: row["title"],
                         author: row["author"],
                         citeKey: row["cite_key"],
-                        attachmentType: row["attachment_type"],
+                        contentType: row["content_type"],
                         pageCount: row["page_count"],
                         cslType: row["csl_type"],
                         year: row["year"],
@@ -193,7 +193,7 @@ struct SearchLibraryTool: AgentTool, Sendable {
             var meta: [String] = []
             if let t = r.cslType { meta.append(t) }
             if let y = r.year { meta.append("Year: \(y)") }
-            if let at = r.attachmentType, let pc = r.pageCount {
+            if let at = r.contentType, let pc = r.pageCount {
                 meta.append("\(at), \(pc) pages")
             }
             if !meta.isEmpty { out += "\n   \(meta.joined(separator: " | "))" }
@@ -217,7 +217,7 @@ struct SearchLibraryTool: AgentTool, Sendable {
         let title: String
         let author: String
         let citeKey: String?
-        let attachmentType: String?
+        let contentType: String?
         let pageCount: Int?
         let cslType: String?
         let year: Int?
@@ -278,7 +278,7 @@ struct ReadLibraryItemTool: AgentTool, Sendable {
                 if let ck = citeKey, !ck.isEmpty {
                     row = try Row.fetchOne(db, sql: """
                         SELECT i.storage_key, a.storage_key AS att_key, a.file_name,
-                               a.attachment_type, a.page_count
+                               a.content_type, a.page_count
                         FROM items i
                         JOIN attachments a ON a.item_id = i.id AND a.is_primary = 1
                         WHERE i.cite_key = ?
@@ -287,7 +287,7 @@ struct ReadLibraryItemTool: AgentTool, Sendable {
                     let pattern = "%\(title!)%"
                     row = try Row.fetchOne(db, sql: """
                         SELECT i.storage_key, a.storage_key AS att_key, a.file_name,
-                               a.attachment_type, a.page_count
+                               a.content_type, a.page_count
                         FROM items i
                         JOIN attachments a ON a.item_id = i.id AND a.is_primary = 1
                         WHERE i.title LIKE ? COLLATE NOCASE
@@ -300,7 +300,7 @@ struct ReadLibraryItemTool: AgentTool, Sendable {
                     itemStorageKey: r["storage_key"],
                     attStorageKey: r["att_key"],
                     fileName: r["file_name"],
-                    attachmentType: r["attachment_type"],
+                    contentType: r["content_type"],
                     pageCount: r["page_count"]
                 )
             }
@@ -322,12 +322,12 @@ struct ReadLibraryItemTool: AgentTool, Sendable {
         )
 
         // Delegate to ReadDocumentTool for the actual file reading
-        guard let itemType = ItemType(rawValue: info.attachmentType) else {
-            return .error("Unsupported attachment type: \(info.attachmentType)")
+        guard let contentType = ContentType(rawValue: info.contentType) else {
+            return .error("Unsupported attachment type: \(info.contentType)")
         }
         let reader = ReadDocumentTool(
             filePath: fileURL.path,
-            documentType: itemType,
+            documentType: contentType,
             pageCount: info.pageCount
         )
         return try await reader.execute(input: ["pages": input["pages"] ?? ""], context: context)
@@ -337,7 +337,7 @@ struct ReadLibraryItemTool: AgentTool, Sendable {
         let itemStorageKey: String
         let attStorageKey: String
         let fileName: String
-        let attachmentType: String
+        let contentType: String
         let pageCount: Int
     }
 }

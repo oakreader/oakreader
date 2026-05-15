@@ -103,7 +103,7 @@ struct SmartCollectionEditorSheet: View {
             Picker("", selection: $conditions[index].field) {
                 Text("Title").tag(FilterField.title)
                 Text("Author").tag(FilterField.author)
-                Text("Type").tag(FilterField.itemType)
+                Text("Type").tag(FilterField.contentType)
                 Text("Last Opened").tag(FilterField.lastOpenedAt)
                 Text("Date Added").tag(FilterField.createdAt)
                 Text("Property").tag(FilterField.property)
@@ -136,7 +136,7 @@ struct SmartCollectionEditorSheet: View {
 
     private func operatorsForField(_ field: FilterField) -> [FilterOperator] {
         switch field {
-        case .itemType:
+        case .contentType:
             return [.eq, .neq]
         case .lastOpenedAt:
             return [.withinDays]

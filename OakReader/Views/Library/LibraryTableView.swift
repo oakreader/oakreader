@@ -43,7 +43,7 @@ struct LibraryTableView: View {
                     Image(systemName: item.displayIcon)
                         .foregroundStyle(Color.primary.opacity(0.4))
                         .font(.system(size: 14))
-                        .accessibilityLabel(item.primaryAttachment?.attachmentType.label ?? "Document")
+                        .accessibilityLabel(item.primaryAttachment?.contentType.label ?? "Document")
 
                     Text(item.title)
                         .font(.system(size: 14))

@@ -64,7 +64,7 @@ enum DuplicateService {
     /// Returns array of groups, each containing 2+ items that are likely duplicates.
     static func findDuplicates(in items: [LibraryItem]) -> [[LibraryItem]] {
         // Exclude notes/markdown items
-        let candidates = items.filter { $0.itemType != .markdown }
+        let candidates = items.filter { $0.contentType != .markdown }
         guard candidates.count >= 2 else { return [] }
 
         var uf = DisjointSetForest<UUID>()

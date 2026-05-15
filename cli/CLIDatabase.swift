@@ -27,7 +27,7 @@ struct CLIAttachment: Codable, FetchableRecord {
     var id: String
     var itemId: String
     var fileName: String
-    var attachmentType: String
+    var contentType: String
     var sourceURL: String?
     var fileSize: Int64
     var pageCount: Int
@@ -38,7 +38,7 @@ struct CLIAttachment: Codable, FetchableRecord {
         case id
         case itemId = "item_id"
         case fileName = "file_name"
-        case attachmentType = "attachment_type"
+        case contentType = "content_type"
         case sourceURL = "source_url"
         case fileSize = "file_size"
         case pageCount = "page_count"
@@ -176,7 +176,7 @@ final class CLIDatabase {
 
             if let type {
                 let mapped = Self.mapItemType(type)
-                conditions.append("a_type.attachment_type = ?")
+                conditions.append("a_type.content_type = ?")
                 args.append(mapped)
             }
 
@@ -488,7 +488,7 @@ final class CLIDatabase {
         let attachmentId: String
         let attachmentStorageKey: String
         let fileName: String
-        let attachmentType: String
+        let contentType: String
         let sourceURL: String?
         let fileSize: Int64
         let pageCount: Int
@@ -504,9 +504,9 @@ final class CLIDatabase {
             """, arguments: [input.id, self.userId, input.storageKey, input.title, input.author, timestamp, timestamp])
 
             try db.execute(sql: """
-                INSERT INTO attachments (id, item_id, storage_key, file_name, attachment_type, source_url, file_size, page_count, is_primary, created_at, updated_at)
+                INSERT INTO attachments (id, item_id, storage_key, file_name, content_type, source_url, file_size, page_count, is_primary, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
-            """, arguments: [input.attachmentId, input.id, input.attachmentStorageKey, input.fileName, input.attachmentType, input.sourceURL, input.fileSize, input.pageCount, timestamp, timestamp])
+            """, arguments: [input.attachmentId, input.id, input.attachmentStorageKey, input.fileName, input.contentType, input.sourceURL, input.fileSize, input.pageCount, timestamp, timestamp])
         }
     }
 
@@ -538,7 +538,7 @@ final class CLIDatabase {
         let title: String
         let author: String
         let citeKey: String?
-        let attachmentType: String?
+        let contentType: String?
         let pageCount: Int?
         let year: Int?
         let doi: String?
@@ -619,7 +619,7 @@ final class CLIDatabase {
         let placeholders = ids.map { _ in "?" }.joined(separator: ",")
         let rows = try Row.fetchAll(db, sql: """
             SELECT i.id, i.title, i.author, i.cite_key,
-                   a.attachment_type, a.page_count,
+                   a.content_type, a.page_count,
                    c.year, c.doi, c.container_title, c.abstract,
                    (SELECT GROUP_CONCAT(po.name, ', ')
                     FROM item_property_values ipv
@@ -643,7 +643,7 @@ final class CLIDatabase {
                 title: row["title"],
                 author: row["author"],
                 citeKey: row["cite_key"],
-                attachmentType: row["attachment_type"],
+                contentType: row["content_type"],
                 pageCount: row["page_count"],
                 year: row["year"],
                 doi: row["doi"],
@@ -673,8 +673,8 @@ final class CLIDatabase {
     static func mapItemType(_ input: String) -> String {
         switch input.lowercased() {
         case "pdf": return "pdf"
-        case "web", "websnapshot": return "webSnapshot"
-        case "video", "embed": return "embed"
+        case "web", "websnapshot", "html": return "html"
+        case "video", "embed": return "video"
         case "note", "markdown": return "markdown"
         default: return input
         }

@@ -41,7 +41,7 @@ final class SemanticIndexService: @unchecked Sendable {
     // MARK: - Public Index API
 
     /// Index an item by type. Routes to the appropriate text extractor and chunker.
-    func indexItem(itemId: String, attachmentType: String, storageKey: String, attStorageKey: String, fileName: String) async {
+    func indexItem(itemId: String, contentType: String, storageKey: String, attStorageKey: String, fileName: String) async {
         let currentModel = await embeddingService.modelId
 
         // Skip if already indexed with the current model
@@ -67,14 +67,14 @@ final class SemanticIndexService: @unchecked Sendable {
             attachmentStorageKey: attStorageKey
         )
 
-        switch attachmentType {
+        switch contentType {
         case "pdf":
             chunks += extractPDFChunks(pdfURL: fileURL)
-        case "webSnapshot":
+        case "html":
             chunks += extractWebSnapshotChunks(attachmentDir: attDir, htmlURL: fileURL)
         case "markdown":
             chunks += extractMarkdownChunks(fileURL: fileURL)
-        case "embed":
+        case "video":
             chunks += extractEmbedTextChunks(attachmentDir: attDir)
         default:
             break
@@ -316,7 +316,7 @@ final class SemanticIndexService: @unchecked Sendable {
         let storageKey: String
         let attStorageKey: String
         let fileName: String
-        let attachmentType: String
+        let contentType: String
     }
 
     /// Find unindexed items (or items with outdated embedding model) and index each one.
@@ -337,10 +337,10 @@ final class SemanticIndexService: @unchecked Sendable {
         do {
             allItems = try await catalogDBQueue.read { db in
                 let rows = try Row.fetchAll(db, sql: """
-                    SELECT i.id, i.storage_key, a.storage_key AS att_key, a.file_name, a.attachment_type
+                    SELECT i.id, i.storage_key, a.storage_key AS att_key, a.file_name, a.content_type
                     FROM items i
                     JOIN attachments a ON a.item_id = i.id AND a.is_primary = 1
-                    WHERE a.attachment_type IN ('pdf', 'webSnapshot', 'markdown', 'embed')
+                    WHERE a.content_type IN ('pdf', 'html', 'markdown', 'video')
                     """)
                 return rows.map { row in
                     UnindexedItem(
@@ -348,7 +348,7 @@ final class SemanticIndexService: @unchecked Sendable {
                         storageKey: row["storage_key"] as String,
                         attStorageKey: row["att_key"] as String,
                         fileName: row["file_name"] as String,
-                        attachmentType: row["attachment_type"] as String
+                        contentType: row["content_type"] as String
                     )
                 }
             }
@@ -371,7 +371,7 @@ final class SemanticIndexService: @unchecked Sendable {
 
             await indexItem(
                 itemId: item.itemId,
-                attachmentType: item.attachmentType,
+                contentType: item.contentType,
                 storageKey: item.storageKey,
                 attStorageKey: item.attStorageKey,
                 fileName: item.fileName
@@ -392,10 +392,10 @@ final class SemanticIndexService: @unchecked Sendable {
             let placeholders = itemIds.map { _ in "?" }.joined(separator: ",")
             itemsToIndex = try await catalogDBQueue.read { db in
                 let rows = try Row.fetchAll(db, sql: """
-                    SELECT i.id, i.storage_key, a.storage_key AS att_key, a.file_name, a.attachment_type
+                    SELECT i.id, i.storage_key, a.storage_key AS att_key, a.file_name, a.content_type
                     FROM items i
                     JOIN attachments a ON a.item_id = i.id AND a.is_primary = 1
-                    WHERE a.attachment_type IN ('pdf', 'webSnapshot', 'markdown', 'embed')
+                    WHERE a.content_type IN ('pdf', 'html', 'markdown', 'video')
                       AND i.id IN (\(placeholders))
                     """, arguments: StatementArguments(itemIds))
                 return rows.map { row in
@@ -404,7 +404,7 @@ final class SemanticIndexService: @unchecked Sendable {
                         storageKey: row["storage_key"] as String,
                         attStorageKey: row["att_key"] as String,
                         fileName: row["file_name"] as String,
-                        attachmentType: row["attachment_type"] as String
+                        contentType: row["content_type"] as String
                     )
                 }
             }
@@ -436,14 +436,14 @@ final class SemanticIndexService: @unchecked Sendable {
                 attachmentStorageKey: item.attStorageKey
             )
 
-            switch item.attachmentType {
+            switch item.contentType {
             case "pdf":
                 chunks += extractPDFChunks(pdfURL: fileURL)
-            case "webSnapshot":
+            case "html":
                 chunks += extractWebSnapshotChunks(attachmentDir: attDir, htmlURL: fileURL)
             case "markdown":
                 chunks += extractMarkdownChunks(fileURL: fileURL)
-            case "embed":
+            case "video":
                 chunks += extractEmbedTextChunks(attachmentDir: attDir)
             default:
                 break

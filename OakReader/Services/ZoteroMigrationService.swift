@@ -474,8 +474,8 @@ final class ZoteroMigrationService {
             let allAttachments = (attachmentsByParent[zItem.itemID] ?? [])
                 .sorted { a, _ in a.contentType == "application/pdf" ? true : false }
             let primaryAtt = allAttachments.first
-            let attachmentType = oakItemType(for: primaryAtt?.contentType)
-            var attFileName = attachmentType == .pdf ? "document.pdf" : "index.html"
+            let contentType = oakItemType(for: primaryAtt?.contentType)
+            var attFileName = contentType == .pdf ? "document.pdf" : "index.html"
             var attFileSize: Int64 = 0
             var attPageCount = 0
             var fileCopied = false
@@ -498,7 +498,7 @@ final class ZoteroMigrationService {
                             attFileSize = size
                         }
 
-                        if attachmentType == .pdf {
+                        if contentType == .pdf {
                             if let pdfDoc = PDFDocument(url: destURL) {
                                 attPageCount = pdfDoc.pageCount
                             }
@@ -537,7 +537,8 @@ final class ZoteroMigrationService {
                 itemId: docId.uuidString,
                 storageKey: attStorageKey,
                 fileName: attFileName,
-                attachmentType: attachmentType.rawValue,
+                contentType: contentType.rawValue,
+                linkMode: (contentType == .html ? LinkMode.importedURL : LinkMode.importedFile).rawValue,
                 sourceURL: cslItem.URL,
                 fileSize: attFileSize,
                 pageCount: attPageCount,
@@ -561,7 +562,7 @@ final class ZoteroMigrationService {
             }
 
             // Enrich web snapshot metadata from HTML meta tags
-            if attachmentType == .webSnapshot && fileCopied {
+            if contentType == .html && fileCopied {
                 let destURL = CatalogDatabase.attachmentFileURL(
                     itemStorageKey: itemStorageKey,
                     attachmentStorageKey: attStorageKey,
@@ -574,9 +575,9 @@ final class ZoteroMigrationService {
             libraryItemMap[zItem.itemID] = libraryItem
             result.itemCount += 1
             if fileCopied {
-                switch attachmentType {
+                switch contentType {
                 case .pdf: result.pdfCount += 1
-                case .webSnapshot: result.webSnapshotCount += 1
+                case .html: result.webSnapshotCount += 1
                 default: break
                 }
             }
@@ -589,11 +590,11 @@ final class ZoteroMigrationService {
                     fileName: attFileName
                 )
                 let capturedItem = libraryItem
-                let capturedType = attachmentType
+                let capturedType = contentType
                 Task {
                     let coverData: Data?
                     switch capturedType {
-                    case .webSnapshot:
+                    case .html:
                         coverData = await coverService.generateWebSnapshotCover(for: destURL)
                     default:
                         coverData = await coverService.generateCover(for: destURL)
@@ -751,10 +752,10 @@ final class ZoteroMigrationService {
     }
 
     /// Determine the OakReader item type from a Zotero attachment content type.
-    private func oakItemType(for contentType: String?) -> ItemType {
+    private func oakItemType(for contentType: String?) -> ContentType {
         switch contentType {
         case "text/html", "application/xhtml+xml":
-            return .webSnapshot
+            return .html
         default:
             return .pdf
         }

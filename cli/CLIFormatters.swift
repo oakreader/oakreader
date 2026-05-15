@@ -18,7 +18,7 @@ enum CLIFormatters {
         for entry in items {
             let title = truncate(entry.item.title, to: 38)
             let author = truncate(entry.item.author.isEmpty ? "-" : entry.item.author, to: 18)
-            let type = entry.attachments.first?.attachmentType ?? "unknown"
+            let type = entry.attachments.first?.contentType ?? "unknown"
             let citeKey = entry.item.citeKey ?? "-"
             lines.append("\(pad(title, to: 40))  \(pad(author, to: 20))  \(pad(type, to: 12))  \(citeKey)")
         }
@@ -72,7 +72,7 @@ enum CLIFormatters {
                 let primary = att.isPrimary ? " (primary)" : ""
                 let size = formatFileSize(att.fileSize)
                 let pages = att.pageCount > 0 ? ", \(att.pageCount) pages" : ""
-                lines.append("  - \(att.fileName) [\(att.attachmentType)\(primary), \(size)\(pages)]")
+                lines.append("  - \(att.fileName) [\(att.contentType)\(primary), \(size)\(pages)]")
                 if let url = att.sourceURL, !url.isEmpty {
                     lines.append("    URL: \(url)")
                 }
@@ -168,7 +168,7 @@ enum CLIFormatters {
 
             var meta: [String] = []
             if let y = r.year { meta.append("Year: \(y)") }
-            if let at = r.attachmentType, let pc = r.pageCount {
+            if let at = r.contentType, let pc = r.pageCount {
                 meta.append("\(at), \(pc) pages")
             }
             if !meta.isEmpty { lines.append("   \(meta.joined(separator: " | "))") }

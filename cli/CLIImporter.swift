@@ -129,7 +129,7 @@ struct CLIImporter {
             attachmentId: attId,
             attachmentStorageKey: attStorageKey,
             fileName: sourceURL.lastPathComponent,
-            attachmentType: "pdf",
+            contentType: "pdf",
             sourceURL: nil,
             fileSize: fileSize,
             pageCount: pageCount
@@ -185,7 +185,7 @@ struct CLIImporter {
             attachmentId: attId,
             attachmentStorageKey: attStorageKey,
             fileName: sourceURL.lastPathComponent,
-            attachmentType: "webSnapshot",
+            contentType: "html",
             sourceURL: sourcePageURL,
             fileSize: fileSize,
             pageCount: 1
@@ -249,7 +249,7 @@ struct CLIImporter {
             attachmentId: attId,
             attachmentStorageKey: attStorageKey,
             fileName: sourceURL.lastPathComponent,
-            attachmentType: "markdown",
+            contentType: "markdown",
             sourceURL: nil,
             fileSize: fileSize,
             pageCount: 1

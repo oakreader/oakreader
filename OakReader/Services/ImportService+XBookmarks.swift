@@ -192,7 +192,8 @@ extension ImportService {
             itemId: docId.uuidString,
             storageKey: attStorageKey,
             fileName: "metadata.json",
-            attachmentType: ItemType.embed.rawValue,
+            contentType: ContentType.video.rawValue,
+            linkMode: LinkMode.linkedURL.rawValue,
             sourceURL: tweetURL.absoluteString,
             fileSize: 0,
             pageCount: 0,
@@ -219,7 +220,7 @@ extension ImportService {
             Task {
                 await service.indexItem(
                     itemId: docId.uuidString,
-                    attachmentType: ItemType.embed.rawValue,
+                    contentType: ContentType.video.rawValue,
                     storageKey: itemStorageKey,
                     attStorageKey: attStorageKey,
                     fileName: "metadata.json"
