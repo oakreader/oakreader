@@ -63,7 +63,7 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
         isOpaque = false
         backgroundColor = .clear
         level = .floating
-        hasShadow = false
+        hasShadow = true
         collectionBehavior = [.transient, .ignoresCycle]
 
         stackView.orientation = .vertical
@@ -83,9 +83,11 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
         documentView.addSubview(stackView)
         scrollView.documentView = documentView
 
-        let container = NSView()
+        let container = NSVisualEffectView()
+        container.material = .popover
+        container.state = .active
+        container.blendingMode = .behindWindow
         container.wantsLayer = true
-        container.layer?.backgroundColor = NSColor.textBackgroundColor.cgColor
         container.layer?.cornerRadius = 18
         container.layer?.borderWidth = 0.5
         container.layer?.borderColor = NSColor.labelColor.withAlphaComponent(0.10).cgColor

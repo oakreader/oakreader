@@ -312,24 +312,25 @@ final class ChatNSTextView: NSTextView {
             return
         }
 
-        // Detect trigger characters
+        // Detect trigger characters — both "/" and "@" open a unified panel
         if let chars = event.characters, chars.count == 1,
            !event.modifierFlags.contains(.command) {
             let ch = chars.first!
+            let combinedItems = slashItems + mentionItems
             if ch == "/" {
                 // Only trigger at input start (no preceding text except whitespace/attachments)
                 let loc = selectedRange().location
                 if loc == 0 || isAtEffectiveStart(loc) {
-                    if !slashItems.isEmpty && !hasSlashToken() {
+                    if !combinedItems.isEmpty && !hasSlashToken() {
                         super.keyDown(with: event)
-                        showCompletionPanel(trigger: "/", items: slashItems)
+                        showCompletionPanel(trigger: "/", items: combinedItems)
                         return
                     }
                 }
             } else if ch == "@" {
-                if !mentionItems.isEmpty {
+                if !combinedItems.isEmpty {
                     super.keyDown(with: event)
-                    showCompletionPanel(trigger: "@", items: mentionItems)
+                    showCompletionPanel(trigger: "@", items: combinedItems)
                     return
                 }
             }
@@ -433,12 +434,7 @@ final class ChatNSTextView: NSTextView {
         default:
             if let c = event.characters, !c.isEmpty {
                 if c == " " {
-                    if triggerChar == "/" {
-                        dismissCompletionPanel()
-                        super.keyDown(with: event)
-                        return true
-                    }
-                    // For @, allow spaces — library titles are multi-word
+                    // Allow spaces — library titles and notes are multi-word
                     super.keyDown(with: event)
                     updateCompletionFilter()
                     return true
