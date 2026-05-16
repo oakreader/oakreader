@@ -14,7 +14,7 @@ enum ContentType: String, Codable {
         case .pdf: return "doc.fill"
         case .html: return "globe"
         case .markdown: return "doc.text"
-        case .audio: return "waveform"
+        case .audio: return "headphones"
         case .video: return "play.rectangle"
         }
     }
