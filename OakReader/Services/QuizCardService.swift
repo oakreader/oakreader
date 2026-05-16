@@ -1,5 +1,6 @@
 import Foundation
 import GRDB
+import FSRS
 
 /// Stateless service for quiz card CRUD and review operations.
 struct QuizCardService {
@@ -68,7 +69,7 @@ struct QuizCardService {
             groupId: groupId,
             type: content.quizType.rawValue,
             contentJson: contentJson,
-            state: CardState.new.rawValue,
+            state: QuizCardState.new.rawValue,
             dueAt: now,
             stability: 0,
             difficulty: 0,
@@ -90,27 +91,40 @@ struct QuizCardService {
 
     // MARK: - Review
 
-    /// Record a review and reschedule using FSRS.
+    /// Record a review and reschedule using the swift-fsrs library.
+    ///
+    /// Flow (same as Anki):
+    /// 1. Convert our QuizCard → FSRS Card
+    /// 2. Call fsrs.next() to get the rescheduled card + review log
+    /// 3. Persist the FSRS output fields back to the database
+    /// 4. Store the review log for history/analytics
     @discardableResult
     func recordReview(card: QuizCard, rating: ReviewRating) throws -> QuizCard {
         let now = Date()
-        let result = QuizScheduler.schedule(card: card, rating: rating, now: now)
+
+        guard let result = QuizScheduler.schedule(card: card, rating: rating, now: now) else {
+            throw NSError(domain: "QuizCardService", code: 500, userInfo: [NSLocalizedDescriptionKey: "FSRS scheduling failed"])
+        }
 
         let nowStr = now.iso8601String
         try database.dbQueue.write { db in
-            // Update card
+            // Update card with FSRS output
             try db.execute(sql: """
                 UPDATE quiz_cards SET
                     state = ?, due_at = ?, stability = ?, difficulty = ?,
-                    elapsed_days = ?, scheduled_days = ?, reps = reps + 1,
-                    lapses = CASE WHEN ? = 'relearning' AND state = 'review' THEN lapses + 1 ELSE lapses END,
+                    elapsed_days = ?, scheduled_days = ?, reps = ?, lapses = ?,
                     last_review_at = ?, updated_at = ?
                 WHERE id = ?
             """, arguments: [
-                result.state.rawValue, result.dueAt.iso8601String,
-                result.stability, result.difficulty,
-                result.elapsedDays, result.scheduledDays,
-                result.state.rawValue, nowStr, nowStr,
+                result.state.rawValue,
+                result.dueAt.iso8601String,
+                result.stability,
+                result.difficulty,
+                result.elapsedDays,
+                result.scheduledDays,
+                result.reps,
+                result.lapses,
+                nowStr, nowStr,
                 card.id.uuidString
             ])
 

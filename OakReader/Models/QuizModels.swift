@@ -37,7 +37,7 @@ enum QuizType: String, Codable, CaseIterable, Identifiable {
 
 // MARK: - Card State (FSRS)
 
-enum CardState: String, Codable {
+enum QuizCardState: String, Codable {
     case new
     case learning
     case review
@@ -183,7 +183,7 @@ struct QuizCard: Identifiable, Hashable {
     var groupId: String?
     let type: QuizType
     let content: QuizContent
-    var state: CardState
+    var state: QuizCardState
     var dueAt: Date
     var stability: Double
     var difficulty: Double
@@ -233,7 +233,7 @@ struct QuizCard: Identifiable, Hashable {
         self.groupId = record.groupId
         self.type = QuizType(rawValue: record.type) ?? .flashcard
         self.content = (try? JSONDecoder().decode(QuizContent.self, from: Data(record.contentJson.utf8))) ?? .flashcard(.init(front: "?", back: "?"))
-        self.state = CardState(rawValue: record.state) ?? .new
+        self.state = QuizCardState(rawValue: record.state) ?? .new
         self.dueAt = Date(iso8601String: record.dueAt) ?? Date()
         self.stability = record.stability
         self.difficulty = record.difficulty

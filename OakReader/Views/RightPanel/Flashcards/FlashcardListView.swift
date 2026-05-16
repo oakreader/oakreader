@@ -66,7 +66,7 @@ struct FlashcardListView: View {
     }
 
     @ViewBuilder
-    private func stateLabel(_ state: CardState) -> some View {
+    private func stateLabel(_ state: QuizCardState) -> some View {
         let (text, color): (String, Color) = switch state {
         case .new: ("New", .blue)
         case .learning: ("Learning", .orange)
