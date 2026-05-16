@@ -6,39 +6,26 @@ import OakAgent
 enum SkillCommands {
 
     /// Installed skills directory: `~/OakReader/agent/skills/`.
-    private static let installedDir: URL = {
+    static let installedDir: URL = {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("OakReader/agent/skills", isDirectory: true)
     }()
 
-    // MARK: - oak skills
+    // MARK: - Public API (called from ArgumentParser commands)
 
-    static func run(args: [String]) {
-        let subcommand = args.first ?? "list"
-
-        switch subcommand {
-        case "list":
-            listSkills()
-        case "show":
-            let name = args.dropFirst().first
-            showSkill(name: name)
-        case "check":
-            checkSkills()
-        case "install":
-            let name = args.dropFirst().first
-            installSkill(name: name)
-        case "uninstall":
-            let name = args.dropFirst().first
-            uninstallSkill(name: name)
-        default:
-            printError("Unknown skills subcommand '\(subcommand)'. Run 'oak --help' for usage.")
-            exit(1)
-        }
+    /// Load the skill catalog (bundled + installed).
+    static func loadCatalog() -> [AgentSkill] {
+        loadCatalogSkills()
     }
 
-    // MARK: - List
+    /// Get names of installed skills.
+    static func installedNames() -> Set<String> {
+        scanInstalledNames()
+    }
 
-    private static func listSkills() {
+    // MARK: - Human-readable Output
+
+    static func listSkillsHuman() {
         let catalog = loadCatalogSkills()
         let installed = scanInstalledNames()
 
@@ -71,18 +58,11 @@ enum SkillCommands {
         }
     }
 
-    // MARK: - Show
-
-    private static func showSkill(name: String?) {
-        guard let name else {
-            printError("Usage: oak skills show <name>")
-            exit(1)
-        }
-
+    static func showSkillHuman(name: String) {
         let catalog = loadCatalogSkills()
         guard let skill = catalog.first(where: { $0.name == name }) else {
-            printError("Skill '\(name)' not found. Run 'oak skills' to see available skills.")
-            exit(1)
+            fputs("Error: Skill '\(name)' not found. Run 'oak skills' to see available skills.\n", stderr)
+            Darwin.exit(1)
         }
 
         let installed = scanInstalledNames().contains(name)
@@ -120,44 +100,18 @@ enum SkillCommands {
         }
     }
 
-    // MARK: - Check
+    // MARK: - Actions
 
-    private static func checkSkills() {
-        let installed = loadInstalledSkills()
-        var allOk = true
-
-        if installed.isEmpty {
-            print("No skills installed. Run 'oak skills install <name>' to install one.")
-            return
-        }
-
-        for skill in installed {
-            guard let bins = skill.requirements?.bins else { continue }
-            for bin in bins {
-                if ToolResolver.resolve(name: bin.name, searchPaths: bin.searchPaths) == nil {
-                    print("WARNING: \(skill.name) \u{2014} \(bin.name) not found")
-                    allOk = false
-                }
-            }
-        }
-
-        if allOk {
-            print("All installed skill dependencies are satisfied.")
-        }
-    }
-
-    // MARK: - Install
-
-    private static func installSkill(name: String?) {
-        guard let name else {
-            printError("Usage: oak skills install <name>")
-            exit(1)
-        }
-
+    static func installSkillAction(name: String, json: Bool, quiet: Bool) {
         let catalog = loadCatalogSkills()
         guard let skill = catalog.first(where: { $0.name == name }) else {
-            printError("Skill '\(name)' not found. Run 'oak skills' to see available skills.")
-            exit(1)
+            if json {
+                let output = CLIOutput(json: true, quiet: quiet)
+                output.error(operation: "skills.install", message: "Skill '\(name)' not found.", code: "not_found")
+            } else {
+                fputs("Error: Skill '\(name)' not found. Run 'oak skills' to see available skills.\n", stderr)
+            }
+            Darwin.exit(1)
         }
 
         let fm = FileManager.default
@@ -169,37 +123,105 @@ enum SkillCommands {
                 try fm.removeItem(at: destDir)
             }
             try fm.copyItem(at: URL(fileURLWithPath: skill.baseDir), to: destDir)
-            print("Installed '\(name)' to \(destDir.path)")
+
+            if json {
+                let output = CLIOutput(json: true, quiet: quiet)
+                output.success(operation: "skills.install", result: CLIOperationResult(
+                    id: nil, message: "Installed '\(name)' to \(destDir.path)"
+                ))
+            } else {
+                print("Installed '\(name)' to \(destDir.path)")
+            }
         } catch {
-            printError("Failed to install '\(name)': \(error.localizedDescription)")
-            exit(1)
+            if json {
+                let output = CLIOutput(json: true, quiet: quiet)
+                output.error(operation: "skills.install", message: error.localizedDescription, code: "install_failed")
+            } else {
+                fputs("Error: Failed to install '\(name)': \(error.localizedDescription)\n", stderr)
+            }
+            Darwin.exit(1)
         }
     }
 
-    // MARK: - Uninstall
-
-    private static func uninstallSkill(name: String?) {
-        guard let name else {
-            printError("Usage: oak skills uninstall <name>")
-            exit(1)
-        }
-
+    static func uninstallSkillAction(name: String, json: Bool, quiet: Bool) {
         let destDir = installedDir.appendingPathComponent(name)
         guard FileManager.default.fileExists(atPath: destDir.path) else {
-            printError("Skill '\(name)' is not installed.")
-            exit(1)
+            if json {
+                let output = CLIOutput(json: true, quiet: quiet)
+                output.error(operation: "skills.uninstall", message: "Skill '\(name)' is not installed.", code: "not_found")
+            } else {
+                fputs("Error: Skill '\(name)' is not installed.\n", stderr)
+            }
+            Darwin.exit(1)
         }
 
         do {
             try FileManager.default.removeItem(at: destDir)
-            print("Uninstalled '\(name)'.")
+            if json {
+                let output = CLIOutput(json: true, quiet: quiet)
+                output.success(operation: "skills.uninstall", result: CLIOperationResult(
+                    id: nil, message: "Uninstalled '\(name)'."
+                ))
+            } else {
+                print("Uninstalled '\(name)'.")
+            }
         } catch {
-            printError("Failed to uninstall '\(name)': \(error.localizedDescription)")
-            exit(1)
+            if json {
+                let output = CLIOutput(json: true, quiet: quiet)
+                output.error(operation: "skills.uninstall", message: error.localizedDescription, code: "uninstall_failed")
+            } else {
+                fputs("Error: Failed to uninstall '\(name)': \(error.localizedDescription)\n", stderr)
+            }
+            Darwin.exit(1)
         }
     }
 
-    // MARK: - Helpers
+    static func checkSkillsAction(json: Bool, quiet: Bool) {
+        let installed = loadInstalledSkills()
+
+        if installed.isEmpty {
+            if json {
+                let output = CLIOutput(json: true, quiet: quiet)
+                output.success(operation: "skills.check", result: CLIOperationResult(
+                    id: nil, message: "No skills installed."
+                ))
+            } else {
+                print("No skills installed. Run 'oak skills install <name>' to install one.")
+            }
+            return
+        }
+
+        var issues: [String] = []
+        for skill in installed {
+            guard let bins = skill.requirements?.bins else { continue }
+            for bin in bins {
+                if ToolResolver.resolve(name: bin.name, searchPaths: bin.searchPaths) == nil {
+                    issues.append("\(skill.name): \(bin.name) not found")
+                }
+            }
+        }
+
+        if json {
+            let output = CLIOutput(json: true, quiet: quiet)
+            if issues.isEmpty {
+                output.success(operation: "skills.check", result: CLIOperationResult(
+                    id: nil, message: "All installed skill dependencies are satisfied."
+                ))
+            } else {
+                output.error(operation: "skills.check", message: issues.joined(separator: "; "), code: "missing_deps")
+            }
+        } else {
+            if issues.isEmpty {
+                print("All installed skill dependencies are satisfied.")
+            } else {
+                for issue in issues {
+                    print("WARNING: \(issue)")
+                }
+            }
+        }
+    }
+
+    // MARK: - Internal Helpers
 
     /// Load the skill catalog (bundled skills from the repo).
     private static func loadCatalogSkills() -> [AgentSkill] {
