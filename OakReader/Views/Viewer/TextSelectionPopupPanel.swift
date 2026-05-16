@@ -208,6 +208,16 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
         self.speakButton = speakBtn
         mainStack.addArrangedSubview(speakBtn)
 
+        if Preferences.shared.isExtensionEnabled(.flashcards) {
+            let quizBtn = PopupIconButton(
+                systemImage: "sparkles",
+                accessibilityLabel: "Generate Quiz"
+            ) { [weak self] in
+                self?.generateQuiz()
+            }
+            mainStack.addArrangedSubview(quizBtn)
+        }
+
         // Separator 2
         mainStack.addArrangedSubview(makeVerticalSeparator())
 
@@ -361,6 +371,55 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
                     self.observeSpeakingState()
                 } else {
                     self.speakButton?.updateImage(systemImage: "speaker.wave.2")
+                }
+            }
+        }
+    }
+
+    private func generateQuiz() {
+        guard let text = selection.string, !text.isEmpty else { return }
+        guard text.count >= 10 else { return } // Minimum length check
+
+        // Create purple quiz-source highlight
+        let annotationId = viewModel.annotation.addQuizHighlight(for: selection)
+
+        // Get page context
+        let pageContext: String
+        if let pdfDoc = viewModel.pdfDocument,
+           let page = pdfDoc.page(at: viewModel.state.currentPageIndex) {
+            pageContext = TextExtractionService().extractText(from: page)
+        } else {
+            pageContext = text
+        }
+
+        let documentTitle = viewModel.libraryItem?.title ?? viewModel.fileName
+        let itemId = viewModel.itemId ?? ""
+
+        // Dismiss toolbar immediately — user continues reading
+        pdfView?.clearSelection()
+        dismissWithAction()
+
+        // Kick off background generation
+        guard let database = viewModel.database, !itemId.isEmpty, let annotationId else { return }
+        let service = QuizGenerationService(database: database)
+
+        Task {
+            do {
+                let cards = try await service.generateFromHighlight(
+                    sourceText: text,
+                    pageContext: String(pageContext.prefix(4_000)),
+                    documentTitle: documentTitle,
+                    itemId: itemId,
+                    annotationId: annotationId
+                )
+                await MainActor.run {
+                    viewModel.appState?.importNotification = "Generated \(cards.count) quiz card\(cards.count == 1 ? "" : "s")"
+                    viewModel.flashcards.loadCards()
+                }
+            } catch {
+                Log.error(Log.store, "Quiz generation failed: \(error)")
+                await MainActor.run {
+                    viewModel.appState?.importNotification = "Quiz generation failed"
                 }
             }
         }

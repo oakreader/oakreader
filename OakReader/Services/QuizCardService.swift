@@ -8,25 +8,27 @@ struct QuizCardService {
 
     // MARK: - Fetch
 
-    /// Fetch all cards for a document, ordered by due date.
+    /// Fetch all non-pending cards for a document, ordered by due date.
     func fetchCards(forItemId itemId: String) throws -> [QuizCard] {
         try database.dbQueue.read { db in
             let records = try QuizCardRecord
                 .filter(QuizCardRecord.CodingKeys.itemId == itemId)
                 .filter(QuizCardRecord.CodingKeys.isSuspended == false)
+                .filter(QuizCardRecord.CodingKeys.isPending == false)
                 .order(QuizCardRecord.CodingKeys.dueAt.asc)
                 .fetchAll(db)
             return records.map { QuizCard(record: $0) }
         }
     }
 
-    /// Fetch cards that are currently due for review.
+    /// Fetch cards that are currently due for review (excludes pending).
     func fetchDueCards(forItemId itemId: String, limit: Int = 50) throws -> [QuizCard] {
         let now = Date().iso8601String
         return try database.dbQueue.read { db in
             let records = try QuizCardRecord
                 .filter(QuizCardRecord.CodingKeys.itemId == itemId)
                 .filter(QuizCardRecord.CodingKeys.isSuspended == false)
+                .filter(QuizCardRecord.CodingKeys.isPending == false)
                 .filter(QuizCardRecord.CodingKeys.dueAt <= now)
                 .order(QuizCardRecord.CodingKeys.dueAt.asc)
                 .limit(limit)
@@ -35,15 +37,60 @@ struct QuizCardService {
         }
     }
 
-    /// Count cards due for review.
+    /// Count cards due for review (excludes pending).
     func dueCount(forItemId itemId: String) throws -> Int {
         let now = Date().iso8601String
         return try database.dbQueue.read { db in
             try QuizCardRecord
                 .filter(QuizCardRecord.CodingKeys.itemId == itemId)
                 .filter(QuizCardRecord.CodingKeys.isSuspended == false)
+                .filter(QuizCardRecord.CodingKeys.isPending == false)
                 .filter(QuizCardRecord.CodingKeys.dueAt <= now)
                 .fetchCount(db)
+        }
+    }
+
+    /// Fetch pending cards for a document (awaiting user review).
+    func fetchPendingCards(forItemId itemId: String) throws -> [QuizCard] {
+        try database.dbQueue.read { db in
+            let records = try QuizCardRecord
+                .filter(QuizCardRecord.CodingKeys.itemId == itemId)
+                .filter(QuizCardRecord.CodingKeys.isPending == true)
+                .order(QuizCardRecord.CodingKeys.createdAt.desc)
+                .fetchAll(db)
+            return records.map { QuizCard(record: $0) }
+        }
+    }
+
+    /// Approve a pending card — sets is_pending=0 and due_at=now so it enters FSRS scheduling.
+    func approveCard(id: UUID) throws {
+        let now = Date().iso8601String
+        try database.dbQueue.write { db in
+            try db.execute(
+                sql: "UPDATE quiz_cards SET is_pending = 0, due_at = ?, updated_at = ? WHERE id = ?",
+                arguments: [now, now, id.uuidString]
+            )
+        }
+    }
+
+    /// Approve all pending cards for a given annotation.
+    func approveBatch(annotationId: String) throws {
+        let now = Date().iso8601String
+        try database.dbQueue.write { db in
+            try db.execute(
+                sql: "UPDATE quiz_cards SET is_pending = 0, due_at = ?, updated_at = ? WHERE annotation_id = ? AND is_pending = 1",
+                arguments: [now, now, annotationId]
+            )
+        }
+    }
+
+    /// Delete all pending cards for a given annotation.
+    func deletePendingCards(annotationId: String) throws {
+        try database.dbQueue.write { db in
+            try db.execute(
+                sql: "DELETE FROM quiz_cards WHERE annotation_id = ? AND is_pending = 1",
+                arguments: [annotationId]
+            )
         }
     }
 
@@ -55,7 +102,11 @@ struct QuizCardService {
         itemId: String,
         conversationId: String? = nil,
         groupId: String? = nil,
-        content: QuizContent
+        content: QuizContent,
+        annotationId: String? = nil,
+        sourceText: String? = nil,
+        pageContext: String? = nil,
+        isPending: Bool = false
     ) throws -> QuizCard {
         let cardId = UUID()
         let now = Date().iso8601String
@@ -79,6 +130,10 @@ struct QuizCardService {
             lapses: 0,
             lastReviewAt: nil,
             isSuspended: false,
+            annotationId: annotationId,
+            sourceText: sourceText,
+            pageContext: pageContext,
+            isPending: isPending,
             createdAt: now,
             updatedAt: now
         )

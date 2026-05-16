@@ -322,6 +322,10 @@ struct QuizCardRecord: Codable, FetchableRecord, MutablePersistableRecord, Hasha
     var lapses: Int
     var lastReviewAt: String?
     var isSuspended: Bool
+    var annotationId: String?
+    var sourceText: String?
+    var pageContext: String?
+    var isPending: Bool
     var createdAt: String
     var updatedAt: String
 
@@ -336,6 +340,10 @@ struct QuizCardRecord: Codable, FetchableRecord, MutablePersistableRecord, Hasha
         case scheduledDays = "scheduled_days"
         case lastReviewAt = "last_review_at"
         case isSuspended = "is_suspended"
+        case annotationId = "annotation_id"
+        case sourceText = "source_text"
+        case pageContext = "page_context"
+        case isPending = "is_pending"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
