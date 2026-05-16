@@ -75,6 +75,9 @@ struct SettingsView: View {
             }
         }
 
+        /// Tabs exposed in the command palette for deep-linking.
+        static let paletteTabs: [Tab] = [.general, .library, .ai, .aiSettings, .audio, .extensions, .youtube]
+
         static func tab(for ext: AppExtension) -> Tab {
             switch ext {
             case .notes: return .extensionNotes
@@ -143,6 +146,12 @@ struct SettingsView: View {
                     selectedTab = .extensions
                 }
                 visibleTabs = updated
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .settingsNavigateToTab)) { notification in
+            if let tabId = notification.userInfo?["tab"] as? String,
+               let tab = Tab(rawValue: tabId) {
+                selectedTab = tab
             }
         }
     }

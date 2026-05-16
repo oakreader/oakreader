@@ -297,6 +297,18 @@ enum MainMenuBuilder {
     private static func buildViewMenu(target: AppDelegate) -> NSMenuItem {
         let viewMenu = NSMenu(title: "View")
 
+        let paletteItem = NSMenuItem(
+            title: "Command Palette...",
+            action: #selector(AppDelegate.showCommandPalette(_:)),
+            keyEquivalent: "p"
+        )
+        paletteItem.keyEquivalentModifierMask = [.command, .shift]
+        paletteItem.target = target
+        paletteItem.image = icon("command")
+        viewMenu.addItem(paletteItem)
+
+        viewMenu.addItem(.separator())
+
         let libraryItem = NSMenuItem(
             title: "Show Library",
             action: #selector(AppDelegate.showLibrary(_:)),

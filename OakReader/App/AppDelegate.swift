@@ -16,6 +16,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var snapshotServer: SnapshotServer?
     private var syncScheduler: SyncScheduler?
     private var appearanceObserver: NSObjectProtocol?
+    private(set) lazy var commandPalette = CommandPaletteController(appDelegate: self)
     func applicationWillFinishLaunching(_ notification: Notification) {
         documentController.appState = appState
         NSApp.mainMenu = MainMenuBuilder.build(target: self)
@@ -267,6 +268,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let buttonY = centerFromBottom - buttonHeight / 2
             button.setFrameOrigin(NSPoint(x: button.frame.origin.x, y: buttonY))
         }
+    }
+
+    // MARK: - Command Palette
+
+    @objc func showCommandPalette(_ sender: Any?) {
+        commandPalette.show()
     }
 
     // MARK: - Settings Window
