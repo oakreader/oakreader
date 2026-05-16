@@ -79,7 +79,7 @@ struct AIChatView: View {
 
             Spacer()
 
-            OakToolButton(systemImage: "bubble.left", tooltip: "New Chat") {
+            OakToolButton(systemImage: "plus.bubble", tooltip: "New Chat") {
                 chatVM.newSession()
             }
 
@@ -162,7 +162,7 @@ struct AIChatView: View {
     private var messageList: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: 8) {
+                LazyVStack(spacing: 12) {
                     ForEach(chatVM.turns) { turn in
                         ChatBubbleView(
                             turn: turn,
