@@ -16,6 +16,7 @@ enum DocumentAction: String {
     case previousPage, nextPage
     case firstPage, lastPage
     case toggleZenMode
+    case togglePresentationMode
 }
 
 extension Notification.Name {

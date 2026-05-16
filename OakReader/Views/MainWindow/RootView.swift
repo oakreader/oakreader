@@ -10,10 +10,16 @@ struct RootView: View {
     @AppStorage("globalFontFamily") private var globalFontFamily: String = "system"
     @AppStorage("globalFontSize") private var globalFontSize: Double = 14.0
 
+    private var isPresenting: Bool {
+        appState.activeTab?.viewModel.state.isPresentationMode == true
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Tab bar — sits in the title bar area (merged with traffic lights)
-            TabBarView(appState: appState)
+            if !isPresenting {
+                TabBarView(appState: appState)
+            }
 
             // Content: all tabs coexist in a ZStack; only the active one is visible.
             ZStack {
@@ -34,6 +40,12 @@ struct RootView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .ignoresSafeArea(.container, edges: .top)
+        .overlay {
+            if isPresenting, let vm = appState.activeTab?.viewModel {
+                PresentationOverlayView(viewModel: vm)
+                    .ignoresSafeArea()
+            }
+        }
         .onChange(of: appState.activeTabID) { _, _ in
             // Reset cursor when switching tabs to prevent leaks from PDF/Web viewer cursor rects
             NSCursor.arrow.set()

@@ -67,6 +67,7 @@
 		31D75CEE8AEEFE3C3681CB21 /* SkillCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE1B1725466F2575C959C69A /* SkillCommands.swift */; };
 		32E35A3A1A708D42D0A83FC6 /* TimelineZoomGestureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 483CDA5E1E5701530D93478F /* TimelineZoomGestureView.swift */; };
 		3361EE0F6F4FD80D6EFA1D5C /* SnapshotOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6176ECEF16286177BB48421B /* SnapshotOverlayView.swift */; };
+		C7A56CF69D688B9A2F59CEDE /* PresentationOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91DD2A016A29AF6ABDC27244 /* PresentationOverlayView.swift */; };
 		3424178F2DF8ADAC0260162F /* EditViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6C6798F1279D0348557EF79 /* EditViewModel.swift */; };
 		345D5C3A621AFF3551742F97 /* SignatureCreationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8980B971FA09CD36F6E0AB38 /* SignatureCreationSheet.swift */; };
 		3471F39243CDDFFC6E1476C2 /* CSLTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10A6B5888A5CF5E18A2C1559 /* CSLTypes.swift */; };
@@ -458,6 +459,7 @@
 		60B1BE6A503FBBAE5E5F6D33 /* ZoteroFieldMapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoteroFieldMapping.swift; sourceTree = "<group>"; };
 		6106DCBA3718298030ECD0F2 /* HeaderFooterService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeaderFooterService.swift; sourceTree = "<group>"; };
 		6176ECEF16286177BB48421B /* SnapshotOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapshotOverlayView.swift; sourceTree = "<group>"; };
+		91DD2A016A29AF6ABDC27244 /* PresentationOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresentationOverlayView.swift; sourceTree = "<group>"; };
 		62D8CC8D7C726C11792024B3 /* OakReader.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OakReader.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		6540F0E88807D8C1B673F4C3 /* ChatBubbleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatBubbleView.swift; sourceTree = "<group>"; };
 		67058640A7746AEB945545CA /* ChatViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatViewModel.swift; sourceTree = "<group>"; };
@@ -677,6 +679,7 @@
 				1C68328C9891BD05075C4993 /* MediaViewerView.swift */,
 				00C73F9EEB44740568DAFD2A /* PageNavigationView.swift */,
 				6D46DC9842C708EE4F886379 /* PDFViewCoordinator.swift */,
+				91DD2A016A29AF6ABDC27244 /* PresentationOverlayView.swift */,
 				B26DDB8ABAE032A0D1F7C5F5 /* PDFViewerRepresentable.swift */,
 				5E7C2340A84717F734A9AFFD /* RecordingSummaryView.swift */,
 				11BE1416DF735A904FF85758 /* SnapshotHitTestNSView.swift */,
@@ -1651,6 +1654,7 @@
 				E0F399D431F803CCC602D66E /* SmartCollectionEditorSheet.swift in Sources */,
 				AD65FC5A720D4B145AA9459F /* SnapshotHitTestNSView.swift in Sources */,
 				3361EE0F6F4FD80D6EFA1D5C /* SnapshotOverlayView.swift in Sources */,
+				C7A56CF69D688B9A2F59CEDE /* PresentationOverlayView.swift in Sources */,
 				396E5B689CA231C6CEDE9378 /* SnapshotServer.swift in Sources */,
 				6668BD5BB724783878035CAC /* SplitDocumentSheet.swift in Sources */,
 				3B8E42E265E6396488FD74CF /* SplitService.swift in Sources */,
