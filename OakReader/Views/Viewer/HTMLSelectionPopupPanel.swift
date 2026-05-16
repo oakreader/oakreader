@@ -5,8 +5,8 @@ import WebKit
 
 /// Horizontal toolbar popup for text selected in HTML document viewers.
 /// Matches the PDF text selection popup style with highlight, chat, note, translate, copy.
-class WebSelectionPopupPanel: NSPanel, AppResignDismissable {
-    private(set) static var current: WebSelectionPopupPanel?
+class HTMLSelectionPopupPanel: NSPanel, AppResignDismissable {
+    private(set) static var current: HTMLSelectionPopupPanel?
 
     private let viewModel: DocumentViewModel
     private let selectedText: String
@@ -38,7 +38,7 @@ class WebSelectionPopupPanel: NSPanel, AppResignDismissable {
     ) {
         current?.dismiss()
 
-        let panel = WebSelectionPopupPanel(
+        let panel = HTMLSelectionPopupPanel(
             atTop: topScreenPoint,
             atBottom: bottomScreenPoint,
             text: text,
@@ -206,6 +206,16 @@ class WebSelectionPopupPanel: NSPanel, AppResignDismissable {
             mainStack.addArrangedSubview(translateBtn)
         }
 
+        if Preferences.shared.isExtensionEnabled(.flashcards) {
+            let quizBtn = PopupIconButton(
+                systemImage: "sparkles",
+                accessibilityLabel: "Generate Quiz"
+            ) { [weak self] in
+                self?.generateQuiz()
+            }
+            mainStack.addArrangedSubview(quizBtn)
+        }
+
         // Separator 2
         mainStack.addArrangedSubview(makeVerticalSeparator())
 
@@ -348,6 +358,51 @@ class WebSelectionPopupPanel: NSPanel, AppResignDismissable {
         dismiss()
     }
 
+    private func generateQuiz() {
+        guard !selectedText.isEmpty, selectedText.count >= 10 else { return }
+
+        // Apply purple highlight in the web view
+        if let webView {
+            let purpleCss = "rgba(163,138,230,0.35)"
+            webView.evaluateJavaScript(
+                "OakHighlighter.highlightSelection('\(purpleCss)', 'highlight');",
+                completionHandler: nil
+            )
+        }
+
+        let documentTitle = viewModel.libraryItem?.title ?? viewModel.fileName
+        let itemId = viewModel.itemId ?? ""
+
+        dismiss()
+
+        // Kick off background generation (no annotation ID for web — uses a synthetic one)
+        guard let database = viewModel.database, !itemId.isEmpty else { return }
+        let service = QuizGenerationService(database: database)
+        let annotationId = UUID().uuidString
+        let text = selectedText
+
+        Task {
+            do {
+                let cards = try await service.generateFromHighlight(
+                    sourceText: text,
+                    pageContext: text, // For HTML, source text is the primary context
+                    documentTitle: documentTitle,
+                    itemId: itemId,
+                    annotationId: annotationId
+                )
+                await MainActor.run {
+                    viewModel.appState?.importNotification = "Generated \(cards.count) quiz card\(cards.count == 1 ? "" : "s")"
+                    viewModel.flashcards.loadCards()
+                }
+            } catch {
+                Log.error(Log.store, "Quiz generation failed: \(error)")
+                await MainActor.run {
+                    viewModel.appState?.importNotification = "Quiz generation failed"
+                }
+            }
+        }
+    }
+
     private func copyText() {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(selectedText, forType: .string)
@@ -366,8 +421,8 @@ class WebSelectionPopupPanel: NSPanel, AppResignDismissable {
             self.animator().alphaValue = 0
         }, completionHandler: { [weak self] in
             self?.orderOut(nil)
-            if WebSelectionPopupPanel.current === self {
-                WebSelectionPopupPanel.current = nil
+            if HTMLSelectionPopupPanel.current === self {
+                HTMLSelectionPopupPanel.current = nil
             }
             callback()
         })
