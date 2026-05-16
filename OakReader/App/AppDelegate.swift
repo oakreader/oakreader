@@ -1,6 +1,5 @@
 import Cocoa
 import CoreText
-import CrashReporter
 import PDFKit
 import Sparkle
 import UniformTypeIdentifiers
@@ -19,7 +18,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var appearanceObserver: NSObjectProtocol?
     private(set) lazy var commandPalette = CommandPaletteController(appDelegate: self)
     func applicationWillFinishLaunching(_ notification: Notification) {
-        setupCrashReporting()
         documentController.appState = appState
         NSApp.mainMenu = MainMenuBuilder.build(target: self)
     }
@@ -662,64 +660,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         appState.dispatchAction(action)
         // Also post notification for ContentView sheet handling
         NotificationCenter.default.post(name: .documentAction, object: action)
-    }
-
-    // MARK: - Crash Reporting
-
-    private func setupCrashReporting() {
-        let config = PLCrashReporterConfig(
-            signalHandlerType: .mach,
-            symbolicationStrategy: .all
-        )
-        guard let reporter = PLCrashReporter(configuration: config) else {
-            Log.error(Log.crash, "Failed to create crash reporter")
-            return
-        }
-
-        if reporter.hasPendingCrashReport() {
-            processPendingCrashReport(reporter)
-        }
-
-        do {
-            try reporter.enable()
-        } catch {
-            Log.error(Log.crash, "Failed to enable crash reporter: \(error)")
-        }
-    }
-
-    private func processPendingCrashReport(_ reporter: PLCrashReporter) {
-        defer { reporter.purgePendingCrashReport() }
-
-        guard let data = try? reporter.loadPendingCrashReportDataAndReturnError(),
-              let report = try? PLCrashReport(data: data) else {
-            return
-        }
-
-        var lines: [String] = []
-        lines.append("=== CRASH REPORT (previous session) ===")
-        lines.append("Signal: \(report.signalInfo.name) code \(report.signalInfo.code)")
-
-        if let exception = report.exceptionInfo {
-            lines.append("Exception: \(exception.exceptionName ?? "unknown")")
-            if let reason = exception.exceptionReason {
-                lines.append("Reason: \(reason)")
-            }
-        }
-
-        if let thread = report.crashedThread {
-            lines.append("Crashed thread: #\(thread.threadNumber)")
-            if let frames = thread.stackFrames as? [PLCrashReportStackFrameInfo] {
-                lines.append("Stack trace:")
-                for (i, frame) in frames.prefix(20).enumerated() {
-                    let symbol = frame.symbolInfo?.symbolName
-                        ?? "0x\(String(frame.instructionPointer, radix: 16))"
-                    lines.append("  \(i): \(symbol)")
-                }
-            }
-        }
-
-        lines.append("=== END CRASH REPORT ===")
-        Log.fault(Log.crash, lines.joined(separator: "\n"))
     }
 
 }
