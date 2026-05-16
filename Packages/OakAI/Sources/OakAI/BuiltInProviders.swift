@@ -19,9 +19,7 @@ public enum BuiltInProviders {
         registry.register(together)
         registry.register(minimax)
         registry.register(zai)
-        registry.register(opencode)
         registry.register(xiaomi)
-        registry.register(kimiCoding)
         // OAuth providers
         registry.register(openaiCodex)
         registry.register(githubCopilot)
@@ -331,27 +329,6 @@ public enum BuiltInProviders {
         authStrategy: .apiKey(envVar: "ZAI_API_KEY")
     )
 
-    // MARK: - OpenCode Zen
-
-    public static let opencode = ProviderInfo(
-        id: "opencode",
-        displayName: "OpenCode Zen",
-        apiFormat: .anthropicMessages,
-        baseURL: URL(string: "https://opencode.ai/zen/v1/messages")!,
-        defaultModelId: "claude-opus-4-6",
-        models: [
-            ModelInfo(id: "claude-opus-4-7", name: "Claude Opus 4.7", providerId: "opencode", contextWindow: 1_000_000, maxTokens: 128_000, reasoning: true, supportsVision: true),
-            ModelInfo(id: "claude-opus-4-6", name: "Claude Opus 4.6", providerId: "opencode", contextWindow: 1_000_000, maxTokens: 128_000, reasoning: true, supportsVision: true),
-            ModelInfo(id: "claude-opus-4-5", name: "Claude Opus 4.5", providerId: "opencode", contextWindow: 200_000, maxTokens: 64_000, reasoning: true, supportsVision: true),
-            ModelInfo(id: "claude-opus-4-1", name: "Claude Opus 4.1", providerId: "opencode", contextWindow: 200_000, maxTokens: 32_000, reasoning: true, supportsVision: true),
-            ModelInfo(id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", providerId: "opencode", contextWindow: 1_000_000, maxTokens: 64_000, reasoning: true, supportsVision: true),
-            ModelInfo(id: "claude-sonnet-4-5", name: "Claude Sonnet 4.5", providerId: "opencode", contextWindow: 200_000, maxTokens: 64_000, reasoning: true, supportsVision: true),
-            ModelInfo(id: "claude-sonnet-4", name: "Claude Sonnet 4", providerId: "opencode", contextWindow: 200_000, maxTokens: 64_000, reasoning: true, supportsVision: true),
-            ModelInfo(id: "claude-haiku-4-5", name: "Claude Haiku 4.5", providerId: "opencode", contextWindow: 200_000, maxTokens: 64_000, reasoning: true, supportsVision: true),
-            ModelInfo(id: "big-pickle", name: "Big Pickle", providerId: "opencode", contextWindow: 200_000, maxTokens: 128_000, reasoning: true, supportsVision: false),
-        ],
-        authStrategy: .apiKey(envVar: "OPENCODE_API_KEY")
-    )
 
     // MARK: - Xiaomi MiMo
 
@@ -371,20 +348,6 @@ public enum BuiltInProviders {
         authStrategy: .apiKey(envVar: "XIAOMI_API_KEY")
     )
 
-    // MARK: - Kimi For Coding
-
-    public static let kimiCoding = ProviderInfo(
-        id: "kimi-coding",
-        displayName: "Kimi For Coding",
-        apiFormat: .anthropicMessages,
-        baseURL: URL(string: "https://api.kimi.com/coding/v1/messages")!,
-        defaultModelId: "kimi-for-coding",
-        models: [
-            ModelInfo(id: "kimi-for-coding", name: "Kimi For Coding", providerId: "kimi-coding", contextWindow: 262_144, maxTokens: 32_768, reasoning: true, supportsVision: true),
-            ModelInfo(id: "kimi-k2-thinking", name: "Kimi K2 Thinking", providerId: "kimi-coding", contextWindow: 262_144, maxTokens: 32_768, reasoning: true, supportsVision: false),
-        ],
-        authStrategy: .apiKey(envVar: "KIMI_API_KEY")
-    )
 
     // MARK: - OpenAI Codex (ChatGPT subscription, OAuth PKCE)
 
