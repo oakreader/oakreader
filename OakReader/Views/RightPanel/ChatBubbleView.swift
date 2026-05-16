@@ -67,7 +67,7 @@ struct ChatBubbleView: View {
                         }
                     }
 
-                    // Actions — visible after response and flush are done
+                    // Actions — visible on hover after response and flush are done
                     if !turn.isStreaming && !reveal.isAnimating && turn.role == .assistant {
                         HStack(spacing: 2) {
                             actionButton(
@@ -101,6 +101,8 @@ struct ChatBubbleView: View {
                                 .animation(.spring(duration: 0.2, bounce: 0.2), value: isSaveHovered)
                             }
                         }
+                        .opacity(isHovered || showCopied || showSaved ? 1 : 0)
+                        .animation(.easeInOut(duration: 0.15), value: isHovered)
                     }
                 }
 
@@ -170,11 +172,7 @@ struct ChatBubbleView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 4)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(bubbleColor)
-        )
+        .padding(.vertical, 4)
         .foregroundStyle(Color(nsColor: .labelColor))
     }
 
@@ -227,11 +225,7 @@ struct ChatBubbleView: View {
                 })
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 4)
-                .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(bubbleColor)
-                )
+                .padding(.vertical, 4)
                 .foregroundStyle(Color(nsColor: .labelColor))
         } else {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
@@ -263,9 +257,9 @@ struct ChatBubbleView: View {
     private var bubbleColor: Color {
         switch turn.role {
         case .user:
-            return Color.accentColor.opacity(0.12)
+            return Color.primary.opacity(0.06)
         case .assistant, .system:
-            return Color(nsColor: .controlBackgroundColor).opacity(0.6)
+            return Color.clear
         }
     }
 
@@ -775,83 +769,33 @@ private struct OakScriptShape: Shape {
     }
 }
 
-// MARK: - Streaming Cursor (Spinning Grid with Glow)
+// MARK: - Streaming Cursor (Three Dots)
 //
-// 3×3 dot grid where dots light up sequentially around the perimeter
-// in a clockwise loop, each with a soft glow halo when active.
-// Sequence: 0→1→2→5→8→7→6→3 (outer ring), center dot pulses gently.
+// Three dots with staggered opacity animation, inspired by Bridge's
+// minimal loading indicator.
 
 private struct StreamingCursor: View {
-    private static let dotSize: CGFloat = 2.5
-    private static let spacing: CGFloat = 2.5
-    private static let glowRadius: CGFloat = 2.5
-    // Perimeter traversal order (clockwise from top-left)
-    private static let sequence: [Int] = [0, 1, 2, 5, 8, 7, 6, 3]
-    private static let cycleDuration: Double = 1.0
+    private static let dotSize: CGFloat = 4
+    private static let spacing: CGFloat = 3
 
-    @State private var step: Int = 0
-    @State private var centerPulse = false
+    @State private var animating = false
 
     var body: some View {
-        let gridSize = Self.dotSize * 3 + Self.spacing * 2
-
-        ZStack {
-            // 3×3 grid
-            VStack(spacing: Self.spacing) {
-                ForEach(0..<3, id: \.self) { row in
-                    HStack(spacing: Self.spacing) {
-                        ForEach(0..<3, id: \.self) { col in
-                            let index = row * 3 + col
-                            let isCenter = index == 4
-                            let activeLevel = isCenter
-                                ? 0.0
-                                : trailIntensity(for: index)
-
-                            Circle()
-                                .fill(Color.primary)
-                                .frame(width: Self.dotSize, height: Self.dotSize)
-                                .opacity(isCenter ? (centerPulse ? 0.4 : 0.15) : (0.12 + 0.5 * activeLevel))
-                                .scaleEffect(isCenter ? (centerPulse ? 1.1 : 0.9) : (0.7 + 0.3 * activeLevel))
-                                .shadow(
-                                    color: Color.primary.opacity(activeLevel * 0.4),
-                                    radius: Self.glowRadius * activeLevel
-                                )
-                        }
-                    }
-                }
+        HStack(spacing: Self.spacing) {
+            ForEach(0..<3, id: \.self) { index in
+                Circle()
+                    .fill(Color.primary)
+                    .frame(width: Self.dotSize, height: Self.dotSize)
+                    .opacity(animating ? 1 : 0.3)
+                    .animation(
+                        .easeInOut(duration: 0.6)
+                            .repeatForever(autoreverses: true)
+                            .delay(Double(index) * 0.15),
+                        value: animating
+                    )
             }
         }
-        .frame(width: gridSize, height: gridSize)
-        .onAppear {
-            withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
-                centerPulse = true
-            }
-            startSpinning()
-        }
-    }
-
-    /// Returns 1.0 for the head dot, fading trail for the 2 behind it, 0 for the rest.
-    private func trailIntensity(for gridIndex: Int) -> Double {
-        guard let seqPos = Self.sequence.firstIndex(of: gridIndex) else { return 0 }
-        let count = Self.sequence.count
-        let headPos = step % count
-        // Distance behind the head (wrapping)
-        let distance = (headPos - seqPos + count) % count
-        switch distance {
-        case 0: return 1.0   // head
-        case 1: return 0.5   // trail 1
-        case 2: return 0.2   // trail 2
-        default: return 0.0
-        }
-    }
-
-    private func startSpinning() {
-        let interval = Self.cycleDuration / Double(Self.sequence.count)
-        Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { _ in
-            withAnimation(.easeOut(duration: interval * 0.9)) {
-                step += 1
-            }
-        }
+        .onAppear { animating = true }
     }
 }
 
