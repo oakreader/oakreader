@@ -15,6 +15,13 @@ final class LibraryStore {
     var selectedCollectionId: UUID? = SystemCollectionID.allItems
     var selectedTagOptionId: UUID?
 
+    // Semantic search state
+    var isSemanticSearchActive: Bool = false
+    var semanticSearchResults: [UUID: SemanticIndexService.SearchResult]?
+    var semanticSearchOrder: [UUID]?
+    var isSemanticSearching: Bool = false
+    @ObservationIgnored var semanticSearchTask: Task<Void, Never>?
+
     // Toolbar filter state
     var selectedTypes: Set<String> = []
     var selectedTagOptionIds: Set<UUID> = []
@@ -30,6 +37,47 @@ final class LibraryStore {
         selectedStatusOptionIds = []
     }
 
+    func clearSemanticSearch() {
+        semanticSearchTask?.cancel()
+        semanticSearchTask = nil
+        semanticSearchResults = nil
+        semanticSearchOrder = nil
+        isSemanticSearching = false
+    }
+
+    func performSemanticSearch() {
+        semanticSearchTask?.cancel()
+
+        guard isSemanticSearchActive, !searchText.isEmpty,
+              let service = semanticIndexService else {
+            clearSemanticSearch()
+            return
+        }
+
+        let query = searchText
+        isSemanticSearching = true
+
+        semanticSearchTask = Task { @MainActor in
+            // Debounce 300ms
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
+
+            let results = await service.search(query: query, maxResults: 50)
+            guard !Task.isCancelled else { return }
+
+            var resultsMap: [UUID: SemanticIndexService.SearchResult] = [:]
+            var order: [UUID] = []
+            for result in results {
+                guard let id = UUID(uuidString: result.itemId) else { continue }
+                resultsMap[id] = result
+                order.append(id)
+            }
+            semanticSearchResults = resultsMap
+            semanticSearchOrder = order
+            isSemanticSearching = false
+        }
+    }
+
     /// Resolved collection for the current selection.
     var selectedCollection: PDFCollection? {
         guard let id = selectedCollectionId else { return nil }
@@ -40,12 +88,14 @@ final class LibraryStore {
     func selectCollection(_ id: UUID?) {
         selectedCollectionId = id
         selectedTagOptionId = nil
+        clearSemanticSearch()
     }
 
     /// Select a tag and clear collection selection.
     func selectTag(_ optionId: UUID?) {
         selectedTagOptionId = optionId
         selectedCollectionId = nil
+        clearSemanticSearch()
     }
 
     /// The system "Tags" property definition.
@@ -182,6 +232,21 @@ final class LibraryStore {
         }
 
         // Apply search
+        if isSemanticSearchActive && !searchText.isEmpty {
+            if let order = semanticSearchOrder, let resultsMap = semanticSearchResults {
+                let matchingIds = Set(order)
+                results = results.filter { matchingIds.contains($0.id) }
+                // Sort by relevance score (highest first)
+                results.sort { a, b in
+                    let scoreA = resultsMap[a.id]?.score ?? 0
+                    let scoreB = resultsMap[b.id]?.score ?? 0
+                    return scoreA > scoreB
+                }
+            }
+            // When searching but no results yet, keep current results unfiltered
+            return results
+        }
+
         if !searchText.isEmpty {
             let query = searchText.lowercased()
             results = results.filter {
@@ -191,7 +256,7 @@ final class LibraryStore {
             }
         }
 
-        // Sort
+        // Sort (keyword mode only — semantic mode sorted by score above)
         results.sort { a, b in
             let cmp: Bool
             switch currentSort {
@@ -308,7 +373,17 @@ final class LibraryStore {
         }
 
         // Apply search within duplicates
-        if !searchText.isEmpty {
+        if isSemanticSearchActive && !searchText.isEmpty {
+            if let order = semanticSearchOrder, let resultsMap = semanticSearchResults {
+                let matchingIds = Set(order)
+                results = results.filter { matchingIds.contains($0.id) }
+                results.sort { a, b in
+                    let scoreA = resultsMap[a.id]?.score ?? 0
+                    let scoreB = resultsMap[b.id]?.score ?? 0
+                    return scoreA > scoreB
+                }
+            }
+        } else if !searchText.isEmpty {
             let query = searchText.lowercased()
             results = results.filter {
                 $0.title.lowercased().contains(query) ||
