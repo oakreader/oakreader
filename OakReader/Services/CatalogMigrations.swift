@@ -418,6 +418,13 @@ extension CatalogDatabase {
                 t.column("reviewed_at", .text).notNull()
             }
             try db.create(index: "idx_quiz_review_log_card_id", on: "quiz_review_log", columns: ["card_id"])
+
+            // Seed "Flashcards" system smart collection
+            let now = Date().iso8601String
+            try db.execute(sql: """
+                INSERT INTO collections (id, user_id, name, icon, sort_order, parent_id, is_smart, is_system, filter_rules, created_at, updated_at)
+                VALUES (?, ?, 'Flashcards', 'rectangle.on.rectangle.angled', 9, NULL, 1, 1, NULL, ?, ?)
+            """, arguments: [SystemCollectionID.flashcards.uuidString, localUserId, now, now])
         }
 
         return migrator

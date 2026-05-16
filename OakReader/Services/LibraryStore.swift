@@ -186,10 +186,19 @@ final class LibraryStore {
         return map
     }
 
+    var isFlashcardsSelected: Bool {
+        selectedCollectionId == SystemCollectionID.flashcards
+    }
+
     var filteredItems: [LibraryItem] {
         // Special handling for Duplicates collection
         if isDuplicatesSelected {
             return duplicatesFilteredItems
+        }
+
+        // Special handling for Flashcards collection (items with quiz cards)
+        if isFlashcardsSelected {
+            return flashcardsFilteredItems
         }
 
         var results = items
@@ -353,10 +362,29 @@ final class LibraryStore {
         if collection.id == SystemCollectionID.duplicates {
             return duplicateGroups.flatMap { $0 }.count
         }
+        if collection.id == SystemCollectionID.flashcards {
+            return flashcardsItemIds.count
+        }
         guard collection.isSmart, let rules = collection.filterRules else {
             return collection.itemCount
         }
         return items.filter { evaluateRules(rules, against: $0) }.count
+    }
+
+    // MARK: - Flashcards Filtered Items
+
+    /// Set of item IDs that have at least one quiz card.
+    private var flashcardsItemIds: Set<UUID> {
+        let ids = (try? database.dbQueue.read { db in
+            try String.fetchAll(db, sql: "SELECT DISTINCT item_id FROM quiz_cards WHERE is_suspended = 0")
+        }) ?? []
+        return Set(ids.compactMap { UUID(uuidString: $0) })
+    }
+
+    /// Items that have quiz cards saved.
+    private var flashcardsFilteredItems: [LibraryItem] {
+        let itemIds = flashcardsItemIds
+        return items.filter { itemIds.contains($0.id) }
     }
 
     // MARK: - Duplicates Filtered Items
