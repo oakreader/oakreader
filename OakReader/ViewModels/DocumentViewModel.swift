@@ -105,6 +105,14 @@ class DocumentViewModel {
         return vm
     }
 
+    private var _flashcards: FlashcardsViewModel?
+    var flashcards: FlashcardsViewModel {
+        if let vm = _flashcards { return vm }
+        let vm = FlashcardsViewModel(parent: self, database: database, storageKey: storageKey)
+        _flashcards = vm
+        return vm
+    }
+
     private var _media: MediaViewModel?
     var media: MediaViewModel {
         if let vm = _media { return vm }

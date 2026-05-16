@@ -1,0 +1,6 @@
+{
+    "name": "quiz",
+    "description": "Generate interactive quiz cards from document content",
+    "icon": { "type": "symbol", "value": "rectangle.on.rectangle.angled" },
+    "version": "1.0.0"
+}

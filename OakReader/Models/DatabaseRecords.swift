@@ -299,6 +299,66 @@ struct AnnotationRecord: Codable, FetchableRecord, MutablePersistableRecord, Has
     }
 }
 
+// MARK: - Quiz Cards
+
+struct QuizCardRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable {
+    static let databaseTableName = "quiz_cards"
+
+    var id: String
+    var itemId: String
+    var conversationId: String?
+    var groupId: String?
+    var type: String
+    var contentJson: String
+    var state: String
+    var dueAt: String
+    var stability: Double
+    var difficulty: Double
+    var elapsedDays: Int
+    var scheduledDays: Int
+    var reps: Int
+    var lapses: Int
+    var lastReviewAt: String?
+    var isSuspended: Bool
+    var createdAt: String
+    var updatedAt: String
+
+    enum CodingKeys: String, CodingKey, ColumnExpression {
+        case id, type, state, stability, difficulty, reps, lapses
+        case itemId = "item_id"
+        case conversationId = "conversation_id"
+        case groupId = "group_id"
+        case contentJson = "content_json"
+        case dueAt = "due_at"
+        case elapsedDays = "elapsed_days"
+        case scheduledDays = "scheduled_days"
+        case lastReviewAt = "last_review_at"
+        case isSuspended = "is_suspended"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+}
+
+struct QuizReviewLogRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable {
+    static let databaseTableName = "quiz_review_log"
+
+    var id: String
+    var cardId: String
+    var rating: Int
+    var state: String
+    var scheduledDays: Int
+    var elapsedDays: Int
+    var reviewedAt: String
+
+    enum CodingKeys: String, CodingKey, ColumnExpression {
+        case id, rating, state
+        case cardId = "card_id"
+        case scheduledDays = "scheduled_days"
+        case elapsedDays = "elapsed_days"
+        case reviewedAt = "reviewed_at"
+    }
+}
+
 // MARK: - Item Relations
 
 struct ItemRelationRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable {

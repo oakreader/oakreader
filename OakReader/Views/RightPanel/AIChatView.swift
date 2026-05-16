@@ -4,6 +4,7 @@ import OakAgent
 struct AIChatView: View {
     let chatVM: ChatViewModel
     var onSaveAssistantResponse: ((Turn) -> Bool)?
+    var onSaveQuizCard: ((QuizContent) -> Bool)?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -168,7 +169,8 @@ struct AIChatView: View {
                             onSaveToNote: onSaveAssistantResponse,
                             onOpenCitation: { citeKey, anchor in
                                 chatVM.openCitation(citeKey: citeKey, anchor: anchor)
-                            }
+                            },
+                            onSaveQuizCard: onSaveQuizCard
                         )
                             .id(turn.id)
                             .transition(

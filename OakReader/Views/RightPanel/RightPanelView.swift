@@ -14,7 +14,8 @@ struct RightPanelContentView: View {
                 case .aiChat:
                     AIChatView(
                         chatVM: viewModel.chat,
-                        onSaveAssistantResponse: saveAssistantResponseAction
+                        onSaveAssistantResponse: saveAssistantResponseAction,
+                        onSaveQuizCard: saveQuizCardAction
                     )
                 case .notes:
                     if Preferences.shared.isExtensionEnabled(.notes) {
@@ -23,6 +24,10 @@ struct RightPanelContentView: View {
                 case .translation:
                     if Preferences.shared.isExtensionEnabled(.translation) {
                         TranslationPanelView(translationVM: viewModel.translation)
+                    }
+                case .flashcards:
+                    if Preferences.shared.isExtensionEnabled(.flashcards) {
+                        FlashcardsPanelView(flashcardsVM: viewModel.flashcards)
                     }
                 }
             }
@@ -36,5 +41,13 @@ struct RightPanelContentView: View {
 
     private func saveAssistantResponseToNote(_ turn: Turn) -> Bool {
         viewModel.notes.addChatResponseToNote(turn.content)
+    }
+
+    private var saveQuizCardAction: ((QuizContent) -> Bool)? {
+        Preferences.shared.isExtensionEnabled(.flashcards) ? saveQuizCard : nil
+    }
+
+    private func saveQuizCard(_ content: QuizContent) -> Bool {
+        viewModel.flashcards.saveCard(content: content)
     }
 }
