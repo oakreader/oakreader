@@ -66,9 +66,10 @@ public enum ModelRegistry {
 public struct ProviderConfig: Codable, Sendable {
     public var providerId: String
     public var model: String
-    /// Extended thinking token budget. `nil` disables thinking.
+    /// Extended thinking token budget (used for budget-based models). `nil` disables thinking.
     public var thinkingBudget: Int?
-    /// Effort level for adaptive thinking ("low", "medium", "high").
+    /// Effort level for thinking ("off", "low", "medium", "high", "max").
+    /// `nil` or "off" disables thinking.
     public var thinkingEffort: String?
 
     /// Resolved model info — maxTokens come from here, not user config.

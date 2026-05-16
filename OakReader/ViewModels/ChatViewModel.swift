@@ -82,11 +82,13 @@ class ChatViewModel {
         let modelId = prefs.aiModel.isEmpty ? defaultModel : prefs.aiModel
         let modelInfo = ProviderRegistry.shared.provider(for: pid)?.models.first { $0.id == modelId }
         let isReasoning = modelInfo?.reasoning == true
+        let effort = prefs.thinkingEffort
+        let thinkingEnabled = isReasoning && effort != "off"
         return ProviderConfig(
             providerId: pid,
             model: modelId,
-            thinkingBudget: isReasoning ? prefs.thinkingBudget : nil,
-            thinkingEffort: isReasoning ? prefs.thinkingEffort : nil
+            thinkingBudget: thinkingEnabled ? prefs.thinkingBudget : nil,
+            thinkingEffort: thinkingEnabled ? effort : nil
         )
     }
 

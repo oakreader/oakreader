@@ -579,7 +579,8 @@ final class Preferences {
         set { defaults.set(newValue, forKey: Keys.thinkingBudget) }
     }
 
-    /// Thinking effort level for adaptive-thinking models ("low", "medium", "high").
+    /// Thinking effort level for reasoning models ("off", "low", "medium", "high", "max").
+    /// "off" disables thinking entirely. Other values map to API effort levels.
     var thinkingEffort: String {
         get { defaults.string(forKey: Keys.thinkingEffort) ?? "high" }
         set { defaults.set(newValue, forKey: Keys.thinkingEffort) }

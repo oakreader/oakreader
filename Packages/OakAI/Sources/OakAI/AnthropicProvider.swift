@@ -118,8 +118,7 @@ public struct AnthropicProvider: LLMProviderService {
         ]
 
         // Extended thinking support
-        if let budget = thinkingBudget, budget > 0 {
-            let effort = thinkingEffort ?? "high"
+        if let effort = thinkingEffort, effort != "off" {
             if useAdaptive {
                 // Opus 4.6+, Sonnet 4.6: adaptive thinking with effort level
                 body["thinking"] = [
@@ -129,11 +128,12 @@ public struct AnthropicProvider: LLMProviderService {
                 body["output_config"] = [
                     "effort": effort,
                 ] as [String: Any]
-            } else {
+            } else if let budget = thinkingBudget, budget > 0 {
                 // Older models: budget-based thinking
                 body["thinking"] = [
                     "type": "enabled",
                     "budget_tokens": budget,
+                    "display": "summarized",
                 ] as [String: Any]
             }
         }
