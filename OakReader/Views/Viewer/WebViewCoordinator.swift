@@ -232,10 +232,10 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessageH
         let bottomScreenPoint = window.convertPoint(toScreen: bottomWindowPoint)
 
         // Reposition existing popup on scroll, or create new one
-        if let popup = WebSelectionPopupPanel.current {
+        if let popup = HTMLSelectionPopupPanel.current {
             popup.reposition(atTop: topScreenPoint, atBottom: bottomScreenPoint)
         } else {
-            WebSelectionPopupPanel.show(
+            HTMLSelectionPopupPanel.show(
                 atTop: topScreenPoint,
                 atBottom: bottomScreenPoint,
                 text: text,
@@ -365,12 +365,12 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessageH
         mouseMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
             // If the click is on the popup panel or its color sub-panel, let it through
             if let win = event.window,
-               let popup = WebSelectionPopupPanel.current,
+               let popup = HTMLSelectionPopupPanel.current,
                popup.ownsWindow(win) {
                 return event
             }
             // Otherwise dismiss the popup
-            WebSelectionPopupPanel.dismissCurrent()
+            HTMLSelectionPopupPanel.dismissCurrent()
             self?.removeMouseMonitor()
             return event
         }
