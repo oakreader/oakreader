@@ -437,9 +437,11 @@ struct AIChatView: View {
             // Thinking effort submenu — only for reasoning models
             if currentModelInfo?.reasoning == true {
                 Picker(selection: effortSelection) {
+                    Text("Off").tag("off")
                     Text("Low").tag("low")
                     Text("Medium").tag("medium")
                     Text("High").tag("high")
+                    Text("Max").tag("max")
                 } label: {
                     Label("Thinking", systemImage: "brain")
                 }
