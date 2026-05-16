@@ -717,12 +717,12 @@ private struct StreamingCursor: View {
                                 : trailIntensity(for: index)
 
                             Circle()
-                                .fill(Color.accentColor)
+                                .fill(Color.primary)
                                 .frame(width: Self.dotSize, height: Self.dotSize)
                                 .opacity(isCenter ? (centerPulse ? 0.4 : 0.15) : (0.12 + 0.5 * activeLevel))
                                 .scaleEffect(isCenter ? (centerPulse ? 1.1 : 0.9) : (0.7 + 0.3 * activeLevel))
                                 .shadow(
-                                    color: Color.accentColor.opacity(activeLevel * 0.4),
+                                    color: Color.primary.opacity(activeLevel * 0.4),
                                     radius: Self.glowRadius * activeLevel
                                 )
                         }
