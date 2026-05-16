@@ -23,6 +23,7 @@ let package = Package(
         .package(url: "https://github.com/unum-cloud/usearch", "2.0.0"..<"2.17.0"),
         .package(url: "https://github.com/dagronf/DSFQuickActionBar", from: "6.2.0"),
         .package(url: "https://github.com/open-spaced-repetition/swift-fsrs", branch: "main"),
+        .package(url: "https://github.com/microsoft/plcrashreporter.git", from: "1.4.0"),
     ],
     targets: [
         .target(
@@ -50,6 +51,7 @@ let package = Package(
                 .product(name: "USearch", package: "usearch"),
                 .product(name: "DSFQuickActionBar", package: "DSFQuickActionBar"),
                 .product(name: "FSRS", package: "swift-fsrs"),
+                .product(name: "CrashReporter", package: "plcrashreporter"),
             ],
             path: "OakReader",
             exclude: [
