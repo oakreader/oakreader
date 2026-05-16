@@ -57,6 +57,63 @@ extension CatalogDatabase {
         noteAttachmentDirectory(noteId: noteId).appendingPathComponent(fileName)
     }
 
+    /// ~/OakReader/agent/
+    static var agentDirectory: URL {
+        dataDirectory.appendingPathComponent("agent", isDirectory: true)
+    }
+
+    /// ~/OakReader/agent/USER.md
+    static var agentUserFileURL: URL {
+        agentDirectory.appendingPathComponent("USER.md")
+    }
+
+    /// ~/OakReader/agent/MEMORY.md
+    static var agentMemoryFileURL: URL {
+        agentDirectory.appendingPathComponent("MEMORY.md")
+    }
+
+    /// ~/OakReader/agent/memory/ — learning logs (legacy)
+    static var agentMemoryLogsDirectory: URL {
+        agentDirectory.appendingPathComponent("memory", isDirectory: true)
+    }
+
+    /// ~/OakReader/agent/concepts/ — per-collection concept maps
+    static var agentConceptsDirectory: URL {
+        agentDirectory.appendingPathComponent("concepts", isDirectory: true)
+    }
+
+    /// ~/OakReader/agent/concepts/{collection-slug}.md — concept map for a collection
+    static func agentConceptMapURL(collectionName: String) -> URL {
+        let slug = collectionName.lowercased()
+            .replacingOccurrences(of: " ", with: "-")
+            .replacingOccurrences(of: "/", with: "-")
+        return agentConceptsDirectory.appendingPathComponent("\(slug).md")
+    }
+
+    /// ~/OakReader/agent/memory/YYYY-MM-DD.jsonl — daily learning log (one JSON per line)
+    static func agentDailyLogURL(date: Date = Date()) -> URL {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let filename = formatter.string(from: date) + ".jsonl"
+        return agentMemoryLogsDirectory.appendingPathComponent(filename)
+    }
+
+    /// ~/OakReader/agent/memory/YYYY-MM.md — monthly summary (markdown, curated)
+    static func agentMonthlyLogURL(date: Date = Date()) -> URL {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM"
+        let filename = formatter.string(from: date) + ".md"
+        return agentMemoryLogsDirectory.appendingPathComponent(filename)
+    }
+
+    /// ~/OakReader/agent/memory/YYYY.md — yearly trajectory (markdown, curated)
+    static func agentYearlyLogURL(date: Date = Date()) -> URL {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy"
+        let filename = formatter.string(from: date) + ".md"
+        return agentMemoryLogsDirectory.appendingPathComponent(filename)
+    }
+
     /// ~/OakReader/chats/
     static var chatsDirectory: URL {
         dataDirectory.appendingPathComponent("chats", isDirectory: true)
@@ -90,6 +147,27 @@ extension CatalogDatabase {
         try FileManager.default.createDirectory(at: notesAttachmentsDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: chatsDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: chatAttachmentsDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: agentDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: agentMemoryLogsDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: agentConceptsDirectory, withIntermediateDirectories: true)
+        bootstrapAgentFiles()
+    }
+
+    /// Copy USER.md and MEMORY.md templates into ~/OakReader/agent/ on first launch.
+    private static func bootstrapAgentFiles() {
+        let fm = FileManager.default
+        let templates: [(resource: String, destination: URL)] = [
+            ("USER", agentUserFileURL),
+            ("MEMORY", agentMemoryFileURL)
+        ]
+        for template in templates {
+            guard !fm.fileExists(atPath: template.destination.path) else { continue }
+            if let bundleURL = Bundle.main.url(
+                forResource: template.resource, withExtension: "md", subdirectory: "AgentTemplates"
+            ), let content = try? String(contentsOf: bundleURL, encoding: .utf8) {
+                try? content.write(to: template.destination, atomically: true, encoding: .utf8)
+            }
+        }
     }
 
     // MARK: - Storage Key Generation
