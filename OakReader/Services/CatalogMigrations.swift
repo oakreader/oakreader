@@ -427,6 +427,37 @@ extension CatalogDatabase {
             """, arguments: [SystemCollectionID.flashcards.uuidString, localUserId, now, now])
         }
 
+        // MARK: v12 — Processing Status
+
+        migrator.registerMigration("v12-processing-status") { db in
+            try db.execute(sql: """
+                ALTER TABLE items ADD COLUMN processing_status TEXT NOT NULL DEFAULT 'none'
+            """)
+
+            // Backfill: mark audio items that already have a transcript file as 'transcribed'
+            let rows = try Row.fetchAll(db, sql: """
+                SELECT i.id, i.storage_key, a.storage_key AS att_storage_key
+                FROM items i
+                JOIN attachments a ON a.item_id = i.id AND a.content_type = 'audio' AND a.is_primary = 1
+            """)
+            let fm = FileManager.default
+            for row in rows {
+                let itemStorageKey: String = row["storage_key"]
+                let attStorageKey: String = row["att_storage_key"]
+                let transcriptURL = CatalogDatabase.attachmentTranscriptURL(
+                    itemStorageKey: itemStorageKey,
+                    attachmentStorageKey: attStorageKey
+                )
+                if fm.fileExists(atPath: transcriptURL.path) {
+                    let itemId: String = row["id"]
+                    try db.execute(
+                        sql: "UPDATE items SET processing_status = 'transcribed' WHERE id = ?",
+                        arguments: [itemId]
+                    )
+                }
+            }
+        }
+
         return migrator
     }
 

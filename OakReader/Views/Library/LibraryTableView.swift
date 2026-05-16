@@ -89,6 +89,20 @@ struct LibraryTableView: View {
                             .font(.system(size: 14))
                             .accessibilityLabel(item.primaryAttachment?.contentType.label ?? "Document")
 
+                        if item.processingStatus == .transcribing || transcribingItemId == item.id {
+                            ProgressView()
+                                .controlSize(.mini)
+                                .scaleEffect(0.7)
+                        } else if item.processingStatus == .transcribed {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                                .font(.system(size: 10))
+                        } else if item.processingStatus == .failed {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.orange)
+                                .font(.system(size: 10))
+                        }
+
                         Text(item.title)
                             .font(.system(size: 14))
                             .lineLimit(1)
@@ -298,10 +312,12 @@ struct LibraryTableView: View {
             Button {
                 transcribeAudioItem(item)
             } label: {
-                Label("Transcribe", systemImage: "waveform")
+                Label("Transcribe", systemImage: "captions.bubble")
             }
             .disabled(
                 Preferences.shared.voiceSTTModel.isEmpty
+                || item.processingStatus == .transcribed
+                || item.processingStatus == .transcribing
                 || transcribingItemId != nil
             )
         }
@@ -461,6 +477,7 @@ struct LibraryTableView: View {
         guard !sttModel.isEmpty else { return }
 
         transcribingItemId = item.id
+        store.updateProcessingStatus(item, status: .transcribing)
         Task {
             do {
                 let text = try await transcriptionService.transcribe(
@@ -472,8 +489,10 @@ struct LibraryTableView: View {
                     attachmentStorageKey: attachment.storageKey
                 )
                 try text.write(to: url, atomically: true, encoding: .utf8)
+                store.updateProcessingStatus(item, status: .transcribed)
             } catch {
                 Log.error(Log.audio, "Transcription failed: \(error)")
+                store.updateProcessingStatus(item, status: .failed)
             }
             transcribingItemId = nil
         }

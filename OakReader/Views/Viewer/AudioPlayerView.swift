@@ -141,7 +141,7 @@ struct AudioPlayerView: View {
         Button {
             startTranscription(itemKey: itemKey, attKey: attKey)
         } label: {
-            Label("Transcribe", systemImage: "waveform")
+            Label("Transcribe", systemImage: "captions.bubble")
         }
         .buttonStyle(.bordered)
         .controlSize(.small)

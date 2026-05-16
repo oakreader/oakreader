@@ -225,6 +225,21 @@ extension LibraryStore {
         }
     }
 
+    func updateProcessingStatus(_ item: LibraryItem, status: ProcessingStatus) {
+        let now = Date().iso8601String
+        do {
+            try database.dbQueue.write { db in
+                try db.execute(
+                    sql: "UPDATE items SET processing_status = ?, updated_at = ? WHERE id = ?",
+                    arguments: [status.rawValue, now, item.id.uuidString]
+                )
+            }
+            invalidate()
+        } catch {
+            Log.error(Log.store, "updateProcessingStatus failed: \(error)")
+        }
+    }
+
     func updateLastPosition(_ item: LibraryItem, position: Double) {
         let now = Date().iso8601String
         do {

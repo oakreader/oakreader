@@ -20,6 +20,7 @@ struct ItemRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable 
     var source: String?
     var sourceKey: String?
     var extra: String?
+    var processingStatus: String = "none"
 
     enum CodingKeys: String, CodingKey, ColumnExpression {
         case id
@@ -35,6 +36,7 @@ struct ItemRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable 
         case source
         case sourceKey = "source_key"
         case extra
+        case processingStatus = "processing_status"
     }
 }
 

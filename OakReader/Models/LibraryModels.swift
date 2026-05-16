@@ -97,6 +97,7 @@ struct LibraryItem: Identifiable, Hashable {
     var source: String?
     var sourceKey: String?
     var extra: String?
+    var processingStatus: ProcessingStatus
 
     // Attachments (files belonging to this item)
     var attachments: [Attachment]
@@ -142,6 +143,7 @@ struct LibraryItem: Identifiable, Hashable {
             && lhs.propertyValues == rhs.propertyValues
             && lhs.collections == rhs.collections
             && lhs.citeKey == rhs.citeKey
+            && lhs.processingStatus == rhs.processingStatus
     }
 
     func hash(into hasher: inout Hasher) {
@@ -164,6 +166,7 @@ struct LibraryItem: Identifiable, Hashable {
         self.source = record.source
         self.sourceKey = record.sourceKey
         self.extra = record.extra
+        self.processingStatus = ProcessingStatus(rawValue: record.processingStatus) ?? .none
         self.attachments = attachments
         self.propertyValues = propertyValues
         self.collections = collections

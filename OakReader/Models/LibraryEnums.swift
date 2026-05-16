@@ -10,6 +10,13 @@ enum SyncStatus: String, Codable {
     case conflict
 }
 
+enum ProcessingStatus: String, Codable {
+    case none
+    case transcribing
+    case transcribed
+    case failed
+}
+
 enum LibrarySortOrder: String, CaseIterable, Identifiable {
     case dateAdded = "Date Added"
     case dateOpened = "Last Opened"
