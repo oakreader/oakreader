@@ -85,33 +85,33 @@ struct AIProvidersSettingsView: View {
         Button {
             selectedProviderId = id
         } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: 10) {
                 if let iconAsset {
                     Image(iconAsset)
                         .resizable()
                         .aspectRatio(contentMode: .fit)
-                        .frame(width: 20, height: 20)
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                        .frame(width: 24, height: 24)
+                        .clipShape(RoundedRectangle(cornerRadius: 5))
                 } else if let sfSymbol {
                     Image(systemName: sfSymbol)
-                        .font(.system(size: 14))
+                        .font(.system(size: 16))
                         .foregroundStyle(.secondary)
-                        .frame(width: 20, height: 20)
+                        .frame(width: 24, height: 24)
                 }
 
                 Text(title)
-                    .font(.body)
+                    .font(.system(size: 13))
                     .foregroundStyle(isConfigured ? .primary : .secondary)
                     .lineLimit(1)
 
                 Spacer()
 
                 Image(systemName: isConfigured ? "checkmark.circle.fill" : "circle")
-                    .font(.caption)
+                    .font(.system(size: 12))
                     .foregroundStyle(isConfigured ? Color.green : Color.secondary.opacity(0.4))
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 5)
+            .padding(.vertical, 6)
             .background(
                 RoundedRectangle(cornerRadius: 5)
                     .fill(selectedProviderId == id ? Color.accentColor.opacity(0.15) : Color.clear)
