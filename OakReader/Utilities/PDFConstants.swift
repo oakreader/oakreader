@@ -242,6 +242,7 @@ enum AppExtension: String, CaseIterable, Identifiable {
 
     var systemCollectionId: UUID? {
         switch self {
+        case .flashcards: return SystemCollectionID.flashcards
         case .xBookmarks: return SystemCollectionID.xBookmarks
         case .githubStars: return SystemCollectionID.githubStars
         default: return nil
