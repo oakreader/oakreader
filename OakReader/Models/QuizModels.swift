@@ -193,6 +193,10 @@ struct QuizCard: Identifiable, Hashable {
     var lapses: Int
     var lastReviewAt: Date?
     var isSuspended: Bool
+    var annotationId: String?
+    var sourceText: String?
+    var pageContext: String?
+    var isPending: Bool
     var createdAt: Date
     var updatedAt: Date
 
@@ -243,6 +247,10 @@ struct QuizCard: Identifiable, Hashable {
         self.lapses = record.lapses
         self.lastReviewAt = record.lastReviewAt.flatMap { Date(iso8601String: $0) }
         self.isSuspended = record.isSuspended
+        self.annotationId = record.annotationId
+        self.sourceText = record.sourceText
+        self.pageContext = record.pageContext
+        self.isPending = record.isPending
         self.createdAt = Date(iso8601String: record.createdAt) ?? Date()
         self.updatedAt = Date(iso8601String: record.updatedAt) ?? Date()
     }

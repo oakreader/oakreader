@@ -458,6 +458,19 @@ extension CatalogDatabase {
             }
         }
 
+        // MARK: v13 — Quiz Annotation Link
+
+        migrator.registerMigration("v13-quiz-annotation-link") { db in
+            try db.alter(table: "quiz_cards") { t in
+                t.add(column: "annotation_id", .text)
+                t.add(column: "source_text", .text)
+                t.add(column: "page_context", .text)
+                t.add(column: "is_pending", .integer).defaults(to: 0)
+            }
+            try db.create(index: "idx_quiz_cards_annotation", on: "quiz_cards", columns: ["annotation_id"])
+            try db.create(index: "idx_quiz_cards_pending", on: "quiz_cards", columns: ["is_pending", "item_id"])
+        }
+
         return migrator
     }
 

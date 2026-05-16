@@ -46,9 +46,16 @@ struct FlashcardsPanelView: View {
             .padding(.horizontal, OakStyle.Spacing.sm)
             .padding(.vertical, OakStyle.Spacing.sm)
 
-            if flashcardsVM.cards.isEmpty {
+            // Pending cards section (shown above the main list when present)
+            if flashcardsVM.pendingCount > 0 {
+                PendingQuizView(flashcardsVM: flashcardsVM)
+                    .frame(maxHeight: 300)
+                Divider()
+            }
+
+            if flashcardsVM.cards.isEmpty && flashcardsVM.pendingCount == 0 {
                 emptyState
-            } else {
+            } else if !flashcardsVM.cards.isEmpty {
                 FlashcardListView(flashcardsVM: flashcardsVM)
             }
         }

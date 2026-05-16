@@ -60,6 +60,129 @@ class AnnotationViewModel {
         currentTool = .none
     }
 
+    // MARK: - Quiz Highlight
+
+    /// Creates a purple highlight tagged as a quiz source and returns the annotation DB ID.
+    @discardableResult
+    func addQuizHighlight(for selection: PDFSelection) -> String? {
+        guard let doc = pdfDocument else { return nil }
+        let quizColor = NSColor(red: 0.64, green: 0.54, blue: 0.90, alpha: 0.5)
+        var resultId: String?
+
+        for page in selection.pages {
+            let selBounds = selection.bounds(for: page)
+            guard selBounds.width > 0, selBounds.height > 0 else { continue }
+
+            let annotation = PDFAnnotation(bounds: selBounds, forType: .highlight, withProperties: nil)
+            annotation.color = quizColor
+            annotation.contents = "[quiz-source]"
+
+            // Set quadrilateral points for precise text coverage
+            let lineSelections = selection.selectionsByLine()
+            var quadPoints: [NSValue] = []
+            for lineSel in lineSelections {
+                let lb = lineSel.bounds(for: page)
+                guard lb.width > 0, lb.height > 0 else { continue }
+                quadPoints.append(NSValue(point: NSPoint(x: lb.minX, y: lb.minY)))
+                quadPoints.append(NSValue(point: NSPoint(x: lb.maxX, y: lb.minY)))
+                quadPoints.append(NSValue(point: NSPoint(x: lb.minX, y: lb.maxY)))
+                quadPoints.append(NSValue(point: NSPoint(x: lb.maxX, y: lb.maxY)))
+            }
+            if !quadPoints.isEmpty {
+                annotation.setValue(quadPoints, forAnnotationKey: .quadPoints)
+            }
+
+            page.addAnnotation(annotation)
+            let pageIndex = doc.index(for: page)
+
+            // Persist to DB and capture the ID
+            let id = UUID().uuidString
+            persistQuizHighlight(
+                pdfAnnotation: annotation,
+                pageIndex: pageIndex,
+                selectedText: selection.string,
+                id: id
+            )
+            if resultId == nil {
+                resultId = id
+            }
+        }
+        parent?.markDocumentEdited()
+        refreshAnnotationModels()
+        return resultId
+    }
+
+    /// Persist a quiz highlight annotation to the store with a known ID.
+    private func persistQuizHighlight(
+        pdfAnnotation: PDFAnnotation,
+        pageIndex: Int,
+        selectedText: String?,
+        id: String
+    ) {
+        guard let store = annotationStore,
+              let attId = attachmentId,
+              let itmId = itemId else { return }
+
+        let now = Date().iso8601String
+
+        var quadPts: [[CGFloat]]? = nil
+        if let qp = pdfAnnotation.value(forAnnotationKey: .quadPoints) as? [NSValue] {
+            quadPts = qp.map { val in
+                let pt = val.pointValue
+                return [pt.x, pt.y]
+            }
+        }
+        let position = PDFAnnotationPosition(
+            pageIndex: pageIndex,
+            bounds: pdfAnnotation.bounds,
+            quadPoints: quadPts
+        )
+        guard let positionJson = position.toJSON() else { return }
+
+        let style = AnnotationStyle(
+            lineWidth: pdfAnnotation.border?.lineWidth,
+            opacity: pdfAnnotation.color.alphaComponent,
+            fontName: nil,
+            fontSize: nil,
+            interiorColorHex: nil
+        )
+        let styleJson = style.toJSON()
+
+        let pageHeight = pdfAnnotation.page?.bounds(for: .mediaBox).height ?? 792
+        let sortIndex = AnnotationStore.makeSortIndex(
+            pageIndex: pageIndex,
+            bounds: pdfAnnotation.bounds,
+            pageHeight: pageHeight
+        )
+
+        let record = AnnotationRecord(
+            id: id,
+            userId: localUserId,
+            itemId: itmId,
+            attachmentId: attId,
+            key: AnnotationStore.generateKey(),
+            type: "highlight",
+            authorName: nil,
+            text: selectedText,
+            comment: "[quiz-source]",
+            color: pdfAnnotation.color.hexString,
+            pageLabel: "\(pageIndex + 1)",
+            sortIndex: sortIndex,
+            positionKind: "pdf",
+            positionJson: positionJson,
+            styleJson: styleJson,
+            source: "oakreader",
+            sourceKey: nil,
+            isExternal: false,
+            createdAt: now,
+            updatedAt: now,
+            deletedAt: nil
+        )
+
+        store.upsert(record)
+        registerMapping(pdfAnnotation, id: id)
+    }
+
     // MARK: - Highlight / Underline / Strikethrough
 
     func addHighlight(for selection: PDFSelection) {
