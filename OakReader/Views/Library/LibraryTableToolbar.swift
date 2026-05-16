@@ -28,17 +28,50 @@ struct LibraryTableToolbar: View {
             HStack(spacing: 8) {
                 // Search field
                 HStack(spacing: 6) {
-                    Image(systemName: "magnifyingglass")
-                        .font(OakStyle.Font.styledCaption)
-                        .foregroundStyle(Color.primary.opacity(0.55))
-                        .accessibilityHidden(true)
-                    TextField("Search Library", text: $searchText)
+                    if store.semanticIndexService != nil {
+                        Button {
+                            store.isSemanticSearchActive.toggle()
+                            if store.isSemanticSearchActive && !searchText.isEmpty {
+                                store.performSemanticSearch()
+                            } else if !store.isSemanticSearchActive {
+                                store.clearSemanticSearch()
+                            }
+                        } label: {
+                            Image(systemName: store.isSemanticSearchActive
+                                  ? "sparkle.magnifyingglass"
+                                  : "magnifyingglass")
+                                .font(OakStyle.Font.styledCaption)
+                                .foregroundStyle(store.isSemanticSearchActive
+                                    ? Color.accentColor
+                                    : Color.primary.opacity(0.55))
+                        }
+                        .buttonStyle(.plain)
+                        .help(store.isSemanticSearchActive ? "Switch to keyword search" : "Switch to semantic search")
+                        .accessibilityLabel(store.isSemanticSearchActive ? "Semantic search active" : "Keyword search active")
+                    } else {
+                        Image(systemName: "magnifyingglass")
+                            .font(OakStyle.Font.styledCaption)
+                            .foregroundStyle(Color.primary.opacity(0.55))
+                            .accessibilityHidden(true)
+                    }
+                    TextField(
+                        store.isSemanticSearchActive ? "Search by meaning..." : "Search Library",
+                        text: $searchText
+                    )
                         .font(.system(size: 13))
                         .textFieldStyle(.plain)
                         .accessibilityLabel("Search library")
                         .onChange(of: searchText) { _, newValue in
                             store.searchText = newValue
+                            if store.isSemanticSearchActive {
+                                store.performSemanticSearch()
+                            }
                         }
+                    if store.isSemanticSearching {
+                        ProgressView()
+                            .controlSize(.small)
+                            .scaleEffect(0.7)
+                    }
                     if !searchText.isEmpty {
                         Button {
                             searchText = ""
