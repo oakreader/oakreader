@@ -320,6 +320,10 @@ enum MainMenuBuilder {
             "Zen Mode", action: .toggleZenMode,
             key: ".", modifiers: [.command, .shift], icon: "eye", target: target
         ))
+        viewMenu.addItem(actionItem(
+            "Presentation Mode", action: .togglePresentationMode,
+            key: "\r", modifiers: [.command, .shift], icon: "play.rectangle", target: target
+        ))
         viewMenu.addItem(.separator())
         viewMenu.addItem(actionItem(
             "Zoom In", action: .zoomIn,

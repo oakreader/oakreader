@@ -228,7 +228,25 @@ class DocumentViewModel {
     // MARK: - Action Handling (called directly by AppState)
 
     func handleAction(_ action: DocumentAction) {
+        // During presentation mode, only allow presentation toggle and page navigation
+        if state.isPresentationMode {
+            switch action {
+            case .togglePresentationMode:
+                break // fall through to main switch
+            case .previousPage, .nextPage, .firstPage, .lastPage:
+                break // allow page navigation
+            default:
+                return // block everything else
+            }
+        }
+
         switch action {
+        case .togglePresentationMode:
+            if state.isPresentationMode {
+                exitPresentationMode()
+            } else {
+                enterPresentationMode()
+            }
         case .toggleZenMode:
             state.isZenMode.toggle()
             if state.isZenMode {
@@ -288,6 +306,56 @@ class DocumentViewModel {
             viewer.goToPage(0)
         case .lastPage:
             viewer.goToPage(pageCount - 1)
+        }
+    }
+
+    // MARK: - Presentation Mode
+
+    func enterPresentationMode() {
+        guard contentType == .pdf, pdfDocument != nil else { return }
+
+        let window = NSApp.keyWindow
+        let wasFullScreen = window?.styleMask.contains(.fullScreen) ?? false
+
+        state.presentationSavedState = PresentationSavedState(
+            isSidebarVisible: state.isSidebarVisible,
+            rightPanelMode: state.rightPanelMode,
+            isZenMode: state.isZenMode,
+            displayMode: state.displayMode,
+            editorMode: state.editorMode,
+            wasAlreadyFullScreen: wasFullScreen
+        )
+
+        state.isSidebarVisible = false
+        state.rightPanelMode = nil
+        state.isZenMode = false
+        state.editorMode = .viewer
+        state.displayMode = .singlePage
+        state.isPresentationMode = true
+
+        if !wasFullScreen {
+            window?.toggleFullScreen(nil)
+        }
+    }
+
+    func exitPresentationMode() {
+        state.isPresentationMode = false
+
+        if let saved = state.presentationSavedState {
+            state.isSidebarVisible = saved.isSidebarVisible
+            state.rightPanelMode = saved.rightPanelMode
+            state.isZenMode = saved.isZenMode
+            state.displayMode = saved.displayMode
+            state.editorMode = saved.editorMode
+
+            if !saved.wasAlreadyFullScreen {
+                let window = NSApp.keyWindow
+                if window?.styleMask.contains(.fullScreen) == true {
+                    window?.toggleFullScreen(nil)
+                }
+            }
+
+            state.presentationSavedState = nil
         }
     }
 

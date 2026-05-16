@@ -18,6 +18,8 @@ class DocumentState {
     var isSidebarVisible: Bool = true
     var rightPanelMode: RightPanelMode? = nil
     var isZenMode: Bool = false
+    var isPresentationMode: Bool = false
+    var presentationSavedState: PresentationSavedState?
     var isLoading: Bool = false
     var errorMessage: String?
     var showError: Bool = false
@@ -29,4 +31,13 @@ class DocumentState {
         errorMessage = message
         showError = true
     }
+}
+
+struct PresentationSavedState {
+    let isSidebarVisible: Bool
+    let rightPanelMode: RightPanelMode?
+    let isZenMode: Bool
+    let displayMode: PDFDisplayMode
+    let editorMode: EditorMode
+    let wasAlreadyFullScreen: Bool
 }
