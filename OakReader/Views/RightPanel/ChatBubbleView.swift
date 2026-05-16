@@ -605,8 +605,8 @@ private extension String {
 
 /// Collapsible section showing extended thinking content from reasoning models.
 /// Collapsed by default. Shows elapsed time and a chevron toggle.
-/// While streaming, the label uses a smooth gradient shimmer animation
-/// inspired by Apple's boot screen text rendering.
+/// While streaming, displays a cursive "oak" handwriting stroke animation
+/// alongside a "Thinking..." label.
 private struct ThinkingDisclosureView: View {
     let thinking: String
     /// True while the model is still in the thinking phase (no text content yet).
@@ -616,7 +616,7 @@ private struct ThinkingDisclosureView: View {
     @State private var streamStartTime = Date()
     @State private var elapsedSeconds: Int = 0
     @State private var timer: Timer?
-    @State private var shimmerPhase: CGFloat = 0
+    @State private var oakStrokeProgress: CGFloat = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -634,10 +634,21 @@ private struct ThinkingDisclosureView: View {
                         .animation(.easeInOut(duration: 0.2), value: isExpanded)
 
                     if isStreaming {
-                        shimmerText("Thinking...")
+                        HStack(spacing: 6) {
+                            OakScriptShape()
+                                .trim(from: 0, to: oakStrokeProgress)
+                                .stroke(style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+                                .foregroundStyle(.secondary)
+                                .frame(width: 36, height: 16)
+                            Text("Thinking...")
+                                .font(OakStyle.ChatFont.messageBody)
+                                .fontWeight(.medium)
+                                .foregroundStyle(.secondary)
+                        }
                     } else {
                         Text("Thought for \(elapsedSeconds)s")
-                            .font(OakStyle.ChatFont.meta)
+                            .font(OakStyle.ChatFont.messageBody)
+                            .fontWeight(.medium)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -666,7 +677,10 @@ private struct ThinkingDisclosureView: View {
             streamStartTime = Date()
             if isStreaming {
                 startTimer()
-                startShimmer()
+                oakStrokeProgress = 0
+                withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
+                    oakStrokeProgress = 1.0
+                }
             } else {
                 elapsedSeconds = max(1, thinking.count / 10)
             }
@@ -682,39 +696,6 @@ private struct ThinkingDisclosureView: View {
         }
     }
 
-    /// A text label with a smooth horizontal gradient shimmer that sweeps
-    /// across like Apple's boot screen handwriting reveal.
-    @ViewBuilder
-    private func shimmerText(_ label: String) -> some View {
-        Text(label)
-            .font(OakStyle.ChatFont.meta)
-            .foregroundStyle(.secondary)
-            .overlay {
-                LinearGradient(
-                    stops: [
-                        .init(color: .clear, location: max(0, shimmerPhase - 0.3)),
-                        .init(color: .primary.opacity(0.5), location: shimmerPhase),
-                        .init(color: .clear, location: min(1, shimmerPhase + 0.3)),
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-                .mask {
-                    Text(label)
-                        .font(OakStyle.ChatFont.meta)
-                }
-            }
-    }
-
-    private func startShimmer() {
-        withAnimation(
-            .easeInOut(duration: 1.8)
-            .repeatForever(autoreverses: false)
-        ) {
-            shimmerPhase = 1.3
-        }
-    }
-
     private func startTimer() {
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             elapsedSeconds = Int(Date().timeIntervalSince(streamStartTime))
@@ -724,6 +705,73 @@ private struct ThinkingDisclosureView: View {
     private func stopTimer() {
         timer?.invalidate()
         timer = nil
+    }
+}
+
+// MARK: - "oak" Script Shape
+//
+// A cursive script rendering of the word "oak" as a single continuous
+// bezier path, designed for `.trim(from:to:)` stroke animation.
+
+private struct OakScriptShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let w = rect.width
+        let h = rect.height
+
+        func pt(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            CGPoint(x: rect.minX + x * w, y: rect.minY + y * h)
+        }
+
+        // ── Letter 'o' ── (counterclockwise oval from near top)
+        path.move(to: pt(0.15, 0.30))
+        path.addCurve(to: pt(0.04, 0.55),
+                      control1: pt(0.06, 0.28),
+                      control2: pt(0.03, 0.40))
+        path.addCurve(to: pt(0.15, 0.73),
+                      control1: pt(0.05, 0.70),
+                      control2: pt(0.09, 0.75))
+        path.addCurve(to: pt(0.23, 0.45),
+                      control1: pt(0.21, 0.71),
+                      control2: pt(0.24, 0.60))
+        path.addCurve(to: pt(0.27, 0.68),
+                      control1: pt(0.22, 0.32),
+                      control2: pt(0.25, 0.50))
+
+        // ── Letter 'a' ── (bowl + stem)
+        path.addCurve(to: pt(0.42, 0.28),
+                      control1: pt(0.29, 0.50),
+                      control2: pt(0.36, 0.28))
+        path.addCurve(to: pt(0.32, 0.50),
+                      control1: pt(0.48, 0.28),
+                      control2: pt(0.30, 0.30))
+        path.addCurve(to: pt(0.44, 0.72),
+                      control1: pt(0.34, 0.68),
+                      control2: pt(0.38, 0.74))
+        path.addQuadCurve(to: pt(0.50, 0.68),
+                          control: pt(0.48, 0.70))
+
+        // ── Letter 'k' ── (ascender, loop back, upper arm, lower arm + flourish)
+        path.addCurve(to: pt(0.56, 0.08),
+                      control1: pt(0.50, 0.45),
+                      control2: pt(0.53, 0.08))
+        path.addCurve(to: pt(0.58, 0.45),
+                      control1: pt(0.59, 0.12),
+                      control2: pt(0.59, 0.32))
+        path.addCurve(to: pt(0.78, 0.22),
+                      control1: pt(0.58, 0.35),
+                      control2: pt(0.70, 0.22))
+        path.addCurve(to: pt(0.62, 0.50),
+                      control1: pt(0.72, 0.28),
+                      control2: pt(0.65, 0.42))
+        path.addCurve(to: pt(0.90, 0.72),
+                      control1: pt(0.66, 0.58),
+                      control2: pt(0.82, 0.72))
+        path.addCurve(to: pt(0.97, 0.62),
+                      control1: pt(0.94, 0.72),
+                      control2: pt(0.97, 0.68))
+
+        return path
     }
 }
 
