@@ -10,6 +10,7 @@ let package = Package(
         .package(path: "Packages/OakAI"),
         .package(path: "Packages/OakAgent"),
         .package(path: "Packages/OakVoice"),
+        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
         .package(url: "https://github.com/gonzalezreal/textual", from: "0.1.0"),
         .package(url: "https://github.com/groue/GRDB.swift", from: "7.0.0"),
         .package(url: "https://github.com/raspu/Highlightr.git", from: "2.3.0"),
@@ -64,6 +65,7 @@ let package = Package(
             name: "oak",
             dependencies: [
                 "OakAgent",
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "GRDB", package: "GRDB.swift"),
             ],
             path: "CLI"

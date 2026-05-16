@@ -533,7 +533,7 @@ final class CLIDatabase {
 
     // MARK: - Search
 
-    struct SearchResultRow {
+    struct SearchResultRow: Codable {
         let itemId: String
         let title: String
         let author: String

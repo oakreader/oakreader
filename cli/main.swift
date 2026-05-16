@@ -1,344 +1,912 @@
+import ArgumentParser
 import Foundation
 import OakAgent
 
-// MARK: - Help Text
+// MARK: - Global Options
 
-let helpText = """
-oak — OakReader CLI
+struct GlobalOptions: ParsableArguments {
+    @Flag(name: .long, help: "Output results as JSON.")
+    var json = false
 
-USAGE:
-    oak                                          Show library stats
-    oak items [list] [--collection <n>] [--tag <n>] [--type pdf|web|video|note]
-              [--search <q>] [--sort title|author|date] [--limit N]
-    oak items show <item>                        Item detail
-    oak items open <item>                        Open in OakReader.app
+    @Flag(name: .long, help: "Suppress non-essential output.")
+    var quiet = false
 
-    oak collections [list]                       List collections (tree)
-    oak collections create <name> [--parent <n>] Create collection
-    oak collections rename <name|id> <new-name>  Rename collection
-    oak collections delete <name|id>             Delete collection
-    oak collections add <collection> <item>      Add item to collection
-    oak collections remove <collection> <item>   Remove item from collection
-
-    oak tags [list]                              List tags with counts
-    oak tags create <name> [--color <hex>]       Create tag
-    oak tags rename <name|id> <new-name>         Rename tag
-    oak tags delete <name|id>                    Delete tag
-    oak tags add <tag> <item>                    Tag an item
-    oak tags remove <tag> <item>                 Untag an item
-
-    oak import <file|url>                       Import PDF, HTML, Markdown, or URL
-        [--title <title>]                        Override title
-        [--collection <name>]                    Add to collection after import
-        [--tag <name>]                           Tag after import
-
-    oak search <query>                           Search library
-        [--mode keyword|semantic|hybrid]          Search mode (default: keyword)
-        [--limit N]                               Max results (default: 20)
-
-    oak status <item>                            Show item status
-    oak status <item> <value>                    Set status (unread/reading/completed/archived)
-
-    oak open <file>                              Open file in OakReader (no import)
-
-    oak chat [--file <path>] [--ask "question"]  AI chat with PDF
-
-    oak skills [list]                            List all skills and install status
-    oak skills show <name>                       Show skill detail
-    oak skills install <name>                    Install a skill
-    oak skills uninstall <name>                  Uninstall a skill
-    oak skills check                             Verify installed skill dependencies
-
-OPTIONS:
-    --db <path>     Path to database (default: ~/OakReader/library.sqlite)
-    --help, -h      Show this help
-    --version       Show version
-"""
-
-let version = "oak 1.0.0"
-
-// MARK: - Argument Parsing
-
-var allArgs = Array(CommandLine.arguments.dropFirst()) // drop executable name
-
-// Check for global flags first
-if allArgs.contains("--help") || allArgs.contains("-h") {
-    if allArgs.first == "chat" {
-        // Delegate to chat help
-    } else {
-        print(helpText)
-        exit(0)
-    }
+    @Option(name: .long, help: "Path to database (default: ~/OakReader/library.sqlite).")
+    var db: String?
 }
 
-if allArgs.contains("--version") {
-    print(version)
-    exit(0)
-}
+// MARK: - Root Command
 
-// Extract --db flag
-var dbPath: String? = nil
-if let idx = allArgs.firstIndex(of: "--db"), idx + 1 < allArgs.count {
-    dbPath = allArgs[idx + 1]
-    allArgs.removeSubrange(idx...idx + 1)
-}
+struct Oak: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "oak",
+        abstract: "OakReader CLI",
+        version: "1.0.0",
+        subcommands: [
+            Items.self,
+            Collections.self,
+            Tags.self,
+            Import.self,
+            Search.self,
+            Status.self,
+            Open.self,
+            Chat.self,
+            Skills.self,
+        ],
+        defaultSubcommand: nil
+    )
 
-// MARK: - Command Dispatch
+    @OptionGroup var globals: GlobalOptions
 
-let command = allArgs.isEmpty ? nil : allArgs.removeFirst()
+    func run() throws {
+        let database = try CLIDatabase(path: globals.db)
+        let output = CLIOutput(json: globals.json, quiet: globals.quiet)
 
-switch command {
-case nil:
-    // `oak` with no arguments: show stats + help hint
-    do {
-        let db = try CLIDatabase(path: dbPath)
-        let commands = CLICommands(db: db)
-        try commands.runStats()
-        print("")
-        print("Run 'oak --help' for available commands.")
-    } catch {
-        printError(error.localizedDescription)
-        exit(1)
-    }
+        let stats = try database.fetchStats()
 
-case "items", "list":
-    do {
-        let db = try CLIDatabase(path: dbPath)
-        let commands = CLICommands(db: db)
-        let subcommand = (command == "list") ? "list" : (allArgs.isEmpty ? "list" : allArgs.removeFirst())
-
-        switch subcommand {
-        case "list":
-            var remaining = allArgs
-            let flags = parseFlags(&remaining)
-            try commands.runItemsList(args: remaining, flags: flags)
-        case "show":
-            try commands.runItemsShow(args: allArgs)
-        case "open":
-            try commands.runItemsOpen(args: allArgs)
-        default:
-            // Treat as `list` with the subcommand as a potential flag
-            allArgs.insert(subcommand, at: 0)
-            var remaining = allArgs
-            let flags = parseFlags(&remaining)
-            try commands.runItemsList(args: remaining, flags: flags)
-        }
-    } catch {
-        printError(error.localizedDescription)
-        exit(1)
-    }
-
-case "collections":
-    do {
-        let db = try CLIDatabase(path: dbPath)
-        let commands = CLICommands(db: db)
-        let subcommand = allArgs.isEmpty ? "list" : allArgs.removeFirst()
-
-        switch subcommand {
-        case "list":
-            try commands.runCollectionsList()
-        case "create":
-            var remaining = allArgs
-            let flags = parseFlags(&remaining)
-            try commands.runCollectionsCreate(args: remaining, flags: flags)
-        case "rename":
-            try commands.runCollectionsRename(args: allArgs)
-        case "delete":
-            try commands.runCollectionsDelete(args: allArgs)
-        case "add":
-            try commands.runCollectionsAdd(args: allArgs)
-        case "remove":
-            try commands.runCollectionsRemove(args: allArgs)
-        default:
-            printError("Unknown collections subcommand '\(subcommand)'. Run 'oak --help' for usage.")
-            exit(1)
-        }
-    } catch {
-        printError(error.localizedDescription)
-        exit(1)
-    }
-
-case "tags":
-    do {
-        let db = try CLIDatabase(path: dbPath)
-        let commands = CLICommands(db: db)
-        let subcommand = allArgs.isEmpty ? "list" : allArgs.removeFirst()
-
-        switch subcommand {
-        case "list":
-            try commands.runTagsList()
-        case "create":
-            var remaining = allArgs
-            let flags = parseFlags(&remaining)
-            try commands.runTagsCreate(args: remaining, flags: flags)
-        case "rename":
-            try commands.runTagsRename(args: allArgs)
-        case "delete":
-            try commands.runTagsDelete(args: allArgs)
-        case "add":
-            try commands.runTagsAdd(args: allArgs)
-        case "remove":
-            try commands.runTagsRemove(args: allArgs)
-        default:
-            printError("Unknown tags subcommand '\(subcommand)'. Run 'oak --help' for usage.")
-            exit(1)
-        }
-    } catch {
-        printError(error.localizedDescription)
-        exit(1)
-    }
-
-case "status":
-    do {
-        let db = try CLIDatabase(path: dbPath)
-        let commands = CLICommands(db: db)
-        try commands.runStatus(args: allArgs)
-    } catch {
-        printError(error.localizedDescription)
-        exit(1)
-    }
-
-case "import":
-    do {
-        let db = try CLIDatabase(path: dbPath)
-        let commands = CLICommands(db: db)
-        var remaining = allArgs
-        let flags = parseFlags(&remaining)
-
-        // Check if this is a URL import (needs async)
-        let input = remaining.first ?? ""
-        if input.hasPrefix("http://") || input.hasPrefix("https://") {
-            _ = Task {
-                do {
-                    try await commands.runImportAsync(args: remaining, flags: flags)
-                } catch {
-                    printError(error.localizedDescription)
-                    exit(1)
-                }
-                exit(0)
-            }
-            RunLoop.main.run()
+        if globals.json {
+            output.success(operation: "stats", result: CLIStats(
+                items: stats.items, collections: stats.collections, tags: stats.tags
+            ))
         } else {
-            let handled = try commands.runImport(args: remaining, flags: flags)
-            if !handled {
-                printError("Unexpected import error.")
-                exit(1)
-            }
+            print(CLIFormatters.formatStats(items: stats.items, collections: stats.collections, tags: stats.tags))
+            print("")
+            print("Run 'oak --help' for available commands.")
         }
-    } catch {
-        printError(error.localizedDescription)
-        exit(1)
     }
+}
 
-case "search":
-    do {
-        let db = try CLIDatabase(path: dbPath)
-        let commands = CLICommands(db: db)
-        var remaining = allArgs
-        let flags = parseFlags(&remaining)
-        let mode = flags["mode"] ?? "keyword"
+// MARK: - Items
 
-        if mode == "semantic" || mode == "hybrid" {
-            // Semantic/hybrid search requires async
-            _ = Task {
-                do {
-                    try await commands.runSearchAsync(args: remaining, flags: flags)
-                } catch {
-                    printError(error.localizedDescription)
-                    exit(1)
-                }
-                exit(0)
-            }
-            RunLoop.main.run()
+struct Items: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Manage library items.",
+        subcommands: [ItemsList.self, ItemsShow.self, ItemsOpen.self],
+        defaultSubcommand: ItemsList.self
+    )
+}
+
+struct ItemsList: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "list", abstract: "List items.")
+
+    @OptionGroup var globals: GlobalOptions
+
+    @Option(name: .long, help: "Filter by collection name.")
+    var collection: String?
+
+    @Option(name: .long, help: "Filter by tag name.")
+    var tag: String?
+
+    @Option(name: .long, help: "Filter by type (pdf, web, video, note).")
+    var type: String?
+
+    @Option(name: .long, help: "Search query.")
+    var search: String?
+
+    @Option(name: .long, help: "Sort by: title, author, date.")
+    var sort: String?
+
+    @Option(name: .long, help: "Maximum number of results.")
+    var limit: Int?
+
+    func run() throws {
+        let database = try CLIDatabase(path: globals.db)
+        let items = try database.fetchAllItems(
+            collectionName: collection,
+            tagName: tag,
+            type: type,
+            search: search,
+            sort: sort,
+            limit: limit
+        )
+
+        if globals.json {
+            let output = CLIOutput(json: true, quiet: globals.quiet)
+            let results = items.map { CLIItemResult(item: $0.item, attachments: $0.attachments) }
+            output.results(operation: "items.list", items: results, meta: ["count": items.count])
         } else {
-            try commands.runSearch(args: remaining, flags: flags)
+            print(CLIFormatters.formatItemList(items))
         }
-    } catch {
-        printError(error.localizedDescription)
-        exit(1)
     }
+}
 
-case "skills":
-    SkillCommands.run(args: allArgs)
+struct ItemsShow: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "show", abstract: "Show item detail.")
 
-case "open":
-    let filePath = allArgs.first ?? ""
-    guard !filePath.isEmpty else {
-        printError("Usage: oak open <file>")
-        exit(1)
+    @OptionGroup var globals: GlobalOptions
+
+    @Argument(help: "Item identifier (title, cite key, or ID).")
+    var item: String
+
+    func run() throws {
+        let database = try CLIDatabase(path: globals.db)
+        let resolver = CLIResolver(db: database)
+        let resolved = try resolver.resolveItem(item)
+
+        guard let result = try database.fetchItem(id: resolved.id) else {
+            throw OakError.notFound("item", item)
+        }
+
+        let tags = try database.fetchItemTags(itemId: resolved.id)
+        let status = try database.fetchItemStatus(itemId: resolved.id)
+        let collections = try database.fetchItemCollections(itemId: resolved.id)
+
+        if globals.json {
+            let output = CLIOutput(json: true, quiet: globals.quiet)
+            let detail = CLIItemDetail(
+                item: result.item,
+                attachments: result.attachments,
+                tags: tags,
+                status: status,
+                collections: collections
+            )
+            output.success(operation: "items.show", result: detail)
+        } else {
+            print(CLIFormatters.formatItemDetail(
+                item: result.item,
+                attachments: result.attachments,
+                tags: tags,
+                status: status,
+                collections: collections
+            ))
+        }
     }
-    let resolved = URL(fileURLWithPath: (filePath as NSString).expandingTildeInPath).standardizedFileURL
-    guard FileManager.default.fileExists(atPath: resolved.path) else {
-        printError("File not found: \(resolved.path)")
-        exit(1)
-    }
-    let process = Process()
-    process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-    process.arguments = ["-a", "OakReader", resolved.path]
-    do {
+}
+
+struct ItemsOpen: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "open", abstract: "Open item in OakReader.app.")
+
+    @OptionGroup var globals: GlobalOptions
+
+    @Argument(help: "Item identifier (title, cite key, or ID).")
+    var item: String
+
+    func run() throws {
+        let database = try CLIDatabase(path: globals.db)
+        let resolver = CLIResolver(db: database)
+        let resolved = try resolver.resolveItem(item)
+
+        let urlString = "oakreader://open/\(resolved.id)"
+        guard let url = URL(string: urlString) else {
+            throw OakError.general("Failed to construct URL.")
+        }
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        process.arguments = [url.absoluteString]
         try process.run()
         process.waitUntilExit()
-    } catch {
-        printError("Failed to open file: \(error.localizedDescription)")
-        exit(1)
-    }
 
-case "chat":
-    // Preserve existing chat functionality
-    var filePath: String?
-    var question: String?
-
-    var i = 0
-    while i < allArgs.count {
-        switch allArgs[i] {
-        case "--file", "-f":
-            i += 1
-            if i < allArgs.count { filePath = allArgs[i] }
-        case "--ask", "-a":
-            i += 1
-            if i < allArgs.count { question = allArgs[i] }
-        case "--help", "-h":
-            let usage = """
-            oak chat — AI chat companion for PDF documents
-
-            USAGE:
-                oak chat --file <path>                    Interactive mode
-                oak chat --file <path> --ask "question"   One-shot mode
-
-            OPTIONS:
-                -f, --file <path>      Path to PDF file
-                -a, --ask <question>   Ask a question (one-shot mode)
-                -h, --help             Show help
-            """
-            print(usage)
-            exit(0)
-        default:
-            if filePath == nil && FileManager.default.fileExists(atPath: allArgs[i]) {
-                filePath = allArgs[i]
-            }
+        if globals.json {
+            let output = CLIOutput(json: true, quiet: globals.quiet)
+            output.success(operation: "items.open", result: CLIOperationResult(
+                id: resolved.id, message: "Opening '\(resolved.title)' in OakReader..."
+            ))
+        } else {
+            print("Opening '\(resolved.title)' in OakReader...")
         }
-        i += 1
     }
-
-    let runner = CLIChatRunner()
-
-    _ = Task {
-        do {
-            if let question {
-                try await runner.oneShot(filePath: filePath, question: question)
-            } else {
-                try await runner.interactive(filePath: filePath)
-            }
-        } catch {
-            fputs("Error: \(error.localizedDescription)\n", stderr)
-            exit(1)
-        }
-        exit(0)
-    }
-
-    RunLoop.main.run()
-
-default:
-    printError("Unknown command '\(command!)'. Run 'oak --help' for usage.")
-    exit(1)
 }
+
+// MARK: - Collections
+
+struct Collections: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Manage collections.",
+        subcommands: [
+            CollectionsList.self, CollectionsCreate.self, CollectionsRename.self,
+            CollectionsAdd.self, CollectionsRemove.self,
+        ],
+        defaultSubcommand: CollectionsList.self
+    )
+}
+
+struct CollectionsList: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "list", abstract: "List collections.")
+
+    @OptionGroup var globals: GlobalOptions
+
+    func run() throws {
+        let database = try CLIDatabase(path: globals.db)
+        let collections = try database.fetchAllCollections()
+        var counts: [String: Int] = [:]
+        for c in collections {
+            counts[c.id] = try database.fetchCollectionItemCount(collectionId: c.id)
+        }
+
+        if globals.json {
+            let output = CLIOutput(json: true, quiet: globals.quiet)
+            let results = collections.map { c in
+                CLICollectionResult(collection: c, count: counts[c.id] ?? 0)
+            }
+            output.results(operation: "collections.list", items: results, meta: ["count": collections.count])
+        } else {
+            print(CLIFormatters.formatCollectionTree(collections, counts: counts))
+        }
+    }
+}
+
+struct CollectionsCreate: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "create", abstract: "Create a collection.")
+
+    @OptionGroup var globals: GlobalOptions
+
+    @Argument(help: "Collection name.")
+    var name: String
+
+    @Option(name: .long, help: "Parent collection name.")
+    var parent: String?
+
+    func run() throws {
+        let database = try CLIDatabase(path: globals.db)
+        let resolver = CLIResolver(db: database)
+
+        var parentId: String?
+        if let parentName = parent {
+            let p = try resolver.resolveParentCollection(parentName)
+            parentId = p.id
+        }
+
+        let id = try database.createCollection(name: name, parentId: parentId)
+
+        if globals.json {
+            let output = CLIOutput(json: true, quiet: globals.quiet)
+            output.success(operation: "collections.create", result: CLIOperationResult(
+                id: id, message: "Created collection '\(name)'"
+            ))
+        } else {
+            print("Created collection '\(name)' [\(id.prefix(8))]")
+        }
+    }
+}
+
+struct CollectionsRename: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "rename", abstract: "Rename a collection.")
+
+    @OptionGroup var globals: GlobalOptions
+
+    @Argument(help: "Current collection name or ID.")
+    var current: String
+
+    @Argument(help: "New name.")
+    var newName: String
+
+    func run() throws {
+        let database = try CLIDatabase(path: globals.db)
+        let resolver = CLIResolver(db: database)
+        let collection = try resolver.resolveCollection(current)
+
+        if CLISystemCollectionID.all.contains(collection.id) {
+            throw OakError.general("Cannot rename system collection '\(collection.name)'.")
+        }
+
+        try database.renameCollection(id: collection.id, newName: newName)
+
+        if globals.json {
+            let output = CLIOutput(json: true, quiet: globals.quiet)
+            output.success(operation: "collections.rename", result: CLIOperationResult(
+                id: collection.id, message: "Renamed '\(collection.name)' -> '\(newName)'"
+            ))
+        } else {
+            print("Renamed collection '\(collection.name)' -> '\(newName)'")
+        }
+    }
+}
+
+struct CollectionsAdd: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "add", abstract: "Add item to collection.")
+
+    @OptionGroup var globals: GlobalOptions
+
+    @Argument(help: "Collection name or ID.")
+    var collection: String
+
+    @Argument(help: "Item identifier.")
+    var item: String
+
+    func run() throws {
+        let database = try CLIDatabase(path: globals.db)
+        let resolver = CLIResolver(db: database)
+        let col = try resolver.resolveCollection(collection)
+        let itm = try resolver.resolveItem(item)
+
+        if col.isSmart || col.isSystem {
+            throw OakError.general("Cannot manually add items to smart/system collection '\(col.name)'.")
+        }
+
+        try database.addItemToCollection(collectionId: col.id, itemId: itm.id)
+
+        if globals.json {
+            let output = CLIOutput(json: true, quiet: globals.quiet)
+            output.success(operation: "collections.add", result: CLIOperationResult(
+                id: itm.id, message: "Added '\(itm.title)' to '\(col.name)'"
+            ))
+        } else {
+            print("Added '\(itm.title)' to collection '\(col.name)'")
+        }
+    }
+}
+
+struct CollectionsRemove: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "remove", abstract: "Remove item from collection.")
+
+    @OptionGroup var globals: GlobalOptions
+
+    @Argument(help: "Collection name or ID.")
+    var collection: String
+
+    @Argument(help: "Item identifier.")
+    var item: String
+
+    func run() throws {
+        let database = try CLIDatabase(path: globals.db)
+        let resolver = CLIResolver(db: database)
+        let col = try resolver.resolveCollection(collection)
+        let itm = try resolver.resolveItem(item)
+
+        try database.removeItemFromCollection(collectionId: col.id, itemId: itm.id)
+
+        if globals.json {
+            let output = CLIOutput(json: true, quiet: globals.quiet)
+            output.success(operation: "collections.remove", result: CLIOperationResult(
+                id: itm.id, message: "Removed '\(itm.title)' from '\(col.name)'"
+            ))
+        } else {
+            print("Removed '\(itm.title)' from collection '\(col.name)'")
+        }
+    }
+}
+
+// MARK: - Tags
+
+struct Tags: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Manage tags.",
+        subcommands: [
+            TagsList.self, TagsCreate.self, TagsRename.self,
+            TagsAdd.self, TagsRemove.self,
+        ],
+        defaultSubcommand: TagsList.self
+    )
+}
+
+struct TagsList: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "list", abstract: "List tags.")
+
+    @OptionGroup var globals: GlobalOptions
+
+    func run() throws {
+        let database = try CLIDatabase(path: globals.db)
+        let tags = try database.fetchAllTags()
+
+        if globals.json {
+            let output = CLIOutput(json: true, quiet: globals.quiet)
+            let results = tags.map { CLITagResult(tag: $0.tag, count: $0.count) }
+            output.results(operation: "tags.list", items: results, meta: ["count": tags.count])
+        } else {
+            print(CLIFormatters.formatTagList(tags))
+        }
+    }
+}
+
+struct TagsCreate: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "create", abstract: "Create a tag.")
+
+    @OptionGroup var globals: GlobalOptions
+
+    @Argument(help: "Tag name.")
+    var name: String
+
+    @Option(name: .long, help: "Color hex code (e.g. FF5733).")
+    var color: String?
+
+    func run() throws {
+        let database = try CLIDatabase(path: globals.db)
+        let id = try database.createTag(name: name, colorHex: color)
+
+        if globals.json {
+            let output = CLIOutput(json: true, quiet: globals.quiet)
+            output.success(operation: "tags.create", result: CLIOperationResult(
+                id: id, message: "Created tag '\(name)'"
+            ))
+        } else {
+            print("Created tag '\(name)' [\(id.prefix(8))]")
+        }
+    }
+}
+
+struct TagsRename: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "rename", abstract: "Rename a tag.")
+
+    @OptionGroup var globals: GlobalOptions
+
+    @Argument(help: "Current tag name or ID.")
+    var current: String
+
+    @Argument(help: "New name.")
+    var newName: String
+
+    func run() throws {
+        let database = try CLIDatabase(path: globals.db)
+        let resolver = CLIResolver(db: database)
+        let tag = try resolver.resolveTag(current)
+
+        try database.renameTag(id: tag.id, newName: newName)
+
+        if globals.json {
+            let output = CLIOutput(json: true, quiet: globals.quiet)
+            output.success(operation: "tags.rename", result: CLIOperationResult(
+                id: tag.id, message: "Renamed '\(tag.name)' -> '\(newName)'"
+            ))
+        } else {
+            print("Renamed tag '\(tag.name)' -> '\(newName)'")
+        }
+    }
+}
+
+struct TagsAdd: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "add", abstract: "Tag an item.")
+
+    @OptionGroup var globals: GlobalOptions
+
+    @Argument(help: "Tag name or ID.")
+    var tag: String
+
+    @Argument(help: "Item identifier.")
+    var item: String
+
+    func run() throws {
+        let database = try CLIDatabase(path: globals.db)
+        let resolver = CLIResolver(db: database)
+        let t = try resolver.resolveTag(tag)
+        let itm = try resolver.resolveItem(item)
+
+        try database.addTagToItem(tagId: t.id, itemId: itm.id)
+
+        if globals.json {
+            let output = CLIOutput(json: true, quiet: globals.quiet)
+            output.success(operation: "tags.add", result: CLIOperationResult(
+                id: itm.id, message: "Tagged '\(itm.title)' with '\(t.name)'"
+            ))
+        } else {
+            print("Tagged '\(itm.title)' with '\(t.name)'")
+        }
+    }
+}
+
+struct TagsRemove: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "remove", abstract: "Untag an item.")
+
+    @OptionGroup var globals: GlobalOptions
+
+    @Argument(help: "Tag name or ID.")
+    var tag: String
+
+    @Argument(help: "Item identifier.")
+    var item: String
+
+    func run() throws {
+        let database = try CLIDatabase(path: globals.db)
+        let resolver = CLIResolver(db: database)
+        let t = try resolver.resolveTag(tag)
+        let itm = try resolver.resolveItem(item)
+
+        try database.removeTagFromItem(tagId: t.id, itemId: itm.id)
+
+        if globals.json {
+            let output = CLIOutput(json: true, quiet: globals.quiet)
+            output.success(operation: "tags.remove", result: CLIOperationResult(
+                id: itm.id, message: "Removed tag '\(t.name)' from '\(itm.title)'"
+            ))
+        } else {
+            print("Removed tag '\(t.name)' from '\(itm.title)'")
+        }
+    }
+}
+
+// MARK: - Import
+
+struct Import: ParsableCommand {
+    static let configuration = CommandConfiguration(abstract: "Import PDF, HTML, Markdown, or URL.")
+
+    @OptionGroup var globals: GlobalOptions
+
+    @Argument(help: "File path or URL to import.")
+    var source: String
+
+    @Option(name: .long, help: "Override title.")
+    var title: String?
+
+    @Option(name: .long, help: "Add to collection after import.")
+    var collection: String?
+
+    @Option(name: .long, help: "Tag after import.")
+    var tag: String?
+
+    func run() throws {
+        let database = try CLIDatabase(path: globals.db)
+        let resolver = CLIResolver(db: database)
+        let importer = CLIImporter(db: database)
+
+        if source.hasPrefix("http://") || source.hasPrefix("https://") {
+            // URL import — needs async
+            _ = Task {
+                do {
+                    let result = try await importer.importURL(source, title: title)
+                    self.handleResult(result, database: database, resolver: resolver)
+                } catch {
+                    if globals.json {
+                        let output = CLIOutput(json: true, quiet: globals.quiet)
+                        output.error(operation: "import", message: error.localizedDescription, code: "import_failed")
+                    } else {
+                        fputs("Error: \(error.localizedDescription)\n", stderr)
+                    }
+                    Darwin.exit(1)
+                }
+                Darwin.exit(0)
+            }
+            RunLoop.main.run()
+        } else {
+            let fileURL = URL(fileURLWithPath: (source as NSString).expandingTildeInPath)
+                .standardizedFileURL
+            guard FileManager.default.fileExists(atPath: fileURL.path) else {
+                throw OakError.notFound("file", source)
+            }
+
+            let ext = fileURL.pathExtension.lowercased()
+            let result: CLIImporter.ImportResult
+            switch ext {
+            case "pdf":
+                result = try importer.importPDF(from: fileURL, title: title)
+            case "html", "htm":
+                result = try importer.importHTML(from: fileURL, title: title)
+            case "md", "markdown":
+                result = try importer.importMarkdown(from: fileURL, title: title)
+            default:
+                throw OakError.general("Unsupported file type: \(ext.isEmpty ? "(none)" : ".\(ext)")")
+            }
+
+            handleResult(result, database: database, resolver: resolver)
+        }
+    }
+
+    private func handleResult(_ result: CLIImporter.ImportResult, database: CLIDatabase, resolver: CLIResolver) {
+        if result.isDuplicate {
+            if globals.json {
+                let output = CLIOutput(json: true, quiet: globals.quiet)
+                output.success(operation: "import", result: CLIOperationResult(
+                    id: result.itemId, message: "Already imported '\(result.title)'"
+                ))
+            } else {
+                print("Already imported '\(result.title)' [\(result.itemId.prefix(8))]")
+            }
+        } else {
+            // Apply --collection and --tag flags
+            if let collectionName = collection {
+                do {
+                    let col = try resolver.resolveCollection(collectionName)
+                    try database.addItemToCollection(collectionId: col.id, itemId: result.itemId)
+                } catch {
+                    fputs("Warning: Failed to add to collection '\(collectionName)': \(error.localizedDescription)\n", stderr)
+                }
+            }
+            if let tagName = tag {
+                do {
+                    let t = try resolver.resolveTag(tagName)
+                    try database.addTagToItem(tagId: t.id, itemId: result.itemId)
+                } catch {
+                    fputs("Warning: Failed to add tag '\(tagName)': \(error.localizedDescription)\n", stderr)
+                }
+            }
+
+            if globals.json {
+                let output = CLIOutput(json: true, quiet: globals.quiet)
+                output.success(operation: "import", result: CLIOperationResult(
+                    id: result.itemId, message: "Imported '\(result.title)'"
+                ))
+            } else {
+                print("Imported '\(result.title)' [\(result.itemId.prefix(8))]")
+            }
+        }
+    }
+}
+
+// MARK: - Search
+
+struct Search: ParsableCommand {
+    static let configuration = CommandConfiguration(abstract: "Search library.")
+
+    @OptionGroup var globals: GlobalOptions
+
+    @Argument(help: "Search query.")
+    var query: [String]
+
+    @Option(name: .long, help: "Search mode: keyword, semantic, hybrid (default: keyword).")
+    var mode: String = "keyword"
+
+    @Option(name: .long, help: "Maximum results (default: 20).")
+    var limit: Int = 20
+
+    func run() throws {
+        let queryString = query.joined(separator: " ")
+        guard !queryString.isEmpty else {
+            throw OakError.general("Search query cannot be empty.")
+        }
+
+        let database = try CLIDatabase(path: globals.db)
+
+        switch mode {
+        case "keyword":
+            let results = try database.keywordSearch(query: queryString, limit: limit)
+            if globals.json {
+                let output = CLIOutput(json: true, quiet: globals.quiet)
+                output.results(operation: "search", items: results, meta: ["count": results.count])
+            } else {
+                print(CLIFormatters.formatSearchResults(results, query: queryString, mode: "keyword"))
+            }
+
+        case "semantic", "hybrid":
+            // Semantic/hybrid search requires async for potential future MLX support
+            _ = Task {
+                fputs("Error: Semantic search requires the OakReader app (MLX embedding model). Use --mode keyword in the CLI.\n", stderr)
+                Darwin.exit(1)
+            }
+            RunLoop.main.run()
+
+        default:
+            throw OakError.general("Unknown search mode '\(mode)'. Use keyword, semantic, or hybrid.")
+        }
+    }
+}
+
+// MARK: - Status
+
+struct Status: ParsableCommand {
+    static let configuration = CommandConfiguration(abstract: "Show or set item status.")
+
+    @OptionGroup var globals: GlobalOptions
+
+    @Argument(help: "Item identifier.")
+    var item: String
+
+    @Argument(help: "New status value (unread/reading/completed/archived). Omit to show current.")
+    var value: String?
+
+    func run() throws {
+        let database = try CLIDatabase(path: globals.db)
+        let resolver = CLIResolver(db: database)
+        let resolved = try resolver.resolveItem(item)
+
+        if let value {
+            let statusOption = try resolver.resolveStatus(value)
+            try database.setItemStatus(itemId: resolved.id, statusOptionId: statusOption.id)
+
+            if globals.json {
+                let output = CLIOutput(json: true, quiet: globals.quiet)
+                output.success(operation: "status.set", result: CLIOperationResult(
+                    id: resolved.id, message: "Set status of '\(resolved.title)' to '\(statusOption.name)'"
+                ))
+            } else {
+                print("Set status of '\(resolved.title)' to '\(statusOption.name)'")
+            }
+        } else {
+            let status = try database.fetchItemStatus(itemId: resolved.id)
+
+            if globals.json {
+                let output = CLIOutput(json: true, quiet: globals.quiet)
+                let detail: [String: String?] = [
+                    "itemId": resolved.id,
+                    "title": resolved.title,
+                    "status": status?.name,
+                ]
+                output.success(operation: "status.show", result: detail)
+            } else {
+                print(CLIFormatters.formatStatus(item: resolved, status: status))
+            }
+        }
+    }
+}
+
+// MARK: - Open (file)
+
+struct Open: ParsableCommand {
+    static let configuration = CommandConfiguration(abstract: "Open file in OakReader (no import).")
+
+    @OptionGroup var globals: GlobalOptions
+
+    @Argument(help: "File path to open.")
+    var file: String
+
+    func run() throws {
+        let resolved = URL(fileURLWithPath: (file as NSString).expandingTildeInPath).standardizedFileURL
+        guard FileManager.default.fileExists(atPath: resolved.path) else {
+            throw OakError.notFound("file", resolved.path)
+        }
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        process.arguments = ["-a", "OakReader", resolved.path]
+        try process.run()
+        process.waitUntilExit()
+
+        if globals.json {
+            let output = CLIOutput(json: true, quiet: globals.quiet)
+            output.success(operation: "open", result: CLIOperationResult(
+                id: nil, message: "Opened '\(resolved.lastPathComponent)' in OakReader"
+            ))
+        }
+    }
+}
+
+// MARK: - Chat
+
+struct Chat: ParsableCommand {
+    static let configuration = CommandConfiguration(abstract: "AI chat with PDF.")
+
+    @OptionGroup var globals: GlobalOptions
+
+    @Option(name: [.short, .long], help: "Path to PDF file.")
+    var file: String?
+
+    @Option(name: [.short, .long], help: "Ask a question (one-shot mode).")
+    var ask: String?
+
+    func run() throws {
+        let runner = CLIChatRunner()
+
+        _ = Task {
+            do {
+                if let ask {
+                    try await runner.oneShot(filePath: file, question: ask)
+                } else {
+                    try await runner.interactive(filePath: file)
+                }
+            } catch {
+                fputs("Error: \(error.localizedDescription)\n", stderr)
+                Darwin.exit(1)
+            }
+            Darwin.exit(0)
+        }
+
+        RunLoop.main.run()
+    }
+}
+
+// MARK: - Skills
+
+struct Skills: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Manage agent skills.",
+        subcommands: [
+            SkillsList.self, SkillsShow.self, SkillsInstall.self,
+            SkillsUninstall.self, SkillsCheck.self,
+        ],
+        defaultSubcommand: SkillsList.self
+    )
+}
+
+struct SkillsList: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "list", abstract: "List all skills.")
+
+    @OptionGroup var globals: GlobalOptions
+
+    func run() throws {
+        if globals.json {
+            let catalog = SkillCommands.loadCatalog()
+            let installed = SkillCommands.installedNames()
+            let output = CLIOutput(json: true, quiet: globals.quiet)
+            let results = catalog.map { skill -> SkillInfo in
+                SkillInfo(
+                    name: skill.name,
+                    description: skill.description,
+                    installed: installed.contains(skill.name)
+                )
+            }
+            output.results(operation: "skills.list", items: results, meta: ["count": results.count])
+        } else {
+            SkillCommands.listSkillsHuman()
+        }
+    }
+}
+
+struct SkillsShow: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "show", abstract: "Show skill detail.")
+
+    @OptionGroup var globals: GlobalOptions
+
+    @Argument(help: "Skill name.")
+    var name: String
+
+    func run() throws {
+        if globals.json {
+            let catalog = SkillCommands.loadCatalog()
+            guard let skill = catalog.first(where: { $0.name == name }) else {
+                throw OakError.notFound("skill", name)
+            }
+            let installed = SkillCommands.installedNames().contains(name)
+            let output = CLIOutput(json: true, quiet: globals.quiet)
+            let info = SkillDetail(
+                name: skill.name,
+                description: skill.description,
+                installed: installed,
+                author: skill.author?.name,
+                baseDir: skill.baseDir
+            )
+            output.success(operation: "skills.show", result: info)
+        } else {
+            SkillCommands.showSkillHuman(name: name)
+        }
+    }
+}
+
+struct SkillsInstall: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "install", abstract: "Install a skill.")
+
+    @OptionGroup var globals: GlobalOptions
+
+    @Argument(help: "Skill name.")
+    var name: String
+
+    func run() throws {
+        SkillCommands.installSkillAction(name: name, json: globals.json, quiet: globals.quiet)
+    }
+}
+
+struct SkillsUninstall: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "uninstall", abstract: "Uninstall a skill.")
+
+    @OptionGroup var globals: GlobalOptions
+
+    @Argument(help: "Skill name.")
+    var name: String
+
+    func run() throws {
+        SkillCommands.uninstallSkillAction(name: name, json: globals.json, quiet: globals.quiet)
+    }
+}
+
+struct SkillsCheck: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "check", abstract: "Verify installed skill dependencies.")
+
+    @OptionGroup var globals: GlobalOptions
+
+    func run() throws {
+        SkillCommands.checkSkillsAction(json: globals.json, quiet: globals.quiet)
+    }
+}
+
+// MARK: - Skill Codable Models
+
+struct SkillInfo: Encodable {
+    let name: String
+    let description: String
+    let installed: Bool
+}
+
+struct SkillDetail: Encodable {
+    let name: String
+    let description: String
+    let installed: Bool
+    let author: String?
+    let baseDir: String
+}
+
+// MARK: - Errors
+
+enum OakError: LocalizedError {
+    case notFound(String, String)
+    case general(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .notFound(let type, let input):
+            return "No \(type) found matching '\(input)'."
+        case .general(let msg):
+            return msg
+        }
+    }
+}
+
+// MARK: - Entry Point
+
+Oak.main()
