@@ -230,15 +230,39 @@ struct FlashcardReviewView: View {
         HStack(spacing: 8) {
             ForEach(ReviewRating.allCases, id: \.rawValue) { rating in
                 Button(action: { flashcardsVM.submitReview(rating: rating) }) {
-                    Text(rating.label)
-                        .font(.system(size: 12, weight: .medium))
-                        .frame(maxWidth: .infinity)
+                    VStack(spacing: 2) {
+                        Text(intervalLabel(for: rating))
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                        Text(rating.label)
+                            .font(.system(size: 12, weight: .medium))
+                    }
+                    .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
                 .tint(ratingColor(rating))
                 .controlSize(.regular)
             }
         }
+    }
+
+    /// Show predicted interval above each rating button (like Anki).
+    private func intervalLabel(for rating: ReviewRating) -> String {
+        guard let card = flashcardsVM.currentReviewCard,
+              let result = QuizScheduler.schedule(card: card, rating: rating) else {
+            return ""
+        }
+        let days = result.scheduledDays
+        if days == 0 {
+            // Short-term: show minutes
+            let minutes = Int(result.dueAt.timeIntervalSinceNow / 60)
+            if minutes <= 0 { return "<1m" }
+            if minutes < 60 { return "\(minutes)m" }
+            return "\(minutes / 60)h"
+        }
+        if days < 30 { return "\(days)d" }
+        if days < 365 { return String(format: "%.1fmo", Double(days) / 30.0) }
+        return String(format: "%.1fy", Double(days) / 365.0)
     }
 
     private func ratingColor(_ rating: ReviewRating) -> Color {

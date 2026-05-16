@@ -194,6 +194,13 @@
 		A4734AE72DCAFD235B91DFD5 /* MediaViewerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C68328C9891BD05075C4993 /* MediaViewerView.swift */; };
 		A4C849BCDFD7E58739BCE675 /* CompareSetupSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A546785A0819A73463325E1D /* CompareSetupSheet.swift */; };
 		A5044D8EBF0F8A518C537278 /* CLIImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EE6B08AE42F5F5093B698DF /* CLIImporter.swift */; };
+		6B9F3A2D4E7C8150DA2B5F94 /* CLIOutput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A4C2D1E5F8B3A9601D4E7C2 /* CLIOutput.swift */; };
+		B8C9D0E1F2A3B4C5D6E7F8A9 /* FSRS in Frameworks */ = {isa = PBXBuildFile; productRef = F6A7B8C9D0E1F2A3B4C5D6E7 /* FSRS */; };
+		C9D0E1F2A3B4C5D6E7F8A9B0 /* DSFQuickActionBar in Frameworks */ = {isa = PBXBuildFile; productRef = A7B8C9D0E1F2A3B4C5D6E7F8 /* DSFQuickActionBar */; };
+		6137B49EB16941DF976047CB /* CommandPaletteController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E866EDE5B9BDF85B4CE62CB2 /* CommandPaletteController.swift */; };
+		87AE8925E7E95C4C8487C821 /* CommandPaletteRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD8AECBB3416F6CB4D481413 /* CommandPaletteRowView.swift */; };
+		104ED1625C1134E2742F956E /* CommandRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761AB4CC31C8BE443DFEF879 /* CommandRegistry.swift */; };
+		9E6EBD1F62888DAF98E0538F /* PaletteCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42A988E5494BA4237407D7E5 /* PaletteCommand.swift */; };
 		A62A69DC501698A2DC0BEF2E /* ImportService+Markdown.swift in Sources */ = {isa = PBXBuildFile; fileRef = F567438B9F047B4A7C8C4594 /* ImportService+Markdown.swift */; };
 		A68B2638A8791B12A8DAD805 /* AudioSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71025755C0E4031874CD681D /* AudioSettingsView.swift */; };
 		A725A7149749F0D724E1CC29 /* TranslationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BD6ACC0C18A6938208786C0 /* TranslationSettingsView.swift */; };
@@ -223,6 +230,7 @@
 		B989E8A812E77BE101B5E7D4 /* CompareViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 202DECC1CD2165A023ADC37E /* CompareViewModel.swift */; };
 		B9BE36D6C7401EE88CE7071D /* YoutubeTranscript in Frameworks */ = {isa = PBXBuildFile; productRef = 3C1F95B9934A22BBA51A5047 /* YoutubeTranscript */; };
 		BA0B27333EF86F5FC6F02701 /* OakAgent in Frameworks */ = {isa = PBXBuildFile; productRef = D1622ABDD098451C89D32128 /* OakAgent */; };
+		E5D2B7A48C3F1E6509A7D4B1 /* ArgumentParser in Frameworks */ = {isa = PBXBuildFile; productRef = C8E4A1F39B2D5E7A4F6B0C13 /* ArgumentParser */; };
 		BA681F5E1B8D6ABC7D0878ED /* AnnotationModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CED884CFE0ED6221919B28F8 /* AnnotationModel.swift */; };
 		BAD50B0EC547A5E9B57F8BC9 /* CGPDFDocument+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7CB0C597FBB0F0023496A41 /* CGPDFDocument+Extensions.swift */; };
 		BAF4691DD4A1CF16CD23B8C7 /* NotePanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 945247B103C64684D0124953 /* NotePanelView.swift */; };
@@ -273,6 +281,21 @@
 		E34316C8E51F20146DE42438 /* CrossRefService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D85A8EB0997300C2F8B67DD4 /* CrossRefService.swift */; };
 		E4BFD61AE77A924AF4C4A082 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A5949616C0CDE532E1672FE /* SettingsView.swift */; };
 		E5B4CA49D67AB3BED1F279B5 /* ChatBubbleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6540F0E88807D8C1B673F4C3 /* ChatBubbleView.swift */; };
+		F6BE9335C69DEDD9D414E194 /* QuizModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 917F0CC34D52248E3754669B /* QuizModels.swift */; };
+		2A00E420096DAD02A14EB019 /* QuizCardService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D5F34DC098D4CFC4A5A5B10 /* QuizCardService.swift */; };
+		1CC01BD450DC4EED3DAA633B /* QuizScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E88F8F2FC6157925A5E317A /* QuizScheduler.swift */; };
+		6A51787C2116CC5D8DA2C07C /* QuizXMLParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEDB58C84E089EAAE98C9032 /* QuizXMLParser.swift */; };
+		C1C534F45FDB8488DD683183 /* FlashcardsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F61A16C8E053B171C76AF54 /* FlashcardsViewModel.swift */; };
+		F3126678DBC62A79A6AE6A82 /* FlashcardListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F03F69165E387D60D96C2A79 /* FlashcardListView.swift */; };
+		0561623C17D4EC4534E87196 /* FlashcardReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29E8EB1E9048A27FDD231B22 /* FlashcardReviewView.swift */; };
+		1FC60FC3271C574A33B25543 /* FlashcardsPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4F8436D022577C114789A83 /* FlashcardsPanelView.swift */; };
+		71408C29E18B94405DC99AD5 /* ChoiceQuizView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C3463773352145639F65D2 /* ChoiceQuizView.swift */; };
+		5905BFAA059F8D762F0F8FAB /* ClozeQuizView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30EE3E3565604C0D348CFDBF /* ClozeQuizView.swift */; };
+		2A708E6EC927B588614BC08C /* FlashcardQuizView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A4D57E53E8BB0D75684C949 /* FlashcardQuizView.swift */; };
+		729919D3D1125AA56481BF29 /* InlineQuizView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88F87E959DD722F9A4C53250 /* InlineQuizView.swift */; };
+		7E7F55D6F92F994917384AE5 /* MatchingQuizView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BCF52DB031493D1BFEDB60F /* MatchingQuizView.swift */; };
+		04A5BA0F7CAC3D36DD9665F9 /* OrderingQuizView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86C812B9E86DDC62CB6A154F /* OrderingQuizView.swift */; };
+		6CD0B4DE3C626C37C2568F36 /* FlashcardSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37FA7FDEC5967731E93D07AD /* FlashcardSettingsView.swift */; };
 		E619929B6D99ACD477406C1A /* LibraryModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 855DBD4C8608B3F5DDE0F430 /* LibraryModels.swift */; };
 		E67539ACBBD36D05236E38AA /* ImageEditOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A604265E0981A8DF5964639 /* ImageEditOverlay.swift */; };
 		E6A69C6436272EE318B11348 /* BatchViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50F84E749C972970463A73B3 /* BatchViewModel.swift */; };
@@ -462,6 +485,25 @@
 		91DD2A016A29AF6ABDC27244 /* PresentationOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresentationOverlayView.swift; sourceTree = "<group>"; };
 		62D8CC8D7C726C11792024B3 /* OakReader.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OakReader.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		6540F0E88807D8C1B673F4C3 /* ChatBubbleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatBubbleView.swift; sourceTree = "<group>"; };
+		917F0CC34D52248E3754669B /* QuizModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizModels.swift; sourceTree = "<group>"; };
+		E866EDE5B9BDF85B4CE62CB2 /* CommandPaletteController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandPaletteController.swift; sourceTree = "<group>"; };
+		CD8AECBB3416F6CB4D481413 /* CommandPaletteRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandPaletteRowView.swift; sourceTree = "<group>"; };
+		761AB4CC31C8BE443DFEF879 /* CommandRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandRegistry.swift; sourceTree = "<group>"; };
+		42A988E5494BA4237407D7E5 /* PaletteCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaletteCommand.swift; sourceTree = "<group>"; };
+		8D5F34DC098D4CFC4A5A5B10 /* QuizCardService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizCardService.swift; sourceTree = "<group>"; };
+		0E88F8F2FC6157925A5E317A /* QuizScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizScheduler.swift; sourceTree = "<group>"; };
+		FEDB58C84E089EAAE98C9032 /* QuizXMLParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizXMLParser.swift; sourceTree = "<group>"; };
+		1F61A16C8E053B171C76AF54 /* FlashcardsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashcardsViewModel.swift; sourceTree = "<group>"; };
+		F03F69165E387D60D96C2A79 /* FlashcardListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashcardListView.swift; sourceTree = "<group>"; };
+		29E8EB1E9048A27FDD231B22 /* FlashcardReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashcardReviewView.swift; sourceTree = "<group>"; };
+		B4F8436D022577C114789A83 /* FlashcardsPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashcardsPanelView.swift; sourceTree = "<group>"; };
+		F7C3463773352145639F65D2 /* ChoiceQuizView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChoiceQuizView.swift; sourceTree = "<group>"; };
+		30EE3E3565604C0D348CFDBF /* ClozeQuizView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClozeQuizView.swift; sourceTree = "<group>"; };
+		0A4D57E53E8BB0D75684C949 /* FlashcardQuizView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashcardQuizView.swift; sourceTree = "<group>"; };
+		88F87E959DD722F9A4C53250 /* InlineQuizView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineQuizView.swift; sourceTree = "<group>"; };
+		5BCF52DB031493D1BFEDB60F /* MatchingQuizView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MatchingQuizView.swift; sourceTree = "<group>"; };
+		86C812B9E86DDC62CB6A154F /* OrderingQuizView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrderingQuizView.swift; sourceTree = "<group>"; };
+		37FA7FDEC5967731E93D07AD /* FlashcardSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashcardSettingsView.swift; sourceTree = "<group>"; };
 		67058640A7746AEB945545CA /* ChatViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatViewModel.swift; sourceTree = "<group>"; };
 		67A7297F5A3894E12796E73F /* TextExtractionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextExtractionService.swift; sourceTree = "<group>"; };
 		699913DA93CBA7649507A450 /* LibraryPropertyStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryPropertyStore.swift; sourceTree = "<group>"; };
@@ -508,6 +550,7 @@
 		8CD6BAACDEA9C3347F8D19E5 /* MarkdownDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownDocument.swift; sourceTree = "<group>"; };
 		8D13E2F2DAAE19DE9BA57F67 /* SemanticDatabase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SemanticDatabase.swift; sourceTree = "<group>"; };
 		8EE6B08AE42F5F5093B698DF /* CLIImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIImporter.swift; sourceTree = "<group>"; };
+		7A4C2D1E5F8B3A9601D4E7C2 /* CLIOutput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIOutput.swift; sourceTree = "<group>"; };
 		8F738341643EF3BE5A70CB44 /* ReferenceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReferenceService.swift; sourceTree = "<group>"; };
 		912AD36ADFACA2448194EBB7 /* TsangerJinKai02-W04.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "TsangerJinKai02-W04.ttf"; sourceTree = "<group>"; };
 		936AA0D7A9E66908D29318BA /* AnnotationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationStore.swift; sourceTree = "<group>"; };
@@ -641,6 +684,8 @@
 				8F413E89092923AC9E22AD7D /* MLXEmbedders in Frameworks */,
 				06643571339C03C82A5BEDE4 /* MLXLMCommon in Frameworks */,
 				AB1153791C10232A4988DC54 /* USearch in Frameworks */,
+				B8C9D0E1F2A3B4C5D6E7F8A9 /* FSRS in Frameworks */,
+				C9D0E1F2A3B4C5D6E7F8A9B0 /* DSFQuickActionBar in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -650,6 +695,7 @@
 			files = (
 				BA0B27333EF86F5FC6F02701 /* OakAgent in Frameworks */,
 				0F13A6E0A89F4F20EAFA4069 /* GRDB in Frameworks */,
+				E5D2B7A48C3F1E6509A7D4B1 /* ArgumentParser in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -891,6 +937,9 @@
 				94F9C17092924D9A9C6BAC31 /* NoteService.swift */,
 				FEC033770C091AC5B1EA41B0 /* PDFRenderingService.swift */,
 				607ACCA3465C1ED0CC1DA6C9 /* PrintService.swift */,
+				8D5F34DC098D4CFC4A5A5B10 /* QuizCardService.swift */,
+				0E88F8F2FC6157925A5E317A /* QuizScheduler.swift */,
+				FEDB58C84E089EAAE98C9032 /* QuizXMLParser.swift */,
 				B3347292FAB8B284480E4486 /* RecordingSummaryService.swift */,
 				9741E79B8A2B0C06ED59E2BE /* RecordingTranscriptionService.swift */,
 				6D293D3946B771FF63A06649 /* RedactionService.swift */,
@@ -958,6 +1007,7 @@
 				3A68874A493BE4FAA33E42A1 /* LibraryEnums.swift */,
 				855DBD4C8608B3F5DDE0F430 /* LibraryModels.swift */,
 				E405D8C8E484EDAAA451C5D6 /* NoteModel.swift */,
+				917F0CC34D52248E3754669B /* QuizModels.swift */,
 				7B98EDB4935AA7D2EBBD45F8 /* PageModel.swift */,
 				D8D3F1C30CD4202DFA8C64B4 /* RedactionRegion.swift */,
 				A1A0EE8E4D060414A9DE9009 /* SecuritySettings.swift */,
@@ -978,6 +1028,7 @@
 				2DF6BFDC7CE175A0B3CCB28A /* CLIDatabase.swift */,
 				2983A71BA4770E4CA31A54D6 /* CLIFormatters.swift */,
 				8EE6B08AE42F5F5093B698DF /* CLIImporter.swift */,
+				7A4C2D1E5F8B3A9601D4E7C2 /* CLIOutput.swift */,
 				23368E03DF8FE36F7445B501 /* CLIResolver.swift */,
 				DEFD66F0E0220F56D5E7E244 /* main.swift */,
 				A10E57E661596E49EB03F2F2 /* Marketplace.swift */,
@@ -1006,6 +1057,7 @@
 				1E17653B4A5B70DEDC4E21C1 /* AppExtensionSettingsView.swift */,
 				71025755C0E4031874CD681D /* AudioSettingsView.swift */,
 				C5078B5988D5C8EEA78A023A /* GeneralSettingsView.swift */,
+				37FA7FDEC5967731E93D07AD /* FlashcardSettingsView.swift */,
 				A1B2C3D4E5F6A7B8C9D0E1F9 /* GitHubStarsSettingsView.swift */,
 				4A6ED63FAF96F7236000130F /* LibrarySettingsView.swift */,
 				4967CAD84B5526E596549826 /* LocalModelsSettingsView.swift */,
@@ -1037,6 +1089,7 @@
 				93C99C7591916F9811A0E20C /* main.swift */,
 				86F8522DF838B0A5C1D31B28 /* MainMenuBuilder.swift */,
 				CF62422793C7EE0AA7518AFA /* OakReaderApp.swift */,
+				D0E1F2A3B4C5D6E70001AAAA /* CommandPalette */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -1126,8 +1179,44 @@
 				BBEB161E817EFFADAC274C26 /* ToolCallCardView.swift */,
 				E2D1C0B9A8F7E6D5C4B3F2A1 /* ToolConfirmationBar.swift */,
 				2FE618D781B9927D23075AF8 /* TranslationPanelView.swift */,
+				A1B2C3D4E5F60001C9D0E1F4 /* Flashcards */,
+				A1B2C3D4E5F60002C9D0E1F4 /* Quiz */,
 			);
 			path = RightPanel;
+			sourceTree = "<group>";
+		};
+		D0E1F2A3B4C5D6E70001AAAA /* CommandPalette */ = {
+			isa = PBXGroup;
+			children = (
+				E866EDE5B9BDF85B4CE62CB2 /* CommandPaletteController.swift */,
+				CD8AECBB3416F6CB4D481413 /* CommandPaletteRowView.swift */,
+				761AB4CC31C8BE443DFEF879 /* CommandRegistry.swift */,
+				42A988E5494BA4237407D7E5 /* PaletteCommand.swift */,
+			);
+			path = CommandPalette;
+			sourceTree = "<group>";
+		};
+		A1B2C3D4E5F60001C9D0E1F4 /* Flashcards */ = {
+			isa = PBXGroup;
+			children = (
+				F03F69165E387D60D96C2A79 /* FlashcardListView.swift */,
+				29E8EB1E9048A27FDD231B22 /* FlashcardReviewView.swift */,
+				B4F8436D022577C114789A83 /* FlashcardsPanelView.swift */,
+			);
+			path = Flashcards;
+			sourceTree = "<group>";
+		};
+		A1B2C3D4E5F60002C9D0E1F4 /* Quiz */ = {
+			isa = PBXGroup;
+			children = (
+				F7C3463773352145639F65D2 /* ChoiceQuizView.swift */,
+				30EE3E3565604C0D348CFDBF /* ClozeQuizView.swift */,
+				0A4D57E53E8BB0D75684C949 /* FlashcardQuizView.swift */,
+				88F87E959DD722F9A4C53250 /* InlineQuizView.swift */,
+				5BCF52DB031493D1BFEDB60F /* MatchingQuizView.swift */,
+				86C812B9E86DDC62CB6A154F /* OrderingQuizView.swift */,
+			);
+			path = Quiz;
 			sourceTree = "<group>";
 		};
 		BFF50359443E72973A6B99EF = {
@@ -1153,6 +1242,7 @@
 				DC5C4D300C72A24A34938E69 /* ConvertViewModel.swift */,
 				258BBD44D9EA81C666F6CA0F /* DocumentViewModel.swift */,
 				C6C6798F1279D0348557EF79 /* EditViewModel.swift */,
+				1F61A16C8E053B171C76AF54 /* FlashcardsViewModel.swift */,
 				6DCADA3916F2556ACD865277 /* FillSignViewModel.swift */,
 				A8F15DB052AD5748299E47EA /* FormEditorViewModel.swift */,
 				0ADD810035D275B765C748C2 /* HeaderFooterViewModel.swift */,
@@ -1263,6 +1353,7 @@
 			packageProductDependencies = (
 				D1622ABDD098451C89D32128 /* OakAgent */,
 				F7AB5ED40472FCDDFAE174DE /* GRDB */,
+				C8E4A1F39B2D5E7A4F6B0C13 /* ArgumentParser */,
 			);
 			productName = oak;
 			productReference = DA9BE07C96577E1D03AA8D4F /* oak */;
@@ -1299,6 +1390,8 @@
 				F32C64CBFE9EF5E98102EEE1 /* MLXEmbedders */,
 				1393D51D1FC43362FAC1F484 /* MLXLMCommon */,
 				AE6F23C64D7D4C813A690AC5 /* USearch */,
+				F6A7B8C9D0E1F2A3B4C5D6E7 /* FSRS */,
+				A7B8C9D0E1F2A3B4C5D6E7F8 /* DSFQuickActionBar */,
 			);
 			productName = OakReader;
 			productReference = 62D8CC8D7C726C11792024B3 /* OakReader.app */;
@@ -1338,6 +1431,9 @@
 				F163331A134E539182CE77A7 /* XCLocalSwiftPackageReference "Packages/OakAI" */,
 				33DEE7E7B16365AF42655D31 /* XCLocalSwiftPackageReference "Packages/OakAgent" */,
 				144FEED95A0E24F15EC51BCC /* XCLocalSwiftPackageReference "Packages/OakVoice" */,
+				AB3F8C2E7D1A4B9F0E5C6D72 /* XCRemoteSwiftPackageReference "swift-argument-parser" */,
+				D4E5F6A7B8C9D0E1F2A3B4C5 /* XCRemoteSwiftPackageReference "swift-fsrs" */,
+				E5F6A7B8C9D0E1F2A3B4C5D6 /* XCRemoteSwiftPackageReference "DSFQuickActionBar" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E6C40581B7F1F5E458BD8009 /* Products */;
@@ -1415,6 +1511,7 @@
 				CBD1428ED92037DE87AE9B92 /* CLIDatabase.swift in Sources */,
 				59AE79D7BB542D60DB5BFDCC /* CLIFormatters.swift in Sources */,
 				A5044D8EBF0F8A518C537278 /* CLIImporter.swift in Sources */,
+				6B9F3A2D4E7C8150DA2B5F94 /* CLIOutput.swift in Sources */,
 				43966FE60D93DFBD222A8F23 /* CLIResolver.swift in Sources */,
 				CD68F5844D15888537F54363 /* Marketplace.swift in Sources */,
 				31D75CEE8AEEFE3C3681CB21 /* SkillCommands.swift in Sources */,
@@ -1468,6 +1565,12 @@
 				7F60BAD7F556331F47CFB0DA /* ChapterGenerationService.swift in Sources */,
 				0025F759B35E0D3485583036 /* ChapterModel.swift in Sources */,
 				E5B4CA49D67AB3BED1F279B5 /* ChatBubbleView.swift in Sources */,
+				71408C29E18B94405DC99AD5 /* ChoiceQuizView.swift in Sources */,
+				5905BFAA059F8D762F0F8FAB /* ClozeQuizView.swift in Sources */,
+				6137B49EB16941DF976047CB /* CommandPaletteController.swift in Sources */,
+				87AE8925E7E95C4C8487C821 /* CommandPaletteRowView.swift in Sources */,
+				104ED1625C1134E2742F956E /* CommandRegistry.swift in Sources */,
+				9E6EBD1F62888DAF98E0538F /* PaletteCommand.swift in Sources */,
 				CB8EC4E4E4FD6178EF4D7777 /* ChatCompletionItem.swift in Sources */,
 				5085E28371BD55D10DC6D08E /* ChatCompletionPanel.swift in Sources */,
 				98F56BC1BA4E498B56D1D476 /* ChatContextSnapshot.swift in Sources */,
@@ -1520,6 +1623,12 @@
 				FA1C04001B4812DFEA9213D2 /* FileCoordination.swift in Sources */,
 				F3096C59543289A0288565A6 /* FillSignViewModel.swift in Sources */,
 				EE105214FB3C1042E923BBAE /* FilterRule.swift in Sources */,
+				C1C534F45FDB8488DD683183 /* FlashcardsViewModel.swift in Sources */,
+				F3126678DBC62A79A6AE6A82 /* FlashcardListView.swift in Sources */,
+				0561623C17D4EC4534E87196 /* FlashcardReviewView.swift in Sources */,
+				1FC60FC3271C574A33B25543 /* FlashcardsPanelView.swift in Sources */,
+				2A708E6EC927B588614BC08C /* FlashcardQuizView.swift in Sources */,
+				6CD0B4DE3C626C37C2568F36 /* FlashcardSettingsView.swift in Sources */,
 				2C7A8913E8D1A3D022686066 /* FlowLayout.swift in Sources */,
 				9777DD9015BE16ACFFA0470B /* FontPickerButton.swift in Sources */,
 				2FA864F1552AC0069FAC8014 /* FormDetectionService.swift in Sources */,
@@ -1552,6 +1661,7 @@
 				AB825F7A04D8D1E0031F43C9 /* ImportService+URL.swift in Sources */,
 				72FFBBCEF5CDB8829ECB25DB /* ImportService.swift in Sources */,
 				F352CAC7A2DA675416A9F5C0 /* ImportSheet.swift in Sources */,
+				729919D3D1125AA56481BF29 /* InlineQuizView.swift in Sources */,
 				C88A073EBA57A8B1228A31DF /* ItemSidebarPanel.swift in Sources */,
 				520E5FA7528766BF307F7F42 /* ItemType.swift in Sources */,
 				69661ABF1192BAACDD69A0A9 /* LibraryCitationExport.swift in Sources */,
@@ -1580,6 +1690,7 @@
 				83AC874935F4B6BDBA30DDBF /* MarkdownRenderer.swift in Sources */,
 				7BD7BB75749A6E7D5677B973 /* MarkdownSelectionPopupPanel.swift in Sources */,
 				D6E762AB3257C090203BCF2D /* MarkdownTextView.swift in Sources */,
+				7E7F55D6F92F994917384AE5 /* MatchingQuizView.swift in Sources */,
 				CE7B2D68229A4DC30D017E5F /* MarkdownViewerView.swift in Sources */,
 				B346916E0BE2FE17E1F7FC5C /* MediaDocument.swift in Sources */,
 				20A5EA555198EDD09927D2CE /* MediaSnapshotOverlayView.swift in Sources */,
@@ -1596,6 +1707,7 @@
 				F6576D28DF9B1412AD616AF1 /* NoteService.swift in Sources */,
 				CB6B073F7410C25B7A6DEDA0 /* NoteSettingsView.swift in Sources */,
 				B8E4EFD9CE3A433CF854203D /* NotesViewModel.swift in Sources */,
+				04A5BA0F7CAC3D36DD9665F9 /* OrderingQuizView.swift in Sources */,
 				09611B6D3684448759E0A86B /* OakReaderApp.swift in Sources */,
 				B13E3E2BAD89594EEB6DAB21 /* OakReaderDocument.swift in Sources */,
 				5FAA0AB62E835FF6C66A904C /* OakStyle.swift in Sources */,
@@ -1622,6 +1734,10 @@
 				A12889391EE13C7989B99C1D /* Preferences.swift in Sources */,
 				6FCAAEBAA086AE6572A7170E /* PrintService.swift in Sources */,
 				C939D8C826D2C44D278BE20C /* ProgressOverlay.swift in Sources */,
+				F6BE9335C69DEDD9D414E194 /* QuizModels.swift in Sources */,
+				2A00E420096DAD02A14EB019 /* QuizCardService.swift in Sources */,
+				1CC01BD450DC4EED3DAA633B /* QuizScheduler.swift in Sources */,
+				6A51787C2116CC5D8DA2C07C /* QuizXMLParser.swift in Sources */,
 				83C5E10DDA18DB00BB9A1DCC /* ReadingOrderView.swift in Sources */,
 				55985062B2B910DFAC73008E /* RecordingSummaryService.swift in Sources */,
 				B03AE29883273DB1062F2448 /* RecordingSummaryView.swift in Sources */,
@@ -2033,6 +2149,30 @@
 				minimumVersion = 0.1.0;
 			};
 		};
+		AB3F8C2E7D1A4B9F0E5C6D72 /* XCRemoteSwiftPackageReference "swift-argument-parser" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-argument-parser.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.5.0;
+			};
+		};
+		D4E5F6A7B8C9D0E1F2A3B4C5 /* XCRemoteSwiftPackageReference "swift-fsrs" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/open-spaced-repetition/swift-fsrs";
+			requirement = {
+				kind = branch;
+				branch = main;
+			};
+		};
+		E5F6A7B8C9D0E1F2A3B4C5D6 /* XCRemoteSwiftPackageReference "DSFQuickActionBar" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/dagronf/DSFQuickActionBar";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 6.2.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -2111,6 +2251,21 @@
 			isa = XCSwiftPackageProductDependency;
 			package = DD10350F424FE099033E1375 /* XCRemoteSwiftPackageReference "GRDB.swift" */;
 			productName = GRDB;
+		};
+		C8E4A1F39B2D5E7A4F6B0C13 /* ArgumentParser */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AB3F8C2E7D1A4B9F0E5C6D72 /* XCRemoteSwiftPackageReference "swift-argument-parser" */;
+			productName = ArgumentParser;
+		};
+		F6A7B8C9D0E1F2A3B4C5D6E7 /* FSRS */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D4E5F6A7B8C9D0E1F2A3B4C5 /* XCRemoteSwiftPackageReference "swift-fsrs" */;
+			productName = FSRS;
+		};
+		A7B8C9D0E1F2A3B4C5D6E7F8 /* DSFQuickActionBar */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E5F6A7B8C9D0E1F2A3B4C5D6 /* XCRemoteSwiftPackageReference "DSFQuickActionBar" */;
+			productName = DSFQuickActionBar;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

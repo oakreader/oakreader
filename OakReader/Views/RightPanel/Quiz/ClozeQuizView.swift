@@ -21,30 +21,34 @@ struct ClozeQuizView: View {
         // Parse cloze markers and render as inline text with tappable blanks
         let segments = parseClozeSegments(content.text)
         FlowLayout(spacing: 2) {
-            ForEach(Array(segments.enumerated()), id: \.offset) { _, segment in
-                switch segment {
-                case .text(let str):
-                    Text(str)
-                        .font(.system(size: 13))
-                case .cloze(let id, let answer):
-                    if revealed.contains(id) {
-                        Text(answer)
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(.green)
-                            .transition(.opacity)
-                    } else {
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                revealed.insert(id)
-                            }
-                        } label: {
-                            Text("[      ]")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(.accentColor)
-                        }
-                        .buttonStyle(.plain)
+            ForEach(0..<segments.count, id: \.self) { idx in
+                clozeSegmentView(segments[idx])
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func clozeSegmentView(_ segment: ClozeSegment) -> some View {
+        switch segment {
+        case .text(let str):
+            Text(str)
+                .font(.system(size: 13))
+        case .cloze(let id, let answer):
+            if revealed.contains(id) {
+                Text(answer)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.green)
+            } else {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        _ = revealed.insert(id)
                     }
+                } label: {
+                    Text("[      ]")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Color.accentColor)
                 }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -99,45 +103,3 @@ struct ClozeQuizView: View {
     }
 }
 
-// MARK: - FlowLayout (simple horizontal wrapping)
-
-/// A simple flow layout that wraps children horizontally.
-private struct FlowLayout: Layout {
-    var spacing: CGFloat
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let result = layout(proposal: proposal, subviews: subviews)
-        return result.size
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let result = layout(proposal: proposal, subviews: subviews)
-        for (index, offset) in result.offsets.enumerated() {
-            subviews[index].place(at: CGPoint(x: bounds.minX + offset.x, y: bounds.minY + offset.y), proposal: .unspecified)
-        }
-    }
-
-    private func layout(proposal: ProposedViewSize, subviews: Subviews) -> (size: CGSize, offsets: [CGPoint]) {
-        let maxWidth = proposal.width ?? .infinity
-        var offsets: [CGPoint] = []
-        var x: CGFloat = 0
-        var y: CGFloat = 0
-        var rowHeight: CGFloat = 0
-        var totalHeight: CGFloat = 0
-
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if x + size.width > maxWidth && x > 0 {
-                x = 0
-                y += rowHeight + spacing
-                rowHeight = 0
-            }
-            offsets.append(CGPoint(x: x, y: y))
-            x += size.width + spacing
-            rowHeight = max(rowHeight, size.height)
-            totalHeight = y + rowHeight
-        }
-
-        return (CGSize(width: maxWidth, height: totalHeight), offsets)
-    }
-}
