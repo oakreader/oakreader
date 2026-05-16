@@ -6,6 +6,7 @@ struct ChatBubbleView: View {
     let turn: Turn
     var onSaveToNote: ((Turn) -> Bool)?
     var onOpenCitation: ((String, CitationAnchor) -> Void)?
+    var onSaveQuizCard: ((QuizContent) -> Bool)?
 
     @State private var isHovered = false
     @State private var isCopyHovered = false
@@ -137,6 +138,48 @@ struct ChatBubbleView: View {
 
     @ViewBuilder
     private var messageBubble: some View {
+        // When assistant message is done streaming and contains quiz blocks, render segments
+        if turn.role == .assistant && !turn.isStreaming && !reveal.isAnimating && hasQuizContent {
+            quizSegmentedBubble
+        } else {
+            plainMessageBubble
+        }
+    }
+
+    /// Whether the fully revealed content contains quiz XML blocks.
+    private var hasQuizContent: Bool {
+        turn.role == .assistant && QuizXMLParser.containsQuiz(turn.content)
+    }
+
+    /// Renders interleaved text segments and inline quiz views.
+    @ViewBuilder
+    private var quizSegmentedBubble: some View {
+        let segments = QuizXMLParser.parse(turn.content)
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(Array(segments.enumerated()), id: \.offset) { _, segment in
+                switch segment {
+                case .text(let markdown):
+                    StructuredText(markdown: protectMathBackslashes(markdown), syntaxExtensions: [.math])
+                        .textual.headingStyle(ChatHeadingStyle())
+                        .textual.textSelection(.enabled)
+                        .font(OakStyle.ChatFont.messageBody)
+                case .quiz(let content):
+                    InlineQuizView(content: content, onSaveToDeck: onSaveQuizCard)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 4)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(bubbleColor)
+        )
+        .foregroundStyle(Color(nsColor: .labelColor))
+    }
+
+    @ViewBuilder
+    private var plainMessageBubble: some View {
         let base = StructuredText(markdown: renderedContent, syntaxExtensions: [.math])
             .textual.headingStyle(ChatHeadingStyle())
             .textual.textSelection(.enabled)

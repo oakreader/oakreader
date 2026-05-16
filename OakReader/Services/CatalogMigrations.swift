@@ -380,6 +380,46 @@ extension CatalogDatabase {
             try db.drop(table: "characters")
         }
 
+        // MARK: v11 — Quiz Cards & Review Log (Flashcards / Spaced Repetition)
+
+        migrator.registerMigration("v11-quiz-cards") { db in
+            try db.create(table: "quiz_cards") { t in
+                t.column("id", .text).primaryKey()
+                t.column("item_id", .text).notNull().references("items", onDelete: .cascade)
+                t.column("conversation_id", .text)
+                t.column("group_id", .text)
+                t.column("type", .text).notNull()             // cloze, choice, flashcard, occlusion, matching, ordering
+                t.column("content_json", .text).notNull()     // JSON-encoded quiz content
+                // FSRS scheduling fields
+                t.column("state", .text).notNull().defaults(to: "new")  // new, learning, review, relearning
+                t.column("due_at", .text).notNull()
+                t.column("stability", .double).notNull().defaults(to: 0)
+                t.column("difficulty", .double).notNull().defaults(to: 0)
+                t.column("elapsed_days", .integer).notNull().defaults(to: 0)
+                t.column("scheduled_days", .integer).notNull().defaults(to: 0)
+                t.column("reps", .integer).notNull().defaults(to: 0)
+                t.column("lapses", .integer).notNull().defaults(to: 0)
+                t.column("last_review_at", .text)
+                t.column("is_suspended", .integer).notNull().defaults(to: false)
+                t.column("created_at", .text).notNull()
+                t.column("updated_at", .text).notNull()
+            }
+            try db.create(index: "idx_quiz_cards_state_due", on: "quiz_cards", columns: ["state", "due_at"])
+            try db.create(index: "idx_quiz_cards_item_id", on: "quiz_cards", columns: ["item_id"])
+            try db.create(index: "idx_quiz_cards_group_id", on: "quiz_cards", columns: ["group_id"])
+
+            try db.create(table: "quiz_review_log") { t in
+                t.column("id", .text).primaryKey()
+                t.column("card_id", .text).notNull().references("quiz_cards", onDelete: .cascade)
+                t.column("rating", .integer).notNull()        // 1=Again, 2=Hard, 3=Good, 4=Easy
+                t.column("state", .text).notNull()            // state before review
+                t.column("scheduled_days", .integer).notNull()
+                t.column("elapsed_days", .integer).notNull()
+                t.column("reviewed_at", .text).notNull()
+            }
+            try db.create(index: "idx_quiz_review_log_card_id", on: "quiz_review_log", columns: ["card_id"])
+        }
+
         return migrator
     }
 
