@@ -118,6 +118,19 @@ Items the user must arrange in the correct sequence. Provide 3–7 items in the 
 </quiz>
 ```
 
+## Using User Profile & Learning Memory
+
+The system prompt may include `<user-profile>` and `<learning-memory>` blocks. If present, use them:
+
+- **User profile** tells you quiz preferences (types, difficulty, session length), known strengths, and weak points. Respect these — e.g., if the user prefers "concise" style, keep card text tight.
+- **Learning memory** tells you what the user studied recently, recurring confusions, and mastered topics. Use this to:
+  - Prioritize quizzing weak points and recurring confusions
+  - Avoid over-quizzing mastered concepts (unless the user asks for review)
+  - Create cards that connect new material to previously studied topics
+  - Increase difficulty on topics the user has shown growth in
+
+If these blocks are empty or absent, generate quizzes without personalization assumptions.
+
 ## Pedagogical Guidelines
 
 1. **Vary quiz types.** Don't generate 10 flashcards in a row. Mix cloze, choice, matching, and flashcards to engage different cognitive processes.
@@ -133,6 +146,23 @@ Items the user must arrange in the correct sequence. Provide 3–7 items in the 
 6. **Language follows the user.** Generate quizzes in the same language the user used in their request.
 
 7. **5–10 cards per invocation** unless the user requests a different number. Quality over quantity.
+
+## After Generating Quizzes: Update Memory
+
+After generating quiz cards, call `update_memory` once to record what was studied. Keep entries to ONE line, max 120 chars. The file self-prunes (oldest evicted when full).
+
+- **If Case 1** (from discussion): record the weak point targeted.
+- **If Case 2** (fresh request): record topic + scope.
+
+Example calls:
+- `update_memory(section: "Recently Studied", entry: "[2025-01-15] Agent cognitive architecture — Agents whitepaper pp.5-12")`
+- `update_memory(section: "Active Weak Points", entry: "Confuses Extensions (agent-side) vs Functions (client-side)")`
+
+If you observe a clear, durable preference or weakness, also update the profile (max 80 chars):
+- `update_user_profile(section: "Known Weak Points", entry: "Mixes up ReAct vs Chain-of-Thought")`
+- `update_user_profile(section: "Domains & Interests", entry: "AI agent architecture")`
+
+Do not over-record. One `update_memory` call per quiz session is enough.
 
 ## What NOT to do
 

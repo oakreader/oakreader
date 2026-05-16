@@ -368,12 +368,143 @@ struct PDFContextProvider {
                 """)
         }
 
+        // User profile and learning memory (personalization layer)
+        let userMemoryBlock = Self.loadUserAndMemory()
+        if !userMemoryBlock.isEmpty {
+            parts.append("""
+                \(userMemoryBlock)
+
+                <memory-instructions>
+                You maintain a dynamic cognitive map of the user's evolving understanding. \
+                This is NOT a knowledge base — it tracks how their MIND changes.
+
+                **Daily log (log_learning) — only when genuine learning signal:**
+                - User confused, asked "why?", struggled, or got something wrong
+                - User had insight, made cross-topic connection, or broke through
+                - User's mental model visibly shifted
+                Do NOT log: simple Q&A, routine tasks, things they already know.
+
+                **Cognitive map (update_memory) — track structural changes:**
+                - Mental model formed or replaced ("now thinks about X using Y framework")
+                - Learning frontier moved (something at the edge became solid)
+                - Misconception identified or resolved
+                - Cross-domain connection discovered
+                - Cognitive pattern observed (how they reason, not what they know)
+
+                **Profile (update_user_profile) — durable identity facts:**
+                - Background, goals, cognition targets, strengths, weaknesses
+
+                **Concept map (update_concept_map) — per-collection vocabulary:**
+                - Add concepts as user encounters them in documents
+                - Update mastery: unseen → encountered → partial → solid → deep
+                - Add relationships between concepts (prerequisite, contrasts-with, etc.)
+                - Mark gaps: important unseen concepts the user should learn next
+                - The concept map tells you exactly what to quiz and at what level
+
+                Observe silently. Do not ask permission. Do not announce updates.
+                </memory-instructions>
+                """)
+        }
+
+        // Concept map for current collection (if exists)
+        let conceptMap = Self.loadConceptMap(for: context)
+        if !conceptMap.isEmpty {
+            parts.append(conceptMap)
+        }
+
         // Skill prompt (after context so the skill can reference it)
         if let skill {
             parts.append(skill.systemPrompt)
         }
 
         return parts.joined(separator: "\n\n")
+    }
+
+    /// Load concept map for the document's primary collection.
+    private static func loadConceptMap(for context: ChatContextSnapshot) -> String {
+        let collectionName = context.document?.collectionNames.first
+            ?? context.activeCollectionName
+        guard let name = collectionName else { return "" }
+
+        let mapURL = CatalogDatabase.agentConceptMapURL(collectionName: name)
+        guard let content = try? String(contentsOf: mapURL, encoding: .utf8),
+              !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return ""
+        }
+
+        return """
+            <concept-map collection="\(xmlEscape(name))">
+            \(content.trimmingCharacters(in: .whitespacesAndNewlines))
+            </concept-map>
+            """
+    }
+
+    // MARK: - User Profile & Memory
+
+    /// Load USER.md, MEMORY.md, and recent daily logs from ~/OakReader/agent/.
+    /// Returns empty string if no files exist.
+    private static func loadUserAndMemory() -> String {
+        var sections: [String] = []
+
+        let userURL = CatalogDatabase.agentUserFileURL
+        if let userContent = try? String(contentsOf: userURL, encoding: .utf8),
+           !userContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            sections.append("<user-profile>\n\(userContent.trimmingCharacters(in: .whitespacesAndNewlines))\n</user-profile>")
+        }
+
+        let memoryURL = CatalogDatabase.agentMemoryFileURL
+        if let memoryContent = try? String(contentsOf: memoryURL, encoding: .utf8),
+           !memoryContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            sections.append("<learning-memory>\n\(memoryContent.trimmingCharacters(in: .whitespacesAndNewlines))\n</learning-memory>")
+        }
+
+        // Load today's + yesterday's daily logs (like OpenClaw's temporal context)
+        let dailyLogs = loadRecentDailyLogs()
+        if !dailyLogs.isEmpty {
+            sections.append("<recent-learning-log>\n\(dailyLogs)\n</recent-learning-log>")
+        }
+
+        return sections.joined(separator: "\n\n")
+    }
+
+    /// Load today and yesterday's daily learning logs (JSONL → readable format).
+    private static func loadRecentDailyLogs() -> String {
+        var logs: [String] = []
+        let today = Date()
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: today) ?? today
+        let decoder = JSONDecoder()
+
+        for date in [yesterday, today] {
+            let url = CatalogDatabase.agentDailyLogURL(date: date)
+            guard let content = try? String(contentsOf: url, encoding: .utf8),
+                  !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                continue
+            }
+
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            var dayLines: [String] = ["## \(formatter.string(from: date))"]
+
+            for line in content.components(separatedBy: "\n") {
+                let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty,
+                      let data = trimmed.data(using: .utf8),
+                      let entry = try? decoder.decode(LearningLogEntry.self, from: data) else {
+                    continue
+                }
+                let time = String(entry.timestamp.suffix(from:
+                    entry.timestamp.index(entry.timestamp.startIndex, offsetBy: min(11, entry.timestamp.count))
+                ).prefix(5))
+                let doc = entry.document.map { " — \($0)" } ?? ""
+                dayLines.append("- \(time) [\(entry.type)] #\(entry.subject) \(entry.entry)\(doc)")
+            }
+
+            if dayLines.count > 1 { // has entries beyond header
+                logs.append(dayLines.joined(separator: "\n"))
+            }
+        }
+
+        return logs.joined(separator: "\n\n")
     }
 
     /// Escape special XML characters in attribute values and text content.

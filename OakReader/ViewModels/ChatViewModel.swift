@@ -207,6 +207,15 @@ class ChatViewModel {
         // 3. Web search (always)
         tools.append(AcademicSearchTool())
 
+        // 3b. Memory & concept tools (always available for personalization)
+        tools.append(UpdateMemoryTool())
+        tools.append(UpdateUserProfileTool())
+        tools.append(LogLearningTool())
+        tools.append(PromoteMemoryTool())
+        tools.append(SearchLearningLogTool())
+        tools.append(UpdateConceptMapTool())
+        tools.append(ReadConceptMapTool())
+
         // 4. Filesystem tools (user preference gated)
         if prefs.agentToolsEnabled, toolContext != nil {
             if prefs.agentReadFileEnabled { tools.append(ReadTool()) }
@@ -232,6 +241,9 @@ class ChatViewModel {
             if snapshot.document?.notes.isEmpty == false || !noteRefs.isEmpty {
                 allowed.append(CatalogDatabase.notesDirectory)
             }
+            // Allow memory/concept tools to write to agent directory
+            allowed.append(CatalogDatabase.agentDirectory)
+            allowed.append(CatalogDatabase.agentConceptsDirectory)
             effectiveToolContext = toolContext ?? ToolExecutionContext(
                 workingDirectory: storagePath ?? URL(fileURLWithPath: NSTemporaryDirectory()),
                 allowedPaths: allowed
