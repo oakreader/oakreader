@@ -122,6 +122,18 @@ struct QuizCardService {
         }
     }
 
+    /// Fetch all non-pending cards across all items, ordered by due date.
+    func fetchAllCards() throws -> [QuizCard] {
+        try database.dbQueue.read { db in
+            let records = try QuizCardRecord
+                .filter(QuizCardRecord.CodingKeys.isSuspended == false)
+                .filter(QuizCardRecord.CodingKeys.isPending == false)
+                .order(QuizCardRecord.CodingKeys.dueAt.asc)
+                .fetchAll(db)
+            return records.map { QuizCard(record: $0) }
+        }
+    }
+
     // MARK: - Create
 
     /// Create a new quiz card from parsed quiz content.
