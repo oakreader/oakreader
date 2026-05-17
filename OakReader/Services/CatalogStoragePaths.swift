@@ -77,18 +77,6 @@ extension CatalogDatabase {
         agentDirectory.appendingPathComponent("memory", isDirectory: true)
     }
 
-    /// ~/OakReader/agent/concepts/ — per-collection concept maps
-    static var agentConceptsDirectory: URL {
-        agentDirectory.appendingPathComponent("concepts", isDirectory: true)
-    }
-
-    /// ~/OakReader/agent/concepts/{collection-slug}.md — concept map for a collection
-    static func agentConceptMapURL(collectionName: String) -> URL {
-        let slug = collectionName.lowercased()
-            .replacingOccurrences(of: " ", with: "-")
-            .replacingOccurrences(of: "/", with: "-")
-        return agentConceptsDirectory.appendingPathComponent("\(slug).md")
-    }
 
     /// ~/OakReader/agent/memory/YYYY-MM-DD.jsonl — daily learning log (one JSON per line)
     static func agentDailyLogURL(date: Date = Date()) -> URL {
@@ -149,7 +137,6 @@ extension CatalogDatabase {
         try FileManager.default.createDirectory(at: chatAttachmentsDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: agentDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: agentMemoryLogsDirectory, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: agentConceptsDirectory, withIntermediateDirectories: true)
         bootstrapAgentFiles()
     }
 
