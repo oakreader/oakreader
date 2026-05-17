@@ -380,7 +380,7 @@ extension CatalogDatabase {
             try db.drop(table: "characters")
         }
 
-        // MARK: v11 — Quiz Cards & Review Log (Flashcards / Spaced Repetition)
+        // MARK: v11 — Quiz Cards & Review Log (Spaced Repetition)
 
         migrator.registerMigration("v11-quiz-cards") { db in
             try db.create(table: "quiz_cards") { t in
@@ -419,12 +419,12 @@ extension CatalogDatabase {
             }
             try db.create(index: "idx_quiz_review_log_card_id", on: "quiz_review_log", columns: ["card_id"])
 
-            // Seed "Flashcards" system smart collection
+            // Seed "Quiz Cards" system smart collection (originally named "Flashcards", renamed in v15)
             let now = Date().iso8601String
             try db.execute(sql: """
                 INSERT INTO collections (id, user_id, name, icon, sort_order, parent_id, is_smart, is_system, filter_rules, created_at, updated_at)
                 VALUES (?, ?, 'Flashcards', 'rectangle.on.rectangle.angled', 9, NULL, 1, 1, NULL, ?, ?)
-            """, arguments: [SystemCollectionID.flashcards.uuidString, localUserId, now, now])
+            """, arguments: [SystemCollectionID.quizCards.uuidString, localUserId, now, now])
         }
 
         // MARK: v12 — Processing Status
@@ -469,6 +469,24 @@ extension CatalogDatabase {
             }
             try db.create(index: "idx_quiz_cards_annotation", on: "quiz_cards", columns: ["annotation_id"])
             try db.create(index: "idx_quiz_cards_pending", on: "quiz_cards", columns: ["is_pending", "item_id"])
+        }
+
+        // MARK: v14 — Quiz Card Collection Link
+
+        migrator.registerMigration("v14-quiz-card-collection") { db in
+            try db.alter(table: "quiz_cards") { t in
+                t.add(column: "collection_id", .text).references("collections", onDelete: .cascade)
+            }
+            try db.create(index: "idx_quiz_cards_collection", on: "quiz_cards", columns: ["collection_id"])
+        }
+
+        // MARK: v15 — Rename Flashcards Collection to Quiz Cards
+
+        migrator.registerMigration("v15-rename-flashcards-collection") { db in
+            try db.execute(sql: """
+                UPDATE collections SET name = 'Quiz Cards'
+                WHERE id = ?
+            """, arguments: [SystemCollectionID.quizCards.uuidString])
         }
 
         return migrator

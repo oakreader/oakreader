@@ -1,13 +1,13 @@
 import SwiftUI
 
-/// Container view for the Flashcards right panel. Switches between list and review mode.
-struct FlashcardsPanelView: View {
-    let flashcardsVM: FlashcardsViewModel
+/// Container view for the Quiz Cards right panel. Switches between list and review mode.
+struct QuizCardsPanelView: View {
+    let quizCardsVM: QuizCardsViewModel
 
     var body: some View {
         VStack(spacing: 0) {
-            if flashcardsVM.isReviewing {
-                FlashcardReviewView(flashcardsVM: flashcardsVM)
+            if quizCardsVM.isReviewing {
+                QuizCardReviewView(quizCardsVM: quizCardsVM)
             } else {
                 cardListContainer
             }
@@ -19,11 +19,11 @@ struct FlashcardsPanelView: View {
         VStack(spacing: 0) {
             // Header
             HStack(spacing: 8) {
-                Text("Flashcards")
+                Text("Quiz Cards")
                     .font(.system(size: 16, weight: .semibold))
 
-                if flashcardsVM.dueCount > 0 {
-                    Text("\(flashcardsVM.dueCount)")
+                if quizCardsVM.dueCount > 0 {
+                    Text("\(quizCardsVM.dueCount)")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 6)
@@ -33,8 +33,8 @@ struct FlashcardsPanelView: View {
 
                 Spacer()
 
-                if flashcardsVM.dueCount > 0 {
-                    Button(action: { flashcardsVM.startReview() }) {
+                if quizCardsVM.dueCount > 0 {
+                    Button(action: { quizCardsVM.startReview() }) {
                         Label("Review", systemImage: "play.fill")
                             .font(.system(size: 12, weight: .medium))
                     }
@@ -47,16 +47,16 @@ struct FlashcardsPanelView: View {
             .padding(.vertical, OakStyle.Spacing.sm)
 
             // Pending cards section (shown above the main list when present)
-            if flashcardsVM.pendingCount > 0 {
-                PendingQuizView(flashcardsVM: flashcardsVM)
+            if quizCardsVM.pendingCount > 0 {
+                PendingQuizView(quizCardsVM: quizCardsVM)
                     .frame(maxHeight: 300)
                 Divider()
             }
 
-            if flashcardsVM.cards.isEmpty && flashcardsVM.pendingCount == 0 {
+            if quizCardsVM.cards.isEmpty && quizCardsVM.pendingCount == 0 {
                 emptyState
-            } else if !flashcardsVM.cards.isEmpty {
-                FlashcardListView(flashcardsVM: flashcardsVM)
+            } else if !quizCardsVM.cards.isEmpty {
+                QuizCardListView(quizCardsVM: quizCardsVM)
             }
         }
     }
@@ -67,7 +67,7 @@ struct FlashcardsPanelView: View {
             Image(systemName: "rectangle.on.rectangle.angled")
                 .font(.system(size: 40))
                 .foregroundStyle(.tertiary)
-            Text("No Flashcards Yet")
+            Text("No Quiz Cards Yet")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.secondary)
             Text("Use the /quiz skill in chat to generate quiz cards, then save the ones you want to review.")

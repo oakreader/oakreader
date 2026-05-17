@@ -1,9 +1,9 @@
 import SwiftUI
 
-struct FlashcardSettingsView: View {
-    @AppStorage("flashcard_targetRetention") private var targetRetention: Double = 0.9
-    @AppStorage("flashcard_maxInterval") private var maxInterval: Int = 36500
-    @AppStorage("flashcard_dailyNewLimit") private var dailyNewLimit: Int = 20
+struct QuizCardSettingsView: View {
+    @AppStorage("quizCard_targetRetention") private var targetRetention: Double = 0.9
+    @AppStorage("quizCard_maxInterval") private var maxInterval: Int = 36500
+    @AppStorage("quizCard_dailyNewLimit") private var dailyNewLimit: Int = 20
 
     var body: some View {
         Form {

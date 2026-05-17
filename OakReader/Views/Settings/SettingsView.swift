@@ -18,7 +18,7 @@ struct SettingsView: View {
         // Extension tabs
         case extensionNotes
         case extensionTranslation
-        case extensionFlashcards
+        case extensionQuizCards
         case extensionXBookmarks
         case extensionGitHubStars
 
@@ -37,7 +37,7 @@ struct SettingsView: View {
             case .youtube: return "YouTube"
             case .extensionNotes: return AppExtension.notes.label
             case .extensionTranslation: return AppExtension.translation.label
-            case .extensionFlashcards: return AppExtension.flashcards.label
+            case .extensionQuizCards: return AppExtension.quizCards.label
             case .extensionXBookmarks: return AppExtension.xBookmarks.label
             case .extensionGitHubStars: return AppExtension.githubStars.label
             }
@@ -56,7 +56,7 @@ struct SettingsView: View {
             case .youtube: return "play.rectangle"
             case .extensionNotes: return AppExtension.notes.systemImage
             case .extensionTranslation: return AppExtension.translation.systemImage
-            case .extensionFlashcards: return AppExtension.flashcards.systemImage
+            case .extensionQuizCards: return AppExtension.quizCards.systemImage
             case .extensionXBookmarks: return AppExtension.xBookmarks.systemImage
             case .extensionGitHubStars: return AppExtension.githubStars.systemImage
             }
@@ -72,7 +72,7 @@ struct SettingsView: View {
             switch self {
             case .extensionNotes: return .notes
             case .extensionTranslation: return .translation
-            case .extensionFlashcards: return .flashcards
+            case .extensionQuizCards: return .quizCards
             case .extensionXBookmarks: return .xBookmarks
             case .extensionGitHubStars: return .githubStars
             default: return nil
@@ -86,7 +86,7 @@ struct SettingsView: View {
             switch ext {
             case .notes: return .extensionNotes
             case .translation: return .extensionTranslation
-            case .flashcards: return .extensionFlashcards
+            case .quizCards: return .extensionQuizCards
             case .xBookmarks: return .extensionXBookmarks
             case .githubStars: return .extensionGitHubStars
             }
@@ -186,8 +186,8 @@ struct SettingsView: View {
             NoteSettingsView()
         case .extensionTranslation:
             TranslationSettingsView()
-        case .extensionFlashcards:
-            FlashcardSettingsView()
+        case .extensionQuizCards:
+            QuizCardSettingsView()
         case .extensionXBookmarks:
             XBookmarksSettingsView(store: store)
         case .extensionGitHubStars:

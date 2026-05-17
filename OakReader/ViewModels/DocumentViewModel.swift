@@ -105,11 +105,11 @@ class DocumentViewModel {
         return vm
     }
 
-    private var _flashcards: FlashcardsViewModel?
-    var flashcards: FlashcardsViewModel {
-        if let vm = _flashcards { return vm }
-        let vm = FlashcardsViewModel(parent: self, database: database, storageKey: storageKey)
-        _flashcards = vm
+    private var _quizCards: QuizCardsViewModel?
+    var quizCards: QuizCardsViewModel {
+        if let vm = _quizCards { return vm }
+        let vm = QuizCardsViewModel(parent: self, database: database, storageKey: storageKey)
+        _quizCards = vm
         return vm
     }
 

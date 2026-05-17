@@ -186,8 +186,8 @@ final class LibraryStore {
         return map
     }
 
-    var isFlashcardsSelected: Bool {
-        selectedCollectionId == SystemCollectionID.flashcards
+    var isQuizCardsSelected: Bool {
+        selectedCollectionId == SystemCollectionID.quizCards
     }
 
     var filteredItems: [LibraryItem] {
@@ -196,9 +196,9 @@ final class LibraryStore {
             return duplicatesFilteredItems
         }
 
-        // Special handling for Flashcards collection (items with quiz cards)
-        if isFlashcardsSelected {
-            return flashcardsFilteredItems
+        // Special handling for Quiz Cards collection (items with quiz cards)
+        if isQuizCardsSelected {
+            return quizCardsFilteredItems
         }
 
         var results = items
@@ -362,8 +362,8 @@ final class LibraryStore {
         if collection.id == SystemCollectionID.duplicates {
             return duplicateGroups.flatMap { $0 }.count
         }
-        if collection.id == SystemCollectionID.flashcards {
-            return flashcardsItemIds.count
+        if collection.id == SystemCollectionID.quizCards {
+            return quizCardsItemIds.count
         }
         guard collection.isSmart, let rules = collection.filterRules else {
             return collection.itemCount
@@ -371,10 +371,10 @@ final class LibraryStore {
         return items.filter { evaluateRules(rules, against: $0) }.count
     }
 
-    // MARK: - Flashcards Filtered Items
+    // MARK: - Quiz Cards Filtered Items
 
     /// Set of item IDs that have at least one quiz card.
-    private var flashcardsItemIds: Set<UUID> {
+    private var quizCardsItemIds: Set<UUID> {
         let ids = (try? database.dbQueue.read { db in
             try String.fetchAll(db, sql: "SELECT DISTINCT item_id FROM quiz_cards WHERE is_suspended = 0")
         }) ?? []
@@ -382,8 +382,8 @@ final class LibraryStore {
     }
 
     /// Items that have quiz cards saved.
-    private var flashcardsFilteredItems: [LibraryItem] {
-        let itemIds = flashcardsItemIds
+    private var quizCardsFilteredItems: [LibraryItem] {
+        let itemIds = quizCardsItemIds
         return items.filter { itemIds.contains($0.id) }
     }
 

@@ -37,6 +37,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let migration = MigrationService(store: appState.libraryStore, coverService: appState.coverService)
         migration.migrateIfNeeded()
 
+        // Migrate AppStorage keys: flashcard_ → quizCard_
+        UserDefaultsKeyMigration.migrateQuizCardKeys()
+
         // Start the snapshot server for Chrome extension
         snapshotServer = SnapshotServer(importService: appState.importService)
         snapshotServer?.start()

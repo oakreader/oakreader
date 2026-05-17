@@ -757,3 +757,30 @@ final class Preferences {
     }
 
 }
+
+// MARK: - UserDefaults Key Migration
+
+enum UserDefaultsKeyMigration {
+    private static let migrationDoneKey = "quizCardKeysMigrated"
+
+    /// Migrate flashcard_ prefixed keys to quizCard_ prefix (one-time).
+    static func migrateQuizCardKeys() {
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: migrationDoneKey) else { return }
+
+        let mappings: [(old: String, new: String)] = [
+            ("flashcard_targetRetention", "quizCard_targetRetention"),
+            ("flashcard_maxInterval", "quizCard_maxInterval"),
+            ("flashcard_dailyNewLimit", "quizCard_dailyNewLimit"),
+        ]
+
+        for (old, new) in mappings {
+            if let value = defaults.object(forKey: old), defaults.object(forKey: new) == nil {
+                defaults.set(value, forKey: new)
+                defaults.removeObject(forKey: old)
+            }
+        }
+
+        defaults.set(true, forKey: migrationDoneKey)
+    }
+}
