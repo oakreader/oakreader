@@ -15,6 +15,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsCloseObserver: NSObjectProtocol?
     private var snapshotServer: SnapshotServer?
     private var appearanceObserver: NSObjectProtocol?
+    private let externalLibraryChangeNotificationName = Notification.Name("com.oakreader.library.didChange")
+    private let externalLibraryChangeSource = "oak-cli"
     private(set) lazy var commandPalette = CommandPaletteController(appDelegate: self)
     func applicationWillFinishLaunching(_ notification: Notification) {
         documentController.appState = appState
@@ -39,6 +41,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Migrate AppStorage keys: flashcard_ → quizCard_
         UserDefaultsKeyMigration.migrateQuizCardKeys()
 
+        installExternalLibraryChangeObserver()
+
         // Start the snapshot server for Chrome extension
         snapshotServer = SnapshotServer(importService: appState.importService)
         snapshotServer?.start()
@@ -47,6 +51,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        DistributedNotificationCenter.default().removeObserver(
+            self,
+            name: externalLibraryChangeNotificationName,
+            object: nil
+        )
         snapshotServer?.stop()
     }
 
@@ -139,6 +148,33 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         default:
             showMainWindow()
+        }
+    }
+
+    private func installExternalLibraryChangeObserver() {
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(handleExternalLibraryChange(_:)),
+            name: externalLibraryChangeNotificationName,
+            object: nil
+        )
+    }
+
+    @objc private func handleExternalLibraryChange(_ notification: Notification) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self,
+                  notification.userInfo?["source"] as? String == self.externalLibraryChangeSource else {
+                return
+            }
+
+            self.appState.libraryStore.invalidate()
+            let message = notification.userInfo?["message"] as? String ?? "Library updated from oak"
+            withAnimation {
+                self.appState.importNotification = message
+            }
+
+            let operation = notification.userInfo?["operation"] as? String ?? "unknown"
+            Log.info(Log.store, "Applied external library change from oak CLI: \(operation)")
         }
     }
 

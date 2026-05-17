@@ -2,6 +2,29 @@ import ArgumentParser
 import Foundation
 import OakAgent
 
+// MARK: - Library Change Notifications
+
+enum CLILibraryChangeNotifier {
+    static let source = "oak-cli"
+    static let notificationName = Notification.Name("com.oakreader.library.didChange")
+
+    static func post(operation: String, message: String, id: String? = nil) {
+        var userInfo: [String: String] = [
+            "source": source,
+            "operation": operation,
+            "message": message,
+        ]
+        if let id { userInfo["id"] = id }
+
+        DistributedNotificationCenter.default().postNotificationName(
+            notificationName,
+            object: source,
+            userInfo: userInfo,
+            deliverImmediately: true
+        )
+    }
+}
+
 // MARK: - Global Options
 
 struct GlobalOptions: ParsableArguments {
@@ -248,6 +271,7 @@ struct CollectionsCreate: ParsableCommand {
         }
 
         let id = try database.createCollection(name: name, parentId: parentId)
+        CLILibraryChangeNotifier.post(operation: "collections.create", message: "Created collection \"\(name)\"", id: id)
 
         if globals.json {
             let output = CLIOutput(json: true, quiet: globals.quiet)
@@ -281,6 +305,7 @@ struct CollectionsRename: ParsableCommand {
         }
 
         try database.renameCollection(id: collection.id, newName: newName)
+        CLILibraryChangeNotifier.post(operation: "collections.rename", message: "Renamed collection to \"\(newName)\"", id: collection.id)
 
         if globals.json {
             let output = CLIOutput(json: true, quiet: globals.quiet)
@@ -315,6 +340,7 @@ struct CollectionsAdd: ParsableCommand {
         }
 
         try database.addItemToCollection(collectionId: col.id, itemId: itm.id)
+        CLILibraryChangeNotifier.post(operation: "collections.add", message: "Added \"\(itm.title)\" to \"\(col.name)\"", id: itm.id)
 
         if globals.json {
             let output = CLIOutput(json: true, quiet: globals.quiet)
@@ -345,6 +371,7 @@ struct CollectionsRemove: ParsableCommand {
         let itm = try resolver.resolveItem(item)
 
         try database.removeItemFromCollection(collectionId: col.id, itemId: itm.id)
+        CLILibraryChangeNotifier.post(operation: "collections.remove", message: "Removed \"\(itm.title)\" from \"\(col.name)\"", id: itm.id)
 
         if globals.json {
             let output = CLIOutput(json: true, quiet: globals.quiet)
@@ -403,6 +430,7 @@ struct TagsCreate: ParsableCommand {
     func run() throws {
         let database = try CLIDatabase(path: globals.db)
         let id = try database.createTag(name: name, colorHex: color)
+        CLILibraryChangeNotifier.post(operation: "tags.create", message: "Created tag \"\(name)\"", id: id)
 
         if globals.json {
             let output = CLIOutput(json: true, quiet: globals.quiet)
@@ -432,6 +460,7 @@ struct TagsRename: ParsableCommand {
         let tag = try resolver.resolveTag(current)
 
         try database.renameTag(id: tag.id, newName: newName)
+        CLILibraryChangeNotifier.post(operation: "tags.rename", message: "Renamed tag to \"\(newName)\"", id: tag.id)
 
         if globals.json {
             let output = CLIOutput(json: true, quiet: globals.quiet)
@@ -462,6 +491,7 @@ struct TagsAdd: ParsableCommand {
         let itm = try resolver.resolveItem(item)
 
         try database.addTagToItem(tagId: t.id, itemId: itm.id)
+        CLILibraryChangeNotifier.post(operation: "tags.add", message: "Tagged \"\(itm.title)\" with \"\(t.name)\"", id: itm.id)
 
         if globals.json {
             let output = CLIOutput(json: true, quiet: globals.quiet)
@@ -492,6 +522,7 @@ struct TagsRemove: ParsableCommand {
         let itm = try resolver.resolveItem(item)
 
         try database.removeTagFromItem(tagId: t.id, itemId: itm.id)
+        CLILibraryChangeNotifier.post(operation: "tags.remove", message: "Removed tag \"\(t.name)\" from \"\(itm.title)\"", id: itm.id)
 
         if globals.json {
             let output = CLIOutput(json: true, quiet: globals.quiet)
@@ -598,6 +629,7 @@ struct Import: ParsableCommand {
                     fputs("Warning: Failed to add tag '\(tagName)': \(error.localizedDescription)\n", stderr)
                 }
             }
+            CLILibraryChangeNotifier.post(operation: "import", message: "Added \"\(result.title)\" from oak", id: result.itemId)
 
             if globals.json {
                 let output = CLIOutput(json: true, quiet: globals.quiet)
@@ -680,6 +712,7 @@ struct Status: ParsableCommand {
         if let value {
             let statusOption = try resolver.resolveStatus(value)
             try database.setItemStatus(itemId: resolved.id, statusOptionId: statusOption.id)
+            CLILibraryChangeNotifier.post(operation: "status.set", message: "Set \"\(resolved.title)\" to \"\(statusOption.name)\"", id: resolved.id)
 
             if globals.json {
                 let output = CLIOutput(json: true, quiet: globals.quiet)
