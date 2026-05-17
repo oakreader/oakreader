@@ -1,28 +1,33 @@
 import AppKit
-import DSFQuickActionBar
 
-final class CommandPaletteController: NSObject, DSFQuickActionBarContentSource {
-    private let bar = DSFQuickActionBar()
+final class CommandPaletteController: NSObject, CommandPalettePanelDelegate {
+    private lazy var panel: CommandPalettePanel = {
+        let p = CommandPalettePanel()
+        p.paletteDelegate = self
+        return p
+    }()
+
     private weak var appDelegate: AppDelegate?
     private var filteredCommands: [PaletteCommand] = []
 
     init(appDelegate: AppDelegate) {
         self.appDelegate = appDelegate
         super.init()
-        bar.contentSource = self
     }
 
     // MARK: - Present / Dismiss
 
     func show() {
         guard let window = appDelegate?.appState.window else { return }
-        bar.present(
-            parentWindow: window,
-            placeholderText: "Type a command...",
-            searchImage: NSImage(systemSymbolName: "command", accessibilityDescription: nil),
-            initialSearchText: "",
-            width: 540
-        )
+
+        if panel.isVisible {
+            panel.dismiss()
+            return
+        }
+
+        filteredCommands = availableCommands()
+        panel.updateRows(filteredCommands)
+        panel.present(relativeTo: window)
     }
 
     // MARK: - Context
@@ -89,55 +94,32 @@ final class CommandPaletteController: NSObject, DSFQuickActionBarContentSource {
         return true
     }
 
-    // MARK: - DSFQuickActionBarContentSource
+    // MARK: - CommandPalettePanelDelegate
 
-    func quickActionBar(
-        _ quickActionBar: DSFQuickActionBar,
-        itemsForSearchTermTask task: DSFQuickActionBar.SearchTask
-    ) {
-        let searchTerm = task.searchTerm.trimmingCharacters(in: .whitespaces)
+    func commandPaletteSearchChanged(_ panel: CommandPalettePanel, text: String) {
+        let term = text.trimmingCharacters(in: .whitespaces)
         let available = availableCommands()
 
-        if searchTerm.isEmpty {
+        if term.isEmpty {
             filteredCommands = available
         } else {
             filteredCommands = available
-                .map { (cmd: $0, score: score(command: $0, query: searchTerm)) }
+                .map { (cmd: $0, score: score(command: $0, query: term)) }
                 .filter { $0.score > 0 }
                 .sorted { $0.score > $1.score }
                 .map(\.cmd)
         }
 
-        let identifiers = filteredCommands.map { $0.id as AnyHashable }
-        task.complete(with: identifiers)
+        panel.updateRows(filteredCommands)
     }
 
-    func quickActionBar(
-        _ quickActionBar: DSFQuickActionBar,
-        viewForItem item: AnyHashable,
-        searchTerm: String
-    ) -> NSView? {
-        guard let id = item as? String,
-              let command = filteredCommands.first(where: { $0.id == id }) else {
-            return nil
-        }
-        let row = CommandPaletteRowView()
-        row.configure(with: command)
-        return row
+    func commandPaletteDidActivate(_ panel: CommandPalettePanel, at index: Int) {
+        guard index >= 0, index < filteredCommands.count else { return }
+        panel.dismiss()
+        execute(filteredCommands[index])
     }
 
-    func quickActionBar(
-        _ quickActionBar: DSFQuickActionBar,
-        didActivateItem item: AnyHashable
-    ) {
-        guard let id = item as? String,
-              let command = filteredCommands.first(where: { $0.id == id }) else {
-            return
-        }
-        execute(command)
-    }
-
-    func quickActionBarDidCancel(_ quickActionBar: DSFQuickActionBar) {
+    func commandPaletteDidDismiss(_ panel: CommandPalettePanel) {
         // No cleanup needed
     }
 

@@ -21,7 +21,7 @@ let package = Package(
         .package(url: "https://github.com/ml-explore/mlx-swift", from: "0.31.3"),
         .package(url: "https://github.com/ml-explore/mlx-swift-lm.git", from: "3.0.0"),
         .package(url: "https://github.com/unum-cloud/usearch", "2.0.0"..<"2.17.0"),
-        .package(url: "https://github.com/dagronf/DSFQuickActionBar", from: "6.2.0"),
+
         .package(url: "https://github.com/open-spaced-repetition/swift-fsrs", branch: "main"),
     ],
     targets: [
@@ -48,7 +48,7 @@ let package = Package(
                 .product(name: "MLXEmbedders", package: "mlx-swift-lm"),
                 .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
                 .product(name: "USearch", package: "usearch"),
-                .product(name: "DSFQuickActionBar", package: "DSFQuickActionBar"),
+
                 .product(name: "FSRS", package: "swift-fsrs"),
             ],
             path: "OakReader",

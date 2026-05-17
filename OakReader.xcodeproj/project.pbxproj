@@ -131,6 +131,7 @@
 		62BDB61D69A9541F6D129C1E /* FormFieldModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A1523799DAAB9978D1DE340 /* FormFieldModel.swift */; };
 		639A4AAC1723401B265C71AF /* QuizCardsPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DA66DD64C2617321E6C53DF /* QuizCardsPanelView.swift */; };
 		64FC46E244CDD562A923412E /* SharingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10CC73228029B5BE684EDB61 /* SharingService.swift */; };
+		65229B80A65E39A3346ABF7E /* DSFQuickActionBar in Frameworks */ = {isa = PBXBuildFile; productRef = B11B322D401962BDF7751EB4 /* DSFQuickActionBar */; };
 		654CF909EED061D5F657396F /* CompressViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54431DA6F76C0AE444D445B9 /* CompressViewModel.swift */; };
 		655B09752BD059F6AA1CF8E4 /* BatchProcessingWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 414C4917B5476636EE2EE633 /* BatchProcessingWindow.swift */; };
 		6668BD5BB724783878035CAC /* SplitDocumentSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54B822DAA6FAE842CB585B93 /* SplitDocumentSheet.swift */; };
@@ -149,6 +150,7 @@
 		73B6367D2F4EC822BDC26968 /* SemanticIndexService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 026E462C6001DA60A27A736B /* SemanticIndexService.swift */; };
 		73E2B121F02EFF4BAC28969D /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEFD66F0E0220F56D5E7E244 /* main.swift */; };
 		73F33DF74FFF620D5410EDF9 /* ErrorTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B904BB292674D48C89EA5BF /* ErrorTypes.swift */; };
+		74A9381164C6D6D740F34D29 /* FSRS in Frameworks */ = {isa = PBXBuildFile; productRef = 4E61A8D9E52E3EAD5259B44B /* FSRS */; };
 		76C5E2A8BF248463869EB246 /* RedactionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D293D3946B771FF63A06649 /* RedactionService.swift */; };
 		7741B23119F62E52C5DAAA5B /* LibraryTableToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E778748A8896A1883FEAAC7 /* LibraryTableToolbar.swift */; };
 		77DADB7F1FB366E675048377 /* DigitalSignatureSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16C3E00AB1FA2424C9D33B5B /* DigitalSignatureSheet.swift */; };
@@ -220,6 +222,7 @@
 		AA1EC00BC308EAD9348D22B5 /* PDFPage+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5739476346DE781CAA05CE23 /* PDFPage+Extensions.swift */; };
 		AAE9A74536492AFE673196F3 /* HTMLOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23E3E15CAB7ADECA997CBC8D /* HTMLOverlayView.swift */; };
 		AAEE915B17F7CB4306D41E23 /* FormFieldPropertyPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FBBFB7902A85A51225323AF /* FormFieldPropertyPanel.swift */; };
+		AB1153791C10232A4988DC54 /* OakVoice in Frameworks */ = {isa = PBXBuildFile; productRef = 700CFFFFF234759D7CB6C385 /* OakVoice */; };
 		AB8A54EEC470E21B7DDC6015 /* AnnotationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 936AA0D7A9E66908D29318BA /* AnnotationStore.swift */; };
 		AC6259C31C891A3EA4741576 /* DocumentConversionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1516C9EACEABF19EFE0903E3 /* DocumentConversionService.swift */; };
 		AD65FC5A720D4B145AA9459F /* SnapshotHitTestNSView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11BE1416DF735A904FF85758 /* SnapshotHitTestNSView.swift */; };
@@ -229,6 +232,7 @@
 		B0F40B872CFA21EB17E14CBF /* Color+Hex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D17F1174B3EE5697AC4D967 /* Color+Hex.swift */; };
 		B13E3E2BAD89594EEB6DAB21 /* OakReaderDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9430D8AD0D92F2EA45E73BDA /* OakReaderDocument.swift */; };
 		B1FE1232C2E15AF345399697 /* ImportService+PDF.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F1E73B68CE5C3BAB49180CE /* ImportService+PDF.swift */; };
+		B2B5FAF6A4CBBEB91F5EEB31 /* ArgumentParser in Frameworks */ = {isa = PBXBuildFile; productRef = 31814E54FBC46915CC246EF7 /* ArgumentParser */; };
 		B30EA596367A622EB67327B9 /* AnnotationPropertyPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 768812F9F5CBE99CA8F70112 /* AnnotationPropertyPanel.swift */; };
 		B346916E0BE2FE17E1F7FC5C /* MediaDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22CA95845DB43F37012BFFEA /* MediaDocument.swift */; };
 		B3D0BB4C56149137E120BD6C /* TextEditOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFE8E5F6886372D84BAE1684 /* TextEditOverlay.swift */; };
@@ -309,6 +313,7 @@
 		EEBFC5FB65E5727E5E98CF38 /* AISettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86F4183A1F7604C2E7152353 /* AISettingsView.swift */; };
 		EF10F6645F3D763D003F0E48 /* ImportService+HTML.swift in Sources */ = {isa = PBXBuildFile; fileRef = 081796638074DEABAB07030A /* ImportService+HTML.swift */; };
 		F0710A13747D53DB936DE32E /* RightPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D84531E29A6D116B01BD569C /* RightPanelView.swift */; };
+		F15AAD8EA3128A65AC97E1A1 /* CommandPalettePanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11ACBAF44051CFB33C15E315 /* CommandPalettePanel.swift */; };
 		F26961C3793386FACEF77FAB /* SemanticDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D13E2F2DAAE19DE9BA57F67 /* SemanticDatabase.swift */; };
 		F2A0733891B412C9F5F1F350 /* TagNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5ADEB81E2037E219F10BD1AD /* TagNode.swift */; };
 		F3096C59543289A0288565A6 /* FillSignViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DCADA3916F2556ACD865277 /* FillSignViewModel.swift */; };
@@ -367,6 +372,7 @@
 		10A6B5888A5CF5E18A2C1559 /* CSLTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSLTypes.swift; sourceTree = "<group>"; };
 		10A8A79F203A72B68BB81305 /* SearchSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchSidebarView.swift; sourceTree = "<group>"; };
 		10CC73228029B5BE684EDB61 /* SharingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharingService.swift; sourceTree = "<group>"; };
+		11ACBAF44051CFB33C15E315 /* CommandPalettePanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandPalettePanel.swift; sourceTree = "<group>"; };
 		11BE1416DF735A904FF85758 /* SnapshotHitTestNSView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapshotHitTestNSView.swift; sourceTree = "<group>"; };
 		12E74D04537336D1EC69CD82 /* SecurityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityService.swift; sourceTree = "<group>"; };
 		131686965C90CDE1C7F81AB7 /* String+PDFSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "String+PDFSearch.swift"; sourceTree = "<group>"; };
@@ -528,6 +534,7 @@
 		80B3554CCD076A22926BEB61 /* ComparisonResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComparisonResult.swift; sourceTree = "<group>"; };
 		8297DFCAB304351040D8E014 /* OakAI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = OakAI; path = Packages/OakAI; sourceTree = SOURCE_ROOT; };
 		83F5836A81B34F501B65BBA1 /* TranslationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationViewModel.swift; sourceTree = "<group>"; };
+		8530813F7B0C18B8176865F8 /* OakVoice */ = {isa = PBXFileReference; lastKnownFileType = folder; name = OakVoice; path = Packages/OakVoice; sourceTree = SOURCE_ROOT; };
 		855DBD4C8608B3F5DDE0F430 /* LibraryModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryModels.swift; sourceTree = "<group>"; };
 		86F4183A1F7604C2E7152353 /* AISettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AISettingsView.swift; sourceTree = "<group>"; };
 		86F8522DF838B0A5C1D31B28 /* MainMenuBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainMenuBuilder.swift; sourceTree = "<group>"; };
@@ -680,6 +687,9 @@
 				80859BD31B884DB1EB2CCCE4 /* MLXEmbedders in Frameworks */,
 				8F413E89092923AC9E22AD7D /* MLXLMCommon in Frameworks */,
 				06643571339C03C82A5BEDE4 /* USearch in Frameworks */,
+				AB1153791C10232A4988DC54 /* OakVoice in Frameworks */,
+				65229B80A65E39A3346ABF7E /* DSFQuickActionBar in Frameworks */,
+				74A9381164C6D6D740F34D29 /* FSRS in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -689,6 +699,7 @@
 			files = (
 				BA0B27333EF86F5FC6F02701 /* OakAgent in Frameworks */,
 				0F13A6E0A89F4F20EAFA4069 /* GRDB in Frameworks */,
+				B2B5FAF6A4CBBEB91F5EEB31 /* ArgumentParser in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -791,6 +802,7 @@
 			isa = PBXGroup;
 			children = (
 				BEF098B7FA82F2D106A0F186 /* CommandPaletteController.swift */,
+				11ACBAF44051CFB33C15E315 /* CommandPalettePanel.swift */,
 				147FBC8F7EF60C47DCCF9556 /* CommandPaletteRowView.swift */,
 				C10AC03220ED95A2AD2B363F /* CommandRegistry.swift */,
 				FFF80B02C4F2CEFA560DF0C9 /* PaletteCommand.swift */,
@@ -1318,6 +1330,7 @@
 			children = (
 				26A98C1C7A683B80D2F4217B /* OakAgent */,
 				8297DFCAB304351040D8E014 /* OakAI */,
+				8530813F7B0C18B8176865F8 /* OakVoice */,
 			);
 			path = Packages;
 			sourceTree = "<group>";
@@ -1354,6 +1367,7 @@
 			packageProductDependencies = (
 				D1622ABDD098451C89D32128 /* OakAgent */,
 				F7AB5ED40472FCDDFAE174DE /* GRDB */,
+				31814E54FBC46915CC246EF7 /* ArgumentParser */,
 			);
 			productName = oak;
 			productReference = DA9BE07C96577E1D03AA8D4F /* oak */;
@@ -1389,6 +1403,9 @@
 				F32C64CBFE9EF5E98102EEE1 /* MLXEmbedders */,
 				1393D51D1FC43362FAC1F484 /* MLXLMCommon */,
 				AE6F23C64D7D4C813A690AC5 /* USearch */,
+				700CFFFFF234759D7CB6C385 /* OakVoice */,
+				B11B322D401962BDF7751EB4 /* DSFQuickActionBar */,
+				4E61A8D9E52E3EAD5259B44B /* FSRS */,
 			);
 			productName = OakReader;
 			productReference = 62D8CC8D7C726C11792024B3 /* OakReader.app */;
@@ -1416,6 +1433,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				A0FC1AC836FC06E7C9FCEAFE /* XCRemoteSwiftPackageReference "swift-cmark-gfm" */,
+				3BB9959E6689892C8511063A /* XCRemoteSwiftPackageReference "DSFQuickActionBar" */,
 				DD10350F424FE099033E1375 /* XCRemoteSwiftPackageReference "GRDB.swift" */,
 				225B7FE5AC36B1D8CF482B3A /* XCRemoteSwiftPackageReference "Highlightr" */,
 				EC431EFA19C3F508366C9671 /* XCRemoteSwiftPackageReference "Sparkle" */,
@@ -1424,9 +1442,12 @@
 				159B6E97585769D8037891EE /* XCRemoteSwiftPackageReference "swift-youtube-transcript" */,
 				7F7015FB4734CA5422A0B91B /* XCRemoteSwiftPackageReference "mlx-swift" */,
 				82081F155A629F0A33B4DB0A /* XCRemoteSwiftPackageReference "mlx-swift-lm" */,
+				B680BFA2F3935A70C71804BD /* XCRemoteSwiftPackageReference "swift-argument-parser" */,
+				1655FC7A881F3D12064C7933 /* XCRemoteSwiftPackageReference "swift-fsrs" */,
 				32D9AB06B48D9C451F68F11B /* XCRemoteSwiftPackageReference "usearch" */,
 				F163331A134E539182CE77A7 /* XCLocalSwiftPackageReference "Packages/OakAI" */,
 				33DEE7E7B16365AF42655D31 /* XCLocalSwiftPackageReference "Packages/OakAgent" */,
+				B09176C776D9887DD00A3113 /* XCLocalSwiftPackageReference "Packages/OakVoice" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E6C40581B7F1F5E458BD8009 /* Products */;
@@ -1580,6 +1601,7 @@
 				B0F40B872CFA21EB17E14CBF /* Color+Hex.swift in Sources */,
 				3F66B758614E211F2D3D5242 /* ColorPickerButton.swift in Sources */,
 				BA0B19F86EAE8D9E358D8617 /* CommandPaletteController.swift in Sources */,
+				F15AAD8EA3128A65AC97E1A1 /* CommandPalettePanel.swift in Sources */,
 				7C507FFF077224B55A687BA4 /* CommandPaletteRowView.swift in Sources */,
 				EC5FBBDBA99538D343AEF315 /* CommandRegistry.swift in Sources */,
 				A4C849BCDFD7E58739BCE675 /* CompareSetupSheet.swift in Sources */,
@@ -2054,6 +2076,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/OakAgent;
 		};
+		B09176C776D9887DD00A3113 /* XCLocalSwiftPackageReference "Packages/OakVoice" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/OakVoice;
+		};
 		F163331A134E539182CE77A7 /* XCLocalSwiftPackageReference "Packages/OakAI" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/OakAI;
@@ -2067,6 +2093,14 @@
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 1.0.0;
+			};
+		};
+		1655FC7A881F3D12064C7933 /* XCRemoteSwiftPackageReference "swift-fsrs" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/open-spaced-repetition/swift-fsrs";
+			requirement = {
+				branch = main;
+				kind = branch;
 			};
 		};
 		225B7FE5AC36B1D8CF482B3A /* XCRemoteSwiftPackageReference "Highlightr" */ = {
@@ -2093,6 +2127,14 @@
 				minimumVersion = 2.0.0;
 			};
 		};
+		3BB9959E6689892C8511063A /* XCRemoteSwiftPackageReference "DSFQuickActionBar" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/dagronf/DSFQuickActionBar";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 6.2.0;
+			};
+		};
 		7F7015FB4734CA5422A0B91B /* XCRemoteSwiftPackageReference "mlx-swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/ml-explore/mlx-swift";
@@ -2115,6 +2157,14 @@
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 1.0.2;
+			};
+		};
+		B680BFA2F3935A70C71804BD /* XCRemoteSwiftPackageReference "swift-argument-parser" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-argument-parser.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.3.0;
 			};
 		};
 		DD10350F424FE099033E1375 /* XCRemoteSwiftPackageReference "GRDB.swift" */ = {
@@ -2158,10 +2208,24 @@
 			package = F474D9310432E71E4A4CF5E8 /* XCRemoteSwiftPackageReference "textual" */;
 			productName = Textual;
 		};
+		31814E54FBC46915CC246EF7 /* ArgumentParser */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B680BFA2F3935A70C71804BD /* XCRemoteSwiftPackageReference "swift-argument-parser" */;
+			productName = ArgumentParser;
+		};
 		3C1F95B9934A22BBA51A5047 /* YoutubeTranscript */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 159B6E97585769D8037891EE /* XCRemoteSwiftPackageReference "swift-youtube-transcript" */;
 			productName = YoutubeTranscript;
+		};
+		4E61A8D9E52E3EAD5259B44B /* FSRS */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1655FC7A881F3D12064C7933 /* XCRemoteSwiftPackageReference "swift-fsrs" */;
+			productName = FSRS;
+		};
+		700CFFFFF234759D7CB6C385 /* OakVoice */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = OakVoice;
 		};
 		7AB56BF574F3683388F071F2 /* Highlightr */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -2181,6 +2245,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 32D9AB06B48D9C451F68F11B /* XCRemoteSwiftPackageReference "usearch" */;
 			productName = USearch;
+		};
+		B11B322D401962BDF7751EB4 /* DSFQuickActionBar */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3BB9959E6689892C8511063A /* XCRemoteSwiftPackageReference "DSFQuickActionBar" */;
+			productName = DSFQuickActionBar;
 		};
 		B751D3E81FD9B92C14A1BC70 /* MLX */ = {
 			isa = XCSwiftPackageProductDependency;
