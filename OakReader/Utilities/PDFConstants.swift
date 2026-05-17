@@ -280,6 +280,7 @@ enum LibraryDetailTab: String, CaseIterable, Identifiable {
     case chat
     case metadata
     case notes
+    case quizCards
 
     var id: String { rawValue }
 
@@ -288,6 +289,7 @@ enum LibraryDetailTab: String, CaseIterable, Identifiable {
         case .chat: return "bubble.left.and.text.bubble.right"
         case .metadata: return "list.bullet.rectangle.portrait"
         case .notes: return "note.text"
+        case .quizCards: return "rectangle.on.rectangle.angled"
         }
     }
 
@@ -296,6 +298,7 @@ enum LibraryDetailTab: String, CaseIterable, Identifiable {
         case .chat: return "AI Chat"
         case .metadata: return "Metadata"
         case .notes: return "Notes"
+        case .quizCards: return "Quiz Cards"
         }
     }
 }

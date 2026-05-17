@@ -94,6 +94,34 @@ struct QuizCardService {
         }
     }
 
+    // MARK: - Collection-level Fetch
+
+    /// Fetch all non-pending cards for a collection, ordered by due date.
+    func fetchCards(forCollectionId collectionId: String) throws -> [QuizCard] {
+        try database.dbQueue.read { db in
+            let records = try QuizCardRecord
+                .filter(QuizCardRecord.CodingKeys.collectionId == collectionId)
+                .filter(QuizCardRecord.CodingKeys.isSuspended == false)
+                .filter(QuizCardRecord.CodingKeys.isPending == false)
+                .order(QuizCardRecord.CodingKeys.dueAt.asc)
+                .fetchAll(db)
+            return records.map { QuizCard(record: $0) }
+        }
+    }
+
+    /// Count cards due for review in a collection (excludes pending).
+    func dueCount(forCollectionId collectionId: String) throws -> Int {
+        let now = Date().iso8601String
+        return try database.dbQueue.read { db in
+            try QuizCardRecord
+                .filter(QuizCardRecord.CodingKeys.collectionId == collectionId)
+                .filter(QuizCardRecord.CodingKeys.isSuspended == false)
+                .filter(QuizCardRecord.CodingKeys.isPending == false)
+                .filter(QuizCardRecord.CodingKeys.dueAt <= now)
+                .fetchCount(db)
+        }
+    }
+
     // MARK: - Create
 
     /// Create a new quiz card from parsed quiz content.
