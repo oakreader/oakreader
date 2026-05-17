@@ -27,7 +27,9 @@ struct RightPanelContentView: View {
                     }
                 case .quizCards:
                     if Preferences.shared.isExtensionEnabled(.quizCards) {
-                        QuizCardsPanelView(quizCardsVM: viewModel.quizCards)
+                        QuizCardsPanelView(quizCardsVM: viewModel.quizCards) {
+                            viewModel.appState?.openQuizReview(vm: viewModel.quizCards)
+                        }
                     }
                 }
             }

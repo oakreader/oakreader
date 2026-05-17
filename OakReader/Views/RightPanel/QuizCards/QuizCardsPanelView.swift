@@ -3,6 +3,7 @@ import SwiftUI
 /// Container view for the Quiz Cards right panel. Switches between list and review mode.
 struct QuizCardsPanelView: View {
     let quizCardsVM: QuizCardsViewModel
+    var onReview: (() -> Void)? = nil
 
     var body: some View {
         VStack(spacing: 0) {
@@ -30,7 +31,13 @@ struct QuizCardsPanelView: View {
                 Spacer()
 
                 if quizCardsVM.dueCount > 0 {
-                    Button(action: { quizCardsVM.startReview() }) {
+                    Button(action: {
+                        if let onReview {
+                            onReview()
+                        } else {
+                            quizCardsVM.startReview()
+                        }
+                    }) {
                         Label("Review", systemImage: "play.fill")
                             .font(.system(size: 12, weight: .medium))
                     }
