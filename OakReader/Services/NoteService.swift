@@ -23,6 +23,25 @@ struct NoteService {
         }
     }
 
+    /// Fetch all notes for multiple items in a single query, grouped by item ID.
+    func fetchNotes(forItemIds itemIds: [String]) throws -> [String: [Note]] {
+        guard !itemIds.isEmpty else { return [:] }
+        return try database.dbQueue.read { db in
+            let records = try NoteRecord
+                .filter(itemIds.contains(NoteRecord.CodingKeys.itemId))
+                .order(
+                    NoteRecord.CodingKeys.isPinned.desc,
+                    NoteRecord.CodingKeys.updatedAt.desc
+                )
+                .fetchAll(db)
+            var grouped: [String: [Note]] = [:]
+            for record in records {
+                grouped[record.itemId, default: []].append(Note(record: record))
+            }
+            return grouped
+        }
+    }
+
     // MARK: - Content (filesystem)
 
     /// Load note content from the .md file on disk.

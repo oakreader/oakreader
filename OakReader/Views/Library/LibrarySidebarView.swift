@@ -427,20 +427,18 @@ private struct CollectionRowView: View {
                 }
                 // Remove duplicates within this collection
                 if !collection.isSmart {
-                    let collectionItems = store.items.filter { $0.collections.contains { $0.id == collection.id } }
-                    let collectionDuplicates = DuplicateService.findDuplicates(in: collectionItems)
-                    if !collectionDuplicates.isEmpty {
-                        Divider()
-                        Button {
-                            for group in collectionDuplicates {
-                                let sorted = group.sorted { $0.dateAdded < $1.dateAdded }
-                                guard let keeper = sorted.first else { continue }
-                                let others = Array(sorted.dropFirst())
-                                store.mergeItems(keeper: keeper, duplicates: others)
-                            }
-                        } label: {
-                            Label("Remove Duplicates (\(collectionDuplicates.count))", systemImage: "arrow.triangle.merge")
+                    Divider()
+                    Button {
+                        let collectionItems = store.items.filter { $0.collections.contains { $0.id == collection.id } }
+                        let collectionDuplicates = DuplicateService.findDuplicates(in: collectionItems)
+                        for group in collectionDuplicates {
+                            let sorted = group.sorted { $0.dateAdded < $1.dateAdded }
+                            guard let keeper = sorted.first else { continue }
+                            let others = Array(sorted.dropFirst())
+                            store.mergeItems(keeper: keeper, duplicates: others)
                         }
+                    } label: {
+                        Label("Remove Duplicates", systemImage: "arrow.triangle.merge")
                     }
                 }
 

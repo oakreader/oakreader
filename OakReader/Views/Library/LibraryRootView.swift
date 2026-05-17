@@ -141,20 +141,20 @@ private struct CollectionNotesPanelView: View {
     let title: String
     let items: [LibraryItem]
 
+    @State private var noteRows: [CollectionNoteRow] = []
+
     private var store: LibraryStore { appState.libraryStore }
 
-    private var noteRows: [CollectionNoteRow] {
+    private func loadData() {
         let service = NoteService(database: store.database)
+        let itemIds = items.map { $0.id.uuidString }
+        let grouped = (try? service.fetchNotes(forItemIds: itemIds)) ?? [:]
         var rows: [CollectionNoteRow] = []
-
         for item in items {
-            let notes = (try? service.fetchNotes(forItemId: item.id.uuidString)) ?? []
-            rows.append(contentsOf: notes.map { note in
-                CollectionNoteRow(item: item, note: note)
-            })
+            let notes = grouped[item.id.uuidString] ?? []
+            rows.append(contentsOf: notes.map { CollectionNoteRow(item: item, note: $0) })
         }
-
-        return rows.sorted { lhs, rhs in
+        noteRows = rows.sorted { lhs, rhs in
             if lhs.note.isPinned != rhs.note.isPinned {
                 return lhs.note.isPinned
             }
@@ -187,6 +187,10 @@ private struct CollectionNotesPanelView: View {
                 }
             }
         }
+        .onAppear { loadData() }
+        .onChange(of: store.selectedCollectionId) { _, _ in loadData() }
+        .onChange(of: store.selectedTagOptionId) { _, _ in loadData() }
+        .onChange(of: store.revision) { _, _ in loadData() }
     }
 }
 

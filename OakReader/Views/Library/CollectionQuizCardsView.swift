@@ -71,13 +71,8 @@ struct CollectionQuizCardsPanelView: View {
         if let collectionId = store.selectedCollectionId, isUserCollection {
             cards = (try? service.fetchCards(forCollectionId: collectionId.uuidString)) ?? []
         } else {
-            var all: [QuizCard] = []
-            for item in currentItems {
-                let itemCards = (try? service.fetchCards(forItemId: item.id.uuidString)) ?? []
-                all.append(contentsOf: itemCards)
-            }
-            all.sort { $0.dueAt < $1.dueAt }
-            cards = all
+            let itemIds = currentItems.map { $0.id.uuidString }
+            cards = (try? service.fetchCards(forItemIds: itemIds)) ?? []
         }
         cardRows = cards.map { card in
             let item = currentItems.first(where: { $0.id.uuidString == card.itemId })
@@ -88,12 +83,8 @@ struct CollectionQuizCardsPanelView: View {
         if let collectionId = store.selectedCollectionId, isUserCollection {
             pendingCardRows = (try? service.fetchPendingCards(forCollectionId: collectionId.uuidString)) ?? []
         } else {
-            var all: [QuizCard] = []
-            for item in currentItems {
-                let itemPending = (try? service.fetchPendingCards(forItemId: item.id.uuidString)) ?? []
-                all.append(contentsOf: itemPending)
-            }
-            pendingCardRows = all.sorted { $0.createdAt > $1.createdAt }
+            let itemIds = currentItems.map { $0.id.uuidString }
+            pendingCardRows = (try? service.fetchPendingCards(forItemIds: itemIds)) ?? []
         }
     }
 
