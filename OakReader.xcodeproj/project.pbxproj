@@ -289,9 +289,9 @@
 		C1C534F45FDB8488DD683183 /* QuizCardsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F61A16C8E053B171C76AF54 /* QuizCardsViewModel.swift */; };
 		F3126678DBC62A79A6AE6A82 /* QuizCardListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F03F69165E387D60D96C2A79 /* QuizCardListView.swift */; };
 		A7B2C3D4E5F6000100000010 /* QuizCardReviewOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7B2C3D4E5F6000200000010 /* QuizCardReviewOverlay.swift */; };
-		A7B2C3D4E5F6000100000011 /* VoiceInputButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7B2C3D4E5F6000200000011 /* VoiceInputButton.swift */; };
-		A7B2C3D4E5F6000100000012 /* EvaluationFeedbackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7B2C3D4E5F6000200000012 /* EvaluationFeedbackView.swift */; };
-		A7B2C3D4E5F6000100000013 /* QuizEvaluationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7B2C3D4E5F6000200000013 /* QuizEvaluationService.swift */; };
+		A7B2C3D4E5F6000100000012 /* QuizCardPreviewContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7B2C3D4E5F6000200000012 /* QuizCardPreviewContent.swift */; };
+		A7B2C3D4E5F6000100000013 /* CollectionQuizCardsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7B2C3D4E5F6000200000013 /* CollectionQuizCardsView.swift */; };
+
 		A7B2C3D4E5F6000100000001 /* PendingQuizView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7B2C3D4E5F6000200000001 /* PendingQuizView.swift */; };
 		A7B2C3D4E5F6000100000002 /* QuizGenerationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7B2C3D4E5F6000200000002 /* QuizGenerationService.swift */; };
 		1FC60FC3271C574A33B25543 /* QuizCardsPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4F8436D022577C114789A83 /* QuizCardsPanelView.swift */; };
@@ -495,9 +495,9 @@
 		1F61A16C8E053B171C76AF54 /* QuizCardsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizCardsViewModel.swift; sourceTree = "<group>"; };
 		F03F69165E387D60D96C2A79 /* QuizCardListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizCardListView.swift; sourceTree = "<group>"; };
 		A7B2C3D4E5F6000200000010 /* QuizCardReviewOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizCardReviewOverlay.swift; sourceTree = "<group>"; };
-		A7B2C3D4E5F6000200000011 /* VoiceInputButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceInputButton.swift; sourceTree = "<group>"; };
-		A7B2C3D4E5F6000200000012 /* EvaluationFeedbackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EvaluationFeedbackView.swift; sourceTree = "<group>"; };
-		A7B2C3D4E5F6000200000013 /* QuizEvaluationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizEvaluationService.swift; sourceTree = "<group>"; };
+		A7B2C3D4E5F6000200000012 /* QuizCardPreviewContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizCardPreviewContent.swift; sourceTree = "<group>"; };
+		A7B2C3D4E5F6000200000013 /* CollectionQuizCardsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionQuizCardsView.swift; sourceTree = "<group>"; };
+
 		A7B2C3D4E5F6000200000001 /* PendingQuizView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingQuizView.swift; sourceTree = "<group>"; };
 		B4F8436D022577C114789A83 /* QuizCardsPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizCardsPanelView.swift; sourceTree = "<group>"; };
 		A7B2C3D4E5F6000200000002 /* QuizGenerationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizGenerationService.swift; sourceTree = "<group>"; };
@@ -961,7 +961,6 @@
 				4858AF08186653B11C29612C /* DocumentTools.swift */,
 				J6VOLKAXES7CCC0YJKNNY26V /* MemoryTools.swift */,
 				C89EEADCAA40A0524474DF72 /* PDFContextProvider.swift */,
-				A7B2C3D4E5F6000200000013 /* QuizEvaluationService.swift */,
 				A7B2C3D4E5F6000200000002 /* QuizGenerationService.swift */,
 				4A5987B0AB524A0EDED7C3C3 /* SearchTools.swift */,
 				4B2A91F80AE646CD9FF9A9AC /* SemanticSearchTool.swift */,
@@ -1190,12 +1189,11 @@
 		A1B2C3D4E5F60001C9D0E1F4 /* QuizCards */ = {
 			isa = PBXGroup;
 			children = (
-				A7B2C3D4E5F6000200000012 /* EvaluationFeedbackView.swift */,
 				A7B2C3D4E5F6000200000001 /* PendingQuizView.swift */,
 				F03F69165E387D60D96C2A79 /* QuizCardListView.swift */,
 				A7B2C3D4E5F6000200000010 /* QuizCardReviewOverlay.swift */,
 				B4F8436D022577C114789A83 /* QuizCardsPanelView.swift */,
-				A7B2C3D4E5F6000200000011 /* VoiceInputButton.swift */,
+				A7B2C3D4E5F6000200000012 /* QuizCardPreviewContent.swift */,
 			);
 			path = QuizCards;
 			sourceTree = "<group>";
@@ -1289,6 +1287,7 @@
 			children = (
 				D5731B7F44DC2787384110A3 /* AddSourcesSheet.swift */,
 				CFA59E881FAEADC7AB4ACA27 /* CollectionEditorSheet.swift */,
+				A7B2C3D4E5F6000200000013 /* CollectionQuizCardsView.swift */,
 				B49EB20DFBDA5072A48A9B12 /* DuplicatesMergePane.swift */,
 				31E4F106C2F0C64B0191320B /* FlowLayout.swift */,
 				4A72FAA928BCA03348A4CC8F /* LibraryRootView.swift */,
@@ -1620,9 +1619,8 @@
 				C1C534F45FDB8488DD683183 /* QuizCardsViewModel.swift in Sources */,
 				F3126678DBC62A79A6AE6A82 /* QuizCardListView.swift in Sources */,
 				A7B2C3D4E5F6000100000010 /* QuizCardReviewOverlay.swift in Sources */,
-				A7B2C3D4E5F6000100000011 /* VoiceInputButton.swift in Sources */,
-				A7B2C3D4E5F6000100000012 /* EvaluationFeedbackView.swift in Sources */,
-				A7B2C3D4E5F6000100000013 /* QuizEvaluationService.swift in Sources */,
+				A7B2C3D4E5F6000100000012 /* QuizCardPreviewContent.swift in Sources */,
+				A7B2C3D4E5F6000100000013 /* CollectionQuizCardsView.swift in Sources */,
 				A7B2C3D4E5F6000100000001 /* PendingQuizView.swift in Sources */,
 				1FC60FC3271C574A33B25543 /* QuizCardsPanelView.swift in Sources */,
 				2A708E6EC927B588614BC08C /* FlashcardQuizView.swift in Sources */,
