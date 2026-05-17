@@ -97,10 +97,6 @@ extension CatalogDatabase {
                 (SystemCollectionID.notes.uuidString, "Notes", "doc.text", 5,
                  #"{"match":"all","conditions":[{"field":"content_type","op":"eq","value":"markdown"}]}"#),
                 (SystemCollectionID.duplicates.uuidString, "Duplicates", "square.on.square", 6, nil),
-                (SystemCollectionID.xBookmarks.uuidString, "X Bookmarks", "icon-x", 7,
-                 #"{"match":"all","conditions":[{"field":"source","op":"eq","value":"x_bookmarks"}]}"#),
-                (SystemCollectionID.githubStars.uuidString, "GitHub Stars", "icon-github", 8,
-                 #"{"match":"all","conditions":[{"field":"source","op":"eq","value":"github_stars"}]}"#),
             ]
             for sc in systemCollections {
                 try db.execute(sql: """
@@ -487,6 +483,17 @@ extension CatalogDatabase {
                 UPDATE collections SET name = 'Quiz Cards'
                 WHERE id = ?
             """, arguments: [SystemCollectionID.quizCards.uuidString])
+        }
+
+        // MARK: v16 — Remove X Bookmarks & GitHub Stars Sync
+
+        migrator.registerMigration("v16-remove-sync-collections") { db in
+            // Remove X Bookmarks and GitHub Stars system smart collections
+            let xBookmarksId = "00000000-0000-0000-0000-00000000000B"
+            let githubStarsId = "00000000-0000-0000-0000-00000000000C"
+            try db.execute(sql: """
+                DELETE FROM collections WHERE id IN (?, ?)
+            """, arguments: [xBookmarksId, githubStarsId])
         }
 
         return migrator
