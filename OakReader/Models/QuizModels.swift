@@ -1,59 +1,5 @@
 import Foundation
 
-// MARK: - Review Mode
-
-enum ReviewMode: String, CaseIterable, Identifiable {
-    case recognition  // Flip card + Remember/Forget
-    case production   // Type answer + AI evaluation
-
-    var id: String { rawValue }
-
-    var label: String {
-        switch self {
-        case .recognition: return "Recognition"
-        case .production: return "Production"
-        }
-    }
-
-    var description: String {
-        switch self {
-        case .recognition: return "Flip card and self-evaluate"
-        case .production: return "Type answer, AI evaluates"
-        }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .recognition: return "rectangle.on.rectangle.angled"
-        case .production: return "keyboard"
-        }
-    }
-}
-
-// MARK: - Evaluation Feedback Mode
-
-enum EvaluationFeedbackMode: String, CaseIterable, Identifiable {
-    case simple    // Correct/incorrect + correct answer
-    case detailed  // Correct/incorrect + AI explanation + correct answer
-
-    var id: String { rawValue }
-
-    var label: String {
-        switch self {
-        case .simple: return "Simple"
-        case .detailed: return "Detailed"
-        }
-    }
-}
-
-// MARK: - Evaluation Result
-
-struct EvaluationResult {
-    let isCorrect: Bool
-    let explanation: String?
-    let correctAnswer: String
-}
-
 // MARK: - Quiz Type
 
 enum QuizType: String, Codable, CaseIterable, Identifiable {

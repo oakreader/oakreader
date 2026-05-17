@@ -4,8 +4,6 @@ struct QuizCardSettingsView: View {
     @AppStorage("quizCard_targetRetention") private var targetRetention: Double = 0.9
     @AppStorage("quizCard_maxInterval") private var maxInterval: Int = 36500
     @AppStorage("quizCard_dailyNewLimit") private var dailyNewLimit: Int = 20
-    @AppStorage("quizCard_reviewMode") private var reviewMode: String = "production"
-    @AppStorage("quizCard_feedbackMode") private var feedbackMode: String = "simple"
 
     var body: some View {
         Form {
@@ -36,20 +34,6 @@ struct QuizCardSettingsView: View {
                             Text("\(dailyNewLimit)")
                                 .monospacedDigit()
                         }
-                    }
-                }
-            }
-
-            Section("Review") {
-                Picker("Default Mode", selection: $reviewMode) {
-                    ForEach(ReviewMode.allCases) { mode in
-                        Text(mode.label).tag(mode.rawValue)
-                    }
-                }
-
-                Picker("Feedback Detail", selection: $feedbackMode) {
-                    ForEach(EvaluationFeedbackMode.allCases) { mode in
-                        Text(mode.label).tag(mode.rawValue)
                     }
                 }
             }
