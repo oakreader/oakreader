@@ -210,6 +210,20 @@ enum CommandRegistry {
             context: [.pdf],
             action: .selector(#selector(AppDelegate.printDocument(_:)))
         ),
+        PaletteCommand(
+            id: "file.exportBackup",
+            title: "Export Library Backup...",
+            category: .file,
+            icon: "archivebox",
+            action: .selector(#selector(AppDelegate.exportLibraryBackup(_:)))
+        ),
+        PaletteCommand(
+            id: "file.restoreBackup",
+            title: "Restore from Backup...",
+            category: .file,
+            icon: "arrow.down.doc",
+            action: .selector(#selector(AppDelegate.restoreLibraryBackup(_:)))
+        ),
     ]
 
     // MARK: - Settings

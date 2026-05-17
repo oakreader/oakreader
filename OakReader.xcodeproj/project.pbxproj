@@ -115,6 +115,8 @@
 		55985062B2B910DFAC73008E /* RecordingSummaryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3347292FAB8B284480E4486 /* RecordingSummaryService.swift */; };
 		5849AC3E10669255D452F102 /* ComparisonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32A5CD58F142D8232ABD0B34 /* ComparisonView.swift */; };
 		58DFACB7DB1AF310CEA7A4CD /* ZoteroMigrationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E682F4A12F66C8D3B12A14F /* ZoteroMigrationService.swift */; };
+		FA91B2C3D4E5F6A7B8C9D0E1 /* BackupService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB82A3B4C5D6E7F8A9B0C1D2 /* BackupService.swift */; };
+		FC73D4E5F6A7B8C9D0E1F2A3 /* BackupProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD64E5F6A7B8C9D0E1F2A3B4 /* BackupProgressView.swift */; };
 		5967878A95FEAB1001C9CD7B /* AccessibilityCheckerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA017F31D0A69846D78444B1 /* AccessibilityCheckerView.swift */; };
 		59AE79D7BB542D60DB5BFDCC /* CLIFormatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2983A71BA4770E4CA31A54D6 /* CLIFormatters.swift */; };
 		59B6D8A2E666CEDCCF423111 /* LibrarySideNavView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF43FBB98C456723EFCE009D /* LibrarySideNavView.swift */; };
@@ -288,7 +290,7 @@
 		6A51787C2116CC5D8DA2C07C /* QuizXMLParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEDB58C84E089EAAE98C9032 /* QuizXMLParser.swift */; };
 		C1C534F45FDB8488DD683183 /* QuizCardsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F61A16C8E053B171C76AF54 /* QuizCardsViewModel.swift */; };
 		F3126678DBC62A79A6AE6A82 /* QuizCardListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F03F69165E387D60D96C2A79 /* QuizCardListView.swift */; };
-		A7B2C3D4E5F6000100000010 /* QuizCardReviewOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7B2C3D4E5F6000200000010 /* QuizCardReviewOverlay.swift */; };
+		A7B2C3D4E5F6000100000010 /* QuizCardReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7B2C3D4E5F6000200000010 /* QuizCardReviewView.swift */; };
 		A7B2C3D4E5F6000100000012 /* QuizCardPreviewContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7B2C3D4E5F6000200000012 /* QuizCardPreviewContent.swift */; };
 		A7B2C3D4E5F6000100000013 /* CollectionQuizCardsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7B2C3D4E5F6000200000013 /* CollectionQuizCardsView.swift */; };
 
@@ -382,6 +384,8 @@
 		1E17653B4A5B70DEDC4E21C1 /* AppExtensionSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppExtensionSettingsView.swift; sourceTree = "<group>"; };
 		1E55DE9B5224B2F68AF785CF /* AnnotationListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationListView.swift; sourceTree = "<group>"; };
 		1E682F4A12F66C8D3B12A14F /* ZoteroMigrationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoteroMigrationService.swift; sourceTree = "<group>"; };
+		FB82A3B4C5D6E7F8A9B0C1D2 /* BackupService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupService.swift; sourceTree = "<group>"; };
+		FD64E5F6A7B8C9D0E1F2A3B4 /* BackupProgressView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupProgressView.swift; sourceTree = "<group>"; };
 		1EE2FC096373238DFBDE71E8 /* ChatCompletionPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatCompletionPanel.swift; sourceTree = "<group>"; };
 		1F1698F5AB44279251965023 /* ImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportService.swift; sourceTree = "<group>"; };
 		1F34E33BC423BCAA3C052D4D /* ExportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSheet.swift; sourceTree = "<group>"; };
@@ -494,7 +498,7 @@
 		FEDB58C84E089EAAE98C9032 /* QuizXMLParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizXMLParser.swift; sourceTree = "<group>"; };
 		1F61A16C8E053B171C76AF54 /* QuizCardsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizCardsViewModel.swift; sourceTree = "<group>"; };
 		F03F69165E387D60D96C2A79 /* QuizCardListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizCardListView.swift; sourceTree = "<group>"; };
-		A7B2C3D4E5F6000200000010 /* QuizCardReviewOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizCardReviewOverlay.swift; sourceTree = "<group>"; };
+		A7B2C3D4E5F6000200000010 /* QuizCardReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizCardReviewView.swift; sourceTree = "<group>"; };
 		A7B2C3D4E5F6000200000012 /* QuizCardPreviewContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizCardPreviewContent.swift; sourceTree = "<group>"; };
 		A7B2C3D4E5F6000200000013 /* CollectionQuizCardsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionQuizCardsView.swift; sourceTree = "<group>"; };
 
@@ -888,6 +892,7 @@
 				67F1728C98D705DA07BF53F6 /* AI */,
 				F02C8B8FC0791BE4586D323C /* AccessibilityService.swift */,
 				936AA0D7A9E66908D29318BA /* AnnotationStore.swift */,
+				FB82A3B4C5D6E7F8A9B0C1D2 /* BackupService.swift */,
 				3365106A06C3516BB125705C /* BatchProcessingService.swift */,
 				B759AEF7B571932C2B41C37C /* CatalogDatabase.swift */,
 				6BCAD1385B34DBC5A6F33CD9 /* CatalogMigrations.swift */,
@@ -1191,7 +1196,7 @@
 			children = (
 				A7B2C3D4E5F6000200000001 /* PendingQuizView.swift */,
 				F03F69165E387D60D96C2A79 /* QuizCardListView.swift */,
-				A7B2C3D4E5F6000200000010 /* QuizCardReviewOverlay.swift */,
+				A7B2C3D4E5F6000200000010 /* QuizCardReviewView.swift */,
 				B4F8436D022577C114789A83 /* QuizCardsPanelView.swift */,
 				A7B2C3D4E5F6000200000012 /* QuizCardPreviewContent.swift */,
 			);
@@ -1286,6 +1291,7 @@
 			isa = PBXGroup;
 			children = (
 				D5731B7F44DC2787384110A3 /* AddSourcesSheet.swift */,
+				FD64E5F6A7B8C9D0E1F2A3B4 /* BackupProgressView.swift */,
 				CFA59E881FAEADC7AB4ACA27 /* CollectionEditorSheet.swift */,
 				A7B2C3D4E5F6000200000013 /* CollectionQuizCardsView.swift */,
 				B49EB20DFBDA5072A48A9B12 /* DuplicatesMergePane.swift */,
@@ -1618,7 +1624,7 @@
 				EE105214FB3C1042E923BBAE /* FilterRule.swift in Sources */,
 				C1C534F45FDB8488DD683183 /* QuizCardsViewModel.swift in Sources */,
 				F3126678DBC62A79A6AE6A82 /* QuizCardListView.swift in Sources */,
-				A7B2C3D4E5F6000100000010 /* QuizCardReviewOverlay.swift in Sources */,
+				A7B2C3D4E5F6000100000010 /* QuizCardReviewView.swift in Sources */,
 				A7B2C3D4E5F6000100000012 /* QuizCardPreviewContent.swift in Sources */,
 				A7B2C3D4E5F6000100000013 /* CollectionQuizCardsView.swift in Sources */,
 				A7B2C3D4E5F6000100000001 /* PendingQuizView.swift in Sources */,
@@ -1805,6 +1811,8 @@
 				079EDE97CFC4C947DD1CB1DE /* ZoteroFieldMapping.swift in Sources */,
 				C1205D6CBED8E36E3DCFFFE0 /* ZoteroImportProgressView.swift in Sources */,
 				58DFACB7DB1AF310CEA7A4CD /* ZoteroMigrationService.swift in Sources */,
+				FA91B2C3D4E5F6A7B8C9D0E1 /* BackupService.swift in Sources */,
+				FC73D4E5F6A7B8C9D0E1F2A3 /* BackupProgressView.swift in Sources */,
 				3CDCD47693C52BAE40D233F5 /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

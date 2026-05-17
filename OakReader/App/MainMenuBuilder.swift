@@ -153,6 +153,26 @@ enum MainMenuBuilder {
 
         fileMenu.addItem(.separator())
 
+        let exportBackupItem = NSMenuItem(
+            title: "Export Library Backup...",
+            action: #selector(AppDelegate.exportLibraryBackup(_:)),
+            keyEquivalent: ""
+        )
+        exportBackupItem.target = target
+        exportBackupItem.image = icon("archivebox")
+        fileMenu.addItem(exportBackupItem)
+
+        let restoreBackupItem = NSMenuItem(
+            title: "Restore from Backup...",
+            action: #selector(AppDelegate.restoreLibraryBackup(_:)),
+            keyEquivalent: ""
+        )
+        restoreBackupItem.target = target
+        restoreBackupItem.image = icon("arrow.down.doc")
+        fileMenu.addItem(restoreBackupItem)
+
+        fileMenu.addItem(.separator())
+
         let closeItem = NSMenuItem(
             title: "Close Tab",
             action: #selector(AppDelegate.closeTab(_:)),

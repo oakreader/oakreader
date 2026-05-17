@@ -96,6 +96,10 @@ final class AppState {
     var showSettings: Bool = false
     var showZoteroImport: Bool = false
     var zoteroImportDataDir: URL?
+    var showBackupExport: Bool = false
+    var backupExportURL: URL?
+    var showBackupRestore: Bool = false
+    var backupRestoreURL: URL?
     var isLibrarySidebarVisible: Bool = true
     var libraryDetailTab: LibraryDetailTab? = nil
     var importNotification: String?
