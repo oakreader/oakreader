@@ -1,7 +1,7 @@
 import AppKit
 
 /// Maps permission types to System Settings deep-link URLs and opens them.
-enum SystemSettingsPanel {
+enum SystemSettingsLauncher {
     case microphone
 
     private var url: URL {

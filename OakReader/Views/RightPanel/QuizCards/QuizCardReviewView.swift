@@ -1,9 +1,8 @@
 import SwiftUI
 import Textual
 
-/// Full-screen overlay for quiz card review sessions.
-/// Covers the entire document window with an Anki-style minimal interface.
-struct QuizCardReviewOverlay: View {
+/// Quiz card review tab with an Anki-style minimal interface.
+struct QuizCardReviewView: View {
     let quizCardsVM: QuizCardsViewModel
     var onDismiss: (() -> Void)? = nil
 
@@ -12,26 +11,23 @@ struct QuizCardReviewOverlay: View {
     @FocusState private var isFocused: Bool
 
     var body: some View {
-        ZStack {
-            // Full background
-            Color(nsColor: .windowBackgroundColor)
-                .ignoresSafeArea()
-
-            reviewSessionView
-        }
-        .focusable()
-        .focused($isFocused)
-        .onAppear { isFocused = true }
-        .onKeyPress(.escape) {
-            quizCardsVM.endReview()
-            onDismiss?()
-            return .handled
-        }
-        .onKeyPress(.space) {
-            guard !isRevealed else { return .ignored }
-            withAnimation(.easeInOut(duration: 0.2)) { isRevealed = true }
-            return .handled
-        }
+        reviewSessionView
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(nsColor: .windowBackgroundColor))
+            .focusable()
+            .focused($isFocused)
+            .focusEffectDisabled()
+            .onAppear { isFocused = true }
+            .onKeyPress(.escape) {
+                quizCardsVM.endReview()
+                onDismiss?()
+                return .handled
+            }
+            .onKeyPress(.space) {
+                guard !isRevealed else { return .ignored }
+                withAnimation(.easeInOut(duration: 0.2)) { isRevealed = true }
+                return .handled
+            }
     }
 
     // MARK: - Review Session
@@ -51,6 +47,7 @@ struct QuizCardReviewOverlay: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 recognitionActionArea
+                    .frame(maxWidth: 640)
                     .padding(.horizontal, OakStyle.Spacing.lg)
                     .padding(.vertical, OakStyle.Spacing.md)
             } else {
@@ -102,7 +99,7 @@ struct QuizCardReviewOverlay: View {
     private func flashcardContent(_ c: QuizContent.FlashcardContent) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             StructuredText(markdown: c.front)
-                .font(.system(size: 16))
+                .font(.system(size: 18))
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             if isRevealed {
@@ -111,7 +108,7 @@ struct QuizCardReviewOverlay: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.secondary)
                 StructuredText(markdown: c.back)
-                    .font(.system(size: 16))
+                    .font(.system(size: 18))
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
@@ -121,15 +118,15 @@ struct QuizCardReviewOverlay: View {
         VStack(alignment: .leading, spacing: 12) {
             if isRevealed {
                 StructuredText(markdown: revealCloze(c.text))
-                    .font(.system(size: 16))
+                    .font(.system(size: 18))
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 StructuredText(markdown: hideCloze(c.text))
-                    .font(.system(size: 16))
+                    .font(.system(size: 18))
                     .frame(maxWidth: .infinity, alignment: .leading)
                 if let hint = c.hint {
                     Text("Hint: \(hint)")
-                        .font(.system(size: 13))
+                        .font(.system(size: 14))
                         .foregroundStyle(.tertiary)
                 }
             }
@@ -139,7 +136,7 @@ struct QuizCardReviewOverlay: View {
     private func choiceContent(_ c: QuizContent.ChoiceContent) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             StructuredText(markdown: c.question)
-                .font(.system(size: 16))
+                .font(.system(size: 18))
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             ForEach(Array(c.choices.enumerated()), id: \.offset) { idx, choice in
@@ -167,7 +164,7 @@ struct QuizCardReviewOverlay: View {
                                 .foregroundStyle(.secondary)
                         }
                         Text(choice)
-                            .font(.system(size: 14))
+                            .font(.system(size: 15))
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .padding(.vertical, 8)
@@ -184,7 +181,7 @@ struct QuizCardReviewOverlay: View {
             if isRevealed, let explanation = c.explanation {
                 Divider()
                 Text(explanation)
-                    .font(.system(size: 13))
+                    .font(.system(size: 14))
                     .foregroundStyle(.secondary)
             }
         }
@@ -206,22 +203,22 @@ struct QuizCardReviewOverlay: View {
     private func matchingContent(_ c: QuizContent.MatchingContent) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Match the pairs:")
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(.secondary)
             ForEach(Array(c.pairs.enumerated()), id: \.offset) { _, pair in
                 HStack {
                     Text(pair.left)
-                        .font(.system(size: 14))
+                        .font(.system(size: 15))
                         .frame(maxWidth: .infinity, alignment: .leading)
                     if isRevealed {
                         Image(systemName: "arrow.right")
                             .foregroundStyle(.secondary)
                         Text(pair.right)
-                            .font(.system(size: 14, weight: .medium))
+                            .font(.system(size: 15, weight: .medium))
                             .frame(maxWidth: .infinity, alignment: .leading)
                     } else {
                         Text("???")
-                            .font(.system(size: 14))
+                            .font(.system(size: 15))
                             .foregroundStyle(.tertiary)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -234,23 +231,23 @@ struct QuizCardReviewOverlay: View {
     private func orderingContent(_ c: QuizContent.OrderingContent) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             StructuredText(markdown: c.prompt)
-                .font(.system(size: 16))
+                .font(.system(size: 18))
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             if isRevealed {
                 ForEach(Array(c.items.enumerated()), id: \.offset) { idx, item in
                     HStack(spacing: 8) {
                         Text("\(idx + 1).")
-                            .font(.system(size: 14, weight: .medium))
+                            .font(.system(size: 15, weight: .medium))
                             .foregroundStyle(.secondary)
                             .frame(width: 24, alignment: .trailing)
                         Text(item)
-                            .font(.system(size: 14))
+                            .font(.system(size: 15))
                     }
                 }
             } else {
                 Text("Think about the correct order...")
-                    .font(.system(size: 13))
+                    .font(.system(size: 14))
                     .foregroundStyle(.tertiary)
             }
         }
@@ -271,8 +268,8 @@ struct QuizCardReviewOverlay: View {
                                 .foregroundStyle(.secondary)
                         }
                         .frame(maxWidth: .infinity)
-                        .frame(height: 32)
-                        .background(Color.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
+                        .frame(height: 56)
+                        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
                     }
                     .buttonStyle(.plain)
                     .onKeyPress("1") {
@@ -289,8 +286,8 @@ struct QuizCardReviewOverlay: View {
                                 .foregroundStyle(.secondary)
                         }
                         .frame(maxWidth: .infinity)
-                        .frame(height: 32)
-                        .background(Color.green.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
+                        .frame(height: 56)
+                        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
                     }
                     .buttonStyle(.plain)
                     .onKeyPress("2") {
@@ -309,8 +306,8 @@ struct QuizCardReviewOverlay: View {
                             .foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity)
-                    .frame(height: 32)
-                    .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 6))
+                    .frame(height: 56)
+                    .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
                 }
                 .buttonStyle(.plain)
             }
