@@ -6,11 +6,7 @@ struct QuizCardsPanelView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if quizCardsVM.isReviewing {
-                QuizCardReviewView(quizCardsVM: quizCardsVM)
-            } else {
-                cardListContainer
-            }
+            cardListContainer
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
