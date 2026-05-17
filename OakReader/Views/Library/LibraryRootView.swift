@@ -128,6 +128,8 @@ private struct LibraryCollectionSidebarPanel: View {
                 title: contextTitle,
                 items: items
             )
+        case .quizCards:
+            CollectionQuizCardsPanelView(appState: appState, title: contextTitle)
         case .metadata, nil:
             EmptyView()
         }
@@ -229,6 +231,102 @@ private struct CollectionNoteListRow: View {
             Text(Self.dateFormatter.string(from: row.note.updatedAt))
                 .font(.system(size: 11))
                 .foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 8)
+        .contentShape(Rectangle())
+    }
+}
+
+// MARK: - Collection Quiz Cards Panel
+
+private struct CollectionQuizCardsPanelView: View {
+    @Bindable var appState: AppState
+    let title: String
+
+    private var store: LibraryStore { appState.libraryStore }
+    private var items: [LibraryItem] { store.filteredItems }
+
+    private var cardRows: [CollectionQuizCardRow] {
+        guard let collectionId = store.selectedCollectionId else { return [] }
+        let service = QuizCardService(database: store.database)
+        let cards = (try? service.fetchCards(forCollectionId: collectionId.uuidString)) ?? []
+
+        return cards.compactMap { card in
+            let item = items.first(where: { $0.id.uuidString == card.itemId })
+            return CollectionQuizCardRow(card: card, itemTitle: item?.title)
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            panelHeader("Quiz Cards", subtitle: "\(cardRows.count) cards in \(title)")
+
+            if items.isEmpty {
+                emptyState(icon: "rectangle.on.rectangle.angled", title: "No Items", subtitle: "This collection has no items.")
+            } else if cardRows.isEmpty {
+                emptyState(icon: "rectangle.on.rectangle.angled", title: "No Quiz Cards", subtitle: "No items in this collection have quiz cards.")
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(cardRows) { row in
+                            Button {
+                                if let itemId = UUID(uuidString: row.card.itemId) {
+                                    appState.selectedLibraryItemIDs = [itemId]
+                                }
+                            } label: {
+                                CollectionQuizCardListRow(row: row)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 8)
+                }
+            }
+        }
+    }
+}
+
+private struct CollectionQuizCardRow: Identifiable {
+    let card: QuizCard
+    let itemTitle: String?
+
+    var id: String { card.id.uuidString }
+}
+
+private struct CollectionQuizCardListRow: View {
+    let row: CollectionQuizCardRow
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 5) {
+                Text(row.card.type.label)
+                    .font(.system(size: 10, weight: .medium))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(.quaternary)
+                    .clipShape(RoundedRectangle(cornerRadius: 3))
+
+                if row.card.isDue {
+                    Circle()
+                        .fill(.orange)
+                        .frame(width: 6, height: 6)
+                }
+            }
+
+            Text(row.card.displayTitle)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(2)
+
+            if let itemTitle = row.itemTitle {
+                Text(itemTitle)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 8)
