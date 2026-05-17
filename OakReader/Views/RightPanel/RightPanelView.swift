@@ -25,9 +25,9 @@ struct RightPanelContentView: View {
                     if Preferences.shared.isExtensionEnabled(.translation) {
                         TranslationPanelView(translationVM: viewModel.translation)
                     }
-                case .flashcards:
-                    if Preferences.shared.isExtensionEnabled(.flashcards) {
-                        FlashcardsPanelView(flashcardsVM: viewModel.flashcards)
+                case .quizCards:
+                    if Preferences.shared.isExtensionEnabled(.quizCards) {
+                        QuizCardsPanelView(quizCardsVM: viewModel.quizCards)
                     }
                 }
             }
@@ -44,10 +44,10 @@ struct RightPanelContentView: View {
     }
 
     private var saveQuizCardAction: ((QuizContent) -> Bool)? {
-        Preferences.shared.isExtensionEnabled(.flashcards) ? saveQuizCard : nil
+        Preferences.shared.isExtensionEnabled(.quizCards) ? saveQuizCard : nil
     }
 
     private func saveQuizCard(_ content: QuizContent) -> Bool {
-        viewModel.flashcards.saveCard(content: content)
+        viewModel.quizCards.saveCard(content: content)
     }
 }

@@ -2,8 +2,8 @@ import SwiftUI
 import Textual
 
 /// Review session: displays the current card and Again/Hard/Good/Easy buttons.
-struct FlashcardReviewView: View {
-    let flashcardsVM: FlashcardsViewModel
+struct QuizCardReviewView: View {
+    let quizCardsVM: QuizCardsViewModel
 
     @State private var isRevealed = false
 
@@ -11,7 +11,7 @@ struct FlashcardReviewView: View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Button(action: { flashcardsVM.endReview() }) {
+                Button(action: { quizCardsVM.endReview() }) {
                     Image(systemName: "xmark")
                         .font(.system(size: 12, weight: .medium))
                 }
@@ -20,7 +20,7 @@ struct FlashcardReviewView: View {
 
                 Spacer()
 
-                Text("\(flashcardsVM.currentReviewIndex + 1) / \(flashcardsVM.dueCards.count)")
+                Text("\(quizCardsVM.currentReviewIndex + 1) / \(quizCardsVM.dueCards.count)")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
@@ -28,7 +28,7 @@ struct FlashcardReviewView: View {
                 Spacer()
 
                 // Progress
-                ProgressView(value: Double(flashcardsVM.currentReviewIndex), total: Double(flashcardsVM.dueCards.count))
+                ProgressView(value: Double(quizCardsVM.currentReviewIndex), total: Double(quizCardsVM.dueCards.count))
                     .frame(width: 80)
             }
             .padding(.horizontal, OakStyle.Spacing.sm)
@@ -37,7 +37,7 @@ struct FlashcardReviewView: View {
             Divider()
 
             // Card content
-            if let card = flashcardsVM.currentReviewCard {
+            if let card = quizCardsVM.currentReviewCard {
                 ScrollView {
                     VStack(spacing: 16) {
                         cardContent(card)
@@ -64,7 +64,7 @@ struct FlashcardReviewView: View {
                 reviewCompleteView
             }
         }
-        .onChange(of: flashcardsVM.currentReviewIndex) { _, _ in
+        .onChange(of: quizCardsVM.currentReviewIndex) { _, _ in
             isRevealed = false
         }
     }
@@ -229,7 +229,7 @@ struct FlashcardReviewView: View {
     private var ratingButtons: some View {
         HStack(spacing: 8) {
             ForEach(ReviewRating.allCases, id: \.rawValue) { rating in
-                Button(action: { flashcardsVM.submitReview(rating: rating) }) {
+                Button(action: { quizCardsVM.submitReview(rating: rating) }) {
                     VStack(spacing: 2) {
                         Text(intervalLabel(for: rating))
                             .font(.system(size: 10))
@@ -248,7 +248,7 @@ struct FlashcardReviewView: View {
 
     /// Show predicted interval above each rating button (like Anki).
     private func intervalLabel(for rating: ReviewRating) -> String {
-        guard let card = flashcardsVM.currentReviewCard,
+        guard let card = quizCardsVM.currentReviewCard,
               let result = QuizScheduler.schedule(card: card, rating: rating) else {
             return ""
         }
@@ -288,7 +288,7 @@ struct FlashcardReviewView: View {
                 .font(.system(size: 14))
                 .foregroundStyle(.secondary)
             Button("Done") {
-                flashcardsVM.endReview()
+                quizCardsVM.endReview()
             }
             .buttonStyle(.bordered)
             .controlSize(.regular)

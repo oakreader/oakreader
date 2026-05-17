@@ -208,7 +208,7 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
         self.speakButton = speakBtn
         mainStack.addArrangedSubview(speakBtn)
 
-        if Preferences.shared.isExtensionEnabled(.flashcards) {
+        if Preferences.shared.isExtensionEnabled(.quizCards) {
             let quizBtn = PopupIconButton(
                 systemImage: "sparkles",
                 accessibilityLabel: "Generate Quiz"
@@ -414,7 +414,7 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
                 )
                 await MainActor.run {
                     viewModel.appState?.importNotification = "Generated \(cards.count) quiz card\(cards.count == 1 ? "" : "s")"
-                    viewModel.flashcards.loadCards()
+                    viewModel.quizCards.loadCards()
                 }
             } catch {
                 Log.error(Log.store, "Quiz generation failed: \(error)")

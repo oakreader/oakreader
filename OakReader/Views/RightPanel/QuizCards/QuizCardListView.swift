@@ -1,12 +1,12 @@
 import SwiftUI
 
-/// List of saved flashcards for the current document, grouped by quiz type.
-struct FlashcardListView: View {
-    let flashcardsVM: FlashcardsViewModel
+/// List of saved quiz cards for the current document, grouped by quiz type.
+struct QuizCardListView: View {
+    let quizCardsVM: QuizCardsViewModel
 
     var body: some View {
         List {
-            ForEach(flashcardsVM.groupedByType, id: \.key) { group in
+            ForEach(quizCardsVM.groupedByType, id: \.key) { group in
                 Section {
                     ForEach(group.cards) { card in
                         cardRow(card)
@@ -56,11 +56,11 @@ struct FlashcardListView: View {
         .padding(.vertical, 2)
         .contextMenu {
             Button("Suspend") {
-                flashcardsVM.toggleSuspend(card)
+                quizCardsVM.toggleSuspend(card)
             }
             Divider()
             Button("Delete", role: .destructive) {
-                flashcardsVM.deleteCard(card)
+                quizCardsVM.deleteCard(card)
             }
         }
     }

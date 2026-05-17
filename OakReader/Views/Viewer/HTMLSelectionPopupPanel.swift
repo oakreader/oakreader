@@ -13,6 +13,9 @@ class HTMLSelectionPopupPanel: NSPanel, AppResignDismissable {
     private weak var webView: WKWebView?
     private let onDismiss: () -> Void
 
+    // Speak button (needs state tracking for icon toggle)
+    private weak var speakButton: PopupIconButton?
+
     // Color sub-panel
     private var colorSubPanel: NSPanel?
     var resignObserver: NSObjectProtocol?
@@ -206,7 +209,16 @@ class HTMLSelectionPopupPanel: NSPanel, AppResignDismissable {
             mainStack.addArrangedSubview(translateBtn)
         }
 
-        if Preferences.shared.isExtensionEnabled(.flashcards) {
+        let speakBtn = PopupIconButton(
+            systemImage: "speaker.wave.2",
+            accessibilityLabel: "Play Sound"
+        ) { [weak self] in
+            self?.speakSelection()
+        }
+        self.speakButton = speakBtn
+        mainStack.addArrangedSubview(speakBtn)
+
+        if Preferences.shared.isExtensionEnabled(.quizCards) {
             let quizBtn = PopupIconButton(
                 systemImage: "sparkles",
                 accessibilityLabel: "Generate Quiz"
@@ -392,12 +404,41 @@ class HTMLSelectionPopupPanel: NSPanel, AppResignDismissable {
                 )
                 await MainActor.run {
                     viewModel.appState?.importNotification = "Generated \(cards.count) quiz card\(cards.count == 1 ? "" : "s")"
-                    viewModel.flashcards.loadCards()
+                    viewModel.quizCards.loadCards()
                 }
             } catch {
                 Log.error(Log.store, "Quiz generation failed: \(error)")
                 await MainActor.run {
                     viewModel.appState?.importNotification = "Quiz generation failed"
+                }
+            }
+        }
+    }
+
+    private func speakSelection() {
+        let voice = viewModel.voice
+        if voice.isSpeaking {
+            voice.stopSpeaking()
+            speakButton?.updateImage(systemImage: "speaker.wave.2")
+            return
+        }
+
+        guard !selectedText.isEmpty else { return }
+        voice.speakText(selectedText)
+        speakButton?.updateImage(systemImage: "stop.fill")
+        observeSpeakingState()
+    }
+
+    private func observeSpeakingState() {
+        withObservationTracking {
+            _ = self.viewModel.voice.isSpeaking
+        } onChange: { [weak self] in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                if self.viewModel.voice.isSpeaking {
+                    self.observeSpeakingState()
+                } else {
+                    self.speakButton?.updateImage(systemImage: "speaker.wave.2")
                 }
             }
         }
@@ -411,6 +452,9 @@ class HTMLSelectionPopupPanel: NSPanel, AppResignDismissable {
 
     func dismiss() {
         removeAppResignObserver()
+
+        // Stop TTS playback if active
+        viewModel.voice.stopSpeaking()
 
         colorSubPanel?.orderOut(nil)
         colorSubPanel = nil

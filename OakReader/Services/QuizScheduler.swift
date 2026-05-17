@@ -30,15 +30,15 @@ enum QuizScheduler {
 
     // MARK: - User Preferences
 
-    /// Read target retention from UserDefaults (set in FlashcardSettingsView).
+    /// Read target retention from UserDefaults (set in QuizCardSettingsView).
     private static var userRequestedRetention: Double {
-        let value = UserDefaults.standard.double(forKey: "flashcard_targetRetention")
+        let value = UserDefaults.standard.double(forKey: "quizCard_targetRetention")
         return value > 0 ? value : 0.9
     }
 
     /// Read maximum interval from UserDefaults.
     private static var userMaximumInterval: Double {
-        let value = UserDefaults.standard.integer(forKey: "flashcard_maxInterval")
+        let value = UserDefaults.standard.integer(forKey: "quizCard_maxInterval")
         return value > 0 ? Double(value) : 36500.0
     }
 

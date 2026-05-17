@@ -2,7 +2,7 @@ import Foundation
 import GRDB
 
 @Observable
-class FlashcardsViewModel {
+class QuizCardsViewModel {
     weak var parent: DocumentViewModel?
 
     // MARK: - State

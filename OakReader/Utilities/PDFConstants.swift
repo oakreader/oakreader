@@ -156,7 +156,7 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
     case notes
     case metadata
     case translation
-    case flashcards
+    case quizCards = "flashcards"
 
     var id: String { rawValue }
 
@@ -166,7 +166,7 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
         case .aiChat: return "bubble.left.and.bubble.right"
         case .notes: return "note.text"
         case .translation: return "translate"
-        case .flashcards: return "rectangle.on.rectangle.angled"
+        case .quizCards: return "rectangle.on.rectangle.angled"
         }
     }
 
@@ -176,7 +176,7 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
         case .aiChat: return "AI Chat"
         case .notes: return "Notes"
         case .translation: return "Translation"
-        case .flashcards: return "Flashcards"
+        case .quizCards: return "Quiz Cards"
         }
     }
 }
@@ -184,7 +184,7 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
 enum AppExtension: String, CaseIterable, Identifiable {
     case notes
     case translation
-    case flashcards
+    case quizCards = "flashcards"
     case xBookmarks
     case githubStars
 
@@ -194,7 +194,7 @@ enum AppExtension: String, CaseIterable, Identifiable {
         switch self {
         case .notes: return "Notes"
         case .translation: return "Translation"
-        case .flashcards: return "Flashcards"
+        case .quizCards: return "Quiz Cards"
         case .xBookmarks: return "X Bookmarks"
         case .githubStars: return "GitHub Stars"
         }
@@ -204,7 +204,7 @@ enum AppExtension: String, CaseIterable, Identifiable {
         switch self {
         case .notes: return "Rich markdown notes panel with Mermaid diagrams and image paste."
         case .translation: return "Translate selected text using AI-powered translation."
-        case .flashcards: return "Spaced repetition flashcards with FSRS scheduling."
+        case .quizCards: return "Spaced repetition quiz cards with FSRS scheduling."
         case .xBookmarks: return "Sync your X (Twitter) bookmarks into OakReader."
         case .githubStars: return "Sync your GitHub starred repositories into OakReader."
         }
@@ -215,7 +215,7 @@ enum AppExtension: String, CaseIterable, Identifiable {
         switch self {
         case .notes: return "note.text"
         case .translation: return "translate"
-        case .flashcards: return "rectangle.on.rectangle.angled"
+        case .quizCards: return "rectangle.on.rectangle.angled"
         case .xBookmarks: return "at"
         case .githubStars: return "star"
         }
@@ -234,7 +234,7 @@ enum AppExtension: String, CaseIterable, Identifiable {
         switch self {
         case .notes: return [.notes]
         case .translation: return [.translation]
-        case .flashcards: return [.flashcards]
+        case .quizCards: return [.quizCards]
         case .xBookmarks: return []
         case .githubStars: return []
         }
@@ -242,7 +242,7 @@ enum AppExtension: String, CaseIterable, Identifiable {
 
     var systemCollectionId: UUID? {
         switch self {
-        case .flashcards: return SystemCollectionID.flashcards
+        case .quizCards: return SystemCollectionID.quizCards
         case .xBookmarks: return SystemCollectionID.xBookmarks
         case .githubStars: return SystemCollectionID.githubStars
         default: return nil
@@ -251,7 +251,7 @@ enum AppExtension: String, CaseIterable, Identifiable {
 
     var enabledByDefault: Bool {
         switch self {
-        case .notes, .translation, .flashcards: return true
+        case .notes, .translation, .quizCards: return true
         case .xBookmarks, .githubStars: return false
         }
     }

@@ -2,12 +2,12 @@ import SwiftUI
 
 /// Shows pending quiz cards generated from highlights, allowing user review before scheduling.
 struct PendingQuizView: View {
-    let flashcardsVM: FlashcardsViewModel
+    let quizCardsVM: QuizCardsViewModel
 
     var body: some View {
         VStack(spacing: 0) {
             header
-            if flashcardsVM.pendingCards.isEmpty {
+            if quizCardsVM.pendingCards.isEmpty {
                 emptyState
             } else {
                 cardList
@@ -22,7 +22,7 @@ struct PendingQuizView: View {
             Text("Pending Review")
                 .font(.system(size: 14, weight: .semibold))
 
-            Text("\(flashcardsVM.pendingCount)")
+            Text("\(quizCardsVM.pendingCount)")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 6)
@@ -31,9 +31,9 @@ struct PendingQuizView: View {
 
             Spacer()
 
-            if flashcardsVM.pendingCount > 0 {
+            if quizCardsVM.pendingCount > 0 {
                 Button("Save All") {
-                    flashcardsVM.approveAllPending()
+                    quizCardsVM.approveAllPending()
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
@@ -48,7 +48,7 @@ struct PendingQuizView: View {
 
     private var cardList: some View {
         List {
-            ForEach(flashcardsVM.pendingCards) { card in
+            ForEach(quizCardsVM.pendingCards) { card in
                 pendingCardRow(card)
             }
         }
@@ -85,7 +85,7 @@ struct PendingQuizView: View {
             // Action buttons
             HStack(spacing: 8) {
                 Button {
-                    flashcardsVM.approveCard(card)
+                    quizCardsVM.approveCard(card)
                 } label: {
                     Label("Save", systemImage: "checkmark.circle")
                         .font(.system(size: 11, weight: .medium))
@@ -95,7 +95,7 @@ struct PendingQuizView: View {
                 .tint(.green)
 
                 Button(role: .destructive) {
-                    flashcardsVM.deletePendingCard(card)
+                    quizCardsVM.deletePendingCard(card)
                 } label: {
                     Label("Delete", systemImage: "trash")
                         .font(.system(size: 11, weight: .medium))
