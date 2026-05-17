@@ -94,7 +94,7 @@ extension CatalogDatabase {
                  #"{"match":"all","conditions":[{"field":"content_type","op":"eq","value":"html"}]}"#),
                 (SystemCollectionID.videos.uuidString, "Videos", "play.rectangle", 4,
                  #"{"match":"all","conditions":[{"field":"content_type","op":"eq","value":"video"}]}"#),
-                (SystemCollectionID.notes.uuidString, "Notes", "doc.text", 5,
+                ("00000000-0000-0000-0000-000000000009", "Notes", "doc.text", 5,
                  #"{"match":"all","conditions":[{"field":"content_type","op":"eq","value":"markdown"}]}"#),
                 (SystemCollectionID.duplicates.uuidString, "Duplicates", "square.on.square", 6, nil),
             ]
@@ -494,6 +494,11 @@ extension CatalogDatabase {
             try db.execute(sql: """
                 DELETE FROM collections WHERE id IN (?, ?)
             """, arguments: [xBookmarksId, githubStarsId])
+        }
+
+        migrator.registerMigration("v17-remove-notes-collection") { db in
+            let notesId = "00000000-0000-0000-0000-000000000009"
+            try db.execute(sql: "DELETE FROM collections WHERE id = ?", arguments: [notesId])
         }
 
         return migrator
