@@ -7,9 +7,7 @@ struct QuizCardReviewOverlay: View {
     let quizCardsVM: QuizCardsViewModel
 
     @State private var isRevealed = false
-    @State private var userAnswer = ""
     @State private var selectedChoiceIndex: Int?
-    @FocusState private var isTextFieldFocused: Bool
 
     var body: some View {
         ZStack {
@@ -17,59 +15,11 @@ struct QuizCardReviewOverlay: View {
             Color(nsColor: .windowBackgroundColor)
                 .ignoresSafeArea()
 
-            if quizCardsVM.isReviewSetup {
-                reviewSetupView
-            } else {
-                reviewSessionView
-            }
+            reviewSessionView
         }
         .onKeyPress(.escape) {
             quizCardsVM.endReview()
             return .handled
-        }
-    }
-
-    // MARK: - Review Setup (Mode Selection)
-
-    private var reviewSetupView: some View {
-        VStack(spacing: 24) {
-            Spacer()
-
-            Text("Review Session")
-                .font(.system(size: 24, weight: .semibold))
-
-            Text("\(quizCardsVM.dueCards.count) cards due")
-                .font(.system(size: 16))
-                .foregroundStyle(.secondary)
-
-            HStack(spacing: 16) {
-                ForEach(ReviewMode.allCases) { mode in
-                    Button(action: { quizCardsVM.beginReview(mode: mode) }) {
-                        VStack(spacing: 8) {
-                            Image(systemName: mode.systemImage)
-                                .font(.system(size: 24))
-                            Text(mode.label)
-                                .font(.system(size: 14, weight: .medium))
-                            Text(mode.description)
-                                .font(.system(size: 12))
-                                .foregroundStyle(.secondary)
-                        }
-                        .frame(width: 160, height: 100)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.large)
-                }
-            }
-            .padding(.top, 8)
-
-            Button("Cancel") {
-                quizCardsVM.cancelSetup()
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
-            .padding(.top, 8)
-
-            Spacer()
         }
     }
 
@@ -96,7 +46,7 @@ struct QuizCardReviewOverlay: View {
                 Divider()
 
                 // Bottom action area
-                actionArea(card)
+                recognitionActionArea
                     .padding(.horizontal, OakStyle.Spacing.lg)
                     .padding(.vertical, OakStyle.Spacing.md)
             } else {
@@ -104,7 +54,8 @@ struct QuizCardReviewOverlay: View {
             }
         }
         .onChange(of: quizCardsVM.currentReviewIndex) { _, _ in
-            resetCardState()
+            isRevealed = false
+            selectedChoiceIndex = nil
         }
     }
 
@@ -162,7 +113,7 @@ struct QuizCardReviewOverlay: View {
                 .font(.system(size: 16))
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            if isRevealed || quizCardsVM.currentEvaluationResult != nil {
+            if isRevealed {
                 Divider()
                 Text("Answer")
                     .font(.system(size: 12, weight: .semibold))
@@ -176,7 +127,7 @@ struct QuizCardReviewOverlay: View {
 
     private func clozeContent(_ c: QuizContent.ClozeContent) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            if isRevealed || quizCardsVM.currentEvaluationResult != nil {
+            if isRevealed {
                 StructuredText(markdown: revealCloze(c.text))
                     .font(.system(size: 16))
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -200,34 +151,64 @@ struct QuizCardReviewOverlay: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             ForEach(Array(c.choices.enumerated()), id: \.offset) { idx, choice in
-                Button(action: {
-                    if selectedChoiceIndex == nil {
+                Button {
+                    guard selectedChoiceIndex == nil else { return }
+                    withAnimation(.easeInOut(duration: 0.2)) {
                         selectedChoiceIndex = idx
-                        quizCardsVM.submitChoiceAnswer(selectedIndex: idx)
+                        isRevealed = true
                     }
-                }) {
+                } label: {
                     HStack(spacing: 10) {
-                        choiceIcon(for: idx, correctIndex: c.correctIndex)
+                        if let selected = selectedChoiceIndex {
+                            if idx == c.correctIndex {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                            } else if idx == selected {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(.red)
+                            } else {
+                                Image(systemName: "circle")
+                                    .foregroundStyle(.secondary)
+                            }
+                        } else {
+                            Image(systemName: "circle")
+                                .foregroundStyle(.secondary)
+                        }
                         Text(choice)
                             .font(.system(size: 14))
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .padding(.vertical, 8)
                     .padding(.horizontal, 12)
-                    .background(choiceBackground(for: idx, correctIndex: c.correctIndex))
-                    .cornerRadius(8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(choiceBackground(for: idx, correctIndex: c.correctIndex))
+                    )
                 }
                 .buttonStyle(.plain)
                 .disabled(selectedChoiceIndex != nil)
             }
 
-            if let result = quizCardsVM.currentEvaluationResult, let explanation = c.explanation {
+            if isRevealed, let explanation = c.explanation {
                 Divider()
                 Text(explanation)
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    private func choiceBackground(for idx: Int, correctIndex: Int) -> Color {
+        guard let selected = selectedChoiceIndex else {
+            return Color.primary.opacity(0.04)
+        }
+        if idx == correctIndex {
+            return Color.green.opacity(0.1)
+        }
+        if idx == selected {
+            return Color.red.opacity(0.1)
+        }
+        return Color.primary.opacity(0.04)
     }
 
     private func matchingContent(_ c: QuizContent.MatchingContent) -> some View {
@@ -240,7 +221,7 @@ struct QuizCardReviewOverlay: View {
                     Text(pair.left)
                         .font(.system(size: 14))
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    if isRevealed || quizCardsVM.currentEvaluationResult != nil {
+                    if isRevealed {
                         Image(systemName: "arrow.right")
                             .foregroundStyle(.secondary)
                         Text(pair.right)
@@ -264,7 +245,7 @@ struct QuizCardReviewOverlay: View {
                 .font(.system(size: 16))
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            if isRevealed || quizCardsVM.currentEvaluationResult != nil {
+            if isRevealed {
                 ForEach(Array(c.items.enumerated()), id: \.offset) { idx, item in
                     HStack(spacing: 8) {
                         Text("\(idx + 1).")
@@ -284,37 +265,6 @@ struct QuizCardReviewOverlay: View {
     }
 
     // MARK: - Action Area
-
-    @ViewBuilder
-    private func actionArea(_ card: QuizCard) -> some View {
-        if let result = quizCardsVM.currentEvaluationResult {
-            // Show evaluation feedback + Next button
-            evaluationFeedbackArea(result)
-        } else if let error = quizCardsVM.evaluationError {
-            // AI failed — show manual override
-            manualOverrideArea(error: error)
-        } else if quizCardsVM.isEvaluating {
-            // Loading
-            HStack(spacing: 8) {
-                ProgressView()
-                    .controlSize(.small)
-                Text("Evaluating...")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity)
-        } else {
-            // Input area based on mode and card type
-            switch quizCardsVM.reviewMode {
-            case .recognition:
-                recognitionActionArea
-            case .production:
-                productionActionArea(card)
-            }
-        }
-    }
-
-    // MARK: Recognition Actions
 
     private var recognitionActionArea: some View {
         Group {
@@ -379,107 +329,6 @@ struct QuizCardReviewOverlay: View {
         }
     }
 
-    // MARK: Production Actions
-
-    @ViewBuilder
-    private func productionActionArea(_ card: QuizCard) -> some View {
-        // Choice cards use tap-to-select, no text input needed
-        if case .choice = card.content {
-            if selectedChoiceIndex == nil {
-                Text("Select an answer above")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.tertiary)
-                    .frame(maxWidth: .infinity)
-            }
-        } else {
-            HStack(spacing: 8) {
-                TextField("Type your answer...", text: $userAnswer)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.system(size: 14))
-                    .focused($isTextFieldFocused)
-                    .onSubmit {
-                        submitCurrentAnswer()
-                    }
-
-                VoiceInputButton(transcribedText: $userAnswer)
-
-                Button(action: { submitCurrentAnswer() }) {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.system(size: 24))
-                }
-                .buttonStyle(.plain)
-                .disabled(userAnswer.trimmingCharacters(in: .whitespaces).isEmpty)
-                .help("Submit (Enter)")
-            }
-            .onAppear { isTextFieldFocused = true }
-        }
-    }
-
-    // MARK: Evaluation Feedback
-
-    private func evaluationFeedbackArea(_ result: EvaluationResult) -> some View {
-        VStack(spacing: 12) {
-            EvaluationFeedbackView(result: result)
-
-            Button(action: { quizCardsVM.advanceAfterEvaluation() }) {
-                HStack(spacing: 4) {
-                    Text("Next")
-                        .font(.system(size: 14, weight: .medium))
-                    Text("(Enter)")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: 36)
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.large)
-            .onKeyPress(.return) {
-                quizCardsVM.advanceAfterEvaluation()
-                return .handled
-            }
-        }
-    }
-
-    // MARK: Manual Override (AI failure)
-
-    private func manualOverrideArea(error: String) -> some View {
-        VStack(spacing: 12) {
-            Text(error)
-                .font(.system(size: 12))
-                .foregroundStyle(.red)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            HStack(spacing: 16) {
-                Button(action: { quizCardsVM.submitManualOverride(remembered: false) }) {
-                    Text("Forget (1)")
-                        .font(.system(size: 14, weight: .medium))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 36)
-                }
-                .buttonStyle(.bordered)
-                .tint(.red)
-
-                Button(action: { quizCardsVM.submitManualOverride(remembered: true) }) {
-                    Text("Remember (2)")
-                        .font(.system(size: 14, weight: .medium))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 36)
-                }
-                .buttonStyle(.bordered)
-                .tint(.green)
-            }
-        }
-        .onKeyPress("1") {
-            quizCardsVM.submitManualOverride(remembered: false)
-            return .handled
-        }
-        .onKeyPress("2") {
-            quizCardsVM.submitManualOverride(remembered: true)
-            return .handled
-        }
-    }
-
     // MARK: - Review Complete
 
     private var reviewCompleteView: some View {
@@ -505,21 +354,6 @@ struct QuizCardReviewOverlay: View {
 
     // MARK: - Helpers
 
-    private func resetCardState() {
-        isRevealed = false
-        userAnswer = ""
-        selectedChoiceIndex = nil
-        isTextFieldFocused = true
-    }
-
-    private func submitCurrentAnswer() {
-        let trimmed = userAnswer.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return }
-        Task {
-            await quizCardsVM.submitAnswer(trimmed)
-        }
-    }
-
     private func hideCloze(_ text: String) -> String {
         text.replacingOccurrences(
             of: #"\{\{c\d+::([^}]*?)(?:::[^}]*)?\}\}"#,
@@ -534,40 +368,5 @@ struct QuizCardReviewOverlay: View {
             with: "**$1**",
             options: .regularExpression
         )
-    }
-
-    // MARK: Choice Helpers
-
-    private func choiceIcon(for idx: Int, correctIndex: Int) -> some View {
-        Group {
-            if let selected = selectedChoiceIndex {
-                if idx == correctIndex {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                } else if idx == selected {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.red)
-                } else {
-                    Image(systemName: "circle")
-                        .foregroundStyle(.secondary)
-                }
-            } else {
-                Image(systemName: "circle")
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    private func choiceBackground(for idx: Int, correctIndex: Int) -> Color {
-        guard let selected = selectedChoiceIndex else {
-            return Color.primary.opacity(0.04)
-        }
-        if idx == correctIndex {
-            return Color.green.opacity(0.1)
-        }
-        if idx == selected {
-            return Color.red.opacity(0.1)
-        }
-        return Color.primary.opacity(0.04)
     }
 }

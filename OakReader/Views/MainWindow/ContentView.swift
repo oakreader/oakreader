@@ -99,7 +99,7 @@ struct ContentView: View {
             )
         }
         .overlay {
-            if viewModel.quizCards.isReviewing || viewModel.quizCards.isReviewSetup {
+            if viewModel.quizCards.isReviewing {
                 QuizCardReviewOverlay(quizCardsVM: viewModel.quizCards)
                     .transition(.opacity)
             }
