@@ -293,7 +293,10 @@ final class Preferences {
 
     var hiddenSystemCollectionIds: Set<UUID> {
         get {
-            let strings = defaults.stringArray(forKey: Keys.hiddenSystemCollectionIds) ?? []
+            guard let strings = defaults.stringArray(forKey: Keys.hiddenSystemCollectionIds) else {
+                // Default: hide Notes collection (notes appear in All Items)
+                return [SystemCollectionID.notes]
+            }
             return Set(strings.compactMap { UUID(uuidString: $0) })
         }
         set {

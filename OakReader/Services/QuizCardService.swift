@@ -134,6 +134,33 @@ struct QuizCardService {
         }
     }
 
+    /// Fetch all non-pending cards for multiple items in a single query, ordered by due date.
+    func fetchCards(forItemIds itemIds: [String]) throws -> [QuizCard] {
+        guard !itemIds.isEmpty else { return [] }
+        return try database.dbQueue.read { db in
+            let records = try QuizCardRecord
+                .filter(itemIds.contains(QuizCardRecord.CodingKeys.itemId))
+                .filter(QuizCardRecord.CodingKeys.isSuspended == false)
+                .filter(QuizCardRecord.CodingKeys.isPending == false)
+                .order(QuizCardRecord.CodingKeys.dueAt.asc)
+                .fetchAll(db)
+            return records.map { QuizCard(record: $0) }
+        }
+    }
+
+    /// Fetch pending cards for multiple items in a single query.
+    func fetchPendingCards(forItemIds itemIds: [String]) throws -> [QuizCard] {
+        guard !itemIds.isEmpty else { return [] }
+        return try database.dbQueue.read { db in
+            let records = try QuizCardRecord
+                .filter(itemIds.contains(QuizCardRecord.CodingKeys.itemId))
+                .filter(QuizCardRecord.CodingKeys.isPending == true)
+                .order(QuizCardRecord.CodingKeys.createdAt.desc)
+                .fetchAll(db)
+            return records.map { QuizCard(record: $0) }
+        }
+    }
+
     /// Fetch all non-pending cards across all items, ordered by due date.
     func fetchAllCards() throws -> [QuizCard] {
         try database.dbQueue.read { db in
