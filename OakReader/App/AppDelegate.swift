@@ -521,6 +521,49 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         appState.showZoteroImport = true
     }
 
+    // MARK: - Library Backup
+
+    @objc func exportLibraryBackup(_ sender: Any?) {
+        let panel = NSSavePanel()
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let dateString = dateFormatter.string(from: Date())
+        panel.nameFieldStringValue = "OakReader-Backup-\(dateString).oakreader"
+        panel.allowedContentTypes = [.init(filenameExtension: "oakreader") ?? .zip]
+        panel.begin { [weak self] response in
+            guard response == .OK, let url = panel.url, let self else { return }
+            self.appState.backupExportURL = url
+            self.appState.showBackupExport = true
+        }
+    }
+
+    @objc func restoreLibraryBackup(_ sender: Any?) {
+        let alert = NSAlert()
+        alert.messageText = "Restore from Backup"
+        alert.informativeText = """
+            This will replace your entire library with the contents of the backup. \
+            Your current library will be preserved in a separate folder as a safety net.
+
+            The app will need to restart after restoring.
+            """
+        alert.alertStyle = .critical
+        alert.addButton(withTitle: "Choose Backup File...")
+        alert.addButton(withTitle: "Cancel")
+
+        let response = alert.runModal()
+        guard response == .alertFirstButtonReturn else { return }
+
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.init(filenameExtension: "oakreader") ?? .zip]
+        panel.allowsMultipleSelection = false
+        panel.message = "Select an OakReader backup file to restore"
+        let openResponse = panel.runModal()
+        guard openResponse == .OK, let url = panel.url else { return }
+
+        appState.backupRestoreURL = url
+        appState.showBackupRestore = true
+    }
+
     // MARK: - Command Line Tools
 
     @objc func installCommandLineTools(_ sender: Any?) {

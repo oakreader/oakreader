@@ -38,7 +38,7 @@ struct RootView: View {
 
                 // Quiz review tab
                 if let session = appState.quizReviewSession {
-                    QuizCardReviewOverlay(quizCardsVM: session.quizCardsVM) {
+                    QuizCardReviewView(quizCardsVM: session.quizCardsVM) {
                         appState.closeQuizReview()
                     }
                     .opacity(appState.activeTabID == session.tabID ? 1 : 0)
@@ -91,6 +91,34 @@ struct RootView: View {
                     onDismiss: {
                         appState.showZoteroImport = false
                         appState.zoteroImportDataDir = nil
+                    }
+                )
+            }
+        }
+        .sheet(isPresented: Binding(
+            get: { appState.showBackupExport },
+            set: { appState.showBackupExport = $0 }
+        )) {
+            if let url = appState.backupExportURL {
+                BackupExportProgressView(
+                    destinationURL: url,
+                    onDismiss: {
+                        appState.showBackupExport = false
+                        appState.backupExportURL = nil
+                    }
+                )
+            }
+        }
+        .sheet(isPresented: Binding(
+            get: { appState.showBackupRestore },
+            set: { appState.showBackupRestore = $0 }
+        )) {
+            if let url = appState.backupRestoreURL {
+                BackupRestoreProgressView(
+                    archiveURL: url,
+                    onDismiss: {
+                        appState.showBackupRestore = false
+                        appState.backupRestoreURL = nil
                     }
                 )
             }
