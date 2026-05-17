@@ -189,18 +189,7 @@ class AnnotationViewModel {
         guard let doc = pdfDocument else { return }
         let effectiveColor = strokeColor.withAlphaComponent(opacity * 0.5)
         for page in selection.pages {
-            // Remove existing highlights that overlap with the new selection
             let selBounds = selection.bounds(for: page)
-            let existingHighlights = page.annotations.filter {
-                $0.type == "Highlight" && $0.bounds.intersects(selBounds)
-            }
-            for old in existingHighlights {
-                page.removeAnnotation(old)
-                if let oldId = persistentId(for: old) {
-                    annotationStore?.softDelete(id: oldId)
-                    removeMapping(old)
-                }
-            }
 
             // Create one highlight annotation covering the full selection on this page
             guard selBounds.width > 0, selBounds.height > 0 else { continue }
