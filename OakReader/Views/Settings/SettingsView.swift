@@ -19,8 +19,6 @@ struct SettingsView: View {
         case extensionNotes
         case extensionTranslation
         case extensionQuizCards
-        case extensionXBookmarks
-        case extensionGitHubStars
 
         var id: String { rawValue }
 
@@ -38,8 +36,6 @@ struct SettingsView: View {
             case .extensionNotes: return AppExtension.notes.label
             case .extensionTranslation: return AppExtension.translation.label
             case .extensionQuizCards: return AppExtension.quizCards.label
-            case .extensionXBookmarks: return AppExtension.xBookmarks.label
-            case .extensionGitHubStars: return AppExtension.githubStars.label
             }
         }
 
@@ -57,8 +53,6 @@ struct SettingsView: View {
             case .extensionNotes: return AppExtension.notes.systemImage
             case .extensionTranslation: return AppExtension.translation.systemImage
             case .extensionQuizCards: return AppExtension.quizCards.systemImage
-            case .extensionXBookmarks: return AppExtension.xBookmarks.systemImage
-            case .extensionGitHubStars: return AppExtension.githubStars.systemImage
             }
         }
 
@@ -73,8 +67,6 @@ struct SettingsView: View {
             case .extensionNotes: return .notes
             case .extensionTranslation: return .translation
             case .extensionQuizCards: return .quizCards
-            case .extensionXBookmarks: return .xBookmarks
-            case .extensionGitHubStars: return .githubStars
             default: return nil
             }
         }
@@ -87,8 +79,6 @@ struct SettingsView: View {
             case .notes: return .extensionNotes
             case .translation: return .extensionTranslation
             case .quizCards: return .extensionQuizCards
-            case .xBookmarks: return .extensionXBookmarks
-            case .githubStars: return .extensionGitHubStars
             }
         }
     }
@@ -188,10 +178,6 @@ struct SettingsView: View {
             TranslationSettingsView()
         case .extensionQuizCards:
             QuizCardSettingsView()
-        case .extensionXBookmarks:
-            XBookmarksSettingsView(store: store)
-        case .extensionGitHubStars:
-            GitHubStarsSettingsView(store: store)
         }
     }
 }

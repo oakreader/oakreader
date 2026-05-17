@@ -14,7 +14,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsWindow: NSWindow?
     private var settingsCloseObserver: NSObjectProtocol?
     private var snapshotServer: SnapshotServer?
-    private var syncScheduler: SyncScheduler?
     private var appearanceObserver: NSObjectProtocol?
     private(set) lazy var commandPalette = CommandPaletteController(appDelegate: self)
     func applicationWillFinishLaunching(_ notification: Notification) {
@@ -44,16 +43,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         snapshotServer = SnapshotServer(importService: appState.importService)
         snapshotServer?.start()
 
-        // Start background sync for X Bookmarks and GitHub Stars
-        syncScheduler = SyncScheduler(importService: appState.importService)
-        syncScheduler?.start()
-
         createMainWindow()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         snapshotServer?.stop()
-        syncScheduler?.stop()
     }
 
     func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool {
