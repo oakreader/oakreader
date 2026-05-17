@@ -9,6 +9,7 @@ struct QuizCardReviewOverlay: View {
 
     @State private var isRevealed = false
     @State private var selectedChoiceIndex: Int?
+    @FocusState private var isFocused: Bool
 
     var body: some View {
         ZStack {
@@ -18,9 +19,17 @@ struct QuizCardReviewOverlay: View {
 
             reviewSessionView
         }
+        .focusable()
+        .focused($isFocused)
+        .onAppear { isFocused = true }
         .onKeyPress(.escape) {
             quizCardsVM.endReview()
             onDismiss?()
+            return .handled
+        }
+        .onKeyPress(.space) {
+            guard !isRevealed else { return .ignored }
+            withAnimation(.easeInOut(duration: 0.2)) { isRevealed = true }
             return .handled
         }
     }
@@ -29,12 +38,8 @@ struct QuizCardReviewOverlay: View {
 
     private var reviewSessionView: some View {
         VStack(spacing: 0) {
-            // Header
             reviewHeader
 
-            Divider()
-
-            // Card content area
             if let card = quizCardsVM.currentReviewCard {
                 ScrollView {
                     VStack(spacing: 16) {
@@ -45,9 +50,6 @@ struct QuizCardReviewOverlay: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                Divider()
-
-                // Bottom action area
                 recognitionActionArea
                     .padding(.horizontal, OakStyle.Spacing.lg)
                     .padding(.vertical, OakStyle.Spacing.md)
@@ -65,23 +67,11 @@ struct QuizCardReviewOverlay: View {
 
     private var reviewHeader: some View {
         HStack {
-            Button(action: { quizCardsVM.endReview(); onDismiss?() }) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 14, weight: .medium))
-            }
-            .buttonStyle(.plain)
-            .help("End review (Esc)")
-
             Spacer()
-
             Text("\(quizCardsVM.currentReviewIndex + 1)/\(quizCardsVM.dueCards.count)")
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
-
-            ProgressView(value: Double(quizCardsVM.currentReviewIndex), total: Double(quizCardsVM.dueCards.count))
-                .frame(width: 120)
-                .padding(.leading, 8)
         }
         .padding(.horizontal, OakStyle.Spacing.md)
         .padding(.vertical, OakStyle.Spacing.sm)
@@ -271,20 +261,20 @@ struct QuizCardReviewOverlay: View {
     private var recognitionActionArea: some View {
         Group {
             if isRevealed {
-                HStack(spacing: 16) {
+                HStack(spacing: 12) {
                     Button(action: { quizCardsVM.submitRecognition(remembered: false) }) {
                         HStack(spacing: 4) {
                             Text("Forget")
-                                .font(.system(size: 14, weight: .medium))
+                                .font(.system(size: 13, weight: .medium))
                             Text("(1)")
-                                .font(.system(size: 12))
+                                .font(.system(size: 11))
                                 .foregroundStyle(.secondary)
                         }
                         .frame(maxWidth: .infinity)
-                        .frame(height: 36)
+                        .frame(height: 32)
+                        .background(Color.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
                     }
-                    .buttonStyle(.bordered)
-                    .tint(.red)
+                    .buttonStyle(.plain)
                     .onKeyPress("1") {
                         quizCardsVM.submitRecognition(remembered: false)
                         return .handled
@@ -293,16 +283,16 @@ struct QuizCardReviewOverlay: View {
                     Button(action: { quizCardsVM.submitRecognition(remembered: true) }) {
                         HStack(spacing: 4) {
                             Text("Remember")
-                                .font(.system(size: 14, weight: .medium))
+                                .font(.system(size: 13, weight: .medium))
                             Text("(2)")
-                                .font(.system(size: 12))
+                                .font(.system(size: 11))
                                 .foregroundStyle(.secondary)
                         }
                         .frame(maxWidth: .infinity)
-                        .frame(height: 36)
+                        .frame(height: 32)
+                        .background(Color.green.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
                     }
-                    .buttonStyle(.bordered)
-                    .tint(.green)
+                    .buttonStyle(.plain)
                     .onKeyPress("2") {
                         quizCardsVM.submitRecognition(remembered: true)
                         return .handled
@@ -313,20 +303,16 @@ struct QuizCardReviewOverlay: View {
                 Button(action: { withAnimation(.easeInOut(duration: 0.2)) { isRevealed = true } }) {
                     HStack(spacing: 4) {
                         Text("Show Answer")
-                            .font(.system(size: 14, weight: .medium))
+                            .font(.system(size: 13, weight: .medium))
                         Text("(Space)")
-                            .font(.system(size: 12))
+                            .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity)
-                    .frame(height: 36)
+                    .frame(height: 32)
+                    .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 6))
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
-                .onKeyPress(.space) {
-                    withAnimation(.easeInOut(duration: 0.2)) { isRevealed = true }
-                    return .handled
-                }
+                .buttonStyle(.plain)
             }
         }
     }
