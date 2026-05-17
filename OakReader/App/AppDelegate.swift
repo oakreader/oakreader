@@ -9,7 +9,11 @@ import OakVoice
 class AppDelegate: NSObject, NSApplicationDelegate {
     let documentController = PDFDocumentController()
     let appState = AppState()
+    #if DEBUG
+    let updaterController = SPUStandardUpdaterController(startingUpdater: false, updaterDelegate: nil, userDriverDelegate: nil)
+    #else
     let updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+    #endif
     private var mainWindow: NSWindow?
     private var settingsWindow: NSWindow?
     private var settingsCloseObserver: NSObjectProtocol?
