@@ -248,12 +248,30 @@ private struct CollectionQuizCardsPanelView: View {
     private var store: LibraryStore { appState.libraryStore }
     private var items: [LibraryItem] { store.filteredItems }
 
-    private var cardRows: [CollectionQuizCardRow] {
-        guard let collectionId = store.selectedCollectionId else { return [] }
-        let service = QuizCardService(database: store.database)
-        let cards = (try? service.fetchCards(forCollectionId: collectionId.uuidString)) ?? []
+    /// True when the selected sidebar entry is a user-created (non-system) collection.
+    private var isUserCollection: Bool {
+        store.selectedCollection?.isSystem == false
+    }
 
-        return cards.compactMap { card in
+    private var cardRows: [CollectionQuizCardRow] {
+        let service = QuizCardService(database: store.database)
+        let cards: [QuizCard]
+
+        if let collectionId = store.selectedCollectionId, isUserCollection {
+            // User-created collection: fetch by collection_id column
+            cards = (try? service.fetchCards(forCollectionId: collectionId.uuidString)) ?? []
+        } else {
+            // System/smart collection or All Items: collect cards from visible items
+            var all: [QuizCard] = []
+            for item in items {
+                let itemCards = (try? service.fetchCards(forItemId: item.id.uuidString)) ?? []
+                all.append(contentsOf: itemCards)
+            }
+            all.sort { $0.dueAt < $1.dueAt }
+            cards = all
+        }
+
+        return cards.map { card in
             let item = items.first(where: { $0.id.uuidString == card.itemId })
             return CollectionQuizCardRow(card: card, itemTitle: item?.title)
         }

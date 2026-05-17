@@ -185,8 +185,6 @@ enum AppExtension: String, CaseIterable, Identifiable {
     case notes
     case translation
     case quizCards = "flashcards"
-    case xBookmarks
-    case githubStars
 
     var id: String { rawValue }
 
@@ -195,8 +193,6 @@ enum AppExtension: String, CaseIterable, Identifiable {
         case .notes: return "Notes"
         case .translation: return "Translation"
         case .quizCards: return "Quiz Cards"
-        case .xBookmarks: return "X Bookmarks"
-        case .githubStars: return "GitHub Stars"
         }
     }
 
@@ -205,29 +201,21 @@ enum AppExtension: String, CaseIterable, Identifiable {
         case .notes: return "Rich markdown notes panel with Mermaid diagrams and image paste."
         case .translation: return "Translate selected text using AI-powered translation."
         case .quizCards: return "Spaced repetition quiz cards with FSRS scheduling."
-        case .xBookmarks: return "Sync your X (Twitter) bookmarks into OakReader."
-        case .githubStars: return "Sync your GitHub starred repositories into OakReader."
         }
     }
 
-    /// SF Symbol name. Used as fallback when `iconAsset` is nil.
+    /// SF Symbol name.
     var systemImage: String {
         switch self {
         case .notes: return "note.text"
         case .translation: return "translate"
         case .quizCards: return "rectangle.on.rectangle.angled"
-        case .xBookmarks: return "at"
-        case .githubStars: return "star"
         }
     }
 
     /// Custom asset catalog image name. Non-nil means use `Image(_:)` instead of SF Symbol.
     var iconAsset: String? {
-        switch self {
-        case .xBookmarks: return "icon-x"
-        case .githubStars: return "icon-github"
-        default: return nil
-        }
+        nil
     }
 
     var rightPanelModes: [RightPanelMode] {
@@ -235,25 +223,18 @@ enum AppExtension: String, CaseIterable, Identifiable {
         case .notes: return [.notes]
         case .translation: return [.translation]
         case .quizCards: return [.quizCards]
-        case .xBookmarks: return []
-        case .githubStars: return []
         }
     }
 
     var systemCollectionId: UUID? {
         switch self {
         case .quizCards: return SystemCollectionID.quizCards
-        case .xBookmarks: return SystemCollectionID.xBookmarks
-        case .githubStars: return SystemCollectionID.githubStars
         default: return nil
         }
     }
 
     var enabledByDefault: Bool {
-        switch self {
-        case .notes, .translation, .quizCards: return true
-        case .xBookmarks, .githubStars: return false
-        }
+        true
     }
 }
 
