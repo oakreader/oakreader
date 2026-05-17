@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// Panel shown in the detail area when the Duplicates collection is selected.
+/// View shown in the detail area when the Duplicates collection is selected.
 /// Shows duplicate group info and a merge interface when a group is selected.
-struct DuplicatesMergePane: View {
+struct DuplicatesMergeView: View {
     @Bindable var appState: AppState
 
     private var store: LibraryStore { appState.libraryStore }

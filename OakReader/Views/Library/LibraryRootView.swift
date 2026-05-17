@@ -79,7 +79,7 @@ struct LibraryRootView: View {
 
             VStack(spacing: 0) {
                 if store.isDuplicatesSelected {
-                    DuplicatesMergePane(appState: appState)
+                    DuplicatesMergeView(appState: appState)
                 } else if let item = selectedItemInCurrentFilter {
                     LibrarySidebarPanel(item: item, appState: appState)
                 } else {
@@ -130,9 +130,141 @@ private struct LibraryCollectionSidebarPanel: View {
             )
         case .quizCards:
             CollectionQuizCardsPanelView(appState: appState, title: contextTitle)
-        case .metadata, nil:
+        case .metadata:
+            CollectionMetadataPanelView(appState: appState, title: contextTitle, items: items)
+        case nil:
             EmptyView()
         }
+    }
+}
+
+// MARK: - Collection Metadata (Summary Stats)
+
+private struct CollectionMetadataPanelView: View {
+    @Bindable var appState: AppState
+    let title: String
+    let items: [LibraryItem]
+
+    private var totalSize: Int64 {
+        items.reduce(0) { $0 + $1.fileSize }
+    }
+
+    private var typeCounts: [(type: ContentType, count: Int)] {
+        var map: [ContentType: Int] = [:]
+        for item in items { map[item.contentType, default: 0] += 1 }
+        return map.sorted { $0.value > $1.value }.map { (type: $0.key, count: $0.value) }
+    }
+
+    private var dateRange: (earliest: Date, latest: Date)? {
+        guard let earliest = items.min(by: { $0.dateAdded < $1.dateAdded }),
+              let latest = items.max(by: { $0.dateAdded < $1.dateAdded }) else { return nil }
+        return (earliest.dateAdded, latest.dateAdded)
+    }
+
+    private var totalPages: Int {
+        items.reduce(0) { $0 + $1.pageCount }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            panelHeader(title, subtitle: "\(items.count) items")
+
+            if items.isEmpty {
+                emptyState(icon: "tray", title: "No Items", subtitle: "This collection is empty.")
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        // Stats grid
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                            statCard(value: "\(items.count)", label: "Items", icon: "doc.on.doc", color: .blue)
+                            statCard(value: "\(totalPages)", label: "Pages", icon: "book.pages", color: .orange)
+                            statCard(
+                                value: ByteCountFormatter.string(fromByteCount: totalSize, countStyle: .file),
+                                label: "Total Size",
+                                icon: "internaldrive",
+                                color: .purple
+                            )
+                            if let range = dateRange {
+                                statCard(
+                                    value: dateRangeString(range),
+                                    label: "Date Range",
+                                    icon: "calendar",
+                                    color: .green
+                                )
+                            }
+                        }
+
+                        // Type breakdown
+                        if typeCounts.count > 1 {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Content Types")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(.secondary)
+
+                                ForEach(typeCounts, id: \.type) { entry in
+                                    HStack(spacing: 8) {
+                                        Image(systemName: entry.type.icon)
+                                            .font(.system(size: 12))
+                                            .foregroundStyle(.secondary)
+                                            .frame(width: 16)
+
+                                        Text(entry.type.label)
+                                            .font(.system(size: 13))
+
+                                        Spacer()
+
+                                        Text("\(entry.count)")
+                                            .font(.system(size: 13, weight: .medium))
+                                            .foregroundStyle(.secondary)
+                                            .monospacedDigit()
+
+                                        // Proportion bar
+                                        let fraction = Double(entry.count) / Double(items.count)
+                                        GeometryReader { geo in
+                                            RoundedRectangle(cornerRadius: 3)
+                                                .fill(Color.accentColor.opacity(0.25))
+                                                .frame(width: geo.size.width * fraction)
+                                        }
+                                        .frame(width: 60, height: 6)
+                                    }
+                                }
+                            }
+                            .padding(12)
+                            .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.03)))
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                }
+            }
+        }
+    }
+
+    private func statCard(value: String, label: String, icon: String, color: Color) -> some View {
+        VStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 16))
+                .foregroundStyle(color)
+            Text(value)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Text(label)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+        .background(RoundedRectangle(cornerRadius: 8).fill(color.opacity(0.08)))
+    }
+
+    private func dateRangeString(_ range: (earliest: Date, latest: Date)) -> String {
+        let fmt = DateFormatter()
+        fmt.dateFormat = "MMM yy"
+        let start = fmt.string(from: range.earliest)
+        let end = fmt.string(from: range.latest)
+        return start == end ? start : "\(start) – \(end)"
     }
 }
 

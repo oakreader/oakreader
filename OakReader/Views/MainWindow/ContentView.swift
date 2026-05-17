@@ -100,7 +100,7 @@ struct ContentView: View {
         }
         .overlay {
             if viewModel.quizCards.isReviewing {
-                QuizCardReviewOverlay(quizCardsVM: viewModel.quizCards)
+                QuizCardReviewView(quizCardsVM: viewModel.quizCards)
                     .transition(.opacity)
             }
         }

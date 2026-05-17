@@ -10,7 +10,7 @@ struct RightPanelContentView: View {
             if let mode = viewModel.state.rightPanelMode {
                 switch mode {
                 case .metadata:
-                    ItemSidebarPanel(viewModel: viewModel)
+                    ItemPanelView(viewModel: viewModel)
                 case .aiChat:
                     AIChatView(
                         chatVM: viewModel.chat,

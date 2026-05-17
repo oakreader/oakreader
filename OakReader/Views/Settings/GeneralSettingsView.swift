@@ -24,7 +24,7 @@ struct GeneralSettingsView: View {
                             if permissionStatus.micNotDetermined {
                                 permissionStatus.requestMicAccess()
                             } else {
-                                SystemSettingsPanel.microphone.open()
+                                SystemSettingsLauncher.microphone.open()
                                 permissionStatus.startPolling()
                             }
                         }
