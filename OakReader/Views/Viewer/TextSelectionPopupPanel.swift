@@ -404,6 +404,9 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
         let service = QuizGenerationService(database: database)
 
         Task {
+            await MainActor.run {
+                viewModel.appState?.isGeneratingQuiz = true
+            }
             do {
                 let cards = try await service.generateFromHighlight(
                     sourceText: text,
@@ -413,12 +416,14 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
                     annotationId: annotationId
                 )
                 await MainActor.run {
+                    viewModel.appState?.isGeneratingQuiz = false
                     viewModel.appState?.importNotification = "Generated \(cards.count) quiz card\(cards.count == 1 ? "" : "s")"
                     viewModel.quizCards.loadCards()
                 }
             } catch {
                 Log.error(Log.store, "Quiz generation failed: \(error)")
                 await MainActor.run {
+                    viewModel.appState?.isGeneratingQuiz = false
                     viewModel.appState?.importNotification = "Quiz generation failed"
                 }
             }

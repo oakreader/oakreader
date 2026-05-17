@@ -45,7 +45,6 @@ struct QuizCardsPanelView: View {
             // Pending cards section (shown above the main list when present)
             if quizCardsVM.pendingCount > 0 {
                 PendingQuizView(quizCardsVM: quizCardsVM)
-                    .frame(maxHeight: 300)
                 Divider()
             }
 
