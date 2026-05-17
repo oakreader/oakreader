@@ -68,6 +68,14 @@ final class DocumentTab: Identifiable {
 
 }
 
+// MARK: - Quiz Review Session
+
+struct QuizReviewSession {
+    let tabID: UUID = UUID()
+    let quizCardsVM: QuizCardsViewModel
+    let returnTabID: UUID?
+}
+
 // MARK: - App State
 
 @Observable
@@ -92,6 +100,7 @@ final class AppState {
     var libraryDetailTab: LibraryDetailTab? = nil
     var importNotification: String?
     var isGeneratingQuiz: Bool = false
+    var quizReviewSession: QuizReviewSession?
 
     // MARK: - Library Chat
 
@@ -499,6 +508,12 @@ final class AppState {
     }
 
     func closeTab(_ tabID: UUID) {
+        // Quiz review tab
+        if quizReviewSession?.tabID == tabID {
+            closeQuizReview()
+            return
+        }
+
         guard let index = openTabs.firstIndex(where: { $0.id == tabID }) else { return }
         let tab = openTabs[index]
 
@@ -542,7 +557,8 @@ final class AppState {
     }
 
     func switchToTab(_ tabID: UUID) {
-        guard openTabs.contains(where: { $0.id == tabID }) else { return }
+        guard openTabs.contains(where: { $0.id == tabID })
+              || quizReviewSession?.tabID == tabID else { return }
         activeTabID = tabID
         updateWindowTitle()
     }
@@ -570,7 +586,27 @@ final class AppState {
 
     /// All tab IDs in display order.
     private var combinedTabIDs: [UUID] {
-        openTabs.map(\.id)
+        var ids = openTabs.map(\.id)
+        if let session = quizReviewSession {
+            ids.append(session.tabID)
+        }
+        return ids
+    }
+
+    // MARK: - Quiz Review Tab
+
+    func openQuizReview(vm: QuizCardsViewModel) {
+        let returnTo = activeTabID
+        let session = QuizReviewSession(quizCardsVM: vm, returnTabID: returnTo)
+        quizReviewSession = session
+        activeTabID = session.tabID
+        vm.startReview()
+    }
+
+    func closeQuizReview() {
+        let returnTo = quizReviewSession?.returnTabID
+        quizReviewSession = nil
+        activeTabID = returnTo
     }
 
     // MARK: - Window

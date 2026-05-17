@@ -257,9 +257,11 @@ struct CollectionQuizDeckView: View {
                let itemId = UUID(uuidString: firstDueRow.card.itemId),
                let item = store.filteredItems.first(where: { $0.id == itemId }) {
                 appState.openLibraryItem(item)
-                // Defer startReview so the tab's view model is fully wired up
+                // Defer so the tab's view model is fully wired up
                 DispatchQueue.main.async {
-                    appState.activeTab?.viewModel.quizCards.startReview()
+                    if let vm = appState.activeTab?.viewModel.quizCards {
+                        appState.openQuizReview(vm: vm)
+                    }
                 }
             }
         } label: {

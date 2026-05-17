@@ -36,6 +36,14 @@ struct RootView: View {
                         .allowsHitTesting(tab.id == appState.activeTabID)
                 }
 
+                // Quiz review tab
+                if let session = appState.quizReviewSession {
+                    QuizCardReviewOverlay(quizCardsVM: session.quizCardsVM) {
+                        appState.closeQuizReview()
+                    }
+                    .opacity(appState.activeTabID == session.tabID ? 1 : 0)
+                    .allowsHitTesting(appState.activeTabID == session.tabID)
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

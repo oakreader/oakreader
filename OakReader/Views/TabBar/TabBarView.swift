@@ -57,7 +57,7 @@ struct TabBarView: View {
             .help("Library: \(pinnedTabTitle)")
             .padding(.trailing, 8)
 
-            if !appState.openTabs.isEmpty {
+            if !appState.openTabs.isEmpty || appState.quizReviewSession != nil {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 0) {
                         ForEach(Array(appState.openTabs.enumerated()), id: \.element.id) { index, tab in
@@ -67,6 +67,15 @@ struct TabBarView: View {
                                 isFirst: index == 0,
                                 onSelect: { appState.switchToTab(tab.id) },
                                 onClose: { appState.closeTab(tab.id) }
+                            )
+                        }
+
+                        if let session = appState.quizReviewSession {
+                            QuizTabView(
+                                isActive: appState.activeTabID == session.tabID,
+                                isFirst: appState.openTabs.isEmpty,
+                                onSelect: { appState.activeTabID = session.tabID },
+                                onClose: { appState.closeQuizReview() }
                             )
                         }
                     }
@@ -145,5 +154,82 @@ struct TabBarView: View {
                 .padding(.vertical, 6)
         }
         // Inactive + not hovering: transparent (gray tab bar shows through)
+    }
+}
+
+// MARK: - Quiz Tab View
+
+struct QuizTabView: View {
+    let isActive: Bool
+    let isFirst: Bool
+    let onSelect: () -> Void
+    let onClose: () -> Void
+
+    @State private var isHovering = false
+    @State private var isCloseHovering = false
+
+    private let cr: CGFloat = 10
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "rectangle.on.rectangle.angled")
+                .font(.system(size: OakStyle.Font.icon))
+            Text("Quiz")
+                .font(OakStyle.Font.styled(size: OakStyle.Font.body, weight: .regular))
+                .lineLimit(1)
+
+            Spacer(minLength: 0)
+
+            Button {
+                onClose()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(isCloseHovering ? Color(nsColor: .labelColor) : .secondary)
+                    .frame(
+                        width: OakStyle.Size.closeButton,
+                        height: OakStyle.Size.closeButton
+                    )
+                    .background(
+                        RoundedRectangle(cornerRadius: OakStyle.Radius.small)
+                            .fill(isCloseHovering ? Color.primary.opacity(0.1) : Color.clear)
+                    )
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .onHover { isCloseHovering = $0 }
+            .opacity(isActive || isHovering ? 1 : 0)
+            .accessibilityLabel("Close Quiz")
+        }
+        .padding(.leading, 10 + cr)
+        .padding(.trailing, 10 + cr)
+        .frame(height: OakStyle.Size.tabHeight)
+        .frame(minWidth: OakStyle.Size.tabMin + cr * 2,
+               maxWidth: OakStyle.Size.tabMax + cr * 2)
+        .foregroundStyle(isActive ? Color(nsColor: .labelColor) : Color(nsColor: .secondaryLabelColor))
+        .background(tabShape)
+        .padding(.leading, isFirst ? 0 : -cr + 3)
+        .padding(.trailing, -cr + 3)
+        .zIndex(isActive ? 2 : isHovering ? 1 : 0)
+        .contentShape(Rectangle())
+        .onTapGesture { onSelect() }
+        .onHover { isHovering = $0 }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Tab: Quiz")
+        .accessibilityAddTraits(isActive ? .isSelected : [])
+    }
+
+    @ViewBuilder
+    private var tabShape: some View {
+        if isActive {
+            BrowserTabShape(concaveRadius: cr)
+                .fill(OakStyle.Colors.activeTabBackground)
+                .padding(.top, 6)
+        } else if isHovering {
+            RoundedRectangle(cornerRadius: OakStyle.Radius.standard)
+                .fill(Color.primary.opacity(0.08))
+                .padding(.horizontal, cr)
+                .padding(.vertical, 5)
+        }
     }
 }
