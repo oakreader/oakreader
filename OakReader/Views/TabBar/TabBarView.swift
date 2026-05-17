@@ -75,6 +75,19 @@ struct TabBarView: View {
 
             Spacer(minLength: 0)
 
+            if appState.isGeneratingQuiz {
+                HStack(spacing: 6) {
+                    ProgressView()
+                        .controlSize(.small)
+                        .scaleEffect(0.7)
+                    Text("Generating quiz card")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.trailing, 8)
+                .transition(.opacity)
+            }
+
             // Settings button — right end, aligned with SideNav column
             Button {
                 NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
