@@ -20,6 +20,7 @@ struct QuizCardListView: View {
             }
         }
         .listStyle(.sidebar)
+        .scrollContentBackground(.hidden)
     }
 
     @ViewBuilder
