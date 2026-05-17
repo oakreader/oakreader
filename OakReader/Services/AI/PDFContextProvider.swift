@@ -394,22 +394,9 @@ struct PDFContextProvider {
                 **Profile (update_user_profile) — durable identity facts:**
                 - Background, goals, cognition targets, strengths, weaknesses
 
-                **Concept map (update_concept_map) — per-collection vocabulary:**
-                - Add concepts as user encounters them in documents
-                - Update mastery: unseen → encountered → partial → solid → deep
-                - Add relationships between concepts (prerequisite, contrasts-with, etc.)
-                - Mark gaps: important unseen concepts the user should learn next
-                - The concept map tells you exactly what to quiz and at what level
-
                 Observe silently. Do not ask permission. Do not announce updates.
                 </memory-instructions>
                 """)
-        }
-
-        // Concept map for current collection (if exists)
-        let conceptMap = Self.loadConceptMap(for: context)
-        if !conceptMap.isEmpty {
-            parts.append(conceptMap)
         }
 
         // Skill prompt (after context so the skill can reference it)
@@ -418,25 +405,6 @@ struct PDFContextProvider {
         }
 
         return parts.joined(separator: "\n\n")
-    }
-
-    /// Load concept map for the document's primary collection.
-    private static func loadConceptMap(for context: ChatContextSnapshot) -> String {
-        let collectionName = context.document?.collectionNames.first
-            ?? context.activeCollectionName
-        guard let name = collectionName else { return "" }
-
-        let mapURL = CatalogDatabase.agentConceptMapURL(collectionName: name)
-        guard let content = try? String(contentsOf: mapURL, encoding: .utf8),
-              !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return ""
-        }
-
-        return """
-            <concept-map collection="\(xmlEscape(name))">
-            \(content.trimmingCharacters(in: .whitespacesAndNewlines))
-            </concept-map>
-            """
     }
 
     // MARK: - User Profile & Memory
