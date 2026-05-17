@@ -122,6 +122,18 @@ struct QuizCardService {
         }
     }
 
+    /// Fetch pending cards for a collection (awaiting user review).
+    func fetchPendingCards(forCollectionId collectionId: String) throws -> [QuizCard] {
+        try database.dbQueue.read { db in
+            let records = try QuizCardRecord
+                .filter(QuizCardRecord.CodingKeys.collectionId == collectionId)
+                .filter(QuizCardRecord.CodingKeys.isPending == true)
+                .order(QuizCardRecord.CodingKeys.createdAt.desc)
+                .fetchAll(db)
+            return records.map { QuizCard(record: $0) }
+        }
+    }
+
     /// Fetch all non-pending cards across all items, ordered by due date.
     func fetchAllCards() throws -> [QuizCard] {
         try database.dbQueue.read { db in
