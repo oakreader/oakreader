@@ -43,6 +43,17 @@ packages:
   usearch:
     url: https://github.com/unum-cloud/usearch
     from: "2.0.0"
+  OakVoice:
+    path: Packages/OakVoice
+  DSFQuickActionBar:
+    url: https://github.com/dagronf/DSFQuickActionBar
+    from: "6.2.0"
+  swift-fsrs:
+    url: https://github.com/open-spaced-repetition/swift-fsrs
+    branch: main
+  swift-argument-parser:
+    url: https://github.com/apple/swift-argument-parser.git
+    from: "1.3.0"
 
 settings:
   base:
@@ -81,6 +92,10 @@ targets:
         product: MLXLMCommon
       - package: usearch
         product: USearch
+      - package: OakVoice
+      - package: DSFQuickActionBar
+      - package: swift-fsrs
+        product: FSRS
       - target: oak
     postCompileScripts:
       - script: |
@@ -121,6 +136,8 @@ targets:
       - package: OakAgent
       - package: GRDB
         product: GRDB
+      - package: swift-argument-parser
+        product: ArgumentParser
     settings:
       base:
         PRODUCT_NAME: oak
