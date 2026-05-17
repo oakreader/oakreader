@@ -308,6 +308,7 @@ struct QuizCardRecord: Codable, FetchableRecord, MutablePersistableRecord, Hasha
 
     var id: String
     var itemId: String
+    var collectionId: String?
     var conversationId: String?
     var groupId: String?
     var type: String
@@ -332,6 +333,7 @@ struct QuizCardRecord: Codable, FetchableRecord, MutablePersistableRecord, Hasha
     enum CodingKeys: String, CodingKey, ColumnExpression {
         case id, type, state, stability, difficulty, reps, lapses
         case itemId = "item_id"
+        case collectionId = "collection_id"
         case conversationId = "conversation_id"
         case groupId = "group_id"
         case contentJson = "content_json"

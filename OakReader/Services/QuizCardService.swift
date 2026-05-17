@@ -100,6 +100,7 @@ struct QuizCardService {
     @discardableResult
     func createCard(
         itemId: String,
+        collectionId: String? = nil,
         conversationId: String? = nil,
         groupId: String? = nil,
         content: QuizContent,
@@ -113,9 +114,21 @@ struct QuizCardService {
         let contentData = try JSONEncoder().encode(content)
         let contentJson = String(data: contentData, encoding: .utf8) ?? "{}"
 
+        // Resolve collection from item if not provided
+        let resolvedCollectionId: String? = collectionId ?? {
+            try? database.dbQueue.read { db in
+                try String.fetchOne(db, sql: """
+                    SELECT collection_id FROM collection_items
+                    WHERE item_id = ?
+                    ORDER BY created_at ASC LIMIT 1
+                """, arguments: [itemId])
+            }
+        }()
+
         var record = QuizCardRecord(
             id: cardId.uuidString,
             itemId: itemId,
+            collectionId: resolvedCollectionId,
             conversationId: conversationId,
             groupId: groupId,
             type: content.quizType.rawValue,
