@@ -5,6 +5,7 @@ import Textual
 /// Covers the entire document window with an Anki-style minimal interface.
 struct QuizCardReviewOverlay: View {
     let quizCardsVM: QuizCardsViewModel
+    var onDismiss: (() -> Void)? = nil
 
     @State private var isRevealed = false
     @State private var selectedChoiceIndex: Int?
@@ -19,6 +20,7 @@ struct QuizCardReviewOverlay: View {
         }
         .onKeyPress(.escape) {
             quizCardsVM.endReview()
+            onDismiss?()
             return .handled
         }
     }
@@ -63,7 +65,7 @@ struct QuizCardReviewOverlay: View {
 
     private var reviewHeader: some View {
         HStack {
-            Button(action: { quizCardsVM.endReview() }) {
+            Button(action: { quizCardsVM.endReview(); onDismiss?() }) {
                 Image(systemName: "xmark")
                     .font(.system(size: 14, weight: .medium))
             }
@@ -344,6 +346,7 @@ struct QuizCardReviewOverlay: View {
                 .foregroundStyle(.secondary)
             Button("Done") {
                 quizCardsVM.endReview()
+                onDismiss?()
             }
             .buttonStyle(.bordered)
             .controlSize(.large)
@@ -357,7 +360,7 @@ struct QuizCardReviewOverlay: View {
     private func hideCloze(_ text: String) -> String {
         text.replacingOccurrences(
             of: #"\{\{c\d+::([^}]*?)(?:::[^}]*)?\}\}"#,
-            with: "[___]",
+            with: "`___`",
             options: .regularExpression
         )
     }
