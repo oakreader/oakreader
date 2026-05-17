@@ -21,6 +21,7 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
     // Text selection popup
     private var selectionPopup: TextSelectionPopupPanel?
     private var selectionChangeObserver: Any?
+    private var pendingPopupWork: DispatchWorkItem?
 
     init(viewModel: DocumentViewModel) {
         self.viewModel = viewModel
@@ -130,9 +131,7 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
                 if event.type == .leftMouseUp {
                     let locationInPDFView = pdfView.convert(event.locationInWindow, from: nil)
                     if pdfView.bounds.contains(locationInPDFView) {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                            self.showSelectionPopupIfNeeded(pdfView: pdfView)
-                        }
+                        self.scheduleSelectionPopup(pdfView: pdfView)
                     }
                 }
                 return event
@@ -147,9 +146,7 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
                 if event.type == .leftMouseUp {
                     let locationInPDFView = pdfView.convert(event.locationInWindow, from: nil)
                     if pdfView.bounds.contains(locationInPDFView) {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                            self.showSelectionPopupIfNeeded(pdfView: pdfView)
-                        }
+                        self.scheduleSelectionPopup(pdfView: pdfView)
                     }
                 }
                 return event
@@ -226,7 +223,19 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
         selectionPopup = popup
     }
 
+    private func scheduleSelectionPopup(pdfView: PDFView) {
+        pendingPopupWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            self?.pendingPopupWork = nil
+            self?.showSelectionPopupIfNeeded(pdfView: pdfView)
+        }
+        pendingPopupWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: work)
+    }
+
     private func dismissSelectionPopup() {
+        pendingPopupWork?.cancel()
+        pendingPopupWork = nil
         selectionPopup?.dismiss()
         selectionPopup = nil
     }
