@@ -12,8 +12,26 @@ class QuizCardsViewModel {
     var pendingCards: [QuizCard] = []
     var dueCount: Int = 0
     var isReviewing: Bool = false
+    var isReviewSetup: Bool = false
     var currentReviewIndex: Int = 0
     var errorMessage: String?
+
+    // Review mode
+    var reviewMode: ReviewMode = {
+        let stored = UserDefaults.standard.string(forKey: "quizCard_reviewMode") ?? "production"
+        return ReviewMode(rawValue: stored) ?? .production
+    }()
+
+    var feedbackMode: EvaluationFeedbackMode = {
+        let stored = UserDefaults.standard.string(forKey: "quizCard_feedbackMode") ?? "simple"
+        return EvaluationFeedbackMode(rawValue: stored) ?? .simple
+    }()
+
+    // AI evaluation state
+    var evaluationService = QuizEvaluationService()
+    var currentEvaluationResult: EvaluationResult?
+    var isEvaluating: Bool = false
+    var evaluationError: String?
 
     var pendingCount: Int { pendingCards.count }
 
@@ -100,11 +118,85 @@ class QuizCardsViewModel {
 
     // MARK: - Review Session
 
+    /// Opens the review setup (mode selection) screen.
     func startReview() {
         guard !dueCards.isEmpty else { return }
+        isReviewSetup = true
+    }
+
+    /// Begins the actual review session after mode selection.
+    func beginReview(mode: ReviewMode) {
+        reviewMode = mode
         currentReviewIndex = 0
+        currentEvaluationResult = nil
+        evaluationError = nil
+        isReviewSetup = false
         isReviewing = true
     }
+
+    /// Cancel setup without starting review.
+    func cancelSetup() {
+        isReviewSetup = false
+    }
+
+    // MARK: - Recognition Mode
+
+    /// Submit Remember/Forget in recognition mode.
+    func submitRecognition(remembered: Bool) {
+        let rating: ReviewRating = remembered ? .good : .again
+        submitReview(rating: rating)
+    }
+
+    // MARK: - Production Mode
+
+    /// Submit a typed/spoken answer for AI evaluation.
+    func submitAnswer(_ answer: String) async {
+        guard let card = currentReviewCard else { return }
+        isEvaluating = true
+        evaluationError = nil
+        currentEvaluationResult = nil
+
+        do {
+            let result = try await evaluationService.evaluate(
+                userAnswer: answer,
+                card: card,
+                feedbackMode: feedbackMode
+            )
+            currentEvaluationResult = result
+        } catch {
+            Log.error(Log.store, "AI evaluation failed: \(error)")
+            evaluationError = error.localizedDescription
+        }
+        isEvaluating = false
+    }
+
+    /// Submit a choice answer (deterministic, no AI needed).
+    func submitChoiceAnswer(selectedIndex: Int) {
+        guard let card = currentReviewCard,
+              case .choice(let content) = card.content else { return }
+        let isCorrect = selectedIndex == content.correctIndex
+        currentEvaluationResult = EvaluationResult(
+            isCorrect: isCorrect,
+            explanation: content.explanation,
+            correctAnswer: content.choices[content.correctIndex]
+        )
+    }
+
+    /// Advance to next card after evaluation feedback is shown.
+    func advanceAfterEvaluation() {
+        guard let result = currentEvaluationResult else { return }
+        let rating: ReviewRating = result.isCorrect ? .good : .again
+        submitReview(rating: rating)
+    }
+
+    /// Manual override after AI failure — user decides Remember/Forget.
+    func submitManualOverride(remembered: Bool) {
+        evaluationError = nil
+        let rating: ReviewRating = remembered ? .good : .again
+        submitReview(rating: rating)
+    }
+
+    // MARK: - Core Review Submission
 
     func submitReview(rating: ReviewRating) {
         guard let cardService, let card = currentReviewCard else { return }
@@ -116,7 +208,9 @@ class QuizCardsViewModel {
                 cards[idx] = updated
             }
 
-            // Move to next card
+            // Reset evaluation state and move to next card
+            currentEvaluationResult = nil
+            evaluationError = nil
             currentReviewIndex += 1
             if currentReviewIndex >= dueCards.count {
                 endReview()
@@ -129,7 +223,10 @@ class QuizCardsViewModel {
 
     func endReview() {
         isReviewing = false
+        isReviewSetup = false
         currentReviewIndex = 0
+        currentEvaluationResult = nil
+        evaluationError = nil
         loadCards() // Refresh due counts
     }
 

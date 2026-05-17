@@ -98,6 +98,12 @@ struct ContentView: View {
                 )
             )
         }
+        .overlay {
+            if viewModel.quizCards.isReviewing || viewModel.quizCards.isReviewSetup {
+                QuizCardReviewOverlay(quizCardsVM: viewModel.quizCards)
+                    .transition(.opacity)
+            }
+        }
         .background(Color(nsColor: .controlBackgroundColor))
         .alert("Error", isPresented: Binding(
             get: { viewModel.state.showError },
