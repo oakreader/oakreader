@@ -85,7 +85,7 @@ struct PendingQuizView: View {
                         }
 
                         // Card content adapts by type
-                        cardContent(for: card)
+                        QuizCardPreviewContent(content: card.content)
                     }
                     .padding(20)
                 }
@@ -99,138 +99,6 @@ struct PendingQuizView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    @ViewBuilder
-    private func cardContent(for card: QuizCard) -> some View {
-        switch card.content {
-        case .flashcard(let content):
-            flashcardContent(front: content.front, back: content.back)
-        case .cloze(let content):
-            clozeContent(text: content.text, hint: content.hint)
-        case .choice(let content):
-            choiceContent(question: content.question, choices: content.choices, correctIndex: content.correctIndex)
-        case .matching(let content):
-            matchingContent(pairs: content.pairs)
-        case .ordering(let content):
-            orderingContent(prompt: content.prompt, items: content.items)
-        case .occlusion:
-            Text("Image occlusion card")
-                .font(.system(size: 14))
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    private func flashcardContent(front: String, back: String) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Front")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.tertiary)
-                    .textCase(.uppercase)
-                Text(front)
-                    .font(.system(size: 15))
-                    .textSelection(.enabled)
-            }
-
-            Divider()
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Back")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.tertiary)
-                    .textCase(.uppercase)
-                Text(back)
-                    .font(.system(size: 15))
-                    .textSelection(.enabled)
-            }
-        }
-    }
-
-    private func clozeContent(text: String, hint: String?) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Display cloze text with blanks highlighted
-            Text(maskedClozeText(text))
-                .font(.system(size: 15))
-                .textSelection(.enabled)
-
-            if let hint, !hint.isEmpty {
-                Text("Hint: \(hint)")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
-                    .italic()
-            }
-        }
-    }
-
-    private func choiceContent(question: String, choices: [String], correctIndex: Int) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(question)
-                .font(.system(size: 15, weight: .medium))
-                .textSelection(.enabled)
-
-            VStack(alignment: .leading, spacing: 6) {
-                ForEach(Array(choices.enumerated()), id: \.offset) { index, choice in
-                    HStack(spacing: 8) {
-                        Image(systemName: index == correctIndex ? "checkmark.circle.fill" : "circle")
-                            .font(.system(size: 13))
-                            .foregroundStyle(index == correctIndex ? .green : .secondary)
-                        Text(choice)
-                            .font(.system(size: 14))
-                    }
-                }
-            }
-        }
-    }
-
-    private func matchingContent(pairs: [QuizContent.MatchingContent.Pair]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Match the pairs:")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.secondary)
-
-            ForEach(Array(pairs.enumerated()), id: \.offset) { _, pair in
-                HStack(spacing: 12) {
-                    Text(pair.left)
-                        .font(.system(size: 14))
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                    Image(systemName: "arrow.right")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.tertiary)
-                    Text(pair.right)
-                        .font(.system(size: 14))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-        }
-    }
-
-    private func orderingContent(prompt: String, items: [String]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(prompt)
-                .font(.system(size: 15, weight: .medium))
-                .textSelection(.enabled)
-
-            ForEach(Array(items.enumerated()), id: \.offset) { index, item in
-                HStack(spacing: 8) {
-                    Text("\(index + 1).")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 20, alignment: .trailing)
-                    Text(item)
-                        .font(.system(size: 14))
-                }
-            }
-        }
-    }
-
-    /// Replaces {{c1::answer}} patterns with [___] for display
-    private func maskedClozeText(_ text: String) -> String {
-        text.replacingOccurrences(
-            of: "\\{\\{c\\d+::(.*?)\\}\\}",
-            with: "[___]",
-            options: .regularExpression
-        )
     }
 
     // MARK: - Action Bar
