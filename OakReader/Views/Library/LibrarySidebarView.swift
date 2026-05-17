@@ -314,6 +314,7 @@ private struct CollectionRowView: View {
     @Binding var editingSmartCollection: PDFCollection?
 
     @State private var isDropTargeted = false
+    @State private var showingDeleteConfirmation = false
 
     private var isSelected: Bool {
         store.selectedCollectionId == collection.id && store.selectedTagOptionId == nil && appState.isLibraryActive
@@ -454,10 +455,23 @@ private struct CollectionRowView: View {
 
                 if !collection.isSystem {
                     Divider()
-                    Button(role: .destructive) { store.deleteCollection(collection) } label: {
+                    Button(role: .destructive) { showingDeleteConfirmation = true } label: {
                         Label("Delete", systemImage: "trash")
                     }
                 }
+            }
+
+            .confirmationDialog(
+                "Delete \"\(collection.name)\"?",
+                isPresented: $showingDeleteConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Delete Collection and Quiz Cards", role: .destructive) {
+                    store.deleteCollection(collection)
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This will permanently delete this collection and all associated quiz cards. This action cannot be undone.")
             }
 
             // Subcollections (recursive)
