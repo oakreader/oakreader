@@ -95,7 +95,6 @@ targets:
         name: "Embed oak CLI"
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.oakreader.OakReader
         PRODUCT_NAME: OakReader
         INFOPLIST_FILE: OakReader/App/Info.plist
         CODE_SIGN_ENTITLEMENTS: OakReader/OakReader.entitlements
@@ -105,6 +104,13 @@ targets:
         CODE_SIGN_IDENTITY: "-"
         SWIFT_STRICT_CONCURRENCY: minimal
         SWIFT_OBJC_BRIDGING_HEADER: OakReader/OakReader-Bridging-Header.h
+      configs:
+        Debug:
+          PRODUCT_BUNDLE_IDENTIFIER: com.oakreader.OakReader.dev
+          BUNDLE_DISPLAY_NAME: "OakReader Dev"
+        Release:
+          PRODUCT_BUNDLE_IDENTIFIER: com.oakreader.OakReader
+          BUNDLE_DISPLAY_NAME: "OakReader"
 
   oak:
     type: tool

@@ -54,6 +54,9 @@ browser-extension/.wxt/
 # TTS samples
 tts_samples/
 
+# Temp files
+tmp/
+
 # Keys and secrets
 *.pem
 *.p12

@@ -1,10 +1,15 @@
 import Foundation
 
 extension CatalogDatabase {
-    /// ~/OakReader/
+    /// ~/OakReader/ (Release) or ~/OakReader-Dev/ (Debug)
     static var dataDirectory: URL {
+        #if DEBUG
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("OakReader-Dev", isDirectory: true)
+        #else
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("OakReader", isDirectory: true)
+        #endif
     }
 
     /// ~/OakReader/storage/
