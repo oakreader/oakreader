@@ -155,6 +155,8 @@ final class LogFileWriter {
 
     private func openFile() {
         let fm = FileManager.default
+        let logsDir = logFileURL.deletingLastPathComponent()
+        try? fm.createDirectory(at: logsDir, withIntermediateDirectories: true)
         if !fm.fileExists(atPath: logFileURL.path) {
             fm.createFile(atPath: logFileURL.path, contents: nil)
         }
