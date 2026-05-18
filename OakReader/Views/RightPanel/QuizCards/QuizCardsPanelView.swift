@@ -49,13 +49,7 @@ struct QuizCardsPanelView: View {
             .padding(.horizontal, OakStyle.Spacing.sm)
             .padding(.vertical, OakStyle.Spacing.sm)
 
-            // Pending cards section (shown above the main list when present)
-            if quizCardsVM.pendingCount > 0 {
-                PendingQuizView(quizCardsVM: quizCardsVM)
-                Divider()
-            }
-
-            if quizCardsVM.cards.isEmpty && quizCardsVM.pendingCount == 0 {
+            if quizCardsVM.cards.isEmpty {
                 emptyState
             } else if !quizCardsVM.cards.isEmpty {
                 QuizCardListView(quizCardsVM: quizCardsVM)

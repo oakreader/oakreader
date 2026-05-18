@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0000A1B2C3D4E5F6A7B8C9D0 /* skills in Resources */ = {isa = PBXBuildFile; fileRef = 0000F2E1D0C9B8A7F6E5D4C3 /* skills */; };
 		0025F759B35E0D3485583036 /* ChapterModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6FBF2AB294757A782CCEA5D /* ChapterModel.swift */; };
 		0071ECB4FF73D275746077AA /* AttachmentPreviewStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CE7B963BA9AF27C8640777F /* AttachmentPreviewStrip.swift */; };
 		00A5CCB098340CB80CB0B71D /* AnnotationListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E55DE9B5224B2F68AF785CF /* AnnotationListView.swift */; };
@@ -42,7 +43,6 @@
 		21B926FA4DD8E5340B898C10 /* BatchProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ACEDD57AE336C99EBE59CF1 /* BatchProgressView.swift */; };
 		21D6E7FC33246E5792605570 /* MergeDocumentsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3F153B13C17589F1BF5DFB8 /* MergeDocumentsSheet.swift */; };
 		249505FEB7F2FB8F5ABF87ED /* BackupProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08000CB32FE5FB153C8D346F /* BackupProgressView.swift */; };
-		24BFE5411EB1C8935CC062CE /* QuizCardPreviewContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FCFF1639896F0B366C888E3 /* QuizCardPreviewContent.swift */; };
 		27926C8DE8B6E9E53CF5553D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35C3D7C67DA37CE045FCE96F /* ContentView.swift */; };
 		28D3A097DDD467370B2F8C01 /* RecordingTranscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9741E79B8A2B0C06ED59E2BE /* RecordingTranscriptionService.swift */; };
 		292A1C4192568BEACFE65E88 /* DatabaseRecords.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2E4089D54ED9BD0D3F84946 /* DatabaseRecords.swift */; };
@@ -107,7 +107,6 @@
 		51DDD612DD951C17BA95299E /* DocumentTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59FB3A6F3A3AEC3676C0F0F6 /* DocumentTabView.swift */; };
 		520E5FA7528766BF307F7F42 /* ItemType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 335E97E0E585E907F5DB4439 /* ItemType.swift */; };
 		525DDC055DEF4B7A827759D7 /* RedactionBurnInSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C0812413BD57A2054D10A83 /* RedactionBurnInSheet.swift */; };
-		5329490F017FABA3F6760F68 /* QuizGenerationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4502B1EC186EE0122897C79 /* QuizGenerationService.swift */; };
 		53561F934267B72C8D1035F7 /* RedactionRegion.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8D3F1C30CD4202DFA8C64B4 /* RedactionRegion.swift */; };
 		55575EB6016D9FA1F38818E5 /* ConversationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1428432F0FC92A5486EAF1E /* ConversationService.swift */; };
 		557C5F1F5CA816F6CEA107CB /* BackupService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E12BE615801270BB860D7415 /* BackupService.swift */; };
@@ -248,6 +247,7 @@
 		BA0B19F86EAE8D9E358D8617 /* CommandPaletteController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEF098B7FA82F2D106A0F186 /* CommandPaletteController.swift */; };
 		BA0B27333EF86F5FC6F02701 /* OakAgent in Frameworks */ = {isa = PBXBuildFile; productRef = D1622ABDD098451C89D32128 /* OakAgent */; };
 		BA681F5E1B8D6ABC7D0878ED /* AnnotationModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CED884CFE0ED6221919B28F8 /* AnnotationModel.swift */; };
+		BAB641B79333A49479DF36BE /* TTSAudioCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A98E4AC7BA0ED39C9BAA1C66 /* TTSAudioCache.swift */; };
 		BAD50B0EC547A5E9B57F8BC9 /* CGPDFDocument+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7CB0C597FBB0F0023496A41 /* CGPDFDocument+Extensions.swift */; };
 		BAF4691DD4A1CF16CD23B8C7 /* NotePanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 945247B103C64684D0124953 /* NotePanelView.swift */; };
 		BB25A0D3E4922D73EF70EDAD /* HeaderFooterSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C48CA4C4510E982E80A5BE77 /* HeaderFooterSheet.swift */; };
@@ -292,7 +292,6 @@
 		D9EFF8A64A3EE800FE4A4A7D /* RedactionToolView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 022679D7BFB8640AEEE2C3EF /* RedactionToolView.swift */; };
 		DB38BB554B81F9147B134ABB /* USER.md in Resources */ = {isa = PBXBuildFile; fileRef = FED7D278C7033C285E6423FA /* USER.md */; };
 		DF26AC14B9E8763040EB8123 /* CatalogDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = B759AEF7B571932C2B41C37C /* CatalogDatabase.swift */; };
-		DF2CF5004768B3A89AA893A5 /* PendingQuizView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC32E178825F7960210606EA /* PendingQuizView.swift */; };
 		DF697AA8687A1A82359C7565 /* TranslationLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3232D6BA9590F8C571CF9937 /* TranslationLanguage.swift */; };
 		E0D39B5BFE8AABDB87DBE98A /* VoiceSpeakerModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45878CC78A8E01ED0197FA6A /* VoiceSpeakerModels.swift */; };
 		E0F399D431F803CCC602D66E /* SmartCollectionEditorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F2452181C93824A747B28F8 /* SmartCollectionEditorSheet.swift */; };
@@ -550,7 +549,6 @@
 		8D13E2F2DAAE19DE9BA57F67 /* SemanticDatabase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SemanticDatabase.swift; sourceTree = "<group>"; };
 		8EE6B08AE42F5F5093B698DF /* CLIImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIImporter.swift; sourceTree = "<group>"; };
 		8F738341643EF3BE5A70CB44 /* ReferenceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReferenceService.swift; sourceTree = "<group>"; };
-		8FCFF1639896F0B366C888E3 /* QuizCardPreviewContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizCardPreviewContent.swift; sourceTree = "<group>"; };
 		912AD36ADFACA2448194EBB7 /* TsangerJinKai02-W04.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "TsangerJinKai02-W04.ttf"; sourceTree = "<group>"; };
 		91FDAC96786D8B4011B623B5 /* HTMLDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTMLDocument.swift; sourceTree = "<group>"; };
 		936AA0D7A9E66908D29318BA /* AnnotationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationStore.swift; sourceTree = "<group>"; };
@@ -580,6 +578,7 @@
 		A6FBF2AB294757A782CCEA5D /* ChapterModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChapterModel.swift; sourceTree = "<group>"; };
 		A882E2478B4C84047DD54FD0 /* WatermarkSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatermarkSheet.swift; sourceTree = "<group>"; };
 		A8F15DB052AD5748299E47EA /* FormEditorViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormEditorViewModel.swift; sourceTree = "<group>"; };
+		A98E4AC7BA0ED39C9BAA1C66 /* TTSAudioCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TTSAudioCache.swift; path = OakReader/ViewModels/TTSAudioCache.swift; sourceTree = SOURCE_ROOT; };
 		A9D3890B559E3BFB4693C89B /* MatchingQuizView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MatchingQuizView.swift; sourceTree = "<group>"; };
 		AB0299671980A750F1F5544E /* MEMORY.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MEMORY.md; sourceTree = "<group>"; };
 		AB52F4E998F30885954293C4 /* ConfiguredProviderStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfiguredProviderStore.swift; sourceTree = "<group>"; };
@@ -622,7 +621,6 @@
 		D18E67DFB5D1EAA11B2B5A07 /* OakToolButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OakToolButton.swift; sourceTree = "<group>"; };
 		D3F153B13C17589F1BF5DFB8 /* MergeDocumentsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MergeDocumentsSheet.swift; sourceTree = "<group>"; };
 		D44EE4D911E3EB343C72403A /* ChatCompletionItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatCompletionItem.swift; sourceTree = "<group>"; };
-		D4502B1EC186EE0122897C79 /* QuizGenerationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizGenerationService.swift; sourceTree = "<group>"; };
 		D62609E48881FD798A356BDD /* SignatureModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignatureModel.swift; sourceTree = "<group>"; };
 		D6E956A0342EDE33F8AC2ACB /* LibraryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryStore.swift; sourceTree = "<group>"; };
 		D7F8A56EF5AEA94BAAD55EDB /* ColorPickerButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorPickerButton.swift; sourceTree = "<group>"; };
@@ -659,7 +657,6 @@
 		F8BE53343B707BDFF3413E55 /* ObjCExceptionCatcher.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ObjCExceptionCatcher.m; sourceTree = "<group>"; };
 		FA017F31D0A69846D78444B1 /* AccessibilityCheckerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityCheckerView.swift; sourceTree = "<group>"; };
 		FADC7847A8EEE480FA43B301 /* SystemPermissionStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemPermissionStatus.swift; sourceTree = "<group>"; };
-		FC32E178825F7960210606EA /* PendingQuizView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingQuizView.swift; sourceTree = "<group>"; };
 		FC870F643394FB8FDBD788D1 /* ZoomableChapterTimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoomableChapterTimelineView.swift; sourceTree = "<group>"; };
 		FE1B1725466F2575C959C69A /* SkillCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkillCommands.swift; sourceTree = "<group>"; };
 		FEC033770C091AC5B1EA41B0 /* PDFRenderingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFRenderingService.swift; sourceTree = "<group>"; };
@@ -667,6 +664,7 @@
 		FF378933F3291D09342F746C /* ClozeQuizView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClozeQuizView.swift; sourceTree = "<group>"; };
 		FF8C05692C7F3D82687804D3 /* QuizCardsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizCardsViewModel.swift; sourceTree = "<group>"; };
 		FFF80B02C4F2CEFA560DF0C9 /* PaletteCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaletteCommand.swift; sourceTree = "<group>"; };
+		0000F2E1D0C9B8A7F6E5D4C3 /* skills */ = {isa = PBXFileReference; lastKnownFileType = folder; path = skills; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -720,9 +718,7 @@
 		0CB5E33D83ACCDD842B28867 /* QuizCards */ = {
 			isa = PBXGroup;
 			children = (
-				FC32E178825F7960210606EA /* PendingQuizView.swift */,
 				277352D94AD7443D8968A6EA /* QuizCardListView.swift */,
-				8FCFF1639896F0B366C888E3 /* QuizCardPreviewContent.swift */,
 				9BAA5362D4860CC3E086CD87 /* QuizCardReviewView.swift */,
 				6DA66DD64C2617321E6C53DF /* QuizCardsPanelView.swift */,
 			);
@@ -995,7 +991,6 @@
 				4858AF08186653B11C29612C /* DocumentTools.swift */,
 				51FDA535131ABD1FB3C745B1 /* MemoryTools.swift */,
 				C89EEADCAA40A0524474DF72 /* PDFContextProvider.swift */,
-				D4502B1EC186EE0122897C79 /* QuizGenerationService.swift */,
 				4A5987B0AB524A0EDED7C3C3 /* SearchTools.swift */,
 				4B2A91F80AE646CD9FF9A9AC /* SemanticSearchTool.swift */,
 			);
@@ -1226,6 +1221,8 @@
 				4C31D42C6F27A5F6CC61D210 /* OakReader */,
 				FC165E5901DDAD54EC3CB28E /* Packages */,
 				E6C40581B7F1F5E458BD8009 /* Products */,
+				0000F2E1D0C9B8A7F6E5D4C3 /* skills */,
+				A98E4AC7BA0ED39C9BAA1C66 /* TTSAudioCache.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -1469,6 +1466,7 @@
 				FFE10D25C8CCA1B1A5982951 /* Assets.xcassets in Resources */,
 				E351F3911A686B291A25132E /* MEMORY.md in Resources */,
 				CF1FE06115DEFE39C67CE511 /* Preview.bundle in Resources */,
+				0000A1B2C3D4E5F6A7B8C9D0 /* skills in Resources */,
 				6EB17E48EFDF2EFCB2F8DDFA /* TsangerJinKai02-W04.ttf in Resources */,
 				DB38BB554B81F9147B134ABB /* USER.md in Resources */,
 				F955D6B65A1EBAF357AFF994 /* grant_voice.wav in Resources */,
@@ -1745,7 +1743,6 @@
 				F9DEB46EAD4E901A082A9E0B /* PageThumbnailCell.swift in Sources */,
 				72C15CBFBA70DCDC60E2AE1D /* PaletteCommand.swift in Sources */,
 				8448155D6237A806CCD6C9B7 /* PasswordSheet.swift in Sources */,
-				DF2CF5004768B3A89AA893A5 /* PendingQuizView.swift in Sources */,
 				B57FFAFE6711955514425346 /* PermissionsView.swift in Sources */,
 				04ED24D1C23A4D9DF3DCE862 /* PopupComponents.swift in Sources */,
 				A12889391EE13C7989B99C1D /* Preferences.swift in Sources */,
@@ -1753,13 +1750,11 @@
 				6FCAAEBAA086AE6572A7170E /* PrintService.swift in Sources */,
 				C939D8C826D2C44D278BE20C /* ProgressOverlay.swift in Sources */,
 				34BB28DC4E7A3A41EE1845FE /* QuizCardListView.swift in Sources */,
-				24BFE5411EB1C8935CC062CE /* QuizCardPreviewContent.swift in Sources */,
 				434AF2CF446CA09FA336AA95 /* QuizCardReviewView.swift in Sources */,
 				FE6B184BE73B0C0A5A375276 /* QuizCardService.swift in Sources */,
 				84AE158AD6D67F9B52374D99 /* QuizCardSettingsView.swift in Sources */,
 				639A4AAC1723401B265C71AF /* QuizCardsPanelView.swift in Sources */,
 				85514D788CEF73749B4E4739 /* QuizCardsViewModel.swift in Sources */,
-				5329490F017FABA3F6760F68 /* QuizGenerationService.swift in Sources */,
 				612FEDCCE0308C29375E3E27 /* QuizModels.swift in Sources */,
 				47A65F2D809D5A38C896A8C8 /* QuizScheduler.swift in Sources */,
 				D294996402B31860639694A0 /* QuizXMLParser.swift in Sources */,
@@ -1832,6 +1827,7 @@
 				C1205D6CBED8E36E3DCFFFE0 /* ZoteroImportProgressView.swift in Sources */,
 				58DFACB7DB1AF310CEA7A4CD /* ZoteroMigrationService.swift in Sources */,
 				3CDCD47693C52BAE40D233F5 /* main.swift in Sources */,
+				BAB641B79333A49479DF36BE /* TTSAudioCache.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

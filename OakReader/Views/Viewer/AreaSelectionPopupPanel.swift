@@ -128,14 +128,26 @@ class AreaSelectionPopupPanel: NSPanel, AppResignDismissable {
         // Separator 1
         mainStack.addArrangedSubview(makeVerticalSeparator())
 
-        // Group 2: Actions (chat + note)
+        // Group 2: Actions (chat)
         let chatBtn = PopupIconButton(
-            systemImage: "bubble.left",
+            systemImage: "text.quote",
             accessibilityLabel: "Add to Chat"
         ) { [weak self] in
             self?.addToChat()
         }
         mainStack.addArrangedSubview(chatBtn)
+
+        // Separator 2
+        mainStack.addArrangedSubview(makeVerticalSeparator())
+
+        // Group 3: Clipboard + Note (copy, then note)
+        let copyBtn = PopupIconButton(
+            systemImage: "doc.on.doc",
+            accessibilityLabel: "Copy Image"
+        ) { [weak self] in
+            self?.copyImage()
+        }
+        mainStack.addArrangedSubview(copyBtn)
 
         if Preferences.shared.isExtensionEnabled(.notes) {
             let noteBtn = PopupIconButton(
@@ -146,18 +158,6 @@ class AreaSelectionPopupPanel: NSPanel, AppResignDismissable {
             }
             mainStack.addArrangedSubview(noteBtn)
         }
-
-        // Separator 2
-        mainStack.addArrangedSubview(makeVerticalSeparator())
-
-        // Group 3: Clipboard (copy image)
-        let copyBtn = PopupIconButton(
-            systemImage: "doc.on.doc",
-            accessibilityLabel: "Copy Image"
-        ) { [weak self] in
-            self?.copyImage()
-        }
-        mainStack.addArrangedSubview(copyBtn)
 
         // Background container
         return makePopupGlassContainer(content: mainStack)

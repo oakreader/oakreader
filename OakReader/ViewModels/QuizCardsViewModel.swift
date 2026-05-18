@@ -9,13 +9,10 @@ class QuizCardsViewModel {
 
     var cards: [QuizCard] = []
     var dueCards: [QuizCard] = []
-    var pendingCards: [QuizCard] = []
     var dueCount: Int = 0
     var isReviewing: Bool = false
     var currentReviewIndex: Int = 0
     var errorMessage: String?
-
-    var pendingCount: Int { pendingCards.count }
 
     /// The card currently being reviewed.
     var currentReviewCard: QuizCard? {
@@ -59,14 +56,12 @@ class QuizCardsViewModel {
         guard let itemId, let cardService else {
             cards = []
             dueCards = []
-            pendingCards = []
             dueCount = 0
             return
         }
         do {
             cards = try cardService.fetchCards(forItemId: itemId)
             dueCards = try cardService.fetchDueCards(forItemId: itemId)
-            pendingCards = try cardService.fetchPendingCards(forItemId: itemId)
             dueCount = dueCards.count
         } catch {
             Log.error(Log.store, "Failed to load quiz cards: \(error)")
@@ -152,72 +147,6 @@ class QuizCardsViewModel {
             dueCount = dueCards.count
         } catch {
             Log.error(Log.store, "Failed to delete quiz card: \(error)")
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    // MARK: - Pending Cards
-
-    /// Approve a single pending card, moving it into FSRS scheduling.
-    func approveCard(_ card: QuizCard) {
-        guard let cardService else { return }
-        do {
-            try cardService.approveCard(id: card.id)
-            pendingCards.removeAll { $0.id == card.id }
-            loadCards()
-        } catch {
-            Log.error(Log.store, "Failed to approve pending card: \(error)")
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    /// Approve all pending cards for a given annotation.
-    func approveAll(annotationId: String) {
-        guard let cardService else { return }
-        do {
-            try cardService.approveBatch(annotationId: annotationId)
-            pendingCards.removeAll { $0.annotationId == annotationId }
-            loadCards()
-        } catch {
-            Log.error(Log.store, "Failed to approve batch: \(error)")
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    /// Approve all pending cards regardless of annotation.
-    func approveAllPending() {
-        guard let cardService else { return }
-        for card in pendingCards {
-            do {
-                try cardService.approveCard(id: card.id)
-            } catch {
-                Log.error(Log.store, "Failed to approve card \(card.id): \(error)")
-            }
-        }
-        pendingCards = []
-        loadCards()
-    }
-
-    /// Delete a single pending card.
-    func deletePendingCard(_ card: QuizCard) {
-        guard let cardService else { return }
-        do {
-            try cardService.deleteCard(id: card.id)
-            pendingCards.removeAll { $0.id == card.id }
-        } catch {
-            Log.error(Log.store, "Failed to delete pending card: \(error)")
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    /// Delete all pending cards for a given annotation.
-    func deleteAllPending(annotationId: String) {
-        guard let cardService else { return }
-        do {
-            try cardService.deletePendingCards(annotationId: annotationId)
-            pendingCards.removeAll { $0.annotationId == annotationId }
-        } catch {
-            Log.error(Log.store, "Failed to delete pending cards: \(error)")
             errorMessage = error.localizedDescription
         }
     }

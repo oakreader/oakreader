@@ -1,10 +1,13 @@
 import SwiftUI
+import UniformTypeIdentifiers
 import OakAgent
 
 struct AIChatView: View {
     let chatVM: ChatViewModel
-    var onSaveAssistantResponse: ((Turn) -> Bool)?
+    var voiceVM: VoiceViewModel?
     var onSaveQuizCard: ((QuizContent) -> Bool)?
+
+    @State private var playingTurnId: UUID?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -31,6 +34,9 @@ struct AIChatView: View {
             chatVM.pendingLibraryRef = nil
             let token = ChatCompletionItem.libraryReference(from: item)
             inputFocusRef.insertDroppedToken(token)
+        }
+        .onChange(of: voiceVM?.isSpeaking) { _, speaking in
+            if speaking == false { playingTurnId = nil }
         }
     }
 
@@ -166,7 +172,9 @@ struct AIChatView: View {
                     ForEach(chatVM.turns) { turn in
                         ChatBubbleView(
                             turn: turn,
-                            onSaveToNote: onSaveAssistantResponse,
+                            onPlayAudio: voiceVM != nil ? { t in playAudio(t) } : nil,
+                            isPlayingAudio: playingTurnId == turn.id && (voiceVM?.isSpeaking ?? false),
+                            onStopAudio: { stopAudio() },
                             onOpenCitation: { citeKey, anchor in
                                 chatVM.openCitation(citeKey: citeKey, anchor: anchor)
                             },
@@ -316,11 +324,13 @@ struct AIChatView: View {
             // Bottom row: attachment + send
             HStack(spacing: 6) {
                 Menu {
-                    Button(action: {}) {
-                        Label("Attach Page Snapshot", systemImage: "doc.viewfinder")
+                    Button(action: { uploadFile() }) {
+                        Label("Upload File", systemImage: "arrow.up.doc")
                     }
-                    Button(action: {}) {
-                        Label("Attach Selection", systemImage: "text.quote")
+                    if chatVM.parent != nil {
+                        Button(action: { chatVM.addDocumentPageSnapshot() }) {
+                            Label("Attach Page", systemImage: "doc.viewfinder")
+                        }
                     }
                 } label: {
                     Image(systemName: "plus")
@@ -381,6 +391,106 @@ struct AIChatView: View {
         )
         .padding(.horizontal, OakStyle.Spacing.sm)
         .padding(.vertical, OakStyle.Spacing.xs)
+    }
+
+    // MARK: - Audio Playback
+
+    private func playAudio(_ turn: Turn) {
+        guard let voiceVM else { return }
+        let text = Self.preprocessForTTS(turn.content)
+        guard !text.isEmpty else { return }
+        playingTurnId = turn.id
+        voiceVM.speakText(text)
+    }
+
+    private func stopAudio() {
+        voiceVM?.stopSpeaking()
+        playingTurnId = nil
+    }
+
+    // MARK: - TTS Text Preprocessing
+
+    /// Strips markup that should not be read aloud: citations, quiz XML,
+    /// code blocks, markdown formatting, and reference blocks.
+    static func preprocessForTTS(_ text: String) -> String {
+        var s = text
+
+        // 1. Remove <referenced-documents>...</referenced-documents> blocks
+        s = s.replacingOccurrences(
+            of: #"<referenced-documents>[\s\S]*?</referenced-documents>"#,
+            with: "",
+            options: .regularExpression
+        )
+
+        // 2. Remove <quiz ...>...</quiz> blocks
+        s = s.replacingOccurrences(
+            of: #"<quiz\s[\s\S]*?</quiz>"#,
+            with: "",
+            options: .regularExpression
+        )
+
+        // 3. Remove fenced code blocks (```...```)
+        s = s.replacingOccurrences(
+            of: #"```[\s\S]*?```"#,
+            with: "",
+            options: .regularExpression
+        )
+
+        // 4. Remove inline code (`...`)
+        s = s.replacingOccurrences(
+            of: #"`[^`]+`"#,
+            with: "",
+            options: .regularExpression
+        )
+
+        // 5. Convert markdown links [text](url) → text (keep the label, drop the URL)
+        s = s.replacingOccurrences(
+            of: #"\[([^\]]+)\]\([^)]+\)"#,
+            with: "$1",
+            options: .regularExpression
+        )
+
+        // 6. Strip bold/italic markers
+        s = s.replacingOccurrences(of: "***", with: "")
+        s = s.replacingOccurrences(of: "**", with: "")
+        s = s.replacingOccurrences(of: "__", with: "")
+
+        // 7. Strip heading markers (e.g. "### ")
+        s = s.replacingOccurrences(
+            of: #"(?m)^#{1,6}\s+"#,
+            with: "",
+            options: .regularExpression
+        )
+
+        // 8. Strip horizontal rules
+        s = s.replacingOccurrences(
+            of: #"(?m)^[-*_]{3,}\s*$"#,
+            with: "",
+            options: .regularExpression
+        )
+
+        // 9. Collapse multiple blank lines
+        s = s.replacingOccurrences(
+            of: #"\n{3,}"#,
+            with: "\n\n",
+            options: .regularExpression
+        )
+
+        return s.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    // MARK: - File Upload
+
+    private func uploadFile() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.allowedContentTypes = [.image, .png, .jpeg, .heic, .gif, .webP, .tiff]
+        panel.message = "Select an image to attach"
+
+        guard panel.runModal() == .OK, let url = panel.url,
+              let imageData = try? Data(contentsOf: url) else { return }
+        chatVM.addUploadedFile(imageData, filename: url.lastPathComponent)
     }
 
     // MARK: - Config Menu

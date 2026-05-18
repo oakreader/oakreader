@@ -170,24 +170,14 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
         // Separator 1
         mainStack.addArrangedSubview(makeVerticalSeparator())
 
-        // Group 2: Actions (chat + note)
+        // Group 2: Actions (chat + translate + speak)
         let chatBtn = PopupIconButton(
-            systemImage: "bubble.left",
+            systemImage: "text.quote",
             accessibilityLabel: "Add to Chat"
         ) { [weak self] in
             self?.addToChat()
         }
         mainStack.addArrangedSubview(chatBtn)
-
-        if Preferences.shared.isExtensionEnabled(.notes) {
-            let noteBtn = PopupIconButton(
-                systemImage: "note.text.badge.plus",
-                accessibilityLabel: "Add to Note"
-            ) { [weak self] in
-                self?.addToNote()
-            }
-            mainStack.addArrangedSubview(noteBtn)
-        }
 
         if Preferences.shared.isExtensionEnabled(.translation) {
             let translateBtn = PopupIconButton(
@@ -208,20 +198,10 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
         self.speakButton = speakBtn
         mainStack.addArrangedSubview(speakBtn)
 
-        if Preferences.shared.isExtensionEnabled(.quizCards) {
-            let quizBtn = PopupIconButton(
-                systemImage: "sparkles",
-                accessibilityLabel: "Generate Quiz"
-            ) { [weak self] in
-                self?.generateQuiz()
-            }
-            mainStack.addArrangedSubview(quizBtn)
-        }
-
         // Separator 2
         mainStack.addArrangedSubview(makeVerticalSeparator())
 
-        // Group 3: Clipboard (copy)
+        // Group 3: Clipboard + Note (copy, then note)
         let copyBtn = PopupIconButton(
             systemImage: "doc.on.doc",
             accessibilityLabel: "Copy"
@@ -229,6 +209,16 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
             self?.copySelection()
         }
         mainStack.addArrangedSubview(copyBtn)
+
+        if Preferences.shared.isExtensionEnabled(.notes) {
+            let noteBtn = PopupIconButton(
+                systemImage: "note.text.badge.plus",
+                accessibilityLabel: "Add to Note"
+            ) { [weak self] in
+                self?.addToNote()
+            }
+            mainStack.addArrangedSubview(noteBtn)
+        }
 
         // Background container
         return makePopupGlassContainer(content: mainStack)
@@ -371,60 +361,6 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
                     self.observeSpeakingState()
                 } else {
                     self.speakButton?.updateImage(systemImage: "speaker.wave.2")
-                }
-            }
-        }
-    }
-
-    private func generateQuiz() {
-        guard let text = selection.string, !text.isEmpty else { return }
-        guard text.count >= 10 else { return } // Minimum length check
-
-        // Create purple quiz-source highlight
-        let annotationId = viewModel.annotation.addQuizHighlight(for: selection)
-
-        // Get page context
-        let pageContext: String
-        if let pdfDoc = viewModel.pdfDocument,
-           let page = pdfDoc.page(at: viewModel.state.currentPageIndex) {
-            pageContext = TextExtractionService().extractText(from: page)
-        } else {
-            pageContext = text
-        }
-
-        let documentTitle = viewModel.libraryItem?.title ?? viewModel.fileName
-        let itemId = viewModel.itemId ?? ""
-
-        // Dismiss toolbar immediately — user continues reading
-        pdfView?.clearSelection()
-        dismissWithAction()
-
-        // Kick off background generation
-        guard let database = viewModel.database, !itemId.isEmpty, let annotationId else { return }
-        let service = QuizGenerationService(database: database)
-
-        Task {
-            await MainActor.run {
-                viewModel.appState?.isGeneratingQuiz = true
-            }
-            do {
-                let cards = try await service.generateFromHighlight(
-                    sourceText: text,
-                    pageContext: String(pageContext.prefix(4_000)),
-                    documentTitle: documentTitle,
-                    itemId: itemId,
-                    annotationId: annotationId
-                )
-                await MainActor.run {
-                    viewModel.appState?.isGeneratingQuiz = false
-                    viewModel.appState?.importNotification = "Generated \(cards.count) quiz card\(cards.count == 1 ? "" : "s")"
-                    viewModel.quizCards.loadCards()
-                }
-            } catch {
-                Log.error(Log.store, "Quiz generation failed: \(error)")
-                await MainActor.run {
-                    viewModel.appState?.isGeneratingQuiz = false
-                    viewModel.appState?.importNotification = "Quiz generation failed"
                 }
             }
         }

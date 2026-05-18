@@ -1,33 +1,14 @@
 import SwiftUI
 
-// MARK: - Service Action Helper
-
-struct CollectionQuizCardActions {
-    let service: QuizCardService
-
-    func approve(_ card: QuizCard) {
-        try? service.approveCard(id: card.id)
-    }
-
-    func approveAll(_ cards: [QuizCard]) {
-        for card in cards { approve(card) }
-    }
-
-    func delete(_ card: QuizCard) {
-        try? service.deleteCard(id: card.id)
-    }
-}
-
 // MARK: - Collection Quiz Tab
 
 enum CollectionQuizTab: String, CaseIterable, Identifiable {
-    case deck, pending, browse
+    case deck, browse
     var id: String { rawValue }
 
     var label: String {
         switch self {
         case .deck: "Deck"
-        case .pending: "Pending"
         case .browse: "Browse"
         }
     }
@@ -35,7 +16,6 @@ enum CollectionQuizTab: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .deck: "rectangle.stack"
-        case .pending: "sparkles"
         case .browse: "list.bullet"
         }
     }
@@ -48,7 +28,6 @@ struct CollectionQuizCardsPanelView: View {
     let title: String
     @State private var tab: CollectionQuizTab = .deck
     @State private var cardRows: [CollectionQuizCardRow] = []
-    @State private var pendingCardRows: [QuizCard] = []
 
     private var store: LibraryStore { appState.libraryStore }
     private var items: [LibraryItem] { store.filteredItems }
@@ -56,10 +35,6 @@ struct CollectionQuizCardsPanelView: View {
     /// True when the selected sidebar entry is a user-created (non-system) collection.
     private var isUserCollection: Bool {
         store.selectedCollection?.isSystem == false
-    }
-
-    private var actions: CollectionQuizCardActions {
-        CollectionQuizCardActions(service: QuizCardService(database: store.database))
     }
 
     private func loadData() {
@@ -78,14 +53,6 @@ struct CollectionQuizCardsPanelView: View {
             let item = currentItems.first(where: { $0.id.uuidString == card.itemId })
             return CollectionQuizCardRow(card: card, itemTitle: item?.title)
         }
-
-        // Load pending
-        if let collectionId = store.selectedCollectionId, isUserCollection {
-            pendingCardRows = (try? service.fetchPendingCards(forCollectionId: collectionId.uuidString)) ?? []
-        } else {
-            let itemIds = currentItems.map { $0.id.uuidString }
-            pendingCardRows = (try? service.fetchPendingCards(forItemIds: itemIds)) ?? []
-        }
     }
 
     var body: some View {
@@ -103,13 +70,6 @@ struct CollectionQuizCardsPanelView: View {
                     CollectionQuizDeckView(
                         appState: appState,
                         cardRows: cardRows
-                    )
-                case .pending:
-                    CollectionQuizPendingView(
-                        appState: appState,
-                        pendingCards: pendingCardRows,
-                        actions: actions,
-                        onChanged: loadData
                     )
                 case .browse:
                     if cardRows.isEmpty {
@@ -271,141 +231,6 @@ struct CollectionQuizDeckView: View {
             .background(RoundedRectangle(cornerRadius: 8).fill(Color.accentColor))
         }
         .buttonStyle(.plain)
-    }
-}
-
-// MARK: - Pending Tab View
-
-struct CollectionQuizPendingView: View {
-    @Bindable var appState: AppState
-    let pendingCards: [QuizCard]
-    let actions: CollectionQuizCardActions
-    var onChanged: (() -> Void)?
-    @State private var pendingIndex: Int = 0
-
-    private var store: LibraryStore { appState.libraryStore }
-
-    private var currentPendingCard: QuizCard? {
-        guard !pendingCards.isEmpty, pendingIndex < pendingCards.count else { return nil }
-        return pendingCards[pendingIndex]
-    }
-
-    var body: some View {
-        if pendingCards.isEmpty {
-            emptyState(icon: "sparkles", title: "No Pending Cards", subtitle: "Generate quiz cards from your documents to review them here.")
-        } else {
-            VStack(spacing: 0) {
-                // Header with count + Save All
-                HStack(spacing: 8) {
-                    Text("Pending Review")
-                        .font(.system(size: 13, weight: .semibold))
-
-                    Text("\(pendingCards.count)")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Capsule().fill(Color.purple))
-
-                    Spacer()
-
-                    Button("Save All") {
-                        actions.approveAll(pendingCards)
-                        onChanged?()
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-
-                // Card preview
-                if let card = currentPendingCard {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 12) {
-                            // Type badge
-                            HStack(spacing: 6) {
-                                Image(systemName: card.type.systemImage)
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(.purple)
-                                Text(card.type.label)
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundStyle(.purple)
-                            }
-
-                            QuizCardPreviewContent(content: card.content)
-                        }
-                        .padding(16)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(Color(nsColor: .controlBackgroundColor))
-                            .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
-                    )
-                    .padding(.horizontal, 12)
-                }
-
-                // Navigation + actions
-                HStack(spacing: 8) {
-                    Button {
-                        if pendingIndex > 0 { pendingIndex -= 1 }
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 12, weight: .medium))
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .disabled(pendingIndex == 0)
-
-                    Text("\(pendingIndex + 1) / \(pendingCards.count)")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.secondary)
-
-                    Button {
-                        if pendingIndex < pendingCards.count - 1 { pendingIndex += 1 }
-                    } label: {
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 12, weight: .medium))
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .disabled(pendingIndex >= pendingCards.count - 1)
-
-                    Spacer()
-
-                    if let card = currentPendingCard {
-                        Button(role: .destructive) {
-                            actions.delete(card)
-                            onChanged?()
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                                .font(.system(size: 12, weight: .medium))
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-
-                        Button {
-                            actions.approve(card)
-                            onChanged?()
-                        } label: {
-                            Label("Save", systemImage: "checkmark.circle")
-                                .font(.system(size: 12, weight: .medium))
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        .tint(.green)
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-            }
-            .onChange(of: pendingCards.count) { _, newCount in
-                if pendingIndex >= newCount {
-                    pendingIndex = max(0, newCount - 1)
-                }
-            }
-        }
     }
 }
 

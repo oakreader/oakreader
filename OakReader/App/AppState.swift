@@ -103,7 +103,6 @@ final class AppState {
     var isLibrarySidebarVisible: Bool = true
     var libraryDetailTab: LibraryDetailTab? = nil
     var importNotification: String?
-    var isGeneratingQuiz: Bool = false
     var quizReviewSession: QuizReviewSession?
 
     // MARK: - Library Chat
