@@ -29,7 +29,7 @@ const submenuTriggerClass =
   "flex w-full items-center gap-2 px-2.5 h-8 rounded-[var(--radius-control)] text-left text-[12px] text-foreground outline-none select-none transition-colors duration-150 data-highlighted:bg-fill-hover data-popup-open:bg-fill-hover";
 
 const popupClass =
-  "max-h-60 overflow-y-auto rounded-[var(--radius-outer)] bg-grouped p-1 origin-[var(--transform-origin)] transition-[transform,scale,opacity] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95";
+  "max-h-60 overflow-y-auto rounded-[var(--radius-inner)] bg-[#faf7f1] p-1 origin-[var(--transform-origin)] transition-[transform,scale,opacity] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95";
 
 const popupShadow =
   "0 0 0 0.5px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.12)";
@@ -75,7 +75,7 @@ function CollectionMenuItem({
         <ChevronRight className="size-3 text-tertiary shrink-0" strokeWidth={2} />
       </Menu.SubmenuTrigger>
       <Menu.Portal>
-        <Menu.Positioner side="right" sideOffset={-4} align="start">
+        <Menu.Positioner side="right" sideOffset={-4} align="start" className="z-50">
           <Menu.Popup
             className={popupClass}
             style={{ boxShadow: popupShadow }}
@@ -125,7 +125,7 @@ export function CollectionPicker({
       <Menu.Root>
         {/* Trigger button — shows current selection */}
         <Menu.Trigger
-          className="flex w-full items-center gap-2 rounded-[var(--radius-outer)] bg-grouped px-3 h-9 text-left transition-colors duration-200 hover:bg-fill-hover"
+          className="flex w-full items-center gap-2 rounded-[var(--radius-control)] bg-grouped px-3 h-9 text-left transition-colors duration-200 hover:bg-fill-hover"
           style={{ boxShadow: "0 0 0 0.5px rgba(0,0,0,0.06)" }}
         >
           {value === "__all__" ? (
@@ -144,7 +144,7 @@ export function CollectionPicker({
 
         {/* Dropdown with cascading submenus */}
         <Menu.Portal>
-          <Menu.Positioner sideOffset={4} align="start">
+          <Menu.Positioner sideOffset={4} align="start" className="z-50">
             <Menu.Popup
               className={popupClass}
               style={{ boxShadow: popupShadow, minWidth: "var(--anchor-width)" }}
