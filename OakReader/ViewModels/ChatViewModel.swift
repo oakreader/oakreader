@@ -1,4 +1,6 @@
 import Foundation
+import AppKit
+import PDFKit
 import OakAgent
 
 struct CitationAnchor {
@@ -543,6 +545,34 @@ class ChatViewModel {
             type: .imageCapture,
             label: "Pasted image",
             imageData: imageData
+        )
+        pendingAttachments.append(attachment)
+    }
+
+    func addUploadedFile(_ imageData: Data, filename: String) {
+        let attachment = TurnAttachment(
+            type: .imageCapture,
+            label: filename,
+            imageData: imageData
+        )
+        pendingAttachments.append(attachment)
+    }
+
+    func addDocumentPageSnapshot() {
+        guard let vm = parent else { return }
+        let pageIndex = vm.state.currentPageIndex
+        guard let pdfDoc = vm.pdfDocument, let page = pdfDoc.page(at: pageIndex) else { return }
+        let renderer = PDFRenderingService()
+        guard let cgImage = renderer.renderPage(page, dpi: 150) else { return }
+        let nsImage = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+        guard let tiffData = nsImage.tiffRepresentation,
+              let bitmap = NSBitmapImageRep(data: tiffData),
+              let pngData = bitmap.representation(using: .png, properties: [:]) else { return }
+        let attachment = TurnAttachment(
+            type: .imageCapture,
+            label: "Page \(pageIndex + 1), \(vm.fileName)",
+            imageData: pngData,
+            pageIndex: pageIndex
         )
         pendingAttachments.append(attachment)
     }
