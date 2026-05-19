@@ -501,6 +501,16 @@ extension CatalogDatabase {
             try db.execute(sql: "DELETE FROM collections WHERE id = ?", arguments: [notesId])
         }
 
+        // MARK: v18 — Inbox Smart Collection
+
+        migrator.registerMigration("v18-inbox-collection") { db in
+            let now = Date().iso8601String
+            try db.execute(sql: """
+                INSERT INTO collections (id, user_id, name, icon, sort_order, parent_id, is_smart, is_system, filter_rules, created_at, updated_at)
+                VALUES (?, ?, 'Inbox', 'tray.and.arrow.down', -1, NULL, 1, 1, NULL, ?, ?)
+            """, arguments: [SystemCollectionID.inbox.uuidString, localUserId, now, now])
+        }
+
         return migrator
     }
 
