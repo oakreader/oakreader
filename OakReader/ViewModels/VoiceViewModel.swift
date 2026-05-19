@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import OakVoice
 
@@ -29,11 +30,11 @@ class VoiceViewModel {
         let refText = prefs.voiceReferenceText.isEmpty ? nil : prefs.voiceReferenceText
         let outputUID = prefs.voiceOutputDeviceUID.isEmpty ? nil : prefs.voiceOutputDeviceUID
 
-        // Build a cache key to avoid re-creating the provider unnecessarily
+        // Build a cache key that includes all voice config that affects audio output
         let cacheKey: String
         switch ttsProviderType {
         case .onDevice:
-            cacheKey = "ondevice:\(ttsRepo)"
+            cacheKey = "ondevice:\(ttsRepo):\(voice ?? ""):\(language)"
         case .elevenLabs:
             cacheKey = "elevenlabs:\(prefs.elevenLabsVoiceId):\(prefs.elevenLabsTTSModelId)"
         }
@@ -62,19 +63,44 @@ class VoiceViewModel {
         let speaker = SpeakerOutput(deviceUID: outputUID)
         speakerOutput = speaker
 
-        let stream = provider.synthesizeStream(
-            text: text,
-            voice: voice,
-            referenceAudioURL: refAudioURL,
-            referenceText: refText
-        )
-
         ttsPlaybackTask = Task { [weak self] in
             do {
-                try await speaker.play(buffers: stream)
+                // Check audio cache first
+                if let cachedStream = await TTSAudioCache.shared.loadStream(text: text, configKey: cacheKey) {
+                    Log.debug(Log.voice, "TTS cache hit: \(text.prefix(50))")
+                    try await speaker.play(buffers: cachedStream)
+                } else {
+                    // Cache miss: synthesize while collecting buffers for caching
+                    let sourceStream = provider.synthesizeStream(
+                        text: text,
+                        voice: voice,
+                        referenceAudioURL: refAudioURL,
+                        referenceText: refText
+                    )
+                    let collector = TTSBufferCollector()
+                    let cachingStream = AsyncThrowingStream<AVAudioPCMBuffer, Error> { continuation in
+                        Task {
+                            do {
+                                for try await buffer in sourceStream {
+                                    await collector.append(buffer)
+                                    continuation.yield(buffer)
+                                }
+                                continuation.finish()
+                            } catch {
+                                continuation.finish(throwing: error)
+                            }
+                        }
+                    }
+                    try await speaker.play(buffers: cachingStream)
+                    // Persist to cache after successful playback
+                    let buffers = await collector.buffers
+                    if !buffers.isEmpty {
+                        await TTSAudioCache.shared.store(buffers: buffers, text: text, configKey: cacheKey)
+                    }
+                }
             } catch {
                 if !Task.isCancelled {
-                    Log.error(Log.voice,"TTS playback failed: \(error.localizedDescription)")
+                    Log.error(Log.voice, "TTS playback failed: \(error.localizedDescription)")
                 }
             }
             await MainActor.run {
@@ -82,6 +108,9 @@ class VoiceViewModel {
                 self?.speakerOutput = nil
             }
         }
+
+        // Periodically clean expired cache entries
+        Task { await TTSAudioCache.shared.cleanExpired() }
     }
 
     @MainActor
