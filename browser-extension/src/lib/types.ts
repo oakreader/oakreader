@@ -30,8 +30,6 @@ export interface PDFSavePayload {
   url: string;
   title: string | null;
   cookies?: string;
-  collectionId?: string;
-  tagOptionIds?: string[];
 }
 
 /** Payload for saving an HTML snapshot (SingleFile capture). */
@@ -41,27 +39,7 @@ export interface HTMLSnapshotPayload {
   title: string | null;
   html: string;
   markdown?: string | null;
-  collectionId?: string;
-  tagOptionIds?: string[];
-  newTags?: string[];
 }
 
 /** @deprecated Use PageCapture for full data or PageMeta for lightweight detection. */
 export type PageData = PageCapture;
-
-export interface CollectionInfo {
-  id: string;
-  name: string;
-  icon: string;
-  children?: CollectionInfo[];
-}
-
-export interface TagNodeInfo {
-  id: string;
-  name: string;
-  fullPath: string;
-  count: number;
-  isTag?: boolean;
-  colorHex?: string;
-  children?: TagNodeInfo[];
-}

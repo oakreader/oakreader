@@ -4,8 +4,6 @@ import { usePopupData } from "@/src/hooks/use-popup-data";
 import { postSnapshot } from "@/src/lib/api";
 import type { PageCapture, PDFSavePayload } from "@/src/lib/types";
 import { PageCard } from "./PageCard";
-import { CollectionPicker } from "./CollectionPicker";
-import { TagInput } from "./TagInput";
 import { SaveButton, type SaveState } from "./SaveButton";
 
 type SaveMode = "pdf" | "html" | "link";
@@ -37,27 +35,7 @@ interface CaptureProgress {
 }
 
 export function App() {
-  const { pageMeta, tabId, collections, tags, initialCollectionId, loading, error } = usePopupData();
-  const [collectionId, setCollectionId] = useState("__all__");
-
-  // Initialize collectionId from resolved initial value once data loads
-  useEffect(() => {
-    if (!loading) {
-      setCollectionId(initialCollectionId);
-    }
-  }, [loading, initialCollectionId]);
-
-  // Persist collection changes to chrome.storage.local
-  const handleCollectionChange = useCallback((id: string) => {
-    setCollectionId(id);
-    try {
-      chrome.storage.local.set({ selectedCollectionId: id });
-    } catch {
-      // storage not available — ignore
-    }
-  }, []);
-  const [selectedTagIds, setSelectedTagIds] = useState<Set<string>>(new Set());
-  const [newTags, setNewTags] = useState<string[]>([]);
+  const { pageMeta, tabId, loading, error } = usePopupData();
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [errorMessage, setErrorMessage] = useState("");
   const [saveMode, setSaveMode] = useState<SaveMode>("html");
@@ -101,39 +79,10 @@ export function App() {
     return () => chrome.runtime.onMessage.removeListener(listener);
   }, []);
 
-  const handleTagToggle = useCallback((id: string) => {
-    setSelectedTagIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  }, []);
-
-  const handleAddNewTag = useCallback((name: string) => {
-    setNewTags((prev) => {
-      if (prev.some((t) => t.toLowerCase() === name.toLowerCase())) return prev;
-      return [...prev, name];
-    });
-  }, []);
-
-  const handleRemoveNewTag = useCallback((name: string) => {
-    setNewTags((prev) => prev.filter((t) => t !== name));
-  }, []);
-
-  const collectionName =
-    collectionId === "__all__"
-      ? "All Items"
-      : collections.find((c) => c.id === collectionId)?.name || "All Items";
-
   const handleSave = useCallback(async () => {
     if (!pageMeta || tabId === null) return;
 
     setErrorMessage("");
-    const selectedCollection = collectionId === "__all__" ? undefined : collectionId;
 
     try {
       let payload: PageCapture | PDFSavePayload;
@@ -186,9 +135,6 @@ export function App() {
           payload: {
             url: pageMeta.url,
             title: pageMeta.title,
-            collectionId: selectedCollection,
-            tagOptionIds: Array.from(selectedTagIds),
-            newTags,
           },
         }) as { status: string; message?: string } | undefined;
 
@@ -210,9 +156,6 @@ export function App() {
           payload: {
             url: pageMeta.url,
             title: pageMeta.title,
-            collectionId: selectedCollection,
-            tagOptionIds: Array.from(selectedTagIds),
-            newTags,
           },
         }) as { status: string; message?: string } | undefined;
 
@@ -247,12 +190,7 @@ export function App() {
         setSaveState("saving");
       }
 
-      const result = await postSnapshot(
-        payload,
-        selectedCollection,
-        Array.from(selectedTagIds),
-        newTags
-      );
+      const result = await postSnapshot(payload);
 
       if (result.status === "ok") {
         setSaveState("saved");
@@ -271,7 +209,7 @@ export function App() {
         setErrorMessage(msg);
       }
     }
-  }, [pageMeta, tabId, collectionId, collections, selectedTagIds, newTags, saveMode]);
+  }, [pageMeta, tabId, saveMode]);
 
   if (loading) {
     return <LoadingState />;
@@ -318,21 +256,6 @@ export function App() {
         {pageMeta?.type === "html" && (
           <SaveModePicker value={saveMode} onChange={setSaveMode} />
         )}
-
-        <CollectionPicker
-          collections={collections}
-          value={collectionId}
-          onChange={handleCollectionChange}
-        />
-
-        <TagInput
-          tags={tags}
-          selectedIds={selectedTagIds}
-          newTags={newTags}
-          onToggle={handleTagToggle}
-          onAddNewTag={handleAddNewTag}
-          onRemoveNewTag={handleRemoveNewTag}
-        />
       </div>
 
       <div className="shrink-0 px-4 pt-2 pb-4 space-y-2 oak-sticky-footer">
@@ -341,7 +264,7 @@ export function App() {
         )}
         <SaveButton
           state={saveState}
-          label={`Saving to ${collectionName}\u2026`}
+          label={"Saving to Inbox\u2026"}
           capturingLabel={
             saveMode === "pdf"
               ? "Generating PDF\u2026"

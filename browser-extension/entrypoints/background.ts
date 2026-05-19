@@ -145,9 +145,6 @@ export default defineBackground(() => {
     payload: {
       url: string;
       title: string | null;
-      collectionId?: string;
-      tagOptionIds?: string[];
-      newTags?: string[];
     }
   ): Promise<{ status: string; message?: string }> {
     // 0. Extract markdown (best-effort)
@@ -198,9 +195,6 @@ export default defineBackground(() => {
       html,
       markdown,
     };
-    if (payload.collectionId) body.collectionId = payload.collectionId;
-    if (payload.tagOptionIds && payload.tagOptionIds.length > 0) body.tagOptionIds = payload.tagOptionIds;
-    if (payload.newTags && payload.newTags.length > 0) body.newTags = payload.newTags;
 
     const response = await fetch(SNAPSHOT_URL, {
       method: "POST",
@@ -222,9 +216,6 @@ export default defineBackground(() => {
     payload: {
       url: string;
       title: string | null;
-      collectionId?: string;
-      tagOptionIds?: string[];
-      newTags?: string[];
     }
   ): Promise<{ status: string; message?: string }> {
     // 0. Extract markdown from the page before attaching debugger
@@ -316,9 +307,6 @@ export default defineBackground(() => {
       pdfData: pdfBase64,
       markdown,
     };
-    if (payload.collectionId) body.collectionId = payload.collectionId;
-    if (payload.tagOptionIds && payload.tagOptionIds.length > 0) body.tagOptionIds = payload.tagOptionIds;
-    if (payload.newTags && payload.newTags.length > 0) body.newTags = payload.newTags;
 
     const response = await fetch(SNAPSHOT_URL, {
       method: "POST",
