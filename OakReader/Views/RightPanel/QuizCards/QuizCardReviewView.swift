@@ -270,6 +270,7 @@ struct QuizCardReviewView: View {
                         .frame(maxWidth: .infinity)
                         .frame(height: 56)
                         .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
+                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.primary.opacity(0.15)))
                     }
                     .buttonStyle(.plain)
                     .onKeyPress("1") {
@@ -288,6 +289,7 @@ struct QuizCardReviewView: View {
                         .frame(maxWidth: .infinity)
                         .frame(height: 56)
                         .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
+                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.primary.opacity(0.15)))
                     }
                     .buttonStyle(.plain)
                     .onKeyPress("2") {
@@ -308,6 +310,7 @@ struct QuizCardReviewView: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: 56)
                     .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.primary.opacity(0.15)))
                 }
                 .buttonStyle(.plain)
             }
