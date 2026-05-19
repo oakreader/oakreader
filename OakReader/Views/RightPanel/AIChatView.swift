@@ -562,7 +562,7 @@ struct AIChatView: View {
                     Text(level.label).tag(level)
                 }
             } label: {
-                Label("Tools", systemImage: "wrench")
+                Label("Permission", systemImage: "wrench")
             }
         } label: {
             HStack(spacing: 3) {
