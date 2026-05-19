@@ -196,20 +196,18 @@ class ChatViewModel {
             ))
         }
 
-        // 2. Library tools (always when database is available)
-        if let dbQueue = sessionService?.database.dbQueue {
-            tools.append(SearchLibraryTool(dbQueue: dbQueue))
-            tools.append(ReadLibraryItemTool(dbQueue: dbQueue))
-
-            if let semanticService = appState?.semanticIndexService {
-                tools.append(SemanticSearchTool(service: semanticService))
-            }
+        // 2. Semantic search (requires MLX model in-process)
+        if let semanticService = appState?.semanticIndexService {
+            tools.append(SemanticSearchTool(service: semanticService))
         }
 
         // 3. Web search (always)
         tools.append(AcademicSearchTool())
 
-        // 3b. Memory tools (always available for personalization)
+        // 3b. Oak CLI (library search, read items, list collections/tags, manage library)
+        tools.append(OakCLITool())
+
+        // 3c. Memory tools (always available for personalization)
         tools.append(UpdateMemoryTool())
         tools.append(UpdateUserProfileTool())
         tools.append(LogLearningTool())
@@ -220,6 +218,7 @@ class ChatViewModel {
         if prefs.agentToolsEnabled, toolContext != nil {
             if prefs.agentReadFileEnabled { tools.append(ReadTool()) }
             if prefs.agentWriteFileEnabled { tools.append(WriteTool()) }
+            tools.append(BashTool())
         }
 
         // 5. ReadTool for notes (when document has notes or note references but ReadTool not already added)

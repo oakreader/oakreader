@@ -1,6 +1,7 @@
 import ArgumentParser
 import Foundation
 import OakAgent
+import PDFKit
 
 // MARK: - Library Change Notifications
 
@@ -83,7 +84,7 @@ struct Oak: ParsableCommand {
 struct Items: ParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "Manage library items.",
-        subcommands: [ItemsList.self, ItemsShow.self, ItemsOpen.self],
+        subcommands: [ItemsList.self, ItemsShow.self, ItemsRead.self, ItemsOpen.self],
         defaultSubcommand: ItemsList.self
     )
 }
@@ -173,6 +174,195 @@ struct ItemsShow: ParsableCommand {
             ))
         }
     }
+}
+
+struct ItemsRead: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "read", abstract: "Read item content (extract text).")
+
+    @OptionGroup var globals: GlobalOptions
+
+    @Argument(help: "Item identifier (title, cite key, or ID).")
+    var item: String
+
+    @Option(name: .long, help: "Page range for PDFs (e.g. \"1-5\", \"3,7,12\"). Omit for all pages.")
+    var pages: String?
+
+    func run() throws {
+        let database = try CLIDatabase(path: globals.db)
+        let resolver = CLIResolver(db: database)
+        let resolved = try resolver.resolveItem(item)
+
+        guard let filePath = try database.fetchItemFilePath(itemId: resolved.id) else {
+            throw OakError.general("No primary attachment found for '\(resolved.title)'.")
+        }
+
+        let url = filePath.fileURL
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            throw OakError.general("File not found: \(url.path)")
+        }
+
+        let text: String
+        switch filePath.contentType {
+        case "pdf":
+            text = try extractPDFText(url: url, pageCount: filePath.pageCount, pagesParam: pages)
+        case "html":
+            text = try extractHTMLText(url: url)
+        case "markdown":
+            text = try extractTextFile(url: url)
+        default:
+            throw OakError.general("Unsupported content type '\(filePath.contentType)' for text extraction.")
+        }
+
+        if globals.json {
+            let output = CLIOutput(json: true, quiet: globals.quiet)
+            output.success(operation: "items.read", result: CLIReadResult(
+                title: resolved.title,
+                citeKey: resolved.citeKey,
+                contentType: filePath.contentType,
+                pageCount: filePath.pageCount,
+                content: String(text.prefix(100_000))
+            ))
+        } else {
+            print(text.prefix(100_000))
+        }
+    }
+
+    // MARK: - Text Extraction
+
+    private func extractPDFText(url: URL, pageCount: Int, pagesParam: String?) throws -> String {
+        guard let pdf = PDFDocument(url: url) else {
+            throw OakError.general("Failed to open PDF at \(url.path)")
+        }
+
+        let pageIndices: [Int]
+        if let param = pagesParam, !param.isEmpty {
+            pageIndices = parsePDFPageRange(param, maxPage: pdf.pageCount)
+            if pageIndices.isEmpty {
+                throw OakError.general(
+                    "Invalid page range: \"\(param)\". Use formats like \"1-5\" or \"3,7,12\". Document has \(pdf.pageCount) pages."
+                )
+            }
+        } else {
+            pageIndices = Array(0..<pdf.pageCount)
+        }
+
+        var parts: [String] = []
+        for index in pageIndices {
+            guard let page = pdf.page(at: index) else { continue }
+            let pageText = page.string ?? ""
+            if !pageText.isEmpty {
+                parts.append("--- Page \(index + 1) ---\n\(pageText)")
+            }
+        }
+
+        if parts.isEmpty {
+            return "No text content found on the requested pages."
+        }
+        return parts.joined(separator: "\n\n")
+    }
+
+    private func extractHTMLText(url: URL) throws -> String {
+        // Prefer markdown version (content.md) saved alongside HTML by browser extension
+        let mdURL = url.deletingLastPathComponent().appendingPathComponent("content.md")
+        if let markdown = try? String(contentsOf: mdURL, encoding: .utf8), !markdown.isEmpty {
+            return markdown
+        }
+
+        guard let data = try? Data(contentsOf: url) else {
+            throw OakError.general("Failed to read HTML file at \(url.path)")
+        }
+
+        // Extract text using XMLDocument (same approach as the app)
+        guard let doc = try? XMLDocument(data: data, options: .documentTidyHTML),
+              let root = doc.rootElement() else {
+            return String(data: data, encoding: .utf8) ?? ""
+        }
+
+        var parts: [String] = []
+        collectHTMLText(from: root, into: &parts)
+        return parts.joined()
+            .components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .joined(separator: "\n")
+            .replacingOccurrences(of: "\n{3,}", with: "\n\n", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func extractTextFile(url: URL) throws -> String {
+        guard let content = try? String(contentsOf: url, encoding: .utf8) else {
+            throw OakError.general("Failed to read file at \(url.path)")
+        }
+        return content
+    }
+
+    // MARK: - HTML Helpers
+
+    private static let suppressedTags: Set<String> = [
+        "script", "style", "noscript", "svg", "math"
+    ]
+
+    private static let blockTags: Set<String> = [
+        "p", "div", "section", "article", "header", "footer", "nav", "main",
+        "h1", "h2", "h3", "h4", "h5", "h6", "blockquote", "pre",
+        "ul", "ol", "li", "table", "tr", "td", "th",
+        "br", "hr", "figcaption", "figure", "details", "summary"
+    ]
+
+    private func collectHTMLText(from node: XMLNode, into parts: inout [String]) {
+        switch node.kind {
+        case .text:
+            if let text = node.stringValue, !text.isEmpty {
+                parts.append(text)
+            }
+        case .element:
+            guard let element = node as? XMLElement else { return }
+            let tag = element.name?.lowercased() ?? ""
+            if Self.suppressedTags.contains(tag) { return }
+            let isBlock = Self.blockTags.contains(tag)
+            if isBlock { parts.append("\n") }
+            for child in node.children ?? [] {
+                collectHTMLText(from: child, into: &parts)
+            }
+            if isBlock { parts.append("\n") }
+        default:
+            for child in node.children ?? [] {
+                collectHTMLText(from: child, into: &parts)
+            }
+        }
+    }
+
+    // MARK: - Page Range Parser
+
+    private func parsePDFPageRange(_ input: String, maxPage: Int) -> [Int] {
+        var indices: [Int] = []
+        let rangeParts = input.split(separator: ",").map {
+            String($0).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        for part in rangeParts {
+            if part.contains("-") {
+                let bounds = part.split(separator: "-").compactMap {
+                    Int(String($0).trimmingCharacters(in: .whitespacesAndNewlines))
+                }
+                guard bounds.count == 2, bounds[0] >= 1, bounds[1] >= bounds[0] else { continue }
+                let start = max(bounds[0], 1)
+                let end = min(bounds[1], maxPage)
+                for page in start...end {
+                    indices.append(page - 1)
+                }
+            } else if let page = Int(part), page >= 1, page <= maxPage {
+                indices.append(page - 1)
+            }
+        }
+        return indices
+    }
+}
+
+struct CLIReadResult: Encodable {
+    let title: String
+    let citeKey: String?
+    let contentType: String
+    let pageCount: Int
+    let content: String
 }
 
 struct ItemsOpen: ParsableCommand {
