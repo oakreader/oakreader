@@ -373,7 +373,12 @@ public enum BuiltInProviders {
             authorizationURL: URL(string: "https://auth.openai.com/oauth/authorize")!,
             tokenURL: URL(string: "https://auth.openai.com/oauth/token")!,
             scopes: ["openid", "profile", "email", "offline_access"],
-            callbackPort: 1455
+            callbackPort: 1455,
+            callbackPath: "/auth/callback",
+            additionalAuthParams: [
+                "codex_cli_simplified_flow": "true",
+                "id_token_add_organizations": "true",
+            ]
         ))
     )
 

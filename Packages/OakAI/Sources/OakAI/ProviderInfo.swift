@@ -25,13 +25,25 @@ public struct OAuthPKCEConfig: Sendable {
     public let tokenURL: URL
     public let scopes: [String]
     public let callbackPort: Int
+    public let callbackPath: String
+    public let additionalAuthParams: [String: String]
 
-    public init(clientId: String, authorizationURL: URL, tokenURL: URL, scopes: [String], callbackPort: Int) {
+    public init(
+        clientId: String,
+        authorizationURL: URL,
+        tokenURL: URL,
+        scopes: [String],
+        callbackPort: Int,
+        callbackPath: String = "/callback",
+        additionalAuthParams: [String: String] = [:]
+    ) {
         self.clientId = clientId
         self.authorizationURL = authorizationURL
         self.tokenURL = tokenURL
         self.scopes = scopes
         self.callbackPort = callbackPort
+        self.callbackPath = callbackPath
+        self.additionalAuthParams = additionalAuthParams
     }
 }
 
