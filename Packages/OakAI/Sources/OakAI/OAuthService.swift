@@ -14,6 +14,8 @@ public struct DeviceCodeResponse: Sendable {
 
 public actor OAuthService {
 
+    public init() {}
+
     // MARK: - PKCE Flow
 
     /// Initiate OAuth PKCE authorization: open browser, wait for callback, exchange code for tokens.
@@ -24,16 +26,21 @@ public actor OAuthService {
         let state = UUID().uuidString
 
         // 2. Build authorization URL
+        let redirectURI = "http://localhost:\(config.callbackPort)\(config.callbackPath)"
         var components = URLComponents(url: config.authorizationURL, resolvingAgainstBaseURL: false)!
-        components.queryItems = [
+        var queryItems = [
             URLQueryItem(name: "response_type", value: "code"),
             URLQueryItem(name: "client_id", value: config.clientId),
-            URLQueryItem(name: "redirect_uri", value: "http://localhost:\(config.callbackPort)/callback"),
+            URLQueryItem(name: "redirect_uri", value: redirectURI),
             URLQueryItem(name: "scope", value: config.scopes.joined(separator: " ")),
             URLQueryItem(name: "state", value: state),
             URLQueryItem(name: "code_challenge", value: challenge),
             URLQueryItem(name: "code_challenge_method", value: "S256"),
         ]
+        for (key, value) in config.additionalAuthParams {
+            queryItems.append(URLQueryItem(name: key, value: value))
+        }
+        components.queryItems = queryItems
 
         let authURL = components.url!
 
@@ -136,11 +143,12 @@ public actor OAuthService {
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
+        let redirectURI = "http://localhost:\(config.callbackPort)\(config.callbackPath)"
         let params = [
             "grant_type=authorization_code",
             "client_id=\(config.clientId)",
             "code=\(code)",
-            "redirect_uri=http://localhost:\(config.callbackPort)/callback",
+            "redirect_uri=\(redirectURI)",
             "code_verifier=\(verifier)",
         ].joined(separator: "&")
         request.httpBody = params.data(using: .utf8)

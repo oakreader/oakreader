@@ -26,6 +26,7 @@ private struct ProviderDetailView: View {
     @State private var elevenLabsTTSModelId: String = ""
     @State private var testResult: String?
     @State private var isTesting: Bool = false
+    @State private var oauthState = OAuthFlowState()
 
     private var provider: ProviderInfo? {
         ProviderRegistry.shared.provider(for: providerId)
@@ -36,6 +37,14 @@ private struct ProviderDetailView: View {
             return store.isElevenLabsConfigured
         }
         return store.configuredLLMProviderIds.contains(providerId)
+    }
+
+    private var isOAuthProvider: Bool {
+        guard let provider else { return false }
+        switch provider.authStrategy {
+        case .oauthPKCE, .oauthDeviceCode: return true
+        default: return false
+        }
     }
 
     var body: some View {
@@ -77,42 +86,13 @@ private struct ProviderDetailView: View {
         Section("Authentication") {
             switch provider.authStrategy {
             case .apiKey(let envVar):
-                SecureField("API Key", text: $apiKey)
-                    .textFieldStyle(.roundedBorder)
+                apiKeyAuthSection(provider: provider, envVar: envVar)
 
-                if let envVar {
-                    Text("Or set the \(envVar) environment variable.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+            case .oauthPKCE(let config):
+                oauthPKCESection(provider: provider, config: config)
 
-                HStack {
-                    Button("Test & Save") {
-                        testAndSaveLLMProvider(provider)
-                    }
-                    .disabled(apiKey.isEmpty || isTesting)
-
-                    if isTesting {
-                        ProgressView()
-                            .controlSize(.small)
-                    }
-
-                    if let result = testResult {
-                        Text(result)
-                            .font(.caption)
-                            .foregroundStyle(result.contains("Success") ? .green : .red)
-                    }
-                }
-
-            case .oauthPKCE:
-                Button("Sign in with \(provider.displayName)...") {
-                    // OAuth PKCE flow
-                }
-
-            case .oauthDeviceCode:
-                Button("Connect \(provider.displayName)...") {
-                    // Device code flow
-                }
+            case .oauthDeviceCode(let config):
+                oauthDeviceCodeSection(provider: provider, config: config)
 
             case .none:
                 Text("No authentication required.")
@@ -121,6 +101,103 @@ private struct ProviderDetailView: View {
                 Button("Add") {
                     store.refresh()
                 }
+            }
+        }
+    }
+
+    // MARK: - Auth Sections
+
+    @ViewBuilder
+    private func apiKeyAuthSection(provider: ProviderInfo, envVar: String?) -> some View {
+        SecureField("API Key", text: $apiKey)
+            .textFieldStyle(.roundedBorder)
+
+        if let envVar {
+            Text("Or set the \(envVar) environment variable.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+
+        HStack {
+            Button("Test & Save") {
+                testAndSaveAPIKey(provider)
+            }
+            .disabled(apiKey.isEmpty || isTesting)
+
+            if isTesting {
+                ProgressView()
+                    .controlSize(.small)
+            }
+
+            if let result = testResult {
+                Text(result)
+                    .font(.caption)
+                    .foregroundStyle(result.contains("Success") ? .green : .red)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func oauthPKCESection(provider: ProviderInfo, config: OAuthPKCEConfig) -> some View {
+        Button("Sign in with \(provider.displayName)...") {
+            startPKCEFlow(provider: provider, config: config)
+        }
+        .disabled(oauthState.isInProgress)
+
+        oauthProgressView {
+            startPKCEFlow(provider: provider, config: config)
+        }
+    }
+
+    @ViewBuilder
+    private func oauthDeviceCodeSection(provider: ProviderInfo, config: DeviceCodeConfig) -> some View {
+        if let deviceCode = oauthState.deviceCode {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Enter this code on GitHub:")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(deviceCode.userCode)
+                    .font(.system(.title2, design: .monospaced).weight(.bold))
+                    .textSelection(.enabled)
+                Link("Open \(deviceCode.verificationURI)",
+                     destination: URL(string: deviceCode.verificationURI)!)
+                    .font(.caption)
+            }
+        } else {
+            Button("Connect \(provider.displayName)...") {
+                startDeviceCodeFlow(provider: provider, config: config)
+            }
+            .disabled(oauthState.isInProgress)
+        }
+
+        oauthProgressView {
+            startDeviceCodeFlow(provider: provider, config: config)
+        }
+    }
+
+    /// Shared OAuth progress / error / retry / cancel UI.
+    @ViewBuilder
+    private func oauthProgressView(retryAction: @escaping () -> Void) -> some View {
+        if oauthState.isInProgress {
+            HStack(spacing: 6) {
+                ProgressView().controlSize(.small)
+                Text("Waiting for authorization...")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Cancel") { cancelOAuth() }
+                    .controlSize(.small)
+            }
+        }
+
+        if let error = oauthState.error {
+            HStack(spacing: 6) {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                Spacer()
+                Button("Retry") { retryAction() }
+                    .controlSize(.small)
             }
         }
     }
@@ -140,18 +217,20 @@ private struct ProviderDetailView: View {
             }
         }
 
-        Section("API Key") {
-            HStack {
-                SecureField("API Key", text: $apiKey)
-                    .textFieldStyle(.roundedBorder)
-                Button("Update") {
-                    if !apiKey.isEmpty {
-                        KeychainService.setAPIKey(apiKey, forProviderId: provider.id)
-                        testResult = "Key updated"
+        if !isOAuthProvider {
+            Section("API Key") {
+                HStack {
+                    SecureField("API Key", text: $apiKey)
+                        .textFieldStyle(.roundedBorder)
+                    Button("Update") {
+                        if !apiKey.isEmpty {
+                            KeychainService.setAPIKey(apiKey, forProviderId: provider.id)
+                            testResult = "Key updated"
+                        }
                     }
+                    .disabled(apiKey.isEmpty)
+                    .controlSize(.small)
                 }
-                .disabled(apiKey.isEmpty)
-                .controlSize(.small)
             }
         }
 
@@ -294,14 +373,12 @@ private struct ProviderDetailView: View {
         apiKey = ""
         testResult = nil
         isTesting = false
+        cancelOAuth()
         if providerId == "__elevenlabs__" {
             let prefs = Preferences.shared
             elevenLabsAPIKey = prefs.elevenLabsAPIKey
             elevenLabsVoiceId = prefs.elevenLabsVoiceId
             elevenLabsTTSModelId = prefs.elevenLabsTTSModelId
-        } else if isConfigured {
-            // Show masked key placeholder — user can type new one to update
-            apiKey = ""
         }
     }
 
@@ -311,47 +388,16 @@ private struct ProviderDetailView: View {
         return "\(count)"
     }
 
-    private func testAndSaveLLMProvider(_ provider: ProviderInfo) {
-        isTesting = true
-        testResult = nil
+    // MARK: - Connection Testing
 
+    private func testAndSaveAPIKey(_ provider: ProviderInfo) {
         KeychainService.setAPIKey(apiKey, forProviderId: provider.id)
-
-        Task {
-            do {
-                let router = ProviderRouter()
-                let testModel = provider.defaultModelId
-                let config = ProviderConfig(providerId: provider.id, model: testModel)
-                let svc = try router.provider(for: config)
-                let messages = [LLMMessage(role: .user, text: "Say 'OK' and nothing else.")]
-                let stream = svc.sendMessage(
-                    messages: messages, model: testModel,
-                    systemPrompt: nil, maxTokens: 50
-                )
-                var gotDelta = false
-                for try await chunk in stream {
-                    if case .delta = chunk { gotDelta = true; break }
-                }
-                await MainActor.run {
-                    if gotDelta {
-                        testResult = "Success!"
-                    } else {
-                        testResult = "No response received"
-                    }
-                    store.refresh()
-                    isTesting = false
-                }
-            } catch {
-                await MainActor.run {
-                    testResult = "Error: \(error.localizedDescription)"
-                    isTesting = false
-                    store.refresh()
-                }
-            }
+        testConnection(provider) {
+            store.refresh()
         }
     }
 
-    private func testConnection(_ provider: ProviderInfo) {
+    private func testConnection(_ provider: ProviderInfo, onSuccess: (() -> Void)? = nil) {
         isTesting = true
         testResult = nil
 
@@ -373,6 +419,7 @@ private struct ProviderDetailView: View {
                 await MainActor.run {
                     testResult = gotDelta ? "Success!" : "No response received"
                     isTesting = false
+                    if gotDelta { onSuccess?() }
                 }
             } catch {
                 await MainActor.run {
@@ -381,5 +428,82 @@ private struct ProviderDetailView: View {
                 }
             }
         }
+    }
+
+    // MARK: - OAuth Flows
+
+    private func startPKCEFlow(provider: ProviderInfo, config: OAuthPKCEConfig) {
+        cancelOAuth()
+        oauthState.isInProgress = true
+
+        oauthState.task = Task {
+            do {
+                let service = OAuthService()
+                let tokenSet = try await service.authorizePKCE(config: config)
+                OAuthTokenStore.store(tokenSet, for: provider.id)
+                await MainActor.run {
+                    oauthState.isInProgress = false
+                    store.refresh()
+                }
+            } catch is CancellationError {
+                // user cancelled
+            } catch {
+                await MainActor.run {
+                    oauthState.isInProgress = false
+                    oauthState.error = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    private func startDeviceCodeFlow(provider: ProviderInfo, config: DeviceCodeConfig) {
+        cancelOAuth()
+        oauthState.isInProgress = true
+
+        oauthState.task = Task {
+            do {
+                let service = OAuthService()
+                let (response, pollTask) = try await service.authorizeDeviceCode(config: config)
+                await MainActor.run {
+                    oauthState.deviceCode = response
+                }
+                let tokenSet = try await pollTask.value
+                OAuthTokenStore.store(tokenSet, for: provider.id)
+                await MainActor.run {
+                    oauthState.reset()
+                    store.refresh()
+                }
+            } catch is CancellationError {
+                // user cancelled
+            } catch {
+                await MainActor.run {
+                    oauthState.isInProgress = false
+                    oauthState.deviceCode = nil
+                    oauthState.error = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    private func cancelOAuth() {
+        oauthState.task?.cancel()
+        oauthState.reset()
+    }
+}
+
+// MARK: - OAuth Flow State
+
+/// Groups all OAuth-related state into one struct to avoid scattered @State variables.
+private struct OAuthFlowState {
+    var isInProgress: Bool = false
+    var error: String?
+    var task: Task<Void, Never>?
+    var deviceCode: DeviceCodeResponse?
+
+    mutating func reset() {
+        isInProgress = false
+        error = nil
+        task = nil
+        deviceCode = nil
     }
 }
