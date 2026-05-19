@@ -14,7 +14,7 @@ struct RightPanelContentView: View {
                 case .aiChat:
                     AIChatView(
                         chatVM: viewModel.chat,
-                        onSaveAssistantResponse: saveAssistantResponseAction,
+                        voiceVM: viewModel.voice,
                         onSaveQuizCard: saveQuizCardAction
                     )
                 case .notes:
@@ -35,14 +35,6 @@ struct RightPanelContentView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-
-    private var saveAssistantResponseAction: ((Turn) -> Bool)? {
-        Preferences.shared.isExtensionEnabled(.notes) ? saveAssistantResponseToNote : nil
-    }
-
-    private func saveAssistantResponseToNote(_ turn: Turn) -> Bool {
-        viewModel.notes.addChatResponseToNote(turn.content)
     }
 
     private var saveQuizCardAction: ((QuizContent) -> Bool)? {
