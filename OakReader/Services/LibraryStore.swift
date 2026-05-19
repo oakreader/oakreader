@@ -186,11 +186,20 @@ final class LibraryStore {
         return map
     }
 
+    var isInboxSelected: Bool {
+        selectedCollectionId == SystemCollectionID.inbox
+    }
+
     var isQuizCardsSelected: Bool {
         selectedCollectionId == SystemCollectionID.quizCards
     }
 
     var filteredItems: [LibraryItem] {
+        // Special handling for Inbox collection (items not in any user collection)
+        if isInboxSelected {
+            return inboxFilteredItems
+        }
+
         // Special handling for Duplicates collection
         if isDuplicatesSelected {
             return duplicatesFilteredItems
@@ -359,6 +368,9 @@ final class LibraryStore {
 
     /// Count items matching a smart collection's rules.
     func smartCollectionItemCount(for collection: PDFCollection) -> Int {
+        if collection.id == SystemCollectionID.inbox {
+            return inboxItemIds.count
+        }
         if collection.id == SystemCollectionID.duplicates {
             return duplicateGroups.flatMap { $0 }.count
         }
@@ -385,6 +397,56 @@ final class LibraryStore {
     private var quizCardsFilteredItems: [LibraryItem] {
         let itemIds = quizCardsItemIds
         return items.filter { itemIds.contains($0.id) }
+    }
+
+    // MARK: - Inbox Filtered Items
+
+    /// Set of item IDs that are not in any user (non-system) collection.
+    private var inboxItemIds: Set<UUID> {
+        Set(items.filter { $0.collections.filter { !$0.isSystem }.isEmpty }.map(\.id))
+    }
+
+    /// Items not assigned to any user collection, filtered by search.
+    private var inboxFilteredItems: [LibraryItem] {
+        let ids = inboxItemIds
+        var results = items.filter { ids.contains($0.id) }
+
+        // Apply search within inbox
+        if isSemanticSearchActive && !searchText.isEmpty {
+            if let order = semanticSearchOrder, let resultsMap = semanticSearchResults {
+                let matchingIds = Set(order)
+                results = results.filter { matchingIds.contains($0.id) }
+                results.sort { a, b in
+                    let scoreA = resultsMap[a.id]?.score ?? 0
+                    let scoreB = resultsMap[b.id]?.score ?? 0
+                    return scoreA > scoreB
+                }
+            }
+        } else if !searchText.isEmpty {
+            let query = searchText.lowercased()
+            results = results.filter {
+                $0.title.lowercased().contains(query) ||
+                $0.author.lowercased().contains(query) ||
+                $0.fileName.lowercased().contains(query)
+            }
+        }
+
+        // Sort (keyword mode only)
+        if !(isSemanticSearchActive && !searchText.isEmpty) {
+            results.sort { a, b in
+                let cmp: Bool
+                switch currentSort {
+                case .dateAdded:  cmp = a.dateAdded < b.dateAdded
+                case .dateOpened: cmp = (a.lastOpenedAt ?? .distantPast) < (b.lastOpenedAt ?? .distantPast)
+                case .title:      cmp = a.title.localizedCaseInsensitiveCompare(b.title) == .orderedAscending
+                case .author:     cmp = a.author.localizedCaseInsensitiveCompare(b.author) == .orderedAscending
+                case .fileSize:   cmp = a.fileSize < b.fileSize
+                }
+                return sortAscending ? cmp : !cmp
+            }
+        }
+
+        return results
     }
 
     // MARK: - Duplicates Filtered Items

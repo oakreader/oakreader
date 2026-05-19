@@ -28,6 +28,7 @@ enum LibrarySortOrder: String, CaseIterable, Identifiable {
 }
 
 enum SystemCollectionID {
+    static let inbox       = UUID(uuidString: "00000000-0000-0000-0000-00000000000E")!
     static let allItems    = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
     static let pdfs        = UUID(uuidString: "00000000-0000-0000-0000-000000000005")!
     static let html = UUID(uuidString: "00000000-0000-0000-0000-000000000006")!
@@ -36,7 +37,7 @@ enum SystemCollectionID {
     static let duplicates  = UUID(uuidString: "00000000-0000-0000-0000-00000000000A")!
     static let quizCards   = UUID(uuidString: "00000000-0000-0000-0000-00000000000D")!
 
-    static let all: [UUID] = [allItems, recentlyRead, pdfs, html, videos, duplicates, quizCards]
+    static let all: [UUID] = [inbox, allItems, recentlyRead, pdfs, html, videos, duplicates, quizCards]
 }
 
 // MARK: - Local user ID
