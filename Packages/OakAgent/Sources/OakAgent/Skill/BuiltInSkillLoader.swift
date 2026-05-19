@@ -59,7 +59,8 @@ public enum BuiltInSkillLoader {
                 systemPrompt: parsed.body,
                 icon: icon,
                 contextMode: contextMode,
-                version: sidecar?.version
+                version: sidecar?.version,
+                isEnabled: sidecar?.enabled ?? true
             )
             skills.append((order, skill))
         }

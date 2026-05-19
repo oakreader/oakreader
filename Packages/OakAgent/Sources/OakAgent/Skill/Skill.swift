@@ -19,6 +19,7 @@ public struct Skill: Identifiable, Codable, Hashable, Sendable {
     public let icon: String
     public let contextMode: ContextMode
     public let version: String?
+    public let isEnabled: Bool
 
     public init(
         id: String,
@@ -27,7 +28,8 @@ public struct Skill: Identifiable, Codable, Hashable, Sendable {
         systemPrompt: String,
         icon: String,
         contextMode: ContextMode,
-        version: String? = nil
+        version: String? = nil,
+        isEnabled: Bool = true
     ) {
         self.id = id
         self.name = name
@@ -36,5 +38,6 @@ public struct Skill: Identifiable, Codable, Hashable, Sendable {
         self.icon = icon
         self.contextMode = contextMode
         self.version = version
+        self.isEnabled = isEnabled
     }
 }

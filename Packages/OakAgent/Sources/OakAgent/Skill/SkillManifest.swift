@@ -13,6 +13,7 @@ public struct SkillManifest: Codable, Sendable {
     public let disableModelInvocation: Bool?
     public let requires: SkillRequirements?
     public let version: String?
+    public let enabled: Bool?
 
     public init(
         name: String? = nil,
@@ -22,7 +23,8 @@ public struct SkillManifest: Codable, Sendable {
         contextMode: String? = nil,
         disableModelInvocation: Bool? = nil,
         requires: SkillRequirements? = nil,
-        version: String? = nil
+        version: String? = nil,
+        enabled: Bool? = nil
     ) {
         self.name = name
         self.description = description
@@ -32,6 +34,7 @@ public struct SkillManifest: Codable, Sendable {
         self.disableModelInvocation = disableModelInvocation
         self.requires = requires
         self.version = version
+        self.enabled = enabled
     }
 }
 

@@ -39,6 +39,10 @@ public struct AgentSkill: Sendable, Identifiable {
     /// Semantic version from `skill.json` sidecar (e.g. "1.0.0").
     public let version: String?
 
+    /// Whether this skill is enabled. Disabled skills remain on disk but are hidden
+    /// from chat and the skill picker.
+    public let isEnabled: Bool
+
     public init(
         name: String,
         description: String,
@@ -49,7 +53,8 @@ public struct AgentSkill: Sendable, Identifiable {
         author: SkillAuthor? = nil,
         contextMode: ContextMode? = nil,
         requirements: SkillRequirements? = nil,
-        version: String? = nil
+        version: String? = nil,
+        isEnabled: Bool = true
     ) {
         self.name = name
         self.description = description
@@ -61,5 +66,6 @@ public struct AgentSkill: Sendable, Identifiable {
         self.contextMode = contextMode
         self.requirements = requirements
         self.version = version
+        self.isEnabled = isEnabled
     }
 }
