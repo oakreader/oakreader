@@ -7,6 +7,7 @@ struct LibrarySidebarPanel: View {
 
     @State private var notesVM: NotesViewModel?
     @State private var metadataTab: MetadataInspectorTab = .info
+    @State private var generatedCoverData: Data?
 
     private var store: LibraryStore { appState.libraryStore }
 
@@ -46,6 +47,16 @@ struct LibrarySidebarPanel: View {
         .onAppear {
             if appState.libraryDetailTab == .notes {
                 createNotesVM()
+            }
+        }
+        .task(id: item.id) {
+            generatedCoverData = nil
+            guard item.coverImageData == nil, item.contentType == .html else { return }
+            let coverService = appState.coverService
+            let fileURL = item.fileURL
+            if let coverData = await coverService.generateHTMLCover(for: fileURL) {
+                store.updateCover(item, imageData: coverData)
+                generatedCoverData = coverData
             }
         }
     }
@@ -134,7 +145,7 @@ struct LibrarySidebarPanel: View {
 
     @ViewBuilder
     private var coverSection: some View {
-        if let data = item.coverImageData, let nsImage = NSImage(data: data) {
+        if let data = item.coverImageData ?? generatedCoverData, let nsImage = NSImage(data: data) {
             HStack {
                 Spacer()
                 Image(nsImage: nsImage)
