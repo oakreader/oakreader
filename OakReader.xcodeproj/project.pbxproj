@@ -77,7 +77,6 @@
 		3D82DA0FC099E1CA869F3287 /* WatermarkService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A9D3622F2AF740C7B4DE15B /* WatermarkService.swift */; };
 		3F66B758614E211F2D3D5242 /* ColorPickerButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7F8A56EF5AEA94BAAD55EDB /* ColorPickerButton.swift */; };
 		3F859EB10C97917820558AF4 /* String+PDFSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 131686965C90CDE1C7F81AB7 /* String+PDFSearch.swift */; };
-		40F602BF3C792643E01240F6 /* .ChatCompletionItem.swift.swp in Resources */ = {isa = PBXBuildFile; fileRef = 228B8A22B9A5F3693AB9374E /* .ChatCompletionItem.swift.swp */; };
 		41CA6D41AA778E870A91C90C /* PDFDocumentController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 468D80F75322A949B8272648 /* PDFDocumentController.swift */; };
 		434AF2CF446CA09FA336AA95 /* QuizCardReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BAA5362D4860CC3E086CD87 /* QuizCardReviewView.swift */; };
 		43693926CE4F9E9AD7C05497 /* ExportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F34E33BC423BCAA3C052D4D /* ExportSheet.swift */; };
@@ -401,7 +400,6 @@
 		213E072D4DBDA107DB9C8194 /* LibraryCoverService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryCoverService.swift; sourceTree = "<group>"; };
 		21CDA00C280D985B61794989 /* CiteKeyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CiteKeyService.swift; sourceTree = "<group>"; };
 		2234981D8BBDD902975EC01B /* CollectionQuizCardsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionQuizCardsView.swift; sourceTree = "<group>"; };
-		228B8A22B9A5F3693AB9374E /* .ChatCompletionItem.swift.swp */ = {isa = PBXFileReference; path = .ChatCompletionItem.swift.swp; sourceTree = "<group>"; };
 		22CA95845DB43F37012BFFEA /* MediaDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaDocument.swift; sourceTree = "<group>"; };
 		23368E03DF8FE36F7445B501 /* CLIResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIResolver.swift; sourceTree = "<group>"; };
 		237C82BC359D06F1ECCF7DCD /* ConversationMeta.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationMeta.swift; sourceTree = "<group>"; };
@@ -1187,7 +1185,6 @@
 			children = (
 				D05B9A178014DE8F44ECAFCC /* Quiz */,
 				0CB5E33D83ACCDD842B28867 /* QuizCards */,
-				228B8A22B9A5F3693AB9374E /* .ChatCompletionItem.swift.swp */,
 				5118CA820B8CFC61AF38EA47 /* AIChatView.swift */,
 				2CE7B963BA9AF27C8640777F /* AttachmentPreviewStrip.swift */,
 				6540F0E88807D8C1B673F4C3 /* ChatBubbleView.swift */,
@@ -1462,7 +1459,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				40F602BF3C792643E01240F6 /* .ChatCompletionItem.swift.swp in Resources */,
 				FFE10D25C8CCA1B1A5982951 /* Assets.xcassets in Resources */,
 				E351F3911A686B291A25132E /* MEMORY.md in Resources */,
 				CF1FE06115DEFE39C67CE511 /* Preview.bundle in Resources */,
