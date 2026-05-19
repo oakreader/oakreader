@@ -97,6 +97,13 @@ struct GeneralSettingsView: View {
                 Toggle("Show status bar", isOn: $showStatusBar)
                     .onChange(of: showStatusBar) { _, val in Preferences.shared.showStatusBar = val }
             }
+
+            Section("About") {
+                LabeledContent("Version") {
+                    Text(appVersionString)
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
         .formStyle(.grouped)
         .onAppear {
@@ -110,9 +117,14 @@ struct GeneralSettingsView: View {
 
     // MARK: - Helpers
 
+    private var appVersionString: String {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—"
+        return "\(version) (\(build))"
+    }
+
     private func dataDirectoryPath() -> String {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-        return appSupport?.appendingPathComponent("OakReader").path ?? "~/Library/Application Support/OakReader"
+        CatalogDatabase.dataDirectory.path
     }
 
     private func chooseDirectory() {
