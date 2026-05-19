@@ -53,7 +53,6 @@ struct Oak: ParsableCommand {
             Search.self,
             Status.self,
             Open.self,
-            Chat.self,
             Skills.self,
         ],
         defaultSubcommand: nil
@@ -768,40 +767,6 @@ struct Open: ParsableCommand {
                 id: nil, message: "Opened '\(resolved.lastPathComponent)' in OakReader"
             ))
         }
-    }
-}
-
-// MARK: - Chat
-
-struct Chat: ParsableCommand {
-    static let configuration = CommandConfiguration(abstract: "AI chat with PDF.")
-
-    @OptionGroup var globals: GlobalOptions
-
-    @Option(name: [.short, .long], help: "Path to PDF file.")
-    var file: String?
-
-    @Option(name: [.short, .long], help: "Ask a question (one-shot mode).")
-    var ask: String?
-
-    func run() throws {
-        let runner = CLIChatRunner()
-
-        _ = Task {
-            do {
-                if let ask {
-                    try await runner.oneShot(filePath: file, question: ask)
-                } else {
-                    try await runner.interactive(filePath: file)
-                }
-            } catch {
-                fputs("Error: \(error.localizedDescription)\n", stderr)
-                Darwin.exit(1)
-            }
-            Darwin.exit(0)
-        }
-
-        RunLoop.main.run()
     }
 }
 
