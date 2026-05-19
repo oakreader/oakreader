@@ -331,6 +331,26 @@ final class BackupService {
             return result
         }
 
+        // Merge installed skills from the previous data that are not in the backup.
+        // This prevents personal (non-bundled) skills from being lost on restore.
+        let oldSkillsDir = safetyBackup.appendingPathComponent("agent/skills")
+        let newSkillsDir = dataDir.appendingPathComponent("agent/skills")
+        if fm.fileExists(atPath: oldSkillsDir.path) {
+            try? fm.createDirectory(at: newSkillsDir, withIntermediateDirectories: true)
+            if let oldEntries = try? fm.contentsOfDirectory(
+                at: oldSkillsDir,
+                includingPropertiesForKeys: [.isDirectoryKey],
+                options: [.skipsHiddenFiles]
+            ) {
+                for entry in oldEntries {
+                    let dest = newSkillsDir.appendingPathComponent(entry.lastPathComponent)
+                    if !fm.fileExists(atPath: dest.path) {
+                        try? fm.copyItem(at: entry, to: dest)
+                    }
+                }
+            }
+        }
+
         result.success = true
         prog.phase = .done
         progress(prog)
@@ -343,15 +363,22 @@ final class BackupService {
     // MARK: - Relaunch
 
     static func relaunchApp() {
-        let url = Bundle.main.bundleURL
+        let bundlePath = Bundle.main.bundlePath
+        // Use a shell script that waits for this process to exit, then reopens the app.
+        // This avoids two simultaneous instances (and two dock icons).
+        let script = """
+        while kill -0 \(ProcessInfo.processInfo.processIdentifier) 2>/dev/null; do sleep 0.1; done
+        open "\(bundlePath)"
+        """
         let task = Process()
-        task.launchPath = "/usr/bin/open"
-        task.arguments = ["-n", url.path]
+        task.executableURL = URL(fileURLWithPath: "/bin/sh")
+        task.arguments = ["-c", script]
         try? task.run()
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            NSApplication.shared.terminate(nil)
-        }
+        // Hard exit — terminate(nil) can be blocked by open sheets.
+        // After a restore the data directory has already been replaced,
+        // so there is nothing to save.
+        exit(0)
     }
 
     // MARK: - Private Helpers
