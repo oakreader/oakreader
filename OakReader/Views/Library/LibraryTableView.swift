@@ -384,6 +384,19 @@ struct LibraryTableView: View {
             Label("Open \(selectedItems.count) Items", systemImage: "doc.richtext")
         }
 
+        Divider()
+
+        let rootCollections = store.rootCollections.sorted(by: { $0.sortOrder < $1.sortOrder })
+        if !rootCollections.isEmpty {
+            Menu {
+                ForEach(rootCollections) { collection in
+                    collectionMenuItem(for: selectedItems, collection: collection)
+                }
+            } label: {
+                Label("Add to Collection", systemImage: "folder.badge.plus")
+            }
+        }
+
         // Export citations for multi-select
         let itemsWithRefs = selectedItems.filter { $0.referenceMetadata != nil }
         if !itemsWithRefs.isEmpty {
@@ -449,6 +462,35 @@ struct LibraryTableView: View {
                     Divider()
                     ForEach(children) { child in
                         collectionMenuItem(for: item, collection: child)
+                    }
+                } label: {
+                    Label(collection.name, systemImage: "folder.fill")
+                }
+            )
+        }
+    }
+
+    private func collectionMenuItem(for items: [LibraryItem], collection: PDFCollection) -> AnyView {
+        let children = collection.subcollections.filter { !$0.isSmart }.sorted(by: { $0.sortOrder < $1.sortOrder })
+        if children.isEmpty {
+            return AnyView(
+                Button {
+                    for item in items { store.addItem(item, to: collection) }
+                } label: {
+                    Label(collection.name, systemImage: "folder.fill")
+                }
+            )
+        } else {
+            return AnyView(
+                Menu {
+                    Button {
+                        for item in items { store.addItem(item, to: collection) }
+                    } label: {
+                        Label(collection.name, systemImage: "folder.fill")
+                    }
+                    Divider()
+                    ForEach(children) { child in
+                        collectionMenuItem(for: items, collection: child)
                     }
                 } label: {
                     Label(collection.name, systemImage: "folder.fill")
