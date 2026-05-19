@@ -2,7 +2,7 @@ import Foundation
 import GRDB
 
 /// Separate GRDB database for semantic search data (chunks + FTS5).
-/// Stored at ~/OakReader/semantic.db — fully regenerable from source content.
+/// Stored at ~/OakReader/semantic.sqlite — fully regenerable from source content.
 final class SemanticDatabase: @unchecked Sendable {
     let dbQueue: DatabaseQueue
 
@@ -50,7 +50,7 @@ final class SemanticDatabase: @unchecked Sendable {
 
     // MARK: - Destroy All
 
-    /// Delete semantic.db and semantic.usearch for full rebuild (e.g. model switch).
+    /// Delete semantic.sqlite and semantic.usearch for full rebuild (e.g. model switch).
     func destroyAll() throws {
         // Close the current connection by running a checkpoint first
         try dbQueue.write { db in

@@ -4,7 +4,7 @@ import GRDB
 
 /// On-device semantic search using MLXEmbedders + USearch HNSW + FTS5 BM25.
 /// Documents are chunked (heading-aware for markdown, sentence-boundary for others)
-/// and indexed into semantic.db + semantic.usearch on import.
+/// and indexed into semantic.sqlite + semantic.usearch on import.
 /// Search uses hybrid RRF to merge vector and keyword results.
 final class SemanticIndexService: @unchecked Sendable {
     let embeddingService: EmbeddingService
@@ -256,7 +256,7 @@ final class SemanticIndexService: @unchecked Sendable {
 
         guard !hits.isEmpty else { return [] }
 
-        // Fetch chunk metadata from semantic.db
+        // Fetch chunk metadata from semantic.sqlite
         let chunkIds = hits.map(\.chunkId)
         let scoreMap = Dictionary(uniqueKeysWithValues: hits.map { ($0.chunkId, $0.score) })
 
@@ -324,7 +324,7 @@ final class SemanticIndexService: @unchecked Sendable {
     func backgroundIndexAll() async {
         let currentModel = await embeddingService.modelId
 
-        // Get already-indexed item IDs from semantic.db
+        // Get already-indexed item IDs from semantic.sqlite
         let indexedIds: Set<String>
         do {
             indexedIds = try semanticDB.indexedItemIds(embeddingModel: currentModel)
