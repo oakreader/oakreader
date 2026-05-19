@@ -188,7 +188,7 @@
 		8F413E89092923AC9E22AD7D /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 1393D51D1FC43362FAC1F484 /* MLXLMCommon */; };
 		8F4B64C9749C52A67653715B /* CollectionQuizCardsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2234981D8BBDD902975EC01B /* CollectionQuizCardsView.swift */; };
 		90DE9085FF6AE8B0685DCA90 /* AccessibilityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F02C8B8FC0791BE4586D323C /* AccessibilityService.swift */; };
-		921CDFD45F55CFD30D4E082E /* CLIChatRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F5FDC02770F02DFA3A79BAE /* CLIChatRunner.swift */; };
+
 		926F2E2181E20990E83C4098 /* DropZoneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BA004BD76C17A3C38A67CED /* DropZoneView.swift */; };
 		93C2F511C00336A09CC8E932 /* LocalModelsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4967CAD84B5526E596549826 /* LocalModelsSettingsView.swift */; };
 		96B6150BB7014296B00993EC /* ImportService+URL.swift in Sources */ = {isa = PBXBuildFile; fileRef = C08533C54398F8171BB80C0D /* ImportService+URL.swift */; };
@@ -444,7 +444,7 @@
 		3D38BCCDC836C6A8870744D6 /* DOIExtractorService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DOIExtractorService.swift; sourceTree = "<group>"; };
 		3EDAE070FD925FD55D45822B /* TabBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabBarView.swift; sourceTree = "<group>"; };
 		3F360CE5C7390D46DF050D61 /* QuizScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizScheduler.swift; sourceTree = "<group>"; };
-		3F5FDC02770F02DFA3A79BAE /* CLIChatRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIChatRunner.swift; sourceTree = "<group>"; };
+
 		3FBBFB7902A85A51225323AF /* FormFieldPropertyPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormFieldPropertyPanel.swift; sourceTree = "<group>"; };
 		40D1BD1CC9681985B41F1C99 /* ClipboardCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardCoordinator.swift; sourceTree = "<group>"; };
 		412451D7D488F2DCEF2F1CF2 /* LibraryCollectionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryCollectionStore.swift; sourceTree = "<group>"; };
@@ -1042,7 +1042,7 @@
 		7AB287EB3D69C981FDC9D5C4 /* cli */ = {
 			isa = PBXGroup;
 			children = (
-				3F5FDC02770F02DFA3A79BAE /* CLIChatRunner.swift */,
+
 				E0934E40C45D625649E6E481 /* CLICommands.swift */,
 				2DF6BFDC7CE175A0B3CCB28A /* CLIDatabase.swift */,
 				2983A71BA4770E4CA31A54D6 /* CLIFormatters.swift */,
@@ -1516,7 +1516,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				921CDFD45F55CFD30D4E082E /* CLIChatRunner.swift in Sources */,
+
 				0E17C11829C1155A97BB3186 /* CLICommands.swift in Sources */,
 				CBD1428ED92037DE87AE9B92 /* CLIDatabase.swift in Sources */,
 				59AE79D7BB542D60DB5BFDCC /* CLIFormatters.swift in Sources */,
@@ -1927,7 +1927,7 @@
 		CCB30DBC10380145AA77979C /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "AppIcon-Dev";
 				BUNDLE_DISPLAY_NAME = "OakReader Dev";
 				CODE_SIGN_ENTITLEMENTS = OakReader/OakReader.entitlements;
 				CODE_SIGN_IDENTITY = "-";
