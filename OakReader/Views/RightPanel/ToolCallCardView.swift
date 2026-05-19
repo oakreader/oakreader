@@ -5,110 +5,149 @@ struct ToolCallCardView: View {
     let record: ToolUseRecord
 
     @State private var isExpanded = false
+    @State private var shimmerPhase: CGFloat = -1
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header row
+            // Header — disclosure style matching ThinkingDisclosureView
             Button {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     isExpanded.toggle()
                 }
             } label: {
-                HStack(spacing: 6) {
-                    // Tool icon
-                    Image(systemName: toolIcon)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(toolColor)
-                        .frame(width: 16, height: 16)
-
-                    // Tool name
-                    Text(displayName)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.primary)
-
-                    // File path
-                    if let path = record.filePath {
-                        Text(abbreviatedPath(path))
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                    }
-
-                    Spacer()
-
-                    // Status indicator
-                    statusView
-
-                    // Expand chevron (hidden when awaiting confirmation)
-                    if record.status != .pending {
+                HStack(spacing: 4) {
+                    // Expand chevron — only shown when there's a result to disclose
+                    if record.status == .completed || record.status == .denied {
                         Image(systemName: "chevron.right")
                             .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(.secondary)
                             .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                            .animation(.easeInOut(duration: 0.2), value: isExpanded)
+                    }
+
+                    if record.isExecuting {
+                        // Shimmer text while executing
+                        shimmerLabel
+                    } else {
+                        // Static label when not executing
+                        staticLabel
                     }
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
             }
             .buttonStyle(.plain)
+            .padding(.vertical, 4)
+            .padding(.horizontal, 4)
 
             // Expanded result
             if isExpanded, let result = record.result {
-                Divider()
-                    .padding(.horizontal, 8)
-
-                ScrollView {
-                    Text(truncatedResult(result))
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(record.isError ? .red : .secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(8)
-                        .textSelection(.enabled)
-                }
-                .frame(maxHeight: 150)
+                Text(truncatedResult(result))
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(record.isError ? .red : .secondary.opacity(0.75))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 8)
+                    .padding(.vertical, 4)
+                    .overlay(alignment: .leading) {
+                        Rectangle()
+                            .fill(Color.secondary.opacity(0.2))
+                            .frame(width: 2)
+                    }
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.6))
+        .onAppear {
+            if record.isExecuting {
+                startShimmer()
+            }
+        }
+        .onChange(of: record.isExecuting) { _, executing in
+            if executing {
+                startShimmer()
+            }
+        }
+    }
+
+    // MARK: - Shimmer Label (executing state)
+
+    private var shimmerLabel: some View {
+        HStack(spacing: 6) {
+            Image(systemName: toolIcon)
+                .font(.system(size: 11, weight: .medium))
+            Text(executingLabel)
+                .font(OakStyle.ChatFont.messageBody)
+                .fontWeight(.medium)
+        }
+        .foregroundStyle(.secondary)
+        .overlay {
+            shimmerGradient
+                .mask {
+                    HStack(spacing: 6) {
+                        Image(systemName: toolIcon)
+                            .font(.system(size: 11, weight: .medium))
+                        Text(executingLabel)
+                            .font(OakStyle.ChatFont.messageBody)
+                            .fontWeight(.medium)
+                    }
+                }
+        }
+    }
+
+    private var shimmerGradient: some View {
+        LinearGradient(
+            colors: [
+                .clear,
+                Color.primary.opacity(0.6),
+                .clear,
+            ],
+            startPoint: .leading,
+            endPoint: .trailing
         )
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+        .frame(width: 60)
+        .offset(x: shimmerPhase * 120)
+        .animation(
+            .easeInOut(duration: 1.5).repeatForever(autoreverses: false),
+            value: shimmerPhase
         )
     }
 
-    // MARK: - Status View
+    private func startShimmer() {
+        shimmerPhase = -1
+        withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: false)) {
+            shimmerPhase = 1
+        }
+    }
+
+    // MARK: - Static Label (completed / pending / denied)
+
+    private var staticLabel: some View {
+        HStack(spacing: 6) {
+            statusIcon
+
+            Text(completedLabel)
+                .font(OakStyle.ChatFont.messageBody)
+                .fontWeight(.medium)
+                .foregroundStyle(.secondary)
+        }
+    }
 
     @ViewBuilder
-    private var statusView: some View {
+    private var statusIcon: some View {
         switch record.status {
         case .pending:
-            HStack(spacing: 3) {
-                ProgressView()
-                    .controlSize(.mini)
-                    .frame(width: 10, height: 10)
-                Text("Awaiting approval")
-                    .font(.system(size: 10, weight: .medium))
-            }
-            .foregroundStyle(.orange)
+            Image(systemName: toolIcon)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.orange)
         case .executing:
-            ProgressView()
-                .controlSize(.mini)
-                .frame(width: 12, height: 12)
+            // Handled by shimmerLabel
+            EmptyView()
         case .completed:
             Image(systemName: record.isError ? "xmark.circle.fill" : "checkmark.circle.fill")
                 .font(.system(size: 11))
                 .foregroundStyle(record.isError ? .red : .green)
         case .denied:
-            HStack(spacing: 3) {
-                Image(systemName: "hand.raised.fill")
-                    .font(.system(size: 10))
-                Text("Denied")
-                    .font(.system(size: 10, weight: .medium))
-            }
-            .foregroundStyle(.red)
+            Image(systemName: "hand.raised.fill")
+                .font(.system(size: 11))
+                .foregroundStyle(.red)
         }
     }
 
@@ -118,15 +157,8 @@ struct ToolCallCardView: View {
         switch record.name {
         case "read_file": return "doc.text"
         case "write_file": return "square.and.pencil"
+        case "bash": return "terminal"
         default: return "wrench"
-        }
-    }
-
-    private var toolColor: Color {
-        switch record.name {
-        case "read_file": return .blue
-        case "write_file": return .orange
-        default: return .secondary
         }
     }
 
@@ -134,7 +166,31 @@ struct ToolCallCardView: View {
         switch record.name {
         case "read_file": return "Read"
         case "write_file": return "Write"
+        case "bash": return "Bash"
         default: return record.name
+        }
+    }
+
+    /// Label shown while the tool is executing (e.g. "Running oak...")
+    private var executingLabel: String {
+        if let path = record.filePath {
+            return "\(displayName) \(abbreviatedPath(path))..."
+        }
+        return "Running \(displayName)..."
+    }
+
+    /// Label shown after execution completes or for other states.
+    private var completedLabel: String {
+        switch record.status {
+        case .pending:
+            return "\(displayName) — awaiting approval"
+        case .denied:
+            return "\(displayName) — denied"
+        case .completed, .executing:
+            if let path = record.filePath {
+                return "\(displayName) \(abbreviatedPath(path))"
+            }
+            return displayName
         }
     }
 
