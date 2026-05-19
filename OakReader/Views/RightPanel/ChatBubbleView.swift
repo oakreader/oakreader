@@ -4,16 +4,16 @@ import Textual
 
 struct ChatBubbleView: View {
     let turn: Turn
-    var onSaveToNote: ((Turn) -> Bool)?
+    var onPlayAudio: ((Turn) -> Void)?
+    var isPlayingAudio: Bool = false
+    var onStopAudio: (() -> Void)?
     var onOpenCitation: ((String, CitationAnchor) -> Void)?
     var onSaveQuizCard: ((QuizContent) -> Bool)?
 
     @State private var isHovered = false
     @State private var isCopyHovered = false
-    @State private var isSaveHovered = false
+    @State private var isPlayHovered = false
     @State private var showCopied = false
-    @State private var showSaved = false
-    @State private var showSaveFailed = false
     @State private var reveal = StreamRevealController()
 
     var body: some View {
@@ -86,19 +86,22 @@ struct ChatBubbleView: View {
                             .animation(.spring(duration: 0.25, bounce: 0.3), value: showCopied)
                             .animation(.spring(duration: 0.2, bounce: 0.2), value: isCopyHovered)
 
-                            if onSaveToNote != nil {
+                            if onPlayAudio != nil {
                                 actionButton(
-                                    systemImage: saveIcon,
-                                    foregroundStyle: saveColor,
-                                    isHovered: isSaveHovered,
-                                    tooltip: saveTooltip
+                                    systemImage: isPlayingAudio ? "stop.fill" : "play.fill",
+                                    foregroundStyle: isPlayingAudio ? .accentColor : .secondary,
+                                    isHovered: isPlayHovered,
+                                    tooltip: isPlayingAudio ? "Stop" : "Play Audio"
                                 ) {
-                                    saveToNote()
+                                    if isPlayingAudio {
+                                        onStopAudio?()
+                                    } else {
+                                        onPlayAudio?(turn)
+                                    }
                                 }
-                                .onHover { isSaveHovered = $0 }
-                                .animation(.spring(duration: 0.25, bounce: 0.3), value: showSaved)
-                                .animation(.spring(duration: 0.25, bounce: 0.3), value: showSaveFailed)
-                                .animation(.spring(duration: 0.2, bounce: 0.2), value: isSaveHovered)
+                                .onHover { isPlayHovered = $0 }
+                                .animation(.spring(duration: 0.2, bounce: 0.2), value: isPlayingAudio)
+                                .animation(.spring(duration: 0.2, bounce: 0.2), value: isPlayHovered)
                             }
                         }
                     }
@@ -394,24 +397,6 @@ struct ChatBubbleView: View {
         .fixedSize()
     }
 
-    private var saveIcon: String {
-        if showSaved { return "checkmark" }
-        if showSaveFailed { return "exclamationmark.triangle" }
-        return "note.text.badge.plus"
-    }
-
-    private var saveColor: Color {
-        if showSaved { return .green }
-        if showSaveFailed { return .red }
-        return .secondary
-    }
-
-    private var saveTooltip: String {
-        if showSaved { return "Saved to Note" }
-        if showSaveFailed { return "Could Not Save" }
-        return "Save to Note"
-    }
-
     private func actionButton(
         systemImage: String,
         foregroundStyle: Color,
@@ -436,21 +421,6 @@ struct ChatBubbleView: View {
     private func copyContent() {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(turn.content, forType: .string)
-    }
-
-    private func saveToNote() {
-        guard let onSaveToNote else { return }
-        if onSaveToNote(turn) {
-            showSaved = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                showSaved = false
-            }
-        } else {
-            showSaveFailed = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                showSaveFailed = false
-            }
-        }
     }
 
     // MARK: - Protect Math Backslashes
