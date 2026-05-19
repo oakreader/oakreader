@@ -61,13 +61,17 @@ final class HybridSearchEngine: @unchecked Sendable {
         index.reserve(index.length + Self.reserveGrowth)
     }
 
-    /// Add a vector with its chunk rowid as key.
+    /// Add a vector with its chunk rowid as key (upsert: replaces if key exists).
     func addVector(key: UInt64, vector: [Float]) {
         lock.lock()
         defer { lock.unlock() }
         guard let index else { return }
+        let usearchKey = USearchKey(key)
+        if index.contains(key: usearchKey) {
+            index.remove(key: usearchKey)
+        }
         reserveIfNeeded()
-        index.add(key: USearchKey(key), vector: vector)
+        index.add(key: usearchKey, vector: vector)
     }
 
     /// Remove vectors by keys.
