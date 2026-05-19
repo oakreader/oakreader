@@ -11,7 +11,8 @@ struct SemanticSearchTool: AgentTool, Sendable {
         Search the user's library by meaning using vector embeddings. Use this for \
         conceptual or thematic queries where exact keyword matches are unlikely \
         (e.g., "papers about making neural networks more efficient"). For exact \
-        keyword searches by author, title, or DOI, use search_library instead. \
+        keyword searches by author, title, or DOI, use the oak tool instead \
+        (oak search <query>). \
         Returns matching items with relevance scores, excerpts, and page references.
         """
     let service: SemanticIndexService
@@ -132,7 +133,7 @@ struct SemanticSearchTool: AgentTool, Sendable {
             out += "\n"
         }
 
-        out += "\nUse read_library_item with a cite_key to read any of these documents."
+        out += "\nUse the oak tool to read any of these documents: oak items read <citeKey> --pages 1-5"
         return String(out.prefix(30_000))
     }
 

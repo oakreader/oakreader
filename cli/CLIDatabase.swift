@@ -668,6 +668,47 @@ final class CLIDatabase {
         }
     }
 
+    // MARK: - File Path Resolution
+
+    struct ItemFilePath {
+        let itemStorageKey: String
+        let attachmentStorageKey: String
+        let fileName: String
+        let contentType: String
+        let pageCount: Int
+
+        var fileURL: URL {
+            let home = FileManager.default.homeDirectoryForCurrentUser
+            return home
+                .appendingPathComponent("OakReader/storage", isDirectory: true)
+                .appendingPathComponent(itemStorageKey, isDirectory: true)
+                .appendingPathComponent("attachments", isDirectory: true)
+                .appendingPathComponent(attachmentStorageKey, isDirectory: true)
+                .appendingPathComponent(fileName)
+        }
+    }
+
+    /// Resolve an item ID to its primary attachment file path.
+    func fetchItemFilePath(itemId: String) throws -> ItemFilePath? {
+        try dbQueue.read { db in
+            let row = try Row.fetchOne(db, sql: """
+                SELECT i.storage_key, a.storage_key AS att_key, a.file_name,
+                       a.content_type, a.page_count
+                FROM items i
+                JOIN attachments a ON a.item_id = i.id AND a.is_primary = 1
+                WHERE i.id = ?
+                """, arguments: [itemId])
+            guard let r = row else { return nil }
+            return ItemFilePath(
+                itemStorageKey: r["storage_key"],
+                attachmentStorageKey: r["att_key"],
+                fileName: r["file_name"],
+                contentType: r["content_type"],
+                pageCount: r["page_count"]
+            )
+        }
+    }
+
     // MARK: - Helpers
 
     static func mapItemType(_ input: String) -> String {

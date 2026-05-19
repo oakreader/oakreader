@@ -283,14 +283,26 @@ struct PDFContextProvider {
                 You have tools to read document pages (read_document), search within the \
                 document (search_document), and find conceptually related items via vector \
                 search (search_semantic). Use the read tool to read note files by their \
-                path listed above. Use search_semantic for thematic queries and \
-                search_library for keyword matches.
+                path listed above. Use the oak tool to search the library \
+                (oak search <query>), read any item's content \
+                (oak items read <citeKey> --pages 1-5), list collections \
+                (oak collections list), list tags (oak tags list), and manage items.
                 """)
 
             // Abstract (outside document block to not crowd metadata)
             if let abstract = doc.abstract, !abstract.isEmpty {
                 parts.append("Document abstract:\n\"\"\"\n\(String(abstract.prefix(2_000)))\n\"\"\"")
             }
+        } else {
+            // No document open — still inform the agent about available tools
+            parts.append("""
+                Use the oak tool to search the library (oak search <query>), \
+                read any item's content (oak items read <citeKey> --pages 1-5), \
+                list collections (oak collections list), list tags (oak tags list), \
+                browse items (oak items list), and manage the library. \
+                Use search_semantic for conceptual/thematic queries and \
+                search_academic to find papers on the web.
+                """)
         }
 
         // Citation link instructions — MUST use oak://cite/{citeKey} for all refs
@@ -351,7 +363,7 @@ struct PDFContextProvider {
             // Cross-document references
             parts.append("""
                 For cross-document references (from search_semantic, \
-                search_library, or <referenced-documents> in the user message), \
+                oak search, or <referenced-documents> in the user message), \
                 use the target document's cite-key:
                 [citeKey, p. N](oak://cite/targetCiteKey?page=N)
                 For <doc> elements, use the `link` attribute as the base URL and \
