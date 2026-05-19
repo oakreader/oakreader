@@ -654,11 +654,11 @@ final class CLIDatabase {
         }
     }
 
-    /// Fetch indexed item IDs from the separate semantic.db.
+    /// Fetch indexed item IDs from the separate semantic.sqlite.
     func fetchSemanticChunkItemIds() throws -> Set<String> {
         let dataDir = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("OakReader", isDirectory: true)
-        let semanticDBURL = dataDir.appendingPathComponent("semantic.db")
+        let semanticDBURL = dataDir.appendingPathComponent("semantic.sqlite")
         guard FileManager.default.fileExists(atPath: semanticDBURL.path) else { return [] }
         let semanticQueue = try DatabaseQueue(path: semanticDBURL.path)
         return try semanticQueue.read { db in

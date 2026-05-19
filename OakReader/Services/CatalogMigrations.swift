@@ -16,13 +16,14 @@ extension CatalogDatabase {
                 t.column("storage_key", .text).notNull().unique()
                 t.column("title", .text).notNull()
                 t.column("author", .text).notNull().defaults(to: "")
-                t.column("is_favorite", .integer).notNull().defaults(to: false)
                 t.column("last_opened_at", .text)
                 t.column("last_position", .double)
                 t.column("sync_status", .text).notNull().defaults(to: "local")
                 t.column("cite_key", .text)
                 t.column("source", .text)
                 t.column("source_key", .text)
+                t.column("extra", .text)
+                t.column("processing_status", .text).notNull().defaults(to: "none")
                 t.column("created_at", .text).notNull()
                 t.column("updated_at", .text).notNull()
             }
@@ -84,6 +85,7 @@ extension CatalogDatabase {
             let now = Date().iso8601String
             // swiftlint:disable:next large_tuple
             let systemCollections: [(id: String, name: String, icon: String, order: Int, rules: String?)] = [
+                (SystemCollectionID.inbox.uuidString, "Inbox", "tray.and.arrow.down", -1, nil),
                 (SystemCollectionID.allItems.uuidString, "All Items", "books.vertical", 0,
                  #"{"match":"all","conditions":[]}"#),
                 (SystemCollectionID.recentlyRead.uuidString, "Recently Read", "book", 1,
@@ -94,15 +96,14 @@ extension CatalogDatabase {
                  #"{"match":"all","conditions":[{"field":"content_type","op":"eq","value":"html"}]}"#),
                 (SystemCollectionID.videos.uuidString, "Videos", "play.rectangle", 4,
                  #"{"match":"all","conditions":[{"field":"content_type","op":"eq","value":"video"}]}"#),
-                ("00000000-0000-0000-0000-000000000009", "Notes", "doc.text", 5,
-                 #"{"match":"all","conditions":[{"field":"content_type","op":"eq","value":"markdown"}]}"#),
-                (SystemCollectionID.duplicates.uuidString, "Duplicates", "square.on.square", 6, nil),
+                (SystemCollectionID.duplicates.uuidString, "Duplicates", "square.on.square", 5, nil),
             ]
             for sc in systemCollections {
-                try db.execute(sql: """
-                    INSERT INTO collections (id, user_id, name, icon, sort_order, parent_id, is_smart, is_system, filter_rules, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, NULL, 1, 1, ?, ?, ?)
-                """, arguments: [sc.id, localUserId, sc.name, sc.icon, sc.order, sc.rules, now, now])
+                try db.execute(
+                    // swiftlint:disable:next line_length
+                    sql: "INSERT INTO collections (id, user_id, name, icon, sort_order, parent_id, is_smart, is_system, filter_rules, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NULL, 1, 1, ?, ?, ?)",
+                    arguments: [sc.id, localUserId, sc.name, sc.icon, sc.order, sc.rules, now, now]
+                )
             }
         }
 
@@ -144,18 +145,6 @@ extension CatalogDatabase {
                 VALUES (?, 'Tags', 'multi_select', 'tag', 0, 1)
             """, arguments: [tagsPropertyId])
 
-            // swiftlint:disable:next large_tuple
-            let tagOptions: [(name: String, color: String, pos: Int)] = [
-                ("Important", "FF6666", 0), ("To Read", "2EA8E5", 1),
-                ("In Progress", "FF8C19", 2), ("Reviewed", "5FB236", 3),
-            ]
-            for opt in tagOptions {
-                try db.execute(sql: """
-                    INSERT INTO property_options (id, property_id, name, color_hex, position)
-                    VALUES (?, ?, ?, ?, ?)
-                """, arguments: [UUID().uuidString, tagsPropertyId, opt.name, opt.color, opt.pos])
-            }
-
             let statusPropertyId = UUID().uuidString
             try db.execute(sql: """
                 INSERT INTO properties (id, name, type, icon, position, is_system)
@@ -164,8 +153,8 @@ extension CatalogDatabase {
 
             // swiftlint:disable:next large_tuple
             let statusOptions: [(name: String, color: String, pos: Int)] = [
-                ("Unread", "999999", 0), ("Reading", "2EA8E5", 1),
-                ("Completed", "5FB236", 2), ("Archived", "A28AE5", 3),
+                ("To Read", "2EA8E5", 0), ("Reading", "FF8C19", 1),
+                ("Finished", "5FB236", 2),
             ]
             for opt in statusOptions {
                 try db.execute(sql: """
@@ -180,9 +169,9 @@ extension CatalogDatabase {
             """, arguments: [UUID().uuidString])
         }
 
-        // MARK: v4 — Notes & Conversations
+        // MARK: v4 — Conversations & Notes
 
-        migrator.registerMigration("v4-notes-conversations") { db in
+        migrator.registerMigration("v4-conversations-notes") { db in
             try db.create(table: "conversations") { t in
                 t.column("id", .text).primaryKey()
                 t.column("user_id", .text).notNull()
@@ -217,6 +206,10 @@ extension CatalogDatabase {
                 t.column("year", .integer)
                 t.column("container_title", .text)
                 t.column("abstract", .text)
+                t.column("pmid", .text)
+                t.column("arxiv_id", .text)
+                t.column("isbn", .text)
+                t.column("issn", .text)
                 t.column("created_at", .text).notNull()
                 t.column("updated_at", .text).notNull()
             }
@@ -224,6 +217,10 @@ extension CatalogDatabase {
             try db.create(index: "idx_citations_year", on: "citations", columns: ["year"], ifNotExists: true)
             try db.create(index: "idx_citations_type", on: "citations", columns: ["csl_type"], ifNotExists: true)
             try db.create(index: "idx_citations_container_title", on: "citations", columns: ["container_title"], ifNotExists: true)
+            try db.execute(sql: "CREATE INDEX idx_citations_pmid ON citations(pmid) WHERE pmid IS NOT NULL")
+            try db.execute(sql: "CREATE INDEX idx_citations_arxiv_id ON citations(arxiv_id) WHERE arxiv_id IS NOT NULL")
+            try db.execute(sql: "CREATE INDEX idx_citations_isbn ON citations(isbn) WHERE isbn IS NOT NULL")
+            try db.execute(sql: "CREATE INDEX idx_citations_issn ON citations(issn) WHERE issn IS NOT NULL")
         }
 
         // MARK: v6 — Annotations
@@ -259,49 +256,9 @@ extension CatalogDatabase {
             """)
         }
 
-        // MARK: v7 — Characters & Voice Calls
+        // MARK: v7 — Full-Text Search & Storage
 
-        migrator.registerMigration("v7-characters") { db in
-            try db.create(table: "characters") { t in
-                t.column("id", .text).primaryKey()
-                t.column("user_id", .text).notNull()
-                t.column("name", .text).notNull()
-                t.column("sort_order", .integer).notNull().defaults(to: 0)
-                t.column("created_at", .text).notNull()
-                t.column("updated_at", .text).notNull()
-            }
-
-            try db.create(table: "voice_calls") { t in
-                t.column("id", .text).primaryKey()
-                t.column("character_id", .text).notNull().references("characters", onDelete: .cascade)
-                t.column("title", .text).notNull().defaults(to: "")
-                t.column("turn_count", .integer).notNull().defaults(to: 0)
-                t.column("duration_seconds", .double).notNull().defaults(to: 0)
-                t.column("created_at", .text).notNull()
-                t.column("updated_at", .text).notNull()
-            }
-            try db.create(index: "idx_voice_calls_character_id", on: "voice_calls", columns: ["character_id"])
-
-            // Seed default character (v10 migration drops this table)
-            let characterId = UUID().uuidString
-            let now = Date().iso8601String
-            try db.execute(sql: """
-                INSERT INTO characters (id, user_id, name, sort_order, created_at, updated_at)
-                VALUES (?, ?, 'Oak', 0, ?, ?)
-            """, arguments: [characterId, localUserId, now, now])
-
-            // swiftlint:disable:next line_length
-            let configJSON = ##"{"avatar":{"colorHex":"#5FB236","type":"color"},"language":"en","llmModel":"","referenceAudio":{"path":"","text":""},"systemPrompt":"","ttsVoice":{"modelId":"","provider":"","voiceId":""}}"##
-            let charsDir = CatalogDatabase.dataDirectory.appendingPathComponent("characters", isDirectory: true)
-            let fm = FileManager.default
-            try fm.createDirectory(at: charsDir, withIntermediateDirectories: true)
-            let configURL = charsDir.appendingPathComponent("\(characterId).json")
-            try configJSON.data(using: .utf8)?.write(to: configURL)
-        }
-
-        // MARK: v8 — Full-Text Search & Storage
-
-        migrator.registerMigration("v8-search-storage") { db in
+        migrator.registerMigration("v7-search-storage") { db in
             try db.create(virtualTable: "items_fts", using: FTS5()) { t in
                 t.synchronize(withTable: "items")
                 t.tokenizer = .unicode61()
@@ -316,37 +273,9 @@ extension CatalogDatabase {
             }
         }
 
-        // MARK: v9 — Citation Enhancements
+        // MARK: v8 — Item Relations & Citation FTS
 
-        migrator.registerMigration("v9-citation-enhancements") { db in
-            // Add extra column to items
-            try db.alter(table: "items") { t in
-                t.add(column: "extra", .text)
-            }
-
-            // Add identifier columns to citations
-            try db.alter(table: "citations") { t in
-                t.add(column: "pmid", .text)
-                t.add(column: "arxiv_id", .text)
-                t.add(column: "isbn", .text)
-                t.add(column: "issn", .text)
-            }
-
-            // Partial indexes on identifier columns
-            try db.execute(sql: """
-                CREATE INDEX idx_citations_pmid ON citations(pmid) WHERE pmid IS NOT NULL
-            """)
-            try db.execute(sql: """
-                CREATE INDEX idx_citations_arxiv_id ON citations(arxiv_id) WHERE arxiv_id IS NOT NULL
-            """)
-            try db.execute(sql: """
-                CREATE INDEX idx_citations_isbn ON citations(isbn) WHERE isbn IS NOT NULL
-            """)
-            try db.execute(sql: """
-                CREATE INDEX idx_citations_issn ON citations(issn) WHERE issn IS NOT NULL
-            """)
-
-            // Item relations table
+        migrator.registerMigration("v8-relations-citation-fts") { db in
             try db.create(table: "item_relations") { t in
                 t.column("id", .text).primaryKey()
                 t.column("source_item_id", .text).notNull().references("items", onDelete: .cascade)
@@ -360,7 +289,6 @@ extension CatalogDatabase {
             """)
             try db.create(index: "idx_item_relations_target", on: "item_relations", columns: ["target_item_id"])
 
-            // FTS5 on citations (abstract + container_title)
             try db.create(virtualTable: "citations_fts", using: FTS5()) { t in
                 t.synchronize(withTable: "citations")
                 t.tokenizer = .unicode61()
@@ -369,25 +297,18 @@ extension CatalogDatabase {
             }
         }
 
-        // MARK: v10 — Remove Characters & Voice Calls
+        // MARK: v9 — Quiz Cards & Review Log
 
-        migrator.registerMigration("v10-voice-agent") { db in
-            try db.drop(table: "voice_calls")
-            try db.drop(table: "characters")
-        }
-
-        // MARK: v11 — Quiz Cards & Review Log (Spaced Repetition)
-
-        migrator.registerMigration("v11-quiz-cards") { db in
+        migrator.registerMigration("v9-quiz-cards") { db in
             try db.create(table: "quiz_cards") { t in
                 t.column("id", .text).primaryKey()
                 t.column("item_id", .text).notNull().references("items", onDelete: .cascade)
                 t.column("conversation_id", .text)
                 t.column("group_id", .text)
-                t.column("type", .text).notNull()             // cloze, choice, flashcard, occlusion, matching, ordering
-                t.column("content_json", .text).notNull()     // JSON-encoded quiz content
+                t.column("type", .text).notNull()
+                t.column("content_json", .text).notNull()
                 // FSRS scheduling fields
-                t.column("state", .text).notNull().defaults(to: "new")  // new, learning, review, relearning
+                t.column("state", .text).notNull().defaults(to: "new")
                 t.column("due_at", .text).notNull()
                 t.column("stability", .double).notNull().defaults(to: 0)
                 t.column("difficulty", .double).notNull().defaults(to: 0)
@@ -397,118 +318,38 @@ extension CatalogDatabase {
                 t.column("lapses", .integer).notNull().defaults(to: 0)
                 t.column("last_review_at", .text)
                 t.column("is_suspended", .integer).notNull().defaults(to: false)
+                t.column("annotation_id", .text)
+                t.column("source_text", .text)
+                t.column("page_context", .text)
+                t.column("is_pending", .integer).notNull().defaults(to: 0)
+                t.column("collection_id", .text).references("collections", onDelete: .cascade)
                 t.column("created_at", .text).notNull()
                 t.column("updated_at", .text).notNull()
             }
             try db.create(index: "idx_quiz_cards_state_due", on: "quiz_cards", columns: ["state", "due_at"])
             try db.create(index: "idx_quiz_cards_item_id", on: "quiz_cards", columns: ["item_id"])
             try db.create(index: "idx_quiz_cards_group_id", on: "quiz_cards", columns: ["group_id"])
+            try db.create(index: "idx_quiz_cards_annotation", on: "quiz_cards", columns: ["annotation_id"])
+            try db.create(index: "idx_quiz_cards_pending", on: "quiz_cards", columns: ["is_pending", "item_id"])
+            try db.create(index: "idx_quiz_cards_collection", on: "quiz_cards", columns: ["collection_id"])
 
             try db.create(table: "quiz_review_log") { t in
                 t.column("id", .text).primaryKey()
                 t.column("card_id", .text).notNull().references("quiz_cards", onDelete: .cascade)
-                t.column("rating", .integer).notNull()        // 1=Again, 2=Hard, 3=Good, 4=Easy
-                t.column("state", .text).notNull()            // state before review
+                t.column("rating", .integer).notNull()
+                t.column("state", .text).notNull()
                 t.column("scheduled_days", .integer).notNull()
                 t.column("elapsed_days", .integer).notNull()
                 t.column("reviewed_at", .text).notNull()
             }
             try db.create(index: "idx_quiz_review_log_card_id", on: "quiz_review_log", columns: ["card_id"])
 
-            // Seed "Quiz Cards" system smart collection (originally named "Flashcards", renamed in v15)
+            // Seed "Quiz Cards" system smart collection
             let now = Date().iso8601String
             try db.execute(sql: """
                 INSERT INTO collections (id, user_id, name, icon, sort_order, parent_id, is_smart, is_system, filter_rules, created_at, updated_at)
-                VALUES (?, ?, 'Flashcards', 'rectangle.on.rectangle.angled', 9, NULL, 1, 1, NULL, ?, ?)
+                VALUES (?, ?, 'Quiz Cards', 'rectangle.on.rectangle.angled', 6, NULL, 1, 1, NULL, ?, ?)
             """, arguments: [SystemCollectionID.quizCards.uuidString, localUserId, now, now])
-        }
-
-        // MARK: v12 — Processing Status
-
-        migrator.registerMigration("v12-processing-status") { db in
-            try db.execute(sql: """
-                ALTER TABLE items ADD COLUMN processing_status TEXT NOT NULL DEFAULT 'none'
-            """)
-
-            // Backfill: mark audio items that already have a transcript file as 'transcribed'
-            let rows = try Row.fetchAll(db, sql: """
-                SELECT i.id, i.storage_key, a.storage_key AS att_storage_key
-                FROM items i
-                JOIN attachments a ON a.item_id = i.id AND a.content_type = 'audio' AND a.is_primary = 1
-            """)
-            let fm = FileManager.default
-            for row in rows {
-                let itemStorageKey: String = row["storage_key"]
-                let attStorageKey: String = row["att_storage_key"]
-                let transcriptURL = CatalogDatabase.attachmentTranscriptURL(
-                    itemStorageKey: itemStorageKey,
-                    attachmentStorageKey: attStorageKey
-                )
-                if fm.fileExists(atPath: transcriptURL.path) {
-                    let itemId: String = row["id"]
-                    try db.execute(
-                        sql: "UPDATE items SET processing_status = 'transcribed' WHERE id = ?",
-                        arguments: [itemId]
-                    )
-                }
-            }
-        }
-
-        // MARK: v13 — Quiz Annotation Link
-
-        migrator.registerMigration("v13-quiz-annotation-link") { db in
-            try db.alter(table: "quiz_cards") { t in
-                t.add(column: "annotation_id", .text)
-                t.add(column: "source_text", .text)
-                t.add(column: "page_context", .text)
-                t.add(column: "is_pending", .integer).defaults(to: 0)
-            }
-            try db.create(index: "idx_quiz_cards_annotation", on: "quiz_cards", columns: ["annotation_id"])
-            try db.create(index: "idx_quiz_cards_pending", on: "quiz_cards", columns: ["is_pending", "item_id"])
-        }
-
-        // MARK: v14 — Quiz Card Collection Link
-
-        migrator.registerMigration("v14-quiz-card-collection") { db in
-            try db.alter(table: "quiz_cards") { t in
-                t.add(column: "collection_id", .text).references("collections", onDelete: .cascade)
-            }
-            try db.create(index: "idx_quiz_cards_collection", on: "quiz_cards", columns: ["collection_id"])
-        }
-
-        // MARK: v15 — Rename Flashcards Collection to Quiz Cards
-
-        migrator.registerMigration("v15-rename-flashcards-collection") { db in
-            try db.execute(sql: """
-                UPDATE collections SET name = 'Quiz Cards'
-                WHERE id = ?
-            """, arguments: [SystemCollectionID.quizCards.uuidString])
-        }
-
-        // MARK: v16 — Remove X Bookmarks & GitHub Stars Sync
-
-        migrator.registerMigration("v16-remove-sync-collections") { db in
-            // Remove X Bookmarks and GitHub Stars system smart collections
-            let xBookmarksId = "00000000-0000-0000-0000-00000000000B"
-            let githubStarsId = "00000000-0000-0000-0000-00000000000C"
-            try db.execute(sql: """
-                DELETE FROM collections WHERE id IN (?, ?)
-            """, arguments: [xBookmarksId, githubStarsId])
-        }
-
-        migrator.registerMigration("v17-remove-notes-collection") { db in
-            let notesId = "00000000-0000-0000-0000-000000000009"
-            try db.execute(sql: "DELETE FROM collections WHERE id = ?", arguments: [notesId])
-        }
-
-        // MARK: v18 — Inbox Smart Collection
-
-        migrator.registerMigration("v18-inbox-collection") { db in
-            let now = Date().iso8601String
-            try db.execute(sql: """
-                INSERT INTO collections (id, user_id, name, icon, sort_order, parent_id, is_smart, is_system, filter_rules, created_at, updated_at)
-                VALUES (?, ?, 'Inbox', 'tray.and.arrow.down', -1, NULL, 1, 1, NULL, ?, ?)
-            """, arguments: [SystemCollectionID.inbox.uuidString, localUserId, now, now])
         }
 
         return migrator

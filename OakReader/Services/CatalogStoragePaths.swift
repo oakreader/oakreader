@@ -17,14 +17,9 @@ extension CatalogDatabase {
         dataDirectory.appendingPathComponent("storage", isDirectory: true)
     }
 
-    /// ~/OakReader/vectors/
-    static var vectorsDirectory: URL {
-        dataDirectory.appendingPathComponent("vectors", isDirectory: true)
-    }
-
-    /// ~/OakReader/semantic.db — regenerable chunk text + metadata + FTS5
+    /// ~/OakReader/semantic.sqlite — regenerable chunk text + metadata + FTS5
     static var semanticDatabaseURL: URL {
-        dataDirectory.appendingPathComponent("semantic.db")
+        dataDirectory.appendingPathComponent("semantic.sqlite")
     }
 
     /// ~/OakReader/semantic.usearch — HNSW vector index (regenerable)
