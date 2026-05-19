@@ -183,7 +183,8 @@ public enum SkillLoader {
             author: manifest.author,
             contextMode: contextMode,
             requirements: manifest.requires,
-            version: manifest.version
+            version: manifest.version,
+            isEnabled: manifest.enabled ?? true
         )
 
         return (skill, nil)
@@ -240,7 +241,8 @@ public enum SkillLoader {
             author: sidecar?.author,
             contextMode: contextMode,
             requirements: sidecar?.requires,
-            version: sidecar?.version
+            version: sidecar?.version,
+            isEnabled: sidecar?.enabled ?? true
         )
 
         return (skill, nil)

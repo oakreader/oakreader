@@ -11,6 +11,7 @@ struct SkillManagementView: View {
     @State private var catalogSkills: [AgentSkill] = []
     @State private var bundledNames: Set<String> = []
     @State private var installedNames: Set<String> = []
+    @State private var disabledNames: Set<String> = []
     @State private var bundledVersions: [String: String] = [:]
     @State private var installedVersions: [String: String] = [:]
     @State private var selectedSkillName: String?
@@ -35,12 +36,14 @@ struct SkillManagementView: View {
                     SkillDetailView(
                         skill: selectedSkill,
                         isInstalled: installedNames.contains(selectedSkill.name),
+                        isDisabled: disabledNames.contains(selectedSkill.name),
                         hasUpdate: hasUpdate(selectedSkill),
                         refreshToken: refreshToken,
                         onBack: { selectedSkillName = nil },
                         onInstall: { installSkill(selectedSkill) },
                         onUninstall: { uninstallSkill(selectedSkill) },
                         onUpdate: { installSkill(selectedSkill) },
+                        onToggle: { toggleSkillEnabled(selectedSkill) },
                         onBinInstalled: { refreshToken += 1 }
                     )
                 } else {
@@ -55,10 +58,12 @@ struct SkillManagementView: View {
                                 title: section.title,
                                 skills: section.skills,
                                 installedNames: installedNames,
+                                disabledNames: disabledNames,
                                 hasUpdate: hasUpdate,
                                 refreshToken: refreshToken,
                                 onSelect: { selectedSkillName = $0.name },
-                                onInstall: { installSkill($0) }
+                                onInstall: { installSkill($0) },
+                                onToggle: { toggleSkillEnabled($0) }
                             )
                         }
                     }
@@ -259,6 +264,31 @@ struct SkillManagementView: View {
         }
     }
 
+    // MARK: - Toggle Enabled
+
+    private func toggleSkillEnabled(_ skill: AgentSkill) {
+        let skillDir = Self.installedDir.appendingPathComponent(skill.name)
+        let jsonURL = skillDir.appendingPathComponent("skill.json")
+        let fm = FileManager.default
+
+        var dict: [String: Any] = [:]
+        if let data = fm.contents(atPath: jsonURL.path),
+           let existing = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            dict = existing
+        }
+
+        let currentlyEnabled = (dict["enabled"] as? Bool) ?? true
+        dict["enabled"] = !currentlyEnabled
+
+        guard let outData = try? JSONSerialization.data(
+            withJSONObject: dict, options: [.prettyPrinted, .sortedKeys]
+        ) else { return }
+
+        fm.createFile(atPath: jsonURL.path, contents: outData)
+        SkillManager.shared.reload()
+        reload()
+    }
+
     // MARK: - Helpers
 
     private func reload() {
@@ -286,6 +316,7 @@ struct SkillManagementView: View {
 
         catalogSkills = (bundledSkills + extra).sorted { Self.displayName(for: $0) < Self.displayName(for: $1) }
         installedNames = Self.scanInstalledNames()
+        disabledNames = Set(installedResult.skills.filter { !$0.isEnabled }.map(\.name))
     }
 
     func hasUpdate(_ skill: AgentSkill) -> Bool {
@@ -372,10 +403,12 @@ private struct SkillCatalogSection: View {
     let title: String
     let skills: [AgentSkill]
     let installedNames: Set<String>
+    let disabledNames: Set<String>
     let hasUpdate: (AgentSkill) -> Bool
     let refreshToken: Int
     let onSelect: (AgentSkill) -> Void
     let onInstall: (AgentSkill) -> Void
+    let onToggle: (AgentSkill) -> Void
 
     private let columns = [
         GridItem(.flexible(minimum: 0), spacing: 30, alignment: .top),
@@ -397,10 +430,12 @@ private struct SkillCatalogSection: View {
                     SkillCatalogItem(
                         skill: skill,
                         isInstalled: installedNames.contains(skill.name),
+                        isDisabled: disabledNames.contains(skill.name),
                         hasUpdate: hasUpdate(skill),
                         refreshToken: refreshToken,
                         onSelect: { onSelect(skill) },
-                        onInstall: { onInstall(skill) }
+                        onInstall: { onInstall(skill) },
+                        onToggle: { onToggle(skill) }
                     )
                 }
             }
@@ -413,21 +448,24 @@ private struct SkillCatalogSection: View {
 private struct SkillCatalogItem: View {
     let skill: AgentSkill
     let isInstalled: Bool
+    let isDisabled: Bool
     let hasUpdate: Bool
     let refreshToken: Int
     let onSelect: () -> Void
     let onInstall: () -> Void
+    let onToggle: () -> Void
 
     @State private var isHovered = false
 
     var body: some View {
         HStack(spacing: 10) {
             SkillIconTile(icon: skill.icon, skillName: skill.name, baseDir: skill.baseDir)
+                .opacity(isDisabled ? 0.45 : 1.0)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(SkillManagementView.displayName(for: skill))
                     .font(OakStyle.Font.styled(size: OakStyle.Font.body, weight: .semibold))
-                    .foregroundStyle(OakStyle.Colors.textPrimary)
+                    .foregroundStyle(isDisabled ? OakStyle.Colors.textTertiary : OakStyle.Colors.textPrimary)
                     .lineLimit(1)
 
                 if !skill.description.isEmpty {
@@ -463,20 +501,23 @@ private struct SkillCatalogItem: View {
                 .frame(width: 26, height: 26)
                 .help("Update available")
         } else if isInstalled {
-            ZStack(alignment: .topTrailing) {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(OakStyle.Colors.textTertiary)
-                    .frame(width: 26, height: 26)
-
+            HStack(spacing: 6) {
                 if hasMissingSetup {
                     Circle()
                         .fill(.orange)
                         .frame(width: 6, height: 6)
-                        .offset(x: -4, y: 5)
+                        .help("Setup required")
                 }
+
+                Toggle("", isOn: Binding(
+                    get: { !isDisabled },
+                    set: { _ in onToggle() }
+                ))
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .labelsHidden()
+                .help(isDisabled ? "Enable skill" : "Disable skill")
             }
-            .help(hasMissingSetup ? "Added, setup required" : "Added")
         } else {
             Button {
                 onInstall()
@@ -538,12 +579,14 @@ private struct LiquidGlassButtonStyle: ButtonStyle {
 private struct SkillDetailView: View {
     let skill: AgentSkill
     let isInstalled: Bool
+    let isDisabled: Bool
     let hasUpdate: Bool
     let refreshToken: Int
     let onBack: () -> Void
     let onInstall: () -> Void
     let onUninstall: () -> Void
     let onUpdate: () -> Void
+    let onToggle: () -> Void
     let onBinInstalled: () -> Void
 
     var body: some View {
@@ -589,6 +632,13 @@ private struct SkillDetailView: View {
 
                 if isInstalled {
                     HStack(spacing: 8) {
+                        Toggle("Enabled", isOn: Binding(
+                            get: { !isDisabled },
+                            set: { _ in onToggle() }
+                        ))
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+
                         if hasUpdate {
                             Button("Update") { onUpdate() }
                                 .controlSize(.small)
