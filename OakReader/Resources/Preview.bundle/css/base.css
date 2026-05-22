@@ -2,6 +2,24 @@
  * Base Styles (Theme-independent)
  */
 
+/* ==================== Selection ==================== */
+::selection {
+  background-color: transparent;
+  color: inherit;
+}
+
+.oak-sel-rect {
+  position: fixed;
+  background-color: rgba(12, 106, 218, 0.25);
+  pointer-events: none;
+  z-index: 1;
+  border-radius: 2px;
+}
+
+.darkmode .oak-sel-rect {
+  background-color: rgba(29, 155, 240, 0.35);
+}
+
 /* ==================== Base Layout ==================== */
 html {
   font-size: 15px;

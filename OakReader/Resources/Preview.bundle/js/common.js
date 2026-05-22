@@ -16,6 +16,45 @@ const OakPreview = {
     document.onmouseup = getSelectionAndSendMessage;
     document.onkeyup = getSelectionAndSendMessage;
     document.oncontextmenu = getSelectionAndSendMessage;
+
+    // Custom selection overlay — renders precise text-hugging highlights
+    const overlay = document.createElement('div');
+    overlay.id = 'oak-sel-overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1;';
+    document.body.appendChild(overlay);
+
+    let rafId = 0;
+
+    function renderSelectionRects() {
+      overlay.textContent = '';
+      const sel = document.getSelection();
+      if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
+
+      const range = sel.getRangeAt(0);
+      const rects = range.getClientRects();
+
+      for (let i = 0; i < rects.length; i++) {
+        const r = rects[i];
+        if (r.width === 0 || r.height === 0) continue;
+        const div = document.createElement('div');
+        div.className = 'oak-sel-rect';
+        div.style.top = r.top + 'px';
+        div.style.left = r.left + 'px';
+        div.style.width = r.width + 'px';
+        div.style.height = r.height + 'px';
+        overlay.appendChild(div);
+      }
+    }
+
+    document.addEventListener('selectionchange', () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(renderSelectionRects);
+    });
+
+    window.addEventListener('scroll', () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(renderSelectionRects);
+    }, true);
   },
 
   setupCheckboxes() {
