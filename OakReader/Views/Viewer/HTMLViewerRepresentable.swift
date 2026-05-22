@@ -127,6 +127,61 @@ struct HTMLViewerRepresentable: NSViewRepresentable {
         config.userContentController.addUserScript(selectionScript)
         config.userContentController.add(context.coordinator, name: "textSelected")
 
+        // Custom selection overlay — hides native ::selection and renders
+        // precise text-hugging highlight rects via getClientRects().
+        let selectionOverlayScript = WKUserScript(
+            source: """
+            (function() {
+                var style = document.createElement('style');
+                style.textContent = [
+                    '::selection { background-color: transparent !important; color: inherit !important; }',
+                    '.oak-sel-rect { position: fixed; background-color: rgba(12,106,218,0.25);',
+                    '  pointer-events: none; z-index: 2147483647; border-radius: 2px; }',
+                    '@media (prefers-color-scheme: dark) {',
+                    '  .oak-sel-rect { background-color: rgba(29,155,240,0.35); }',
+                    '}'
+                ].join('\\n');
+                document.head.appendChild(style);
+
+                var overlay = document.createElement('div');
+                overlay.id = 'oak-sel-overlay';
+                overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:2147483647;';
+                document.body.appendChild(overlay);
+
+                var rafId = 0;
+                function renderSelectionRects() {
+                    overlay.textContent = '';
+                    var sel = window.getSelection();
+                    if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
+                    var range = sel.getRangeAt(0);
+                    var rects = range.getClientRects();
+                    for (var i = 0; i < rects.length; i++) {
+                        var r = rects[i];
+                        if (r.width === 0 || r.height === 0) continue;
+                        var div = document.createElement('div');
+                        div.className = 'oak-sel-rect';
+                        div.style.top = r.top + 'px';
+                        div.style.left = r.left + 'px';
+                        div.style.width = r.width + 'px';
+                        div.style.height = r.height + 'px';
+                        overlay.appendChild(div);
+                    }
+                }
+                document.addEventListener('selectionchange', function() {
+                    cancelAnimationFrame(rafId);
+                    rafId = requestAnimationFrame(renderSelectionRects);
+                });
+                window.addEventListener('scroll', function() {
+                    cancelAnimationFrame(rafId);
+                    rafId = requestAnimationFrame(renderSelectionRects);
+                }, true);
+            })();
+            """,
+            injectionTime: .atDocumentEnd,
+            forMainFrameOnly: true
+        )
+        config.userContentController.addUserScript(selectionOverlayScript)
+
         // Inject web-highlighter library + OakHighlighter bridge (order matters)
         let jsBundle = Bundle.main.resourceURL?
             .appendingPathComponent("Preview.bundle/js")
