@@ -39,9 +39,7 @@ struct ChatBubbleView: View {
 
                     // Tool call cards for assistant messages
                     if turn.role == .assistant && !turn.toolUses.isEmpty {
-                        ForEach(turn.toolUses) { record in
-                            ToolCallCardView(record: record)
-                        }
+                        ToolCallGroupView(records: turn.toolUses)
                     }
 
                     // Message content
@@ -67,8 +65,7 @@ struct ChatBubbleView: View {
                         }
                     }
 
-                    // Actions — always visible after response and flush are done
-                    if !turn.isStreaming && !reveal.isAnimating && turn.role == .assistant {
+                    if shouldShowActions {
                         HStack(spacing: 2) {
                             actionButton(
                                 systemImage: showCopied ? "checkmark" : "doc.on.doc",
@@ -154,6 +151,26 @@ struct ChatBubbleView: View {
         turn.role == .assistant && QuizXMLParser.containsQuiz(turn.content)
     }
 
+    /// `OpenURLAction` that intercepts `oak://` citation links and delegates
+    /// to `onOpenCitation`. Non-oak URLs fall through to the system handler.
+    private var citationOpenURLAction: OpenURLAction {
+        OpenURLAction { url in
+            guard let (citeKey, anchor) = CitationAnchor.parse(from: url) else {
+                return .systemAction
+            }
+            onOpenCitation?(citeKey, anchor)
+            return .handled
+        }
+    }
+
+    /// Builds a `StructuredText` view with the shared chat styling applied.
+    private func chatMarkdown(_ markdown: String) -> some View {
+        StructuredText(markdown: protectMathBackslashes(markdown), syntaxExtensions: [.math])
+            .textual.headingStyle(ChatHeadingStyle())
+            .textual.textSelection(.enabled)
+            .font(OakStyle.ChatFont.messageBody)
+    }
+
     /// Renders interleaved text segments and inline quiz views.
     @ViewBuilder
     private var quizSegmentedBubble: some View {
@@ -162,72 +179,22 @@ struct ChatBubbleView: View {
             ForEach(Array(segments.enumerated()), id: \.offset) { _, segment in
                 switch segment {
                 case .text(let markdown):
-                    StructuredText(markdown: protectMathBackslashes(markdown), syntaxExtensions: [.math])
-                        .textual.headingStyle(ChatHeadingStyle())
-                        .textual.textSelection(.enabled)
-                        .font(OakStyle.ChatFont.messageBody)
+                    chatMarkdown(markdown)
                 case .quiz(let content):
                     InlineQuizView(content: content, onSaveToDeck: onSaveQuizCard)
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 4)
-        .padding(.vertical, 4)
-        .foregroundStyle(Color(nsColor: .labelColor))
+        .environment(\.openURL, citationOpenURLAction)
+        .assistantBubbleStyle()
     }
 
     @ViewBuilder
     private var plainMessageBubble: some View {
-        let base = StructuredText(markdown: renderedContent, syntaxExtensions: [.math])
-            .textual.headingStyle(ChatHeadingStyle())
-            .textual.textSelection(.enabled)
-            .font(OakStyle.ChatFont.messageBody)
-
         if turn.role == .assistant {
-            base
-                .environment(\.openURL, OpenURLAction { url in
-                    guard url.scheme == "oak" else { return .systemAction }
-
-                    // Backward compat: oak://page/N → treat as current-doc page citation
-                    if url.host == "page",
-                       let pageStr = url.pathComponents.dropFirst().first,
-                       let page = Int(pageStr) {
-                        onOpenCitation?("", CitationAnchor(page: page - 1))
-                        return .handled
-                    }
-
-                    if url.host == "cite",
-                       let citeKey = url.pathComponents.dropFirst().first {
-                        let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
-                        let queryItems = components?.queryItems ?? []
-
-                        var anchor = CitationAnchor()
-                        for item in queryItems {
-                            switch item.name {
-                            case "page":
-                                if let v = item.value, let p = Int(v) { anchor.page = p - 1 }
-                            case "heading":
-                                anchor.heading = item.value?.removingPercentEncoding ?? item.value
-                            case "time":
-                                if let v = item.value, let t = Double(v) { anchor.time = t }
-                            case "text":
-                                anchor.text = item.value?.removingPercentEncoding ?? item.value
-                            default:
-                                break
-                            }
-                        }
-
-                        onOpenCitation?(citeKey, anchor)
-                        return .handled
-                    }
-
-                    return .systemAction
-                })
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 4)
-                .padding(.vertical, 4)
-                .foregroundStyle(Color(nsColor: .labelColor))
+            chatMarkdown(renderedContent)
+                .environment(\.openURL, citationOpenURLAction)
+                .assistantBubbleStyle()
         } else {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 ForEach(skillBadges, id: \.self) { skill in
@@ -237,7 +204,7 @@ struct ChatBubbleView: View {
                     referenceBadge(ref.title, icon: ref.icon)
                 }
                 if !renderedContent.isEmpty {
-                    base
+                    chatMarkdown(renderedContent)
                 }
             }
             .padding(.horizontal, 14)
@@ -324,19 +291,11 @@ struct ChatBubbleView: View {
         let fullRange = NSRange(location: 0, length: xmlNS.length)
 
         for match in refDocPattern.matches(in: xmlBlock, range: fullRange) {
-            let title = xmlNS.substring(with: match.range(at: 1))
-                .replacingOccurrences(of: "&amp;", with: "&")
-                .replacingOccurrences(of: "&lt;", with: "<")
-                .replacingOccurrences(of: "&gt;", with: ">")
-                .replacingOccurrences(of: "&quot;", with: "\"")
+            let title = xmlUnescape(xmlNS.substring(with: match.range(at: 1)))
             refs.append((title: title, icon: "doc.text"))
         }
         for match in refNotePattern.matches(in: xmlBlock, range: fullRange) {
-            let title = xmlNS.substring(with: match.range(at: 1))
-                .replacingOccurrences(of: "&amp;", with: "&")
-                .replacingOccurrences(of: "&lt;", with: "<")
-                .replacingOccurrences(of: "&gt;", with: ">")
-                .replacingOccurrences(of: "&quot;", with: "\"")
+            let title = xmlUnescape(xmlNS.substring(with: match.range(at: 1)))
             refs.append((title: title, icon: "note.text"))
         }
 
@@ -362,6 +321,10 @@ struct ChatBubbleView: View {
         }
 
         return (skillIds, remaining.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    private var shouldShowActions: Bool {
+        turn.role == .assistant && !turn.isStreaming && !reveal.isAnimating && !renderedContent.isEmpty
     }
 
     private var shouldShowMessageBubble: Bool {
@@ -423,7 +386,15 @@ struct ChatBubbleView: View {
         NSPasteboard.general.setString(turn.content, forType: .string)
     }
 
-    // MARK: - Protect Math Backslashes
+    // MARK: - Helpers
+
+    private static func xmlUnescape(_ string: String) -> String {
+        string
+            .replacingOccurrences(of: "&amp;", with: "&")
+            .replacingOccurrences(of: "&lt;", with: "<")
+            .replacingOccurrences(of: "&gt;", with: ">")
+            .replacingOccurrences(of: "&quot;", with: "\"")
+    }
 
     // Regex: extract title from <doc> and <note> elements in <referenced-documents>
     // swiftlint:disable:next force_try
@@ -545,6 +516,24 @@ struct ChatBubbleView: View {
         }
 
         return s
+    }
+}
+
+// MARK: - Assistant Bubble Style
+
+private struct AssistantBubbleStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 4)
+            .padding(.vertical, 4)
+            .foregroundStyle(Color(nsColor: .labelColor))
+    }
+}
+
+private extension View {
+    func assistantBubbleStyle() -> some View {
+        modifier(AssistantBubbleStyle())
     }
 }
 

@@ -8,6 +8,46 @@ struct CitationAnchor {
     var heading: String?
     var time: Double?   // seconds
     var text: String?   // text fragment to find & highlight
+
+    /// Parse an `oak://cite/{citeKey}?page=N&heading=...&time=S&text=...` URL
+    /// into a `(citeKey, anchor)` pair. Returns nil for non-citation URLs.
+    static func parse(from url: URL) -> (citeKey: String, anchor: CitationAnchor)? {
+        guard url.scheme == "oak" else { return nil }
+
+        // oak://page/N → current-document page citation (empty citeKey)
+        if url.host == "page",
+           let pageStr = url.pathComponents.dropFirst().first,
+           let page = Int(pageStr) {
+            return ("", CitationAnchor(page: page - 1))
+        }
+
+        // oak://cite/{citeKey}?page=N&heading=...&time=S&text=...
+        guard url.host == "cite",
+              let citeKey = url.pathComponents.dropFirst().first else {
+            return nil
+        }
+
+        let queryItems = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems ?? []
+
+        var anchor = CitationAnchor()
+        for item in queryItems {
+            switch item.name {
+            case "page":
+                if let v = item.value, let p = Int(v) { anchor.page = p - 1 }
+            case "heading":
+                anchor.heading = item.value?.removingPercentEncoding ?? item.value
+            case "time":
+                if let v = item.value, let t = Double(v) { anchor.time = t }
+            case "text":
+                anchor.text = item.value?.removingPercentEncoding ?? item.value
+            default:
+                break
+            }
+        }
+
+        return (citeKey, anchor)
+    }
 }
 
 struct PendingConfirmation {
@@ -51,7 +91,7 @@ class ChatViewModel {
     // MARK: - Private
 
     private let engine: AgentSession
-    private let contextProvider = PDFContextProvider()
+    private let contextProvider = LLMContextProvider()
     private var streamTask: Task<Void, Never>?
     /// Whether a DB record has been created for the current session.
     private var sessionRecordCreated: Bool = false
@@ -159,7 +199,7 @@ class ChatViewModel {
 
         // Build enriched context snapshot
         let contextMode = effectiveSkill?.contextMode ?? .currentPage
-        let snapshot = PDFContextProvider.buildContextSnapshot(
+        let snapshot = LLMContextProvider.buildContextSnapshot(
             from: parent,
             appState: parent?.appState ?? appState,
             contextMode: contextMode
@@ -167,7 +207,7 @@ class ChatViewModel {
 
         // Build system prompt from snapshot
         let currentSkill = effectiveSkill
-        let systemPrompt = PDFContextProvider.buildSystemPrompt(
+        let systemPrompt = LLMContextProvider.buildSystemPrompt(
             skill: currentSkill,
             context: snapshot
         )
