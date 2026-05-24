@@ -80,10 +80,42 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessageH
                 .replacingOccurrences(of: "\\", with: "\\\\")
                 .replacingOccurrences(of: "'", with: "\\'")
                 .replacingOccurrences(of: "\n", with: "\\n")
+            // Use mark.js for cross-node, case-insensitive, whitespace-normalized
+            // text matching. Temporarily wraps the first match in a <mark> element,
+            // scrolls to it, then removes the wrapper after 3 seconds.
             let js = """
             (function() {
-                window.getSelection().removeAllRanges();
-                window.find('\(escapedText)', false, false, true);
+                var ctx = document.querySelector('.heti') || document.body;
+                var instance = new Mark(ctx);
+                // Remove any previous citation highlight.
+                instance.unmark({ className: 'oak-cite-hl' });
+
+                var scrolled = false;
+                instance.mark('\(escapedText)', {
+                    acrossElements: true,
+                    caseSensitive: false,
+                    separateWordSearch: false,
+                    className: 'oak-cite-hl',
+                    each: function(el) {
+                        // Scroll only to the first <mark> element of the first match.
+                        if (!scrolled) {
+                            scrolled = true;
+                            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                    },
+                    noMatch: function() {
+                        // Last resort: try the deprecated window.find for simple cases.
+                        window.getSelection().removeAllRanges();
+                        window.find('\(escapedText)', false, false, true);
+                    },
+                    done: function(count) {
+                        if (count === 0) return;
+                        // Remove the highlight after 3 seconds.
+                        setTimeout(function() {
+                            instance.unmark({ className: 'oak-cite-hl' });
+                        }, 3000);
+                    }
+                });
             })();
             """
             webView.evaluateJavaScript(js, completionHandler: nil)

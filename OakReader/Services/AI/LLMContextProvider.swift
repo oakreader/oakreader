@@ -3,7 +3,7 @@ import PDFKit
 import OakAgent
 
 /// Builds context snapshots and system prompts for the AI chat session.
-struct PDFContextProvider {
+struct LLMContextProvider {
 
     // MARK: - Context Snapshot
 
@@ -184,6 +184,12 @@ struct PDFContextProvider {
             is presented.
             """)
 
+        // Voice guidelines (loaded from ~/OakReader/agent/VOICE.md)
+        if let voiceContent = try? String(contentsOf: CatalogDatabase.agentVoiceFileURL, encoding: .utf8),
+           !voiceContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            parts.append("<voice>\n\(voiceContent.trimmingCharacters(in: .whitespacesAndNewlines))\n</voice>")
+        }
+
         // App context
         var appContextParts: [String] = []
         if let name = context.activeCollectionName {
@@ -326,10 +332,14 @@ struct PDFContextProvider {
                     [p. N](oak://cite/\(eck)?page=N)
                     [p. N](oak://cite/\(eck)?page=N&text=phrase)
 
+                    Prefer adding &text= with a distinctive 5-15 word phrase \
+                    from the page so the reader can jump to the exact passage.
+
                     Example — notice every page mention is a link:
                     \"The transformer replaces recurrence with self-attention \
-                    ([p. 2](oak://cite/\(eck)?page=2)). The scaled dot-product \
-                    formula is defined on [p. 3](oak://cite/\(eck)?page=3), and \
+                    ([p. 2](oak://cite/\(eck)?page=2&text=entirely+on+attention+mechanisms)). \
+                    The scaled dot-product formula is defined on \
+                    [p. 3](oak://cite/\(eck)?page=3&text=Scaled+Dot-Product+Attention), and \
                     multi-head attention extends it on [p. 4](oak://cite/\(eck)?page=4).\"
                     """)
             case .html, .markdown:
@@ -338,11 +348,19 @@ struct PDFContextProvider {
                     [§ Heading](oak://cite/\(eck)?heading=HeadingText)
                     ["quoted phrase"](oak://cite/\(eck)?text=quoted+text)
 
+                    For ?text= use a distinctive 5-15 word phrase copied from \
+                    the rendered text (not the raw markdown source). Matching \
+                    is case-insensitive and tolerates whitespace differences, \
+                    so focus on choosing a unique phrase rather than exact formatting.
+
+                    Prefer ?text= for referencing specific passages; use \
+                    ?heading= only when pointing to a whole section.
+
                     Example:
                     \"The API supports batch processing \
                     ([§ Batch Endpoints](oak://cite/\(eck)?heading=Batch%20Endpoints)), \
                     which the docs call 'fire-and-forget' \
-                    (["fire-and-forget"](oak://cite/\(eck)?text=fire-and-forget)).\"
+                    (["fire-and-forget strategy"](oak://cite/\(eck)?text=fire-and-forget+strategy+for+asynchronous+jobs)).\"
 
                     Do not use page numbers — this document has no pages.
                     """)

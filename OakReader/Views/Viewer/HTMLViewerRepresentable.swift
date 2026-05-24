@@ -7,13 +7,8 @@ import WebKit
 final class OakWebView: WKWebView {
     weak var coordinator: WebViewCoordinator?
 
-    override func resetCursorRects() {
-        addCursorRect(bounds, cursor: .arrow)
-    }
-
-    override func cursorUpdate(with event: NSEvent) {
-        NSCursor.arrow.set()
-    }
+    // Cursor is controlled via CSS (`cursor: default` on html) so that
+    // WebKit can still show pointer on links without fighting native overrides.
 
     override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
         super.willOpenMenu(menu, with: event)
@@ -167,14 +162,13 @@ struct HTMLViewerRepresentable: NSViewRepresentable {
                         overlay.appendChild(div);
                     }
                 }
-                document.addEventListener('selectionchange', function() {
+                function scheduleRender() {
                     cancelAnimationFrame(rafId);
                     rafId = requestAnimationFrame(renderSelectionRects);
-                });
-                window.addEventListener('scroll', function() {
-                    cancelAnimationFrame(rafId);
-                    rafId = requestAnimationFrame(renderSelectionRects);
-                }, true);
+                }
+                document.addEventListener('selectionchange', scheduleRender);
+                window.addEventListener('scroll', scheduleRender, true);
+                window.addEventListener('resize', scheduleRender);
             })();
             """,
             injectionTime: .atDocumentEnd,
@@ -182,10 +176,10 @@ struct HTMLViewerRepresentable: NSViewRepresentable {
         )
         config.userContentController.addUserScript(selectionOverlayScript)
 
-        // Inject web-highlighter library + OakHighlighter bridge (order matters)
+        // Inject libraries: mark.js (text finder), web-highlighter + bridge (order matters)
         let jsBundle = Bundle.main.resourceURL?
             .appendingPathComponent("Preview.bundle/js")
-        for jsFile in ["web-highlighter.min.js", "oak-web-highlighter.js"] {
+        for jsFile in ["mark.min.js", "web-highlighter.min.js", "oak-web-highlighter.js"] {
             if let url = jsBundle?.appendingPathComponent(jsFile),
                let src = try? String(contentsOf: url, encoding: .utf8) {
                 let script = WKUserScript(
