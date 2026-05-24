@@ -29,6 +29,7 @@ html {
   font-family: var(--text-font);
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
+  cursor: default;
 }
 
 body {
@@ -74,6 +75,17 @@ a[href*="oak-ref://%40"] {
   font-style: italic;
   text-decoration: none;
   border-bottom: 1px dashed var(--accent-color);
+}
+
+/* Citation highlight (from AI chat links via mark.js) */
+.oak-cite-hl {
+  background-color: rgba(255, 200, 60, 0.45);
+  border-radius: 2px;
+  padding: 1px 0;
+}
+
+.darkmode .oak-cite-hl {
+  background-color: rgba(255, 200, 60, 0.30);
 }
 
 /* ==================== Code Styles ==================== */

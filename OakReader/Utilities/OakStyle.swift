@@ -186,7 +186,7 @@ enum OakStyle {
         /// Chat message body — respects user's font family.
         /// Weight .regular (400) for comfortable reading.
         static var messageBody: SwiftUI.Font {
-            Font.styled(size: max(Font.body, 14), weight: .regular)
+            Font.styled(size: max(Font.body, 15), weight: .regular)
         }
         /// Chat header title — weight .semibold (600) for clear hierarchy.
         static var headerTitle: SwiftUI.Font {
