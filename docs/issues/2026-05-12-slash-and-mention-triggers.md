@@ -205,7 +205,7 @@ chatVM.send(
 - [ ] Build sectioned completion popup (Context / Library / Plugins)
 - [ ] Allow multiple `@` mentions per message
 - [ ] Render mention tokens inline with blue tint background
-- [ ] `@document` and `@page:N` override context snapshot in `PDFContextProvider`
+- [ ] `@document` and `@page:N` override context snapshot in `LLMContextProvider`
 - [ ] `@selection` captures current text selection at send time
 - [ ] `@notes` injects attached note content
 - [ ] `@library` enables library search tools
@@ -230,7 +230,7 @@ chatVM.send(
 | New view | `CompletionPopupView.swift` | Autocomplete popup component |
 | Chat view | `AIChatView.swift` | Host popup overlay, coordinate positioning |
 | Chat VM | `ChatViewModel.swift` | Accept context overrides, plugin tool activation in `send()` |
-| Context | `PDFContextProvider.swift` | Support context override parameters |
+| Context | `LLMContextProvider.swift` | Support context override parameters |
 | Skill picker | `SkillPickerBar.swift` | Sync with `/`-selected skill (Phase 1: keep, Phase 3: evaluate removal) |
 | Skill loader | `SkillLoader.swift` | No change (already loads from all sources) |
 | Plugin service | `PluginService.swift` | Query installed plugin tools for `@` completion |
