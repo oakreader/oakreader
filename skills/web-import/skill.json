@@ -17,13 +17,14 @@
                 "versionArgs": ["--version"]
             },
             {
-                "name": "pandoc",
-                "description": "Convert HTML to Markdown for AI context",
+                "name": "html-to-markdown",
+                "description": "Convert HTML to clean Markdown for AI context",
                 "searchPaths": [
-                    "/opt/homebrew/bin/pandoc",
-                    "/usr/local/bin/pandoc"
+                    "~/Library/Application Support/OakReader/bin/html-to-markdown",
+                    "/opt/homebrew/bin/html-to-markdown",
+                    "/usr/local/bin/html-to-markdown"
                 ],
-                "install": { "brew": "pandoc" },
+                "install": { "brew": "kreuzberg-dev/tap/html-to-markdown" },
                 "versionArgs": ["--version"]
             }
         ]

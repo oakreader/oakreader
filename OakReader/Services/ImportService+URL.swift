@@ -1,5 +1,6 @@
 import Foundation
 import AppKit
+import OakAgent
 
 struct URLImportOptions {
     var preferEmbedForMedia: Bool = true
@@ -162,9 +163,10 @@ extension ImportService {
     }
 
     private func archiveWithMonolith(_ sourceURL: URL, outputURL: URL) async throws {
-        guard let monolith = Self.findExecutable(named: "monolith") else {
+        guard let monolithPath = ToolResolver.resolveFromInstalledSkills(name: "monolith") else {
             throw URLImportError.archiverUnavailable
         }
+        let monolith = URL(fileURLWithPath: monolithPath)
 
         let result = try await Self.runProcess(
             executableURL: monolith,
@@ -185,15 +187,13 @@ extension ImportService {
     }
 
     private func markdownFromHTML(htmlURL: URL) async -> String? {
-        if let pandoc = Self.findExecutable(named: "pandoc") {
-            let mdURL = htmlURL.deletingPathExtension().appendingPathExtension("md")
+        if let toolPath = ToolResolver.resolveFromInstalledSkills(name: "html-to-markdown") {
             if let result = try? await Self.runProcess(
-                executableURL: pandoc,
-                arguments: [htmlURL.path, "-f", "html", "-t", "gfm", "--wrap=none", "-o", mdURL.path]
+                executableURL: URL(fileURLWithPath: toolPath),
+                arguments: [htmlURL.path]
             ), result.exitCode == 0,
-               let markdown = try? String(contentsOf: mdURL, encoding: .utf8),
-               !markdown.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                return markdown
+               !result.stdout.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return result.stdout
             }
         }
 
@@ -378,26 +378,16 @@ extension ImportService {
 
     // MARK: - Process Helpers
 
-    private struct ProcessResult {
+    struct ProcessResult {
         let exitCode: Int32
         let stdout: String
         let stderr: String
     }
 
-    private static func findExecutable(named name: String) -> URL? {
-        let candidates = [
-            "/opt/homebrew/bin/\(name)",
-            "/usr/local/bin/\(name)",
-            "/usr/bin/\(name)",
-            "/bin/\(name)"
-        ]
-        for path in candidates where FileManager.default.isExecutableFile(atPath: path) {
-            return URL(fileURLWithPath: path)
-        }
-        return nil
-    }
+    /// Timeout for child processes (e.g. html-to-markdown, monolith).
+    private static let processTimeout: TimeInterval = 30
 
-    private static func runProcess(executableURL: URL, arguments: [String]) async throws -> ProcessResult {
+    static func runProcess(executableURL: URL, arguments: [String]) async throws -> ProcessResult {
         try await Task.detached(priority: .utility) {
             let process = Process()
             process.executableURL = executableURL
@@ -413,10 +403,33 @@ extension ImportService {
             process.standardError = stderr
 
             try process.run()
-            process.waitUntilExit()
 
-            let outData = stdout.fileHandleForReading.readDataToEndOfFile()
-            let errData = stderr.fileHandleForReading.readDataToEndOfFile()
+            // Kill the process if it exceeds the timeout.
+            let timer = DispatchSource.makeTimerSource(queue: .global())
+            timer.schedule(deadline: .now() + processTimeout)
+            timer.setEventHandler { process.terminate() }
+            timer.resume()
+
+            // Read both pipes concurrently BEFORE waitUntilExit to avoid
+            // pipe buffer deadlock.
+            var outData = Data()
+            var errData = Data()
+            let group = DispatchGroup()
+            group.enter()
+            DispatchQueue.global().async {
+                outData = stdout.fileHandleForReading.readDataToEndOfFile()
+                group.leave()
+            }
+            group.enter()
+            DispatchQueue.global().async {
+                errData = stderr.fileHandleForReading.readDataToEndOfFile()
+                group.leave()
+            }
+            group.wait()
+
+            process.waitUntilExit()
+            timer.cancel()
+
             return ProcessResult(
                 exitCode: process.terminationStatus,
                 stdout: String(data: outData, encoding: .utf8) ?? "",

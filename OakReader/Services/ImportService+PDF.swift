@@ -1,5 +1,6 @@
 import Foundation
 import PDFKit
+import OakAgent
 
 extension ImportService {
     // MARK: - Import
@@ -119,9 +120,10 @@ extension ImportService {
             await autoExtractReference(itemId: docId.uuidString, pdfURL: destURL, title: title, author: author, webSourceURL: webSourceURL)
         }
 
-        // Semantic index for vector search
+        // Extract structured markdown from PDF (for semantic indexing and CLI reading)
         if let service = semanticIndexService {
             Task {
+                await extractPDFMarkdown(pdfURL: destURL, attachmentDir: attDir)
                 await service.indexItem(
                     itemId: docId.uuidString,
                     contentType: ContentType.pdf.rawValue,
@@ -130,9 +132,30 @@ extension ImportService {
                     fileName: sourceURL.lastPathComponent
                 )
             }
+        } else {
+            Task { await extractPDFMarkdown(pdfURL: destURL, attachmentDir: attDir) }
         }
 
         return item
+    }
+
+    // MARK: - PDF Markdown Extraction
+
+    /// If pdf-oxide is available, convert PDF to structured markdown and save as content.md.
+    /// Silent no-op if pdf-oxide is not installed.
+    private func extractPDFMarkdown(pdfURL: URL, attachmentDir: URL) async {
+        guard let toolPath = ToolResolver.resolveFromInstalledSkills(name: "pdf-oxide") else { return }
+
+        let mdURL = attachmentDir.appendingPathComponent("content.md")
+        guard let result = try? await Self.runProcess(
+            executableURL: URL(fileURLWithPath: toolPath),
+            arguments: ["markdown", pdfURL.path]
+        ), result.exitCode == 0,
+           !result.stdout.isEmpty else {
+            return
+        }
+
+        try? result.stdout.write(to: mdURL, atomically: true, encoding: .utf8)
     }
 
     // MARK: - Reference Extraction

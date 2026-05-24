@@ -32,11 +32,16 @@ public enum ToolResolver {
 
     /// Look up a `BinRequirement` by name from installed skills, then resolve it.
     ///
-    /// Scans `~/OakReader/agent/skills/` for a skill whose `skill.json` declares
+    /// Scans `~/OakReader(-Dev)/skills/` for a skill whose `skill.json` declares
     /// a bin with the given name, and resolves using its searchPaths.
     public static func resolveFromInstalledSkills(name: String) -> String? {
+        #if DEBUG
         let installedDir = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("OakReader/agent/skills")
+            .appendingPathComponent("OakReader-Dev/skills")
+        #else
+        let installedDir = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("OakReader/skills")
+        #endif
         let skills = SkillLoader.loadSkills(from: [installedDir]).skills
 
         for skill in skills {
