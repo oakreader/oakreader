@@ -79,8 +79,6 @@ struct LibrarySidebarPanel: View {
 
     @ViewBuilder
     private var referenceTabContent: some View {
-        coverSection
-
         sectionHeader("Reference")
         referenceContent
             .padding(.horizontal, OakStyle.Spacing.xs)
