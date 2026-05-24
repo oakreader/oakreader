@@ -47,8 +47,12 @@ struct LibraryTableView: View {
     @State private var tableSelection: Set<UUID> = []
     @State private var transcriptionService = RecordingTranscriptionService()
     @State private var transcribingItemId: UUID?
+    @State private var itemsPendingTrash: [LibraryItem] = []
+    @State private var itemsPendingDelete: [LibraryItem] = []
+    @State private var showEmptyBinConfirmation = false
 
     private var store: LibraryStore { appState.libraryStore }
+    private var isBinMode: Bool { store.isBinSelected }
 
     private var isRecentlyRead: Bool {
         store.selectedCollectionId == SystemCollectionID.recentlyRead
@@ -191,6 +195,71 @@ struct LibraryTableView: View {
             if mapToItemIds(tableSelection) != newValue {
                 tableSelection = newValue
             }
+        }
+        .onDeleteCommand {
+            let items = store.filteredItems
+            let allItemIds = mapToItemIds(tableSelection)
+            let selectedItems = items.filter { allItemIds.contains($0.id) }
+            guard !selectedItems.isEmpty else { return }
+            if isBinMode {
+                itemsPendingDelete = selectedItems
+            } else {
+                itemsPendingTrash = selectedItems
+            }
+        }
+        .confirmationDialog(
+            "Move to Bin?",
+            isPresented: Binding(
+                get: { !itemsPendingTrash.isEmpty },
+                set: { if !$0 { itemsPendingTrash = [] } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Move to Bin", role: .destructive) {
+                store.trashItems(itemsPendingTrash)
+                itemsPendingTrash = []
+            }
+            Button("Cancel", role: .cancel) { itemsPendingTrash = [] }
+        } message: {
+            let count = itemsPendingTrash.count
+            if count == 1 {
+                Text("'\(itemsPendingTrash.first?.title ?? "")' will be moved to the Bin. You can restore it later.")
+            } else {
+                Text("\(count) items will be moved to the Bin. You can restore them later.")
+            }
+        }
+        .confirmationDialog(
+            "Delete Permanently?",
+            isPresented: Binding(
+                get: { !itemsPendingDelete.isEmpty },
+                set: { if !$0 { itemsPendingDelete = [] } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Delete Permanently", role: .destructive) {
+                for item in itemsPendingDelete { store.removeItem(item) }
+                itemsPendingDelete = []
+            }
+            Button("Cancel", role: .cancel) { itemsPendingDelete = [] }
+        } message: {
+            let count = itemsPendingDelete.count
+            if count == 1 {
+                Text("'\(itemsPendingDelete.first?.title ?? "")' will be permanently deleted. This cannot be undone.")
+            } else {
+                Text("\(count) items will be permanently deleted. This cannot be undone.")
+            }
+        }
+        .confirmationDialog(
+            "Empty Bin?",
+            isPresented: $showEmptyBinConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Empty Bin", role: .destructive) {
+                store.emptyBin()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("All items in the Bin will be permanently deleted. This cannot be undone.")
         }
     }
 
@@ -373,8 +442,17 @@ struct LibraryTableView: View {
 
         Divider()
 
-        Button(role: .destructive) { store.removeItem(item) } label: {
-            Label("Remove from Library", systemImage: "trash")
+        if isBinMode {
+            Button { store.restoreItem(item) } label: {
+                Label("Restore", systemImage: "arrow.uturn.backward")
+            }
+            Button(role: .destructive) { itemsPendingDelete = [item] } label: {
+                Label("Delete Permanently", systemImage: "trash")
+            }
+        } else {
+            Button(role: .destructive) { itemsPendingTrash = [item] } label: {
+                Label("Move to Bin", systemImage: "trash")
+            }
         }
     }
 
@@ -420,22 +498,38 @@ struct LibraryTableView: View {
 
         Divider()
 
-        Button(role: .destructive) { for item in selectedItems { store.removeItem(item) } } label: {
-            Label("Remove \(selectedItems.count) Items", systemImage: "trash")
+        if isBinMode {
+            Button { store.restoreItems(selectedItems) } label: {
+                Label("Restore \(selectedItems.count) Items", systemImage: "arrow.uturn.backward")
+            }
+            Button(role: .destructive) { itemsPendingDelete = selectedItems } label: {
+                Label("Delete \(selectedItems.count) Items Permanently", systemImage: "trash")
+            }
+        } else {
+            Button(role: .destructive) { itemsPendingTrash = selectedItems } label: {
+                Label("Move \(selectedItems.count) Items to Bin", systemImage: "trash")
+            }
         }
     }
 
     @ViewBuilder
     private func emptySelectionMenu() -> some View {
-        Button {
-            createNewNote()
-        } label: {
-            Label("Add Note", systemImage: "note.text.badge.plus")
-        }
-        Button {
-            importPDFs()
-        } label: {
-            Label("Import File...", systemImage: "square.and.arrow.up")
+        if isBinMode {
+            Button(role: .destructive) { showEmptyBinConfirmation = true } label: {
+                Label("Empty Bin", systemImage: "trash")
+            }
+            .disabled(store.trashedItems.isEmpty)
+        } else {
+            Button {
+                createNewNote()
+            } label: {
+                Label("Add Note", systemImage: "note.text.badge.plus")
+            }
+            Button {
+                importPDFs()
+            } label: {
+                Label("Import File...", systemImage: "square.and.arrow.up")
+            }
         }
     }
 

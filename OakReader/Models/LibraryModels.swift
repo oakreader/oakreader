@@ -98,6 +98,7 @@ struct LibraryItem: Identifiable, Hashable {
     var sourceKey: String?
     var extra: String?
     var processingStatus: ProcessingStatus
+    var deletedAt: Date?
 
     // Attachments (files belonging to this item)
     var attachments: [Attachment]
@@ -167,6 +168,7 @@ struct LibraryItem: Identifiable, Hashable {
         self.sourceKey = record.sourceKey
         self.extra = record.extra
         self.processingStatus = ProcessingStatus(rawValue: record.processingStatus) ?? .none
+        self.deletedAt = record.deletedAt.flatMap { Date(iso8601String: $0) }
         self.attachments = attachments
         self.propertyValues = propertyValues
         self.collections = collections

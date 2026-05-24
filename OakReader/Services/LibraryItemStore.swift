@@ -7,7 +7,7 @@ extension LibraryStore {
 
     func fetchAllItems() throws -> [LibraryItem] {
         try database.dbQueue.read { db in
-            let records = try ItemRecord.fetchAll(db)
+            let records = try ItemRecord.filter(ItemRecord.CodingKeys.deletedAt == nil).fetchAll(db)
             let allAttachments = try AttachmentRecord.fetchAll(db)
             let allCollectionItems = try CollectionItemRecord.fetchAll(db)
             let allCollections = try CollectionRecord.order(CollectionRecord.CodingKeys.sortOrder).fetchAll(db)
@@ -396,6 +396,117 @@ extension LibraryStore {
             invalidate()
         } catch {
             Log.error(Log.store, "mergeItems failed: \(error)")
+        }
+    }
+
+    // MARK: - Soft Delete (Bin)
+
+    func fetchTrashedItems() throws -> [LibraryItem] {
+        try database.dbQueue.read { db in
+            let records = try ItemRecord.filter(ItemRecord.CodingKeys.deletedAt != nil).fetchAll(db)
+            let allAttachments = try AttachmentRecord.fetchAll(db)
+            let allCitations = try CitationRecord.fetchAll(db)
+
+            var itemAttachmentsMap: [String: [AttachmentRecord]] = [:]
+            for att in allAttachments {
+                itemAttachmentsMap[att.itemId, default: []].append(att)
+            }
+
+            var citationMap: [String: ReferenceMetadata] = [:]
+            for record in allCitations {
+                if let meta = ReferenceMetadata(jsonString: record.cslJson) {
+                    citationMap[record.itemId] = meta
+                }
+            }
+
+            return records.map { item in
+                let attRecords = itemAttachmentsMap[item.id] ?? []
+                let attachments = attRecords.map { Attachment(record: $0, itemStorageKey: item.storageKey) }
+                let primary = attachments.first { $0.isPrimary } ?? attachments.first
+                let coverData = primary.flatMap { Self.loadCoverData(attachment: $0) }
+                let citation = citationMap[item.id]
+                return LibraryItem(
+                    record: item,
+                    attachments: attachments,
+                    coverImageData: coverData,
+                    referenceMetadata: citation
+                )
+            }
+        }
+    }
+
+    func trashItem(_ item: LibraryItem) {
+        let now = Date().iso8601String
+        do {
+            try database.dbQueue.write { db in
+                try db.execute(
+                    sql: "UPDATE items SET deleted_at = ?, updated_at = ? WHERE id = ?",
+                    arguments: [now, now, item.id.uuidString]
+                )
+            }
+            invalidate()
+        } catch {
+            Log.error(Log.store, "trashItem failed: \(error)")
+        }
+    }
+
+    func trashItems(_ items: [LibraryItem]) {
+        let now = Date().iso8601String
+        do {
+            try database.dbQueue.write { db in
+                for item in items {
+                    try db.execute(
+                        sql: "UPDATE items SET deleted_at = ?, updated_at = ? WHERE id = ?",
+                        arguments: [now, now, item.id.uuidString]
+                    )
+                }
+            }
+            invalidate()
+        } catch {
+            Log.error(Log.store, "trashItems failed: \(error)")
+        }
+    }
+
+    func restoreItem(_ item: LibraryItem) {
+        let now = Date().iso8601String
+        do {
+            try database.dbQueue.write { db in
+                try db.execute(
+                    sql: "UPDATE items SET deleted_at = NULL, updated_at = ? WHERE id = ?",
+                    arguments: [now, item.id.uuidString]
+                )
+            }
+            invalidate()
+        } catch {
+            Log.error(Log.store, "restoreItem failed: \(error)")
+        }
+    }
+
+    func restoreItems(_ items: [LibraryItem]) {
+        let now = Date().iso8601String
+        do {
+            try database.dbQueue.write { db in
+                for item in items {
+                    try db.execute(
+                        sql: "UPDATE items SET deleted_at = NULL, updated_at = ? WHERE id = ?",
+                        arguments: [now, item.id.uuidString]
+                    )
+                }
+            }
+            invalidate()
+        } catch {
+            Log.error(Log.store, "restoreItems failed: \(error)")
+        }
+    }
+
+    func emptyBin() {
+        do {
+            let trashedItems = try fetchTrashedItems()
+            for item in trashedItems {
+                removeItem(item)
+            }
+        } catch {
+            Log.error(Log.store, "emptyBin failed: \(error)")
         }
     }
 

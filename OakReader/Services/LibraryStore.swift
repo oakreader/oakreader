@@ -190,6 +190,10 @@ final class LibraryStore {
         selectedCollectionId == SystemCollectionID.readingList
     }
 
+    var isBinSelected: Bool {
+        selectedCollectionId == SystemCollectionID.bin
+    }
+
     var isQuizCardsSelected: Bool {
         selectedCollectionId == SystemCollectionID.quizCards
     }
@@ -198,6 +202,11 @@ final class LibraryStore {
         // Special handling for Reading List collection (items not in any user collection)
         if isReadingListSelected {
             return readingListFilteredItems
+        }
+
+        // Special handling for Bin collection (trashed items)
+        if isBinSelected {
+            return binFilteredItems
         }
 
         // Special handling for Duplicates collection
@@ -374,6 +383,9 @@ final class LibraryStore {
         if collection.id == SystemCollectionID.duplicates {
             return duplicateGroups.flatMap { $0 }.count
         }
+        if collection.id == SystemCollectionID.bin {
+            return trashedItems.count
+        }
         if collection.id == SystemCollectionID.quizCards {
             return quizCardsItemIds.count
         }
@@ -480,6 +492,34 @@ final class LibraryStore {
                 $0.author.lowercased().contains(query) ||
                 $0.fileName.lowercased().contains(query)
             }
+        }
+
+        return results
+    }
+
+    // MARK: - Bin (Trashed Items)
+
+    var trashedItems: [LibraryItem] {
+        _ = revision
+        return (try? fetchTrashedItems()) ?? []
+    }
+
+    /// Trashed items filtered by search text.
+    private var binFilteredItems: [LibraryItem] {
+        var results = trashedItems
+
+        if !searchText.isEmpty {
+            let query = searchText.lowercased()
+            results = results.filter {
+                $0.title.lowercased().contains(query) ||
+                $0.author.lowercased().contains(query) ||
+                $0.fileName.lowercased().contains(query)
+            }
+        }
+
+        // Sort by deleted_at descending (most recently trashed first)
+        results.sort { a, b in
+            (a.deletedAt ?? .distantPast) > (b.deletedAt ?? .distantPast)
         }
 
         return results

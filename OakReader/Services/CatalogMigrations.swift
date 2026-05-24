@@ -353,6 +353,20 @@ extension CatalogDatabase {
         }
 
 
+        // MARK: v10 — Soft Delete (Bin)
+
+        migrator.registerMigration("v10-soft-delete") { db in
+            try db.execute(sql: "ALTER TABLE items ADD COLUMN deleted_at TEXT")
+            try db.create(index: "idx_items_deleted_at", on: "items", columns: ["deleted_at"], ifNotExists: true)
+
+            // Seed "Bin" system smart collection
+            let now = Date().iso8601String
+            try db.execute(sql: """
+                INSERT INTO collections (id, user_id, name, icon, sort_order, parent_id, is_smart, is_system, filter_rules, created_at, updated_at)
+                VALUES (?, ?, 'Bin', 'trash', 7, NULL, 1, 1, NULL, ?, ?)
+            """, arguments: [SystemCollectionID.bin.uuidString, localUserId, now, now])
+        }
+
         return migrator
     }
 

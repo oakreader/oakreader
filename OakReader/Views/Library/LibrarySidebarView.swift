@@ -12,6 +12,7 @@ struct LibrarySidebarView: View {
     @State private var expandedTagNodes: Set<UUID> = []
     @State private var editingSmartCollection: PDFCollection?
     @State private var extensionRevision = 0
+    @State private var showEmptyBinConfirmation = false
 
     private var store: LibraryStore { appState.libraryStore }
 
@@ -50,6 +51,18 @@ struct LibrarySidebarView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: Preferences.appExtensionToggleNotification)) { _ in
             extensionRevision += 1
+        }
+        .confirmationDialog(
+            "Empty Bin?",
+            isPresented: $showEmptyBinConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Empty Bin", role: .destructive) {
+                store.emptyBin()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("All items in the Bin will be permanently deleted. This cannot be undone.")
         }
     }
 
@@ -132,6 +145,14 @@ struct LibrarySidebarView: View {
                     Label("Merge All Duplicates", systemImage: "arrow.triangle.merge")
                 }
                 .disabled(groupCount == 0)
+            }
+            if collection.id == SystemCollectionID.bin {
+                Button(role: .destructive) {
+                    showEmptyBinConfirmation = true
+                } label: {
+                    Label("Empty Bin", systemImage: "trash")
+                }
+                .disabled(store.trashedItems.isEmpty)
             }
         }
     }
