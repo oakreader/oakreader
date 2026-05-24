@@ -23,7 +23,7 @@ struct RightPanelContentView: View {
                     }
                 case .translation:
                     if Preferences.shared.isExtensionEnabled(.translation) {
-                        TranslationPanelView(translationVM: viewModel.translation)
+                        TranslationPanelView(translationVM: viewModel.translation, voiceVM: viewModel.voice)
                     }
                 case .quizCards:
                     if Preferences.shared.isExtensionEnabled(.quizCards) {
