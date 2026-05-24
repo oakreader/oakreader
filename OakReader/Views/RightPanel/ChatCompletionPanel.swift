@@ -27,7 +27,7 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
     private let panelWidth: CGFloat
     private let windowFrame: NSRect
 
-    fileprivate static let rowHeight: CGFloat = 26
+    fileprivate static let rowHeight: CGFloat = 28
     fileprivate static let headerHeight: CGFloat = 22
     fileprivate static let emptyHeight: CGFloat = 46
     private static let maxPanelHeight: CGFloat = 640
@@ -269,8 +269,8 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
         let margin: CGFloat = 8
 
         // Cap height to available space above the anchor within the window
-        let maxAvailableHeight = constraintRect.maxY - anchorPoint.y - margin * 2
-        let height = min(contentHeight(), Self.maxPanelHeight, max(maxAvailableHeight, Self.emptyHeight + Self.verticalInset * 2))
+        let maxAvailableHeight = max(constraintRect.maxY - anchorPoint.y - margin * 2, 0)
+        let height = max(min(contentHeight(), Self.maxPanelHeight, max(maxAvailableHeight, Self.emptyHeight + Self.verticalInset * 2)), 0)
 
         let maxX = constraintRect.maxX - panelWidth - margin
         let x = min(max(anchorPoint.x, constraintRect.minX + margin), maxX)
@@ -310,8 +310,8 @@ private final class ChatCompletionRowView: NSView {
         icon.translatesAutoresizingMaskIntoConstraints = false
 
         let label = NSTextField(labelWithString: item.displayLabel)
-        label.font = .systemFont(ofSize: 13, weight: .regular)
-        label.textColor = item.completionTint
+        label.font = .systemFont(ofSize: 14, weight: .regular)
+        label.textColor = .labelColor
         label.lineBreakMode = .byTruncatingTail
         label.translatesAutoresizingMaskIntoConstraints = false
         label.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)

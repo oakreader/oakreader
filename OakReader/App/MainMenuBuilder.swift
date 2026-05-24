@@ -54,6 +54,7 @@ enum MainMenuBuilder {
             keyEquivalent: ""
         )
         checkForUpdatesItem.target = updaterController
+        checkForUpdatesItem.image = icon("arrow.triangle.2.circlepath")
         appMenu.addItem(checkForUpdatesItem)
         let installCLIItem = NSMenuItem(
             title: "Install Command Line Tools...",
@@ -64,11 +65,13 @@ enum MainMenuBuilder {
         installCLIItem.image = icon("terminal")
         appMenu.addItem(installCLIItem)
         appMenu.addItem(.separator())
-        appMenu.addItem(NSMenuItem(
+        let settingsItem = NSMenuItem(
             title: "Settings...",
             action: Selector(("showSettingsWindow:")),
             keyEquivalent: ","
-        ))
+        )
+        settingsItem.image = icon("gearshape")
+        appMenu.addItem(settingsItem)
         appMenu.addItem(.separator())
         let servicesMenu = NSMenu(title: "Services")
         let servicesItem = NSMenuItem(title: "Services", action: nil, keyEquivalent: "")

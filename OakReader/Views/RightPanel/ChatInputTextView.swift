@@ -31,6 +31,9 @@ struct ChatInputTextView: NSViewRepresentable {
         func insertDroppedToken(_ item: ChatCompletionItem) {
             textView?.insertDroppedToken(item)
         }
+        func dismissCompletion() {
+            textView?.dismissCompletionIfNeeded()
+        }
     }
 
     let focusRef: FocusRef
@@ -398,6 +401,11 @@ final class ChatNSTextView: NSTextView {
         triggerLocation = nil
     }
 
+    /// Public entry point so SwiftUI can dismiss the popup (e.g. on tab switch).
+    func dismissCompletionIfNeeded() {
+        if completionPanel != nil { dismissCompletionPanel() }
+    }
+
     private func handleCompletionKey(_ event: NSEvent) -> Bool {
         guard completionPanel != nil, let startLoc = triggerLocation else { return false }
 
@@ -491,7 +499,7 @@ final class ChatNSTextView: NSTextView {
         // Insert attachment + trailing space
         let mutable = NSMutableAttributedString(attributedString: attachStr)
         let spaceAttrs: [NSAttributedString.Key: Any] = [
-            .font: font ?? .systemFont(ofSize: 15),
+            .font: font ?? .systemFont(ofSize: 16),
             .foregroundColor: NSColor.labelColor,
         ]
         mutable.append(NSAttributedString(string: " ", attributes: spaceAttrs))

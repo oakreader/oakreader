@@ -435,7 +435,7 @@ struct LibraryTableView: View {
         Button {
             importPDFs()
         } label: {
-            Label("Import File...", systemImage: "square.and.arrow.down")
+            Label("Import File...", systemImage: "square.and.arrow.up")
         }
     }
 
