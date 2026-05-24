@@ -97,7 +97,7 @@ Generate a script from document content and synthesize it to audio with one voic
 ### Requirements
 
 - [ ] Add "Generate Audio Summary" action to the library item context menu and viewer toolbar.
-- [ ] Script generation via AI chat (reuse `PDFContextProvider` for document context).
+- [ ] Script generation via AI chat (reuse `LLMContextProvider` for document context).
   - System prompt instructs the model to produce a narration script.
   - User selects style: Brief, Deep Dive, or Critique.
   - User selects Character (defaults to built-in narrator).
@@ -127,7 +127,7 @@ Write in {language} matching the source document.
 Keep the script between {min_words}–{max_words} words.
 Structure: opening hook → main content → takeaway.
 
-User: [document content from PDFContextProvider]
+User: [document content from LLMContextProvider]
 ```
 
 ### Affected Areas
@@ -137,7 +137,7 @@ User: [document content from PDFContextProvider]
 - `OakReader/ViewModels/` (new AudioSummaryViewModel)
 - `OakReader/Services/` (new AudioSummaryService)
 - `OakReader/Services/ImportService+Audio.swift` (store generated audio)
-- `OakReader/Services/AI/PDFContextProvider.swift` (reuse for context)
+- `OakReader/Services/AI/LLMContextProvider.swift` (reuse for context)
 - `Packages/OakVoiceAI/` (expose batch TTS API)
 
 ---

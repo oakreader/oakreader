@@ -72,6 +72,11 @@ extension CatalogDatabase {
         agentDirectory.appendingPathComponent("MEMORY.md")
     }
 
+    /// ~/OakReader/agent/VOICE.md
+    static var agentVoiceFileURL: URL {
+        agentDirectory.appendingPathComponent("VOICE.md")
+    }
+
     /// ~/OakReader/agent/memory/ — learning logs (legacy)
     static var agentMemoryLogsDirectory: URL {
         agentDirectory.appendingPathComponent("memory", isDirectory: true)
@@ -145,7 +150,8 @@ extension CatalogDatabase {
         let fm = FileManager.default
         let templates: [(resource: String, destination: URL)] = [
             ("USER", agentUserFileURL),
-            ("MEMORY", agentMemoryFileURL)
+            ("MEMORY", agentMemoryFileURL),
+            ("VOICE", agentVoiceFileURL)
         ]
         for template in templates {
             guard !fm.fileExists(atPath: template.destination.path) else { continue }

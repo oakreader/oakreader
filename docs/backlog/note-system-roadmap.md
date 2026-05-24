@@ -44,7 +44,7 @@ Both use the same underlying editor component, but they do not yet share a full 
 
 ### Requirements
 
-- [ ] Fix note lookup in `PDFContextProvider.buildDocumentContext`.
+- [ ] Fix note lookup in `LLMContextProvider.buildDocumentContext`.
   - Current code calls `fetchNotes(forItemId: storageKey)`, but `fetchNotes` expects the item UUID.
   - Use `vm.itemId` or `vm.libraryItem?.id.uuidString`.
 - [ ] Restrict `NotePreviewView` file access.
@@ -63,7 +63,7 @@ Both use the same underlying editor component, but they do not yet share a full 
 
 ### Affected Areas
 
-- `OakReader/Services/AI/PDFContextProvider.swift`
+- `OakReader/Services/AI/LLMContextProvider.swift`
 - `OakReader/Views/RightPanel/NotePreviewView.swift`
 - `OakReader/ViewModels/NotesViewModel.swift`
 - `OakReader/Services/MarkdownRenderer.swift`
@@ -309,7 +309,7 @@ Make notes first-class AI context.
 ### Affected Areas
 
 - `OakReader/ViewModels/ChatViewModel.swift`
-- `OakReader/Services/AI/PDFContextProvider.swift`
+- `OakReader/Services/AI/LLMContextProvider.swift`
 - `OakReader/Services/AI/SearchTools.swift`
 - `OakReader/Services/SemanticIndexService.swift`
 - `OakReader/Views/RightPanel/ChatInputTextView.swift`

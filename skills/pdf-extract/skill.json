@@ -1,0 +1,19 @@
+{
+    "name": "pdf-extract",
+    "description": "Extract structured text from PDF documents",
+    "icon": { "type": "symbol", "value": "doc.richtext" },
+    "version": "1.0.0",
+    "requires": {
+        "bins": [{
+            "name": "pdf-oxide",
+            "description": "Convert PDF to Markdown preserving headings, tables, and lists",
+            "searchPaths": [
+                "~/Library/Application Support/OakReader/bin/pdf-oxide",
+                "/opt/homebrew/bin/pdf-oxide",
+                "/usr/local/bin/pdf-oxide"
+            ],
+            "install": { "brew": "yfedoseev/tap/pdf-oxide" },
+            "versionArgs": ["--version"]
+        }]
+    }
+}
