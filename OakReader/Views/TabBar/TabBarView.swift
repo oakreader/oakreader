@@ -9,6 +9,7 @@ struct TabBarView: View {
 
     @State private var isFullScreen = false
     @State private var isPinnedHovering = false
+    @State private var pluginRefresh = false
 
     private var store: LibraryStore { appState.libraryStore }
 
@@ -84,7 +85,28 @@ struct TabBarView: View {
 
             Spacer(minLength: 0)
 
-            // Settings button — right end, aligned with SideNav column
+            // Panel mode tabs — context-dependent, glass button group
+            if let viewModel = appState.activeTab?.viewModel,
+               viewModel.storageKey != nil,
+               !viewModel.state.isZenMode {
+                // Document tab: show document panel modes
+                glassButtonGroup {
+                    ForEach(panelVisibleModes) { mode in
+                        panelTabButton(mode: mode, viewModel: viewModel)
+                    }
+                }
+                .padding(.trailing, 4)
+            } else if appState.isLibraryActive {
+                // Library tab: show library detail tabs
+                glassButtonGroup {
+                    ForEach(LibraryDetailTab.allCases) { tab in
+                        libraryTabButton(tab: tab)
+                    }
+                }
+                .padding(.trailing, 4)
+            }
+
+            // Settings button — right end
             Button {
                 NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
             } label: {
@@ -97,7 +119,7 @@ struct TabBarView: View {
             .foregroundStyle(appState.showSettings ? Color.accentColor : Color(nsColor: .labelColor))
             .help("Settings")
             .accessibilityLabel("Settings")
-            .frame(width: OakStyle.Size.sidenavWidth)
+            .padding(.trailing, OakStyle.Spacing.xs)
         }
         .padding(.leading, isFullScreen ? fullScreenPadding : trafficLightPadding)
         .frame(height: OakStyle.Size.tabBarHeight)
@@ -108,6 +130,15 @@ struct TabBarView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didExitFullScreenNotification)) { _ in
             isFullScreen = false
         }
+        .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in
+            let modes = panelVisibleModes
+            if let vm = appState.activeTab?.viewModel,
+               let current = vm.state.rightPanelMode,
+               !modes.contains(current) {
+                vm.state.rightPanelMode = nil
+            }
+            pluginRefresh.toggle()
+        }
     }
 
     // MARK: - Sidebar Toggle
@@ -117,6 +148,80 @@ struct TabBarView: View {
             return viewModel.state.isSidebarVisible
         }
         return appState.isLibrarySidebarVisible
+    }
+
+    // MARK: - Panel Mode Tabs
+
+    private var panelVisibleModes: [RightPanelMode] {
+        _ = pluginRefresh
+        let disabledModes = AppExtension.allCases
+            .filter { !Preferences.shared.isExtensionEnabled($0) }
+            .flatMap(\.rightPanelModes)
+        return RightPanelMode.allCases.filter { !disabledModes.contains($0) }
+    }
+
+    private static let glassIconSize: CGFloat = 12
+    private static let glassButtonSize: CGFloat = 24
+
+    private func panelTabButton(mode: RightPanelMode, viewModel: DocumentViewModel) -> some View {
+        let isActive = viewModel.state.rightPanelMode == mode
+
+        return Button {
+            if viewModel.state.rightPanelMode == mode {
+                viewModel.state.rightPanelMode = nil
+            } else {
+                viewModel.state.rightPanelMode = mode
+            }
+        } label: {
+            Image(systemName: mode.systemImage)
+                .font(.system(size: Self.glassIconSize, weight: .medium))
+                .frame(width: Self.glassButtonSize, height: Self.glassButtonSize)
+                .background(
+                    Circle()
+                        .fill(isActive ? Color.primary.opacity(0.12) : Color.clear)
+                )
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(isActive ? Color(nsColor: .labelColor) : Color(nsColor: .secondaryLabelColor))
+        .help(mode.label)
+    }
+
+    // MARK: - Library Detail Tabs
+
+    private func libraryTabButton(tab: LibraryDetailTab) -> some View {
+        let isActive = appState.libraryDetailTab == tab
+
+        return Button {
+            if appState.libraryDetailTab == tab {
+                appState.libraryDetailTab = nil
+            } else {
+                appState.libraryDetailTab = tab
+            }
+        } label: {
+            Image(systemName: tab.systemImage)
+                .font(.system(size: Self.glassIconSize, weight: .medium))
+                .frame(width: Self.glassButtonSize, height: Self.glassButtonSize)
+                .background(
+                    Circle()
+                        .fill(isActive ? Color.primary.opacity(0.12) : Color.clear)
+                )
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(isActive ? Color(nsColor: .labelColor) : Color(nsColor: .secondaryLabelColor))
+        .help(tab.label)
+    }
+
+    // MARK: - Glass Button Group
+
+    private func glassButtonGroup<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        HStack(spacing: 2) {
+            content()
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .modifier(GlassGroupModifier())
     }
 
     // MARK: - Pinned Tab Content
@@ -217,6 +322,29 @@ struct QuizTabView: View {
                 .fill(Color.primary.opacity(0.08))
                 .padding(.horizontal, cr)
                 .padding(.vertical, 5)
+        }
+    }
+}
+
+// MARK: - Glass Group Modifier
+
+/// Wraps content in a Liquid Glass capsule on macOS 26+,
+/// falling back to ultraThinMaterial + stroke on older systems.
+private struct GlassGroupModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 26, *) {
+            content
+                .glassEffect(.regular.interactive(), in: .capsule)
+        } else {
+            content
+                .background(
+                    .ultraThinMaterial,
+                    in: Capsule()
+                )
+                .overlay(
+                    Capsule()
+                        .strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5)
+                )
         }
     }
 }
