@@ -13,9 +13,7 @@ struct LibrarySidebarPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if appState.libraryDetailTab == .chat {
-                AIChatView(chatVM: appState.libraryChatVM)
-            } else if appState.libraryDetailTab == .notes {
+            if appState.libraryDetailTab == .notes {
                 // NotePanelView manages its own scrolling
                 if let notesVM {
                     NotePanelView(notesVM: notesVM)
