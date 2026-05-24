@@ -21,72 +21,53 @@ struct ContentView: View {
             let maxRightPanel = geometry.size.width * 0.6
 
             HStack(spacing: 0) {
-                // Sidebar + content wrapped together for the pane corner beside SideNav.
-                HStack(spacing: 0) {
-                    // Left sidebar — full height
-                    if viewModel.state.isSidebarVisible {
-                        sidebarContentView
-                            .frame(width: effectiveSidebarWidth)
-                            .background(Color(nsColor: .controlBackgroundColor))
-                            .onHover { inside in if inside { NSCursor.arrow.set() } }
+                // Left sidebar — full height
+                if viewModel.state.isSidebarVisible {
+                    sidebarContentView
+                        .frame(width: effectiveSidebarWidth)
+                        .background(Color(nsColor: .controlBackgroundColor))
+                        .onHover { inside in if inside { NSCursor.arrow.set() } }
 
-                        panelDivider { delta in
-                            let range = sidebarWidthRange
-                            sidebarWidth = min(max(effectiveSidebarWidth + delta, range.lowerBound), range.upperBound)
-                        }
-                    }
-
-                    // Main content column
-                    VStack(spacing: 0) {
-                        if viewModel.contentType == .video {
-                            Spacer().frame(height: 8)
-                        }
-
-                        // Main content area
-                        ZStack {
-                            if viewModel.hasDocument {
-                                mainContentView
-                            } else {
-                                emptyStateView
-                            }
-
-                            // Loading overlay
-                            if viewModel.state.isLoading {
-                                ProgressOverlay(message: "Processing...")
-                            }
-                        }
-                        .frame(minWidth: 300)
-                        .frame(maxWidth: .infinity)
-                    }
-                    .background(OakStyle.Colors.contentBackground)
-
-                    // Right panel — draggable divider (full height under tab bar)
-                    if viewModel.state.rightPanelMode != nil {
-                        panelDivider { delta in
-                            rightPanelWidth = min(max(rightPanelWidth - delta, 320), maxRightPanel)
-                        }
-
-                        RightPanelContentView(viewModel: viewModel)
-                            .frame(width: min(rightPanelWidth, maxRightPanel))
-                            .background(Color(nsColor: .controlBackgroundColor))
-                            .onHover { inside in if inside { NSCursor.arrow.set() } }
+                    panelDivider { delta in
+                        let range = sidebarWidthRange
+                        sidebarWidth = min(max(effectiveSidebarWidth + delta, range.lowerBound), range.upperBound)
                     }
                 }
-                .clipShape(
-                    UnevenRoundedRectangle(
-                        topLeadingRadius: 2,
-                        bottomLeadingRadius: 0,
-                        bottomTrailingRadius: 0,
-                        topTrailingRadius: OakStyle.Radius.standard
-                    )
-                )
 
-                // Side navigation strip — hidden in zen mode and for external files
-                if viewModel.storageKey != nil && !viewModel.state.isZenMode {
-                    SideNavView(rightPanelMode: Binding(
-                        get: { viewModel.state.rightPanelMode },
-                        set: { viewModel.state.rightPanelMode = $0 }
-                    ))
+                // Main content column
+                VStack(spacing: 0) {
+                    if viewModel.contentType == .video {
+                        Spacer().frame(height: 8)
+                    }
+
+                    // Main content area
+                    ZStack {
+                        if viewModel.hasDocument {
+                            mainContentView
+                        } else {
+                            emptyStateView
+                        }
+
+                        // Loading overlay
+                        if viewModel.state.isLoading {
+                            ProgressOverlay(message: "Processing...")
+                        }
+                    }
+                    .frame(minWidth: 300)
+                    .frame(maxWidth: .infinity)
+                }
+                .background(OakStyle.Colors.contentBackground)
+
+                // Right panel — draggable divider (full height under tab bar)
+                if viewModel.state.rightPanelMode != nil {
+                    panelDivider { delta in
+                        rightPanelWidth = min(max(rightPanelWidth - delta, 320), maxRightPanel)
+                    }
+
+                    RightPanelContentView(viewModel: viewModel)
+                        .frame(width: min(rightPanelWidth, maxRightPanel))
+                        .background(Color(nsColor: .controlBackgroundColor))
+                        .onHover { inside in if inside { NSCursor.arrow.set() } }
                 }
             }
             .clipShape(

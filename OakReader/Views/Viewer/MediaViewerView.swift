@@ -643,7 +643,7 @@ struct MediaViewerView: View {
                 let topHeight = totalHeight * 0.7
                 let bottomHeight = totalHeight * 0.3
                 let maxVideoWidth = max(geometry.size.width - 32, 280)
-                let videoWidth = min(maxVideoWidth, (topHeight - 40) * 16 / 9, 1120)
+                let videoWidth = max(min(maxVideoWidth, max(topHeight - 40, 0) * 16 / 9, 1120), 0)
 
                 VStack(spacing: 0) {
                     VStack(spacing: 6) {

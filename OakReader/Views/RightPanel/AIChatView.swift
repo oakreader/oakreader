@@ -7,6 +7,7 @@ struct AIChatView: View {
     var voiceVM: VoiceViewModel?
     var onSaveQuizCard: ((QuizContent) -> Bool)?
 
+    @Environment(\.isTabActive) private var isTabActive
     @State private var playingTurnId: UUID?
 
     var body: some View {
@@ -37,6 +38,9 @@ struct AIChatView: View {
         }
         .onChange(of: voiceVM?.isSpeaking) { _, speaking in
             if speaking == false { playingTurnId = nil }
+        }
+        .onChange(of: isTabActive) { _, active in
+            if !active { inputFocusRef.dismissCompletion() }
         }
     }
 
@@ -219,7 +223,7 @@ struct AIChatView: View {
                     let ratio = scrollContentHeight > viewH
                         ? viewH / scrollContentHeight : 1
                     let thumbH = max(ratio * viewH, 28)
-                    let maxTravel = viewH - thumbH
+                    let maxTravel = max(viewH - thumbH, 0)
                     let scrollable = scrollContentHeight - viewH
                     let progress = scrollable > 0
                         ? min(max(scrollOffset / scrollable, 0), 1) : 0

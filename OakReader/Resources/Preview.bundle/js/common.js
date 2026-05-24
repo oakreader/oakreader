@@ -46,15 +46,13 @@ const OakPreview = {
       }
     }
 
-    document.addEventListener('selectionchange', () => {
+    function scheduleRender() {
       cancelAnimationFrame(rafId);
       rafId = requestAnimationFrame(renderSelectionRects);
-    });
-
-    window.addEventListener('scroll', () => {
-      cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(renderSelectionRects);
-    }, true);
+    }
+    document.addEventListener('selectionchange', scheduleRender);
+    window.addEventListener('scroll', scheduleRender, true);
+    window.addEventListener('resize', scheduleRender);
   },
 
   setupCheckboxes() {

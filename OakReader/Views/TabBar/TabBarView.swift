@@ -106,21 +106,8 @@ struct TabBarView: View {
                 .padding(.trailing, 4)
             }
 
-            // Settings button — right end
-            Button {
-                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-            } label: {
-                Image(systemName: "gearshape")
-                    .font(.system(size: OakStyle.Font.icon))
-                    .frame(width: OakStyle.Size.buttonStandard, height: OakStyle.Size.buttonStandard)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(appState.showSettings ? Color.accentColor : Color(nsColor: .labelColor))
-            .help("Settings")
-            .accessibilityLabel("Settings")
-            .padding(.trailing, OakStyle.Spacing.xs)
         }
+        .padding(.trailing, OakStyle.Spacing.xs)
         .padding(.leading, isFullScreen ? fullScreenPadding : trafficLightPadding)
         .frame(height: OakStyle.Size.tabBarHeight)
         .background(.thinMaterial)
