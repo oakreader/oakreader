@@ -33,8 +33,6 @@ struct LibraryRootView: View {
                 }
             }
 
-            // Side navigation strip — always visible, outside the resizable content panes.
-            LibrarySideNavView(tab: $appState.libraryDetailTab)
         }
         .background(libraryChromeBackground)
         .onHover { inside in if inside { NSCursor.arrow.set() } }
@@ -78,7 +76,13 @@ struct LibraryRootView: View {
             )
 
             VStack(spacing: 0) {
-                if store.isDuplicatesSelected {
+                if appState.libraryDetailTab == .chat {
+                    // Chat lives outside the item-selection branch so its
+                    // structural identity stays stable when the selection changes,
+                    // preventing AIChatView from being destroyed & recreated
+                    // (which would replay the empty-state entrance animation).
+                    AIChatView(chatVM: appState.libraryChatVM)
+                } else if store.isDuplicatesSelected {
                     DuplicatesMergeView(appState: appState)
                 } else if let item = selectedItemInCurrentFilter {
                     LibrarySidebarPanel(item: item, appState: appState)
@@ -121,7 +125,7 @@ private struct LibraryCollectionSidebarPanel: View {
     var body: some View {
         switch appState.libraryDetailTab {
         case .chat:
-            AIChatView(chatVM: appState.libraryChatVM)
+            EmptyView() // Handled at detailContentPanel level for stable identity
         case .notes:
             CollectionNotesPanelView(
                 appState: appState,
@@ -172,91 +176,79 @@ private struct CollectionMetadataPanelView: View {
             if items.isEmpty {
                 emptyState(icon: "tray", title: "No Items", subtitle: "This collection is empty.")
             } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
-                        // Stats grid
-                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                            statCard(value: "\(items.count)", label: "Items", icon: "doc.on.doc", color: .blue)
-                            statCard(value: "\(totalPages)", label: "Pages", icon: "book.pages", color: .orange)
-                            statCard(
-                                value: ByteCountFormatter.string(fromByteCount: totalSize, countStyle: .file),
-                                label: "Total Size",
-                                icon: "internaldrive",
-                                color: .purple
-                            )
-                            if let range = dateRange {
-                                statCard(
-                                    value: dateRangeString(range),
-                                    label: "Date Range",
-                                    icon: "calendar",
-                                    color: .green
-                                )
-                            }
-                        }
-
-                        // Type breakdown
-                        if typeCounts.count > 1 {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Content Types")
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .foregroundStyle(.secondary)
-
-                                ForEach(typeCounts, id: \.type) { entry in
-                                    HStack(spacing: 8) {
-                                        Image(systemName: entry.type.icon)
-                                            .font(.system(size: 12))
-                                            .foregroundStyle(.secondary)
-                                            .frame(width: 16)
-
-                                        Text(entry.type.label)
-                                            .font(.system(size: 13))
-
-                                        Spacer()
-
-                                        Text("\(entry.count)")
-                                            .font(.system(size: 13, weight: .medium))
-                                            .foregroundStyle(.secondary)
-                                            .monospacedDigit()
-
-                                        // Proportion bar
-                                        let fraction = Double(entry.count) / Double(items.count)
-                                        GeometryReader { geo in
-                                            RoundedRectangle(cornerRadius: 3)
-                                                .fill(Color.accentColor.opacity(0.25))
-                                                .frame(width: geo.size.width * fraction)
-                                        }
-                                        .frame(width: 60, height: 6)
-                                    }
-                                }
-                            }
-                            .padding(12)
-                            .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.03)))
+                List {
+                    // Stats section
+                    Section {
+                        statRow(label: "Items", value: "\(items.count)", icon: "doc.on.doc")
+                        statRow(label: "Pages", value: "\(totalPages)", icon: "book.pages")
+                        statRow(
+                            label: "Total Size",
+                            value: ByteCountFormatter.string(fromByteCount: totalSize, countStyle: .file),
+                            icon: "internaldrive"
+                        )
+                        if let range = dateRange {
+                            statRow(label: "Date Range", value: dateRangeString(range), icon: "calendar")
                         }
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
+
+                    // Content types section
+                    if typeCounts.count > 1 {
+                        Section("Content Types") {
+                            ForEach(typeCounts, id: \.type) { entry in
+                                HStack(spacing: 8) {
+                                    Image(systemName: entry.type.icon)
+                                        .font(.system(size: 13))
+                                        .foregroundStyle(.secondary)
+                                        .frame(width: 20, alignment: .center)
+
+                                    Text(entry.type.label)
+                                        .font(.system(size: 13))
+
+                                    Spacer()
+
+                                    Text("\(entry.count)")
+                                        .font(.system(size: 13, weight: .medium))
+                                        .foregroundStyle(.secondary)
+                                        .monospacedDigit()
+
+                                    let fraction = Double(entry.count) / Double(items.count)
+                                    Capsule()
+                                        .fill(Color.primary.opacity(0.12))
+                                        .frame(width: 48, height: 4)
+                                        .overlay(alignment: .leading) {
+                                            Capsule()
+                                                .fill(Color.primary.opacity(0.35))
+                                                .frame(width: 48 * fraction)
+                                        }
+                                }
+                            }
+                        }
+                    }
                 }
+                .listStyle(.inset)
+                .scrollContentBackground(.hidden)
             }
         }
     }
 
-    private func statCard(value: String, label: String, icon: String, color: Color) -> some View {
-        VStack(spacing: 4) {
+    private func statRow(label: String, value: String, icon: String) -> some View {
+        HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 16))
-                .foregroundStyle(color)
-            Text(value)
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-            Text(label)
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: 13))
                 .foregroundStyle(.secondary)
+                .frame(width: 20, alignment: .center)
+
+            Text(label)
+                .font(.system(size: 13))
+                .foregroundStyle(.primary)
+
+            Spacer()
+
+            Text(value)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
-        .background(RoundedRectangle(cornerRadius: 8).fill(color.opacity(0.08)))
     }
 
     private func dateRangeString(_ range: (earliest: Date, latest: Date)) -> String {
