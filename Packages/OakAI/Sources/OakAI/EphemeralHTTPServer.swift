@@ -2,8 +2,10 @@ import Foundation
 import Network
 
 /// Lightweight NWListener-based HTTP server for OAuth callbacks.
-/// Starts on a specified port, waits for a single GET /callback request, extracts code/state, returns success HTML, and shuts down.
+/// Starts on a specified port, waits for a single GET request to the callback path,
+/// extracts code/state, returns success HTML, and shuts down.
 public actor EphemeralHTTPServer {
+    private let callbackPath: String
     private var listener: NWListener?
     private var continuation: CheckedContinuation<CallbackResult, Error>?
 
@@ -12,95 +14,104 @@ public actor EphemeralHTTPServer {
         public let state: String?
     }
 
-    /// Start the server and wait for a callback. Returns the authorization code when received.
+    public init(callbackPath: String = "/auth/callback") {
+        self.callbackPath = callbackPath
+    }
+
+    /// Start the server and wait for the OAuth callback. Returns the authorization code when received.
+    /// Automatically cancels the listener when the calling Task is cancelled.
     public func waitForCallback(port: Int, timeoutSeconds: Int = 120) async throws -> CallbackResult {
-        try await withCheckedThrowingContinuation { cont in
-            self.continuation = cont
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { cont in
+                self.continuation = cont
 
-            do {
-                let params = NWParameters.tcp
-                let listener = try NWListener(using: params, on: NWEndpoint.Port(integerLiteral: UInt16(port)))
+                do {
+                    let listener = try NWListener(using: .tcp, on: NWEndpoint.Port(integerLiteral: UInt16(port)))
 
-                listener.stateUpdateHandler = { [weak self] state in
-                    if case .failed(let error) = state {
-                        Task { await self?.fail(with: error) }
+                    listener.stateUpdateHandler = { [weak self] state in
+                        if case .failed(let error) = state {
+                            Task { await self?.fail(with: error) }
+                        }
                     }
-                }
+                    listener.newConnectionHandler = { [weak self] connection in
+                        Task { await self?.handleConnection(connection) }
+                    }
 
-                listener.newConnectionHandler = { [weak self] connection in
-                    Task { await self?.handleConnection(connection) }
-                }
+                    self.listener = listener
+                    listener.start(queue: .global(qos: .userInitiated))
 
-                self.listener = listener
-                listener.start(queue: .global(qos: .userInitiated))
-
-                // Timeout
-                Task {
-                    try await Task.sleep(nanoseconds: UInt64(timeoutSeconds) * 1_000_000_000)
-                    await self.fail(with: OAuthError.timeout)
+                    Task { [weak self] in
+                        try? await Task.sleep(nanoseconds: UInt64(timeoutSeconds) * 1_000_000_000)
+                        await self?.fail(with: OAuthError.timeout)
+                    }
+                } catch {
+                    cont.resume(throwing: error)
+                    self.continuation = nil
                 }
-            } catch {
-                cont.resume(throwing: error)
-                self.continuation = nil
             }
+        } onCancel: { [self] in
+            Task { await self.cancel() }
         }
     }
+
+    /// Cancel the server and clean up resources.
+    public func cancel() {
+        fail(with: CancellationError())
+    }
+
+    // MARK: - Connection Handling
 
     private func handleConnection(_ connection: NWConnection) {
         connection.start(queue: .global(qos: .userInitiated))
 
         connection.receive(minimumIncompleteLength: 1, maximumLength: 8192) { [weak self] data, _, _, error in
-            Task {
-                if let error {
-                    await self?.fail(with: error)
-                    return
-                }
-
-                guard let data, let requestString = String(data: data, encoding: .utf8) else {
-                    await self?.fail(with: OAuthError.invalidCallback)
-                    return
-                }
-
-                // Parse GET /callback?code=...&state=...
-                guard let firstLine = requestString.split(separator: "\r\n").first else {
-                    await self?.fail(with: OAuthError.invalidCallback)
-                    return
-                }
-
-                let parts = firstLine.split(separator: " ")
-                guard parts.count >= 2, parts[0] == "GET" else {
-                    await self?.fail(with: OAuthError.invalidCallback)
-                    return
-                }
-
-                let pathAndQuery = String(parts[1])
-                guard let components = URLComponents(string: pathAndQuery),
-                      let queryItems = components.queryItems,
-                      let code = queryItems.first(where: { $0.name == "code" })?.value
-                else {
-                    await self?.fail(with: OAuthError.invalidCallback)
-                    return
-                }
-
-                let state = queryItems.first(where: { $0.name == "state" })?.value
-
-                // Send success HTML response
-                let html = """
-                    <html><body style="font-family:system-ui;text-align:center;padding-top:60px;">
-                    <h2>Authorization Successful</h2>
-                    <p>You can close this window and return to OakReader.</p>
-                    </body></html>
-                    """
-                let response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n\(html)"
-                let responseData = response.data(using: .utf8)!
-
-                connection.send(content: responseData, completion: .contentProcessed { _ in
-                    connection.cancel()
-                })
-
-                await self?.succeed(with: CallbackResult(code: code, state: state))
-            }
+            Task { await self?.processRequest(connection: connection, data: data, error: error) }
         }
+    }
+
+    private func processRequest(connection: NWConnection, data: Data?, error: NWError?) {
+        // Connection-level errors just drop the connection — don't fail the flow.
+        guard error == nil, let data, let request = String(data: data, encoding: .utf8) else {
+            connection.cancel()
+            return
+        }
+
+        guard let parsed = HTTPRequestLine.parse(request) else {
+            respond(connection: connection, status: "400 Bad Request", body: "Malformed request.")
+            return
+        }
+        guard parsed.method == "GET" else {
+            respond(connection: connection, status: "405 Method Not Allowed", body: "Only GET is supported.")
+            return
+        }
+        // Ignore non-callback paths (e.g. /favicon.ico) without failing the flow.
+        guard parsed.path == callbackPath else {
+            respond(connection: connection, status: "404 Not Found", body: "Not found.")
+            return
+        }
+        guard let code = parsed.queryItems?["code"] else {
+            respond(connection: connection, status: "400 Bad Request", body: "Missing authorization code.")
+            return
+        }
+
+        let successHTML = """
+            <html><body style="font-family:system-ui;text-align:center;padding-top:60px;">
+            <h2>Authorization Successful</h2>
+            <p>You can close this window and return to OakReader.</p>
+            </body></html>
+            """
+        respond(connection: connection, status: "200 OK", body: successHTML, raw: true)
+        succeed(with: CallbackResult(code: code, state: parsed.queryItems?["state"]))
+    }
+
+    // MARK: - Response Helpers
+
+    private func respond(connection: NWConnection, status: String, body: String, raw: Bool = false) {
+        let content = raw ? body : "<html><body style=\"font-family:system-ui;text-align:center;padding-top:60px;\"><p>\(body)</p></body></html>"
+        let http = "HTTP/1.1 \(status)\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n\(content)"
+        connection.send(content: http.data(using: .utf8)!, completion: .contentProcessed { _ in
+            connection.cancel()
+        })
     }
 
     private func succeed(with result: CallbackResult) {
@@ -117,6 +128,32 @@ public actor EphemeralHTTPServer {
         continuation = nil
     }
 }
+
+// MARK: - Minimal HTTP Request Line Parser
+
+private struct HTTPRequestLine {
+    let method: String
+    let path: String
+    let queryItems: [String: String]?
+
+    static func parse(_ raw: String) -> HTTPRequestLine? {
+        guard let firstLine = raw.split(separator: "\r\n").first else { return nil }
+        let parts = firstLine.split(separator: " ")
+        guard parts.count >= 2 else { return nil }
+
+        let method = String(parts[0])
+        let pathAndQuery = String(parts[1])
+        guard let components = URLComponents(string: pathAndQuery) else { return nil }
+
+        let items = components.queryItems?.reduce(into: [String: String]()) { dict, item in
+            if let value = item.value { dict[item.name] = value }
+        }
+
+        return HTTPRequestLine(method: method, path: components.path, queryItems: items)
+    }
+}
+
+// MARK: - OAuth Errors
 
 public enum OAuthError: LocalizedError, Sendable {
     case timeout

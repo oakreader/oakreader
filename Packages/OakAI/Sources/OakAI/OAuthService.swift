@@ -45,17 +45,21 @@ public actor OAuthService {
         let authURL = components.url!
 
         // 3. Start ephemeral HTTP server to receive callback
-        let server = EphemeralHTTPServer()
+        let server = EphemeralHTTPServer(callbackPath: config.callbackPath)
 
         // 4. Open browser
-        await MainActor.run {
-            #if canImport(AppKit)
-            NSWorkspace.shared.open(authURL)
-            #endif
-        }
+        #if canImport(AppKit)
+        _ = await MainActor.run { NSWorkspace.shared.open(authURL) }
+        #endif
 
-        // 5. Wait for callback
-        let callback = try await server.waitForCallback(port: config.callbackPort)
+        // 5. Wait for callback (cancel server on failure to free the port)
+        let callback: EphemeralHTTPServer.CallbackResult
+        do {
+            callback = try await server.waitForCallback(port: config.callbackPort)
+        } catch {
+            await server.cancel()
+            throw error
+        }
 
         // Verify state
         if callback.state != state {
@@ -144,14 +148,16 @@ public actor OAuthService {
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
         let redirectURI = "http://localhost:\(config.callbackPort)\(config.callbackPath)"
-        let params = [
-            "grant_type=authorization_code",
-            "client_id=\(config.clientId)",
-            "code=\(code)",
-            "redirect_uri=\(redirectURI)",
-            "code_verifier=\(verifier)",
-        ].joined(separator: "&")
-        request.httpBody = params.data(using: .utf8)
+        var components = URLComponents()
+        components.queryItems = [
+            URLQueryItem(name: "grant_type", value: "authorization_code"),
+            URLQueryItem(name: "client_id", value: config.clientId),
+            URLQueryItem(name: "code", value: code),
+            URLQueryItem(name: "redirect_uri", value: redirectURI),
+            URLQueryItem(name: "code_verifier", value: verifier),
+        ]
+        // URLComponents.percentEncodedQuery properly encodes form values
+        request.httpBody = components.percentEncodedQuery?.data(using: .utf8)
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {

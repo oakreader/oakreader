@@ -11,6 +11,7 @@ public enum KeychainService: Sendable {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
+            kSecUseDataProtectionKeychain as String: true,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
         ]
@@ -26,6 +27,7 @@ public enum KeychainService: Sendable {
         let baseQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
+            kSecUseDataProtectionKeychain as String: true,
         ]
 
         guard !key.isEmpty else {
@@ -33,17 +35,10 @@ public enum KeychainService: Sendable {
             return true
         }
 
-        let data = key.data(using: .utf8)!
-
-        let updateAttrs: [String: Any] = [
-            kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked,
-        ]
-        let updateStatus = SecItemUpdate(baseQuery as CFDictionary, updateAttrs as CFDictionary)
-        if updateStatus == errSecSuccess { return true }
+        SecItemDelete(baseQuery as CFDictionary)
 
         var addQuery = baseQuery
-        addQuery[kSecValueData as String] = data
+        addQuery[kSecValueData as String] = key.data(using: .utf8)!
         addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlocked
         return SecItemAdd(addQuery as CFDictionary, nil) == errSecSuccess
     }
@@ -53,6 +48,7 @@ public enum KeychainService: Sendable {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
+            kSecUseDataProtectionKeychain as String: true,
         ]
         SecItemDelete(query as CFDictionary)
     }
@@ -67,6 +63,7 @@ public enum KeychainService: Sendable {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
+            kSecUseDataProtectionKeychain as String: true,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
         ]
@@ -83,6 +80,7 @@ public enum KeychainService: Sendable {
         let baseQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
+            kSecUseDataProtectionKeychain as String: true,
         ]
 
         guard !value.isEmpty else {
@@ -90,16 +88,10 @@ public enum KeychainService: Sendable {
             return true
         }
 
-        let data = value.data(using: .utf8)!
-        let updateAttrs: [String: Any] = [
-            kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked,
-        ]
-        let updateStatus = SecItemUpdate(baseQuery as CFDictionary, updateAttrs as CFDictionary)
-        if updateStatus == errSecSuccess { return true }
+        SecItemDelete(baseQuery as CFDictionary)
 
         var addQuery = baseQuery
-        addQuery[kSecValueData as String] = data
+        addQuery[kSecValueData as String] = value.data(using: .utf8)!
         addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlocked
         return SecItemAdd(addQuery as CFDictionary, nil) == errSecSuccess
     }
@@ -110,6 +102,7 @@ public enum KeychainService: Sendable {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
+            kSecUseDataProtectionKeychain as String: true,
         ]
         SecItemDelete(query as CFDictionary)
     }
