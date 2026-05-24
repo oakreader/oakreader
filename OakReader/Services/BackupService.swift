@@ -333,8 +333,8 @@ final class BackupService {
 
         // Merge installed skills from the previous data that are not in the backup.
         // This prevents personal (non-bundled) skills from being lost on restore.
-        let oldSkillsDir = safetyBackup.appendingPathComponent("agent/skills")
-        let newSkillsDir = dataDir.appendingPathComponent("agent/skills")
+        let oldSkillsDir = safetyBackup.appendingPathComponent("skills")
+        let newSkillsDir = dataDir.appendingPathComponent("skills")
         if fm.fileExists(atPath: oldSkillsDir.path) {
             try? fm.createDirectory(at: newSkillsDir, withIntermediateDirectories: true)
             if let oldEntries = try? fm.contentsOfDirectory(

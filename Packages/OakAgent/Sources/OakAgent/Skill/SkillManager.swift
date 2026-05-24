@@ -5,8 +5,13 @@ public final class SkillManager {
     public static let shared = SkillManager()
 
     public nonisolated static let installedDir: URL = {
+        #if DEBUG
         FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("OakReader/agent/skills", isDirectory: true)
+            .appendingPathComponent("OakReader-Dev/skills", isDirectory: true)
+        #else
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("OakReader/skills", isDirectory: true)
+        #endif
     }()
 
     /// Only enabled skills — used by chat, skill picker, and system prompt.

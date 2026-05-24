@@ -230,6 +230,14 @@ struct ItemsRead: ParsableCommand {
     // MARK: - Text Extraction
 
     private func extractPDFText(url: URL, pageCount: Int, pagesParam: String?) throws -> String {
+        // Prefer structured content.md when reading the full document
+        if pagesParam == nil {
+            let mdURL = url.deletingLastPathComponent().appendingPathComponent("content.md")
+            if let markdown = try? String(contentsOf: mdURL, encoding: .utf8), !markdown.isEmpty {
+                return markdown
+            }
+        }
+
         guard let pdf = PDFDocument(url: url) else {
             throw OakError.general("Failed to open PDF at \(url.path)")
         }

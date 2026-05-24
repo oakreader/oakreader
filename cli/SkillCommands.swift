@@ -5,10 +5,15 @@ import OakAgent
 
 enum SkillCommands {
 
-    /// Installed skills directory: `~/OakReader/agent/skills/`.
+    /// Installed skills directory: `~/OakReader/skills/` (Release) or `~/OakReader-Dev/skills/` (Debug).
     static let installedDir: URL = {
+        #if DEBUG
         FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("OakReader/agent/skills", isDirectory: true)
+            .appendingPathComponent("OakReader-Dev/skills", isDirectory: true)
+        #else
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("OakReader/skills", isDirectory: true)
+        #endif
     }()
 
     // MARK: - Public API (called from ArgumentParser commands)
@@ -244,7 +249,7 @@ enum SkillCommands {
         return skills
     }
 
-    /// Load only installed skills from ~/OakReader/agent/skills/.
+    /// Load only installed skills from ~/OakReader/skills/.
     private static func loadInstalledSkills() -> [AgentSkill] {
         SkillLoader.loadSkills(from: [installedDir]).skills
     }

@@ -191,7 +191,7 @@ struct CLIImporter {
             pageCount: 1
         ))
 
-        // Generate content.md via pandoc if available
+        // Generate content.md via html-to-markdown if available
         extractMarkdown(from: destURL, to: attDir)
 
         return ImportResult(itemId: docId, title: title, isDuplicate: false)
@@ -307,30 +307,42 @@ struct CLIImporter {
         }
     }
 
-    // MARK: - Pandoc Markdown Extraction
+    // MARK: - Markdown Extraction
 
-    /// If pandoc is available, convert HTML to markdown and save as content.md.
-    /// Silent no-op if pandoc is not installed.
+    /// If html-to-markdown is available, convert HTML to markdown and save as content.md.
+    /// Silent no-op if html-to-markdown is not installed.
+    /// Timeout in seconds for HTML-to-Markdown conversions.
+    private static let conversionTimeout: TimeInterval = 30
+
     func extractMarkdown(from htmlURL: URL, to attachmentDir: URL) {
-        guard let pandocPath = ToolResolver.resolveFromInstalledSkills(name: "pandoc") else { return }
+        guard let toolPath = ToolResolver.resolveFromInstalledSkills(name: "html-to-markdown") else { return }
 
         let mdURL = attachmentDir.appendingPathComponent("content.md")
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: pandocPath)
-        process.arguments = ["-f", "html", "-t", "markdown-raw_html", "--wrap=none", htmlURL.path]
+        process.executableURL = URL(fileURLWithPath: toolPath)
+        process.arguments = [htmlURL.path]
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = FileHandle.nullDevice
 
         do {
             try process.run()
-            process.waitUntilExit()
-            guard process.terminationStatus == 0 else { return }
+
+            let timer = DispatchSource.makeTimerSource(queue: .global())
+            timer.schedule(deadline: .now() + Self.conversionTimeout)
+            timer.setEventHandler { process.terminate() }
+            timer.resume()
+
+            // Read pipe data BEFORE waitUntilExit to avoid pipe buffer deadlock.
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            timer.cancel()
+
+            guard process.terminationStatus == 0 else { return }
             guard !data.isEmpty else { return }
             try data.write(to: mdURL)
         } catch {
-            // Silent failure — pandoc is optional
+            // Silent failure — html-to-markdown is optional
         }
     }
 

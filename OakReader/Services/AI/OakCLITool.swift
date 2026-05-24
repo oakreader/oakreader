@@ -10,13 +10,12 @@ struct OakCLITool: AgentTool, Sendable {
         Run an oak CLI command to interact with the user's library. \
         Available commands: \
         collections list | collections create <name> | collections add <collection> <item> | \
-        items list [--collection <name>] [--tag <name>] [--search <q>] [--sort title|author|date] [--limit N] | \
+        items list [--collection <name>] [--tag <name>] [--search <q>] [--sort title|author|date] | \
         items show <item> | items read <item> [--pages 1-5] | \
         tags list | tags create <name> | tags add <tag> <item> | \
         search <query> [--limit N] | status <item> [unread|reading|completed|archived]. \
-        Output is always JSON. \
-        IMPORTANT: Always use --limit (e.g. --limit 20) with "items list" and "search" to avoid overwhelming output. \
-        Only omit --limit when the user explicitly asks to see everything.
+        Output is always JSON. The response includes a meta.count field with the total count. \
+        For "search", use --limit (max 20) to control result size.
         """
 
     private static let oakPath = "/usr/local/bin/oak"
@@ -28,7 +27,7 @@ struct OakCLITool: AgentTool, Sendable {
                 "command": [
                     "type": "string",
                     "description":
-                        "The oak subcommand and arguments (e.g. \"collections list\", \"tags list\", \"items list --limit 10\", \"items list --collection Papers --limit 20\", \"search attention mechanism --limit 10\")."
+                        "The oak subcommand and arguments (e.g. \"collections list\", \"tags list\", \"items list\", \"items list --collection Papers\", \"search attention mechanism --limit 10\")."
                 ] as [String: Any]
             ] as [String: Any],
             "required": ["command"]
@@ -43,13 +42,17 @@ struct OakCLITool: AgentTool, Sendable {
             return .error("Missing required parameter: command")
         }
 
-        // Safety net: inject --limit 20 for list/search commands that omit it
+        // Safety net: items list always gets a tight limit (agent reads meta.count
+        // for totals); search gets capped at 50.
         var safeCommand = command
-        if !safeCommand.contains("--limit") {
-            let listPattern = safeCommand.hasPrefix("items list") || safeCommand.hasPrefix("search")
-            if listPattern {
-                safeCommand += " --limit 20"
-            }
+        if safeCommand.hasPrefix("items list") {
+            // Strip any --limit the agent may have added and force --limit 5
+            safeCommand = safeCommand.replacingOccurrences(
+                of: #"--limit\s+\d+"#, with: "", options: .regularExpression
+            ).trimmingCharacters(in: .whitespaces)
+            safeCommand += " --limit 5"
+        } else if safeCommand.hasPrefix("search") && !safeCommand.contains("--limit") {
+            safeCommand += " --limit 20"
         }
 
         // Build the full shell command — always append --json for structured output
