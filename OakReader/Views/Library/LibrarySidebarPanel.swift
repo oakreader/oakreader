@@ -141,26 +141,35 @@ struct LibrarySidebarPanel: View {
 
     @ViewBuilder
     private var coverSection: some View {
+        HStack {
+            Spacer()
+            coverContent
+            Spacer()
+        }
+        .padding(OakStyle.Spacing.xs)
+    }
+
+    @ViewBuilder
+    private var coverContent: some View {
         if let data = item.coverImageData ?? generatedCoverData, let nsImage = NSImage(data: data) {
-            HStack {
-                Spacer()
-                Image(nsImage: nsImage)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(maxHeight: 220)
-                    .cornerRadius(OakStyle.Radius.small)
-                    .background(
-                        RoundedRectangle(cornerRadius: OakStyle.Radius.small)
-                            .fill(Color(nsColor: .textBackgroundColor))
-                            .shadow(color: .black.opacity(0.25), radius: 6, y: 3)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: OakStyle.Radius.small)
-                            .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
-                    )
-                Spacer()
+            Image(nsImage: nsImage)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(maxHeight: 220)
+                .coverCard(shadow: true)
+        } else {
+            VStack(spacing: OakStyle.Spacing.xs) {
+                Image(systemName: item.displayIcon)
+                    .font(.system(size: 32, weight: .light))
+                    .foregroundStyle(.tertiary)
+                Text(item.title)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(3)
             }
-            .padding(OakStyle.Spacing.xs)
+            .frame(width: 160, height: 160)
+            .coverCard(shadow: false)
         }
     }
 

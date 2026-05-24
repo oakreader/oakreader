@@ -228,6 +228,26 @@ enum OakStyle {
         static let concave: CGFloat = 10
     }
 
+    // MARK: - View Modifiers
+
+    struct CoverCardModifier: ViewModifier {
+        var shadow: Bool
+
+        func body(content: Content) -> some View {
+            content
+                .cornerRadius(Radius.small)
+                .background(
+                    RoundedRectangle(cornerRadius: Radius.small)
+                        .fill(shadow ? Color(nsColor: .textBackgroundColor) : Color.primary.opacity(0.03))
+                        .shadow(color: shadow ? .black.opacity(0.25) : .clear, radius: 6, y: 3)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radius.small)
+                        .stroke(Color.primary.opacity(shadow ? 0.1 : 0.08), lineWidth: 0.5)
+                )
+        }
+    }
+
     // MARK: - Annotation Colors
 
     enum AnnotationColors {
@@ -252,5 +272,11 @@ enum OakStyle {
             ("Gray", gray, NSColor(red: 0.667, green: 0.667, blue: 0.667, alpha: 1.0)),
             ("Black", black, NSColor(red: 0.0, green: 0.0, blue: 0.0, alpha: 1.0)),
         ]
+    }
+}
+
+extension View {
+    func coverCard(shadow: Bool) -> some View {
+        modifier(OakStyle.CoverCardModifier(shadow: shadow))
     }
 }
