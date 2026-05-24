@@ -70,18 +70,7 @@ class TranslationViewModel {
             return m.isEmpty ? (ProviderRegistry.shared.provider(for: pid)?.defaultModelId ?? "") : m
         }()
 
-        let sameLanguage = sourceLang == targetLang && sourceLang != .auto
-        let systemPrompt = sameLanguage
-            ? "You are a text polishing engine. Revise the text to improve clarity, conciseness, and readability. Output only the revised text without explanations."
-            : "You are a translation engine that translates text accurately and naturally. Output only the translated text without explanations."
-
-        let userPrompt: String
-        if sameLanguage {
-            userPrompt = "Polish the following text in \(targetLang.displayName):\n\n\(text)"
-        } else {
-            let sourceLabel = sourceLang == .auto ? "auto-detected language" : sourceLang.displayName
-            userPrompt = "Translate from \(sourceLabel) to \(targetLang.displayName):\n\n\(text)"
-        }
+        let (systemPrompt, userPrompt) = buildPrompts(text: text)
 
         let config = ProviderConfig(providerId: pid, model: model)
         let messages = [LLMMessage(role: .user, text: userPrompt)]
@@ -117,6 +106,127 @@ class TranslationViewModel {
             }
             isTranslating = false
         }
+    }
+
+    // MARK: - Prompt Construction
+
+    private var isChinese: Bool {
+        [.zhHans, .zhHant, .lzh].contains(targetLang)
+    }
+
+    /// Detect whether the input is a single word or short phrase suitable for dictionary-style output.
+    private func isWordLookup(_ text: String) -> Bool {
+        let words = text.split(separator: " ")
+        // Single English-style word, or a very short CJK string (≤4 chars with no spaces)
+        if words.count == 1 && text.count <= 30 { return true }
+        // Short CJK input (no spaces, ≤5 chars) — likely a word/phrase lookup
+        if words.count == 1 && text.count <= 5
+            && text.unicodeScalars.contains(where: { $0.value >= 0x4E00 && $0.value <= 0x9FFF }) {
+            return true
+        }
+        return false
+    }
+
+    /// Build document context string from the parent document's metadata.
+    private var documentContext: String {
+        guard let item = parent?.libraryItem else { return "" }
+        var parts: [String] = []
+        if !item.title.isEmpty { parts.append("Document: \(item.title)") }
+        if !item.author.isEmpty { parts.append("Author: \(item.author)") }
+        parts.append("Type: \(item.contentType.rawValue)")
+        return parts.joined(separator: " | ")
+    }
+
+    private func buildPrompts(text: String) -> (system: String, user: String) {
+        let sameLanguage = sourceLang == targetLang && sourceLang != .auto
+        let sourceLabel = sourceLang == .auto ? "auto-detected language" : sourceLang.displayName
+        let targetLabel = targetLang.displayName
+        let docCtx = documentContext
+
+        // --- Polishing mode (same language) ---
+        if sameLanguage {
+            let system = """
+            You are an expert editor and native \(targetLabel) writer. \
+            Revise the text to improve clarity, conciseness, and coherence \
+            so it reads like polished native prose. \
+            Preserve the original meaning and tone. Output only the revised text.
+            """
+            let user = "Polish the following \(targetLabel) text:\n\n\(text)"
+            return (system, user)
+        }
+
+        // --- Word / short phrase lookup ---
+        if isWordLookup(text) {
+            if isChinese {
+                let system = """
+                你是一位翻译引擎。翻译给出的文本，只需翻译不需要解释。\
+                当文本是单个单词时，请给出：\
+                单词原始形态（如有）、语种、对应音标或转写、\
+                所有含义（含词性）、至少三条双语示例。\
+                格式：
+                [语种] / 音标
+                [词性] 含义
+                例句：
+                1. 例句 (翻译)
+                """
+                var user = "翻译为\(targetLabel)：\n\n\(text)"
+                if !docCtx.isEmpty { user += "\n\n[\(docCtx)]" }
+                return (system, user)
+            } else {
+                let system = """
+                You are a translation engine. When the input is a single word, provide: \
+                original form (if applicable), source language, phonetic transcription, \
+                all meanings with parts of speech, and at least 3 bilingual example sentences. \
+                Format:
+                [Language] / Phonetics
+                [POS] Meaning
+                Examples:
+                1. Example (Translation)
+                """
+                var user = "Translate to \(targetLabel):\n\n\(text)"
+                if !docCtx.isEmpty { user += "\n\n[\(docCtx)]" }
+                return (system, user)
+            }
+        }
+
+        // --- Full text translation ---
+        let system: String
+        var user: String
+
+        if isChinese {
+            // Chinese-target: "reshape" philosophy for natural, native Chinese output
+            system = """
+            你是一位资深中文重塑专家。你的任务不是逐字翻译，而是"重塑"：\
+            完全吸收原文的思想、逻辑、语气和意图，\
+            然后彻底抛弃原文的语法结构，\
+            以中文母语者的思维，用最自然、最地道的\(targetLabel)重新表达。\
+            要求：
+            - 不出现翻译腔，读者应感受不到翻译痕迹
+            - 长句拆短，被动转主动，符合中文表达习惯
+            - 保持原文的风格和语气
+            - 专业术语准确，通用表达地道
+            - 只输出重塑后的译文，不要任何解释
+            """
+            user = "将以下\(sourceLabel)文本重塑为\(targetLabel)：\n\n\(text)"
+        } else {
+            system = """
+            You are a professional translator. Your goal is to produce a translation \
+            that reads as if originally written in \(targetLabel) by a native speaker. \
+            Requirements:
+            - Convey the meaning, tone, and intent accurately
+            - Use natural \(targetLabel) sentence structures and idioms, not calques from the source
+            - Break up overly long sentences when needed for readability
+            - Keep technical terms accurate and domain-appropriate
+            - Output only the translated text, no explanations
+            """
+            user = "Translate from \(sourceLabel) to \(targetLabel):\n\n\(text)"
+        }
+
+        if !docCtx.isEmpty {
+            user += "\n\n[\(docCtx)]"
+        }
+
+        return (system, user)
     }
 
     func stopTranslation() {
