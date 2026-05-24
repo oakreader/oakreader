@@ -12,7 +12,7 @@ final class LibraryStore {
     var searchText: String = ""
     var currentSort: LibrarySortOrder = .dateAdded
     var sortAscending: Bool = false
-    var selectedCollectionId: UUID? = SystemCollectionID.allItems
+    var selectedCollectionId: UUID? = SystemCollectionID.readingList
     var selectedTagOptionId: UUID?
 
     // Semantic search state
@@ -186,8 +186,8 @@ final class LibraryStore {
         return map
     }
 
-    var isInboxSelected: Bool {
-        selectedCollectionId == SystemCollectionID.inbox
+    var isReadingListSelected: Bool {
+        selectedCollectionId == SystemCollectionID.readingList
     }
 
     var isQuizCardsSelected: Bool {
@@ -195,9 +195,9 @@ final class LibraryStore {
     }
 
     var filteredItems: [LibraryItem] {
-        // Special handling for Inbox collection (items not in any user collection)
-        if isInboxSelected {
-            return inboxFilteredItems
+        // Special handling for Reading List collection (items not in any user collection)
+        if isReadingListSelected {
+            return readingListFilteredItems
         }
 
         // Special handling for Duplicates collection
@@ -368,8 +368,8 @@ final class LibraryStore {
 
     /// Count items matching a smart collection's rules.
     func smartCollectionItemCount(for collection: PDFCollection) -> Int {
-        if collection.id == SystemCollectionID.inbox {
-            return inboxItemIds.count
+        if collection.id == SystemCollectionID.readingList {
+            return readingListItemIds.count
         }
         if collection.id == SystemCollectionID.duplicates {
             return duplicateGroups.flatMap { $0 }.count
@@ -399,19 +399,19 @@ final class LibraryStore {
         return items.filter { itemIds.contains($0.id) }
     }
 
-    // MARK: - Inbox Filtered Items
+    // MARK: - Reading List Filtered Items
 
     /// Set of item IDs that are not in any user (non-system) collection.
-    private var inboxItemIds: Set<UUID> {
+    private var readingListItemIds: Set<UUID> {
         Set(items.filter { $0.collections.filter { !$0.isSystem }.isEmpty }.map(\.id))
     }
 
     /// Items not assigned to any user collection, filtered by search.
-    private var inboxFilteredItems: [LibraryItem] {
-        let ids = inboxItemIds
+    private var readingListFilteredItems: [LibraryItem] {
+        let ids = readingListItemIds
         var results = items.filter { ids.contains($0.id) }
 
-        // Apply search within inbox
+        // Apply search within reading list
         if isSemanticSearchActive && !searchText.isEmpty {
             if let order = semanticSearchOrder, let resultsMap = semanticSearchResults {
                 let matchingIds = Set(order)

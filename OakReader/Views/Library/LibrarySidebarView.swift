@@ -157,7 +157,8 @@ private extension LibrarySidebarView {
 
             ForEach(store.systemSmartCollections.sorted(by: { $0.sortOrder < $1.sortOrder })) { collection in
                 if !store.hiddenSystemCollectionIds.contains(collection.id)
-                    && !isCollectionDisabledByExtension(collection.id) {
+                    && !isCollectionDisabledByExtension(collection.id)
+                    && collection.id != SystemCollectionID.quizCards {
                     smartCollectionRow(collection)
                 }
             }

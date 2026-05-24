@@ -227,10 +227,7 @@ enum AppExtension: String, CaseIterable, Identifiable {
     }
 
     var systemCollectionId: UUID? {
-        switch self {
-        case .quizCards: return SystemCollectionID.quizCards
-        default: return nil
-        }
+        nil
     }
 
     var enabledByDefault: Bool {
