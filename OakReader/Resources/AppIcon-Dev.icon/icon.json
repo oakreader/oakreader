@@ -6,12 +6,10 @@
     {
       "layers" : [
         {
-          "glass" : true,
-          "hidden" : false,
-          "image-name" : "o_letter.png",
+          "image-name" : "o_letter.svg",
           "name" : "o_letter",
           "position" : {
-            "scale" : 1.0,
+            "scale" : 3.2,
             "translation-in-points" : [
               0,
               0
@@ -26,9 +24,8 @@
     }
   ],
   "supported-platforms" : {
-    "circles" : [
-      "watchOS"
-    ],
-    "squares" : "shared"
+    "squares" : [
+      "macOS"
+    ]
   }
 }
