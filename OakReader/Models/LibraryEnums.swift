@@ -28,16 +28,16 @@ enum LibrarySortOrder: String, CaseIterable, Identifiable {
 }
 
 enum SystemCollectionID {
-    static let inbox       = UUID(uuidString: "00000000-0000-0000-0000-00000000000E")!
-    static let allItems    = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
-    static let pdfs        = UUID(uuidString: "00000000-0000-0000-0000-000000000005")!
-    static let html = UUID(uuidString: "00000000-0000-0000-0000-000000000006")!
-    static let videos      = UUID(uuidString: "00000000-0000-0000-0000-000000000007")!
+    static let readingList  = UUID(uuidString: "00000000-0000-0000-0000-00000000000E")!
+    static let allItems     = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+    static let pdfs         = UUID(uuidString: "00000000-0000-0000-0000-000000000005")!
+    static let html         = UUID(uuidString: "00000000-0000-0000-0000-000000000006")!
+    static let videos       = UUID(uuidString: "00000000-0000-0000-0000-000000000007")!
     static let recentlyRead = UUID(uuidString: "00000000-0000-0000-0000-000000000008")!
-    static let duplicates  = UUID(uuidString: "00000000-0000-0000-0000-00000000000A")!
-    static let quizCards   = UUID(uuidString: "00000000-0000-0000-0000-00000000000D")!
+    static let duplicates   = UUID(uuidString: "00000000-0000-0000-0000-00000000000A")!
+    static let quizCards    = UUID(uuidString: "00000000-0000-0000-0000-00000000000D")!
 
-    static let all: [UUID] = [inbox, allItems, recentlyRead, pdfs, html, videos, duplicates, quizCards]
+    static let all: [UUID] = [readingList, allItems, recentlyRead, pdfs, html, videos, duplicates]
 }
 
 // MARK: - Local user ID

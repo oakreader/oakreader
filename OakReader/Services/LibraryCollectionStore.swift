@@ -194,7 +194,7 @@ extension LibraryStore {
                 try db.execute(sql: "DELETE FROM collections WHERE id = ?", arguments: [collection.id.uuidString])
             }
             if selectedCollectionId == collection.id {
-                selectedCollectionId = SystemCollectionID.allItems
+                selectedCollectionId = SystemCollectionID.readingList
             }
             invalidate()
         } catch {

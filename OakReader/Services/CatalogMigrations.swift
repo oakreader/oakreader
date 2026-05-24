@@ -85,7 +85,7 @@ extension CatalogDatabase {
             let now = Date().iso8601String
             // swiftlint:disable:next large_tuple
             let systemCollections: [(id: String, name: String, icon: String, order: Int, rules: String?)] = [
-                (SystemCollectionID.inbox.uuidString, "Inbox", "tray.and.arrow.down", -1, nil),
+                (SystemCollectionID.readingList.uuidString, "Reading List", "bookmark", -1, nil),
                 (SystemCollectionID.allItems.uuidString, "All Items", "books.vertical", 0,
                  #"{"match":"all","conditions":[]}"#),
                 (SystemCollectionID.recentlyRead.uuidString, "Recently Read", "book", 1,
@@ -351,6 +351,7 @@ extension CatalogDatabase {
                 VALUES (?, ?, 'Quiz Cards', 'rectangle.on.rectangle.angled', 6, NULL, 1, 1, NULL, ?, ?)
             """, arguments: [SystemCollectionID.quizCards.uuidString, localUserId, now, now])
         }
+
 
         return migrator
     }
