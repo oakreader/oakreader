@@ -37,6 +37,12 @@ struct TranslationSourceTextView: NSViewRepresentable {
         textView.font = font
         textView.insertionPointColor = .controlAccentColor
 
+        // Increase line height for better readability
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.lineHeightMultiple = 1.4
+        textView.defaultParagraphStyle = paragraphStyle
+        textView.typingAttributes[.paragraphStyle] = paragraphStyle
+
         // Disable smart substitutions
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false

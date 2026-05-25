@@ -19,6 +19,7 @@ struct TranslationPanelView: View {
             ScrollView {
                 VStack(spacing: OakStyle.Spacing.sm) {
                     sourceCard
+                    translateButton
                     targetCard
 
                     if !translationVM.wordExplanation.isEmpty || translationVM.isExplainingWord {
@@ -43,10 +44,6 @@ struct TranslationPanelView: View {
                 .font(OakStyle.ChatFont.headerTitle)
 
             Spacer()
-
-            OakToolButton(systemImage: "arrow.trianglehead.2.counterclockwise", tooltip: "Clear") {
-                translationVM.clear()
-            }
         }
         .padding(.horizontal, OakStyle.Spacing.sm)
         .padding(.vertical, OakStyle.Spacing.sm)
@@ -56,13 +53,11 @@ struct TranslationPanelView: View {
 
     private var languageBar: some View {
         HStack(spacing: 4) {
-            Picker("", selection: $translationVM.sourceLang) {
-                ForEach(TranslationLanguage.allCases) { lang in
-                    Text(lang.nativeName).tag(lang)
-                }
-            }
-            .labelsHidden()
-            .frame(maxWidth: .infinity)
+            languageMenuButton(
+                title: translationVM.sourceLang.nativeName,
+                languages: TranslationLanguage.allCases,
+                selection: $translationVM.sourceLang
+            )
 
             Button {
                 translationVM.swapLanguages()
@@ -77,15 +72,20 @@ struct TranslationPanelView: View {
             .disabled(translationVM.sourceLang == .auto)
             .help("Swap languages")
 
-            Picker("", selection: $translationVM.targetLang) {
-                ForEach(TranslationLanguage.targetCases) { lang in
-                    Text(lang.nativeName).tag(lang)
-                }
-            }
-            .labelsHidden()
-            .frame(maxWidth: .infinity)
+            languageMenuButton(
+                title: translationVM.targetLang.nativeName,
+                languages: TranslationLanguage.targetCases,
+                selection: $translationVM.targetLang
+            )
         }
-        .frame(height: 32)
+        .frame(height: 36)
+        .padding(.horizontal, OakStyle.Spacing.xs)
+        .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5)
+        )
         .padding(.horizontal, OakStyle.Spacing.sm)
         .padding(.bottom, OakStyle.Spacing.sm)
         .onChange(of: translationVM.sourceLang) { _, _ in
@@ -138,22 +138,40 @@ struct TranslationPanelView: View {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(translationVM.sourceText, forType: .string)
                 }
-
-                // Translate
-                toolbarButton(
-                    systemImage: translationVM.isTranslating ? "stop.fill" : "arrow.right.circle.fill",
-                    tooltip: translationVM.isTranslating ? "Stop" : "Translate"
-                ) {
-                    if translationVM.isTranslating {
-                        translationVM.stopTranslation()
-                    } else {
-                        translationVM.translate()
-                    }
-                }
             }
         }
         .padding(.horizontal, OakStyle.Spacing.xs)
         .padding(.vertical, OakStyle.Spacing.xxs)
+    }
+
+    // MARK: - Translate Button
+
+    private var translateButton: some View {
+        HStack {
+            Spacer()
+            Button {
+                if translationVM.isTranslating {
+                    translationVM.stopTranslation()
+                } else {
+                    translationVM.translate()
+                }
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: translationVM.isTranslating ? "stop.fill" : "arrow.right.circle.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text(translationVM.isTranslating ? "Stop" : "Translate")
+                        .font(OakStyle.Font.styled(size: 13, weight: .semibold))
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 7)
+                .foregroundStyle(.white)
+                .background(Color.accentColor)
+                .clipShape(RoundedRectangle(cornerRadius: 7))
+            }
+            .buttonStyle(.plain)
+            .disabled(translationVM.sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .opacity(translationVM.sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.4 : 1.0)
+        }
     }
 
     // MARK: - Target Card
@@ -267,14 +285,50 @@ struct TranslationPanelView: View {
         )
     }
 
+    // MARK: - Language Menu Button
+
+    private func languageMenuButton(
+        title: String,
+        languages: [TranslationLanguage],
+        selection: Binding<TranslationLanguage>
+    ) -> some View {
+        Menu {
+            ForEach(languages) { lang in
+                Button {
+                    selection.wrappedValue = lang
+                } label: {
+                    if lang == selection.wrappedValue {
+                        Label(lang.nativeName, systemImage: "checkmark")
+                    } else {
+                        Text(lang.nativeName)
+                    }
+                }
+            }
+        } label: {
+            Text(title)
+                .font(OakStyle.Font.styled(size: 13, weight: .medium))
+                .frame(maxWidth: .infinity)
+                .frame(height: 28)
+                .contentShape(Rectangle())
+                .background(Color(nsColor: .controlBackgroundColor))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5)
+                )
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
     // MARK: - Shared Components
 
     private func toolbarButton(systemImage: String, tooltip: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(.secondary)
-                .frame(width: 26, height: 26)
+                .frame(width: 30, height: 30)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
