@@ -356,8 +356,8 @@ public enum BuiltInProviders {
     public static let openaiCodex = ProviderInfo(
         id: "openai-codex",
         displayName: "OpenAI (ChatGPT Login)",
-        apiFormat: .openaiCompletions,
-        baseURL: URL(string: "https://api.openai.com/v1/chat/completions")!,
+        apiFormat: .openaiResponses,
+        baseURL: URL(string: "https://chatgpt.com/backend-api")!,
         defaultModelId: "gpt-5.4",
         models: [
             ModelInfo(id: "gpt-5.4", name: "GPT-5.4", providerId: "openai-codex", contextWindow: 272_000, maxTokens: 128_000, reasoning: true, supportsVision: true),

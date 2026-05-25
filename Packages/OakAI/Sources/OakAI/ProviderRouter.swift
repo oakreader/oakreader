@@ -22,6 +22,8 @@ public struct ProviderRouter: Sendable {
             return AnthropicProvider(apiKey: credential, baseURL: info.baseURL, customHeaders: info.customHeaders)
         case .openaiCompletions:
             return OpenAIProvider(apiKey: credential, baseURL: info.baseURL, customHeaders: info.customHeaders)
+        case .openaiResponses:
+            return OpenAIResponsesProvider(apiKey: credential, baseURL: info.baseURL, customHeaders: info.customHeaders)
         case .googleGenerativeAI:
             return GoogleProvider(apiKey: credential, baseURL: info.baseURL, customHeaders: info.customHeaders)
         }
