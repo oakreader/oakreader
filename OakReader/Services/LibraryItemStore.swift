@@ -157,7 +157,8 @@ extension LibraryStore {
     /// Fetch a single item by an arbitrary WHERE clause, fully hydrated with attachments,
     /// collections, property values, citation, and cover.
     private func fetchItem(whereSQL: String, arguments: StatementArguments) -> LibraryItem? {
-        try? database.dbQueue.read { db in
+        do {
+            return try database.dbQueue.read { db in
             guard let record = try ItemRecord.fetchOne(
                 db,
                 sql: "SELECT * FROM items WHERE \(whereSQL) AND deleted_at IS NULL LIMIT 1",
@@ -240,6 +241,10 @@ extension LibraryStore {
                 coverImageData: coverData,
                 referenceMetadata: refMeta
             )
+            }
+        } catch {
+            Log.error(Log.store, "fetchItem(\(whereSQL)) failed: \(error)")
+            return nil
         }
     }
 

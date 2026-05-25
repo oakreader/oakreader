@@ -349,6 +349,7 @@ final class AppState {
         }
 
         guard FileManager.default.fileExists(atPath: pdfURL.path) else {
+            Log.error(Log.open, "Cannot open PDF \"\(item.title)\": file not found at \(pdfURL.path) (primaryAttachment=\(item.primaryAttachment?.storageKey ?? "nil"), attachments=\(item.attachments.count))")
             let alert = NSAlert()
             alert.messageText = "Cannot Open PDF"
             alert.informativeText = "The file \"\(item.title)\" could not be found in managed storage."
