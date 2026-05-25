@@ -12,6 +12,8 @@ class DocumentViewModel {
     var markdownDocument: MarkdownDocument?
     /// Observable markdown content for reactive outline updates.
     var markdownContent: String = ""
+    /// When set, the viewer loads this URL directly instead of local HTML (used for `.link` embeds).
+    var liveURL: URL?
     var contentType: ContentType
     var state: DocumentState
     /// Database reference, set by AppState when the tab is created.
