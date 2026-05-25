@@ -367,6 +367,13 @@ extension CatalogDatabase {
             """, arguments: [SystemCollectionID.bin.uuidString, localUserId, now, now])
         }
 
+        // MARK: v11 — Attachment Lookup Indexes
+
+        migrator.registerMigration("v11-attachment-lookup-indexes") { db in
+            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_attachments_source_url ON attachments(source_url)")
+            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_attachments_file_name ON attachments(file_name)")
+        }
+
         return migrator
     }
 

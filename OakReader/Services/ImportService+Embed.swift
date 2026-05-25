@@ -18,7 +18,7 @@ extension ImportService {
     @discardableResult
     func importEmbed(_ input: EmbedImportInput) -> LibraryItem? {
         // Duplicate detection by source URL
-        if let existing = store.items.first(where: { $0.sourceURL == input.sourceURL }) {
+        if let existing = store.findItem(bySourceURL: input.sourceURL) {
             return existing
         }
 
