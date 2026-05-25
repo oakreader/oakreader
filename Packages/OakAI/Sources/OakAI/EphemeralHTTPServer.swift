@@ -29,8 +29,14 @@ public actor EphemeralHTTPServer {
                     let listener = try NWListener(using: .tcp, on: NWEndpoint.Port(integerLiteral: UInt16(port)))
 
                     listener.stateUpdateHandler = { [weak self] state in
-                        if case .failed(let error) = state {
+                        switch state {
+                        case .failed(let error):
                             Task { await self?.fail(with: error) }
+                        case .waiting(let error):
+                            // Port in use or network unavailable — fail instead of hanging.
+                            Task { await self?.fail(with: error) }
+                        default:
+                            break
                         }
                     }
                     listener.newConnectionHandler = { [weak self] connection in
@@ -57,6 +63,12 @@ public actor EphemeralHTTPServer {
     /// Cancel the server and clean up resources.
     public func cancel() {
         fail(with: CancellationError())
+    }
+
+    /// Manually provide the authorization result (e.g. from a pasted redirect URL).
+    /// Resolves the pending `waitForCallback` as if the browser callback arrived.
+    public func provideManualResult(code: String, state: String? = nil) {
+        succeed(with: CallbackResult(code: code, state: state))
     }
 
     // MARK: - Connection Handling
