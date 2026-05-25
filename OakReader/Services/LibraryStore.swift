@@ -168,7 +168,13 @@ final class LibraryStore {
         if let cached = itemsCache, cached.revision == revision {
             return cached.items
         }
-        let result = (try? fetchAllItems()) ?? []
+        let result: [LibraryItem]
+        do {
+            result = try fetchAllItems()
+        } catch {
+            Log.error(Log.store, "fetchAllItems failed: \(error)")
+            result = []
+        }
         itemsCache = (revision: revision, items: result)
         return result
     }
