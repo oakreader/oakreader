@@ -2,6 +2,28 @@ import Foundation
 import OakAI
 import PDFKit
 
+// MARK: - Pronunciation Accent
+
+enum PronunciationAccent: String, CaseIterable, Identifiable {
+    case british, american
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .british: "British"
+        case .american: "American"
+        }
+    }
+
+    var ipaLabel: String {
+        switch self {
+        case .british: "BrE"
+        case .american: "AmE"
+        }
+    }
+}
+
 // MARK: - Agent Permission Level
 
 /// Controls when tool calls require user confirmation.
@@ -91,6 +113,7 @@ final class Preferences {
         static let translationAIModel = "translationAIModel"
         static let translationSourceLang = "translationSourceLang"
         static let translationTargetLang = "translationTargetLang"
+        static let pronunciationAccent = "pronunciationAccent"
         // Agent tools
         static let agentToolsEnabled = "agentToolsEnabled"
         static let agentReadFileEnabled = "agentReadFileEnabled"
@@ -460,6 +483,11 @@ final class Preferences {
     var translationTargetLang: TranslationLanguage {
         get { TranslationLanguage(rawValue: defaults.string(forKey: Keys.translationTargetLang) ?? "") ?? .zhHans }
         set { defaults.set(newValue.rawValue, forKey: Keys.translationTargetLang) }
+    }
+
+    var pronunciationAccent: PronunciationAccent {
+        get { PronunciationAccent(rawValue: defaults.string(forKey: Keys.pronunciationAccent) ?? "") ?? .british }
+        set { defaults.set(newValue.rawValue, forKey: Keys.pronunciationAccent) }
     }
 
     // MARK: - Agent Tools

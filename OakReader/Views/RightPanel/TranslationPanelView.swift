@@ -1,4 +1,5 @@
 import SwiftUI
+import Textual
 
 struct TranslationPanelView: View {
     @Bindable var translationVM: TranslationViewModel
@@ -14,14 +15,18 @@ struct TranslationPanelView: View {
         VStack(spacing: 0) {
             headerBar
             languageBar
-            Divider().padding(.horizontal, OakStyle.Spacing.sm)
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    sourceSection
-                    Divider().padding(.horizontal, OakStyle.Spacing.sm)
-                    targetSection
+                VStack(spacing: OakStyle.Spacing.sm) {
+                    sourceCard
+                    targetCard
+
+                    if !translationVM.wordExplanation.isEmpty || translationVM.isExplainingWord {
+                        wordExplanationCard
+                    }
                 }
+                .padding(.horizontal, OakStyle.Spacing.sm)
+                .padding(.vertical, OakStyle.Spacing.xs)
             }
             .scrollContentBackground(.hidden)
         }
@@ -38,19 +43,6 @@ struct TranslationPanelView: View {
                 .font(OakStyle.ChatFont.headerTitle)
 
             Spacer()
-
-            if translationVM.isTranslating {
-                OakToolButton(systemImage: "stop.circle", tooltip: "Stop") {
-                    translationVM.stopTranslation()
-                }
-            }
-
-            if !translationVM.translatedText.isEmpty {
-                OakToolButton(systemImage: "doc.on.doc", tooltip: "Copy translation") {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(translationVM.translatedText, forType: .string)
-                }
-            }
 
             OakToolButton(systemImage: "arrow.trianglehead.2.counterclockwise", tooltip: "Clear") {
                 translationVM.clear()
@@ -93,8 +85,9 @@ struct TranslationPanelView: View {
             .labelsHidden()
             .frame(maxWidth: .infinity)
         }
+        .frame(height: 32)
         .padding(.horizontal, OakStyle.Spacing.sm)
-        .padding(.bottom, OakStyle.Spacing.xs)
+        .padding(.bottom, OakStyle.Spacing.sm)
         .onChange(of: translationVM.sourceLang) { _, _ in
             translationVM.onLanguageChange()
         }
@@ -103,34 +96,76 @@ struct TranslationPanelView: View {
         }
     }
 
-    // MARK: - Source Section
+    // MARK: - Source Card
 
-    private var sourceSection: some View {
+    private var sourceCard: some View {
         VStack(alignment: .leading, spacing: 0) {
-            TextField("Enter text", text: $translationVM.sourceText, axis: .vertical)
-                .font(OakStyle.Font.styledBody)
-                .textFieldStyle(.plain)
-                .lineLimit(3...10)
-                .padding(.horizontal, OakStyle.Spacing.sm)
-                .padding(.vertical, OakStyle.Spacing.sm)
-                .onChange(of: translationVM.sourceText) { _, _ in
-                    translationVM.debouncedTranslate()
+            TranslationSourceTextView(
+                text: $translationVM.sourceText,
+                font: OakStyle.Font.nsFont(size: OakStyle.Font.body),
+                placeholder: "Enter text",
+                onWordSelected: { word, sentence, _ in
+                    translationVM.explainWord(word, inSentence: sentence)
                 }
-
-            if voiceVM != nil && !translationVM.sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                HStack {
-                    voiceButton(for: .source)
-                    Spacer()
-                }
-                .padding(.horizontal, OakStyle.Spacing.sm)
-                .padding(.bottom, OakStyle.Spacing.xs)
+            )
+            .frame(minHeight: 60, maxHeight: 150)
+            .onChange(of: translationVM.sourceText) { _, _ in
+                translationVM.debouncedTranslate()
             }
+
+            // Toolbar
+            sourceToolbar
         }
+        .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5)
+        )
     }
 
-    // MARK: - Target Section
+    private var sourceToolbar: some View {
+        HStack(spacing: 4) {
+            if voiceVM != nil && !translationVM.sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                voiceButton(for: .source)
+            }
 
-    private var targetSection: some View {
+            Spacer()
+
+            if !translationVM.sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                // Copy source
+                toolbarButton(systemImage: "doc.on.doc", tooltip: "Copy") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(translationVM.sourceText, forType: .string)
+                }
+
+                // Translate
+                toolbarButton(
+                    systemImage: translationVM.isTranslating ? "stop.fill" : "arrow.right.circle.fill",
+                    tooltip: translationVM.isTranslating ? "Stop" : "Translate"
+                ) {
+                    if translationVM.isTranslating {
+                        translationVM.stopTranslation()
+                    } else {
+                        translationVM.translate()
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, OakStyle.Spacing.xs)
+        .padding(.vertical, OakStyle.Spacing.xxs)
+    }
+
+    // MARK: - Target Card
+
+    private var displayText: String {
+        if translationVM.isTranslating {
+            return translationVM.translatedText.sealIncompleteMarkdown()
+        }
+        return translationVM.translatedText
+    }
+
+    private var targetCard: some View {
         VStack(alignment: .leading, spacing: 0) {
             if let error = translationVM.errorMessage {
                 HStack(spacing: 6) {
@@ -145,48 +180,121 @@ struct TranslationPanelView: View {
                 .padding(.horizontal, OakStyle.Spacing.sm)
                 .padding(.vertical, OakStyle.Spacing.xs)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.yellow.opacity(0.1))
             }
 
             if translationVM.translatedText.isEmpty && !translationVM.isTranslating {
                 emptyState
             } else {
-                Text(translationVM.translatedText)
+                StructuredText(markdown: displayText)
+                    .textual.textSelection(.enabled)
                     .font(OakStyle.Font.styledBody)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, minHeight: 80, alignment: .topLeading)
+                    .frame(maxWidth: .infinity, minHeight: 60, alignment: .topLeading)
                     .padding(.horizontal, OakStyle.Spacing.sm)
                     .padding(.vertical, OakStyle.Spacing.xs)
 
-                if voiceVM != nil && !translationVM.translatedText.isEmpty {
-                    HStack {
-                        voiceButton(for: .target)
-                        Spacer()
-                    }
-                    .padding(.horizontal, OakStyle.Spacing.sm)
-                    .padding(.bottom, OakStyle.Spacing.xs)
+                // Toolbar
+                targetToolbar
+            }
+        }
+        .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5)
+        )
+    }
+
+    private var targetToolbar: some View {
+        HStack(spacing: 4) {
+            if voiceVM != nil && !translationVM.translatedText.isEmpty {
+                voiceButton(for: .target)
+            }
+
+            Spacer()
+
+            if !translationVM.translatedText.isEmpty {
+                toolbarButton(systemImage: "doc.on.doc", tooltip: "Copy translation") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(translationVM.translatedText, forType: .string)
                 }
             }
         }
+        .padding(.horizontal, OakStyle.Spacing.xs)
+        .padding(.vertical, OakStyle.Spacing.xxs)
+    }
+
+    // MARK: - Word Explanation Card
+
+    private var explanationDisplayText: String {
+        if translationVM.isExplainingWord {
+            return translationVM.wordExplanation.sealIncompleteMarkdown()
+        }
+        return translationVM.wordExplanation
+    }
+
+    private var wordExplanationCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                if translationVM.isExplainingWord {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+                Text(translationVM.explanationWord)
+                    .font(OakStyle.Font.styled(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                toolbarButton(systemImage: "xmark", tooltip: "Dismiss") {
+                    translationVM.stopWordExplanation()
+                    translationVM.wordExplanation = ""
+                    translationVM.explanationWord = ""
+                }
+            }
+            .padding(.horizontal, OakStyle.Spacing.sm)
+            .padding(.top, OakStyle.Spacing.xs)
+
+            StructuredText(markdown: explanationDisplayText)
+                .textual.textSelection(.enabled)
+                .font(OakStyle.Font.styledBody)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .padding(.horizontal, OakStyle.Spacing.sm)
+                .padding(.vertical, OakStyle.Spacing.xs)
+        }
+        .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5)
+        )
+    }
+
+    // MARK: - Shared Components
+
+    private func toolbarButton(systemImage: String, tooltip: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 26, height: 26)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(tooltip)
     }
 
     // MARK: - Voice Playback
 
     private func voiceButton(for section: PlayingSection) -> some View {
         let isPlaying = playingSection == section && (voiceVM?.isSpeaking ?? false)
-        return Button {
+        return toolbarButton(
+            systemImage: isPlaying ? "stop.fill" : "speaker.wave.2.fill",
+            tooltip: isPlaying ? "Stop" : "Play"
+        ) {
             if isPlaying {
                 stopPlayback()
             } else {
                 playText(for: section)
             }
-        } label: {
-            Image(systemName: isPlaying ? "stop.fill" : "speaker.wave.2.fill")
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
         }
-        .buttonStyle(.plain)
-        .help(isPlaying ? "Stop" : "Play")
     }
 
     private func playText(for section: PlayingSection) {
@@ -221,6 +329,6 @@ struct TranslationPanelView: View {
                 .foregroundStyle(.secondary)
             Spacer()
         }
-        .frame(maxWidth: .infinity, minHeight: 120)
+        .frame(maxWidth: .infinity, minHeight: 100)
     }
 }
