@@ -5,6 +5,7 @@ import Foundation
 public enum APIFormat: String, Codable, Sendable {
     case anthropicMessages
     case openaiCompletions
+    case openaiResponses
     case googleGenerativeAI
 }
 
