@@ -1,6 +1,4 @@
 {
-    "name": "latex",
-    "description": "Export documents as LaTeX compilable with Tectonic",
     "icon": { "type": "symbol", "value": "doc.richtext.fill" },
     "version": "1.0.0",
     "requires": {

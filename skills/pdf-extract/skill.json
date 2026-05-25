@@ -1,6 +1,4 @@
 {
-    "name": "pdf-extract",
-    "description": "Extract structured text from PDF documents",
     "icon": { "type": "symbol", "value": "doc.richtext" },
     "version": "1.0.0",
     "requires": {

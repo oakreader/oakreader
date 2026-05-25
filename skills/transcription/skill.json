@@ -1,6 +1,4 @@
 {
-    "name": "transcription",
-    "description": "Transcribe audio and video files",
     "icon": { "type": "symbol", "value": "waveform.circle.fill" },
     "version": "1.0.0",
     "requires": {
