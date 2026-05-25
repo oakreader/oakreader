@@ -46,7 +46,6 @@ struct NoteSettingsView: View {
     private let modeOptions: [(label: String, value: String)] = [
         ("Edit", "edit"),
         ("Preview", "preview"),
-        ("Split", "split"),
     ]
 
     var body: some View {
