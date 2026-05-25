@@ -218,17 +218,27 @@ struct LibrarySidebarPanel: View {
     @ViewBuilder
     private var infoGrid: some View {
         VStack(alignment: .leading, spacing: OakStyle.Spacing.xxs) {
-            LabeledContent("File", value: item.fileName)
-            LabeledContent("Pages", value: "\(item.pageCount)")
-            LabeledContent("Size", value: ByteCountFormatter.string(fromByteCount: item.fileSize, countStyle: .file))
-            LabeledContent("Added", value: item.dateAdded.formatted(date: .abbreviated, time: .omitted))
+            infoRow("File Name", value: item.fileName)
+            infoRow("Pages", value: "\(item.pageCount)")
+            infoRow("Size", value: ByteCountFormatter.string(fromByteCount: item.fileSize, countStyle: .file))
+            infoRow("Added", value: item.dateAdded.formatted(date: .abbreviated, time: .omitted))
             if let lastOpened = item.lastOpenedAt {
-                LabeledContent("Opened", value: lastOpened.formatted(date: .abbreviated, time: .omitted))
+                infoRow("Opened", value: lastOpened.formatted(date: .abbreviated, time: .omitted))
             }
         }
         .font(.system(size: 14))
         .foregroundStyle(OakStyle.Colors.textSecondary)
         .textSelection(.enabled)
+    }
+
+    @ViewBuilder
+    private func infoRow(_ label: String, value: String) -> some View {
+        HStack(alignment: .top) {
+            Text(label)
+                .frame(width: 70, alignment: .leading)
+            Text(value)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
     // MARK: - Properties
