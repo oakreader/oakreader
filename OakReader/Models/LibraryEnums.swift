@@ -41,6 +41,18 @@ enum SystemCollectionID {
     static let all: [UUID] = [readingList, allItems, recentlyRead, pdfs, html, videos, duplicates, bin]
 }
 
+enum SystemPropertyID {
+    static let tags   = UUID(uuidString: "00000000-0000-0000-0001-000000000001")!
+    static let status = UUID(uuidString: "00000000-0000-0000-0001-000000000002")!
+    static let rating = UUID(uuidString: "00000000-0000-0000-0001-000000000003")!
+}
+
+enum SystemStatusOptionID {
+    static let toRead   = UUID(uuidString: "00000000-0000-0000-0002-000000000001")!
+    static let reading  = UUID(uuidString: "00000000-0000-0000-0002-000000000002")!
+    static let finished = UUID(uuidString: "00000000-0000-0000-0002-000000000003")!
+}
+
 // MARK: - Local user ID
 
 /// Default user ID for Phase 1 (local-only). Will become a real user ID in Phase 2 (sync).

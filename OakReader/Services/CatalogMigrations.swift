@@ -24,6 +24,7 @@ extension CatalogDatabase {
                 t.column("source_key", .text)
                 t.column("extra", .text)
                 t.column("processing_status", .text).notNull().defaults(to: "none")
+                t.column("deleted_at", .text)
                 t.column("created_at", .text).notNull()
                 t.column("updated_at", .text).notNull()
             }
@@ -32,6 +33,7 @@ extension CatalogDatabase {
                 CREATE UNIQUE INDEX idx_items_source ON items(source, source_key)
                 WHERE source IS NOT NULL AND source_key IS NOT NULL
             """)
+            try db.create(index: "idx_items_deleted_at", on: "items", columns: ["deleted_at"], ifNotExists: true)
 
             try db.create(table: "attachments") { t in
                 t.column("id", .text).primaryKey()
@@ -48,6 +50,8 @@ extension CatalogDatabase {
                 t.column("updated_at", .text).notNull()
             }
             try db.create(index: "idx_attachments_item_id", on: "attachments", columns: ["item_id"])
+            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_attachments_source_url ON attachments(source_url)")
+            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_attachments_file_name ON attachments(file_name)")
         }
 
         // MARK: v2 — Collections
@@ -80,31 +84,6 @@ extension CatalogDatabase {
                 t.primaryKey(["item_id", "collection_id"])
             }
             try db.create(index: "idx_collection_items_collection_id", on: "collection_items", columns: ["collection_id"], ifNotExists: true)
-
-            // Seed system smart collections
-            let now = Date().iso8601String
-            // swiftlint:disable:next large_tuple
-            let systemCollections: [(id: String, name: String, icon: String, order: Int, rules: String?)] = [
-                (SystemCollectionID.readingList.uuidString, "Reading List", "bookmark", -1, nil),
-                (SystemCollectionID.allItems.uuidString, "All Items", "books.vertical", 0,
-                 #"{"match":"all","conditions":[]}"#),
-                (SystemCollectionID.recentlyRead.uuidString, "Recently Read", "book", 1,
-                 #"{"match":"all","conditions":[{"field":"last_opened_at","op":"within_days","value":"14"}]}"#),
-                (SystemCollectionID.pdfs.uuidString, "PDFs", "doc.fill", 2,
-                 #"{"match":"all","conditions":[{"field":"content_type","op":"eq","value":"pdf"}]}"#),
-                (SystemCollectionID.html.uuidString, "Web", "globe", 3,
-                 #"{"match":"all","conditions":[{"field":"content_type","op":"eq","value":"html"}]}"#),
-                (SystemCollectionID.videos.uuidString, "Videos", "play.rectangle", 4,
-                 #"{"match":"all","conditions":[{"field":"content_type","op":"eq","value":"video"}]}"#),
-                (SystemCollectionID.duplicates.uuidString, "Duplicates", "square.on.square", 5, nil),
-            ]
-            for sc in systemCollections {
-                try db.execute(
-                    // swiftlint:disable:next line_length
-                    sql: "INSERT INTO collections (id, user_id, name, icon, sort_order, parent_id, is_smart, is_system, filter_rules, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NULL, 1, 1, ?, ?, ?)",
-                    arguments: [sc.id, localUserId, sc.name, sc.icon, sc.order, sc.rules, now, now]
-                )
-            }
         }
 
         // MARK: v3 — Properties
@@ -137,36 +116,6 @@ extension CatalogDatabase {
             }
             try db.create(index: "idx_item_property_values_item", on: "item_property_values", columns: ["item_id"])
             try db.create(index: "idx_item_property_values_property", on: "item_property_values", columns: ["property_id"])
-
-            // Seed system properties
-            let tagsPropertyId = UUID().uuidString
-            try db.execute(sql: """
-                INSERT INTO properties (id, name, type, icon, position, is_system)
-                VALUES (?, 'Tags', 'multi_select', 'tag', 0, 1)
-            """, arguments: [tagsPropertyId])
-
-            let statusPropertyId = UUID().uuidString
-            try db.execute(sql: """
-                INSERT INTO properties (id, name, type, icon, position, is_system)
-                VALUES (?, 'Status', 'single_select', 'circle.dotted', 1, 1)
-            """, arguments: [statusPropertyId])
-
-            // swiftlint:disable:next large_tuple
-            let statusOptions: [(name: String, color: String, pos: Int)] = [
-                ("To Read", "2EA8E5", 0), ("Reading", "FF8C19", 1),
-                ("Finished", "5FB236", 2),
-            ]
-            for opt in statusOptions {
-                try db.execute(sql: """
-                    INSERT INTO property_options (id, property_id, name, color_hex, position)
-                    VALUES (?, ?, ?, ?, ?)
-                """, arguments: [UUID().uuidString, statusPropertyId, opt.name, opt.color, opt.pos])
-            }
-
-            try db.execute(sql: """
-                INSERT INTO properties (id, name, type, icon, position, is_system)
-                VALUES (?, 'Rating', 'number', 'star', 2, 1)
-            """, arguments: [UUID().uuidString])
         }
 
         // MARK: v4 — Conversations & Notes
@@ -256,20 +205,14 @@ extension CatalogDatabase {
             """)
         }
 
-        // MARK: v7 — Full-Text Search & Storage
+        // MARK: v7 — Full-Text Search
 
-        migrator.registerMigration("v7-search-storage") { db in
+        migrator.registerMigration("v7-search") { db in
             try db.create(virtualTable: "items_fts", using: FTS5()) { t in
                 t.synchronize(withTable: "items")
                 t.tokenizer = .unicode61()
                 t.column("title")
                 t.column("author")
-            }
-
-            // Ensure storage directories exist
-            let fm = FileManager.default
-            for dir in [storageDirectory, notesDirectory, notesAttachmentsDirectory, chatsDirectory, chatAttachmentsDirectory] {
-                try fm.createDirectory(at: dir, withIntermediateDirectories: true)
             }
         }
 
@@ -343,35 +286,6 @@ extension CatalogDatabase {
                 t.column("reviewed_at", .text).notNull()
             }
             try db.create(index: "idx_quiz_review_log_card_id", on: "quiz_review_log", columns: ["card_id"])
-
-            // Seed "Quiz Cards" system smart collection
-            let now = Date().iso8601String
-            try db.execute(sql: """
-                INSERT INTO collections (id, user_id, name, icon, sort_order, parent_id, is_smart, is_system, filter_rules, created_at, updated_at)
-                VALUES (?, ?, 'Quiz Cards', 'rectangle.on.rectangle.angled', 6, NULL, 1, 1, NULL, ?, ?)
-            """, arguments: [SystemCollectionID.quizCards.uuidString, localUserId, now, now])
-        }
-
-
-        // MARK: v10 — Soft Delete (Bin)
-
-        migrator.registerMigration("v10-soft-delete") { db in
-            try db.execute(sql: "ALTER TABLE items ADD COLUMN deleted_at TEXT")
-            try db.create(index: "idx_items_deleted_at", on: "items", columns: ["deleted_at"], ifNotExists: true)
-
-            // Seed "Bin" system smart collection
-            let now = Date().iso8601String
-            try db.execute(sql: """
-                INSERT INTO collections (id, user_id, name, icon, sort_order, parent_id, is_smart, is_system, filter_rules, created_at, updated_at)
-                VALUES (?, ?, 'Bin', 'trash', 7, NULL, 1, 1, NULL, ?, ?)
-            """, arguments: [SystemCollectionID.bin.uuidString, localUserId, now, now])
-        }
-
-        // MARK: v11 — Attachment Lookup Indexes
-
-        migrator.registerMigration("v11-attachment-lookup-indexes") { db in
-            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_attachments_source_url ON attachments(source_url)")
-            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_attachments_file_name ON attachments(file_name)")
         }
 
         return migrator
