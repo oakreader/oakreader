@@ -481,20 +481,20 @@ final class ZoteroMigrationService {
                 continue
             }
 
-            // Detect YouTube videos by URL before looking at attachments
-            let isYouTube = cslItem.URL.map { Self.isYouTubeURL($0) } ?? false
+            // Detect video sites (YouTube, Bilibili) by URL before looking at attachments
+            let isVideo = cslItem.URL.map { Self.isVideoURL($0) } ?? false
 
             // Find attachment — prefer PDF over HTML when multiple exist
             let allAttachments = (attachmentsByParent[zItem.itemID] ?? [])
                 .sorted { a, _ in a.contentType == "application/pdf" ? true : false }
             let primaryAtt = allAttachments.first
-            var contentType: ContentType = isYouTube ? .video : oakItemType(for: primaryAtt?.contentType)
-            var attFileName = isYouTube ? "metadata.json" : (contentType == .pdf ? "document.pdf" : "index.html")
+            var contentType: ContentType = isVideo ? .video : oakItemType(for: primaryAtt?.contentType)
+            var attFileName = isVideo ? "metadata.json" : (contentType == .pdf ? "document.pdf" : "index.html")
             var attFileSize: Int64 = 0
             var attPageCount = 0
             var fileCopied = false
 
-            if isYouTube {
+            if isVideo {
                 // Write metadata.json for YouTube items
                 let publishedAt: String? = cslItem.issued.flatMap { date in
                     guard let y = date.year else { return date.raw }
@@ -551,6 +551,27 @@ final class ZoteroMigrationService {
                         result.errors.append("File copy failed: \(title)")
                     }
                 }
+            }
+
+            // If no file was copied and item has a URL, treat as a linked web bookmark
+            if !fileCopied && !isVideo, let urlString = cslItem.URL, let url = URL(string: urlString) {
+                contentType = .video
+                attFileName = "metadata.json"
+                let metadata = MediaMetadata(
+                    title: cslItem.title ?? title,
+                    author: authorDisplay,
+                    sourceURL: url,
+                    duration: nil,
+                    thumbnailURL: nil,
+                    publishedAt: nil,
+                    description: cslItem.abstract,
+                    embedType: "link"
+                )
+                if let encoded = try? JSONEncoder().encode(metadata) {
+                    try? encoded.write(to: attDir.appendingPathComponent("metadata.json"), options: .atomic)
+                }
+                let embedHTML = ImportService.generateLinkEmbedHTML(metadata: metadata)
+                try? embedHTML.write(to: attDir.appendingPathComponent("embed.html"), atomically: true, encoding: .utf8)
             }
 
             let linkMode: LinkMode
@@ -804,10 +825,11 @@ final class ZoteroMigrationService {
         }
     }
 
-    /// Check if a URL string points to a YouTube video.
-    private static func isYouTubeURL(_ urlString: String) -> Bool {
+    /// Check if a URL string points to a video site (YouTube, Bilibili).
+    private static func isVideoURL(_ urlString: String) -> Bool {
         guard let host = URL(string: urlString)?.host?.lowercased() else { return false }
         return host.contains("youtube.com") || host.contains("youtu.be")
+            || host.contains("bilibili.com") || host.contains("b23.tv")
     }
 
     /// Copy all sibling files from a Zotero storage directory to the OakReader attachment directory.
