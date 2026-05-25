@@ -99,14 +99,28 @@ struct NoteEditorView: View {
 
             Spacer()
 
-            // Mode toggle — individual icon buttons
-            ForEach(NoteEditorMode.allCases, id: \.rawValue) { mode in
-                toolbarButton(
-                    icon: mode.icon,
-                    style: currentMode == mode ? .primary : .tertiary,
-                    help: mode.label
-                ) { currentModeRaw = mode.rawValue }
+            // Mode toggle — segmented picker
+            Picker("Mode", selection: $currentModeRaw) {
+                ForEach(NoteEditorMode.allCases, id: \.rawValue) { mode in
+                    Image(systemName: mode.icon)
+                        .tag(mode.rawValue)
+                }
             }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(width: 90)
+            .help("Switch editor mode")
+
+            // New note (compose)
+            Button(action: { notesVM.createNote() }) {
+                Image(systemName: "square.and.pencil")
+                    .font(.system(size: OakStyle.Font.icon))
+                    .foregroundStyle(.secondary)
+                    .frame(width: OakStyle.Size.buttonStandard, height: OakStyle.Size.buttonStandard)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("New Note")
 
             // More menu (delete, pin)
             if let note = notesVM.selectedNote {
@@ -165,23 +179,6 @@ struct NoteEditorView: View {
                 editorCoordinator = coordinator
             }
         )
-    }
-
-    // MARK: - Toolbar Button
-
-    private func toolbarButton(
-        icon: String, style: HierarchicalShapeStyle = .secondary,
-        help: String, action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: OakStyle.Font.icon))
-                .foregroundStyle(style)
-                .frame(width: OakStyle.Size.buttonStandard, height: OakStyle.Size.buttonStandard)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .help(help)
     }
 
     // MARK: - Preview Pane
