@@ -59,9 +59,6 @@ struct MarkdownViewerView: View {
                     case .preview:
                         previewPane
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    case .split:
-                        splitPane
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 }
             }
@@ -106,31 +103,17 @@ struct MarkdownViewerView: View {
             .buttonStyle(.plain)
             .help("Zen Mode (⇧⌘.)")
 
-            // Toggle between edit and preview
-            Button {
-                currentModeRaw = (currentMode == .edit ? NoteEditorMode.preview : NoteEditorMode.edit).rawValue
-            } label: {
-                Image(systemName: currentMode == .edit ? NoteEditorMode.preview.icon : NoteEditorMode.edit.icon)
-                    .font(.system(size: OakStyle.Font.icon))
-                    .foregroundStyle(currentMode != .split ? .primary : .tertiary)
-                    .frame(width: OakStyle.Size.buttonStandard, height: OakStyle.Size.buttonStandard)
-                    .contentShape(Rectangle())
+            // Mode toggle — segmented picker
+            Picker("Mode", selection: $currentModeRaw) {
+                ForEach(NoteEditorMode.allCases, id: \.rawValue) { mode in
+                    Image(systemName: mode.icon)
+                        .tag(mode.rawValue)
+                }
             }
-            .buttonStyle(.plain)
-            .help(currentMode == .edit ? "Preview" : "Edit")
-
-            // Split button
-            Button {
-                currentModeRaw = (currentMode == .split ? NoteEditorMode.edit : NoteEditorMode.split).rawValue
-            } label: {
-                Image(systemName: NoteEditorMode.split.icon)
-                    .font(.system(size: OakStyle.Font.icon))
-                    .foregroundStyle(currentMode == .split ? .primary : .tertiary)
-                    .frame(width: OakStyle.Size.buttonStandard, height: OakStyle.Size.buttonStandard)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .help("Split")
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(width: 60)
+            .help("Switch editor mode")
         }
         .padding(.horizontal, OakStyle.Spacing.sm)
         .padding(.vertical, OakStyle.Spacing.xs)
@@ -183,17 +166,6 @@ struct MarkdownViewerView: View {
         )
         .frame(maxWidth: 780)
         .frame(maxWidth: .infinity)
-    }
-
-    // MARK: - Split Pane
-
-    private var splitPane: some View {
-        HSplitView {
-            editorPane
-                .frame(minWidth: 200)
-            previewPane
-                .frame(minWidth: 200)
-        }
     }
 
     // MARK: - Auto-Save

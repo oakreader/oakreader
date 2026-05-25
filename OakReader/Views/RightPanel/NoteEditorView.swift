@@ -5,13 +5,11 @@ import AppKit
 enum NoteEditorMode: String, CaseIterable {
     case edit
     case preview
-    case split
 
     var icon: String {
         switch self {
         case .edit: return "square.and.pencil"
         case .preview: return "book"
-        case .split: return "rectangle.split.2x1"
         }
     }
 
@@ -19,12 +17,11 @@ enum NoteEditorMode: String, CaseIterable {
         switch self {
         case .edit: return "Edit"
         case .preview: return "Preview"
-        case .split: return "Split"
         }
     }
 }
 
-/// Note editor with Edit / Preview / Split mode toggle.
+/// Note editor with Edit / Preview mode toggle.
 /// Replaces the old WYSIWYG WKWebView editor with a plain-text NSTextView
 /// and a Textual-based markdown preview.
 struct NoteEditorView: View {
@@ -73,9 +70,6 @@ struct NoteEditorView: View {
             case .preview:
                 previewPane
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-            case .split:
-                splitPane
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
     }
@@ -108,7 +102,7 @@ struct NoteEditorView: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .frame(width: 90)
+            .frame(width: 60)
             .help("Switch editor mode")
 
             // New note (compose)
@@ -189,17 +183,6 @@ struct NoteEditorView: View {
             baseURL: notesVM.notesDirectoryURL,
             onReferenceClick: handleReferenceClick
         )
-    }
-
-    // MARK: - Split Pane
-
-    private var splitPane: some View {
-        VSplitView {
-            editorPane
-                .frame(minHeight: 120)
-            previewPane
-                .frame(minHeight: 120)
-        }
     }
 
     // MARK: - Reference Click
