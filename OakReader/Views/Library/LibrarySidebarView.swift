@@ -409,7 +409,7 @@ private struct CollectionRowView: View {
                 guard !collection.isSmart else { return false }
                 for idString in droppedIDs {
                     guard let uuid = UUID(uuidString: idString),
-                          let item = store.items.first(where: { $0.id == uuid }) else { continue }
+                          let item = store.findItem(byId: uuid) else { continue }
                     store.addItem(item, to: collection)
                 }
                 return !droppedIDs.isEmpty

@@ -131,7 +131,7 @@ final class AppState {
 
     var selectedLibraryItem: LibraryItem? {
         guard let firstID = selectedLibraryItemIDs.first else { return nil }
-        return libraryStore.items.first { $0.id == firstID }
+        return libraryStore.findItem(byId: firstID)
     }
 
     init() {

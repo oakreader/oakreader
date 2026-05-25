@@ -334,6 +334,7 @@
 		FA15F75D86F6E573038C2C9B /* SearchSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10A8A79F203A72B68BB81305 /* SearchSidebarView.swift */; };
 		FA1C04001B4812DFEA9213D2 /* FileCoordination.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37594A1723FA448772E9FAA7 /* FileCoordination.swift */; };
 		FD86B18DAC21BDACE850161C /* LibraryPropertyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 699913DA93CBA7649507A450 /* LibraryPropertyStore.swift */; };
+		2D5B08A1AA148D98C1E0D484 /* LibraryQuerying.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF099FD4D8A6552242E08317 /* LibraryQuerying.swift */; };
 		FE6B184BE73B0C0A5A375276 /* QuizCardService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C919BD5E7BE17E2290FDA963 /* QuizCardService.swift */; };
 		FFE10D25C8CCA1B1A5982951 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CF758B038910E7989807B7E1 /* Assets.xcassets */; };
 		A1B2C3D4E5F6A7B8C9D0E1F2 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F6A7B8C9D0E1F2A3 /* AppIcon.icon */; };
@@ -504,6 +505,7 @@
 		67058640A7746AEB945545CA /* ChatViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatViewModel.swift; sourceTree = "<group>"; };
 		67A7297F5A3894E12796E73F /* TextExtractionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextExtractionService.swift; sourceTree = "<group>"; };
 		699913DA93CBA7649507A450 /* LibraryPropertyStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryPropertyStore.swift; sourceTree = "<group>"; };
+		FF099FD4D8A6552242E08317 /* LibraryQuerying.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryQuerying.swift; sourceTree = "<group>"; };
 		6A3019C71FD938084B3328D5 /* AnnotationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationViewModel.swift; sourceTree = "<group>"; };
 		6A92000415AEF2F5CE2FC86F /* BatchFileListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchFileListView.swift; sourceTree = "<group>"; };
 		6BC5B006B91985952010BF6E /* PDFAnnotation+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PDFAnnotation+Extensions.swift"; sourceTree = "<group>"; };
@@ -960,6 +962,7 @@
 				213E072D4DBDA107DB9C8194 /* LibraryCoverService.swift */,
 				2E33DDC20D3CB640586A0201 /* LibraryItemStore.swift */,
 				699913DA93CBA7649507A450 /* LibraryPropertyStore.swift */,
+				FF099FD4D8A6552242E08317 /* LibraryQuerying.swift */,
 				D6E956A0342EDE33F8AC2ACB /* LibraryStore.swift */,
 				24FB9A6CF90E7947927E64EF /* MarkdownRenderer.swift */,
 				336D639AE3FEAE342018B695 /* MergeService.swift */,
@@ -1692,6 +1695,7 @@
 				BCCEFBE3CCE57229BFE10BCA /* LibraryItemStore.swift in Sources */,
 				E619929B6D99ACD477406C1A /* LibraryModels.swift in Sources */,
 				FD86B18DAC21BDACE850161C /* LibraryPropertyStore.swift in Sources */,
+				2D5B08A1AA148D98C1E0D484 /* LibraryQuerying.swift in Sources */,
 				8761A72AB9AC6F3C09922499 /* LibraryRootView.swift in Sources */,
 				896C6CBF991680F0AC9F2C7E /* LibrarySettingsView.swift in Sources */,
 				59B6D8A2E666CEDCCF423111 /* LibrarySideNavView.swift in Sources */,

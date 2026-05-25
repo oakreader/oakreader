@@ -106,11 +106,29 @@ final class LibraryStore {
     /// Returns tag options with their item counts, sorted by count descending.
     func tagOptionsWithCounts() -> [(option: PropertyOption, count: Int)] {
         guard let tagsProp = tagsProperty else { return [] }
-        let allItems = items
+
+        // Single SQL query: count items per option, excluding trashed items
+        let countsMap: [String: Int] = (try? database.dbQueue.read { db in
+            let rows = try Row.fetchAll(db, sql: """
+                SELECT ipv.option_id, COUNT(DISTINCT ipv.item_id) AS cnt
+                FROM item_property_values ipv
+                JOIN items i ON i.id = ipv.item_id
+                WHERE ipv.property_id = ?
+                  AND ipv.option_id IS NOT NULL
+                  AND i.deleted_at IS NULL
+                GROUP BY ipv.option_id
+            """, arguments: [tagsProp.id.uuidString])
+            var map: [String: Int] = [:]
+            for row in rows {
+                let optionId: String = row["option_id"]
+                let cnt: Int = row["cnt"]
+                map[optionId] = cnt
+            }
+            return map
+        }) ?? [:]
+
         return tagsProp.options.map { option in
-            let count = allItems.filter { item in
-                item.propertyValues.contains { $0.option?.id == option.id }
-            }.count
+            let count = countsMap[option.id.uuidString] ?? 0
             return (option: option, count: count)
         }.sorted { $0.count > $1.count }
     }
@@ -153,10 +171,6 @@ final class LibraryStore {
         let result = (try? fetchAllItems()) ?? []
         itemsCache = (revision: revision, items: result)
         return result
-    }
-
-    func findItem(byCiteKey citeKey: String) -> LibraryItem? {
-        items.first { $0.citeKey == citeKey }
     }
 
     // MARK: - Duplicate Detection
@@ -258,43 +272,9 @@ final class LibraryStore {
             }
         }
 
-        // Apply search
-        if isSemanticSearchActive && !searchText.isEmpty {
-            if let order = semanticSearchOrder, let resultsMap = semanticSearchResults {
-                let matchingIds = Set(order)
-                results = results.filter { matchingIds.contains($0.id) }
-                // Sort by relevance score (highest first)
-                results.sort { a, b in
-                    let scoreA = resultsMap[a.id]?.score ?? 0
-                    let scoreB = resultsMap[b.id]?.score ?? 0
-                    return scoreA > scoreB
-                }
-            }
-            // When searching but no results yet, keep current results unfiltered
-            return results
-        }
-
-        if !searchText.isEmpty {
-            let query = searchText.lowercased()
-            results = results.filter {
-                $0.title.lowercased().contains(query) ||
-                $0.author.lowercased().contains(query) ||
-                $0.fileName.lowercased().contains(query)
-            }
-        }
-
-        // Sort (keyword mode only — semantic mode sorted by score above)
-        results.sort { a, b in
-            let cmp: Bool
-            switch currentSort {
-            case .dateAdded:  cmp = a.dateAdded < b.dateAdded
-            case .dateOpened: cmp = (a.lastOpenedAt ?? .distantPast) < (b.lastOpenedAt ?? .distantPast)
-            case .title:      cmp = a.title.localizedCaseInsensitiveCompare(b.title) == .orderedAscending
-            case .author:     cmp = a.author.localizedCaseInsensitiveCompare(b.author) == .orderedAscending
-            case .fileSize:   cmp = a.fileSize < b.fileSize
-            }
-            return sortAscending ? cmp : !cmp
-        }
+        // Apply search & sort
+        applySearch(to: &results)
+        applySort(to: &results)
 
         return results
     }
@@ -411,6 +391,49 @@ final class LibraryStore {
         return items.filter { itemIds.contains($0.id) }
     }
 
+    // MARK: - Search & Sort Helpers
+
+    /// Apply keyword or semantic search filtering to the given items.
+    private func applySearch(to items: inout [LibraryItem]) {
+        if isSemanticSearchActive && !searchText.isEmpty {
+            if let order = semanticSearchOrder, let resultsMap = semanticSearchResults {
+                let matchingIds = Set(order)
+                items = items.filter { matchingIds.contains($0.id) }
+                items.sort { a, b in
+                    let scoreA = resultsMap[a.id]?.score ?? 0
+                    let scoreB = resultsMap[b.id]?.score ?? 0
+                    return scoreA > scoreB
+                }
+            }
+            return
+        }
+
+        if !searchText.isEmpty {
+            let query = searchText.lowercased()
+            items = items.filter {
+                $0.title.lowercased().contains(query) ||
+                $0.author.lowercased().contains(query) ||
+                $0.fileName.lowercased().contains(query)
+            }
+        }
+    }
+
+    /// Apply the current sort order. Skipped when semantic search is active (sorted by relevance).
+    private func applySort(to items: inout [LibraryItem]) {
+        guard !(isSemanticSearchActive && !searchText.isEmpty) else { return }
+        items.sort { a, b in
+            let cmp: Bool
+            switch currentSort {
+            case .dateAdded:  cmp = a.dateAdded < b.dateAdded
+            case .dateOpened: cmp = (a.lastOpenedAt ?? .distantPast) < (b.lastOpenedAt ?? .distantPast)
+            case .title:      cmp = a.title.localizedCaseInsensitiveCompare(b.title) == .orderedAscending
+            case .author:     cmp = a.author.localizedCaseInsensitiveCompare(b.author) == .orderedAscending
+            case .fileSize:   cmp = a.fileSize < b.fileSize
+            }
+            return sortAscending ? cmp : !cmp
+        }
+    }
+
     // MARK: - Reading List Filtered Items
 
     /// Set of item IDs that are not in any user (non-system) collection.
@@ -422,42 +445,8 @@ final class LibraryStore {
     private var readingListFilteredItems: [LibraryItem] {
         let ids = readingListItemIds
         var results = items.filter { ids.contains($0.id) }
-
-        // Apply search within reading list
-        if isSemanticSearchActive && !searchText.isEmpty {
-            if let order = semanticSearchOrder, let resultsMap = semanticSearchResults {
-                let matchingIds = Set(order)
-                results = results.filter { matchingIds.contains($0.id) }
-                results.sort { a, b in
-                    let scoreA = resultsMap[a.id]?.score ?? 0
-                    let scoreB = resultsMap[b.id]?.score ?? 0
-                    return scoreA > scoreB
-                }
-            }
-        } else if !searchText.isEmpty {
-            let query = searchText.lowercased()
-            results = results.filter {
-                $0.title.lowercased().contains(query) ||
-                $0.author.lowercased().contains(query) ||
-                $0.fileName.lowercased().contains(query)
-            }
-        }
-
-        // Sort (keyword mode only)
-        if !(isSemanticSearchActive && !searchText.isEmpty) {
-            results.sort { a, b in
-                let cmp: Bool
-                switch currentSort {
-                case .dateAdded:  cmp = a.dateAdded < b.dateAdded
-                case .dateOpened: cmp = (a.lastOpenedAt ?? .distantPast) < (b.lastOpenedAt ?? .distantPast)
-                case .title:      cmp = a.title.localizedCaseInsensitiveCompare(b.title) == .orderedAscending
-                case .author:     cmp = a.author.localizedCaseInsensitiveCompare(b.author) == .orderedAscending
-                case .fileSize:   cmp = a.fileSize < b.fileSize
-                }
-                return sortAscending ? cmp : !cmp
-            }
-        }
-
+        applySearch(to: &results)
+        applySort(to: &results)
         return results
     }
 
@@ -473,27 +462,7 @@ final class LibraryStore {
             }
             results.append(contentsOf: sorted)
         }
-
-        // Apply search within duplicates
-        if isSemanticSearchActive && !searchText.isEmpty {
-            if let order = semanticSearchOrder, let resultsMap = semanticSearchResults {
-                let matchingIds = Set(order)
-                results = results.filter { matchingIds.contains($0.id) }
-                results.sort { a, b in
-                    let scoreA = resultsMap[a.id]?.score ?? 0
-                    let scoreB = resultsMap[b.id]?.score ?? 0
-                    return scoreA > scoreB
-                }
-            }
-        } else if !searchText.isEmpty {
-            let query = searchText.lowercased()
-            results = results.filter {
-                $0.title.lowercased().contains(query) ||
-                $0.author.lowercased().contains(query) ||
-                $0.fileName.lowercased().contains(query)
-            }
-        }
-
+        applySearch(to: &results)
         return results
     }
 
@@ -507,15 +476,7 @@ final class LibraryStore {
     /// Trashed items filtered by search text.
     private var binFilteredItems: [LibraryItem] {
         var results = trashedItems
-
-        if !searchText.isEmpty {
-            let query = searchText.lowercased()
-            results = results.filter {
-                $0.title.lowercased().contains(query) ||
-                $0.author.lowercased().contains(query) ||
-                $0.fileName.lowercased().contains(query)
-            }
-        }
+        applySearch(to: &results)
 
         // Sort by deleted_at descending (most recently trashed first)
         results.sort { a, b in

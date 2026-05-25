@@ -70,7 +70,7 @@ extension ImportService {
             throw URLImportError.invalidURL
         }
 
-        if let existing = await MainActor.run(body: { store.items.first(where: { $0.sourceURL == sourceURL }) }) {
+        if let existing = await MainActor.run(body: { store.findItem(bySourceURL: sourceURL) }) {
             return existing
         }
 
