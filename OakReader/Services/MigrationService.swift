@@ -208,7 +208,7 @@ private class OldSQLiteReader {
         let sql = """
             SELECT Z_PK, ZFILEBOOKMARKDATA, ZFILENAME, ZFILEPATH,
                    ZTITLE, ZAUTHOR, ZDATEADDED, ZDATELASTOPENED,
-                   ZPAGECOUNT, ZFILESIZE, ZISFAVORITE, ZCOVERIMAGEDATA
+                   ZPAGECOUNT, ZFILESIZE, ZCOVERIMAGEDATA
             FROM \(table)
         """
 
@@ -231,7 +231,7 @@ private class OldSQLiteReader {
                 lastOpenedAt: dateColumn(stmt, col: 7),
                 pageCount: Int(sqlite3_column_int(stmt, 8)),
                 fileSize: sqlite3_column_int64(stmt, 9),
-                coverImageData: blobColumn(stmt, col: 11)
+                coverImageData: blobColumn(stmt, col: 10)
             )
             results.append(item)
         }
