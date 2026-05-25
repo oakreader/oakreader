@@ -174,7 +174,7 @@ struct ChatBubbleView: View {
             .font(OakStyle.ChatFont.messageBody)
     }
 
-    /// Renders interleaved text segments and inline quiz views.
+    /// Renders interleaved text segments, inline quiz views, and deck carousels.
     @ViewBuilder
     private var quizSegmentedBubble: some View {
         let segments = QuizXMLParser.parse(turn.content)
@@ -185,6 +185,8 @@ struct ChatBubbleView: View {
                     chatMarkdown(markdown)
                 case .quiz(let content):
                     InlineQuizView(content: content, onSaveToDeck: onSaveQuizCard)
+                case .deck(let deck):
+                    InlineDeckView(deck: deck, onSaveCard: onSaveQuizCard)
                 }
             }
         }

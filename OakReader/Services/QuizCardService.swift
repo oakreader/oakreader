@@ -190,7 +190,11 @@ struct QuizCardService {
     ) throws -> QuizCard {
         let cardId = UUID()
         let now = Date().iso8601String
-        let contentData = try JSONEncoder().encode(content)
+
+        // Copy occlusion image to deck attachments if applicable
+        let resolvedContent = try copyOcclusionImage(content: content, cardId: cardId)
+
+        let contentData = try JSONEncoder().encode(resolvedContent)
         let contentJson = String(data: contentData, encoding: .utf8) ?? "{}"
 
         // Resolve collection from item if not provided
@@ -210,7 +214,7 @@ struct QuizCardService {
             collectionId: resolvedCollectionId,
             conversationId: conversationId,
             groupId: groupId,
-            type: content.quizType.rawValue,
+            type: resolvedContent.quizType.rawValue,
             contentJson: contentJson,
             state: QuizCardState.new.rawValue,
             dueAt: now,
@@ -289,12 +293,57 @@ struct QuizCardService {
         }
 
         // Re-fetch to return updated card
-        return try database.dbQueue.read { db in
+        var updated = try database.dbQueue.read { db in
             guard let record = try QuizCardRecord.fetchOne(db, key: card.id.uuidString) else {
                 throw NSError(domain: "QuizCardService", code: 404, userInfo: [NSLocalizedDescriptionKey: "Card not found"])
             }
             return QuizCard(record: record)
         }
+
+        // Auto-suspend if leech threshold reached
+        if rating == .again && QuizCardService.isLeech(updated) {
+            let autoSuspend = UserDefaults.standard.bool(forKey: "quizCard_autoSuspendLeech")
+            if autoSuspend {
+                try suspendCard(id: updated.id, suspended: true)
+                updated.isSuspended = true
+            }
+        }
+
+        return updated
+    }
+
+    // MARK: - Image Occlusion Storage
+
+    /// Copy the occlusion image from its source (e.g. chat attachments) to deck/attachments/{cardId}/.
+    /// Returns updated content with the new absolute path.
+    private func copyOcclusionImage(content: QuizContent, cardId: UUID) throws -> QuizContent {
+        guard case .occlusion(let c) = content else { return content }
+        let sourceURL = URL(fileURLWithPath: c.imageURL)
+        guard FileManager.default.fileExists(atPath: sourceURL.path) else { return content }
+
+        let destDir = CatalogDatabase.deckAttachmentDirectory(cardId: cardId)
+        try FileManager.default.createDirectory(at: destDir, withIntermediateDirectories: true)
+
+        let destURL = CatalogDatabase.deckAttachmentURL(cardId: cardId, fileName: sourceURL.lastPathComponent)
+        if !FileManager.default.fileExists(atPath: destURL.path) {
+            try FileManager.default.copyItem(at: sourceURL, to: destURL)
+        }
+
+        let updatedContent = QuizContent.OcclusionContent(
+            imageURL: destURL.path,
+            masks: c.masks,
+            labels: c.labels
+        )
+        return .occlusion(updatedContent)
+    }
+
+    // MARK: - Leech Detection
+
+    /// Whether a card qualifies as a leech based on current settings.
+    static func isLeech(_ card: QuizCard) -> Bool {
+        let threshold = UserDefaults.standard.integer(forKey: "quizCard_leechThreshold")
+        let effectiveThreshold = threshold > 0 ? threshold : 6
+        return card.lapses >= effectiveThreshold
     }
 
     // MARK: - Delete
