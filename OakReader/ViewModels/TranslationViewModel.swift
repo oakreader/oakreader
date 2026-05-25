@@ -12,8 +12,14 @@ class TranslationViewModel {
     var isTranslating: Bool = false
     var errorMessage: String?
 
+    // Word explanation state
+    var wordExplanation: String = ""
+    var isExplainingWord: Bool = false
+    var explanationWord: String = ""
+
     private var streamTask: Task<Void, Never>?
     private var debounceTask: Task<Void, Never>?
+    private var wordExplanationTask: Task<Void, Never>?
     private var skipNextDebounce = false
     private let router = ProviderRouter()
 
@@ -149,9 +155,11 @@ class TranslationViewModel {
             You are an expert editor and native \(targetLabel) writer. \
             Revise the text to improve clarity, conciseness, and coherence \
             so it reads like polished native prose. \
-            Preserve the original meaning and tone. Output only the revised text.
+            Preserve the original meaning and tone. Output only the revised text. \
+            Begin directly with the revised text. Do not add any preamble, labels, or commentary.
             """
-            let user = "Polish the following \(targetLabel) text:\n\n\(text)"
+            var user = "Polish the following \(targetLabel) text:\n\n\(text)"
+            if !docCtx.isEmpty { user += "\n\n[\(docCtx)]" }
             return (system, user)
         }
 
@@ -159,8 +167,7 @@ class TranslationViewModel {
         if isWordLookup(text) {
             if isChinese {
                 let system = """
-                你是一位翻译引擎。翻译给出的文本，只需翻译不需要解释。\
-                当文本是单个单词时，请给出：\
+                你是一位翻译引擎。当文本是单个单词时，请给出：\
                 单词原始形态（如有）、语种、对应音标或转写、\
                 所有含义（含词性）、至少三条双语示例。\
                 格式：
@@ -168,6 +175,7 @@ class TranslationViewModel {
                 [词性] 含义
                 例句：
                 1. 例句 (翻译)
+                如果提供了文档上下文（方括号内），用它来消歧术语，但不要在输出中包含它。
                 """
                 var user = "翻译为\(targetLabel)：\n\n\(text)"
                 if !docCtx.isEmpty { user += "\n\n[\(docCtx)]" }
@@ -182,6 +190,7 @@ class TranslationViewModel {
                 [POS] Meaning
                 Examples:
                 1. Example (Translation)
+                If document context is provided in brackets, use it to disambiguate terminology but do not include it in your output.
                 """
                 var user = "Translate to \(targetLabel):\n\n\(text)"
                 if !docCtx.isEmpty { user += "\n\n[\(docCtx)]" }
@@ -206,6 +215,8 @@ class TranslationViewModel {
             - 保持原文的风格和语气
             - 专业术语准确，通用表达地道
             - 只输出重塑后的译文，不要任何解释
+            如果提供了文档上下文（方括号内），用它来消歧术语，但不要在输出中包含它。\
+            直接以译文开头，不要加任何前言、标签或评论。
             """
             user = "将以下\(sourceLabel)文本重塑为\(targetLabel)：\n\n\(text)"
         } else {
@@ -218,6 +229,8 @@ class TranslationViewModel {
             - Break up overly long sentences when needed for readability
             - Keep technical terms accurate and domain-appropriate
             - Output only the translated text, no explanations
+            If document context is provided in brackets, use it to disambiguate terminology but do not include it in your output. \
+            Begin directly with the translated text. Do not add any preamble, labels, or commentary.
             """
             user = "Translate from \(sourceLabel) to \(targetLabel):\n\n\(text)"
         }
@@ -227,6 +240,117 @@ class TranslationViewModel {
         }
 
         return (system, user)
+    }
+
+    // MARK: - Word Explanation
+
+    func explainWord(_ word: String, inSentence sentence: String) {
+        stopWordExplanation()
+        explanationWord = word
+        wordExplanation = ""
+        isExplainingWord = true
+
+        let prefs = Preferences.shared
+        let pid = prefs.translationAIProviderId
+        let model: String = {
+            let m = prefs.translationAIModel
+            return m.isEmpty ? (ProviderRegistry.shared.provider(for: pid)?.defaultModelId ?? "") : m
+        }()
+
+        let systemPrompt = buildWordExplanationSystemPrompt()
+        let userPrompt = buildWordExplanationUserPrompt(word: word, sentence: sentence)
+
+        let config = ProviderConfig(providerId: pid, model: model)
+        let messages = [LLMMessage(role: .user, text: userPrompt)]
+
+        wordExplanationTask = Task { @MainActor in
+            do {
+                let svc = try router.provider(for: config)
+                let stream = svc.sendMessage(
+                    messages: messages,
+                    model: model,
+                    systemPrompt: systemPrompt,
+                    maxTokens: 4096
+                )
+
+                for try await chunk in stream {
+                    switch chunk {
+                    case .delta(let delta):
+                        wordExplanation += delta
+                    case .thinking, .toolUse, .finished:
+                        break
+                    case .error(let msg):
+                        wordExplanation += "\n\n⚠️ \(msg)"
+                    }
+                }
+            } catch {
+                if !(error is CancellationError) {
+                    wordExplanation += "\n\n⚠️ \(error.localizedDescription)"
+                }
+            }
+            isExplainingWord = false
+        }
+    }
+
+    func stopWordExplanation() {
+        wordExplanationTask?.cancel()
+        wordExplanationTask = nil
+        isExplainingWord = false
+    }
+
+    private func buildWordExplanationSystemPrompt() -> String {
+        let accent = Preferences.shared.pronunciationAccent
+        let targetLabel = targetLang.displayName
+        let ipaNote = accent == .british
+            ? "Use British English pronunciation (BrE IPA)."
+            : "Use American English pronunciation (AmE IPA)."
+
+        return """
+        You are an expert word analyst. \(ipaNote) \
+        Provide a deep, insightful explanation of the given word using the exact format specified. \
+        All translations and explanations should be in \(targetLabel). \
+        Use markdown formatting. Be concise but illuminating. \
+        If the word appears in the given sentence context, tailor collocations and examples to that context.
+        """
+    }
+
+    private func buildWordExplanationUserPrompt(word: String, sentence: String) -> String {
+        let targetLabel = targetLang.displayName
+
+        var prompt = """
+        Explain this word in depth:
+
+        **Word:** \(word)
+        """
+        if !sentence.isEmpty {
+            prompt += "\n**Sentence context:** \(sentence)"
+        }
+
+        prompt += """
+
+
+        Use this exact format (translate all annotations and explanations into \(targetLabel)):
+
+        ## {Word}  /{phonetics}/  {\(targetLabel) translation}
+
+        ### Core Semantics
+        - **Original Image**: one-sentence physical image of the word's origin
+        - **Core Imagery**: formula (e.g., warmth + time + protection = incubation)
+        - **Explanation**: insightful analysis of deep meaning and modern usage
+
+        ### One-liner
+        > "English sentence demonstrating nuanced usage. \(targetLabel) philosophical summary."
+
+        ### Collocations
+        Common collocations, especially those appearing in the given sentence context.
+
+        ### Derivatives
+        Related derived words with brief meanings.
+
+        ### Memory
+        Etymology-based deep memory technique.
+        """
+        return prompt
     }
 
     func stopTranslation() {
