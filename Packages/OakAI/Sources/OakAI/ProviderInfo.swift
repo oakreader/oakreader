@@ -72,6 +72,8 @@ public struct ProviderInfo: Identifiable, Sendable, Hashable {
     public let models: [ModelInfo]
     public let authStrategy: AuthStrategy
     public let customHeaders: [String: String]
+    /// Lower values appear first in the provider list. Default is 100.
+    public let displayOrder: Int
 
     public init(
         id: String,
@@ -81,7 +83,8 @@ public struct ProviderInfo: Identifiable, Sendable, Hashable {
         defaultModelId: String,
         models: [ModelInfo],
         authStrategy: AuthStrategy = .apiKey(envVar: nil),
-        customHeaders: [String: String] = [:]
+        customHeaders: [String: String] = [:],
+        displayOrder: Int = 100
     ) {
         self.id = id
         self.displayName = displayName
@@ -91,6 +94,7 @@ public struct ProviderInfo: Identifiable, Sendable, Hashable {
         self.models = models
         self.authStrategy = authStrategy
         self.customHeaders = customHeaders
+        self.displayOrder = displayOrder
     }
 
     // MARK: - Hashable (by id only — AuthStrategy is not Hashable)

@@ -391,13 +391,18 @@ private struct ProviderDetailView: View {
     // MARK: - Connection Testing
 
     private func testAndSaveAPIKey(_ provider: ProviderInfo) {
-        KeychainService.setAPIKey(apiKey, forProviderId: provider.id)
-        testConnection(provider) {
-            store.refresh()
+        testConnection(provider, credential: apiKey) {
+            // Save to Keychain only after successful test
+            let saved = KeychainService.setAPIKey(apiKey, forProviderId: provider.id)
+            if saved {
+                store.refresh()
+            } else {
+                testResult = "Connection OK but failed to save key to Keychain"
+            }
         }
     }
 
-    private func testConnection(_ provider: ProviderInfo, onSuccess: (() -> Void)? = nil) {
+    private func testConnection(_ provider: ProviderInfo, credential: String? = nil, onSuccess: (() -> Void)? = nil) {
         isTesting = true
         testResult = nil
 
@@ -406,7 +411,12 @@ private struct ProviderDetailView: View {
                 let router = ProviderRouter()
                 let testModel = provider.defaultModelId
                 let config = ProviderConfig(providerId: provider.id, model: testModel)
-                let svc = try router.provider(for: config)
+                let svc: LLMProviderService
+                if let credential {
+                    svc = try router.provider(for: config, credential: credential)
+                } else {
+                    svc = try router.provider(for: config)
+                }
                 let messages = [LLMMessage(role: .user, text: "Say 'OK' and nothing else.")]
                 let stream = svc.sendMessage(
                     messages: messages, model: testModel,

@@ -50,7 +50,8 @@ public enum BuiltInProviders {
             ModelInfo(id: "claude-haiku-4-5", name: "Claude Haiku 4.5", providerId: "anthropic", contextWindow: 200_000, maxTokens: 64_000, reasoning: true, supportsVision: true),
             ModelInfo(id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5 (20251001)", providerId: "anthropic", contextWindow: 200_000, maxTokens: 64_000, reasoning: true, supportsVision: true),
         ],
-        authStrategy: .apiKey(envVar: "ANTHROPIC_API_KEY")
+        authStrategy: .apiKey(envVar: "ANTHROPIC_API_KEY"),
+        displayOrder: 1
     )
 
     // MARK: - OpenAI
@@ -91,7 +92,8 @@ public enum BuiltInProviders {
             ModelInfo(id: "o3-mini", name: "o3-mini", providerId: "openai", contextWindow: 200_000, maxTokens: 100_000, reasoning: true, supportsVision: false),
             ModelInfo(id: "o3-pro", name: "o3-pro", providerId: "openai", contextWindow: 200_000, maxTokens: 100_000, reasoning: true, supportsVision: true),
         ],
-        authStrategy: .apiKey(envVar: "OPENAI_API_KEY")
+        authStrategy: .apiKey(envVar: "OPENAI_API_KEY"),
+        displayOrder: 0
     )
 
     // MARK: - Google
@@ -379,7 +381,8 @@ public enum BuiltInProviders {
                 "codex_cli_simplified_flow": "true",
                 "id_token_add_organizations": "true",
             ]
-        ))
+        )),
+        displayOrder: 0
     )
 
     // MARK: - GitHub Copilot (Copilot subscription, device code)
