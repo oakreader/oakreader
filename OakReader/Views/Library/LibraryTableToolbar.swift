@@ -58,7 +58,7 @@ struct LibraryTableToolbar: View {
                         store.isSemanticSearchActive ? "Search by meaning..." : "Search Library",
                         text: $searchText
                     )
-                        .font(.system(size: 13))
+                        .font(.system(size: 14))
                         .textFieldStyle(.plain)
                         .accessibilityLabel("Search library")
                         .onChange(of: searchText) { _, newValue in
@@ -157,7 +157,7 @@ struct LibraryTableToolbar: View {
                 .accessibilityLabel("Add Sources to Library")
             }
             .padding(.horizontal, 8)
-            .frame(height: 41)
+            .frame(height: 44)
 
         }
         .background(Color(nsColor: .windowBackgroundColor))

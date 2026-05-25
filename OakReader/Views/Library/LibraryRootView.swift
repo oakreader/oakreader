@@ -14,6 +14,8 @@ struct LibraryRootView: View {
                 LibrarySidebarView(appState: appState)
                     .frame(width: 280)
                     .background(OakStyle.Colors.sidebarBackground)
+
+                Divider()
             }
 
             // Middle + Right panes (golden ratio: table ≥ 0.382, detail ≤ 0.618)

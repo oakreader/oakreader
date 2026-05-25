@@ -16,13 +16,16 @@ struct AIChatView: View {
             header
 
             // Content: either history drawer or chat
-            if chatVM.showHistory {
-                ChatHistoryDrawer(chatVM: chatVM)
-                    .transition(.move(edge: .leading))
-            } else {
-                chatContent
-                    .transition(.move(edge: .trailing))
+            Group {
+                if chatVM.showHistory {
+                    ChatHistoryDrawer(chatVM: chatVM)
+                        .transition(.move(edge: .leading))
+                } else {
+                    chatContent
+                        .transition(.move(edge: .trailing))
+                }
             }
+            .clipped()
         }
         .animation(.easeInOut(duration: 0.2), value: chatVM.showHistory)
         .onAppear {

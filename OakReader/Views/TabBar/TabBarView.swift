@@ -85,12 +85,12 @@ struct TabBarView: View {
 
             Spacer(minLength: 0)
 
-            // Panel mode tabs — context-dependent, glass button group
+            // Panel mode tabs — context-dependent
             if let viewModel = appState.activeTab?.viewModel,
                viewModel.storageKey != nil,
                !viewModel.state.isZenMode {
                 // Document tab: show document panel modes
-                glassButtonGroup {
+                HStack(spacing: 4) {
                     ForEach(panelVisibleModes) { mode in
                         panelTabButton(mode: mode, viewModel: viewModel)
                     }
@@ -98,7 +98,7 @@ struct TabBarView: View {
                 .padding(.trailing, 4)
             } else if appState.isLibraryActive {
                 // Library tab: show library detail tabs
-                glassButtonGroup {
+                HStack(spacing: 4) {
                     ForEach(LibraryDetailTab.allCases) { tab in
                         libraryTabButton(tab: tab)
                     }
@@ -147,68 +147,14 @@ struct TabBarView: View {
         return RightPanelMode.allCases.filter { !disabledModes.contains($0) }
     }
 
-    private static let glassIconSize: CGFloat = 12
-    private static let glassButtonSize: CGFloat = 24
-
     private func panelTabButton(mode: RightPanelMode, viewModel: DocumentViewModel) -> some View {
-        let isActive = viewModel.state.rightPanelMode == mode
-
-        return Button {
-            if viewModel.state.rightPanelMode == mode {
-                viewModel.state.rightPanelMode = nil
-            } else {
-                viewModel.state.rightPanelMode = mode
-            }
-        } label: {
-            Image(systemName: mode.systemImage)
-                .font(.system(size: Self.glassIconSize, weight: .medium))
-                .frame(width: Self.glassButtonSize, height: Self.glassButtonSize)
-                .background(
-                    Circle()
-                        .fill(isActive ? Color.primary.opacity(0.12) : Color.clear)
-                )
-                .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(isActive ? Color(nsColor: .labelColor) : Color(nsColor: .secondaryLabelColor))
-        .help(mode.label)
+        PanelTabButtonView(mode: mode, viewModel: viewModel)
     }
 
     // MARK: - Library Detail Tabs
 
     private func libraryTabButton(tab: LibraryDetailTab) -> some View {
-        let isActive = appState.libraryDetailTab == tab
-
-        return Button {
-            if appState.libraryDetailTab == tab {
-                appState.libraryDetailTab = nil
-            } else {
-                appState.libraryDetailTab = tab
-            }
-        } label: {
-            Image(systemName: tab.systemImage)
-                .font(.system(size: Self.glassIconSize, weight: .medium))
-                .frame(width: Self.glassButtonSize, height: Self.glassButtonSize)
-                .background(
-                    Circle()
-                        .fill(isActive ? Color.primary.opacity(0.12) : Color.clear)
-                )
-                .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(isActive ? Color(nsColor: .labelColor) : Color(nsColor: .secondaryLabelColor))
-        .help(tab.label)
-    }
-
-    // MARK: - Glass Button Group
-
-    private func glassButtonGroup<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        HStack(spacing: 2) {
-            content()
-        }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 3)
-        .modifier(GlassGroupModifier())
+        LibraryTabButtonView(tab: tab, appState: appState)
     }
 
     // MARK: - Pinned Tab Content
@@ -310,6 +256,94 @@ struct QuizTabView: View {
                 .padding(.horizontal, cr)
                 .padding(.vertical, 5)
         }
+    }
+}
+
+// MARK: - Panel Tab Button
+
+private struct PanelTabButtonView: View {
+    let mode: RightPanelMode
+    let viewModel: DocumentViewModel
+
+    @State private var isHovering = false
+
+    private var isActive: Bool {
+        viewModel.state.rightPanelMode == mode
+    }
+
+    private var fillOpacity: Double {
+        if isActive { return 0.12 }
+        if isHovering { return 0.07 }
+        return 0
+    }
+
+    var body: some View {
+        Button {
+            if viewModel.state.rightPanelMode == mode {
+                viewModel.state.rightPanelMode = nil
+            } else {
+                viewModel.state.rightPanelMode = mode
+            }
+        } label: {
+            Image(systemName: mode.systemImage)
+                .font(.system(size: 14, weight: .medium))
+                .frame(width: 34, height: 26)
+                .background(
+                    Capsule()
+                        .fill(Color.primary.opacity(fillOpacity))
+                )
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(isActive ? Color(nsColor: .labelColor) : Color(nsColor: .secondaryLabelColor))
+        .onHover { isHovering = $0 }
+        .animation(.easeInOut(duration: 0.15), value: isActive)
+        .animation(.easeInOut(duration: 0.12), value: isHovering)
+        .help(mode.label)
+    }
+}
+
+// MARK: - Library Tab Button
+
+private struct LibraryTabButtonView: View {
+    let tab: LibraryDetailTab
+    let appState: AppState
+
+    @State private var isHovering = false
+
+    private var isActive: Bool {
+        appState.libraryDetailTab == tab
+    }
+
+    private var fillOpacity: Double {
+        if isActive { return 0.12 }
+        if isHovering { return 0.07 }
+        return 0
+    }
+
+    var body: some View {
+        Button {
+            if appState.libraryDetailTab == tab {
+                appState.libraryDetailTab = nil
+            } else {
+                appState.libraryDetailTab = tab
+            }
+        } label: {
+            Image(systemName: tab.systemImage)
+                .font(.system(size: 14, weight: .medium))
+                .frame(width: 34, height: 26)
+                .background(
+                    Capsule()
+                        .fill(Color.primary.opacity(fillOpacity))
+                )
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(isActive ? Color(nsColor: .labelColor) : Color(nsColor: .secondaryLabelColor))
+        .onHover { isHovering = $0 }
+        .animation(.easeInOut(duration: 0.15), value: isActive)
+        .animation(.easeInOut(duration: 0.12), value: isHovering)
+        .help(tab.label)
     }
 }
 
