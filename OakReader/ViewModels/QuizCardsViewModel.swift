@@ -13,6 +13,10 @@ class QuizCardsViewModel {
     var isReviewing: Bool = false
     var currentReviewIndex: Int = 0
     var errorMessage: String?
+    var leechDetectedCard: QuizCard?
+
+    /// Callback to route a regeneration prompt into the chat.
+    var onRegenerateRequest: ((String) -> Void)?
 
     /// The card currently being reviewed.
     var currentReviewCard: QuizCard? {
@@ -120,13 +124,42 @@ class QuizCardsViewModel {
                 cards[idx] = updated
             }
 
-            currentReviewIndex += 1
-            if currentReviewIndex >= dueCards.count {
-                endReview()
+            // Check for leech
+            if rating == .again && QuizCardService.isLeech(updated) {
+                leechDetectedCard = updated
+            } else {
+                currentReviewIndex += 1
+                if currentReviewIndex >= dueCards.count {
+                    endReview()
+                }
             }
         } catch {
             Log.error(Log.store, "Failed to record review: \(error)")
             errorMessage = error.localizedDescription
+        }
+    }
+
+    // MARK: - Leech
+
+    func dismissLeechAlert() {
+        leechDetectedCard = nil
+        currentReviewIndex += 1
+        if currentReviewIndex >= dueCards.count {
+            endReview()
+        }
+    }
+
+    func regenerateCard(_ card: QuizCard) {
+        let concept = card.sourceText ?? card.displayTitle
+        let prompt = "Regenerate a quiz card for this concept: \(concept). Make it clearer and easier to remember."
+
+        deleteCard(card)
+        leechDetectedCard = nil
+        onRegenerateRequest?(prompt)
+
+        currentReviewIndex = min(currentReviewIndex, dueCards.count)
+        if currentReviewIndex >= dueCards.count {
+            endReview()
         }
     }
 

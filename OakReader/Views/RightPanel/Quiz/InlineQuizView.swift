@@ -53,10 +53,8 @@ struct InlineQuizView: View {
             MatchingQuizView(content: c)
         case .ordering(let c):
             OrderingQuizView(content: c)
-        case .occlusion:
-            Text("Image occlusion not yet supported.")
-                .font(.system(size: 12))
-                .foregroundStyle(.tertiary)
+        case .occlusion(let c):
+            OcclusionQuizView(content: c)
         }
     }
 

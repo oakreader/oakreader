@@ -6,20 +6,26 @@ import Foundation
 /// Quiz blocks are parsed into `QuizContent` values; surrounding text is preserved as-is.
 enum QuizXMLParser {
 
-    /// A segment of LLM output: either plain text (Markdown) or a parsed quiz block.
+    /// A segment of LLM output: plain text, a single quiz, or a grouped deck.
     enum ContentSegment {
         case text(String)
         case quiz(QuizContent)
+        case deck(QuizDeck)
     }
 
     // MARK: - Public API
 
-    /// Check whether a string contains any `<quiz>` blocks.
+    /// Check whether a string contains any `<quiz>` or `<deck>` blocks.
     static func containsQuiz(_ text: String) -> Bool {
         text.range(of: #"<quiz\s"#, options: .regularExpression) != nil
+            || text.range(of: #"<deck[\s>]"#, options: .regularExpression) != nil
     }
 
-    /// Parse LLM output into interleaved text and quiz segments.
+    /// Parse LLM output into interleaved text, quiz, and deck segments.
+    ///
+    /// `<deck>` blocks take priority: nested `<quiz>` tags inside a deck are
+    /// grouped into a single `.deck` segment rather than emitted individually.
+    /// Standalone `<quiz>` blocks outside any deck render as `.quiz` segments.
     static func parse(_ text: String) -> [ContentSegment] {
         var segments: [ContentSegment] = []
         let ns = text as NSString
@@ -27,11 +33,47 @@ enum QuizXMLParser {
 
         var cursor = 0
 
+        // First pass: find <deck> blocks (which contain nested <quiz> blocks).
+        deckBlockPattern.enumerateMatches(in: text, range: fullRange) { match, _, stop in
+            guard let match else { return }
+            let matchRange = match.range
+
+            // Parse any standalone <quiz> blocks in the text between cursor and this deck.
+            if matchRange.location > cursor {
+                let gapRange = NSRange(location: cursor, length: matchRange.location - cursor)
+                let gap = ns.substring(with: gapRange)
+                parseStandaloneQuizBlocks(from: gap, into: &segments)
+            }
+
+            // Parse the deck block
+            let deckXML = ns.substring(with: matchRange)
+            if let deck = parseDeckBlock(deckXML) {
+                segments.append(.deck(deck))
+            }
+
+            cursor = matchRange.location + matchRange.length
+        }
+
+        // Parse any remaining standalone <quiz> blocks after the last deck.
+        if cursor < ns.length {
+            let remaining = ns.substring(from: cursor)
+            parseStandaloneQuizBlocks(from: remaining, into: &segments)
+        }
+
+        return segments
+    }
+
+    /// Parse standalone `<quiz>` blocks and interleaved text from a string
+    /// that is NOT inside a `<deck>`.
+    private static func parseStandaloneQuizBlocks(from text: String, into segments: inout [ContentSegment]) {
+        let ns = text as NSString
+        let fullRange = NSRange(location: 0, length: ns.length)
+        var cursor = 0
+
         quizBlockPattern.enumerateMatches(in: text, range: fullRange) { match, _, _ in
             guard let match else { return }
             let matchRange = match.range
 
-            // Text before this quiz block
             if matchRange.location > cursor {
                 let beforeRange = NSRange(location: cursor, length: matchRange.location - cursor)
                 let before = ns.substring(with: beforeRange).trimmingCharacters(in: .whitespacesAndNewlines)
@@ -40,7 +82,6 @@ enum QuizXMLParser {
                 }
             }
 
-            // Parse the quiz block
             let xmlContent = ns.substring(with: matchRange)
             if let quiz = parseQuizBlock(xmlContent) {
                 segments.append(.quiz(quiz))
@@ -49,15 +90,12 @@ enum QuizXMLParser {
             cursor = matchRange.location + matchRange.length
         }
 
-        // Remaining text after last quiz block
         if cursor < ns.length {
             let remaining = ns.substring(from: cursor).trimmingCharacters(in: .whitespacesAndNewlines)
             if !remaining.isEmpty {
                 segments.append(.text(remaining))
             }
         }
-
-        return segments
     }
 
     // MARK: - Regex
@@ -68,6 +106,51 @@ enum QuizXMLParser {
         pattern: #"<quiz\s+type="(\w+)"[^>]*>(.*?)</quiz>"#,
         options: [.dotMatchesLineSeparators]
     )
+
+    /// Matches `<deck title="...">...</deck>` blocks (non-greedy, dotall).
+    // swiftlint:disable:next force_try
+    private static let deckBlockPattern = try! NSRegularExpression(
+        pattern: #"<deck(?:\s+title="([^"]*)")?\s*>(.*?)</deck>"#,
+        options: [.dotMatchesLineSeparators]
+    )
+
+    // MARK: - Deck Parsing
+
+    /// Parse a `<deck>` block: extract its title and all nested `<quiz>` children.
+    private static func parseDeckBlock(_ xml: String) -> QuizDeck? {
+        let ns = xml as NSString
+        let fullRange = NSRange(location: 0, length: ns.length)
+
+        guard let deckMatch = deckBlockPattern.firstMatch(in: xml, range: fullRange) else {
+            return nil
+        }
+
+        let title: String
+        if deckMatch.range(at: 1).location != NSNotFound {
+            title = ns.substring(with: deckMatch.range(at: 1))
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        } else {
+            title = ""
+        }
+
+        let body = ns.substring(with: deckMatch.range(at: 2))
+
+        // Parse all nested <quiz> blocks inside the deck body.
+        var cards: [QuizContent] = []
+        let bodyNS = body as NSString
+        let bodyRange = NSRange(location: 0, length: bodyNS.length)
+
+        quizBlockPattern.enumerateMatches(in: body, range: bodyRange) { match, _, _ in
+            guard let match else { return }
+            let quizXML = bodyNS.substring(with: match.range)
+            if let content = parseQuizBlock(quizXML) {
+                cards.append(content)
+            }
+        }
+
+        guard !cards.isEmpty else { return nil }
+        return QuizDeck(title: title, cards: cards)
+    }
 
     // MARK: - Block Parsing
 

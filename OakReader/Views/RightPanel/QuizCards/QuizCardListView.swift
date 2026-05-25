@@ -3,6 +3,7 @@ import SwiftUI
 /// List of saved quiz cards for the current document, grouped by quiz type.
 struct QuizCardListView: View {
     let quizCardsVM: QuizCardsViewModel
+    @AppStorage("quizCard_leechThreshold") private var leechThreshold: Int = 6
 
     var body: some View {
         List {
@@ -34,6 +35,12 @@ struct QuizCardListView: View {
                 HStack(spacing: 6) {
                     stateLabel(card.state)
 
+                    if card.lapses >= leechThreshold {
+                        Image(systemName: "bolt.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.orange)
+                    }
+
                     if card.isDue {
                         Text("Due")
                             .font(.system(size: 10, weight: .medium))
@@ -58,6 +65,13 @@ struct QuizCardListView: View {
         .contextMenu {
             Button("Suspend") {
                 quizCardsVM.toggleSuspend(card)
+            }
+            if card.lapses >= leechThreshold {
+                Button {
+                    quizCardsVM.regenerateCard(card)
+                } label: {
+                    Label("Regenerate", systemImage: "arrow.trianglehead.2.counterclockwise")
+                }
             }
             Divider()
             Button("Delete", role: .destructive) {

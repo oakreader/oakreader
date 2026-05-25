@@ -174,6 +174,16 @@ enum QuizContent: Codable, Hashable {
     }
 }
 
+// MARK: - Quiz Deck (grouped cards for carousel display)
+
+/// A group of quiz cards wrapped in a `<deck>` tag, displayed as a navigable
+/// carousel in the chat. Each card can be individually saved to the review deck.
+struct QuizDeck: Identifiable, Hashable {
+    let id = UUID()
+    let title: String
+    let cards: [QuizContent]
+}
+
 // MARK: - QuizCard (view-facing model)
 
 struct QuizCard: Identifiable, Hashable {
