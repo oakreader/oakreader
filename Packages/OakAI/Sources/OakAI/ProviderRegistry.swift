@@ -29,7 +29,12 @@ public final class ProviderRegistry: @unchecked Sendable {
     public var allProviders: [ProviderInfo] {
         lock.lock()
         defer { lock.unlock() }
-        return providers.values.sorted { $0.displayName < $1.displayName }
+        return providers.values.sorted {
+            if $0.displayOrder != $1.displayOrder {
+                return $0.displayOrder < $1.displayOrder
+            }
+            return $0.displayName < $1.displayName
+        }
     }
 
     /// Look up model info by model ID across all providers.
