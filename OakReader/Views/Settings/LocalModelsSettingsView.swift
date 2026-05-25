@@ -2,13 +2,6 @@ import SwiftUI
 import OakVoice
 
 struct LocalModelsSettingsView: View {
-    // MARK: - Sidebar selection
-
-    enum SidebarItem: Hashable {
-        case category(ModelCategory)
-        case hfEndpoint
-    }
-
     enum ModelCategory: String, CaseIterable, Identifiable {
         case embedding, stt, tts, vad
 
@@ -20,15 +13,6 @@ struct LocalModelsSettingsView: View {
             case .stt: "Speech-to-Text"
             case .tts: "Text-to-Speech"
             case .vad: "Voice Activity Detection"
-            }
-        }
-
-        var icon: String {
-            switch self {
-            case .embedding: "magnifyingglass"
-            case .stt: "mic"
-            case .tts: "speaker.wave.2"
-            case .vad: "waveform"
             }
         }
 
@@ -44,14 +28,12 @@ struct LocalModelsSettingsView: View {
 
     // MARK: - State
 
-    @State private var selectedItem: SidebarItem? = .category(.embedding)
     @State private var sttModel: String
     @State private var ttsModel: String
     @State private var vadModel: String
     @State private var embeddingModel: String
     @State private var hfEndpoint: String
 
-    // Model download states (shared with AISettingsView)
     let modelStates: SharedModelStates
 
     private var modelManager: ModelManager { ModelManager.shared }
@@ -84,178 +66,32 @@ struct LocalModelsSettingsView: View {
     // MARK: - Body
 
     var body: some View {
-        HStack(spacing: 0) {
-            sidebar
-                .frame(width: 200)
-
-            Divider()
-
-            detailPanel
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-        .onAppear {
-            modelStates.refresh(repos: allRepos)
-            applyHFEndpoint(hfEndpoint)
-        }
-        .onDisappear { save() }
-        .onChange(of: allRepos) { _, _ in
-            modelStates.refresh(repos: allRepos)
-        }
-    }
-
-    // MARK: - Sidebar
-
-    private var sidebar: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 2) {
-                sectionHeader("Models")
-
-                ForEach(ModelCategory.allCases) { category in
-                    let repo = selectedRepo(for: category)
-                    let downloaded = isDownloaded(repo: repo)
-                    listRow(
-                        item: .category(category),
-                        sfSymbol: category.icon,
-                        title: category.label,
-                        isConfigured: downloaded
-                    )
-                }
-
-                sectionHeader("Settings")
-
-                listRow(
-                    item: .hfEndpoint,
-                    sfSymbol: "network",
-                    title: "HuggingFace",
-                    isConfigured: true
-                )
-
-                Divider()
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-
-                downloadAllButton
-                    .padding(.horizontal, 8)
-            }
-            .padding(.vertical, 8)
-        }
-        .background(Color(nsColor: .controlBackgroundColor))
-    }
-
-    private func sectionHeader(_ title: String) -> some View {
-        Text(title)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 12)
-            .padding(.top, 12)
-            .padding(.bottom, 4)
-    }
-
-    private func listRow(item: SidebarItem, sfSymbol: String, title: String, isConfigured: Bool) -> some View {
-        Button {
-            selectedItem = item
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: sfSymbol)
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 20, height: 20)
-
-                Text(title)
-                    .font(.body)
-                    .foregroundStyle(isConfigured ? .primary : .secondary)
-                    .lineLimit(1)
-
-                Spacer()
-
-                Image(systemName: isConfigured ? "checkmark.circle.fill" : "circle")
-                    .font(.caption)
-                    .foregroundStyle(isConfigured ? Color.green : Color.secondary.opacity(0.4))
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 5)
-            .background(
-                RoundedRectangle(cornerRadius: 5)
-                    .fill(selectedItem == item ? Color.accentColor.opacity(0.15) : Color.clear)
-            )
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .padding(.horizontal, 4)
-    }
-
-    private var downloadAllButton: some View {
-        Button {
-            Task {
-                applyHFEndpoint(hfEndpoint)
-                let config = VoiceModelConfig(
-                    sttModel: sttModel,
-                    ttsModel: ttsModel,
-                    vadModel: vadModel
-                )
-                try? await modelManager.downloadAll(config)
-            }
-        } label: {
-            HStack {
-                Image(systemName: allDownloaded ? "checkmark.circle.fill" : "arrow.down.circle")
-                    .foregroundStyle(allDownloaded ? .green : .accentColor)
-                Text(allDownloaded ? "All Downloaded" : "Download All")
-                    .font(.body)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 5)
-        }
-        .buttonStyle(.plain)
-        .disabled(allDownloaded)
-    }
-
-    // MARK: - Detail Panel
-
-    @ViewBuilder
-    private var detailPanel: some View {
-        switch selectedItem {
-        case .category(let category):
-            categoryDetailView(category)
-        case .hfEndpoint:
-            hfEndpointView
-        case nil:
-            ContentUnavailableView(
-                "Select an Item",
-                systemImage: "cpu",
-                description: Text("Choose a model category from the list to configure it.")
-            )
-        }
-    }
-
-    private func categoryDetailView(_ category: ModelCategory) -> some View {
-        let binding = modelBinding(for: category)
-        let repo = binding.wrappedValue
-        let state: ModelManager.ModelState = modelStates.states[repo] ?? .notDownloaded
-        let currentOption = category.knownModels.first { $0.repo == repo }
-
-        return Form {
+        Form {
             Section {
-                Picker("Model", selection: binding) {
-                    ForEach(category.knownModels) { option in
-                        Text("\(option.name) (\(option.sizeLabel))").tag(option.repo)
+                Button {
+                    Task {
+                        applyHFEndpoint(hfEndpoint)
+                        let config = VoiceModelConfig(
+                            sttModel: sttModel,
+                            ttsModel: ttsModel,
+                            vadModel: vadModel
+                        )
+                        try? await modelManager.downloadAll(config)
+                    }
+                } label: {
+                    HStack {
+                        Image(systemName: allDownloaded ? "checkmark.circle.fill" : "arrow.down.circle")
+                            .foregroundStyle(allDownloaded ? .green : .accentColor)
+                        Text(allDownloaded ? "All Downloaded" : "Download All")
                     }
                 }
+                .disabled(allDownloaded)
             }
 
-            Section("Status") {
-                modelStatusRow(repo: repo)
-
-                if let option = currentOption {
-                    LabeledContent("Size", value: option.sizeLabel)
-                }
+            ForEach(ModelCategory.allCases) { category in
+                categorySection(category)
             }
-        }
-        .formStyle(.grouped)
-    }
 
-    private var hfEndpointView: some View {
-        Form {
             Section("HuggingFace Endpoint") {
                 TextField("Endpoint URL", text: $hfEndpoint)
                     .textFieldStyle(.roundedBorder)
@@ -269,6 +105,37 @@ struct LocalModelsSettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .navigationTitle("Local Models")
+        .onAppear {
+            modelStates.refresh(repos: allRepos)
+            applyHFEndpoint(hfEndpoint)
+        }
+        .onDisappear { save() }
+        .onChange(of: allRepos) { _, _ in
+            modelStates.refresh(repos: allRepos)
+        }
+    }
+
+    // MARK: - Category Section
+
+    @ViewBuilder
+    private func categorySection(_ category: ModelCategory) -> some View {
+        let binding = modelBinding(for: category)
+        let repo = binding.wrappedValue
+
+        Section(category.label) {
+            Picker("Model", selection: binding) {
+                ForEach(category.knownModels) { option in
+                    Text("\(option.name) (\(option.sizeLabel))").tag(option.repo)
+                }
+            }
+
+            modelStatusRow(repo: repo)
+
+            if let option = category.knownModels.first(where: { $0.repo == repo }) {
+                LabeledContent("Size", value: option.sizeLabel)
+            }
+        }
     }
 
     // MARK: - Model Status Row
@@ -349,28 +216,12 @@ struct LocalModelsSettingsView: View {
 
     // MARK: - Helpers
 
-    private func selectedRepo(for category: ModelCategory) -> String {
-        switch category {
-        case .embedding: embeddingModel
-        case .stt: sttModel
-        case .tts: ttsModel
-        case .vad: vadModel
-        }
-    }
-
     private func modelBinding(for category: ModelCategory) -> Binding<String> {
         switch category {
         case .embedding: $embeddingModel
         case .stt: $sttModel
         case .tts: $ttsModel
         case .vad: $vadModel
-        }
-    }
-
-    private func isDownloaded(repo: String) -> Bool {
-        switch modelStates.states[repo] {
-        case .downloaded, .ready: return true
-        default: return false
         }
     }
 

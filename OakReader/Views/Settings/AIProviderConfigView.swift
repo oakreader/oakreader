@@ -48,6 +48,13 @@ private struct ProviderDetailView: View {
         }
     }
 
+    private var displayTitle: String {
+        if providerId == "__elevenlabs__" {
+            return "ElevenLabs"
+        }
+        return provider?.displayName ?? "Provider"
+    }
+
     var body: some View {
         if let provider {
             Form {
@@ -60,11 +67,13 @@ private struct ProviderDetailView: View {
                 }
             }
             .formStyle(.grouped)
+            .navigationTitle(displayTitle)
             .onAppear { loadState() }
             .onChange(of: providerId) { _, _ in loadState() }
         } else if providerId == "__elevenlabs__" {
             Form { elevenLabsContent }
                 .formStyle(.grouped)
+                .navigationTitle(displayTitle)
                 .onAppear { loadState() }
                 .onChange(of: providerId) { _, _ in loadState() }
         } else {

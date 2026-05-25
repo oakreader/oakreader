@@ -3,45 +3,17 @@ import OakAgent
 import OakVoice
 
 struct AISettingsView: View {
-    // MARK: - Sidebar Category
-
-    enum Category: String, Hashable, Identifiable {
-        case chat, voiceLLM
-        case embedding, transcribe, tts
-        case agentTools
-
-        var id: String { rawValue }
-
-        var label: String {
-            switch self {
-            case .chat: "Chat"
-            case .voiceLLM: "Voice Chat LLM"
-            case .embedding: "Embedding"
-            case .transcribe: "Transcribe"
-            case .tts: "TTS"
-            case .agentTools: "Tools"
-            }
-        }
-
-        var icon: String {
-            switch self {
-            case .chat: "bubble.left"
-            case .voiceLLM: "mic.badge.plus"
-            case .embedding: "magnifyingglass"
-            case .transcribe: "mic"
-            case .tts: "speaker.wave.2"
-            case .agentTools: "wrench.and.screwdriver"
-            }
-        }
-    }
-
-    private static let llmCategories: [Category] = [.chat, .voiceLLM]
-    private static let onDeviceCategories: [Category] = [.embedding, .transcribe, .tts]
-    private static let agentCategories: [Category] = [.agentTools]
+    /// Sentinel ID for ElevenLabs (not in ProviderRegistry).
+    static let elevenLabsId = "__elevenlabs__"
+    /// Sentinel ID for Local Models.
+    static let localModelsId = "__local_models__"
 
     // MARK: - State
 
-    @State private var selectedCategory: Category = .chat
+    let modelStates: SharedModelStates
+    @State private var store = ConfiguredProviderStore.shared
+    @State private var navigationPath = NavigationPath()
+    @State private var showAddProviderSheet = false
 
     // Chat LLM
     @State private var chatProviderId: String
@@ -57,26 +29,15 @@ struct AISettingsView: View {
     @State private var sttModel: String
     @State private var ttsModel: String
 
-
     // STT/TTS provider type
     @State private var sttProvider: String
     @State private var ttsProvider: String
     @State private var elevenLabsVoiceId: String
     @State private var elevenLabsTTSModelId: String
 
-    // Agent tools
-    @State private var agentToolsEnabled: Bool
-    @State private var agentReadFileEnabled: Bool
-    @State private var agentWriteFileEnabled: Bool
-    @State private var agentPermissionLevel: AgentPermissionLevel
-
     // Thinking
     @State private var thinkingBudget: Int
 
-    // Model download states (shared with LocalModelsSettingsView)
-    let modelStates: SharedModelStates
-
-    private let store = ConfiguredProviderStore.shared
     private var modelManager: ModelManager { ModelManager.shared }
 
     // MARK: - Init
@@ -84,7 +45,6 @@ struct AISettingsView: View {
     init(modelStates: SharedModelStates) {
         self.modelStates = modelStates
         let prefs = Preferences.shared
-        let defaults = UserDefaults.standard
 
         // Chat
         let pid = prefs.aiProviderId
@@ -92,11 +52,10 @@ struct AISettingsView: View {
         let defaultModel = ProviderRegistry.shared.provider(for: pid)?.defaultModelId ?? ""
         _chatModel = State(initialValue: prefs.aiModel.isEmpty ? defaultModel : prefs.aiModel)
 
-        // Voice Chat LLM – empty model means "use chat default"
+        // Voice Chat LLM
         let vlm = prefs.voiceLLMModel
         _voiceLLMUseChatDefault = State(initialValue: vlm.isEmpty)
         _voiceLLMModel = State(initialValue: vlm.isEmpty ? defaultModel : vlm)
-        // Derive provider from model
         let vlmProvider = Self.providerForModel(vlm.isEmpty ? (prefs.aiModel.isEmpty ? defaultModel : prefs.aiModel) : vlm) ?? pid
         _voiceLLMProviderId = State(initialValue: vlmProvider)
 
@@ -107,23 +66,17 @@ struct AISettingsView: View {
         _embeddingModel = State(initialValue: prefs.embeddingModel.isEmpty ? defaultEmbedding : prefs.embeddingModel)
         _sttModel = State(initialValue: prefs.voiceSTTModel.isEmpty ? defaultSTT : prefs.voiceSTTModel)
         _ttsModel = State(initialValue: prefs.voiceTTSModel.isEmpty ? defaultTTS : prefs.voiceTTSModel)
+
         // STT/TTS provider type
         _sttProvider = State(initialValue: prefs.voiceSTTProvider)
         _ttsProvider = State(initialValue: prefs.voiceTTSProvider)
         _elevenLabsVoiceId = State(initialValue: prefs.elevenLabsVoiceId)
         _elevenLabsTTSModelId = State(initialValue: prefs.elevenLabsTTSModelId)
 
-        // Agent tools
-        _agentToolsEnabled = State(initialValue: prefs.agentToolsEnabled)
-        _agentReadFileEnabled = State(initialValue: prefs.agentReadFileEnabled)
-        _agentWriteFileEnabled = State(initialValue: prefs.agentWriteFileEnabled)
-        _agentPermissionLevel = State(initialValue: prefs.agentPermissionLevel)
-
         // Thinking
         _thinkingBudget = State(initialValue: prefs.thinkingBudget)
     }
 
-    /// Find which configured provider owns a given model ID.
     private static func providerForModel(_ modelId: String) -> String? {
         for provider in ConfiguredProviderStore.shared.configuredLLMProviders {
             if provider.models.contains(where: { $0.id == modelId }) {
@@ -136,312 +89,283 @@ struct AISettingsView: View {
     // MARK: - Body
 
     var body: some View {
-        HStack(spacing: 0) {
-            sidebar
-                .frame(width: 200)
-
-            Divider()
-
-            detailPanel
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        NavigationStack(path: $navigationPath) {
+            Form {
+                providersSection
+                chatSection
+                thinkingSection
+                voiceChatSection
+                transcribeSection
+                ttsSection
+                embeddingSection
+            }
+            .formStyle(.grouped)
+            .navigationTitle("AI")
+            .navigationDestination(for: String.self) { providerId in
+                if providerId == Self.localModelsId {
+                    LocalModelsSettingsView(modelStates: modelStates)
+                } else {
+                    AIProviderConfigView(providerId: providerId, store: store)
+                }
+            }
+            .sheet(isPresented: $showAddProviderSheet) {
+                AddProviderSheet(store: store) { selectedId in
+                    showAddProviderSheet = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        navigationPath.append(selectedId)
+                    }
+                }
+            }
         }
         .onAppear { modelStates.refresh(repos: allRepos) }
         .onDisappear { save() }
     }
 
-    // MARK: - Sidebar
-
-    private var sidebar: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 2) {
-                sectionHeader("LLM")
-                ForEach(Self.llmCategories) { cat in
-                    sidebarRow(cat)
-                }
-
-                sectionHeader("On-Device")
-                ForEach(Self.onDeviceCategories) { cat in
-                    sidebarRow(cat)
-                }
-
-                sectionHeader("Agent")
-                ForEach(Self.agentCategories) { cat in
-                    sidebarRow(cat)
-                }
-            }
-            .padding(.vertical, 8)
-        }
-        .background(Color(nsColor: .controlBackgroundColor))
-    }
-
-    private func sectionHeader(_ title: String) -> some View {
-        Text(title)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 12)
-            .padding(.top, 12)
-            .padding(.bottom, 4)
-    }
-
-    private func sidebarRow(_ category: Category) -> some View {
-        Button {
-            selectedCategory = category
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: category.icon)
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 20, height: 20)
-
-                Text(category.label)
-                    .font(.body)
-                    .lineLimit(1)
-
-                Spacer()
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 5)
-            .background(
-                RoundedRectangle(cornerRadius: 5)
-                    .fill(selectedCategory == category ? Color.accentColor.opacity(0.15) : .clear)
-            )
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .padding(.horizontal, 4)
-    }
-
-    // MARK: - Detail Panel
+    // MARK: - Providers Section
 
     @ViewBuilder
-    private var detailPanel: some View {
-        switch selectedCategory {
-        case .chat: chatPanel
-        case .voiceLLM: voiceLLMPanel
-        case .embedding: localModelPanel(binding: $embeddingModel, knownModels: KnownModels.embedding)
-        case .transcribe: transcribePanel
-        case .tts: ttsPanel
-        case .agentTools: agentToolsPanel
-        }
-    }
+    private var providersSection: some View {
+        Section("Providers") {
+            ForEach(store.configuredLLMProviders) { provider in
+                NavigationLink(value: provider.id) {
+                    HStack(spacing: 10) {
+                        Image("provider-\(provider.id)")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 24, height: 24)
+                            .clipShape(RoundedRectangle(cornerRadius: 5))
 
-    // MARK: - Chat Panel
+                        Text(provider.displayName)
 
-    private var chatPanel: some View {
-        Form {
-            Section("Default LLM") {
-                if store.configuredLLMProviders.isEmpty {
-                    Text("Configure a provider in AI Providers to select a default LLM.")
+                        Spacer()
+
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.green)
+                    }
+                }
+            }
+
+            if store.isElevenLabsConfigured {
+                NavigationLink(value: Self.elevenLabsId) {
+                    HStack(spacing: 10) {
+                        Image("provider-elevenlabs")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 24, height: 24)
+                            .clipShape(RoundedRectangle(cornerRadius: 5))
+
+                        Text("ElevenLabs")
+
+                        Spacer()
+
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.green)
+                    }
+                }
+            }
+
+            NavigationLink(value: Self.localModelsId) {
+                HStack(spacing: 10) {
+                    Image(systemName: "arrow.down.circle")
+                        .font(.system(size: 16))
                         .foregroundStyle(.secondary)
-                } else {
-                    Picker("Provider", selection: $chatProviderId) {
-                        ForEach(store.configuredLLMProviders) { p in
-                            Text(p.displayName).tag(p.id)
-                        }
-                    }
-                    .onChange(of: chatProviderId) { _, newValue in
-                        chatModel = ProviderRegistry.shared.provider(for: newValue)?.defaultModelId ?? ""
-                    }
+                        .frame(width: 24, height: 24)
 
-                    if let provider = ProviderRegistry.shared.provider(for: chatProviderId) {
-                        Picker("Model", selection: $chatModel) {
-                            ForEach(provider.models) { m in
-                                Text(m.name).tag(m.id)
-                            }
-                        }
-                    }
-
-                    if let provider = ProviderRegistry.shared.provider(for: chatProviderId),
-                       let info = provider.models.first(where: { $0.id == chatModel }) {
-                        LabeledContent("Context Window", value: formatTokens(info.contextWindow))
-                        LabeledContent("Max Output", value: formatTokens(info.maxTokens))
-                        LabeledContent("Vision", value: info.supportsVision ? "Yes" : "No")
-                        LabeledContent("Reasoning", value: info.reasoning ? "Yes" : "No")
-                    }
+                    Text("Local Models")
                 }
             }
 
-            // Thinking budget — only shown when the selected model supports reasoning
-            if let provider = ProviderRegistry.shared.provider(for: chatProviderId),
-               let info = provider.models.first(where: { $0.id == chatModel }),
-               info.reasoning {
-                Section("Extended Thinking") {
-                    Stepper(
-                        "Budget: \(formatTokens(thinkingBudget)) tokens",
-                        value: $thinkingBudget,
-                        in: 1000...128000,
-                        step: 1000
-                    )
+            Button {
+                showAddProviderSheet = true
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "plus.circle")
+                        .font(.system(size: 16))
+                        .foregroundStyle(.tint)
+                        .frame(width: 24, height: 24)
 
-                    Text("Token budget for model reasoning. Higher values allow deeper thinking but increase latency and cost.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Text("Add Provider...")
+                        .foregroundStyle(.tint)
+                }
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    // MARK: - Chat Section
+
+    @ViewBuilder
+    private var chatSection: some View {
+        Section("Chat") {
+            if store.configuredLLMProviders.isEmpty {
+                Text("Add a provider above to select a default LLM.")
+                    .foregroundStyle(.secondary)
+            } else {
+                Picker("Provider", selection: $chatProviderId) {
+                    ForEach(store.configuredLLMProviders) { p in
+                        Text(p.displayName).tag(p.id)
+                    }
+                }
+                .onChange(of: chatProviderId) { _, newValue in
+                    chatModel = ProviderRegistry.shared.provider(for: newValue)?.defaultModelId ?? ""
+                }
+
+                if let provider = ProviderRegistry.shared.provider(for: chatProviderId) {
+                    Picker("Model", selection: $chatModel) {
+                        ForEach(provider.models) { m in
+                            Text(m.name).tag(m.id)
+                        }
+                    }
+                }
+
+                if let provider = ProviderRegistry.shared.provider(for: chatProviderId),
+                   let info = provider.models.first(where: { $0.id == chatModel }) {
+                    LabeledContent("Context Window", value: formatTokens(info.contextWindow))
+                    LabeledContent("Max Output", value: formatTokens(info.maxTokens))
+                    LabeledContent("Vision", value: info.supportsVision ? "Yes" : "No")
+                    LabeledContent("Reasoning", value: info.reasoning ? "Yes" : "No")
                 }
             }
         }
-        .formStyle(.grouped)
     }
 
-    // MARK: - Voice Chat LLM Panel
+    // MARK: - Thinking Section
 
-    private var voiceLLMPanel: some View {
-        Form {
-            Section("Voice Chat LLM") {
-                Toggle("Use Chat default", isOn: $voiceLLMUseChatDefault)
+    @ViewBuilder
+    private var thinkingSection: some View {
+        if let provider = ProviderRegistry.shared.provider(for: chatProviderId),
+           let info = provider.models.first(where: { $0.id == chatModel }),
+           info.reasoning {
+            Section("Extended Thinking") {
+                Stepper(
+                    "Budget: \(formatTokens(thinkingBudget)) tokens",
+                    value: $thinkingBudget,
+                    in: 1000...128000,
+                    step: 1000
+                )
 
-                if voiceLLMUseChatDefault {
-                    chatDefaultLabel
-                } else {
-                    llmPickers(providerId: $voiceLLMProviderId, model: $voiceLLMModel)
-                }
+                Text("Token budget for model reasoning. Higher values allow deeper thinking but increase latency and cost.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
-        .formStyle(.grouped)
     }
 
-    // MARK: - Transcribe Panel
+    // MARK: - Voice Chat Section
 
-    private var transcribePanel: some View {
-        Form {
-            Section("Transcribe Provider") {
-                Picker("Provider", selection: $sttProvider) {
-                    ForEach(VoiceProviderType.allCases, id: \.rawValue) { type in
-                        if type == .elevenLabs && !store.isElevenLabsConfigured {
-                            EmptyView()
-                        } else {
-                            Text(type.displayName).tag(type.rawValue)
-                        }
+    @ViewBuilder
+    private var voiceChatSection: some View {
+        Section("Voice Chat LLM") {
+            Toggle("Use Chat default", isOn: $voiceLLMUseChatDefault)
+
+            if voiceLLMUseChatDefault {
+                chatDefaultLabel
+            } else {
+                llmPickers(providerId: $voiceLLMProviderId, model: $voiceLLMModel)
+            }
+        }
+    }
+
+    // MARK: - Transcribe Section
+
+    @ViewBuilder
+    private var transcribeSection: some View {
+        Section("Transcribe") {
+            Picker("Provider", selection: $sttProvider) {
+                ForEach(VoiceProviderType.allCases, id: \.rawValue) { type in
+                    if type == .elevenLabs && !store.isElevenLabsConfigured {
+                        EmptyView()
+                    } else {
+                        Text(type.displayName).tag(type.rawValue)
                     }
                 }
             }
 
             if sttProvider == VoiceProviderType.onDevice.rawValue {
-                Section("On-Device Model") {
-                    Picker("Model", selection: $sttModel) {
-                        ForEach(KnownModels.stt) { option in
-                            Text("\(option.name) (\(option.sizeLabel))").tag(option.repo)
-                        }
+                Picker("Model", selection: $sttModel) {
+                    ForEach(KnownModels.stt) { option in
+                        Text("\(option.name) (\(option.sizeLabel))").tag(option.repo)
                     }
                 }
 
-                Section("Status") {
-                    modelStatusRow(repo: sttModel)
-                    if let option = KnownModels.stt.first(where: { $0.repo == sttModel }) {
-                        LabeledContent("Size", value: option.sizeLabel)
-                    }
+                modelStatusRow(repo: sttModel)
+
+                if let option = KnownModels.stt.first(where: { $0.repo == sttModel }) {
+                    LabeledContent("Size", value: option.sizeLabel)
                 }
             }
         }
-        .formStyle(.grouped)
     }
 
-    // MARK: - TTS Panel
+    // MARK: - TTS Section
 
-    private var ttsPanel: some View {
-        Form {
-            Section("TTS Provider") {
-                Picker("Provider", selection: $ttsProvider) {
-                    ForEach(VoiceProviderType.allCases, id: \.rawValue) { type in
-                        if type == .elevenLabs && !store.isElevenLabsConfigured {
-                            EmptyView()
-                        } else {
-                            Text(type.displayName).tag(type.rawValue)
-                        }
+    @ViewBuilder
+    private var ttsSection: some View {
+        Section("TTS") {
+            Picker("Provider", selection: $ttsProvider) {
+                ForEach(VoiceProviderType.allCases, id: \.rawValue) { type in
+                    if type == .elevenLabs && !store.isElevenLabsConfigured {
+                        EmptyView()
+                    } else {
+                        Text(type.displayName).tag(type.rawValue)
                     }
                 }
             }
 
             if ttsProvider == VoiceProviderType.onDevice.rawValue {
-                Section("On-Device Model") {
-                    Picker("Model", selection: $ttsModel) {
-                        ForEach(KnownModels.tts) { option in
-                            Text("\(option.name) (\(option.sizeLabel))").tag(option.repo)
-                        }
+                Picker("Model", selection: $ttsModel) {
+                    ForEach(KnownModels.tts) { option in
+                        Text("\(option.name) (\(option.sizeLabel))").tag(option.repo)
                     }
                 }
 
-                Section("Status") {
-                    modelStatusRow(repo: ttsModel)
-                    if let option = KnownModels.tts.first(where: { $0.repo == ttsModel }) {
-                        LabeledContent("Size", value: option.sizeLabel)
-                    }
+                modelStatusRow(repo: ttsModel)
+
+                if let option = KnownModels.tts.first(where: { $0.repo == ttsModel }) {
+                    LabeledContent("Size", value: option.sizeLabel)
                 }
             }
 
             if ttsProvider == VoiceProviderType.elevenLabs.rawValue && store.isElevenLabsConfigured {
-                Section("ElevenLabs Settings") {
-                    TextField("Voice ID", text: $elevenLabsVoiceId)
-                        .textFieldStyle(.roundedBorder)
+                TextField("Voice ID", text: $elevenLabsVoiceId)
+                    .textFieldStyle(.roundedBorder)
 
-                    Picker("TTS Model", selection: $elevenLabsTTSModelId) {
-                        Text("Turbo v2.5 (fastest)").tag("eleven_turbo_v2_5")
-                        Text("Flash v2.5 (fast)").tag("eleven_flash_v2_5")
-                        Text("Multilingual v2 (quality)").tag("eleven_multilingual_v2")
-                    }
+                Picker("TTS Model", selection: $elevenLabsTTSModelId) {
+                    Text("Turbo v2.5 (fastest)").tag("eleven_turbo_v2_5")
+                    Text("Flash v2.5 (fast)").tag("eleven_flash_v2_5")
+                    Text("Multilingual v2 (quality)").tag("eleven_multilingual_v2")
                 }
             }
         }
-        .formStyle(.grouped)
     }
 
-    // MARK: - Local Model Panel (Embedding / VAD)
+    // MARK: - Embedding Section
 
-    private func localModelPanel(binding: Binding<String>, knownModels: [ModelOption]) -> some View {
-        let repo = binding.wrappedValue
-        return Form {
-            Section("Model") {
-                Picker("Model", selection: binding) {
-                    ForEach(knownModels) { option in
-                        Text("\(option.name) (\(option.sizeLabel))").tag(option.repo)
-                    }
+    @ViewBuilder
+    private var embeddingSection: some View {
+        Section("Embedding") {
+            Picker("Model", selection: $embeddingModel) {
+                ForEach(KnownModels.embedding) { option in
+                    Text("\(option.name) (\(option.sizeLabel))").tag(option.repo)
                 }
             }
 
-            Section("Status") {
-                modelStatusRow(repo: repo)
-                if let option = knownModels.first(where: { $0.repo == repo }) {
-                    LabeledContent("Size", value: option.sizeLabel)
-                }
+            modelStatusRow(repo: embeddingModel)
+
+            if let option = KnownModels.embedding.first(where: { $0.repo == embeddingModel }) {
+                LabeledContent("Size", value: option.sizeLabel)
             }
         }
-        .formStyle(.grouped)
-    }
-
-    // MARK: - Agent Tools Panel
-
-    private var agentToolsPanel: some View {
-        Form {
-            Section("Agent Tools") {
-                Toggle("Enable Agent Tools", isOn: $agentToolsEnabled)
-
-                Toggle("Read File", isOn: $agentReadFileEnabled)
-                    .disabled(!agentToolsEnabled)
-
-                Toggle("Write File", isOn: $agentWriteFileEnabled)
-                    .disabled(!agentToolsEnabled)
-
-                Picker("Confirmation", selection: $agentPermissionLevel) {
-                    ForEach(AgentPermissionLevel.allCases) { level in
-                        Text(level.label).tag(level)
-                    }
-                }
-                .disabled(!agentToolsEnabled)
-
-                Text(agentPermissionLevel.description)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .formStyle(.grouped)
     }
 
     // MARK: - Shared Components
 
-    /// Provider + Model pickers for LLM capabilities.
     @ViewBuilder
     private func llmPickers(providerId: Binding<String>, model: Binding<String>) -> some View {
         if store.configuredLLMProviders.isEmpty {
-            Text("Configure a provider in AI Providers first.")
+            Text("Add a provider above to select a model.")
                 .foregroundStyle(.secondary)
         } else {
             Picker("Provider", selection: providerId) {
@@ -463,7 +387,6 @@ struct AISettingsView: View {
         }
     }
 
-    /// Label showing the current Chat default provider + model.
     private var chatDefaultLabel: some View {
         let providerName = ProviderRegistry.shared.provider(for: chatProviderId)?.displayName ?? chatProviderId
         let modelName = ProviderRegistry.shared.provider(for: chatProviderId)?.models.first(where: { $0.id == chatModel })?.name ?? chatModel
@@ -553,7 +476,6 @@ struct AISettingsView: View {
 
     private func save() {
         let prefs = Preferences.shared
-        let defaults = UserDefaults.standard
 
         // Chat
         prefs.aiProviderId = chatProviderId
@@ -572,12 +494,6 @@ struct AISettingsView: View {
         prefs.voiceTTSProvider = ttsProvider
         prefs.elevenLabsVoiceId = elevenLabsVoiceId
         prefs.elevenLabsTTSModelId = elevenLabsTTSModelId
-
-        // Agent tools
-        prefs.agentToolsEnabled = agentToolsEnabled
-        prefs.agentReadFileEnabled = agentReadFileEnabled
-        prefs.agentWriteFileEnabled = agentWriteFileEnabled
-        prefs.agentPermissionLevel = agentPermissionLevel
 
         // Thinking
         prefs.thinkingBudget = thinkingBudget

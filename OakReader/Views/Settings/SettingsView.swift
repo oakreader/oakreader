@@ -9,8 +9,7 @@ struct SettingsView: View {
         case general
         case library
         case ai
-        case aiSettings
-        case localModels
+        case agent
         case audio
         case extensions
         case skills
@@ -26,9 +25,8 @@ struct SettingsView: View {
             switch self {
             case .general: return "General"
             case .library: return "Library"
-            case .ai: return "AI Providers"
-            case .aiSettings: return "AI Settings"
-            case .localModels: return "Local Models"
+            case .ai: return "AI"
+            case .agent: return "Agent"
             case .audio: return "Audio"
             case .extensions: return "Extensions"
             case .skills: return "Skills"
@@ -44,8 +42,7 @@ struct SettingsView: View {
             case .general: return "gearshape"
             case .library: return "books.vertical"
             case .ai: return "sparkles.2"
-            case .aiSettings: return "cpu"
-            case .localModels: return "arrow.down.circle"
+            case .agent: return "wrench.and.screwdriver"
             case .audio: return "speaker.wave.2"
             case .extensions: return "square.grid.2x2"
             case .skills: return "hammer"
@@ -72,7 +69,7 @@ struct SettingsView: View {
         }
 
         /// Tabs exposed in the command palette for deep-linking.
-        static let paletteTabs: [Tab] = [.general, .library, .ai, .aiSettings, .audio, .extensions, .youtube]
+        static let paletteTabs: [Tab] = [.general, .library, .ai, .agent, .audio, .extensions, .youtube]
 
         static func tab(for ext: AppExtension) -> Tab {
             switch ext {
@@ -84,7 +81,7 @@ struct SettingsView: View {
     }
 
     /// Fixed tabs that always appear.
-    private static let fixedTabs: [Tab] = [.general, .library, .ai, .aiSettings, .audio, .skills, .extensions, .youtube]
+    private static let fixedTabs: [Tab] = [.general, .library, .ai, .agent, .audio, .skills, .extensions, .youtube]
 
     @State private var selectedTab: Tab = .general
     @State private var visibleTabs: [Tab] = Self.buildVisibleTabs()
@@ -159,11 +156,9 @@ struct SettingsView: View {
         case .library:
             LibrarySettingsView(store: store)
         case .ai:
-            AIProvidersSettingsView(modelStates: modelStates)
-        case .aiSettings:
             AISettingsView(modelStates: modelStates)
-        case .localModels:
-            EmptyView() // Moved under AI Providers
+        case .agent:
+            AgentSettingsView()
         case .audio:
             AudioSettingsView()
         case .extensions:
