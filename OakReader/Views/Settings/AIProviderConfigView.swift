@@ -27,6 +27,7 @@ private struct ProviderDetailView: View {
     @State private var testResult: String?
     @State private var isTesting: Bool = false
     @State private var oauthState = OAuthFlowState()
+    @State private var manualURL: String = ""
 
     private var provider: ProviderInfo? {
         ProviderRegistry.shared.provider(for: providerId)
@@ -143,6 +144,23 @@ private struct ProviderDetailView: View {
             startPKCEFlow(provider: provider, config: config)
         }
         .disabled(oauthState.isInProgress)
+
+        if oauthState.isInProgress {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("If the browser didn't redirect back, paste the full URL here:")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                HStack {
+                    TextField("http://localhost:\(config.callbackPort)...", text: $manualURL)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.caption)
+                        .onSubmit { submitManualURL() }
+                    Button("Submit") { submitManualURL() }
+                        .controlSize(.small)
+                        .disabled(manualURL.isEmpty)
+                }
+            }
+        }
 
         oauthProgressView {
             startPKCEFlow(provider: provider, config: config)
@@ -445,14 +463,22 @@ private struct ProviderDetailView: View {
     private func startPKCEFlow(provider: ProviderInfo, config: OAuthPKCEConfig) {
         cancelOAuth()
         oauthState.isInProgress = true
+        manualURL = ""
+
+        let (stream, continuation) = AsyncStream<String>.makeStream()
+        oauthState.manualCodeContinuation = continuation
 
         oauthState.task = Task {
             do {
                 let service = OAuthService()
-                let tokenSet = try await service.authorizePKCE(config: config)
+                let tokenSet = try await service.authorizePKCE(config: config) {
+                    for await value in stream { return value }
+                    throw CancellationError()
+                }
                 OAuthTokenStore.store(tokenSet, for: provider.id)
                 await MainActor.run {
                     oauthState.isInProgress = false
+                    oauthState.manualCodeContinuation = nil
                     store.refresh()
                 }
             } catch is CancellationError {
@@ -460,10 +486,18 @@ private struct ProviderDetailView: View {
             } catch {
                 await MainActor.run {
                     oauthState.isInProgress = false
+                    oauthState.manualCodeContinuation = nil
                     oauthState.error = error.localizedDescription
                 }
             }
         }
+    }
+
+    private func submitManualURL() {
+        guard !manualURL.isEmpty else { return }
+        oauthState.manualCodeContinuation?.yield(manualURL)
+        oauthState.manualCodeContinuation?.finish()
+        oauthState.manualCodeContinuation = nil
     }
 
     private func startDeviceCodeFlow(provider: ProviderInfo, config: DeviceCodeConfig) {
@@ -498,6 +532,7 @@ private struct ProviderDetailView: View {
     private func cancelOAuth() {
         oauthState.task?.cancel()
         oauthState.reset()
+        manualURL = ""
     }
 }
 
@@ -509,11 +544,14 @@ private struct OAuthFlowState {
     var error: String?
     var task: Task<Void, Never>?
     var deviceCode: DeviceCodeResponse?
+    var manualCodeContinuation: AsyncStream<String>.Continuation?
 
     mutating func reset() {
         isInProgress = false
         error = nil
         task = nil
         deviceCode = nil
+        manualCodeContinuation?.finish()
+        manualCodeContinuation = nil
     }
 }
