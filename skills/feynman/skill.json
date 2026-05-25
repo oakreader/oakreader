@@ -1,6 +1,4 @@
 {
-    "name": "feynman",
-    "description": "Deepen understanding by teaching back and finding gaps",
     "icon": { "type": "symbol", "value": "person.fill.viewfinder" },
     "version": "1.0.0"
 }

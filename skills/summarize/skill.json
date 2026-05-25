@@ -1,6 +1,4 @@
 {
-    "name": "summarize",
-    "description": "Concise document summary",
     "icon": { "type": "symbol", "value": "text.document.fill" },
     "version": "1.0.0"
 }
