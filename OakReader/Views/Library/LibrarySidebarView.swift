@@ -337,6 +337,7 @@ private struct CollectionRowView: View {
 
     @State private var isDropTargeted = false
     @State private var showingDeleteConfirmation = false
+    @State private var dragExpandTask: Task<Void, Never>?
 
     private var isSelected: Bool {
         store.selectedCollectionId == collection.id && store.selectedTagOptionId == nil && appState.isLibraryActive
@@ -415,6 +416,18 @@ private struct CollectionRowView: View {
                 return !droppedIDs.isEmpty
             } isTargeted: { targeted in
                 isDropTargeted = targeted && !collection.isSmart
+                // Auto-expand collapsed collections after hovering during drag (spring-loaded)
+                dragExpandTask?.cancel()
+                if targeted && !collection.isSmart && hasChildren && !isExpanded {
+                    let collectionId = collection.id
+                    dragExpandTask = Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(800))
+                        guard !Task.isCancelled else { return }
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            expandedCollections.insert(collectionId)
+                        }
+                    }
+                }
             }
             .contextMenu {
                 if collection.isSmart && !collection.isSystem {

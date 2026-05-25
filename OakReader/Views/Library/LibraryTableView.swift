@@ -170,8 +170,10 @@ struct LibraryTableView: View {
                             TableRow(LibraryRow.child(attachment, of: item))
                         }
                     }
+                    .draggable(item.id.uuidString)
                 } else {
                     TableRow(LibraryRow.parent(item))
+                        .draggable(item.id.uuidString)
                 }
             }
         }
