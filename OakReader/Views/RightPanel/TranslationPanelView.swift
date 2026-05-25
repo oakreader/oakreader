@@ -108,7 +108,7 @@ struct TranslationPanelView: View {
                     translationVM.explainWord(word, inSentence: sentence)
                 }
             )
-            .frame(minHeight: 60, maxHeight: 150)
+            .frame(minHeight: 100, maxHeight: 200)
             .onChange(of: translationVM.sourceText) { _, _ in
                 translationVM.debouncedTranslate()
             }
