@@ -84,7 +84,7 @@ struct TranslationPanelView: View {
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5)
+                .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1)
         )
         .padding(.horizontal, OakStyle.Spacing.sm)
         .padding(.bottom, OakStyle.Spacing.sm)
@@ -120,7 +120,7 @@ struct TranslationPanelView: View {
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5)
+                .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1)
         )
     }
 
@@ -218,7 +218,7 @@ struct TranslationPanelView: View {
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5)
+                .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1)
         )
     }
 
@@ -272,7 +272,7 @@ struct TranslationPanelView: View {
 
             StructuredText(markdown: explanationDisplayText)
                 .textual.textSelection(.enabled)
-                .font(OakStyle.Font.styledBody)
+                .font(OakStyle.Font.styled(size: 13))
                 .frame(maxWidth: .infinity, alignment: .topLeading)
                 .padding(.horizontal, OakStyle.Spacing.sm)
                 .padding(.vertical, OakStyle.Spacing.xs)
@@ -281,7 +281,7 @@ struct TranslationPanelView: View {
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5)
+                .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1)
         )
     }
 
@@ -314,7 +314,7 @@ struct TranslationPanelView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 6))
                 .overlay(
                     RoundedRectangle(cornerRadius: 6)
-                        .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5)
+                        .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1)
                 )
         }
         .menuStyle(.borderlessButton)
