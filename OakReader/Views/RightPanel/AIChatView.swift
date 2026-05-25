@@ -503,28 +503,35 @@ struct AIChatView: View {
     // MARK: - Config Menu
 
     private var currentModelName: String {
-        let prefs = Preferences.shared
-        let pid = prefs.aiProviderId
-        let provider = ProviderRegistry.shared.provider(for: pid)
-        let modelId = settingsModel.isEmpty ? (provider?.defaultModelId ?? "") : settingsModel
-        return provider?.models.first { $0.id == modelId }?.name ?? modelId
+        let store = ConfiguredProviderStore.shared
+        let pair = store.availableLLMModels.first { $0.model.id == settingsModel }
+        return pair?.model.name ?? settingsModel
     }
 
-    @State private var settingsModel: String = Preferences.shared.aiModel
+    @State private var settingsModel: String = {
+        let prefs = Preferences.shared
+        if !prefs.aiModel.isEmpty { return prefs.aiModel }
+        let pid = prefs.aiProviderId
+        return ProviderRegistry.shared.provider(for: pid)?.defaultModelId ?? ""
+    }()
     @State private var settingsEffort: String = Preferences.shared.thinkingEffort
     @State private var settingsPermission: AgentPermissionLevel = Preferences.shared.agentPermissionLevel
 
     private var settingsMenu: some View {
         let prefs = Preferences.shared
-        let providerInfo = ProviderRegistry.shared.provider(for: prefs.aiProviderId)
-        let models = providerInfo?.models ?? []
-        let currentModel = settingsModel.isEmpty ? (providerInfo?.defaultModelId ?? "") : settingsModel
-        let currentModelInfo = providerInfo?.models.first { $0.id == currentModel }
+        let store = ConfiguredProviderStore.shared
+        let configuredProviders = store.configuredLLMProviders
+        let currentModel = settingsModel
+        let currentModelInfo = store.availableLLMModels.first { $0.model.id == currentModel }?.model
         let modelSelection = Binding<String>(
             get: { currentModel },
             set: { newValue in
                 prefs.aiModel = newValue
                 settingsModel = newValue
+                // Auto-switch provider when selecting a model from a different provider
+                if let pair = store.availableLLMModels.first(where: { $0.model.id == newValue }) {
+                    prefs.aiProviderId = pair.provider.id
+                }
             }
         )
         let effortSelection = Binding<String>(
@@ -544,8 +551,16 @@ struct AIChatView: View {
 
         return Menu {
             Picker(selection: modelSelection) {
-                ForEach(models) { model in
-                    Text(model.name).tag(model.id)
+                let disabled = Preferences.shared.disabledModelIds
+                ForEach(configuredProviders) { provider in
+                    let models = provider.models.filter { !disabled.contains($0.id) }
+                    if !models.isEmpty {
+                        Section(provider.displayName) {
+                            ForEach(models) { model in
+                                Text(model.name).tag(model.id)
+                            }
+                        }
+                    }
                 }
             } label: {
                 Label("Model", systemImage: "cpu")
