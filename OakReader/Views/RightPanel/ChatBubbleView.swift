@@ -155,9 +155,12 @@ struct ChatBubbleView: View {
     /// to `onOpenCitation`. Non-oak URLs fall through to the system handler.
     private var citationOpenURLAction: OpenURLAction {
         OpenURLAction { url in
+            print("[Citation] openURL fired: \(url)")
             guard let (citeKey, anchor) = CitationAnchor.parse(from: url) else {
+                print("[Citation] not an oak:// URL, falling through to system")
                 return .systemAction
             }
+            print("[Citation] parsed citeKey=\(citeKey) anchor=\(anchor)")
             onOpenCitation?(citeKey, anchor)
             return .handled
         }
@@ -242,10 +245,12 @@ struct ChatBubbleView: View {
         // Seal incomplete markdown during streaming to prevent jitter.
         // Without this, `**bold` flips between literal and bold rendering
         // as the closing `**` arrives character by character.
+        // NOTE: protectMathBackslashes is applied once in chatMarkdown();
+        // applying it here too would double-escape backslashes in LaTeX.
         if turn.isStreaming || reveal.isAnimating {
-            return protectMathBackslashes(sealIncompleteMarkdown(content))
+            return content.sealIncompleteMarkdown()
         }
-        return protectMathBackslashes(content)
+        return content
     }
 
     private var skillBadges: [String] {
@@ -444,79 +449,6 @@ struct ChatBubbleView: View {
         return result
     }
 
-    // MARK: - Seal Incomplete Markdown (Streamdown)
-
-    /// Closes unmatched markdown markers in streaming content to prevent jitter.
-    /// When the model streams `**bold`, the unclosed `**` causes the parser to
-    /// alternate between literal and bold rendering. By appending the missing
-    /// closing markers, the parser renders consistently on every frame.
-    ///
-    /// Pipeline order matters — process from most specific to least specific:
-    /// code fences → inline code → bold+italic → bold → italic → strikethrough → math
-    private func sealIncompleteMarkdown(_ text: String) -> String {
-        guard !text.isEmpty else { return text }
-        var s = text
-
-        // 1. Code fences — if odd count of ```, close the fence.
-        //    Everything inside a code fence is literal, so return early.
-        if s.countNonOverlapping("```") % 2 == 1 {
-            if !s.hasSuffix("\n") { s += "\n" }
-            s += "```"
-            return s
-        }
-
-        // 2. Inline code — count single backticks (not part of ```).
-        //    If odd, close it and return (markers inside code spans are literal).
-        let withoutFences = s.replacingOccurrences(of: "```", with: "   ")
-        if withoutFences.filter({ $0 == "`" }).count % 2 == 1 {
-            s += "`"
-            return s
-        }
-
-        // 3. Bold+italic *** (must check before ** and *)
-        let tripleStarCount = s.countNonOverlapping("***")
-        if tripleStarCount % 2 == 1 {
-            s += "***"
-            return s
-        }
-
-        // 4. Bold ** (count ** that aren't part of ***)
-        let withoutTriple = s.replacingOccurrences(of: "***", with: "   ")
-        if withoutTriple.countNonOverlapping("**") % 2 == 1 {
-            s += "**"
-        }
-
-        // 5. Italic * (single *, not part of ** or ***)
-        let withoutDouble = withoutTriple.replacingOccurrences(of: "**", with: "  ")
-        if withoutDouble.filter({ $0 == "*" }).count % 2 == 1 {
-            s += "*"
-        }
-
-        // 6. Strikethrough ~~
-        if s.countNonOverlapping("~~") % 2 == 1 {
-            s += "~~"
-        }
-
-        // 7. Math $$ — display math requires $$ on its own line.
-        //    If the unclosed $$ has a newline after it (block math), close
-        //    with \n$$ so the parser sees a proper display block.
-        if s.countNonOverlapping("$$") % 2 == 1 {
-            // Find the last (unclosed) $$
-            if let lastDollar = s.range(of: "$$", options: .backwards) {
-                let afterDollar = s[lastDollar.upperBound...]
-                if afterDollar.contains("\n") {
-                    // Block math — close on a new line
-                    if !s.hasSuffix("\n") { s += "\n" }
-                    s += "$$"
-                } else {
-                    // Inline-style $$ — close on same line
-                    s += "$$"
-                }
-            }
-        }
-
-        return s
-    }
 }
 
 // MARK: - Assistant Bubble Style
@@ -537,20 +469,6 @@ private extension View {
     }
 }
 
-// MARK: - String extension for non-overlapping pattern counting
-
-private extension String {
-    /// Counts non-overlapping occurrences of `pattern` in the string.
-    func countNonOverlapping(_ pattern: String) -> Int {
-        var count = 0
-        var searchRange = startIndex..<endIndex
-        while let range = range(of: pattern, range: searchRange) {
-            count += 1
-            searchRange = range.upperBound..<endIndex
-        }
-        return count
-    }
-}
 
 // MARK: - Thinking Disclosure View
 
