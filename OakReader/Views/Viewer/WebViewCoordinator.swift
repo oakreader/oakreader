@@ -12,15 +12,20 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessageH
     private var scrollMonitor: Any?
     private var headingObserver: NSObjectProtocol?
     private var findTextObserver: NSObjectProtocol?
+    private var progressObservation: NSKeyValueObservation?
 
     init(viewModel: DocumentViewModel) {
         self.viewModel = viewModel
     }
 
+    /// Whether this coordinator is handling a live remote URL (link embed) vs local HTML.
+    var isLiveMode: Bool { viewModel.liveURL != nil }
+
     deinit {
         removeMouseMonitor()
         removeScrollMonitor()
         removeNotificationObservers()
+        progressObservation?.invalidate()
     }
 
     // MARK: - Active State
@@ -173,26 +178,63 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessageH
         decidePolicyFor navigationAction: WKNavigationAction,
         decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
     ) {
-        // Allow initial file load and same-document anchors
-        if let url = navigationAction.request.url {
-            if url.isFileURL {
-                decisionHandler(.allow)
-                return
-            }
-            // Block all external navigation — security parity with Zotero
-            if url.scheme == "http" || url.scheme == "https" {
-                decisionHandler(.cancel)
-                return
-            }
+        guard let url = navigationAction.request.url else {
+            decisionHandler(.allow)
+            return
         }
-        decisionHandler(.allow)
+
+        // Local HTML mode: allow file URLs, block external HTTP(S)
+        guard isLiveMode else {
+            let isExternalWeb = url.scheme == "http" || url.scheme == "https"
+            decisionHandler(isExternalWeb ? .cancel : .allow)
+            return
+        }
+
+        // Live mode: allow same-origin HTTP(S); open cross-origin clicks in system browser
+        guard url.scheme == "http" || url.scheme == "https" else {
+            decisionHandler(.allow)
+            return
+        }
+
+        let isCrossOriginClick = navigationAction.navigationType == .linkActivated
+            && url.host != viewModel.liveURL?.host
+        if isCrossOriginClick {
+            decisionHandler(.cancel)
+            NSWorkspace.shared.open(url)
+        } else {
+            decisionHandler(.allow)
+        }
     }
 
-    // MARK: - Page Load Complete
+    // MARK: - Navigation Lifecycle
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        viewModel.state.webLoadProgress = 1
         webView.evaluateJavaScript("OakHighlighter.init();") { [weak self] _, _ in
             self?.restoreSavedHighlights()
+        }
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        handleNavigationError(error)
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        handleNavigationError(error)
+    }
+
+    private func handleNavigationError(_ error: Error) {
+        guard isLiveMode else { return }
+        viewModel.state.webLoadProgress = 0
+        viewModel.state.presentError("Failed to load page: \(error.localizedDescription)")
+    }
+
+    func setupProgressObservation() {
+        guard isLiveMode, let webView else { return }
+        progressObservation = webView.observe(\.estimatedProgress, options: .new) { [weak self] wv, _ in
+            DispatchQueue.main.async {
+                self?.viewModel.state.webLoadProgress = wv.estimatedProgress
+            }
         }
     }
 

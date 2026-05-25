@@ -187,9 +187,12 @@ struct ContentView: View {
                 }
             }
         case .video:
+            let isLiveLink = viewModel.liveURL != nil
             ZStack {
                 if viewModel.mediaDocument?.metadata.resolvedEmbedType == .youtube {
                     MediaViewerView(viewModel: viewModel)
+                } else if isLiveLink {
+                    liveWebView
                 } else {
                     EmbedCardView(viewModel: viewModel)
                 }
@@ -197,8 +200,8 @@ struct ContentView: View {
                     MediaSnapshotOverlayView(viewModel: viewModel)
                 }
             }
-            .padding(.horizontal, 8)
-            .padding(.bottom, 8)
+            .padding(.horizontal, isLiveLink ? 0 : 8)
+            .padding(.bottom, isLiveLink ? 0 : 8)
         case .markdown:
             MarkdownViewerView(viewModel: viewModel)
         case .audio:
@@ -206,6 +209,18 @@ struct ContentView: View {
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+    }
+
+    private var liveWebView: some View {
+        HTMLViewerRepresentable(viewModel: viewModel)
+            .overlay(alignment: .top) {
+                let progress = viewModel.state.webLoadProgress
+                if progress > 0, progress < 1 {
+                    ProgressView(value: progress)
+                        .progressViewStyle(.linear)
+                        .tint(.accentColor)
+                }
+            }
     }
 
     @ViewBuilder

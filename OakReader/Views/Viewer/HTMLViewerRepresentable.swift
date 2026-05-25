@@ -3,7 +3,7 @@ import WebKit
 
 // MARK: - Custom WKWebView with context menu
 
-/// WKWebView subclass that adds an "Area Selection" toggle to the right-click context menu.
+/// WKWebView subclass that adds custom items to the right-click context menu.
 final class OakWebView: WKWebView {
     weak var coordinator: WebViewCoordinator?
 
@@ -15,6 +15,18 @@ final class OakWebView: WKWebView {
 
         menu.addItem(.separator())
 
+        // "Open in Browser" for live link embeds
+        if coordinator?.isLiveMode == true {
+            let openItem = NSMenuItem(
+                title: "Open in Browser",
+                action: #selector(openInBrowser),
+                keyEquivalent: ""
+            )
+            openItem.target = self
+            openItem.image = NSImage(systemSymbolName: "safari", accessibilityDescription: nil)
+            menu.addItem(openItem)
+        }
+
         let isAreaMode = coordinator?.viewModel.state.editorMode == .snapshot
         let areaItem = NSMenuItem(
             title: "Area Selection",
@@ -25,6 +37,11 @@ final class OakWebView: WKWebView {
         areaItem.image = NSImage(systemSymbolName: "rectangle.dashed", accessibilityDescription: nil)
         areaItem.state = isAreaMode ? .on : .off
         menu.addItem(areaItem)
+    }
+
+    @objc private func openInBrowser() {
+        guard let url = coordinator?.webView?.url ?? coordinator?.viewModel.liveURL else { return }
+        NSWorkspace.shared.open(url)
     }
 
     @objc private func toggleAreaSelection() {
@@ -200,9 +217,12 @@ struct HTMLViewerRepresentable: NSViewRepresentable {
         context.coordinator.webView = webView
         context.coordinator.setupScrollMonitor()
         context.coordinator.setupNotificationObservers()
+        context.coordinator.setupProgressObservation()
 
-        // Load the HTML document
-        if let snapshot = viewModel.html {
+        // Load content: remote URL for live link embeds, local file for HTML snapshots
+        if let liveURL = viewModel.liveURL {
+            webView.load(URLRequest(url: liveURL))
+        } else if let snapshot = viewModel.html {
             let storageDir = snapshot.htmlURL.deletingLastPathComponent()
             webView.loadFileURL(snapshot.htmlURL, allowingReadAccessTo: storageDir)
         }

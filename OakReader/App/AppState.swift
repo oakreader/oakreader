@@ -461,6 +461,10 @@ final class AppState {
             tab.viewModel.itemStorageKey = item.storageKey
             tab.viewModel.attachmentId = item.primaryAttachment?.id.uuidString
 
+            if media.metadata.resolvedEmbedType == .link {
+                tab.viewModel.liveURL = media.sourceURL
+            }
+
             tab.title = item.title
             openTabs.append(tab)
             activeTabID = tab.id

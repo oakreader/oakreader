@@ -20,6 +20,7 @@ class DocumentState {
     var isZenMode: Bool = false
     var isPresentationMode: Bool = false
     var presentationSavedState: PresentationSavedState?
+    var webLoadProgress: Double = 0
     var isLoading: Bool = false
     var errorMessage: String?
     var showError: Bool = false
