@@ -110,7 +110,7 @@ enum OakStyle {
         static let tabHeight: CGFloat = 40
         static let tabBarHeight: CGFloat = 40
         static let closeButton: CGFloat = 18
-        static let sidenavWidth: CGFloat = 38
+        static let sidenavWidth: CGFloat = 42
         static let rightPanelWidth: CGFloat = 520
         static let sidebarMin: CGFloat = 200
         static let sidebarMax: CGFloat = 320

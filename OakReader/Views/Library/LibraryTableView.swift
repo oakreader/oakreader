@@ -90,7 +90,7 @@ struct LibraryTableView: View {
 
                         Image(systemName: item.displayIcon)
                             .foregroundStyle(Color.primary.opacity(0.4))
-                            .font(.system(size: 14))
+                            .font(.system(size: 15))
                             .accessibilityLabel(item.primaryAttachment?.contentType.label ?? "Document")
 
                         if item.processingStatus == .transcribing || transcribingItemId == item.id {
@@ -108,7 +108,7 @@ struct LibraryTableView: View {
                         }
 
                         Text(item.title)
-                            .font(.system(size: 14))
+                            .font(.system(size: 15))
                             .lineLimit(1)
 
                     case .attachment(let att, _):
@@ -123,6 +123,7 @@ struct LibraryTableView: View {
                             .lineLimit(1)
                     }
                 }
+                .padding(.vertical, 2)
             }
             .width(min: 150, ideal: 300, max: .infinity)
 
@@ -132,7 +133,7 @@ struct LibraryTableView: View {
                     Text(item.author)
                         .font(.system(size: 13))
                         .lineLimit(1)
-                        .foregroundStyle(Color.primary.opacity(0.55))
+                        .foregroundStyle(Color.primary.opacity(0.6))
                 case .attachment(let att, _):
                     Text(att.contentType.label)
                         .font(.system(size: 12))
@@ -147,7 +148,7 @@ struct LibraryTableView: View {
                 case .item(let item):
                     Text(dateColumnValue(for: item), style: .date)
                         .font(.system(size: 13))
-                        .foregroundStyle(Color.primary.opacity(0.55))
+                        .foregroundStyle(Color.primary.opacity(0.6))
                 case .attachment(let att, _):
                     if att.fileSize > 0 {
                         Text(ByteCountFormatter.string(fromByteCount: att.fileSize, countStyle: .file))

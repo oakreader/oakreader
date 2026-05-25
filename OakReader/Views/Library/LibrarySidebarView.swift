@@ -33,7 +33,7 @@ struct LibrarySidebarView: View {
 
             Spacer()
         }
-        .background(.thinMaterial)
+        .background(OakStyle.Colors.sidebarBackground)
         .sheet(isPresented: $showNewCollection) {
             CollectionEditorSheet(store: store, collection: nil, parent: nil)
         }
@@ -70,7 +70,7 @@ struct LibrarySidebarView: View {
 
     private func sectionHeader(_ title: String) -> some View {
         Text(title)
-            .font(.system(size: 11, weight: .bold))
+            .font(.system(size: 12, weight: .bold))
             .foregroundColor(Color(nsColor: .labelColor).opacity(0.55))
             .tracking(0.5)
             .padding(.horizontal, 20)
@@ -112,14 +112,14 @@ struct LibrarySidebarView: View {
                             .aspectRatio(contentMode: .fit)
                     } else {
                         Image(systemName: collection.icon)
-                            .font(.system(size: 13))
+                            .font(.system(size: 14))
                     }
                 }
                 .foregroundStyle(.primary)
                 .frame(width: 18, height: 18)
 
                 Text(collection.name)
-                    .font(.system(size: 13, weight: isSelected ? .medium : .regular))
+                    .font(.system(size: 14, weight: isSelected ? .medium : .regular))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
 
@@ -204,9 +204,9 @@ private extension LibrarySidebarView {
                 } label: {
                     HStack(spacing: 3) {
                         Image(systemName: mode.systemImage)
-                            .font(.system(size: 10))
+                            .font(.system(size: 11))
                         Text(mode.label)
-                            .font(.system(size: 11, weight: selected ? .semibold : .medium))
+                            .font(.system(size: 12, weight: selected ? .semibold : .medium))
                     }
                     .frame(maxWidth: .infinity)
                     .frame(height: 22)
@@ -357,13 +357,13 @@ private struct CollectionRowView: View {
                     .frame(width: CGFloat(depth) * 18)
 
                 Image(systemName: collection.icon == "folder" ? "folder.fill" : collection.icon)
-                    .font(.system(size: 13))
+                    .font(.system(size: 14))
                     .foregroundStyle(isSelected ? .primary : .secondary)
                     .frame(width: 18)
                     .padding(.trailing, 5)
 
                 Text(collection.name)
-                    .font(.system(size: 13, weight: isSelected ? .medium : .regular))
+                    .font(.system(size: 14, weight: isSelected ? .medium : .regular))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
 
@@ -613,7 +613,7 @@ private struct TagNodeRowView: View {
                         .padding(.trailing, 5)
 
                     Text(node.name)
-                        .font(.system(size: 13, weight: isSelected ? .medium : .regular))
+                        .font(.system(size: 14, weight: isSelected ? .medium : .regular))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
 
@@ -622,7 +622,7 @@ private struct TagNodeRowView: View {
                     let total = node.totalCount()
                     if total > 0 {
                         Text("\(total)")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(.secondary)
                             .padding(.trailing, 4)
                     }
