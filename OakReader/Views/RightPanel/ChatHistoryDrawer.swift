@@ -82,13 +82,19 @@ struct ChatHistoryDrawer: View {
                 Spacer()
 
                 if hoveredSessionId == session.id {
-                    Button(action: { chatVM.deleteSessionFromList(session.id) }) {
-                        Image(systemName: "trash")
+                    Menu {
+                        sessionMenuItems(session)
+                    } label: {
+                        Image(systemName: "ellipsis")
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
+                            .frame(width: 20, height: 20)
+                            .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
-                    .help("Delete conversation")
+                    .menuStyle(.borderlessButton)
+                    .menuIndicator(.hidden)
+                    .fixedSize()
+                    .help("More actions")
                 }
             }
             .padding(.horizontal, 8)
@@ -108,6 +114,36 @@ struct ChatHistoryDrawer: View {
         .buttonStyle(.plain)
         .onHover { isHovered in
             hoveredSessionId = isHovered ? session.id : nil
+        }
+        .contextMenu {
+            sessionMenuItems(session)
+        }
+    }
+
+    // MARK: - Session Menu
+
+    @ViewBuilder
+    private func sessionMenuItems(_ session: ConversationMeta) -> some View {
+        Button {
+            NSWorkspace.shared.activateFileViewerSelecting([CatalogDatabase.chatFileURL(sessionId: session.id)])
+        } label: {
+            Label("Open in Finder", systemImage: "folder")
+        }
+
+        Button {
+            let path = CatalogDatabase.chatFileURL(sessionId: session.id).path
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(path, forType: .string)
+        } label: {
+            Label("Copy File Path", systemImage: "doc.on.doc")
+        }
+
+        Divider()
+
+        Button(role: .destructive) {
+            chatVM.deleteSessionFromList(session.id)
+        } label: {
+            Label("Delete Conversation", systemImage: "trash")
         }
     }
 
