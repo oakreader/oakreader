@@ -11,6 +11,16 @@ public enum ContextMode: String, Codable, Sendable {
 
 // MARK: - Skill
 
+/// A **user-toggled chat mode preset** — the manual counterpart to ``AgentSkill``.
+///
+/// The user turns one of these on or off in chat. While active, its full
+/// ``systemPrompt`` (the entire `SKILL.md` body, loaded eagerly) is injected and its
+/// ``contextMode`` controls what document context is attached. Loaded by
+/// ``BuiltInSkillLoader`` into `SkillManager.shared`.
+///
+/// Contrast with ``AgentSkill``, which the *agent* loads dynamically on demand via the
+/// `read` tool (progressive disclosure) rather than the user toggling it. Both are read
+/// from the same `SKILL.md` files but serve these two different entry points.
 public struct Skill: Identifiable, Codable, Hashable, Sendable {
     public let id: String
     public let name: String
