@@ -47,11 +47,14 @@ public actor Agent {
         let toolsByName = self.toolsByName
         let context = self.context
 
-        // Inject agent skills listing into system prompt
+        // Inject agent skills listing into system prompt — only when a read tool is
+        // available, since the listing instructs the model to load skills via `read`.
         var fullSystemPrompt = systemPrompt ?? ""
-        let skillsBlock = SkillPromptFormatter.formatForPrompt(config.skills)
-        if !skillsBlock.isEmpty {
-            fullSystemPrompt += skillsBlock
+        if toolsByName["read"] != nil {
+            let skillsBlock = SkillPromptFormatter.formatForPrompt(config.skills)
+            if !skillsBlock.isEmpty {
+                fullSystemPrompt += skillsBlock
+            }
         }
         let resolvedSystemPrompt: String? = fullSystemPrompt.isEmpty ? nil : fullSystemPrompt
 
