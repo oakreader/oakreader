@@ -10,11 +10,19 @@ public enum SkillSource: String, Sendable, Codable {
     case path
 }
 
-/// A file-based agent skill discovered from `SKILL.md` files.
+/// An **agent-invoked skill** — the dynamic counterpart to ``Skill``.
 ///
-/// Follows the [Agent Skills](https://agentskills.io) standard:
-/// skills are defined by Markdown files with YAML frontmatter and loaded lazily
-/// by the LLM via the `read` tool when a task matches the skill's description.
+/// The *agent* enters and exits these on its own: only the name/description are listed
+/// in the system prompt (see ``SkillPromptFormatter``), and the model loads the full
+/// `SKILL.md` body lazily via the `read` tool when a task matches — progressive
+/// disclosure, so the body never sits in context unless needed. Loaded by ``SkillLoader``.
+///
+/// Contrast with ``Skill``, which the *user* manually toggles in chat and whose full body
+/// is injected eagerly while active. Both are read from the same `SKILL.md` files but
+/// serve these two different entry points.
+///
+/// Follows the [Agent Skills](https://agentskills.io) standard: skills are defined by
+/// Markdown files with YAML frontmatter.
 public struct AgentSkill: Sendable, Identifiable {
     public var id: String { name }
 

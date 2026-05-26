@@ -13,8 +13,9 @@ public struct SkillLoadResult: Sendable {
     }
 }
 
-/// Discovers and loads `SKILL.md` files from directories following the
-/// [Agent Skills](https://agentskills.io) specification.
+/// Discovers and loads ``AgentSkill`` objects (agent-invoked, lazily read) from `SKILL.md`
+/// files, following the [Agent Skills](https://agentskills.io) specification. For the
+/// user-toggled chat-mode counterpart, see ``BuiltInSkillLoader`` / ``Skill``.
 ///
 /// Discovery rules:
 /// 1. If a directory contains `SKILL.md`, treat it as a skill root (don't recurse further).
@@ -301,7 +302,7 @@ public enum SkillLoader {
 
         // Try loading skill.json sidecar from the same directory
         let baseDir = url.deletingLastPathComponent()
-        let sidecar = loadSidecarManifest(in: baseDir)
+        let sidecar = SkillManifest.sidecar(in: baseDir)
 
         var contextMode: ContextMode? = nil
         if let mode = sidecar?.contextMode {
@@ -324,14 +325,5 @@ public enum SkillLoader {
         )
 
         return (skill, advisory)
-    }
-
-    /// Load `skill.json` from a directory if it exists.
-    private static func loadSidecarManifest(in directory: URL) -> SkillManifest? {
-        let jsonURL = directory.appendingPathComponent("skill.json")
-        guard let data = FileManager.default.contents(atPath: jsonURL.path) else {
-            return nil
-        }
-        return try? JSONDecoder().decode(SkillManifest.self, from: data)
     }
 }

@@ -1,6 +1,7 @@
 import Foundation
 
-/// Loads built-in `Skill` objects from `SKILL.md` + `skill.json` pairs in a directory.
+/// Loads ``Skill`` objects (user-toggled chat mode presets) from `SKILL.md` + `skill.json`
+/// pairs in a directory. For the agent-invoked counterpart, see ``SkillLoader`` / ``AgentSkill``.
 ///
 /// Only subdirectories containing a `SKILL.md` file with a non-empty body are loaded.
 /// The frontmatter fields `title`, `description`, `context-mode`, and `order` map to
@@ -38,14 +39,7 @@ public enum BuiltInSkillLoader {
             let order = Int(meta["order"] ?? "") ?? 99
 
             // Read icon and version from skill.json sidecar
-            let sidecar: SkillManifest? = {
-                let jsonURL = item.appendingPathComponent("skill.json")
-                guard let jsonData = fm.contents(atPath: jsonURL.path),
-                      let manifest = try? JSONDecoder().decode(SkillManifest.self, from: jsonData) else {
-                    return nil
-                }
-                return manifest
-            }()
+            let sidecar = SkillManifest.sidecar(in: item)
 
             let icon: String = {
                 if case .symbol(let symbol) = sidecar?.icon { return symbol }

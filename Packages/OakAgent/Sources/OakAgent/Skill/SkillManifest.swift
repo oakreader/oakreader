@@ -38,6 +38,19 @@ public struct SkillManifest: Codable, Sendable {
     }
 }
 
+extension SkillManifest {
+    /// Decode the optional `skill.json` sidecar in `directory`.
+    ///
+    /// Returns `nil` when the file is absent or fails to decode. Use this for the
+    /// sidecar-metadata case where a missing or malformed manifest is non-fatal; the
+    /// primary `skill.json` loading path (where errors should surface) decodes directly.
+    static func sidecar(in directory: URL) -> SkillManifest? {
+        let url = directory.appendingPathComponent("skill.json")
+        guard let data = FileManager.default.contents(atPath: url.path) else { return nil }
+        return try? JSONDecoder().decode(SkillManifest.self, from: data)
+    }
+}
+
 // MARK: - Skill Icon
 
 /// Icon for a skill, supporting SF Symbols, URLs, or local file references.
