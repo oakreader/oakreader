@@ -14,23 +14,27 @@ public enum SkillPromptFormatter {
         let visible = skills.filter { !$0.disableModelInvocation }
         guard !visible.isEmpty else { return "" }
 
-        var lines: [String] = []
-        lines.append("")
-        lines.append("The following skills provide specialized instructions for specific tasks.")
-        lines.append("Use the read tool to load a skill's file when the task matches its description.")
-        lines.append("")
-        lines.append("<available_skills>")
+        let header = """
 
-        for skill in visible {
-            lines.append("  <skill>")
-            lines.append("    <name>\(escapeXML(skill.name))</name>")
-            lines.append("    <description>\(escapeXML(skill.description))</description>")
-            lines.append("    <location>\(escapeXML(skill.filePath))</location>")
-            lines.append("  </skill>")
+
+        The following skills provide specialized instructions for specific tasks.
+        Use the read tool to load a skill's file when the task matches its description.
+        When a skill file references a relative path, resolve it against the skill's directory (the parent of its SKILL.md) and use that absolute path in tool commands.
+
+        <available_skills>
+        """
+
+        let entries = visible.map { skill in
+            """
+              <skill>
+                <name>\(escapeXML(skill.name))</name>
+                <description>\(escapeXML(skill.description))</description>
+                <location>\(escapeXML(skill.filePath))</location>
+              </skill>
+            """
         }
 
-        lines.append("</available_skills>")
-        return lines.joined(separator: "\n")
+        return ([header] + entries + ["</available_skills>"]).joined(separator: "\n")
     }
 
     private static func escapeXML(_ string: String) -> String {
@@ -38,5 +42,7 @@ public enum SkillPromptFormatter {
             .replacingOccurrences(of: "&", with: "&amp;")
             .replacingOccurrences(of: "<", with: "&lt;")
             .replacingOccurrences(of: ">", with: "&gt;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "'", with: "&apos;")
     }
 }
