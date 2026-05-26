@@ -33,9 +33,10 @@ public enum OAuthTokenStore: Sendable {
 
     // MARK: - CRUD
 
-    public static func store(_ tokenSet: TokenSet, for providerId: String) {
+    @discardableResult
+    public static func store(_ tokenSet: TokenSet, for providerId: String) -> Bool {
         let service = "\(servicePrefix).\(providerId)"
-        guard let data = try? JSONEncoder().encode(tokenSet) else { return }
+        guard let data = try? JSONEncoder().encode(tokenSet) else { return false }
 
         let baseQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -48,7 +49,11 @@ public enum OAuthTokenStore: Sendable {
         var addQuery = baseQuery
         addQuery[kSecValueData as String] = data
         addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlocked
-        SecItemAdd(addQuery as CFDictionary, nil)
+        let status = SecItemAdd(addQuery as CFDictionary, nil)
+        if status != errSecSuccess {
+            print("[OAuthTokenStore] SecItemAdd failed for \(providerId): OSStatus \(status)")
+        }
+        return status == errSecSuccess
     }
 
     public static func loadTokenSet(for providerId: String) -> TokenSet? {
