@@ -12,6 +12,7 @@ extension ImportService {
         let transcript: String?
         let metadata: MediaMetadata
         var embedType: String = "youtube"
+        var contentMarkdown: String?
     }
 
     /// Import an embed (YouTube, Twitter, or generic link) from Chrome extension payload.
@@ -60,6 +61,13 @@ extension ImportService {
                 }
                 let embedHTMLURL = attDir.appendingPathComponent("embed.html")
                 try embedHTML.write(to: embedHTMLURL, atomically: true, encoding: .utf8)
+            }
+
+            // Save article markdown for AI chat context
+            if let md = input.contentMarkdown,
+               !md.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                let mdURL = attDir.appendingPathComponent("content.md")
+                try md.write(to: mdURL, atomically: true, encoding: .utf8)
             }
         } catch {
             Log.error(Log.importer, "Failed to import embed: \(error)")

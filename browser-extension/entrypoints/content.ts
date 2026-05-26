@@ -27,6 +27,7 @@ interface PageCapture {
   description?: string | null;
   embedType?: string;
   biblio?: Record<string, unknown>;
+  markdown?: string | null;
 }
 
 // ─── Page Meta ──────────────────────────────────────────────────────────────────
@@ -146,7 +147,18 @@ export default defineContentScript({
 
       if (request.action === "extractLinkMeta") {
         const result = extractLinkMetadata(document, location.href);
-        sendResponse(toLegacyPayload(result));
+        const payload = toLegacyPayload(result);
+
+        // Extract article markdown for AI chat context
+        try {
+          const defuddled = new Defuddle(document).parse();
+          const markdown = createMarkdownContent(defuddled.content, location.href);
+          if (markdown) payload.markdown = markdown;
+        } catch {
+          // Best effort — link save still works without markdown
+        }
+
+        sendResponse(payload);
         return true;
       }
 

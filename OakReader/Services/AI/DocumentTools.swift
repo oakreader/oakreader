@@ -128,7 +128,13 @@ struct ReadDocumentTool: AgentTool, Sendable {
         switch documentType {
         case .pdf:
             return readPDF(url: url, pagesParam: input["pages"])
-        case .markdown, .video:
+        case .markdown:
+            return readTextFile(url: url)
+        case .video:
+            let mdURL = url.deletingLastPathComponent().appendingPathComponent("content.md")
+            if let md = try? String(contentsOf: mdURL, encoding: .utf8), !md.isEmpty {
+                return .success(String(md.prefix(50_000)))
+            }
             return readTextFile(url: url)
         case .html:
             return readHTML(url: url)
@@ -237,7 +243,13 @@ struct SearchDocumentTool: AgentTool, Sendable {
         switch documentType {
         case .pdf:
             return searchPDF(url: url, query: query, maxResults: maxResults)
-        case .markdown, .video:
+        case .markdown:
+            return searchTextFile(url: url, query: query, maxResults: maxResults)
+        case .video:
+            let mdURL = url.deletingLastPathComponent().appendingPathComponent("content.md")
+            if let markdown = try? String(contentsOf: mdURL, encoding: .utf8), !markdown.isEmpty {
+                return searchPlainText(markdown, query: query, maxResults: maxResults)
+            }
             return searchTextFile(url: url, query: query, maxResults: maxResults)
         case .html:
             return searchHTML(url: url, query: query, maxResults: maxResults)

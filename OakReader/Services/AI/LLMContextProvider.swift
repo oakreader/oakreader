@@ -94,7 +94,14 @@ struct LLMContextProvider {
                    let text = try? String(contentsOf: url, encoding: .utf8) {
                     currentPageText = String(text.prefix(4_000))
                 } else {
-                    currentPageText = media.metadata.description ?? ""
+                    // Check for article content saved by browser extension
+                    let mdURL = media.fileURL.deletingLastPathComponent()
+                        .appendingPathComponent("content.md")
+                    if let md = try? String(contentsOf: mdURL, encoding: .utf8), !md.isEmpty {
+                        currentPageText = String(md.prefix(4_000))
+                    } else {
+                        currentPageText = media.metadata.description ?? ""
+                    }
                 }
             } else {
                 currentPageText = ""
