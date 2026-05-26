@@ -14,6 +14,7 @@ struct SettingsView: View {
         case extensions
         case skills
         case youtube
+        case webSearch
         // Extension tabs
         case extensionNotes
         case extensionTranslation
@@ -31,6 +32,7 @@ struct SettingsView: View {
             case .extensions: return "Extensions"
             case .skills: return "Skills"
             case .youtube: return "YouTube"
+            case .webSearch: return "Web Search"
             case .extensionNotes: return AppExtension.notes.label
             case .extensionTranslation: return AppExtension.translation.label
             case .extensionQuizCards: return AppExtension.quizCards.label
@@ -47,6 +49,7 @@ struct SettingsView: View {
             case .extensions: return "square.grid.2x2"
             case .skills: return "hammer"
             case .youtube: return "play.rectangle"
+            case .webSearch: return "magnifyingglass.circle"
             case .extensionNotes: return AppExtension.notes.systemImage
             case .extensionTranslation: return AppExtension.translation.systemImage
             case .extensionQuizCards: return AppExtension.quizCards.systemImage
@@ -69,7 +72,7 @@ struct SettingsView: View {
         }
 
         /// Tabs exposed in the command palette for deep-linking.
-        static let paletteTabs: [Tab] = [.general, .library, .ai, .agent, .audio, .extensions, .youtube]
+        static let paletteTabs: [Tab] = [.general, .library, .ai, .agent, .audio, .extensions, .youtube, .webSearch]
 
         static func tab(for ext: AppExtension) -> Tab {
             switch ext {
@@ -81,7 +84,7 @@ struct SettingsView: View {
     }
 
     /// Fixed tabs that always appear.
-    private static let fixedTabs: [Tab] = [.general, .library, .ai, .agent, .audio, .skills, .extensions, .youtube]
+    private static let fixedTabs: [Tab] = [.general, .library, .ai, .agent, .audio, .skills, .extensions, .youtube, .webSearch]
 
     @State private var selectedTab: Tab = .general
     @State private var visibleTabs: [Tab] = Self.buildVisibleTabs()
@@ -167,6 +170,8 @@ struct SettingsView: View {
             SkillManagementView()
         case .youtube:
             YouTubeSettingsView()
+        case .webSearch:
+            WebSearchSettingsView()
         case .extensionNotes:
             NoteSettingsView()
         case .extensionTranslation:

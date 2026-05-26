@@ -151,6 +151,8 @@ final class Preferences {
         static let embeddingModel = "embeddingModel"
         // Appearance
         static let appearanceMode = "appearanceMode"
+        // Web search
+        static let webSearchProvider = "webSearchProvider"
         // External tools
         static let ytDlpPath = "ytDlpPath"
         static let ytDlpCachedVersion = "ytDlpCachedVersion"
@@ -683,6 +685,14 @@ final class Preferences {
         }
         // Fall back to bundled default voice
         return Bundle.main.url(forResource: "grant_voice", withExtension: "wav")
+    }
+
+    // MARK: - Web Search
+
+    /// Selected web search provider ID, or "auto" for automatic resolution.
+    var webSearchProviderId: String {
+        get { defaults.string(forKey: Keys.webSearchProvider) ?? "auto" }
+        set { defaults.set(newValue, forKey: Keys.webSearchProvider) }
     }
 
     // MARK: - External Tools

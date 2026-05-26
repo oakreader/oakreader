@@ -243,6 +243,8 @@ class ChatViewModel {
 
         // 3. Web search (always)
         tools.append(AcademicSearchTool())
+        tools.append(WebSearchTool())
+        tools.append(WebFetchTool())
 
         // 3b. Oak CLI (library search, read items, list collections/tags, manage library)
         tools.append(OakCLITool())
@@ -275,13 +277,8 @@ class ChatViewModel {
             let storagePath = parent?.itemStorageKey.map {
                 CatalogDatabase.documentDirectory(storageKey: $0)
             }
-            var allowed = storagePath.map { [$0] } ?? []
-            // Allow ReadTool to access notes directory (paths are in the system prompt or user message)
-            if snapshot.document?.notes.isEmpty == false || !noteRefs.isEmpty {
-                allowed.append(CatalogDatabase.notesDirectory)
-            }
-            // Allow memory tools to write to agent directory
-            allowed.append(CatalogDatabase.agentDirectory)
+            // Allow tools to access everything under ~/OakReader-Dev/ (debug) or ~/OakReader/ (prod)
+            let allowed = [CatalogDatabase.dataDirectory]
             effectiveToolContext = toolContext ?? ToolExecutionContext(
                 workingDirectory: storagePath ?? URL(fileURLWithPath: NSTemporaryDirectory()),
                 allowedPaths: allowed
