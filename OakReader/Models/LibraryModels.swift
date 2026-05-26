@@ -30,7 +30,7 @@ struct Attachment: Identifiable, Hashable {
                 return dir.appendingPathComponent("metadata.json")
             }
             return dir.appendingPathComponent(fileName)
-        case .video:
+        case .embed:
             return dir.appendingPathComponent("metadata.json")
         case .markdown:
             return dir.appendingPathComponent(fileName)
@@ -52,9 +52,6 @@ struct Attachment: Identifiable, Hashable {
         if linkMode == .linkedURL, let host = sourceURL?.host?.lowercased() {
             if host.contains("youtube.com") || host.contains("youtu.be") {
                 return "play.rectangle"
-            }
-            if host.contains("x.com") || host.contains("twitter.com") {
-                return "at"
             }
             return "link"
         }

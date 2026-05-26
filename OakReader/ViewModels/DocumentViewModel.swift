@@ -150,7 +150,7 @@ class DocumentViewModel {
         switch contentType {
         case .pdf: return pdfDocument?.pageCount ?? 0
         case .html: return 1
-        case .video: return 1
+        case .embed: return 1
         case .markdown: return 1
         case .audio: return 1
         }
@@ -160,14 +160,14 @@ class DocumentViewModel {
         switch contentType {
         case .pdf: return pdfDocument != nil
         case .html: return html != nil
-        case .video: return mediaDocument != nil
+        case .embed: return mediaDocument != nil
         case .markdown: return markdownDocument != nil
         case .audio: return false
         }
     }
 
     var usesMediaSidebar: Bool {
-        contentType == .video && mediaDocument?.metadata.resolvedEmbedType == .youtube
+        contentType == .embed && mediaDocument?.metadata.resolvedEmbedType == .youtube
     }
 
     var fileName: String {
@@ -176,7 +176,7 @@ class DocumentViewModel {
             return document?.fileURL?.lastPathComponent ?? "Untitled"
         case .html:
             return html?.htmlURL.deletingPathExtension().lastPathComponent ?? "Untitled"
-        case .video:
+        case .embed:
             return mediaDocument?.metadata.title ?? "Untitled"
         case .markdown:
             return markdownDocument?.fileURL.deletingPathExtension().lastPathComponent ?? "Untitled"
@@ -222,7 +222,7 @@ class DocumentViewModel {
 
     init(media: MediaDocument) {
         self.mediaDocument = media
-        self.contentType = .video
+        self.contentType = .embed
         self.state = DocumentState()
         state.isSidebarVisible = media.metadata.resolvedEmbedType == .youtube
         state.mediaSidebarMode = .outline

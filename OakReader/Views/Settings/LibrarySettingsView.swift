@@ -15,7 +15,7 @@ struct LibrarySettingsView: View {
         (SystemCollectionID.recentlyRead, "Recently Read", "book"),
         (SystemCollectionID.pdfs, "PDFs", "doc.fill"),
         (SystemCollectionID.html, "Web", "globe"),
-        (SystemCollectionID.videos, "Videos", "play.rectangle"),
+        (SystemCollectionID.embeds, "Embeds", "link"),
     ]
 
     private var isIndexing: Bool { indexedCount < totalCount }

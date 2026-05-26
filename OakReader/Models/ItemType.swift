@@ -7,7 +7,7 @@ enum ContentType: String, Codable {
     case html       // text/html (HTML documents, web embeds)
     case markdown   // text/markdown
     case audio      // audio/*
-    case video      // video/* (YouTube, etc.)
+    case embed      // embeds (YouTube, link bookmarks, etc.)
 
     var icon: String {
         switch self {
@@ -15,7 +15,7 @@ enum ContentType: String, Codable {
         case .html: return "globe"
         case .markdown: return "doc.text"
         case .audio: return "headphones"
-        case .video: return "play.rectangle"
+        case .embed: return "link"
         }
     }
 
@@ -25,7 +25,7 @@ enum ContentType: String, Codable {
         case .html: return "Web"
         case .markdown: return "Note"
         case .audio: return "Audio"
-        case .video: return "Video"
+        case .embed: return "Embed"
         }
     }
 }
@@ -35,5 +35,5 @@ enum ContentType: String, Codable {
 enum LinkMode: String, Codable {
     case importedFile   // File stored in OakReader's managed storage
     case importedURL    // URL content snapshot saved locally (web page saved offline)
-    case linkedURL      // External URL loaded on demand (YouTube, tweet, etc.)
+    case linkedURL      // External URL loaded on demand (YouTube, link embed, etc.)
 }

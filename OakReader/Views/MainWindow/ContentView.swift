@@ -36,7 +36,7 @@ struct ContentView: View {
 
                 // Main content column
                 VStack(spacing: 0) {
-                    if viewModel.contentType == .video {
+                    if viewModel.contentType == .embed {
                         Spacer().frame(height: 8)
                     }
 
@@ -186,7 +186,7 @@ struct ContentView: View {
                     HTMLOverlayView(viewModel: viewModel)
                 }
             }
-        case .video:
+        case .embed:
             let isLiveLink = viewModel.liveURL != nil
             ZStack {
                 if viewModel.mediaDocument?.metadata.resolvedEmbedType == .youtube {

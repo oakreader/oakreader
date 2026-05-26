@@ -488,7 +488,7 @@ final class ZoteroMigrationService {
             let allAttachments = (attachmentsByParent[zItem.itemID] ?? [])
                 .sorted { a, _ in a.contentType == "application/pdf" ? true : false }
             let primaryAtt = allAttachments.first
-            var contentType: ContentType = isVideo ? .video : oakItemType(for: primaryAtt?.contentType)
+            var contentType: ContentType = isVideo ? .embed : oakItemType(for: primaryAtt?.contentType)
             var attFileName = isVideo ? "metadata.json" : (contentType == .pdf ? "document.pdf" : "index.html")
             var attFileSize: Int64 = 0
             var attPageCount = 0
@@ -555,7 +555,7 @@ final class ZoteroMigrationService {
 
             // If no file was copied and item has a URL, treat as a linked web bookmark
             if !fileCopied && !isVideo, let urlString = cslItem.URL, let url = URL(string: urlString) {
-                contentType = .video
+                contentType = .embed
                 attFileName = "metadata.json"
                 let metadata = MediaMetadata(
                     title: cslItem.title ?? title,
@@ -576,7 +576,7 @@ final class ZoteroMigrationService {
 
             let linkMode: LinkMode
             switch contentType {
-            case .video: linkMode = .linkedURL
+            case .embed: linkMode = .linkedURL
             case .html:  linkMode = .importedURL
             default:     linkMode = .importedFile
             }

@@ -3,20 +3,19 @@ import Foundation
 /// Discriminator for embed subtypes.
 enum EmbedType: String, Codable {
     case youtube
-    case twitter
     case link       // generic bookmark — any URL saved as "link" mode
 }
 
-/// Metadata for embed documents (YouTube, Twitter, generic links), stored as metadata.json.
+/// Metadata for embed documents (YouTube, generic links), stored as metadata.json.
 struct MediaMetadata: Codable {
     let title: String
-    let author: String              // Channel name / @handle / site name
+    let author: String              // Channel name / site name
     let sourceURL: URL              // Original URL
     let duration: Int?              // Seconds (YouTube only)
     let thumbnailURL: URL?
     let publishedAt: String?        // ISO 8601
     let description: String?
-    let embedType: String?          // "youtube" | "twitter" | "link", nil → defaults to "youtube"
+    let embedType: String?          // "youtube" | "link", nil → defaults to "youtube"
 
     /// Resolved enum from the optional string field (backward-compatible).
     var resolvedEmbedType: EmbedType {
@@ -24,7 +23,7 @@ struct MediaMetadata: Codable {
     }
 }
 
-/// Lightweight data holder for embed documents (YouTube, Twitter posts, generic links).
+/// Lightweight data holder for embed documents (YouTube, generic links).
 /// Not an NSDocument — media items are read-only.
 final class MediaDocument {
     let storageDirectory: URL
@@ -32,7 +31,7 @@ final class MediaDocument {
     let transcriptURL: URL?         // transcript.txt if available
     let chaptersURL: URL?           // chapters.json if available
     let highlightsURL: URL?         // highlights.json if available
-    let embedHTMLURL: URL?          // embed.html for tweet/link rendering
+    let embedHTMLURL: URL?          // embed.html for link rendering
     let sourceURL: URL
 
     init(storageDirectory: URL) throws {

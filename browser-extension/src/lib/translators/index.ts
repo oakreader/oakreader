@@ -8,9 +8,7 @@ export {
 export { extractLinkMetadata } from "./link";
 export {
   isYouTubeWatchURL,
-  isTwitterStatusURL,
   isDOIURL,
   isScholarlyDomain,
   extractYouTubeVideoId,
-  extractTwitterHandle,
 } from "./url-utils";

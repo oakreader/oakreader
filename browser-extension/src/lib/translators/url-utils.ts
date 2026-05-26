@@ -17,22 +17,6 @@ export function isYouTubeWatchURL(url: string): boolean {
   }
 }
 
-export function isTwitterStatusURL(url: string): boolean {
-  try {
-    const u = new URL(url);
-    return (
-      (u.hostname === "x.com" ||
-        u.hostname === "www.x.com" ||
-        u.hostname === "twitter.com" ||
-        u.hostname === "www.twitter.com" ||
-        u.hostname === "mobile.twitter.com") &&
-      /^\/[^/]+\/status\/\d+/.test(u.pathname)
-    );
-  } catch {
-    return false;
-  }
-}
-
 export function isDOIURL(url: string): boolean {
   try {
     const u = new URL(url);
@@ -104,11 +88,3 @@ export function extractYouTubeVideoId(url: string): string | null {
   }
 }
 
-export function extractTwitterHandle(url: string): string {
-  try {
-    const pathname = new URL(url).pathname;
-    return pathname.split("/")[1] || "";
-  } catch {
-    return "";
-  }
-}

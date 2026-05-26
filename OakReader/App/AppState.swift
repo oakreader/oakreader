@@ -330,7 +330,7 @@ final class AppState {
             openHTMLItem(item)
         case .pdf:
             openPDFItem(item)
-        case .video:
+        case .embed:
             openMediaItem(item)
         case .markdown:
             openMarkdownItem(item)

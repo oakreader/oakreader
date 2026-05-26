@@ -527,7 +527,7 @@ class ChatViewModel {
                 )
             }
 
-        case .video, .audio:
+        case .embed, .audio:
             if let time = anchor.time {
                 vm.media.requestSeek(seconds: time)
             } else if let text = anchor.text {

@@ -90,12 +90,12 @@ enum CLISystemCollectionID {
     static let allItems     = "00000000-0000-0000-0000-000000000002"
     static let pdfs         = "00000000-0000-0000-0000-000000000005"
     static let html         = "00000000-0000-0000-0000-000000000006"
-    static let videos       = "00000000-0000-0000-0000-000000000007"
+    static let embeds       = "00000000-0000-0000-0000-000000000007"
     static let recentlyRead = "00000000-0000-0000-0000-000000000008"
     static let notes        = "00000000-0000-0000-0000-000000000009"
     static let duplicates   = "00000000-0000-0000-0000-00000000000A"
 
-    static let all: Set<String> = [readingList, allItems, pdfs, html, videos, recentlyRead, notes, duplicates]
+    static let all: Set<String> = [readingList, allItems, pdfs, html, embeds, recentlyRead, notes, duplicates]
 }
 
 // MARK: - Database Connection
@@ -716,7 +716,7 @@ final class CLIDatabase {
         switch input.lowercased() {
         case "pdf": return "pdf"
         case "web", "websnapshot", "html": return "html"
-        case "video", "embed": return "video"
+        case "video", "embed": return "embed"
         case "note", "markdown": return "markdown"
         default: return input
         }

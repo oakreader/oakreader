@@ -20,7 +20,7 @@ export interface PageCapture {
   thumbnailURL?: string | null;
   transcript?: string | null;
   description?: string | null;
-  embedType?: "youtube" | "twitter" | "link";
+  embedType?: "youtube" | "link";
   biblio?: BiblioMetadata;
   markdown?: string | null;
 }
