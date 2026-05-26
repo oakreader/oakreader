@@ -380,6 +380,7 @@ public enum BuiltInProviders {
             additionalAuthParams: [
                 "codex_cli_simplified_flow": "true",
                 "id_token_add_organizations": "true",
+                "originator": "oakreader",
             ]
         )),
         displayOrder: 0

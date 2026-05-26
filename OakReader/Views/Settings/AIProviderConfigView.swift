@@ -484,11 +484,15 @@ private struct ProviderDetailView: View {
                     for await value in stream { return value }
                     throw CancellationError()
                 }
-                OAuthTokenStore.store(tokenSet, for: provider.id)
+                let stored = OAuthTokenStore.store(tokenSet, for: provider.id)
                 await MainActor.run {
                     oauthState.isInProgress = false
                     oauthState.manualCodeContinuation = nil
-                    store.refresh()
+                    if stored {
+                        store.refresh()
+                    } else {
+                        oauthState.error = "Failed to save credentials to Keychain"
+                    }
                 }
             } catch is CancellationError {
                 // user cancelled

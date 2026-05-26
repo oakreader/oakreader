@@ -204,19 +204,16 @@ public actor OAuthService {
         var request = URLRequest(url: config.tokenURL)
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
 
         let redirectURI = "http://localhost:\(config.callbackPort)\(config.callbackPath)"
-        var components = URLComponents()
-        components.queryItems = [
-            URLQueryItem(name: "grant_type", value: "authorization_code"),
-            URLQueryItem(name: "client_id", value: config.clientId),
-            URLQueryItem(name: "code", value: code),
-            URLQueryItem(name: "redirect_uri", value: redirectURI),
-            URLQueryItem(name: "code_verifier", value: verifier),
+        let params: [(String, String)] = [
+            ("grant_type", "authorization_code"),
+            ("client_id", config.clientId),
+            ("code", code),
+            ("code_verifier", verifier),
+            ("redirect_uri", redirectURI),
         ]
-        // URLComponents.percentEncodedQuery properly encodes form values
-        request.httpBody = components.percentEncodedQuery?.data(using: .utf8)
+        request.httpBody = Self.formURLEncode(params).data(using: .utf8)
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
@@ -307,6 +304,20 @@ public actor OAuthService {
         }
 
         throw OAuthError.deviceCodeExpired
+    }
+
+    // MARK: - Form URL Encoding
+
+    /// Encode key-value pairs as application/x-www-form-urlencoded (RFC compliant).
+    /// Unlike URLComponents.percentEncodedQuery which uses RFC 3986 query encoding (leaves : / unencoded),
+    /// this properly percent-encodes all non-unreserved characters as required by form encoding.
+    static func formURLEncode(_ params: [(String, String)]) -> String {
+        let allowed = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
+        return params.map { key, value in
+            let encodedKey = key.addingPercentEncoding(withAllowedCharacters: allowed) ?? key
+            let encodedValue = value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value
+            return "\(encodedKey)=\(encodedValue)"
+        }.joined(separator: "&")
     }
 }
 
