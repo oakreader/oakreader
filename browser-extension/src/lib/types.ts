@@ -22,6 +22,7 @@ export interface PageCapture {
   description?: string | null;
   embedType?: "youtube" | "twitter" | "link";
   biblio?: BiblioMetadata;
+  markdown?: string | null;
 }
 
 /** Payload for saving a PDF by URL (no HTML capture needed). */

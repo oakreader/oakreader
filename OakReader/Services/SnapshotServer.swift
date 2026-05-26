@@ -438,7 +438,8 @@ final class SnapshotServer {
                     thumbnailData: thumbnailData,
                     transcript: payload.transcript,
                     metadata: metadata,
-                    embedType: resolvedEmbedType
+                    embedType: resolvedEmbedType,
+                    contentMarkdown: payload.markdown
                 ))
                 if let item {
                     self.assignToCollection(item: item, collectionId: payload.collectionId)
