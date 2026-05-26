@@ -6,6 +6,18 @@ import Foundation
 /// can discover skills and read their full instructions via the `read` tool.
 public enum SkillPromptFormatter {
 
+    /// The skills section to append to a system prompt — or `""` when it must be omitted.
+    ///
+    /// Single source of truth for *whether* skills get injected. The listing tells the
+    /// model to load skill files via the `read` tool, so it is pointless (and misleading)
+    /// without one — callers pass `hasReadTool` and this method gates on it. Returns `""`
+    /// when there is no read tool or no model-invokable skills, so callers can append the
+    /// result unconditionally.
+    public static func promptSection(skills: [AgentSkill], hasReadTool: Bool) -> String {
+        guard hasReadTool else { return "" }
+        return formatForPrompt(skills)
+    }
+
     /// Format skills as an XML block for the system prompt.
     ///
     /// Only includes skills where `disableModelInvocation` is `false`.

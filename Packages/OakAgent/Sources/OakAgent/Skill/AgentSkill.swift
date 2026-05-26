@@ -1,5 +1,15 @@
 import Foundation
 
+/// Where a skill was discovered, mirroring pi's source scopes.
+public enum SkillSource: String, Sendable, Codable {
+    /// Global, user-level skills directory (e.g. `~/OakReader/skills`).
+    case user
+    /// Project-local skills directory.
+    case project
+    /// An explicitly supplied file or directory path.
+    case path
+}
+
 /// A file-based agent skill discovered from `SKILL.md` files.
 ///
 /// Follows the [Agent Skills](https://agentskills.io) standard:
@@ -43,6 +53,9 @@ public struct AgentSkill: Sendable, Identifiable {
     /// from chat and the skill picker.
     public let isEnabled: Bool
 
+    /// Where this skill was discovered (user-global, project-local, or explicit path).
+    public let source: SkillSource
+
     public init(
         name: String,
         description: String,
@@ -54,7 +67,8 @@ public struct AgentSkill: Sendable, Identifiable {
         contextMode: ContextMode? = nil,
         requirements: SkillRequirements? = nil,
         version: String? = nil,
-        isEnabled: Bool = true
+        isEnabled: Bool = true,
+        source: SkillSource = .path
     ) {
         self.name = name
         self.description = description
@@ -67,5 +81,6 @@ public struct AgentSkill: Sendable, Identifiable {
         self.requirements = requirements
         self.version = version
         self.isEnabled = isEnabled
+        self.source = source
     }
 }

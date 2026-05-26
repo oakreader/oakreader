@@ -50,8 +50,9 @@ public enum FrontmatterParser {
             let key = trimmed[trimmed.startIndex..<colonIndex]
                 .trimmingCharacters(in: .whitespaces)
                 .lowercased()
-            let value = trimmed[trimmed.index(after: colonIndex)...]
+            let rawValue = trimmed[trimmed.index(after: colonIndex)...]
                 .trimmingCharacters(in: .whitespaces)
+            let value = stripQuotes(rawValue)
 
             if !key.isEmpty {
                 frontmatter[key] = value
@@ -64,5 +65,30 @@ public enum FrontmatterParser {
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
         return FrontmatterResult(frontmatter: frontmatter, body: body)
+    }
+
+    /// Strip a single layer of matching outer quotes from a YAML scalar.
+    ///
+    /// Matches how a real YAML parser unquotes `key: "value"` / `key: 'value'`.
+    /// For double-quoted strings, common backslash escapes are also unescaped.
+    private static func stripQuotes(_ value: String) -> String {
+        guard value.count >= 2, let first = value.first, let last = value.last else {
+            return value
+        }
+
+        if first == "\"" && last == "\"" {
+            let inner = String(value.dropFirst().dropLast())
+            return inner
+                .replacingOccurrences(of: "\\\"", with: "\"")
+                .replacingOccurrences(of: "\\\\", with: "\\")
+        }
+
+        if first == "'" && last == "'" {
+            // YAML single quotes escape a literal quote by doubling it.
+            return String(value.dropFirst().dropLast())
+                .replacingOccurrences(of: "''", with: "'")
+        }
+
+        return value
     }
 }

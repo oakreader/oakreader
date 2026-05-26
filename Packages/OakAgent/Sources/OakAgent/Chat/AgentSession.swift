@@ -50,15 +50,12 @@ public actor AgentSession {
                     }
 
                     // 2. Build final system prompt (append agent skills listing)
+                    // Append the agent skills listing (no-op when there is no read tool or no skills).
                     var finalPrompt = systemPrompt
-                    // Only inject the skills listing when a read tool is available, since
-                    // it instructs the model to load skill files via `read`.
-                    if (tools ?? []).contains(where: { $0.name == "read" }) {
-                        let skillsBlock = SkillPromptFormatter.formatForPrompt(agentSkills)
-                        if !skillsBlock.isEmpty {
-                            finalPrompt += skillsBlock
-                        }
-                    }
+                    finalPrompt += SkillPromptFormatter.promptSection(
+                        skills: agentSkills,
+                        hasReadTool: (tools ?? []).contains { $0.name == "read" }
+                    )
 
                     // 3. Build initial LLM messages
                     var llmMessages = buildMessages(
