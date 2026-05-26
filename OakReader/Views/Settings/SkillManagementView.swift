@@ -305,7 +305,7 @@ struct SkillManagementView: View {
         }
 
         // Include user skills from installed dir that aren't in catalog.
-        let installedResult = SkillLoader.loadSkills(from: [Self.installedDir])
+        let installedResult = SkillLoader.loadSkills(from: [Self.installedDir], source: .user)
         installedVersions = [:]
         for skill in installedResult.skills {
             if let v = skill.version { installedVersions[skill.name] = v }

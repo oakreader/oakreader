@@ -775,7 +775,7 @@ class ChatViewModel {
 
     private static func loadAgentSkills() -> [AgentSkill] {
         // Only load installed skills from the shared SkillManager directory.
-        SkillLoader.loadSkills(from: [SkillManager.installedDir]).skills
+        SkillLoader.loadSkills(from: [SkillManager.installedDir], source: .user).skills
     }
 
     // MARK: - Private — Session Persistence

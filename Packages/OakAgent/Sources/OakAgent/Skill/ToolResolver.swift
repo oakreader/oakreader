@@ -42,7 +42,7 @@ public enum ToolResolver {
         let installedDir = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("OakReader/skills")
         #endif
-        let skills = SkillLoader.loadSkills(from: [installedDir]).skills
+        let skills = SkillLoader.loadSkills(from: [installedDir], source: .user).skills
 
         for skill in skills {
             guard let bins = skill.requirements?.bins else { continue }
