@@ -1,4 +1,4 @@
-export type ContentKind = "webpage" | "youtube" | "twitter" | "scholarly" | "link";
+export type ContentKind = "webpage" | "youtube" | "scholarly" | "link";
 
 export interface BiblioMetadata {
   doi?: string | null;
@@ -25,8 +25,6 @@ export interface TranslatorResult {
   videoId?: string | null;
   duration?: number | null;
   transcript?: string | null;
-  // Twitter-specific
-  handle?: string;
   html?: string;
   markdown?: string | null;
   // Scholarly-specific

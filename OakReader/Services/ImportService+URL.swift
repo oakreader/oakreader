@@ -326,14 +326,11 @@ extension ImportService {
         let host = url.host?.lowercased() ?? ""
         return host.contains("youtube.com")
             || host.contains("youtu.be")
-            || host.contains("x.com")
-            || host.contains("twitter.com")
     }
 
     private static func detectEmbedType(from url: URL) -> String {
         let host = url.host?.lowercased() ?? ""
         if host.contains("youtube.com") || host.contains("youtu.be") { return "youtube" }
-        if host.contains("x.com") || host.contains("twitter.com") { return "twitter" }
         return "link"
     }
 

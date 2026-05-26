@@ -86,17 +86,6 @@ function toLegacyPayload(result: TranslatorResult): PageCapture {
         transcript: result.transcript,
       };
 
-    case "twitter":
-      return {
-        type: "embed",
-        url: result.url,
-        title: result.title,
-        author: result.author,
-        description: result.description,
-        thumbnailURL: result.thumbnailURL,
-        embedType: "twitter",
-      };
-
     case "link":
       return {
         type: "embed",

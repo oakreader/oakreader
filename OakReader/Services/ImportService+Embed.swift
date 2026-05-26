@@ -15,7 +15,7 @@ extension ImportService {
         var contentMarkdown: String?
     }
 
-    /// Import an embed (YouTube, Twitter, or generic link) from Chrome extension payload.
+    /// Import an embed (YouTube or generic link) from Chrome extension payload.
     @discardableResult
     func importEmbed(_ input: EmbedImportInput) -> LibraryItem? {
         // Duplicate detection by source URL
@@ -51,14 +51,9 @@ extension ImportService {
                 try thumbnailData.write(to: coverURL, options: .atomic)
             }
 
-            // Generate embed.html for non-YouTube types (tweets, links)
+            // Generate embed.html for non-YouTube types (link bookmarks)
             if input.embedType != "youtube" {
-                let embedHTML: String
-                if input.embedType == "twitter" {
-                    embedHTML = Self.generateTweetEmbedHTML(metadata: input.metadata)
-                } else {
-                    embedHTML = Self.generateLinkEmbedHTML(metadata: input.metadata)
-                }
+                let embedHTML = Self.generateLinkEmbedHTML(metadata: input.metadata)
                 let embedHTMLURL = attDir.appendingPathComponent("embed.html")
                 try embedHTML.write(to: embedHTMLURL, atomically: true, encoding: .utf8)
             }
@@ -93,7 +88,7 @@ extension ImportService {
             itemId: docId.uuidString,
             storageKey: attStorageKey,
             fileName: "metadata.json",
-            contentType: ContentType.video.rawValue,
+            contentType: ContentType.embed.rawValue,
             linkMode: LinkMode.linkedURL.rawValue,
             sourceURL: input.sourceURL.absoluteString,
             fileSize: 0,
@@ -111,7 +106,6 @@ extension ImportService {
         // Auto-create reference metadata
         let cslType: String
         switch input.embedType {
-        case "twitter": cslType = "post"
         case "link": cslType = "webpage"
         default: cslType = "motion_picture"
         }
@@ -129,7 +123,7 @@ extension ImportService {
             Task {
                 await service.indexItem(
                     itemId: docId.uuidString,
-                    contentType: ContentType.video.rawValue,
+                    contentType: ContentType.embed.rawValue,
                     storageKey: itemStorageKey,
                     attStorageKey: attStorageKey,
                     fileName: "metadata.json"
@@ -173,127 +167,6 @@ extension ImportService {
         text.replacingOccurrences(of: "&", with: "&amp;")
             .replacingOccurrences(of: "<", with: "&lt;")
             .replacingOccurrences(of: ">", with: "&gt;")
-    }
-
-    /// Generate a styled HTML card for a tweet / X post.
-    static func generateTweetEmbedHTML(metadata: MediaMetadata) -> String {
-        let title = escapeHTML(metadata.title)
-        let author = escapeHTML(metadata.author)
-        let description = escapeHTML(metadata.description ?? "")
-        let sourceURL = escapeHTML(metadata.sourceURL.absoluteString)
-        let initial = author.first.map(String.init) ?? "X"
-
-        return """
-        <!DOCTYPE html>
-        <html>
-        <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body {
-            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
-            background: #1a1a1a;
-            color: #e7e9ea;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            padding: 40px;
-          }
-          .card {
-            background: #16181c;
-            border: 1px solid #2f3336;
-            border-radius: 16px;
-            padding: 24px;
-            max-width: 520px;
-            width: 100%;
-          }
-          .header {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 16px;
-          }
-          .avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: #1d9bf0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            font-size: 18px;
-            color: white;
-            flex-shrink: 0;
-          }
-          .author-info { flex: 1; min-width: 0; }
-          .author-name {
-            font-weight: 700;
-            font-size: 15px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-          }
-          .author-handle {
-            color: #71767b;
-            font-size: 14px;
-          }
-          .x-logo {
-            width: 24px;
-            height: 24px;
-            flex-shrink: 0;
-          }
-          .content {
-            font-size: 15px;
-            line-height: 1.5;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            margin-bottom: 16px;
-          }
-          .media {
-            margin-bottom: 16px;
-          }
-          .media img {
-            width: 100%;
-            border-radius: 12px;
-            display: block;
-          }
-          .source {
-            color: #71767b;
-            font-size: 13px;
-            border-top: 1px solid #2f3336;
-            padding-top: 12px;
-          }
-          .source a {
-            color: #1d9bf0;
-            text-decoration: none;
-          }
-        </style>
-        </head>
-        <body>
-        <div class="card">
-          <div class="header">
-            <div class="avatar">\(escapeHTML(initial))</div>
-            <div class="author-info">
-              <div class="author-name">\(title)</div>
-              <div class="author-handle">\(author)</div>
-            </div>
-            <svg class="x-logo" viewBox="0 0 24 24" fill="#e7e9ea">
-              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99
-              21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-            </svg>
-          </div>
-          <div class="content">\(description)</div>
-          <div class="media"><img src="cover.webp" onerror="this.parentElement.style.display='none'"></div>
-          <div class="source">
-            <a href="\(sourceURL)">View on X</a>
-          </div>
-        </div>
-        </body>
-        </html>
-        """
     }
 
     /// Generate a styled HTML bookmark card for a generic link.

@@ -457,7 +457,6 @@ final class SnapshotServer {
     private static func detectEmbedType(from urlString: String) -> String {
         guard let url = URL(string: urlString), let host = url.host?.lowercased() else { return "youtube" }
         if host.contains("youtube.com") || host.contains("youtu.be") { return "youtube" }
-        if host.contains("x.com") || host.contains("twitter.com") { return "twitter" }
         return "link"
     }
 
@@ -717,7 +716,7 @@ struct SnapshotPayload: Codable {
     let collectionId: String?   // optional — target collection, nil = unsorted
     let tagOptionIds: [String]? // optional — tag option UUIDs to assign
     let newTags: [String]?      // optional — tag names to create and assign
-    let embedType: String?      // "youtube" | "twitter" | "link", nil → inferred from URL
+    let embedType: String?      // "youtube" | "link", nil → inferred from URL
     let biblio: BiblioPayload?  // scholarly metadata from browser extension
 }
 

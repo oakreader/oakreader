@@ -288,6 +288,23 @@ extension CatalogDatabase {
             try db.create(index: "idx_quiz_review_log_card_id", on: "quiz_review_log", columns: ["card_id"])
         }
 
+        // MARK: v10 — Rename video → embed
+
+        migrator.registerMigration("v10-rename-video-to-embed") { db in
+            try db.execute(sql: "UPDATE attachments SET content_type = 'embed' WHERE content_type = 'video'")
+
+            // Update existing system collection for current users (INSERT OR IGNORE won't touch it)
+            let embedsId = SystemCollectionID.embeds.uuidString
+            try db.execute(
+                sql: """
+                    UPDATE collections SET name = 'Embeds', icon = 'link',
+                    filter_rules = '{"match":"all","conditions":[{"field":"content_type","op":"eq","value":"embed"}]}'
+                    WHERE id = ?
+                """,
+                arguments: [embedsId]
+            )
+        }
+
         return migrator
     }
 
