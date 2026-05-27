@@ -4,10 +4,11 @@ import Foundation
 /// Aligned with Zotero's `attachmentContentType` (MIME-based), simplified to an enum.
 enum ContentType: String, Codable {
     case pdf        // application/pdf
-    case html       // text/html (HTML documents, web embeds)
+    case html       // text/html (saved web page snapshots)
     case markdown   // text/markdown
     case audio      // audio/*
-    case embed      // embeds (YouTube, link bookmarks, etc.)
+    case video      // YouTube / on-demand video embeds
+    case link       // generic web link / bookmark (loaded on demand)
 
     var icon: String {
         switch self {
@@ -15,7 +16,8 @@ enum ContentType: String, Codable {
         case .html: return "globe"
         case .markdown: return "doc.text"
         case .audio: return "headphones"
-        case .embed: return "link"
+        case .video: return "play.rectangle.fill"
+        case .link: return "link"
         }
     }
 
@@ -25,7 +27,8 @@ enum ContentType: String, Codable {
         case .html: return "Web"
         case .markdown: return "Note"
         case .audio: return "Audio"
-        case .embed: return "Embed"
+        case .video: return "Video"
+        case .link: return "Bookmark"
         }
     }
 }

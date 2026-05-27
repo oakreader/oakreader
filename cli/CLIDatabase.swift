@@ -716,7 +716,8 @@ final class CLIDatabase {
         switch input.lowercased() {
         case "pdf": return "pdf"
         case "web", "websnapshot", "html": return "html"
-        case "video", "embed": return "embed"
+        case "video", "embed": return "video"
+        case "link", "bookmark": return "link"
         case "note", "markdown": return "markdown"
         default: return input
         }

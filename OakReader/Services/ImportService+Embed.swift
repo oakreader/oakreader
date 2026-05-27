@@ -23,6 +23,9 @@ extension ImportService {
             return existing
         }
 
+        // YouTube embeds → .video; generic bookmarks → .link.
+        let resolvedContentType: ContentType = input.embedType == "link" ? .link : .video
+
         let docId = UUID()
         let attId = UUID()
         let itemStorageKey = CatalogDatabase.generateStorageKey()
@@ -88,7 +91,7 @@ extension ImportService {
             itemId: docId.uuidString,
             storageKey: attStorageKey,
             fileName: "metadata.json",
-            contentType: ContentType.embed.rawValue,
+            contentType: resolvedContentType.rawValue,
             linkMode: LinkMode.linkedURL.rawValue,
             sourceURL: input.sourceURL.absoluteString,
             fileSize: 0,
@@ -123,7 +126,7 @@ extension ImportService {
             Task {
                 await service.indexItem(
                     itemId: docId.uuidString,
-                    contentType: ContentType.embed.rawValue,
+                    contentType: resolvedContentType.rawValue,
                     storageKey: itemStorageKey,
                     attStorageKey: attStorageKey,
                     fileName: "metadata.json"

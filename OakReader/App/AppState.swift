@@ -87,8 +87,6 @@ final class AppState {
     var semanticIndexService: SemanticIndexService?
     private var backgroundIndexTask: Task<Void, Never>?
 
-
-
     var openTabs: [DocumentTab] = []
     var activeTabID: UUID?
     var window: NSWindow?
@@ -101,7 +99,7 @@ final class AppState {
     var showBackupRestore: Bool = false
     var backupRestoreURL: URL?
     var isLibrarySidebarVisible: Bool = true
-    var libraryDetailTab: LibraryDetailTab? = nil
+    var libraryDetailTab: LibraryDetailTab?
     var importNotification: String?
     var quizReviewSession: QuizReviewSession?
 
@@ -282,7 +280,7 @@ final class AppState {
             let mdDoc = try MarkdownDocument(fileURL: url)
             let tab = DocumentTab(markdown: mdDoc, storageKey: nil)
             tab.viewModel.appState = self
-    
+
             tab.title = url.deletingPathExtension().lastPathComponent
             openTabs.append(tab)
             activeTabID = tab.id
@@ -325,12 +323,15 @@ final class AppState {
 
     /// Open a library item directly (already imported). Dispatches by document type.
     func openLibraryItem(_ item: LibraryItem) {
+        // Mark opened up front so re-opening an already-open item still refreshes
+        // last_opened_at (the per-type open funcs return early when a tab exists).
+        libraryStore.markOpened(item)
         switch item.contentType {
         case .html:
             openHTMLItem(item)
         case .pdf:
             openPDFItem(item)
-        case .embed:
+        case .video, .link:
             openMediaItem(item)
         case .markdown:
             openMarkdownItem(item)
@@ -349,7 +350,12 @@ final class AppState {
         }
 
         guard FileManager.default.fileExists(atPath: pdfURL.path) else {
-            Log.error(Log.open, "Cannot open PDF \"\(item.title)\": file not found at \(pdfURL.path) (primaryAttachment=\(item.primaryAttachment?.storageKey ?? "nil"), attachments=\(item.attachments.count))")
+            let primaryKey = item.primaryAttachment?.storageKey ?? "nil"
+            Log.error(
+                Log.open,
+                "Cannot open PDF \"\(item.title)\": file not found at \(pdfURL.path) "
+                    + "(primaryAttachment=\(primaryKey), attachments=\(item.attachments.count))"
+            )
             let alert = NSAlert()
             alert.messageText = "Cannot Open PDF"
             alert.informativeText = "The file \"\(item.title)\" could not be found in managed storage."
@@ -370,7 +376,6 @@ final class AppState {
         }
 
         NSDocumentController.shared.noteNewRecentDocumentURL(pdfURL)
-        libraryStore.markOpened(item)
 
         let tab = DocumentTab(document: doc, storageKey: item.storageKey)
         tab.viewModel.database = libraryStore.database
@@ -408,7 +413,6 @@ final class AppState {
 
         do {
             let snapshot = try HTMLDocument(htmlURL: htmlURL, sourceURL: item.sourceURL)
-            libraryStore.markOpened(item)
 
             let tab = DocumentTab(html: snapshot, storageKey: item.storageKey)
             tab.viewModel.database = libraryStore.database
@@ -451,7 +455,6 @@ final class AppState {
 
         do {
             let media = try MediaDocument(storageDirectory: attDir)
-            libraryStore.markOpened(item)
 
             let tab = DocumentTab(media: media, storageKey: item.storageKey)
             tab.viewModel.database = libraryStore.database
@@ -495,7 +498,6 @@ final class AppState {
 
         do {
             let mdDoc = try MarkdownDocument(fileURL: mdURL)
-            libraryStore.markOpened(item)
 
             let tab = DocumentTab(markdown: mdDoc, storageKey: item.storageKey)
             tab.viewModel.database = libraryStore.database
@@ -504,7 +506,7 @@ final class AppState {
             tab.viewModel.appState = self
             tab.viewModel.itemStorageKey = item.storageKey
             tab.viewModel.attachmentId = item.primaryAttachment?.id.uuidString
-    
+
             tab.title = item.title
             openTabs.append(tab)
             activeTabID = tab.id

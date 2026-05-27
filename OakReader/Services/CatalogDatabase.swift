@@ -38,9 +38,10 @@ final class CatalogDatabase {
                 (SystemCollectionID.pdfs.uuidString, "PDFs", "doc.fill", 2,
                  #"{"match":"all","conditions":[{"field":"content_type","op":"eq","value":"pdf"}]}"#),
                 (SystemCollectionID.html.uuidString, "Web", "globe", 3,
-                 #"{"match":"all","conditions":[{"field":"content_type","op":"eq","value":"html"}]}"#),
-                (SystemCollectionID.embeds.uuidString, "Embeds", "link", 4,
-                 #"{"match":"all","conditions":[{"field":"content_type","op":"eq","value":"embed"}]}"#),
+                 #"{"match":"any","conditions":[{"field":"content_type","op":"eq","value":"html"},"#
+                     + #"{"field":"content_type","op":"eq","value":"link"}]}"#),
+                (SystemCollectionID.embeds.uuidString, "Videos", "play.rectangle", 4,
+                 #"{"match":"all","conditions":[{"field":"content_type","op":"eq","value":"video"}]}"#),
                 (SystemCollectionID.duplicates.uuidString, "Duplicates", "square.on.square", 5, nil),
                 (SystemCollectionID.quizCards.uuidString, "Quiz Cards", "rectangle.on.rectangle.angled", 6, nil),
                 (SystemCollectionID.bin.uuidString, "Bin", "trash", 7, nil),
@@ -57,6 +58,7 @@ final class CatalogDatabase {
             }
 
             // ── System Properties ──
+            // swiftlint:disable:next large_tuple
             let systemProperties: [(id: String, name: String, type: String, icon: String, position: Int)] = [
                 (SystemPropertyID.tags.uuidString, "Tags", "multi_select", "tag", 0),
                 (SystemPropertyID.status.uuidString, "Status", "single_select", "circle.dotted", 1),
@@ -73,6 +75,7 @@ final class CatalogDatabase {
             }
 
             // ── Status Options ──
+            // swiftlint:disable:next large_tuple
             let statusOptions: [(id: String, name: String, color: String, position: Int)] = [
                 (SystemStatusOptionID.toRead.uuidString, "To Read", "2EA8E5", 0),
                 (SystemStatusOptionID.reading.uuidString, "Reading", "FF8C19", 1),

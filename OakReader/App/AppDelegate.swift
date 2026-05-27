@@ -17,7 +17,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var mainWindow: NSWindow?
     private var settingsWindow: NSWindow?
     private var settingsCloseObserver: NSObjectProtocol?
-    private var snapshotServer: SnapshotServer?
+    private var oakServer: OakServer?
     private var appearanceObserver: NSObjectProtocol?
     private let externalLibraryChangeNotificationName = Notification.Name("com.oakreader.library.didChange")
     private let externalLibraryChangeSource = "oak-cli"
@@ -47,9 +47,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         installExternalLibraryChangeObserver()
 
-        // Start the snapshot server for Chrome extension
-        snapshotServer = SnapshotServer(importService: appState.importService)
-        snapshotServer?.start()
+        // Start the local server that bridges the browser extension
+        oakServer = OakServer(importService: appState.importService)
+        oakServer?.start()
 
         createMainWindow()
     }
@@ -60,7 +60,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             name: externalLibraryChangeNotificationName,
             object: nil
         )
-        snapshotServer?.stop()
+        oakServer?.stop()
     }
 
     func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool {
