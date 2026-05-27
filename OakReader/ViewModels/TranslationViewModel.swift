@@ -97,7 +97,7 @@ class TranslationViewModel {
                         translatedText += delta
                     case .thinking:
                         break
-                    case .toolUse:
+                    case .toolUse, .toolInputDelta:
                         break
                     case .finished:
                         break
@@ -277,7 +277,7 @@ class TranslationViewModel {
                     switch chunk {
                     case .delta(let delta):
                         wordExplanation += delta
-                    case .thinking, .toolUse, .finished:
+                    case .thinking, .toolUse, .toolInputDelta, .finished:
                         break
                     case .error(let msg):
                         wordExplanation += "\n\n⚠️ \(msg)"

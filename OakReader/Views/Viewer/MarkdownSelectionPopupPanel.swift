@@ -320,7 +320,7 @@ class MarkdownSelectionPopupPanel: NSPanel, AppResignDismissable {
                         result += delta
                     case .thinking:
                         break
-                    case .toolUse:
+                    case .toolUse, .toolInputDelta:
                         break
                     case .finished:
                         break

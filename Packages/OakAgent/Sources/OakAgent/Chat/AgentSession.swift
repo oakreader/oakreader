@@ -115,6 +115,8 @@ public actor AgentSession {
                                 continuation.yield(.thinkingDelta(text))
                             case .toolUse(let toolCall):
                                 toolCalls.append(toolCall)
+                            case .toolInputDelta(let id, let name, let partialJSON):
+                                continuation.yield(.toolInputDelta(id: id, name: name, partialJSON: partialJSON))
                             case .finished(let reason):
                                 _ = reason
                             case .error(let msg):

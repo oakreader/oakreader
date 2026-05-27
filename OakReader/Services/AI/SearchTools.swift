@@ -45,7 +45,7 @@ struct AcademicSearchTool: AgentTool, Sendable {
         ]
     }
 
-    func execute(input: [String: String], context: ToolExecutionContext) async throws -> ToolOutput {
+    func execute(input: ToolInput, context: ToolExecutionContext) async throws -> ToolOutput {
         guard let query = input["query"], !query.isEmpty else {
             return .error("Missing required parameter: query")
         }

@@ -25,7 +25,7 @@ public struct BashTool: AgentTool {
 
     public init() {}
 
-    public func execute(input: [String: String], context: ToolExecutionContext) async throws -> ToolOutput {
+    public func execute(input: ToolInput, context: ToolExecutionContext) async throws -> ToolOutput {
         guard let command = input["command"] else {
             return .error("Missing required parameter: command")
         }

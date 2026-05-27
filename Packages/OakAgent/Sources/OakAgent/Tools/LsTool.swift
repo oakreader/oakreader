@@ -20,7 +20,7 @@ public struct LsTool: AgentTool {
 
     public init() {}
 
-    public func execute(input: [String: String], context: ToolExecutionContext) async throws -> ToolOutput {
+    public func execute(input: ToolInput, context: ToolExecutionContext) async throws -> ToolOutput {
         let rawPath = input["path"] ?? context.workingDirectory.path
         let resolvedPath = PathSandbox.resolve(path: rawPath, workingDirectory: context.workingDirectory)
 

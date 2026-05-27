@@ -122,7 +122,7 @@ struct ReadDocumentTool: AgentTool, Sendable {
         ]
     }
 
-    func execute(input: [String: String], context: ToolExecutionContext) async throws -> ToolOutput {
+    func execute(input: ToolInput, context: ToolExecutionContext) async throws -> ToolOutput {
         let url = URL(fileURLWithPath: filePath)
 
         switch documentType {
@@ -130,7 +130,7 @@ struct ReadDocumentTool: AgentTool, Sendable {
             return readPDF(url: url, pagesParam: input["pages"])
         case .markdown:
             return readTextFile(url: url)
-        case .embed:
+        case .video, .link:
             let mdURL = url.deletingLastPathComponent().appendingPathComponent("content.md")
             if let md = try? String(contentsOf: mdURL, encoding: .utf8), !md.isEmpty {
                 return .success(String(md.prefix(50_000)))
@@ -232,7 +232,7 @@ struct SearchDocumentTool: AgentTool, Sendable {
         ]
     }
 
-    func execute(input: [String: String], context: ToolExecutionContext) async throws -> ToolOutput {
+    func execute(input: ToolInput, context: ToolExecutionContext) async throws -> ToolOutput {
         guard let query = input["query"], !query.isEmpty else {
             return .error("Missing required parameter: query")
         }
@@ -245,7 +245,7 @@ struct SearchDocumentTool: AgentTool, Sendable {
             return searchPDF(url: url, query: query, maxResults: maxResults)
         case .markdown:
             return searchTextFile(url: url, query: query, maxResults: maxResults)
-        case .embed:
+        case .video, .link:
             let mdURL = url.deletingLastPathComponent().appendingPathComponent("content.md")
             if let markdown = try? String(contentsOf: mdURL, encoding: .utf8), !markdown.isEmpty {
                 return searchPlainText(markdown, query: query, maxResults: maxResults)

@@ -144,7 +144,7 @@ public struct OpenAIProvider: LLMProviderService {
                             textContent += text
                         case .toolUse(let call):
                             let inputJSON: String
-                            if let data = try? JSONSerialization.data(withJSONObject: call.input),
+                            if let data = try? JSONSerialization.data(withJSONObject: call.input.jsonObject),
                                let str = String(data: data, encoding: .utf8) {
                                 inputJSON = str
                             } else {
@@ -231,56 +231,58 @@ public struct OpenAIProvider: LLMProviderService {
 
                 if let toolCalls = delta["tool_calls"] as? [[String: Any]] {
                     for tc in toolCalls {
-                        guard let index = tc["index"] as? Int else { continue }
-
-                        if let id = tc["id"] as? String {
-                            let funcInfo = tc["function"] as? [String: Any]
-                            toolCallAccumulators[index] = (
-                                id: id,
-                                name: funcInfo?["name"] as? String ?? "",
-                                arguments: funcInfo?["arguments"] as? String ?? ""
-                            )
-                        } else if let funcInfo = tc["function"] as? [String: Any],
-                                  let argChunk = funcInfo["arguments"] as? String
-                        {
+                        // Tolerate OpenAI-compatible provider variations: some omit
+                        // `index` on argument deltas, some repeat `id`/`name` on
+                        // every chunk. Default index to 0, create the accumulator
+                        // once, fill id/name when they arrive, and ALWAYS append
+                        // argument fragments (never reset what we've gathered).
+                        let index = tc["index"] as? Int ?? 0
+                        let funcInfo = tc["function"] as? [String: Any]
+                        if toolCallAccumulators[index] == nil {
+                            toolCallAccumulators[index] = (id: "", name: "", arguments: "")
+                        }
+                        if let id = tc["id"] as? String, !id.isEmpty {
+                            toolCallAccumulators[index]?.id = id
+                        }
+                        if let name = funcInfo?["name"] as? String, !name.isEmpty {
+                            toolCallAccumulators[index]?.name = name
+                        }
+                        if let argChunk = funcInfo?["arguments"] as? String {
                             toolCallAccumulators[index]?.arguments += argChunk
+                            if let acc = toolCallAccumulators[index] {
+                                continuation.yield(.toolInputDelta(
+                                    id: acc.id, name: acc.name, partialJSON: acc.arguments
+                                ))
+                            }
                         }
                     }
                 }
             }
 
             if let finishReason = choice["finish_reason"] as? String {
-                if finishReason == "tool_calls" {
+                // Yield accumulated tool calls on ANY finish — some providers end
+                // a tool-call turn with finish_reason "stop" instead of "tool_calls".
+                if !toolCallAccumulators.isEmpty {
                     for index in toolCallAccumulators.keys.sorted() {
-                        if let acc = toolCallAccumulators[index] {
+                        if let acc = toolCallAccumulators[index], !acc.name.isEmpty {
                             let input = parseToolInput(acc.arguments)
-                            let toolCall = ToolCall(id: acc.id, name: acc.name, input: input)
+                            let id = acc.id.isEmpty ? UUID().uuidString : acc.id
+                            let toolCall = ToolCall(id: id, name: acc.name, input: input)
                             continuation.yield(.toolUse(toolCall))
                         }
                     }
                     continuation.yield(.finished(stopReason: "tool_calls"))
-                    continuation.finish()
-                    return
                 } else {
                     continuation.yield(.finished(stopReason: finishReason))
-                    continuation.finish()
-                    return
                 }
+                continuation.finish()
+                return
             }
         }
         continuation.finish()
     }
 
-    private func parseToolInput(_ jsonString: String) -> [String: String] {
-        guard !jsonString.isEmpty,
-              let data = jsonString.data(using: .utf8),
-              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else { return [:] }
-
-        var result: [String: String] = [:]
-        for (key, value) in obj {
-            result[key] = "\(value)"
-        }
-        return result
+    private func parseToolInput(_ jsonString: String) -> ToolInput {
+        ToolInput(json: jsonString)
     }
 }

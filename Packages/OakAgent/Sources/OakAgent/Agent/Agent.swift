@@ -84,6 +84,8 @@ public actor Agent {
                             break // Agent does not use thinking
                         case .toolUse(let toolCall):
                             toolCalls.append(toolCall)
+                        case .toolInputDelta:
+                            break // Agent path does not surface streaming tool input
                         case .finished:
                             break
                         case .error(let msg):

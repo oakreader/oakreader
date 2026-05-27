@@ -37,7 +37,7 @@ struct OakCLITool: AgentTool, Sendable {
     /// Maximum output length returned to the agent to avoid context bloat.
     private static let maxOutputLength = 8_000
 
-    func execute(input: [String: String], context: ToolExecutionContext) async throws -> ToolOutput {
+    func execute(input: ToolInput, context: ToolExecutionContext) async throws -> ToolOutput {
         guard let command = input["command"], !command.isEmpty else {
             return .error("Missing required parameter: command")
         }

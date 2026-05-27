@@ -1,4 +1,5 @@
 import Foundation
+import OakAI
 
 // MARK: - Tool Use Status
 
@@ -14,12 +15,12 @@ public enum ToolUseStatus: String, Codable, Sendable {
 public struct ToolUseRecord: Identifiable, Codable, Sendable {
     public let id: String
     public let name: String
-    public let input: [String: String]
+    public let input: ToolInput
     public var result: String?
     public var isError: Bool
     public var status: ToolUseStatus
 
-    public init(id: String, name: String, input: [String: String], result: String? = nil, isError: Bool = false, status: ToolUseStatus = .executing) {
+    public init(id: String, name: String, input: ToolInput, result: String? = nil, isError: Bool = false, status: ToolUseStatus = .executing) {
         self.id = id
         self.name = name
         self.input = input
@@ -42,7 +43,7 @@ public struct ToolUseRecord: Identifiable, Codable, Sendable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(String.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)
-        input = try container.decode([String: String].self, forKey: .input)
+        input = try container.decode(ToolInput.self, forKey: .input)
         result = try container.decodeIfPresent(String.self, forKey: .result)
         isError = try container.decodeIfPresent(Bool.self, forKey: .isError) ?? false
         status = try container.decodeIfPresent(ToolUseStatus.self, forKey: .status) ?? (result != nil ? .completed : .executing)
