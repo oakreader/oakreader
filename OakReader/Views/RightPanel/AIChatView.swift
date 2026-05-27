@@ -47,6 +47,20 @@ struct AIChatView: View {
         }
     }
 
+    /// True while the agent is working but no per-turn animation (thinking
+    /// stroke, tool-call shimmer, or streaming text cursor) is already on screen.
+    /// Drives the universal footer spinner so the user always sees activity.
+    private var showWorkingIndicator: Bool {
+        guard chatVM.isStreaming else { return false }
+        guard let last = chatVM.turns.last else { return true }
+        // Agent just received the user message and hasn't produced anything yet.
+        if last.role != .assistant { return true }
+        let hasExecutingTool = last.toolUses.contains { $0.status == .executing }
+        let isStreamingText = last.isStreaming && !last.content.isEmpty
+        let isThinking = last.isStreaming && last.content.isEmpty && (last.thinking?.isEmpty == false)
+        return !(hasExecutingTool || isStreamingText || isThinking)
+    }
+
     // MARK: - Chat Content
 
     private var chatContent: some View {
@@ -197,11 +211,25 @@ struct AIChatView: View {
                                 )
                             )
                     }
+                    // Universal "agent is working" indicator — the same 3×3 grid
+                    // animation used for streaming. Covers the phases where no
+                    // per-turn animation is visible: the wait for the next LLM
+                    // response between tool iterations, and the gap before the
+                    // first chunk arrives.
+                    if showWorkingIndicator {
+                        StreamingCursor()
+                            .padding(.leading, 4)
+                            .padding(.vertical, 4)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .transition(.opacity)
+                    }
+
                     // Invisible anchor at the very bottom — more reliable
                     // than scrolling to the last turn whose height is still growing.
                     Color.clear.frame(height: 1).id("bottom")
                 }
                 .padding(OakStyle.Spacing.sm)
+                .animation(.easeInOut(duration: 0.2), value: showWorkingIndicator)
                 .animation(.spring(duration: 0.35, bounce: 0.15), value: chatVM.turns.count)
                 .background(
                     GeometryReader { inner in
@@ -268,8 +296,18 @@ struct AIChatView: View {
                 scrollTask = Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(32))
                     guard !Task.isCancelled else { return }
-                    withAnimation(.smooth(duration: 0.15)) {
+                    // Instant follow during streaming. An *animated* scrollTo
+                    // restarts every tick as the content grows, so overlapping
+                    // 0.15s animations never settle and the scroll visibly
+                    // stutters — worse now that content commits in larger 15fps
+                    // steps. Height grows in small frequent steps, so instant
+                    // tracking reads as smooth continuous scroll.
+                    if chatVM.isStreaming {
                         proxy.scrollTo("bottom")
+                    } else {
+                        withAnimation(.smooth(duration: 0.15)) {
+                            proxy.scrollTo("bottom")
+                        }
                     }
                 }
             }

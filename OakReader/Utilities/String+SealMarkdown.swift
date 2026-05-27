@@ -7,7 +7,13 @@ extension String {
     /// closing markers, the parser renders consistently on every frame.
     ///
     /// Pipeline order matters — process from most specific to least specific:
-    /// code fences → inline code → bold+italic → bold → italic → strikethrough → math
+    /// code fences → inline code → bold+italic → bold → italic → strikethrough
+    ///
+    /// Note: math (`$`/`$$`) is intentionally NOT sealed. Renderers that show
+    /// math (chat) keep the `.math` extension on while streaming and rely on
+    /// Textual ignoring an unclosed delimiter — so an in-progress formula stays
+    /// literal until it closes, instead of being force-closed into a malformed
+    /// equation (which could wedge Textual's attachment layout).
     func sealIncompleteMarkdown() -> String {
         guard !isEmpty else { return self }
         var s = self
@@ -52,23 +58,7 @@ extension String {
             s += "~~"
         }
 
-        // 7. Math $$ — display math requires $$ on its own line.
-        //    If the unclosed $$ has a newline after it (block math), close
-        //    with \n$$ so the parser sees a proper display block.
-        if s.countNonOverlapping("$$") % 2 == 1 {
-            // Find the last (unclosed) $$
-            if let lastDollar = s.range(of: "$$", options: .backwards) {
-                let afterDollar = s[lastDollar.upperBound...]
-                if afterDollar.contains("\n") {
-                    // Block math — close on a new line
-                    if !s.hasSuffix("\n") { s += "\n" }
-                    s += "$$"
-                } else {
-                    // Inline-style $$ — close on same line
-                    s += "$$"
-                }
-            }
-        }
+        // Math ($/$$) is intentionally left untouched — see the doc comment.
 
         return s
     }

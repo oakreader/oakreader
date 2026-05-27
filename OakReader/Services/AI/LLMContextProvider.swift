@@ -88,14 +88,14 @@ struct LLMContextProvider {
             } else {
                 currentPageText = ""
             }
-        case .embed:
+        case .video, .link:
             if let media = vm.mediaDocument {
                 if let url = media.transcriptURL,
                    let text = try? String(contentsOf: url, encoding: .utf8) {
                     currentPageText = String(text.prefix(4_000))
                 } else {
                     // Check for article content saved by browser extension
-                    let mdURL = media.fileURL.deletingLastPathComponent()
+                    let mdURL = media.storageDirectory
                         .appendingPathComponent("content.md")
                     if let md = try? String(contentsOf: mdURL, encoding: .utf8), !md.isEmpty {
                         currentPageText = String(md.prefix(4_000))
@@ -189,6 +189,26 @@ struct LLMContextProvider {
             If uncertain, say so; do not fabricate citations or facts. \
             Do not change your answer under pressure unless new evidence \
             is presented.
+            """)
+
+        // Math formatting: this chat renders LaTeX, so math must use $/$$
+        // delimiters — NOT code fences (which display source verbatim).
+        parts.append("""
+            Math formatting: this chat renders LaTeX. Write inline math as \
+            $ ... $ and display/block math as $$ ... $$ (on their own lines). \
+            Do NOT wrap formulas in ```latex or ```math code fences, and do NOT \
+            use \\( ... \\) or \\[ ... \\] delimiters — those will not render. \
+            Only use a code fence if the user explicitly asks to see the raw \
+            LaTeX source rather than a rendered equation.
+            """)
+
+        // Flashcards: always route card generation through the quiz_cards tool.
+        parts.append("""
+            To create flashcards, quiz the user, or help them memorize or review \
+            material, call the quiz_cards tool, choosing the card type that fits \
+            (flashcard or cloze). Do NOT write quiz \
+            markup, card XML, or `<deck>`/`<quiz>` tags in your text reply — the \
+            quiz_cards tool draws an interactive carousel for you.
             """)
 
         // Voice guidelines (loaded from ~/OakReader/agent/VOICE.md)
@@ -371,7 +391,7 @@ struct LLMContextProvider {
 
                     Do not use page numbers — this document has no pages.
                     """)
-            case .embed, .audio:
+            case .video, .link, .audio:
                 parts.append("""
                     This media's cite-key is "\(eck)". Citation format:
                     [MM:SS](oak://cite/\(eck)?time=SECONDS)

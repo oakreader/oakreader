@@ -1,28 +1,36 @@
 import SwiftUI
 
-/// Interactive cloze deletion quiz. Blanks are revealed on tap.
+/// Interactive cloze-deletion card. Blanks render as accent pills; tapping one
+/// reveals the answer with a soft pop. Chromeless — sits on the deck surface.
 struct ClozeQuizView: View {
     let content: QuizContent.ClozeContent
     @State private var revealed: Set<String> = []
 
+    private let accent = QuizStyle.accent(for: .cloze)
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             clozeText
-            if let hint = content.hint, revealed.count < clozeIds.count {
-                Text("Hint: \(hint)")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.tertiary)
+
+            if let hint = content.hint, !hint.isEmpty, revealed.count < clozeIds.count {
+                HStack(alignment: .firstTextBaseline, spacing: 5) {
+                    Image(systemName: "lightbulb")
+                        .font(.system(size: 10))
+                    Text(hint)
+                        .font(QuizStyle.hint)
+                }
+                .foregroundStyle(.tertiary)
+                .transition(.opacity)
             }
         }
     }
 
     @ViewBuilder
     private var clozeText: some View {
-        // Parse cloze markers and render as inline text with tappable blanks
         let segments = parseClozeSegments(content.text)
-        FlowLayout(spacing: 2) {
-            ForEach(0..<segments.count, id: \.self) { idx in
-                clozeSegmentView(segments[idx])
+        FlowLayout(spacing: 3) {
+            ForEach(Array(segments.enumerated()), id: \.offset) { _, segment in
+                clozeSegmentView(segment)
             }
         }
     }
@@ -32,21 +40,33 @@ struct ClozeQuizView: View {
         switch segment {
         case .text(let str):
             Text(str)
-                .font(.system(size: 13))
+                .font(.system(size: 15))
+
         case .cloze(let id, let answer):
             if revealed.contains(id) {
                 Text(answer)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.green)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(accent)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 1)
+                    .background(Capsule().fill(accent.opacity(0.14)))
+                    .transition(.scale(scale: 0.6).combined(with: .opacity))
             } else {
                 Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        _ = revealed.insert(id)
-                    }
+                    withAnimation(QuizStyle.pop) { _ = revealed.insert(id) }
                 } label: {
-                    Text("[      ]")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Color.accentColor)
+                    Text("？？？")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(accent)
+                        .frame(minWidth: 46)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 1)
+                        .background(
+                            Capsule()
+                                .strokeBorder(accent.opacity(0.5), style: StrokeStyle(lineWidth: 1, dash: [3, 2]))
+                                .background(Capsule().fill(accent.opacity(0.06)))
+                        )
+                        .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
             }
@@ -85,7 +105,6 @@ struct ClozeQuizView: View {
 
         regex.enumerateMatches(in: text, range: fullRange) { match, _, _ in
             guard let match else { return }
-            // Text before cloze
             if match.range.location > cursor {
                 let before = ns.substring(with: NSRange(location: cursor, length: match.range.location - cursor))
                 segments.append(.text(before))
@@ -102,4 +121,3 @@ struct ClozeQuizView: View {
         return segments
     }
 }
-

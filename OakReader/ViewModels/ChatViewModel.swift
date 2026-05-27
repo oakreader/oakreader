@@ -249,6 +249,9 @@ class ChatViewModel {
         // 3b. Oak CLI (library search, read items, list collections/tags, manage library)
         tools.append(OakCLITool())
 
+        // 3b-ii. Flashcards — render front/back cards inline as a carousel
+        tools.append(QuizCardsTool())
+
         // 3c. Memory tools (always available for personalization)
         tools.append(UpdateMemoryTool())
         tools.append(UpdateUserProfileTool())
@@ -353,22 +356,74 @@ class ChatViewModel {
                             turns.append(newTurn)
                         }
 
+                    case .toolInputDelta(let id, let name, let partialJSON):
+                        // Stream the in-progress tool input so quiz cards render as
+                        // they're generated. Only materialize a provisional record
+                        // for quiz_cards (the only special inline renderer); the raw
+                        // partial JSON is parsed leniently by the card view.
+                        if name == "quiz_cards" {
+                            let targetIdx: Int
+                            if let aid = assistantTurnId,
+                               let idx = turns.lastIndex(where: { $0.id == aid }) {
+                                targetIdx = idx
+                            } else {
+                                let newTurn = Turn(role: .assistant, content: "", isStreaming: true)
+                                assistantTurnId = newTurn.id
+                                turns.append(newTurn)
+                                targetIdx = turns.count - 1
+                            }
+                            let provisional = ToolUseRecord(
+                                id: id, name: name,
+                                input: ["_partial": .string(partialJSON)],
+                                status: .executing
+                            )
+                            if let tIdx = turns[targetIdx].toolUses.firstIndex(where: { $0.id == id }) {
+                                turns[targetIdx].toolUses[tIdx] = provisional
+                            } else {
+                                turns[targetIdx].toolUses.append(provisional)
+                            }
+                        }
+
                     case .toolUseStarted(let record):
+                        // A tool-only iteration emits no text/thinking delta before
+                        // running tools, so `assistantTurnId` may still be nil here.
+                        // Create the turn now so the executing record renders (and the
+                        // tool-call shimmer animates) while the tool runs.
+                        let idx: Int
                         if let id = assistantTurnId,
-                           let idx = turns.lastIndex(where: { $0.id == id })
+                           let existing = turns.lastIndex(where: { $0.id == id })
                         {
+                            idx = existing
+                        } else {
+                            let newTurn = Turn(role: .assistant, content: "", isStreaming: true)
+                            assistantTurnId = newTurn.id
+                            turns.append(newTurn)
+                            idx = turns.count - 1
+                        }
+                        // Upsert: a provisional record may already exist from
+                        // streaming tool-input deltas.
+                        if let toolIdx = turns[idx].toolUses.firstIndex(where: { $0.id == record.id }) {
+                            turns[idx].toolUses[toolIdx] = record
+                        } else {
                             turns[idx].toolUses.append(record)
                         }
 
                     case .toolUsePending(let record):
+                        let idx: Int
                         if let id = assistantTurnId,
-                           let idx = turns.lastIndex(where: { $0.id == id })
+                           let existing = turns.lastIndex(where: { $0.id == id })
                         {
-                            if let toolIdx = turns[idx].toolUses.firstIndex(where: { $0.id == record.id }) {
-                                turns[idx].toolUses[toolIdx] = record
-                            } else {
-                                turns[idx].toolUses.append(record)
-                            }
+                            idx = existing
+                        } else {
+                            let newTurn = Turn(role: .assistant, content: "", isStreaming: true)
+                            assistantTurnId = newTurn.id
+                            turns.append(newTurn)
+                            idx = turns.count - 1
+                        }
+                        if let toolIdx = turns[idx].toolUses.firstIndex(where: { $0.id == record.id }) {
+                            turns[idx].toolUses[toolIdx] = record
+                        } else {
+                            turns[idx].toolUses.append(record)
                         }
 
                     case .toolUseCompleted(let record):
@@ -527,7 +582,7 @@ class ChatViewModel {
                 )
             }
 
-        case .embed, .audio:
+        case .video, .link, .audio:
             if let time = anchor.time {
                 vm.media.requestSeek(seconds: time)
             } else if let text = anchor.text {
