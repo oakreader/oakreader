@@ -73,6 +73,8 @@ class ChatViewModel {
     var showSettings: Bool = false
     var errorMessage: String?
     var pendingToolConfirmation: PendingConfirmation?
+    /// Live status from the research subagent while it runs (nil when idle).
+    var researchActivity: String?
 
     /// Set by external actions (e.g. context menu "Add to Chat") and consumed by AIChatView.
     var pendingLibraryRef: LibraryItem?
@@ -131,6 +133,20 @@ class ChatViewModel {
             model: modelId,
             thinkingBudget: thinkingEnabled ? prefs.thinkingBudget : nil,
             thinkingEffort: thinkingEnabled ? effort : nil
+        )
+    }
+
+    /// Config for the research subagent's loop: same provider, but a cheaper/faster
+    /// model when `researchModel` is set, and no extended thinking (it's tool-driven).
+    var researchConfig: ProviderConfig {
+        let prefs = Preferences.shared
+        let researchModel = prefs.researchModel
+        let base = config
+        return ProviderConfig(
+            providerId: base.providerId,
+            model: researchModel.isEmpty ? base.model : researchModel,
+            thinkingBudget: nil,
+            thinkingEffort: nil
         )
     }
 
@@ -238,9 +254,16 @@ class ChatViewModel {
 
         // 2. Full-text content search (FTS5 over the indexed library), plus a
         //    research subagent for deep multi-document questions (its own loop).
-        if let semanticService = appState?.semanticIndexService {
-            tools.append(SemanticSearchTool(service: semanticService))
-            tools.append(ResearchTool(searchService: semanticService, config: currentConfig))
+        if let ftsService = appState?.ftsIndexService {
+            tools.append(FTSSearchTool(service: ftsService))
+            let activitySink: @Sendable (String) -> Void = { [weak self] status in
+                Task { @MainActor in self?.researchActivity = status }
+            }
+            tools.append(ResearchTool(
+                searchService: ftsService,
+                config: researchConfig,
+                onActivity: activitySink
+            ))
         }
 
         // 3. Web search (always)
@@ -481,6 +504,7 @@ class ChatViewModel {
             }
 
             isStreaming = false
+            researchActivity = nil
         }
     }
 
@@ -596,6 +620,7 @@ class ChatViewModel {
         streamTask?.cancel()
         streamTask = nil
         isStreaming = false
+        researchActivity = nil
 
         // Finalize any streaming turn
         if let idx = turns.lastIndex(where: { $0.isStreaming }) {

@@ -147,8 +147,8 @@ final class CommandPaletteController: NSObject, CommandPalettePanelDelegate {
         case .appearanceMode(let mode):
             Preferences.shared.appearanceMode = mode
 
-        case .rebuildSemanticIndex:
-            NotificationCenter.default.post(name: .semanticIndexRebuildRequested, object: nil)
+        case .rebuildSearchIndex:
+            NotificationCenter.default.post(name: .searchIndexRebuildRequested, object: nil)
         }
     }
 }

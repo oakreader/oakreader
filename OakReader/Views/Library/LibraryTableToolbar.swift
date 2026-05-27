@@ -28,26 +28,26 @@ struct LibraryTableToolbar: View {
             HStack(spacing: 8) {
                 // Search field
                 HStack(spacing: 6) {
-                    if store.semanticIndexService != nil {
+                    if store.ftsIndexService != nil {
                         Button {
-                            store.isSemanticSearchActive.toggle()
-                            if store.isSemanticSearchActive && !searchText.isEmpty {
-                                store.performSemanticSearch()
-                            } else if !store.isSemanticSearchActive {
-                                store.clearSemanticSearch()
+                            store.isFullTextSearchActive.toggle()
+                            if store.isFullTextSearchActive && !searchText.isEmpty {
+                                store.performFullTextSearch()
+                            } else if !store.isFullTextSearchActive {
+                                store.clearFullTextSearch()
                             }
                         } label: {
-                            Image(systemName: store.isSemanticSearchActive
+                            Image(systemName: store.isFullTextSearchActive
                                   ? "text.magnifyingglass"
                                   : "magnifyingglass")
                                 .font(OakStyle.Font.styledCaption)
-                                .foregroundStyle(store.isSemanticSearchActive
+                                .foregroundStyle(store.isFullTextSearchActive
                                     ? Color.accentColor
                                     : Color.primary.opacity(0.55))
                         }
                         .buttonStyle(.plain)
-                        .help(store.isSemanticSearchActive ? "Switch to title search" : "Switch to full-text content search")
-                        .accessibilityLabel(store.isSemanticSearchActive ? "Full-text search active" : "Title search active")
+                        .help(store.isFullTextSearchActive ? "Switch to title search" : "Switch to full-text content search")
+                        .accessibilityLabel(store.isFullTextSearchActive ? "Full-text search active" : "Title search active")
                     } else {
                         Image(systemName: "magnifyingglass")
                             .font(OakStyle.Font.styledCaption)
@@ -55,7 +55,7 @@ struct LibraryTableToolbar: View {
                             .accessibilityHidden(true)
                     }
                     TextField(
-                        store.isSemanticSearchActive ? "Search by meaning..." : "Search Library",
+                        store.isFullTextSearchActive ? "Search by meaning..." : "Search Library",
                         text: $searchText
                     )
                         .font(.system(size: 14))
@@ -63,11 +63,11 @@ struct LibraryTableToolbar: View {
                         .accessibilityLabel("Search library")
                         .onChange(of: searchText) { _, newValue in
                             store.searchText = newValue
-                            if store.isSemanticSearchActive {
-                                store.performSemanticSearch()
+                            if store.isFullTextSearchActive {
+                                store.performFullTextSearch()
                             }
                         }
-                    if store.isSemanticSearching {
+                    if store.isFullTextSearching {
                         ProgressView()
                             .controlSize(.small)
                             .scaleEffect(0.7)

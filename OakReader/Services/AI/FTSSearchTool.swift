@@ -6,7 +6,7 @@ import OakAgent
 /// Use to find documents whose *content* mentions specific terms (not just titles).
 /// The chat agent drives retrieval: issue a query, read the results, and refine the
 /// query or call again as needed.
-struct SemanticSearchTool: AgentTool, Sendable {
+struct FTSSearchTool: AgentTool, Sendable {
     let name = "search_content"
     let description = """
         Full-text search across the content of the user's library documents (BM25 \
@@ -19,7 +19,21 @@ struct SemanticSearchTool: AgentTool, Sendable {
         again. Optionally pass content_type to restrict the search to one kind of \
         document. For exact lookups by author, title, or DOI, use oak search instead.
         """
-    let service: SemanticIndexService
+    let service: FTSIndexService
+
+    /// One retrieved passage, in structured form. Used by the research subagent to
+    /// build a deterministic source list from what was actually retrieved.
+    struct CitedPassage: Sendable, Hashable {
+        let citeKey: String?
+        let title: String
+        let author: String?
+        let page: Int?      // 1-based, nil for abstract/whole-doc chunks
+        let snippet: String
+    }
+
+    /// Optional sink invoked with the structured results of each successful search.
+    /// `nil` for the normal chat agent; set by `ResearchTool` to log retrievals.
+    var onResults: (@Sendable ([CitedPassage]) -> Void)?
 
     var inputSchema: [String: Any] {
         [
@@ -114,13 +128,27 @@ struct SemanticSearchTool: AgentTool, Sendable {
             return .error("Failed to fetch item metadata: \(error.localizedDescription)")
         }
 
+        // Report structured passages to any observer (e.g. the research subagent).
+        if let onResults {
+            onResults(results.map { r in
+                let meta = metadata[r.itemId]
+                return CitedPassage(
+                    citeKey: meta?.citeKey,
+                    title: meta?.title ?? "Unknown",
+                    author: meta?.author,
+                    page: r.pageStart.map { $0 + 1 },
+                    snippet: r.excerpt
+                )
+            })
+        }
+
         return .success(formatResults(results, metadata: metadata, query: query))
     }
 
     // MARK: - Private
 
     private func formatResults(
-        _ results: [SemanticIndexService.SearchResult],
+        _ results: [FTSIndexService.SearchResult],
         metadata: [String: ItemMeta],
         query: String
     ) -> String {

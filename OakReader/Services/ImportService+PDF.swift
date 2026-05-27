@@ -120,8 +120,8 @@ extension ImportService {
             await autoExtractReference(itemId: docId.uuidString, pdfURL: destURL, title: title, author: author, webSourceURL: webSourceURL)
         }
 
-        // Extract structured markdown from PDF (for semantic indexing and CLI reading)
-        if let service = semanticIndexService {
+        // Extract structured markdown from PDF (for full-text indexing and CLI reading)
+        if let service = ftsIndexService {
             Task {
                 await extractPDFMarkdown(pdfURL: destURL, attachmentDir: attDir)
                 await service.indexItem(

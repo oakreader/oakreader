@@ -40,8 +40,8 @@ enum PaletteAction {
     case settingsTab(String)
     /// Change appearance mode.
     case appearanceMode(String)
-    /// Rebuild the semantic index.
-    case rebuildSemanticIndex
+    /// Rebuild the full-text search index.
+    case rebuildSearchIndex
 }
 
 // MARK: - Palette Command

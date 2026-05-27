@@ -84,7 +84,7 @@ final class AppState {
     let coverService = LibraryCoverService()
     let referenceService: ReferenceService
     let importService: ImportService
-    var semanticIndexService: SemanticIndexService?
+    var ftsIndexService: FTSIndexService?
     private var backgroundIndexTask: Task<Void, Never>?
 
     var openTabs: [DocumentTab] = []
@@ -149,7 +149,7 @@ final class AppState {
 
         // Listen for rebuild requests from settings
         NotificationCenter.default.addObserver(
-            forName: .semanticIndexRebuildRequested,
+            forName: .searchIndexRebuildRequested,
             object: nil,
             queue: nil
         ) { [weak self] _ in
@@ -162,20 +162,20 @@ final class AppState {
     private func startContentIndexing(database: CatalogDatabase) {
         backgroundIndexTask = Task {
             do {
-                let semanticDB = try SemanticDatabase()
-                let service = SemanticIndexService.create(
-                    semanticDB: semanticDB,
+                let ftsDB = try FTSDatabase()
+                let service = FTSIndexService.create(
+                    ftsDB: ftsDB,
                     catalogDBQueue: database.dbQueue
                 )
                 await MainActor.run {
-                    self.semanticIndexService = service
-                    self.importService.semanticIndexService = service
-                    self.libraryStore.semanticIndexService = service
+                    self.ftsIndexService = service
+                    self.importService.ftsIndexService = service
+                    self.libraryStore.ftsIndexService = service
                 }
-                Log.info(Log.semantic, "Full-text index service initialized")
+                Log.info(Log.fts, "Full-text index service initialized")
                 await service.backgroundIndexAll()
             } catch {
-                Log.error(Log.semantic, "Failed to initialize full-text index service: \(error)")
+                Log.error(Log.fts, "Failed to initialize full-text index service: \(error)")
             }
         }
     }

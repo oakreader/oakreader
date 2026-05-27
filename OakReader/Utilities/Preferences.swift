@@ -89,6 +89,8 @@ final class Preferences {
         // AI preferences
         static let aiProvider = "aiProvider"
         static let aiModel = "aiModel"
+        /// Optional cheaper/faster model for the research subagent (empty = inherit chat model).
+        static let researchModel = "researchModel"
         // Note editor preferences
         static let noteEditorMode = "noteEditorMode"
         static let noteEditorFontFamily = "noteEditorFontFamily"
@@ -367,6 +369,13 @@ final class Preferences {
     var aiModel: String {
         get { defaults.string(forKey: Keys.aiModel) ?? "" }
         set { defaults.set(newValue, forKey: Keys.aiModel) }
+    }
+
+    /// Optional cheaper/faster model id for the research subagent's loop.
+    /// Empty means inherit the main chat model.
+    var researchModel: String {
+        get { defaults.string(forKey: Keys.researchModel) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.researchModel) }
     }
 
     // MARK: - Note Editor Preferences

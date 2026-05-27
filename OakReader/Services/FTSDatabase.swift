@@ -2,21 +2,25 @@ import Foundation
 import GRDB
 
 /// Separate GRDB database for full-text search data (chunks + FTS5 BM25).
-/// Stored at ~/OakReader/semantic.sqlite — fully regenerable from source content.
-final class SemanticDatabase: @unchecked Sendable {
+/// Stored at ~/OakReader/search.sqlite — fully regenerable from source content.
+final class FTSDatabase: @unchecked Sendable {
     let dbQueue: DatabaseQueue
 
     init() throws {
-        let dbURL = CatalogDatabase.semanticDatabaseURL
+        let dbURL = CatalogDatabase.searchDatabaseURL
         try FileManager.default.createDirectory(
             at: dbURL.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
 
-        // Clean up the legacy vector index left by pre-FTS5 builds (regenerable cache,
-        // never read again). Best-effort — failure here must not block opening the DB.
-        let legacyVectorIndex = dbURL.deletingLastPathComponent().appendingPathComponent("semantic.usearch")
-        try? FileManager.default.removeItem(at: legacyVectorIndex)
+        // Clean up regenerable caches left by older builds: the pre-FTS5 vector index
+        // and the previous semantic.sqlite (this DB was renamed to search.sqlite). Both
+        // are fully regenerable, so they're deleted rather than migrated. Best-effort —
+        // failure here must not block opening the DB.
+        let dataDir = dbURL.deletingLastPathComponent()
+        for legacy in ["semantic.usearch", "semantic.sqlite", "semantic.sqlite-wal", "semantic.sqlite-shm"] {
+            try? FileManager.default.removeItem(at: dataDir.appendingPathComponent(legacy))
+        }
 
         var config = Configuration()
         config.foreignKeysEnabled = false // no FK to catalog.db
@@ -76,7 +80,7 @@ final class SemanticDatabase: @unchecked Sendable {
 
     /// Insert chunks. Returns their assigned rowids.
     @discardableResult
-    func insertChunks(_ chunks: [SemanticChunk]) throws -> [Int64] {
+    func insertChunks(_ chunks: [FTSChunk]) throws -> [Int64] {
         try dbQueue.write { db in
             var rowids: [Int64] = []
             for var chunk in chunks {
@@ -98,11 +102,11 @@ final class SemanticDatabase: @unchecked Sendable {
     }
 
     /// Fetch chunk texts and metadata by rowids.
-    func fetchChunks(byIds ids: [Int64]) throws -> [SemanticChunk] {
+    func fetchChunks(byIds ids: [Int64]) throws -> [FTSChunk] {
         guard !ids.isEmpty else { return [] }
         return try dbQueue.read { db in
             let placeholders = ids.map { _ in "?" }.joined(separator: ",")
-            return try SemanticChunk.fetchAll(db, sql: """
+            return try FTSChunk.fetchAll(db, sql: """
                 SELECT * FROM chunks WHERE id IN (\(placeholders))
                 """, arguments: StatementArguments(ids))
         }
@@ -204,9 +208,9 @@ final class SemanticDatabase: @unchecked Sendable {
     }
 }
 
-// MARK: - SemanticChunk Model
+// MARK: - FTSChunk Model
 
-struct SemanticChunk: Codable, FetchableRecord, MutablePersistableRecord {
+struct FTSChunk: Codable, FetchableRecord, MutablePersistableRecord {
     static let databaseTableName = "chunks"
 
     var id: Int64?

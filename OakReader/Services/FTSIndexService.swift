@@ -4,21 +4,21 @@ import GRDB
 
 /// On-device full-text search over the library.
 /// Documents are chunked (heading-aware for markdown, sentence-boundary for others)
-/// and stored in semantic.sqlite on import; search uses FTS5 BM25 keyword ranking.
+/// and stored in search.sqlite on import; search uses FTS5 BM25 keyword ranking.
 /// No embeddings or vector index — the chat agent drives retrieval by issuing queries.
-final class SemanticIndexService: @unchecked Sendable {
-    let semanticDB: SemanticDatabase
+final class FTSIndexService: @unchecked Sendable {
+    let ftsDB: FTSDatabase
     let catalogDBQueue: DatabaseQueue
 
     static func create(
-        semanticDB: SemanticDatabase,
+        ftsDB: FTSDatabase,
         catalogDBQueue: DatabaseQueue
-    ) -> SemanticIndexService {
-        SemanticIndexService(semanticDB: semanticDB, catalogDBQueue: catalogDBQueue)
+    ) -> FTSIndexService {
+        FTSIndexService(ftsDB: ftsDB, catalogDBQueue: catalogDBQueue)
     }
 
-    private init(semanticDB: SemanticDatabase, catalogDBQueue: DatabaseQueue) {
-        self.semanticDB = semanticDB
+    private init(ftsDB: FTSDatabase, catalogDBQueue: DatabaseQueue) {
+        self.ftsDB = ftsDB
         self.catalogDBQueue = catalogDBQueue
     }
 
@@ -27,7 +27,7 @@ final class SemanticIndexService: @unchecked Sendable {
     /// Index an item by type. Routes to the appropriate text extractor and chunker.
     func indexItem(itemId: String, contentType: String, storageKey: String, attStorageKey: String, fileName: String) async {
         // Skip if already indexed.
-        if let count = try? semanticDB.chunkCount(forItemId: itemId), count > 0 {
+        if let count = try? ftsDB.chunkCount(forItemId: itemId), count > 0 {
             return
         }
 
@@ -40,7 +40,7 @@ final class SemanticIndexService: @unchecked Sendable {
         )
 
         guard !chunks.isEmpty else {
-            Log.info(Log.semantic, "No text to index for item \(itemId)")
+            Log.info(Log.fts, "No text to index for item \(itemId)")
             return
         }
 
@@ -99,7 +99,7 @@ final class SemanticIndexService: @unchecked Sendable {
 
         // Fallback: PDFKit page text with plain text chunking
         guard let pdfDoc = PDFDocument(url: pdfURL) else {
-            Log.error(Log.semantic, "Cannot open PDF: \(pdfURL.lastPathComponent)")
+            Log.error(Log.fts, "Cannot open PDF: \(pdfURL.lastPathComponent)")
             return []
         }
         var chunks: [ContentChunker.Chunk] = []
@@ -163,7 +163,7 @@ final class SemanticIndexService: @unchecked Sendable {
     private func storeChunks(itemId: String, chunks: [ContentChunker.Chunk]) {
         let now = Date().iso8601String
         let records = chunks.map { chunk in
-            SemanticChunk(
+            FTSChunk(
                 id: nil,
                 itemId: itemId,
                 chunkType: chunk.type,
@@ -175,10 +175,10 @@ final class SemanticIndexService: @unchecked Sendable {
             )
         }
         do {
-            try semanticDB.insertChunks(records)
-            Log.info(Log.semantic, "Indexed \(records.count) chunks for item \(itemId)")
+            try ftsDB.insertChunks(records)
+            Log.info(Log.fts, "Indexed \(records.count) chunks for item \(itemId)")
         } catch {
-            Log.error(Log.semantic, "Failed to save chunk records for item \(itemId): \(error)")
+            Log.error(Log.fts, "Failed to save chunk records for item \(itemId): \(error)")
         }
     }
 
@@ -200,28 +200,28 @@ final class SemanticIndexService: @unchecked Sendable {
     ///     list view); `false` returns the top individual passages in rank order, so the
     ///     agent can read several distinct page-anchored excerpts (research loop).
     func search(query: String, maxResults: Int = 10, itemIds: [String]? = nil, groupByItem: Bool = true) async -> [SearchResult] {
-        let hits: [SemanticDatabase.Hit]
+        let hits: [FTSDatabase.Hit]
         do {
-            hits = try semanticDB.bm25Search(query: query, maxResults: maxResults * 3, itemIds: itemIds)
+            hits = try ftsDB.bm25Search(query: query, maxResults: maxResults * 3, itemIds: itemIds)
         } catch {
-            Log.error(Log.semantic, "Full-text search failed: \(error)")
+            Log.error(Log.fts, "Full-text search failed: \(error)")
             return []
         }
 
         guard !hits.isEmpty else { return [] }
 
-        let chunks: [SemanticChunk]
+        let chunks: [FTSChunk]
         do {
-            chunks = try semanticDB.fetchChunks(byIds: hits.map(\.chunkId))
+            chunks = try ftsDB.fetchChunks(byIds: hits.map(\.chunkId))
         } catch {
-            Log.error(Log.semantic, "Failed to fetch chunks: \(error)")
+            Log.error(Log.fts, "Failed to fetch chunks: \(error)")
             return []
         }
         let chunkById = Dictionary(uniqueKeysWithValues: chunks.compactMap { c in c.id.map { ($0, c) } })
 
         // Build results in BM25 rank order (hits are already best-first), preferring the
         // snippet() window over a raw prefix.
-        func makeResult(_ hit: SemanticDatabase.Hit) -> SearchResult? {
+        func makeResult(_ hit: FTSDatabase.Hit) -> SearchResult? {
             guard let chunk = chunkById[hit.chunkId] else { return nil }
             let excerpt = hit.snippet.isEmpty ? String(chunk.chunkText.prefix(300)) : hit.snippet
             return SearchResult(
@@ -264,9 +264,9 @@ final class SemanticIndexService: @unchecked Sendable {
 
     func removeChunks(forItemId itemId: String) async {
         do {
-            try semanticDB.deleteChunks(forItemId: itemId)
+            try ftsDB.deleteChunks(forItemId: itemId)
         } catch {
-            Log.error(Log.semantic, "Failed to delete chunk records for item \(itemId): \(error)")
+            Log.error(Log.fts, "Failed to delete chunk records for item \(itemId): \(error)")
         }
     }
 
@@ -284,9 +284,9 @@ final class SemanticIndexService: @unchecked Sendable {
     func backgroundIndexAll() async {
         let indexedIds: Set<String>
         do {
-            indexedIds = try semanticDB.indexedItemIds()
+            indexedIds = try ftsDB.indexedItemIds()
         } catch {
-            Log.error(Log.semantic, "Failed to query indexed items: \(error)")
+            Log.error(Log.fts, "Failed to query indexed items: \(error)")
             return
         }
 
@@ -294,18 +294,18 @@ final class SemanticIndexService: @unchecked Sendable {
         do {
             allItems = try await fetchIndexableItems()
         } catch {
-            Log.error(Log.semantic, "Failed to query items: \(error)")
+            Log.error(Log.fts, "Failed to query items: \(error)")
             return
         }
 
         let itemsToIndex = allItems.filter { !indexedIds.contains($0.itemId) }
 
         guard !itemsToIndex.isEmpty else {
-            Log.info(Log.semantic, "All items already indexed")
+            Log.info(Log.fts, "All items already indexed")
             return
         }
 
-        Log.info(Log.semantic, "Background indexing \(itemsToIndex.count) items")
+        Log.info(Log.fts, "Background indexing \(itemsToIndex.count) items")
 
         for item in itemsToIndex {
             guard !Task.isCancelled else { break }
@@ -319,7 +319,7 @@ final class SemanticIndexService: @unchecked Sendable {
             try? await Task.sleep(for: .milliseconds(50))
         }
 
-        Log.info(Log.semantic, "Background indexing complete")
+        Log.info(Log.fts, "Background indexing complete")
     }
 
     /// Re-index specific items by their IDs (e.g. "Index All Content" on a collection).
@@ -328,17 +328,17 @@ final class SemanticIndexService: @unchecked Sendable {
         do {
             itemsToIndex = try await fetchIndexableItems(restrictedTo: itemIds)
         } catch {
-            Log.error(Log.semantic, "Failed to query items for collection indexing: \(error)")
+            Log.error(Log.fts, "Failed to query items for collection indexing: \(error)")
             return
         }
 
-        Log.info(Log.semantic, "Indexing \(itemsToIndex.count) items from collection")
+        Log.info(Log.fts, "Indexing \(itemsToIndex.count) items from collection")
 
         for item in itemsToIndex {
             guard !Task.isCancelled else { break }
 
             // Force re-index: delete existing chunks first.
-            try? semanticDB.deleteChunks(forItemId: item.itemId)
+            try? ftsDB.deleteChunks(forItemId: item.itemId)
 
             let chunks = await extractChunks(
                 itemId: item.itemId,
@@ -353,7 +353,7 @@ final class SemanticIndexService: @unchecked Sendable {
             try? await Task.sleep(for: .milliseconds(50))
         }
 
-        Log.info(Log.semantic, "Collection indexing complete")
+        Log.info(Log.fts, "Collection indexing complete")
     }
 
     /// Fetch indexable items from catalog.db, recently opened first.

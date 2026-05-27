@@ -6,7 +6,7 @@ import PDFKit
 @Observable
 final class LibraryStore {
     let database: CatalogDatabase
-    var semanticIndexService: SemanticIndexService?
+    var ftsIndexService: FTSIndexService?
 
     // Search & filter state
     var searchText: String = ""
@@ -15,12 +15,12 @@ final class LibraryStore {
     var selectedCollectionId: UUID? = SystemCollectionID.readingList
     var selectedTagOptionId: UUID?
 
-    // Semantic search state
-    var isSemanticSearchActive: Bool = false
-    var semanticSearchResults: [UUID: SemanticIndexService.SearchResult]?
-    var semanticSearchOrder: [UUID]?
-    var isSemanticSearching: Bool = false
-    @ObservationIgnored var semanticSearchTask: Task<Void, Never>?
+    // Full-text search state
+    var isFullTextSearchActive: Bool = false
+    var fullTextSearchResults: [UUID: FTSIndexService.SearchResult]?
+    var fullTextSearchOrder: [UUID]?
+    var isFullTextSearching: Bool = false
+    @ObservationIgnored var fullTextSearchTask: Task<Void, Never>?
 
     // Toolbar filter state
     var selectedTypes: Set<String> = []
@@ -37,27 +37,27 @@ final class LibraryStore {
         selectedStatusOptionIds = []
     }
 
-    func clearSemanticSearch() {
-        semanticSearchTask?.cancel()
-        semanticSearchTask = nil
-        semanticSearchResults = nil
-        semanticSearchOrder = nil
-        isSemanticSearching = false
+    func clearFullTextSearch() {
+        fullTextSearchTask?.cancel()
+        fullTextSearchTask = nil
+        fullTextSearchResults = nil
+        fullTextSearchOrder = nil
+        isFullTextSearching = false
     }
 
-    func performSemanticSearch() {
-        semanticSearchTask?.cancel()
+    func performFullTextSearch() {
+        fullTextSearchTask?.cancel()
 
-        guard isSemanticSearchActive, !searchText.isEmpty,
-              let service = semanticIndexService else {
-            clearSemanticSearch()
+        guard isFullTextSearchActive, !searchText.isEmpty,
+              let service = ftsIndexService else {
+            clearFullTextSearch()
             return
         }
 
         let query = searchText
-        isSemanticSearching = true
+        isFullTextSearching = true
 
-        semanticSearchTask = Task { @MainActor in
+        fullTextSearchTask = Task { @MainActor in
             // Debounce 300ms
             try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled else { return }
@@ -65,16 +65,16 @@ final class LibraryStore {
             let results = await service.search(query: query, maxResults: 50)
             guard !Task.isCancelled else { return }
 
-            var resultsMap: [UUID: SemanticIndexService.SearchResult] = [:]
+            var resultsMap: [UUID: FTSIndexService.SearchResult] = [:]
             var order: [UUID] = []
             for result in results {
                 guard let id = UUID(uuidString: result.itemId) else { continue }
                 resultsMap[id] = result
                 order.append(id)
             }
-            semanticSearchResults = resultsMap
-            semanticSearchOrder = order
-            isSemanticSearching = false
+            fullTextSearchResults = resultsMap
+            fullTextSearchOrder = order
+            isFullTextSearching = false
         }
     }
 
@@ -88,14 +88,14 @@ final class LibraryStore {
     func selectCollection(_ id: UUID?) {
         selectedCollectionId = id
         selectedTagOptionId = nil
-        clearSemanticSearch()
+        clearFullTextSearch()
     }
 
     /// Select a tag and clear collection selection.
     func selectTag(_ optionId: UUID?) {
         selectedTagOptionId = optionId
         selectedCollectionId = nil
-        clearSemanticSearch()
+        clearFullTextSearch()
     }
 
     /// The system "Tags" property definition.
@@ -403,10 +403,10 @@ final class LibraryStore {
 
     // MARK: - Search & Sort Helpers
 
-    /// Apply keyword or semantic search filtering to the given items.
+    /// Apply keyword or full-text search filtering to the given items.
     private func applySearch(to items: inout [LibraryItem]) {
-        if isSemanticSearchActive && !searchText.isEmpty {
-            if let order = semanticSearchOrder, let resultsMap = semanticSearchResults {
+        if isFullTextSearchActive && !searchText.isEmpty {
+            if let order = fullTextSearchOrder, let resultsMap = fullTextSearchResults {
                 let matchingIds = Set(order)
                 items = items.filter { matchingIds.contains($0.id) }
                 items.sort { a, b in
@@ -428,9 +428,9 @@ final class LibraryStore {
         }
     }
 
-    /// Apply the current sort order. Skipped when semantic search is active (sorted by relevance).
+    /// Apply the current sort order. Skipped when full-text search is active (sorted by relevance).
     private func applySort(to items: inout [LibraryItem]) {
-        guard !(isSemanticSearchActive && !searchText.isEmpty) else { return }
+        guard !(isFullTextSearchActive && !searchText.isEmpty) else { return }
         // The Recently Read collection always orders by last-opened time (most recent first),
         // matching its "Last Opened" column — regardless of the global sort default.
         let effectiveSort: LibrarySortOrder = isRecentlyReadSelected ? .dateOpened : currentSort
