@@ -15,6 +15,9 @@ DerivedData/
 # Swift Package Manager
 .swiftpm/
 Package.resolved
+# ...except the Xcode project's resolved versions — committed so CI pins the
+# same dependency versions as local (e.g. usearch 2.16.10, which has .F32).
+!OakReader.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 
 # CocoaPods (if ever used)
 Pods/
@@ -56,6 +59,12 @@ tts_samples/
 
 # Temp files
 tmp/
+
+# Agent runtime state
+.agmod/
+
+# Cloudflare Wrangler
+.wrangler/
 
 # Keys and secrets
 *.pem
