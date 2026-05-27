@@ -52,27 +52,6 @@ enum SidebarMode: String, CaseIterable, Identifiable {
     }
 }
 
-enum MediaSidebarMode: String, CaseIterable, Identifiable {
-    case transcript
-    case outline
-
-    var id: String { rawValue }
-
-    var label: String {
-        switch self {
-        case .transcript: return "Transcript"
-        case .outline: return "Chapters"
-        }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .transcript: return "captions.bubble"
-        case .outline: return "list.number"
-        }
-    }
-}
-
 enum AnnotationTool: String, CaseIterable, Identifiable {
     case none
     case highlight

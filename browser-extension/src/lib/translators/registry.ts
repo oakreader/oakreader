@@ -1,10 +1,8 @@
 import type { ContentKind, Translator } from "./types";
-import { youtubeTranslator } from "./youtube";
 import { scholarlyTranslator } from "./scholarly";
 import { genericWebpageTranslator } from "./webpage";
 
 const translators: Translator[] = [
-  youtubeTranslator,
   scholarlyTranslator,
   genericWebpageTranslator,
 ].sort((a, b) => b.priority - a.priority);
@@ -29,8 +27,6 @@ export function detectContentKind(url: string): ContentKind {
  */
 export function contentKindToPageType(kind: ContentKind): "html" | "embed" {
   switch (kind) {
-    case "youtube":
-      return "embed";
     case "webpage":
     case "scholarly":
     case "link":
@@ -43,8 +39,6 @@ export function contentKindToPageType(kind: ContentKind): "html" | "embed" {
  */
 export function contentKindToLabel(kind: ContentKind): string {
   switch (kind) {
-    case "youtube":
-      return "Video";
     case "scholarly":
       return "Article";
     case "link":

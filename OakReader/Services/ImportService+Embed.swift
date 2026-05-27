@@ -9,7 +9,6 @@ extension ImportService {
         let sourceURL: URL
         let duration: Int?
         let thumbnailData: Data?
-        let transcript: String?
         let metadata: MediaMetadata
         var embedType: String = "youtube"
         var contentMarkdown: String?
@@ -41,12 +40,6 @@ extension ImportService {
             let metadataURL = CatalogDatabase.attachmentMetadataURL(itemStorageKey: itemStorageKey, attachmentStorageKey: attStorageKey)
             let encoded = try JSONEncoder().encode(input.metadata)
             try encoded.write(to: metadataURL, options: .atomic)
-
-            // Write transcript to attachment directory
-            if let transcript = input.transcript, !transcript.isEmpty {
-                let transcriptURL = CatalogDatabase.attachmentTranscriptURL(itemStorageKey: itemStorageKey, attachmentStorageKey: attStorageKey)
-                try transcript.write(to: transcriptURL, atomically: true, encoding: .utf8)
-            }
 
             // Write thumbnail as cover to attachment directory
             if let thumbnailData = input.thumbnailData {
@@ -130,33 +123,6 @@ extension ImportService {
                     storageKey: itemStorageKey,
                     attStorageKey: attStorageKey,
                     fileName: "metadata.json"
-                )
-            }
-        }
-
-        // Auto-generate chapters and highlights for YouTube embeds
-        if input.embedType == "youtube" {
-            let hasTranscript = input.transcript != nil && !input.transcript!.isEmpty
-            Task {
-                let service = ChapterGenerationService()
-                // Generate structural chapters (native YouTube or AI sections)
-                await service.run(
-                    itemStorageKey: itemStorageKey,
-                    attachmentStorageKey: attStorageKey,
-                    sourceURL: input.sourceURL,
-                    duration: input.duration,
-                    transcriptAlreadyExists: hasTranscript,
-                    mode: .chapters
-                )
-                // Generate AI highlights
-                await service.run(
-                    itemStorageKey: itemStorageKey,
-                    attachmentStorageKey: attStorageKey,
-                    sourceURL: input.sourceURL,
-                    duration: input.duration,
-                    transcriptAlreadyExists: hasTranscript,
-                    tryNativeChapters: false,
-                    mode: .highlights
                 )
             }
         }

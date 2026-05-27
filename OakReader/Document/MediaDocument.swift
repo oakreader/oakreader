@@ -30,8 +30,6 @@ final class MediaDocument {
     let storageDirectory: URL
     let metadata: MediaMetadata
     let transcriptURL: URL?         // transcript.txt if available
-    let chaptersURL: URL?           // chapters.json if available
-    let highlightsURL: URL?         // highlights.json if available
     let embedHTMLURL: URL?          // embed.html for link rendering
     let sourceURL: URL
 
@@ -48,12 +46,6 @@ final class MediaDocument {
 
         let transcript = storageDirectory.appendingPathComponent("transcript.txt")
         self.transcriptURL = FileManager.default.fileExists(atPath: transcript.path) ? transcript : nil
-
-        let chapters = storageDirectory.appendingPathComponent("chapters.json")
-        self.chaptersURL = FileManager.default.fileExists(atPath: chapters.path) ? chapters : nil
-
-        let highlights = storageDirectory.appendingPathComponent("highlights.json")
-        self.highlightsURL = FileManager.default.fileExists(atPath: highlights.path) ? highlights : nil
 
         let embedHTML = storageDirectory.appendingPathComponent("embed.html")
         self.embedHTMLURL = FileManager.default.fileExists(atPath: embedHTML.path) ? embedHTML : nil

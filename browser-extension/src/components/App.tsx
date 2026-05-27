@@ -168,7 +168,7 @@ export function App() {
         setTimeout(() => window.close(), 2500);
         return;
       } else {
-        // Embed types (YouTube, …): dispatch to the URL's translator via content script
+        // Embed types (link bookmarks): dispatch to the URL's translator via content script
         setSaveState("capturing");
 
         try {

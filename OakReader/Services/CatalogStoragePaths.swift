@@ -227,22 +227,10 @@ extension CatalogDatabase {
             .appendingPathComponent("metadata.json")
     }
 
-    /// Transcript file URL for an embed attachment.
+    /// Transcript file URL for an attachment (audio recordings).
     static func attachmentTranscriptURL(itemStorageKey: String, attachmentStorageKey: String) -> URL {
         attachmentDirectory(itemStorageKey: itemStorageKey, attachmentStorageKey: attachmentStorageKey)
             .appendingPathComponent("transcript.txt")
-    }
-
-    /// Chapters JSON URL for an embed attachment.
-    static func attachmentChaptersURL(itemStorageKey: String, attachmentStorageKey: String) -> URL {
-        attachmentDirectory(itemStorageKey: itemStorageKey, attachmentStorageKey: attachmentStorageKey)
-            .appendingPathComponent("chapters.json")
-    }
-
-    /// Highlights JSON URL for an embed attachment.
-    static func attachmentHighlightsURL(itemStorageKey: String, attachmentStorageKey: String) -> URL {
-        attachmentDirectory(itemStorageKey: itemStorageKey, attachmentStorageKey: attachmentStorageKey)
-            .appendingPathComponent("highlights.json")
     }
 
     /// Summary JSON URL for an audio recording attachment.

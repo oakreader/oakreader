@@ -2,21 +2,6 @@
  * Shared URL detection utilities — single source of truth for all URL-based detection.
  */
 
-export function isYouTubeWatchURL(url: string): boolean {
-  try {
-    const u = new URL(url);
-    return (
-      (u.hostname === "www.youtube.com" ||
-        u.hostname === "youtube.com" ||
-        u.hostname === "m.youtube.com") &&
-      u.pathname === "/watch" &&
-      u.searchParams.has("v")
-    );
-  } catch {
-    return false;
-  }
-}
-
 export function isDOIURL(url: string): boolean {
   try {
     const u = new URL(url);
@@ -77,14 +62,6 @@ export function isScholarlyDomain(url: string): boolean {
     );
   } catch {
     return false;
-  }
-}
-
-export function extractYouTubeVideoId(url: string): string | null {
-  try {
-    return new URL(url).searchParams.get("v");
-  } catch {
-    return null;
   }
 }
 

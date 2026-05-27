@@ -107,36 +107,25 @@ struct ContentView: View {
         }
         .onAppear {
             setupActionObserver()
-            adjustSidebarWidthForMediaIfNeeded()
-        }
-        .onChange(of: viewModel.usesMediaSidebar) { _, _ in
-            adjustSidebarWidthForMediaIfNeeded()
         }
         .onDisappear { removeActionObserver() }
     }
 
     private var sidebarWidthRange: ClosedRange<CGFloat> {
-        viewModel.usesMediaSidebar ? 260...460 : 140...380
+        140...380
     }
 
     private var effectiveSidebarWidth: CGFloat {
-        viewModel.usesMediaSidebar ? max(sidebarWidth, 280) : sidebarWidth
+        sidebarWidth
     }
 
     @ViewBuilder
     private var sidebarContentView: some View {
         if viewModel.contentType == .markdown {
             MarkdownOutlineSidebarView(viewModel: viewModel)
-        } else if viewModel.usesMediaSidebar {
-            MediaSidebarView(viewModel: viewModel)
         } else {
             SidebarView(viewModel: viewModel)
         }
-    }
-
-    private func adjustSidebarWidthForMediaIfNeeded() {
-        guard viewModel.usesMediaSidebar else { return }
-        sidebarWidth = max(sidebarWidth, 280)
     }
 
     // MARK: - Draggable Panel Divider
@@ -189,9 +178,7 @@ struct ContentView: View {
         case .video, .link:
             let isLiveLink = viewModel.liveURL != nil
             ZStack {
-                if viewModel.mediaDocument?.metadata.resolvedEmbedType == .youtube {
-                    MediaViewerView(viewModel: viewModel)
-                } else if isLiveLink {
+                if isLiveLink {
                     liveWebView
                 } else {
                     EmbedCardView(viewModel: viewModel)
