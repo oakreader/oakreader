@@ -136,6 +136,15 @@ targets:
         Release:
           PRODUCT_BUNDLE_IDENTIFIER: com.oakreader.OakReader
           BUNDLE_DISPLAY_NAME: "OakReader"
+          # Developer ID signing for distribution, scoped to THIS target only.
+          # (Passing these as global xcodebuild overrides breaks SPM package
+          # targets and the oak tool, which reject provisioning profiles.)
+          # CI installs the profile by this exact name before archiving.
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: "Developer ID Application"
+          DEVELOPMENT_TEAM: "5Y27G7B6D8"
+          PROVISIONING_PROFILE_SPECIFIER: "OakReader Developer ID"
+          OTHER_CODE_SIGN_FLAGS: "--timestamp"
 
   oak:
     type: tool
