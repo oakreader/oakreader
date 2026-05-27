@@ -13,6 +13,8 @@ packages:
     path: Packages/OakAgent
   OakAI:
     path: Packages/OakAI
+  OakEditor:
+    path: Packages/OakEditor
   Textual:
     url: https://github.com/gonzalezreal/textual
     from: "0.1.0"
@@ -57,6 +59,7 @@ targets:
       - path: character
     dependencies:
       - package: OakAI
+      - package: OakEditor
       - package: OakAgent
       - package: Textual
       - package: GRDB
@@ -86,7 +89,7 @@ targets:
         # Marketing version is the release trigger and source of truth: bump it
         # (SemVer X.Y.Z) and merge to main to ship. CURRENT_PROJECT_VERSION is a
         # placeholder; CI overrides it with the git commit count at archive time.
-        MARKETING_VERSION: "0.1.1"
+        MARKETING_VERSION: "0.1.2"
         CURRENT_PROJECT_VERSION: "1"
         # Sparkle EdDSA public key (NOT secret). Paste the key printed by
         # Sparkle's generate_keys here after generating the keypair; the matching
