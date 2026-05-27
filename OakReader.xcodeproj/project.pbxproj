@@ -28,6 +28,7 @@
 		0E17C11829C1155A97BB3186 /* CLICommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0934E40C45D625649E6E481 /* CLICommands.swift */; };
 		0EDE4C99CBE09BE869F5519C /* HeaderFooterViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ADD810035D275B765C748C2 /* HeaderFooterViewModel.swift */; };
 		0F13A6E0A89F4F20EAFA4069 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = F7AB5ED40472FCDDFAE174DE /* GRDB */; };
+		103070479B17846DE2CA8739 /* ResearchTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE3C5AFB721EE407EADCAE17 /* ResearchTool.swift */; };
 		12FA5F1FDBDA736CBBEF159E /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 88A1DAF0FF249C2CCB62FE43 /* AppIcon.icon */; };
 		136093BE55B0DD09A6D7C24B /* TranslationSourceTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E9F2651F00EFFB87568A1CE /* TranslationSourceTextView.swift */; };
 		142C5FD3DCD265AD5C4315DF /* FormFieldOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49648117F5861D90E9E1FE53 /* FormFieldOverlay.swift */; };
@@ -672,6 +673,7 @@
 		EA91E07EE10DFB021A1A92A7 /* AppIcon-Dev.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = "AppIcon-Dev.icon"; sourceTree = "<group>"; };
 		ECB7B68284A0E958AA74C670 /* SerperSearchProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SerperSearchProvider.swift; sourceTree = "<group>"; };
 		ED85A42B383CC82001C8EAC8 /* ObjCExceptionCatcher.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ObjCExceptionCatcher.h; sourceTree = "<group>"; };
+		EE3C5AFB721EE407EADCAE17 /* ResearchTool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResearchTool.swift; sourceTree = "<group>"; };
 		F02C8B8FC0791BE4586D323C /* AccessibilityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityService.swift; sourceTree = "<group>"; };
 		F2B8FACC1596E748A3B8955B /* FormFieldToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormFieldToolbar.swift; sourceTree = "<group>"; };
 		F2C0A783E601F0D37DEFF58E /* TavilySearchProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TavilySearchProvider.swift; sourceTree = "<group>"; };
@@ -1037,6 +1039,7 @@
 				51FDA535131ABD1FB3C745B1 /* MemoryTools.swift */,
 				055FD9450A98B89BA5A9E9A9 /* OakCLITool.swift */,
 				5C5B15F171F50884D4671DA1 /* QuizCardsTool.swift */,
+				EE3C5AFB721EE407EADCAE17 /* ResearchTool.swift */,
 				4A5987B0AB524A0EDED7C3C3 /* SearchTools.swift */,
 				4B2A91F80AE646CD9FF9A9AC /* SemanticSearchTool.swift */,
 				50CD4408767BA75C7CB27191 /* WebFetchTool.swift */,
@@ -1823,6 +1826,7 @@
 				D9EFF8A64A3EE800FE4A4A7D /* RedactionToolView.swift in Sources */,
 				60C2E9229F9BAD55574472A9 /* ReferenceMetadataView.swift in Sources */,
 				D203D0879C1D6334AA846B0D /* ReferenceService.swift in Sources */,
+				103070479B17846DE2CA8739 /* ResearchTool.swift in Sources */,
 				F0710A13747D53DB936DE32E /* RightPanelView.swift in Sources */,
 				832691C12077823A7E2438B5 /* RootView.swift in Sources */,
 				FA15F75D86F6E573038C2C9B /* SearchSidebarView.swift in Sources */,

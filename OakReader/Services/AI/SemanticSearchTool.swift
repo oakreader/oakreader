@@ -10,12 +10,14 @@ struct SemanticSearchTool: AgentTool, Sendable {
     let name = "search_content"
     let description = """
         Full-text search across the content of the user's library documents (BM25 \
-        keyword ranking over indexed page/section text). Use this to find documents \
-        that mention specific terms, phrases, or topics inside their body — not just \
-        the title. If the first query is too broad or too narrow, refine the terms \
-        and search again. For exact lookups by author, title, or DOI, use the oak \
-        tool instead (oak search <query>). \
-        Returns matching items with relevance scores, excerpts, and page references.
+        keyword ranking over indexed page/section text). Use this to find passages \
+        that mention specific terms, phrases, or topics inside a document's body — \
+        not just the title. Returns the top matching passages, each with a relevance \
+        score, a snippet around the match, and a page reference, so you can then read \
+        the most promising ones with the oak tool (oak items read <citeKey> --pages). \
+        If the first query returns too little or too much, refine the terms and search \
+        again. Optionally pass content_type to restrict the search to one kind of \
+        document. For exact lookups by author, title, or DOI, use oak search instead.
         """
     let service: SemanticIndexService
 
@@ -26,11 +28,17 @@ struct SemanticSearchTool: AgentTool, Sendable {
                 "query": [
                     "type": "string",
                     "description":
-                        "Natural language description of the topic or concept to search for"
+                        "Keywords or a short natural-language description of the topic to find"
                 ],
                 "max_results": [
                     "type": "string",
-                    "description": "Maximum results to return (default: 10)"
+                    "description": "Maximum passages to return (default: 10, max 50)"
+                ],
+                "content_type": [
+                    "type": "string",
+                    "description":
+                        "Optional scope filter: only search documents of this type. One of: pdf, html, markdown, video.",
+                    "enum": ["pdf", "html", "markdown", "video"]
                 ]
             ],
             "required": ["query"]
@@ -43,7 +51,28 @@ struct SemanticSearchTool: AgentTool, Sendable {
         }
         let limit = min(Int(input["max_results"] ?? "10") ?? 10, 50)
 
-        let results = await service.search(query: query, maxResults: limit)
+        // Optional scope: resolve content_type → the set of item IDs to search within.
+        var scopeItemIds: [String]?
+        if let contentType = input["content_type"], !contentType.isEmpty {
+            do {
+                let ids = try await service.catalogDBQueue.read { db in
+                    try String.fetchAll(db, sql: """
+                        SELECT DISTINCT i.id FROM items i
+                        JOIN attachments a ON a.item_id = i.id AND a.is_primary = 1
+                        WHERE a.content_type = ?
+                        """, arguments: [contentType])
+                }
+                if ids.isEmpty {
+                    return .success("No \(contentType) documents in the library to search.")
+                }
+                scopeItemIds = ids
+            } catch {
+                return .error("Failed to resolve content_type filter: \(error.localizedDescription)")
+            }
+        }
+
+        // Passages mode: return distinct top-ranked excerpts (not collapsed per item).
+        let results = await service.search(query: query, maxResults: limit, itemIds: scopeItemIds, groupByItem: false)
 
         if results.isEmpty {
             return .success("No documents matching \"\(query)\" were found in the library.")
@@ -95,7 +124,7 @@ struct SemanticSearchTool: AgentTool, Sendable {
         metadata: [String: ItemMeta],
         query: String
     ) -> String {
-        var out = "Found \(results.count) matching document(s) for \"\(query)\":\n"
+        var out = "Found \(results.count) matching passage(s) for \"\(query)\":\n"
 
         for (i, r) in results.enumerated() {
             let meta = metadata[r.itemId]

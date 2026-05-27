@@ -108,7 +108,7 @@ struct LibrarySettingsView: View {
             try Int.fetchOne(db, sql: """
                 SELECT COUNT(*) FROM items i
                 JOIN attachments a ON a.item_id = i.id AND a.is_primary = 1
-                WHERE a.content_type IN ('pdf', 'html', 'markdown', 'video')
+                WHERE a.content_type IN ('pdf', 'html', 'markdown', 'video', 'link')
                 """)
         }) ?? 0
 

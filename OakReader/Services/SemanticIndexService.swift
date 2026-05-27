@@ -193,11 +193,16 @@ final class SemanticIndexService: @unchecked Sendable {
         let pageEnd: Int?
     }
 
-    /// Full-text BM25 search, deduplicating by item_id (keep highest score).
-    func search(query: String, maxResults: Int = 10) async -> [SearchResult] {
+    /// Full-text BM25 search.
+    /// - Parameters:
+    ///   - itemIds: when non-nil, restricts the search to these items (scope filter).
+    ///   - groupByItem: `true` collapses to the single best passage per item (library
+    ///     list view); `false` returns the top individual passages in rank order, so the
+    ///     agent can read several distinct page-anchored excerpts (research loop).
+    func search(query: String, maxResults: Int = 10, itemIds: [String]? = nil, groupByItem: Bool = true) async -> [SearchResult] {
         let hits: [SemanticDatabase.Hit]
         do {
-            hits = try semanticDB.bm25Search(query: query, maxResults: maxResults * 3)
+            hits = try semanticDB.bm25Search(query: query, maxResults: maxResults * 3, itemIds: itemIds)
         } catch {
             Log.error(Log.semantic, "Full-text search failed: \(error)")
             return []
@@ -205,43 +210,54 @@ final class SemanticIndexService: @unchecked Sendable {
 
         guard !hits.isEmpty else { return [] }
 
-        let chunkIds = hits.map(\.chunkId)
-        let scoreMap = Dictionary(uniqueKeysWithValues: hits.map { ($0.chunkId, $0.score) })
-
         let chunks: [SemanticChunk]
         do {
-            chunks = try semanticDB.fetchChunks(byIds: chunkIds)
+            chunks = try semanticDB.fetchChunks(byIds: hits.map(\.chunkId))
         } catch {
             Log.error(Log.semantic, "Failed to fetch chunks: \(error)")
             return []
         }
+        let chunkById = Dictionary(uniqueKeysWithValues: chunks.compactMap { c in c.id.map { ($0, c) } })
 
-        // Deduplicate by item_id, keeping highest score
-        var bestByItem: [String: SearchResult] = [:]
-        for chunk in chunks {
-            guard let chunkId = chunk.id else { continue }
-            let score = scoreMap[chunkId] ?? 0
-            let result = SearchResult(
+        // Build results in BM25 rank order (hits are already best-first), preferring the
+        // snippet() window over a raw prefix.
+        func makeResult(_ hit: SemanticDatabase.Hit) -> SearchResult? {
+            guard let chunk = chunkById[hit.chunkId] else { return nil }
+            let excerpt = hit.snippet.isEmpty ? String(chunk.chunkText.prefix(300)) : hit.snippet
+            return SearchResult(
                 itemId: chunk.itemId,
-                score: score,
-                excerpt: String(chunk.chunkText.prefix(300)),
+                score: hit.score,
+                excerpt: excerpt,
                 chunkType: chunk.chunkType,
                 pageStart: chunk.pageStart,
                 pageEnd: chunk.pageEnd
             )
-            if let existing = bestByItem[chunk.itemId] {
-                if score > existing.score {
-                    bestByItem[chunk.itemId] = result
-                }
-            } else {
-                bestByItem[chunk.itemId] = result
-            }
         }
 
-        return Array(bestByItem.values)
-            .sorted { $0.score > $1.score }
-            .prefix(maxResults)
-            .map { $0 }
+        if groupByItem {
+            var bestByItem: [String: SearchResult] = [:]
+            for hit in hits {
+                guard let result = makeResult(hit) else { continue }
+                if let existing = bestByItem[result.itemId] {
+                    if result.score > existing.score { bestByItem[result.itemId] = result }
+                } else {
+                    bestByItem[result.itemId] = result
+                }
+            }
+            return Array(bestByItem.values)
+                .sorted { $0.score > $1.score }
+                .prefix(maxResults)
+                .map { $0 }
+        }
+
+        // Passages mode: keep rank order, return distinct top hits.
+        var results: [SearchResult] = []
+        for hit in hits {
+            guard let result = makeResult(hit) else { continue }
+            results.append(result)
+            if results.count >= maxResults { break }
+        }
+        return results
     }
 
     // MARK: - Remove Chunks
@@ -348,7 +364,7 @@ final class SemanticIndexService: @unchecked Sendable {
                 SELECT i.id, i.storage_key, a.storage_key AS att_key, a.file_name, a.content_type
                 FROM items i
                 JOIN attachments a ON a.item_id = i.id AND a.is_primary = 1
-                WHERE a.content_type IN ('pdf', 'html', 'markdown', 'video')
+                WHERE a.content_type IN ('pdf', 'html', 'markdown', 'video', 'link')
                 """
             var arguments = StatementArguments()
             if let itemIds {
