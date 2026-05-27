@@ -112,6 +112,16 @@ targets:
       base:
         PRODUCT_NAME: OakReader
         INFOPLIST_FILE: OakReader/App/Info.plist
+        # Marketing version is the release trigger and source of truth: bump it
+        # (SemVer X.Y.Z) and merge to main to ship. CURRENT_PROJECT_VERSION is a
+        # placeholder; CI overrides it with the git commit count at archive time.
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        # Sparkle EdDSA public key (NOT secret). Paste the key printed by
+        # Sparkle's generate_keys here after generating the keypair; the matching
+        # private key is the SPARKLE_ED_KEY GitHub secret. Empty in dev builds
+        # (which don't auto-update) is fine.
+        SPARKLE_PUBLIC_ED_KEY: "zm3UpFrDf8tFcctK2vkEhrms6oFTp50AUb824lP9BAw="
         CODE_SIGN_ENTITLEMENTS: OakReader/OakReader.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         COMBINE_HIDPI_IMAGES: YES
