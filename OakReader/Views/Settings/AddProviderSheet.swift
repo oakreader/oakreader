@@ -38,6 +38,7 @@ struct AddProviderSheet: View {
                             } label: {
                                 providerRow(
                                     iconAsset: "provider-\(provider.id)",
+                                    fallbackSymbol: provider.isLocal ? "desktopcomputer" : "cpu",
                                     title: provider.displayName
                                 )
                             }
@@ -65,13 +66,9 @@ struct AddProviderSheet: View {
         .frame(width: 360, height: 400)
     }
 
-    private func providerRow(iconAsset: String, title: String) -> some View {
+    private func providerRow(iconAsset: String, fallbackSymbol: String = "cpu", title: String) -> some View {
         HStack(spacing: 10) {
-            Image(iconAsset)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: 24, height: 24)
-                .clipShape(RoundedRectangle(cornerRadius: 5))
+            ProviderIconView(assetName: iconAsset, fallbackSymbol: fallbackSymbol)
 
             Text(title)
                 .font(.body)

@@ -29,6 +29,11 @@ private struct ProviderDetailView: View {
     @State private var oauthState = OAuthFlowState()
     @State private var manualURL: String = ""
 
+    // Local providers (Ollama, LM Studio)
+    @State private var serverURL: String = ""
+    @State private var isDiscovering: Bool = false
+    @State private var discoverResult: String?
+
     private var provider: ProviderInfo? {
         ProviderRegistry.shared.provider(for: providerId)
     }
@@ -93,23 +98,86 @@ private struct ProviderDetailView: View {
             }
         }
 
-        Section("Authentication") {
-            switch provider.authStrategy {
-            case .apiKey(let envVar):
-                apiKeyAuthSection(provider: provider, envVar: envVar)
+        if provider.isLocal {
+            Section("Server") {
+                localServerControls(provider, buttonTitle: "Connect")
+            }
+        } else {
+            Section("Authentication") {
+                switch provider.authStrategy {
+                case .apiKey(let envVar):
+                    apiKeyAuthSection(provider: provider, envVar: envVar)
 
-            case .oauthPKCE(let config):
-                oauthPKCESection(provider: provider, config: config)
+                case .oauthPKCE(let config):
+                    oauthPKCESection(provider: provider, config: config)
 
-            case .oauthDeviceCode(let config):
-                oauthDeviceCodeSection(provider: provider, config: config)
+                case .oauthDeviceCode(let config):
+                    oauthDeviceCodeSection(provider: provider, config: config)
 
-            case .none:
-                Text("No authentication required.")
+                case .none:
+                    Text("No authentication required.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Button("Add") {
+                        store.refresh()
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Local Server Controls
+
+    /// Shared URL field + discover button for local OpenAI-compatible providers.
+    @ViewBuilder
+    private func localServerControls(_ provider: ProviderInfo, buttonTitle: String) -> some View {
+        TextField("Server URL", text: $serverURL)
+            .textFieldStyle(.roundedBorder)
+            .autocorrectionDisabled()
+
+        Text("OpenAI-compatible API base, e.g. http://localhost:11434/v1")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+
+        HStack {
+            Button(buttonTitle) { discoverAndSave(provider) }
+                .disabled(serverURL.isEmpty || isDiscovering)
+
+            if isDiscovering {
+                ProgressView()
+                    .controlSize(.small)
+            }
+
+            if let result = discoverResult {
+                Text(result)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
-                Button("Add") {
+                    .foregroundStyle(result.hasPrefix("Found") ? .green : .red)
+            }
+        }
+    }
+
+    private func discoverAndSave(_ provider: ProviderInfo) {
+        let trimmed = serverURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let base = URL(string: trimmed), base.scheme != nil else {
+            discoverResult = "Invalid URL"
+            return
+        }
+        isDiscovering = true
+        discoverResult = nil
+
+        Task {
+            do {
+                let ids = try await LocalModelDiscovery.fetchModelIDs(apiBase: base)
+                await MainActor.run {
+                    LocalProviderStore.shared.save(id: provider.id, apiBase: trimmed, modelIDs: ids)
                     store.refresh()
+                    isDiscovering = false
+                    discoverResult = "Found \(ids.count) model\(ids.count == 1 ? "" : "s")"
+                }
+            } catch {
+                await MainActor.run {
+                    isDiscovering = false
+                    discoverResult = error.localizedDescription
                 }
             }
         }
@@ -244,7 +312,11 @@ private struct ProviderDetailView: View {
             }
         }
 
-        if !isOAuthProvider {
+        if provider.isLocal {
+            Section("Server") {
+                localServerControls(provider, buttonTitle: "Refresh Models")
+            }
+        } else if !isOAuthProvider {
             Section("API Key") {
                 HStack {
                     SecureField("API Key", text: $apiKey)
@@ -325,11 +397,16 @@ private struct ProviderDetailView: View {
 
         Section {
             Button("Reset Provider", role: .destructive) {
-                KeychainService.deleteAPIKey(forProviderId: provider.id)
-                OAuthTokenStore.delete(for: provider.id)
+                if provider.isLocal {
+                    LocalProviderStore.shared.remove(id: provider.id)
+                } else {
+                    KeychainService.deleteAPIKey(forProviderId: provider.id)
+                    OAuthTokenStore.delete(for: provider.id)
+                }
                 store.refresh()
                 apiKey = ""
                 testResult = nil
+                discoverResult = nil
             }
         }
     }
@@ -400,7 +477,12 @@ private struct ProviderDetailView: View {
         apiKey = ""
         testResult = nil
         isTesting = false
+        discoverResult = nil
+        isDiscovering = false
         cancelOAuth()
+        if let provider, provider.isLocal {
+            serverURL = LocalProviderStore.shared.apiBase(for: providerId)
+        }
         if providerId == "__elevenlabs__" {
             let prefs = Preferences.shared
             elevenLabsAPIKey = prefs.elevenLabsAPIKey

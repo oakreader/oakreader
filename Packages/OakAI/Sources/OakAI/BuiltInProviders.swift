@@ -20,10 +20,43 @@ public enum BuiltInProviders {
         registry.register(minimax)
         registry.register(zai)
         registry.register(xiaomi)
+        // Local OpenAI-compatible servers
+        registry.register(ollama)
+        registry.register(lmstudio)
         // OAuth providers
         registry.register(openaiCodex)
         registry.register(githubCopilot)
     }
+
+    // MARK: - Ollama (local)
+
+    /// Ollama's OpenAI-compatible endpoint. Models are discovered at runtime from the
+    /// running server, so the static list is empty until the user connects.
+    public static let ollama = ProviderInfo(
+        id: "ollama",
+        displayName: "Ollama",
+        apiFormat: .openaiCompletions,
+        baseURL: URL(string: "http://localhost:11434/v1/chat/completions")!,
+        defaultModelId: "",
+        models: [],
+        authStrategy: .none,
+        displayOrder: 50,
+        isLocal: true
+    )
+
+    // MARK: - LM Studio (local)
+
+    public static let lmstudio = ProviderInfo(
+        id: "lmstudio",
+        displayName: "LM Studio",
+        apiFormat: .openaiCompletions,
+        baseURL: URL(string: "http://localhost:1234/v1/chat/completions")!,
+        defaultModelId: "",
+        models: [],
+        authStrategy: .none,
+        displayOrder: 51,
+        isLocal: true
+    )
 
     // MARK: - Anthropic
 

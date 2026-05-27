@@ -115,11 +115,10 @@ struct AISettingsView: View {
             ForEach(store.configuredLLMProviders) { provider in
                 NavigationLink(value: provider.id) {
                     HStack(spacing: 10) {
-                        Image("provider-\(provider.id)")
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 24, height: 24)
-                            .clipShape(RoundedRectangle(cornerRadius: 5))
+                        ProviderIconView(
+                            assetName: "provider-\(provider.id)",
+                            fallbackSymbol: provider.isLocal ? "desktopcomputer" : "cpu"
+                        )
 
                         Text(provider.displayName)
 

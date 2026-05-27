@@ -33,7 +33,11 @@ public struct OpenAIProvider: LLMProviderService {
                     var request = URLRequest(url: baseURL)
                     request.httpMethod = "POST"
                     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                    request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+                    // Local servers (Ollama, LM Studio) take no key; omit the header so we
+                    // don't send a bogus "Bearer " value.
+                    if !apiKey.isEmpty {
+                        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+                    }
 
                     for (key, value) in customHeaders {
                         request.setValue(value, forHTTPHeaderField: key)
