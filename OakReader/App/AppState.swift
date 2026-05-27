@@ -144,8 +144,8 @@ final class AppState {
         self.importService = ImportService(store: libraryStore, coverService: coverService, referenceService: referenceService)
         startAutosaveTimer()
 
-        // Initialize semantic index service asynchronously
-        startSemanticIndexing(database: database)
+        // Initialize the full-text index service asynchronously
+        startContentIndexing(database: database)
 
         // Listen for rebuild requests from settings
         NotificationCenter.default.addObserver(
@@ -155,37 +155,16 @@ final class AppState {
         ) { [weak self] _ in
             guard let self else { return }
             self.backgroundIndexTask?.cancel()
-            self.startSemanticIndexing(database: self.libraryStore.database)
+            self.startContentIndexing(database: self.libraryStore.database)
         }
     }
 
-    private func startSemanticIndexing(database: CatalogDatabase) {
+    private func startContentIndexing(database: CatalogDatabase) {
         backgroundIndexTask = Task {
-            let defaultEmbedding = KnownModels.embedding.first?.repo ?? ""
-            let embeddingRepo = Preferences.shared.embeddingModel.isEmpty
-                ? defaultEmbedding
-                : Preferences.shared.embeddingModel
-
-            guard await ModelManager.shared.isDownloaded(embeddingRepo) else {
-                Log.info(Log.semantic, "Embedding model not downloaded, skipping semantic service")
-                return
-            }
-
             do {
-                let embeddingService = EmbeddingService(modelId: embeddingRepo)
-                try await embeddingService.loadModel()
-
                 let semanticDB = try SemanticDatabase()
-                let dimensions = try await embeddingService.embed(text: "test").count
-                let searchEngine = HybridSearchEngine(
-                    semanticDB: semanticDB,
-                    dimensions: UInt32(dimensions)
-                )
-
                 let service = SemanticIndexService.create(
-                    embeddingService: embeddingService,
                     semanticDB: semanticDB,
-                    searchEngine: searchEngine,
                     catalogDBQueue: database.dbQueue
                 )
                 await MainActor.run {
@@ -193,10 +172,10 @@ final class AppState {
                     self.importService.semanticIndexService = service
                     self.libraryStore.semanticIndexService = service
                 }
-                Log.info(Log.semantic, "Semantic index service initialized")
+                Log.info(Log.semantic, "Full-text index service initialized")
                 await service.backgroundIndexAll()
             } catch {
-                Log.error(Log.semantic, "Failed to initialize semantic index service: \(error)")
+                Log.error(Log.semantic, "Failed to initialize full-text index service: \(error)")
             }
         }
     }

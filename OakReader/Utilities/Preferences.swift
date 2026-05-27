@@ -102,9 +102,6 @@ final class Preferences {
         static let noteEditorRenderImages = "noteEditorRenderImages"
         static let noteEditorHideSyntax = "noteEditorHideSyntax"
         static let noteEditorAccentColor = "noteEditorAccentColor"
-        // YouTube preferences
-        static let youtubeAIProvider = "youtubeAIProvider"
-        static let youtubeAIModel = "youtubeAIModel"
         // Plugins (extensions)
         static let disabledPlugins = "disabledPlugins"
         static let explicitlyToggledPlugins = "explicitlyToggledPlugins"
@@ -129,8 +126,6 @@ final class Preferences {
         static let noteEditorFontOverridden = "noteEditorFontOverridden"
         // Voice AI
         static let voiceSTTModel = "voiceSTTModel"
-        static let voiceTTSModel = "voiceTTSModel"
-        static let voiceVADModel = "voiceVADModel"
         static let voiceTTSVoice = "voiceTTSVoice"
         static let voiceReferenceAudioPath = "voiceReferenceAudioPath"
         static let voiceReferenceText = "voiceReferenceText"
@@ -138,8 +133,7 @@ final class Preferences {
         static let voiceLanguage = "voiceLanguage"
         static let voiceInputDeviceUID = "voiceInputDeviceUID"
         static let voiceOutputDeviceUID = "voiceOutputDeviceUID"
-        static let hfEndpoint = "hfEndpoint"
-        // ElevenLabs cloud providers
+        // Cloud voice providers
         static let voiceSTTProvider = "voiceSTTProvider"
         static let voiceTTSProvider = "voiceTTSProvider"
         static let elevenLabsAPIKey = "elevenLabsAPIKey"
@@ -147,17 +141,10 @@ final class Preferences {
         static let elevenLabsTTSModelId = "elevenLabsTTSModelId"
         // Disabled models
         static let disabledModelIds = "disabledModelIds"
-        // Embedding
-        static let embeddingModel = "embeddingModel"
         // Appearance
         static let appearanceMode = "appearanceMode"
         // Web search
         static let webSearchProvider = "webSearchProvider"
-        // External tools
-        static let ytDlpPath = "ytDlpPath"
-        static let ytDlpCachedVersion = "ytDlpCachedVersion"
-        static let ytDlpCachedLatestVersion = "ytDlpCachedLatestVersion"
-        static let ytDlpLastVersionCheck = "ytDlpLastVersionCheck"
     }
 
     private init() {
@@ -441,30 +428,6 @@ final class Preferences {
         set { defaults.set(newValue, forKey: Keys.noteEditorAccentColor) }
     }
 
-    // MARK: - YouTube Preferences
-
-    var youtubeAIProviderId: String {
-        get { defaults.string(forKey: Keys.youtubeAIProvider) ?? aiProviderId }
-        set { defaults.set(newValue, forKey: Keys.youtubeAIProvider) }
-    }
-
-    var youtubeAIModel: String {
-        get { defaults.string(forKey: Keys.youtubeAIModel) ?? "" }
-        set { defaults.set(newValue, forKey: Keys.youtubeAIModel) }
-    }
-
-    static var chapterPromptURL: URL {
-        CatalogDatabase.dataDirectory
-            .appendingPathComponent("prompts")
-            .appendingPathComponent("chapter-generation.md")
-    }
-
-    static var sectionPromptURL: URL {
-        CatalogDatabase.dataDirectory
-            .appendingPathComponent("prompts")
-            .appendingPathComponent("section-generation.md")
-    }
-
     // MARK: - Translation Preferences
 
     var translationAIProviderId: String {
@@ -559,16 +522,6 @@ final class Preferences {
         set { defaults.set(newValue, forKey: Keys.voiceSTTModel) }
     }
 
-    var voiceTTSModel: String {
-        get { defaults.string(forKey: Keys.voiceTTSModel) ?? "" }
-        set { defaults.set(newValue, forKey: Keys.voiceTTSModel) }
-    }
-
-    var voiceVADModel: String {
-        get { defaults.string(forKey: Keys.voiceVADModel) ?? "" }
-        set { defaults.set(newValue, forKey: Keys.voiceVADModel) }
-    }
-
     var voiceTTSVoice: String {
         get { defaults.string(forKey: Keys.voiceTTSVoice) ?? "" }
         set { defaults.set(newValue, forKey: Keys.voiceTTSVoice) }
@@ -609,13 +562,6 @@ final class Preferences {
         set { defaults.set(newValue, forKey: Keys.voiceOutputDeviceUID) }
     }
 
-    /// Custom HuggingFace endpoint URL (e.g. "https://hf-mirror.com" for China).
-    /// Empty string means default (https://huggingface.co).
-    var hfEndpoint: String {
-        get { defaults.string(forKey: Keys.hfEndpoint) ?? "" }
-        set { defaults.set(newValue, forKey: Keys.hfEndpoint) }
-    }
-
     // MARK: - Disabled Models
 
     /// Model IDs that the user has toggled off in provider settings.
@@ -638,24 +584,17 @@ final class Preferences {
         disabledModelIds = disabled
     }
 
-    // MARK: - Embedding Model
+    // MARK: - Cloud Voice Provider Preferences
 
-    var embeddingModel: String {
-        get { defaults.string(forKey: Keys.embeddingModel) ?? "" }
-        set { defaults.set(newValue, forKey: Keys.embeddingModel) }
-    }
-
-    // MARK: - ElevenLabs Cloud Provider Preferences
-
-    /// STT provider type: "on_device" or "elevenlabs".
+    /// STT provider type (currently only "elevenlabs").
     var voiceSTTProvider: String {
-        get { defaults.string(forKey: Keys.voiceSTTProvider) ?? "on_device" }
+        get { defaults.string(forKey: Keys.voiceSTTProvider) ?? "elevenlabs" }
         set { defaults.set(newValue, forKey: Keys.voiceSTTProvider) }
     }
 
-    /// TTS provider type: "on_device" or "elevenlabs".
+    /// TTS provider type (currently only "elevenlabs").
     var voiceTTSProvider: String {
-        get { defaults.string(forKey: Keys.voiceTTSProvider) ?? "on_device" }
+        get { defaults.string(forKey: Keys.voiceTTSProvider) ?? "elevenlabs" }
         set { defaults.set(newValue, forKey: Keys.voiceTTSProvider) }
     }
 
@@ -693,29 +632,6 @@ final class Preferences {
     var webSearchProviderId: String {
         get { defaults.string(forKey: Keys.webSearchProvider) ?? "auto" }
         set { defaults.set(newValue, forKey: Keys.webSearchProvider) }
-    }
-
-    // MARK: - External Tools
-
-    var ytDlpPath: String {
-        get { defaults.string(forKey: Keys.ytDlpPath) ?? "" }
-        set { defaults.set(newValue, forKey: Keys.ytDlpPath) }
-    }
-
-    /// Cached local yt-dlp version (avoids running the binary every time settings opens).
-    var ytDlpCachedVersion: String? {
-        get { defaults.string(forKey: Keys.ytDlpCachedVersion) }
-        set { defaults.set(newValue, forKey: Keys.ytDlpCachedVersion) }
-    }
-
-    var ytDlpCachedLatestVersion: String? {
-        get { defaults.string(forKey: Keys.ytDlpCachedLatestVersion) }
-        set { defaults.set(newValue, forKey: Keys.ytDlpCachedLatestVersion) }
-    }
-
-    var ytDlpLastVersionCheck: Date? {
-        get { defaults.object(forKey: Keys.ytDlpLastVersionCheck) as? Date }
-        set { defaults.set(newValue, forKey: Keys.ytDlpLastVersionCheck) }
     }
 
 }

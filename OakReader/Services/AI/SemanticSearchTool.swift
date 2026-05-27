@@ -2,17 +2,19 @@ import Foundation
 import GRDB
 import OakAgent
 
-/// Searches the library using semantic/vector similarity via MLX embeddings.
-/// Use for conceptual queries where exact keywords may not appear in titles or abstracts
-/// (e.g., "papers about making models smaller" will find work on pruning/quantization).
+/// Searches the full text of the user's library using FTS5 BM25 keyword ranking.
+/// Use to find documents whose *content* mentions specific terms (not just titles).
+/// The chat agent drives retrieval: issue a query, read the results, and refine the
+/// query or call again as needed.
 struct SemanticSearchTool: AgentTool, Sendable {
-    let name = "search_semantic"
+    let name = "search_content"
     let description = """
-        Search the user's library by meaning using vector embeddings. Use this for \
-        conceptual or thematic queries where exact keyword matches are unlikely \
-        (e.g., "papers about making neural networks more efficient"). For exact \
-        keyword searches by author, title, or DOI, use the oak tool instead \
-        (oak search <query>). \
+        Full-text search across the content of the user's library documents (BM25 \
+        keyword ranking over indexed page/section text). Use this to find documents \
+        that mention specific terms, phrases, or topics inside their body — not just \
+        the title. If the first query is too broad or too narrow, refine the terms \
+        and search again. For exact lookups by author, title, or DOI, use the oak \
+        tool instead (oak search <query>). \
         Returns matching items with relevance scores, excerpts, and page references.
         """
     let service: SemanticIndexService
@@ -44,7 +46,7 @@ struct SemanticSearchTool: AgentTool, Sendable {
         let results = await service.search(query: query, maxResults: limit)
 
         if results.isEmpty {
-            return .success("No semantically similar items found for \"\(query)\" in the library.")
+            return .success("No documents matching \"\(query)\" were found in the library.")
         }
 
         // Enrich results with item metadata from catalog.db
@@ -93,7 +95,7 @@ struct SemanticSearchTool: AgentTool, Sendable {
         metadata: [String: ItemMeta],
         query: String
     ) -> String {
-        var out = "Found \(results.count) semantically similar item(s) for \"\(query)\":\n"
+        var out = "Found \(results.count) matching document(s) for \"\(query)\":\n"
 
         for (i, r) in results.enumerated() {
             let meta = metadata[r.itemId]
