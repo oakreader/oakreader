@@ -527,7 +527,7 @@ private struct CollectionRowView: View {
                     Button {
                         embedCollectionContent(collection)
                     } label: {
-                        Label("Embed All Content", systemImage: "brain")
+                        Label("Index All Content", systemImage: "text.magnifyingglass")
                     }
                 }
 

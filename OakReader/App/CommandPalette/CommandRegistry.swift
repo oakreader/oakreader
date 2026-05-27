@@ -254,7 +254,7 @@ enum CommandRegistry {
     private static let search: [PaletteCommand] = [
         PaletteCommand(
             id: "search.rebuildIndex",
-            title: "Rebuild Semantic Index",
+            title: "Rebuild Search Index",
             category: .search,
             icon: "arrow.triangle.2.circlepath",
             action: .rebuildSemanticIndex

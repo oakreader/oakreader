@@ -43,7 +43,7 @@ struct LibrarySettingsView: View {
                 }
             }
 
-            Section("Semantic Index") {
+            Section("Search Index") {
                 LabeledContent("Indexed Items") {
                     Text("\(indexedCount) / \(totalCount)")
                         .monospacedDigit()
@@ -79,7 +79,7 @@ struct LibrarySettingsView: View {
                 }
                 .disabled(isRebuilding)
 
-                Text("Clears the semantic index and re-indexes all documents. Use after switching embedding models.")
+                Text("Clears the full-text search index and re-indexes all documents.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

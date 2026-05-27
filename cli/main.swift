@@ -850,9 +850,6 @@ struct Search: ParsableCommand {
     @Argument(help: "Search query.")
     var query: [String]
 
-    @Option(name: .long, help: "Search mode: keyword, semantic, hybrid (default: keyword).")
-    var mode: String = "keyword"
-
     @Option(name: .long, help: "Maximum results (default: 20).")
     var limit: Int = 20
 
@@ -863,27 +860,12 @@ struct Search: ParsableCommand {
         }
 
         let database = try CLIDatabase(path: globals.db)
-
-        switch mode {
-        case "keyword":
-            let results = try database.keywordSearch(query: queryString, limit: limit)
-            if globals.json {
-                let output = CLIOutput(json: true, quiet: globals.quiet)
-                output.results(operation: "search", items: results, meta: ["count": results.count])
-            } else {
-                print(CLIFormatters.formatSearchResults(results, query: queryString, mode: "keyword"))
-            }
-
-        case "semantic", "hybrid":
-            // Semantic/hybrid search requires async for potential future MLX support
-            _ = Task {
-                fputs("Error: Semantic search requires the OakReader app (MLX embedding model). Use --mode keyword in the CLI.\n", stderr)
-                Darwin.exit(1)
-            }
-            RunLoop.main.run()
-
-        default:
-            throw OakError.general("Unknown search mode '\(mode)'. Use keyword, semantic, or hybrid.")
+        let results = try database.keywordSearch(query: queryString, limit: limit)
+        if globals.json {
+            let output = CLIOutput(json: true, quiet: globals.quiet)
+            output.results(operation: "search", items: results, meta: ["count": results.count])
+        } else {
+            print(CLIFormatters.formatSearchResults(results, query: queryString, mode: "keyword"))
         }
     }
 }

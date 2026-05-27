@@ -236,7 +236,7 @@ class ChatViewModel {
             ))
         }
 
-        // 2. Semantic search (requires MLX model in-process)
+        // 2. Full-text content search (FTS5 over the indexed library)
         if let semanticService = appState?.semanticIndexService {
             tools.append(SemanticSearchTool(service: semanticService))
         }

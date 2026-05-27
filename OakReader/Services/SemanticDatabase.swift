@@ -1,7 +1,7 @@
 import Foundation
 import GRDB
 
-/// Separate GRDB database for semantic search data (chunks + FTS5).
+/// Separate GRDB database for full-text search data (chunks + FTS5 BM25).
 /// Stored at ~/OakReader/semantic.sqlite — fully regenerable from source content.
 final class SemanticDatabase: @unchecked Sendable {
     let dbQueue: DatabaseQueue
@@ -23,6 +23,9 @@ final class SemanticDatabase: @unchecked Sendable {
 
     private static var migrator: DatabaseMigrator {
         var migrator = DatabaseMigrator()
+        // This database is a regenerable cache: if the schema definition changes,
+        // wipe and rebuild from source content rather than writing a migration.
+        migrator.eraseDatabaseOnSchemaChange = true
 
         migrator.registerMigration("v1-chunks") { db in
             try db.create(table: "chunks") { t in
@@ -33,7 +36,6 @@ final class SemanticDatabase: @unchecked Sendable {
                 t.column("page_end", .integer)
                 t.column("chunk_text", .text).notNull()
                 t.column("token_count", .integer)
-                t.column("embedding_model", .text).notNull()
                 t.column("created_at", .text).notNull()
             }
             try db.create(index: "idx_chunks_item_id", on: "chunks", columns: ["item_id"])
@@ -50,23 +52,16 @@ final class SemanticDatabase: @unchecked Sendable {
 
     // MARK: - Destroy All
 
-    /// Delete semantic.sqlite and semantic.usearch for full rebuild (e.g. model switch).
+    /// Delete all chunks for a full rebuild (e.g. from the Rebuild Index button).
     func destroyAll() throws {
-        // Close the current connection by running a checkpoint first
         try dbQueue.write { db in
             try db.execute(sql: "DELETE FROM chunks")
-        }
-
-        // Delete the USearch index file
-        let indexURL = CatalogDatabase.semanticIndexURL
-        if FileManager.default.fileExists(atPath: indexURL.path) {
-            try FileManager.default.removeItem(at: indexURL)
         }
     }
 
     // MARK: - Chunk Operations
 
-    /// Insert chunks and return their assigned rowids (used as USearch keys).
+    /// Insert chunks. Returns their assigned rowids.
     @discardableResult
     func insertChunks(_ chunks: [SemanticChunk]) throws -> [Int64] {
         try dbQueue.write { db in
@@ -82,13 +77,10 @@ final class SemanticDatabase: @unchecked Sendable {
         }
     }
 
-    /// Delete all chunks for an item. Returns the deleted rowids (for USearch cleanup).
-    @discardableResult
-    func deleteChunks(forItemId itemId: String) throws -> [Int64] {
+    /// Delete all chunks for an item.
+    func deleteChunks(forItemId itemId: String) throws {
         try dbQueue.write { db in
-            let rowids = try Int64.fetchAll(db, sql: "SELECT id FROM chunks WHERE item_id = ?", arguments: [itemId])
             try db.execute(sql: "DELETE FROM chunks WHERE item_id = ?", arguments: [itemId])
-            return rowids
         }
     }
 
@@ -103,21 +95,17 @@ final class SemanticDatabase: @unchecked Sendable {
         }
     }
 
-    /// Count chunks for an item with a specific embedding model.
-    func chunkCount(forItemId itemId: String, embeddingModel: String) throws -> Int {
+    /// Count chunks for an item.
+    func chunkCount(forItemId itemId: String) throws -> Int {
         try dbQueue.read { db in
-            try Int.fetchOne(db, sql: """
-                SELECT COUNT(*) FROM chunks WHERE item_id = ? AND embedding_model = ?
-                """, arguments: [itemId, embeddingModel]) ?? 0
+            try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM chunks WHERE item_id = ?", arguments: [itemId]) ?? 0
         }
     }
 
     /// Get all indexed item IDs.
-    func indexedItemIds(embeddingModel: String) throws -> Set<String> {
+    func indexedItemIds() throws -> Set<String> {
         try dbQueue.read { db in
-            let ids = try String.fetchAll(db, sql: """
-                SELECT DISTINCT item_id FROM chunks WHERE embedding_model = ?
-                """, arguments: [embeddingModel])
+            let ids = try String.fetchAll(db, sql: "SELECT DISTINCT item_id FROM chunks")
             return Set(ids)
         }
     }
@@ -127,44 +115,49 @@ final class SemanticDatabase: @unchecked Sendable {
     struct IndexStats {
         let indexedItemCount: Int
         let totalChunkCount: Int
-        let embeddingModel: String?
     }
 
     func indexStats() throws -> IndexStats {
         try dbQueue.read { db in
             let itemCount = try Int.fetchOne(db, sql: "SELECT COUNT(DISTINCT item_id) FROM chunks") ?? 0
             let chunkCount = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM chunks") ?? 0
-            let model = try String.fetchOne(db, sql: "SELECT embedding_model FROM chunks LIMIT 1")
-            return IndexStats(indexedItemCount: itemCount, totalChunkCount: chunkCount, embeddingModel: model)
+            return IndexStats(indexedItemCount: itemCount, totalChunkCount: chunkCount)
         }
     }
 
     // MARK: - FTS5 Search
 
-    /// BM25 keyword search on chunk text. Returns rowids ordered by relevance.
-    func bm25Search(query: String, maxResults: Int = 50) throws -> [Int64] {
+    /// A BM25-ranked full-text hit: chunk rowid plus a relevance score (higher = better).
+    struct Hit: Sendable {
+        let chunkId: Int64
+        let score: Double
+    }
+
+    /// BM25 keyword search on chunk text, ordered by relevance.
+    func bm25Search(query: String, maxResults: Int = 50) throws -> [Hit] {
         try dbQueue.read { db in
-            // Escape FTS5 special characters and build a simple query
             let sanitized = Self.sanitizeFTS5Query(query)
             guard !sanitized.isEmpty else { return [] }
 
-            return try Int64.fetchAll(db, sql: """
-                SELECT rowid FROM chunks_fts
+            // FTS5 bm25() returns lower (more negative) values for better matches;
+            // negate so higher = more relevant for downstream sorting.
+            let rows = try Row.fetchAll(db, sql: """
+                SELECT rowid, bm25(chunks_fts) AS score FROM chunks_fts
                 WHERE chunks_fts MATCH ?
                 ORDER BY rank
                 LIMIT ?
                 """, arguments: [sanitized, maxResults])
+            return rows.map { Hit(chunkId: $0["rowid"], score: -($0["score"] as Double)) }
         }
     }
 
     /// Sanitize a user query for FTS5 MATCH syntax.
     private static func sanitizeFTS5Query(_ query: String) -> String {
-        // Split into words, wrap each in quotes to treat as literal terms
+        // Split into words, wrap each in quotes to treat as literal terms (implicit AND).
         let words = query.components(separatedBy: .whitespacesAndNewlines)
             .map { $0.trimmingCharacters(in: .punctuationCharacters) }
             .filter { !$0.isEmpty }
         guard !words.isEmpty else { return "" }
-        // Use implicit AND: each word is quoted
         return words.map { "\"\($0)\"" }.joined(separator: " ")
     }
 }
@@ -174,14 +167,13 @@ final class SemanticDatabase: @unchecked Sendable {
 struct SemanticChunk: Codable, FetchableRecord, MutablePersistableRecord {
     static let databaseTableName = "chunks"
 
-    var id: Int64?          // auto-increment rowid = USearch key
+    var id: Int64?
     var itemId: String
     var chunkType: String   // "abstract", "page", "section"
     var pageStart: Int?
     var pageEnd: Int?
     var chunkText: String
     var tokenCount: Int?
-    var embeddingModel: String
     var createdAt: String
 
     enum CodingKeys: String, CodingKey, ColumnExpression {
@@ -192,7 +184,6 @@ struct SemanticChunk: Codable, FetchableRecord, MutablePersistableRecord {
         case pageEnd = "page_end"
         case chunkText = "chunk_text"
         case tokenCount = "token_count"
-        case embeddingModel = "embedding_model"
         case createdAt = "created_at"
     }
 

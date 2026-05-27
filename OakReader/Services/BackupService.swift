@@ -64,7 +64,7 @@ final class BackupService {
 
     /// Files/directories to exclude from backup.
     private let excludedNames: Set<String> = [
-        "semantic.sqlite", "semantic.usearch", "logs"
+        "semantic.sqlite", "logs"
     ]
 
     // MARK: - Export

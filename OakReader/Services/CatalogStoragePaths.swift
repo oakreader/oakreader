@@ -22,11 +22,6 @@ extension CatalogDatabase {
         dataDirectory.appendingPathComponent("semantic.sqlite")
     }
 
-    /// ~/OakReader/semantic.usearch — HNSW vector index (regenerable)
-    static var semanticIndexURL: URL {
-        dataDirectory.appendingPathComponent("semantic.usearch")
-    }
-
     /// ~/OakReader/logs/
     static var logsDirectory: URL {
         dataDirectory.appendingPathComponent("logs", isDirectory: true)

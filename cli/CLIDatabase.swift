@@ -615,7 +615,7 @@ final class CLIDatabase {
         }
     }
 
-    /// Fetch enriched details for a set of item IDs (shared by keyword and semantic search).
+    /// Fetch enriched details for a set of item IDs (used by keyword search).
     static func fetchSearchDetails(db: Database, ids: [String], limit: Int) throws -> [SearchResultRow] {
         let placeholders = ids.map { _ in "?" }.joined(separator: ",")
         let rows = try Row.fetchAll(db, sql: """
@@ -652,20 +652,6 @@ final class CLIDatabase {
                 abstract: row["abstract"],
                 tags: row["tag_names"]
             )
-        }
-    }
-
-    /// Fetch indexed item IDs from the separate semantic.sqlite.
-    func fetchSemanticChunkItemIds() throws -> Set<String> {
-        let dataDir = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("OakReader", isDirectory: true)
-        let semanticDBURL = dataDir.appendingPathComponent("semantic.sqlite")
-        guard FileManager.default.fileExists(atPath: semanticDBURL.path) else { return [] }
-        let semanticQueue = try DatabaseQueue(path: semanticDBURL.path)
-        return try semanticQueue.read { db in
-            guard try db.tableExists("chunks") else { return [] }
-            let ids = try String.fetchAll(db, sql: "SELECT DISTINCT item_id FROM chunks")
-            return Set(ids)
         }
     }
 

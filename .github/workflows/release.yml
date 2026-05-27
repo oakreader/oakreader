@@ -94,27 +94,6 @@ jobs:
             -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
 
-      # ── Install provisioning profile (for keychain-access-groups) ──
-      - name: Install provisioning profile
-        id: profile
-        if: steps.check.outputs.skip == 'false'
-        env:
-          PROVISIONING_PROFILE: ${{ secrets.PROVISIONING_PROFILE }}
-        run: |
-          PROFILE_PATH="$RUNNER_TEMP/oakreader.provisionprofile"
-          echo "$PROVISIONING_PROFILE" | base64 --decode > "$PROFILE_PATH"
-
-          PROFILE_PLIST=$(security cms -D -i "$PROFILE_PATH")
-          UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" /dev/stdin <<< "$PROFILE_PLIST")
-          NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" /dev/stdin <<< "$PROFILE_PLIST")
-
-          DEST="$HOME/Library/MobileDevice/Provisioning Profiles"
-          mkdir -p "$DEST"
-          cp "$PROFILE_PATH" "$DEST/$UUID.provisionprofile"
-
-          echo "name=$NAME" >> "$GITHUB_OUTPUT"
-          echo "Installed provisioning profile: $NAME ($UUID)"
-
       # ── Generate Xcode project from project.yml ───────────────
       - name: Install XcodeGen
         if: steps.check.outputs.skip == 'false'
@@ -136,9 +115,9 @@ jobs:
             -scheme ${{ env.SCHEME }}
 
       # ── Archive (version + build number injected here) ────────
-      # Signing (manual Developer ID + profile) is scoped to the OakReader
-      # target in project.yml's Release config — NOT passed globally here,
-      # which would break SPM package targets and the oak tool.
+      # Manual Developer ID signing is scoped to the OakReader target in
+      # project.yml's Release config — NOT passed globally here, which would
+      # break SPM package targets and the oak tool.
       - name: Build archive
         if: steps.check.outputs.skip == 'false'
         run: |
@@ -153,16 +132,18 @@ jobs:
             -skipPackagePluginValidation \
             -skipMacroValidation
 
+      # ── Extract the app from the archive ──────────────────────
+      # The archive's product is already Developer-ID-signed (manual signing is
+      # scoped to the OakReader Release config in project.yml), so we skip the
+      # flaky `xcodebuild -exportArchive` distribution machinery and just copy
+      # the .app out. The next step re-seals it after signing the embedded oak.
       - name: Export app
         if: steps.check.outputs.skip == 'false'
         run: |
-          # Inject the provisioning profile name into ExportOptions
-          sed -i '' "s/__PROVISIONING_PROFILE_NAME__/${{ steps.profile.outputs.name }}/" ExportOptions.plist
-
-          xcodebuild -exportArchive \
-            -archivePath "$RUNNER_TEMP/${{ env.APP_NAME }}.xcarchive" \
-            -exportPath "$RUNNER_TEMP/export" \
-            -exportOptionsPlist ExportOptions.plist
+          mkdir -p "$RUNNER_TEMP/export"
+          cp -R \
+            "$RUNNER_TEMP/${{ env.APP_NAME }}.xcarchive/Products/Applications/${{ env.APP_NAME }}.app" \
+            "$RUNNER_TEMP/export/"
 
       # ── Sign embedded oak CLI, then re-seal the app bundle ────
       - name: Sign embedded binaries
@@ -184,8 +165,6 @@ jobs:
           done
 
           # Re-seal the outer bundle so CodeResources covers the (re)signed oak.
-          # The embedded provisioning profile is preserved, so the restricted
-          # keychain-access-groups entitlement still validates at launch.
           codesign --force --sign "$IDENTITY" --options runtime --timestamp \
             --entitlements OakReader/OakReader.entitlements "$APP"
 

@@ -39,7 +39,7 @@ struct LibraryTableToolbar: View {
                             }
                         } label: {
                             Image(systemName: store.isSemanticSearchActive
-                                  ? "sparkle.magnifyingglass"
+                                  ? "text.magnifyingglass"
                                   : "magnifyingglass")
                                 .font(OakStyle.Font.styledCaption)
                                 .foregroundStyle(store.isSemanticSearchActive
@@ -47,8 +47,8 @@ struct LibraryTableToolbar: View {
                                     : Color.primary.opacity(0.55))
                         }
                         .buttonStyle(.plain)
-                        .help(store.isSemanticSearchActive ? "Switch to keyword search" : "Switch to semantic search")
-                        .accessibilityLabel(store.isSemanticSearchActive ? "Semantic search active" : "Keyword search active")
+                        .help(store.isSemanticSearchActive ? "Switch to title search" : "Switch to full-text content search")
+                        .accessibilityLabel(store.isSemanticSearchActive ? "Full-text search active" : "Title search active")
                     } else {
                         Image(systemName: "magnifyingglass")
                             .font(OakStyle.Font.styledCaption)
