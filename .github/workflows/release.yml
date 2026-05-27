@@ -12,7 +12,6 @@ concurrency:
 env:
   APP_NAME: OakReader
   SCHEME: OakReader
-  XCODE_VERSION: "16.0"
   # R2 / hosting. The DMG lives at $DOWNLOAD_BASE_URL/$R2_PREFIX/v<version>/OakReader.dmg
   # and the appcast at $DOWNLOAD_BASE_URL/$R2_PREFIX/appcast.xml (matches SUFeedURL).
   R2_BUCKET: oakreader-downloads
@@ -22,7 +21,10 @@ env:
 
 jobs:
   release:
-    runs-on: macos-15
+    # macos-26 ships Xcode 26 (Swift 6.2+), required by transitive deps like
+    # mlx-audio-swift that pin Swift tools 6.2. macos-15 (Xcode 16/Swift 6.0)
+    # fails package resolution.
+    runs-on: macos-26
     timeout-minutes: 60
     permissions:
       contents: write
@@ -33,9 +35,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app
 
       # ── Version = MARKETING_VERSION (source of truth, in project.yml) ──
       - name: Extract version
