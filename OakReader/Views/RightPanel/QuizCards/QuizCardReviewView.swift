@@ -4,7 +4,7 @@ import Textual
 /// Quiz card review view — Noji-inspired clean, minimal aesthetic.
 struct QuizCardReviewView: View {
     let quizCardsVM: QuizCardsViewModel
-    var onDismiss: (() -> Void)? = nil
+    var onDismiss: (() -> Void)?
 
     @AppStorage("quizCard_ratingButtonCount") private var ratingButtonCount: Int = 2
     @State private var isRevealed = false
@@ -131,7 +131,7 @@ struct QuizCardReviewView: View {
     }
 
     private var progress: CGFloat {
-        guard quizCardsVM.dueCards.count > 0 else { return 0 }
+        guard !quizCardsVM.dueCards.isEmpty else { return 0 }
         return CGFloat(quizCardsVM.currentReviewIndex) / CGFloat(quizCardsVM.dueCards.count)
     }
 
@@ -557,7 +557,9 @@ struct QuizCardReviewView: View {
     }
 
     private var showAnswerButton: some View {
-        Button(action: { withAnimation(.spring(duration: 0.35, bounce: 0.15)) { isRevealed = true } }) {
+        Button {
+            withAnimation(.spring(duration: 0.35, bounce: 0.15)) { isRevealed = true }
+        } label: {
             HStack(spacing: 6) {
                 Text("Show Answer")
                     .font(.system(size: 14, weight: .semibold))
@@ -600,7 +602,9 @@ struct QuizCardReviewView: View {
     }
 
     private func ratingButton(label: String, key: String, rating: ReviewRating, tint: Color) -> some View {
-        Button(action: { quizCardsVM.submitReview(rating: rating) }) {
+        Button {
+            quizCardsVM.submitReview(rating: rating)
+        } label: {
             VStack(spacing: 4) {
                 Text(label)
                     .font(.system(size: 13, weight: .semibold))

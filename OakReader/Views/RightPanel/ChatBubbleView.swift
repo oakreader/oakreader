@@ -37,9 +37,19 @@ struct ChatBubbleView: View {
                         )
                     }
 
-                    // Tool call cards for assistant messages
+                    // Tool call cards for assistant messages. `quiz_cards` tool
+                    // calls are drawn as inline flashcard carousels; everything
+                    // else uses the generic collapsible tool-call summary.
                     if turn.role == .assistant && !turn.toolUses.isEmpty {
-                        ToolCallGroupView(records: turn.toolUses)
+                        if !otherToolRecords.isEmpty {
+                            ToolCallGroupView(records: otherToolRecords)
+                        }
+                        ForEach(renderCardRecords) { record in
+                            if let deck = Self.decodeCardDeck(from: record) {
+                                InlineDeckView(deck: deck, onSaveCard: onSaveQuizCard)
+                                    .environment(\.openURL, citationOpenURLAction)
+                            }
+                        }
                     }
 
                     // Message content
@@ -47,8 +57,9 @@ struct ChatBubbleView: View {
                         messageBubble
                     }
 
-                    // Streaming cursor
-                    if turn.isStreaming || reveal.isAnimating {
+                    // Streaming cursor — only while text is streaming, not while a
+                    // tool-only turn is executing (the tool-call shimmer covers that).
+                    if (turn.isStreaming || reveal.isAnimating) && shouldShowMessageBubble {
                         StreamingCursor()
                             .padding(.leading, 4)
                     }
@@ -151,6 +162,90 @@ struct ChatBubbleView: View {
         turn.role == .assistant && QuizXMLParser.containsQuiz(turn.content)
     }
 
+    /// `quiz_cards` tool calls — rendered as inline flashcard carousels.
+    private var renderCardRecords: [ToolUseRecord] {
+        turn.toolUses.filter { $0.name == "quiz_cards" }
+    }
+
+    /// All other tool calls — rendered via the generic tool-call summary.
+    private var otherToolRecords: [ToolUseRecord] {
+        turn.toolUses.filter { $0.name != "quiz_cards" }
+    }
+
+    /// Decode the flashcards carried in a `quiz_cards` tool call into a
+    /// `QuizDeck` for carousel display. Cards arrive as a structured `cards`
+    /// array once the tool call completes, or as a still-streaming raw
+    /// tool-input buffer under `_partial` while the model is generating them.
+    /// In the streaming case only fully-written card objects are rendered, so
+    /// the carousel grows card-by-card.
+    private static func decodeCardDeck(from record: ToolUseRecord) -> QuizDeck? {
+        let cards: [QuizContent]
+        if let cardValues = record.input.array("cards") {
+            cards = cardValues.compactMap { QuizCardsTool.decodeCard($0) }
+        } else if let partial = record.input["_partial"] {
+            cards = cardsFromPartialJSON(partial)
+        } else {
+            return nil
+        }
+
+        guard !cards.isEmpty else { return nil }
+        return QuizDeck(
+            title: record.input["title"] ?? "",
+            cards: cards
+        )
+    }
+
+    /// Extract complete card objects from a still-streaming raw tool-input JSON
+    /// buffer (e.g. `{"title":"…","cards":[{…},{…},{…`). Finds the `cards`
+    /// array and pulls each balanced `{…}` object via brace counting (ignoring
+    /// braces inside strings), skipping a trailing half-written one — so the
+    /// carousel grows card-by-card.
+    private static func cardsFromPartialJSON(_ raw: String) -> [QuizContent] {
+        guard let keyRange = raw.range(of: "\"cards\"") else { return [] }
+        let after = raw[keyRange.upperBound...]
+        guard let openBracket = after.firstIndex(of: "[") else { return [] }
+
+        let decoder = JSONDecoder()
+        var cards: [QuizContent] = []
+        var depth = 0
+        var inString = false
+        var escaped = false
+        var buf = ""
+
+        var i = after.index(after: openBracket)
+        while i < after.endIndex {
+            let c = after[i]
+            defer { i = after.index(after: i) }
+
+            if depth > 0 { buf.append(c) }
+
+            if escaped {
+                escaped = false
+            } else if c == "\\" {
+                escaped = true
+            } else if c == "\"" {
+                inString.toggle()
+            } else if !inString {
+                if c == "{" {
+                    if depth == 0 { buf = "{" }
+                    depth += 1
+                } else if c == "}" {
+                    depth -= 1
+                    if depth == 0 {
+                        if let data = buf.data(using: .utf8),
+                           let card = try? decoder.decode(QuizContent.self, from: data) {
+                            cards.append(card)
+                        }
+                        buf = ""
+                    }
+                } else if c == "]", depth == 0 {
+                    break
+                }
+            }
+        }
+        return cards
+    }
+
     /// `OpenURLAction` that intercepts `oak://` citation links and delegates
     /// to `onOpenCitation`. Non-oak URLs fall through to the system handler.
     private var citationOpenURLAction: OpenURLAction {
@@ -166,12 +261,37 @@ struct ChatBubbleView: View {
         }
     }
 
+    /// True while this turn's text is still being revealed (network streaming
+    /// or the local reveal animation).
+    private var isRevealing: Bool {
+        turn.isStreaming || reveal.isAnimating
+    }
+
     /// Builds a `StructuredText` view with the shared chat styling applied.
-    private func chatMarkdown(_ markdown: String) -> some View {
-        StructuredText(markdown: protectMathBackslashes(markdown), syntaxExtensions: [.math])
+    ///
+    /// Math renders live (the `.math` extension stays on while streaming) so a
+    /// formula appears the instant its closing `$`/`$$` arrives. We never *seal*
+    /// incomplete math (see `sealIncompleteMarkdown`): Textual ignores an
+    /// unclosed `$`, so a half-written formula stays literal text until it
+    /// closes and Textual never lays out a malformed equation.
+    ///
+    /// Text *selection* is deferred until streaming settles. Textual's
+    /// `AttachmentView` reads `@Environment(TextSelectionModel.self)` per
+    /// attachment; with selection enabled the attachment overlay (a
+    /// `GeometryReader` inside `overlayPreferenceValue(Text.LayoutKey)`) can
+    /// enter a non-converging layout transaction that spins the main thread
+    /// (frozen "white screen"), and the 60fps reveal makes it far worse.
+    /// Selecting mid-stream text is pointless anyway.
+    @ViewBuilder
+    private func chatMarkdown(_ markdown: String, streaming: Bool = false) -> some View {
+        let text = StructuredText(markdown: protectMathBackslashes(markdown), syntaxExtensions: [.math])
             .textual.headingStyle(ChatHeadingStyle())
-            .textual.textSelection(.enabled)
             .font(OakStyle.ChatFont.messageBody)
+        if streaming {
+            text
+        } else {
+            text.textual.textSelection(.enabled)
+        }
     }
 
     /// Renders interleaved text segments, inline quiz views, and deck carousels.
@@ -197,7 +317,7 @@ struct ChatBubbleView: View {
     @ViewBuilder
     private var plainMessageBubble: some View {
         if turn.role == .assistant {
-            chatMarkdown(renderedContent)
+            chatMarkdown(renderedContent, streaming: isRevealing)
                 .environment(\.openURL, citationOpenURLAction)
                 .assistantBubbleStyle()
         } else {
@@ -335,7 +455,14 @@ struct ChatBubbleView: View {
     }
 
     private var shouldShowMessageBubble: Bool {
-        turn.role == .assistant || !renderedContent.isEmpty || !skillBadges.isEmpty || !referenceBadges.isEmpty
+        if turn.role == .assistant {
+            // Skip the empty bubble for tool-only agentic turns (no text content).
+            // While tools are executing the turn streams with empty content but
+            // carries tool-use records — don't render a blank bubble for it.
+            if !renderedContent.isEmpty { return true }
+            return (turn.isStreaming || reveal.isAnimating) && turn.toolUses.isEmpty
+        }
+        return !renderedContent.isEmpty || !skillBadges.isEmpty || !referenceBadges.isEmpty
     }
 
     private func skillBadge(_ skillId: String) -> some View {
@@ -654,7 +781,7 @@ private struct OakScriptShape: Shape {
 // in a clockwise loop, each with a soft glow halo when active.
 // Sequence: 0→1→2→5→8→7→6→3 (outer ring), center dot pulses gently.
 
-private struct StreamingCursor: View {
+struct StreamingCursor: View {
     private static let dotSize: CGFloat = 2.5
     private static let spacing: CGFloat = 2.5
     private static let glowRadius: CGFloat = 2.5
@@ -1008,12 +1135,38 @@ private final class StreamRevealController {
 
     // MARK: - Helpers
 
+    /// Commit cadence throttle. `displayedContent` assignment triggers a full
+    /// SwiftUI text re-layout (`TextLayoutManager.computeMetrics`), whose cost
+    /// grows with text length. Committing at 60fps on a long message saturates
+    /// the main thread → visible stutter/"white flash". So the character count
+    /// still advances every 60fps tick (pacing unaffected), but the expensive
+    /// published write backs off as the text grows. The final char always
+    /// commits immediately so nothing is left un-rendered.
+    private var lastCommitTime: TimeInterval = 0
+
+    private static func commitInterval(forLength n: Int) -> TimeInterval {
+        switch n {
+        case ..<2_000: return 1.0 / 60.0   // short: smooth 60fps
+        case ..<6_000: return 1.0 / 30.0   // medium: 30fps
+        default:       return 1.0 / 15.0   // long: 15fps (layout is heavy)
+        }
+    }
+
     private func advanceDisplay(by chars: Int) {
-        let target = targetContent
         let newCount = min(displayedCount + chars, targetCount)
+        displayedCount = newCount
+
+        // Throttle the expensive commit; always commit the final character.
+        let now = ProcessInfo.processInfo.systemUptime
+        let reachedEnd = newCount >= targetCount
+        guard reachedEnd || now - lastCommitTime >= Self.commitInterval(forLength: targetCount) else {
+            return
+        }
+        lastCommitTime = now
+
+        let target = targetContent
         let endIdx = target.index(target.startIndex, offsetBy: newCount)
         displayedContent = String(target[..<endIdx])
-        displayedCount = newCount
     }
 
     private func syncImmediate(_ content: String) {
@@ -1037,6 +1190,7 @@ private final class StreamRevealController {
         wasRendering = false
         bufferEmptySince = 0
         charAccum = 0
+        lastCommitTime = 0
     }
 
     private static func clamp(_ value: Double, _ lo: Double, _ hi: Double) -> Double {
