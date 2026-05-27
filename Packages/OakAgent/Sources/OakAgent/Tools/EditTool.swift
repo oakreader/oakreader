@@ -29,7 +29,7 @@ public struct EditTool: AgentTool {
 
     public init() {}
 
-    public func execute(input: [String: String], context: ToolExecutionContext) async throws -> ToolOutput {
+    public func execute(input: ToolInput, context: ToolExecutionContext) async throws -> ToolOutput {
         guard let rawPath = input["path"] else {
             return .error("Missing required parameter: path")
         }

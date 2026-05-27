@@ -232,7 +232,7 @@ final class ChapterGenerationService {
                 switch chunk {
                 case .delta(let text): fullResponse += text
                 case .thinking: break
-                case .toolUse: break
+                case .toolUse, .toolInputDelta: break
                 case .finished: break
                 case .error(let msg):
                     Log.error(Log.chapters, "Enrichment AI error: \(msg)")
@@ -523,7 +523,7 @@ final class ChapterGenerationService {
                     fullResponse += text
                 case .thinking:
                     break
-                case .toolUse:
+                case .toolUse, .toolInputDelta:
                     break
                 case .finished:
                     break

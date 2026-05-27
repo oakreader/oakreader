@@ -116,7 +116,7 @@ public struct GoogleProvider: LLMProviderService {
                         ] as [String: Any]
                     ])
                 case .toolUse(let toolCall):
-                    let args: [String: Any] = toolCall.input.reduce(into: [:]) { $0[$1.key] = $1.value }
+                    let args: [String: Any] = toolCall.input.jsonObject
                     parts.append([
                         "functionCall": [
                             "name": toolCall.name,
@@ -179,11 +179,7 @@ public struct GoogleProvider: LLMProviderService {
                     {
                         let callId = UUID().uuidString
                         let args = functionCall["args"] as? [String: Any] ?? [:]
-                        var input: [String: String] = [:]
-                        for (key, value) in args {
-                            input[key] = "\(value)"
-                        }
-                        let toolCall = ToolCall(id: callId, name: name, input: input)
+                        let toolCall = ToolCall(id: callId, name: name, input: ToolInput(jsonObject: args))
                         continuation.yield(.toolUse(toolCall))
                     }
                 }

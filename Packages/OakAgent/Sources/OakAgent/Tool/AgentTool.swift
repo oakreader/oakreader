@@ -1,4 +1,5 @@
 import Foundation
+@_exported import OakAI
 
 // MARK: - Tool Category
 
@@ -28,7 +29,7 @@ public protocol AgentTool: Sendable {
     var category: ToolCategory { get }
 
     /// Execute the tool with the given context and return a result.
-    func execute(input: [String: String], context: ToolExecutionContext) async throws -> ToolOutput
+    func execute(input: ToolInput, context: ToolExecutionContext) async throws -> ToolOutput
 }
 
 extension AgentTool {

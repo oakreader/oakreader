@@ -187,7 +187,7 @@ public struct AnthropicProvider: LLMProviderService {
                             "type": "tool_use",
                             "id": toolCall.id,
                             "name": toolCall.name,
-                            "input": toolCall.input,
+                            "input": toolCall.input.jsonObject,
                         ] as [String: Any]
                     case .toolResult(let result):
                         return [
@@ -259,6 +259,11 @@ public struct AnthropicProvider: LLMProviderService {
                               let partial = delta["partial_json"] as? String
                     {
                         currentToolInput += partial
+                        continuation.yield(.toolInputDelta(
+                            id: currentToolId ?? "",
+                            name: currentToolName ?? "",
+                            partialJSON: currentToolInput
+                        ))
                     }
                 }
 
@@ -303,17 +308,8 @@ public struct AnthropicProvider: LLMProviderService {
         continuation.finish()
     }
 
-    private func parseToolInput(_ jsonString: String) -> [String: String] {
-        guard !jsonString.isEmpty,
-              let data = jsonString.data(using: .utf8),
-              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else { return [:] }
-
-        var result: [String: String] = [:]
-        for (key, value) in obj {
-            result[key] = "\(value)"
-        }
-        return result
+    private func parseToolInput(_ jsonString: String) -> ToolInput {
+        ToolInput(json: jsonString)
     }
 
     /// Extract human-readable message from Anthropic error JSON.

@@ -24,7 +24,7 @@ public struct FindTool: AgentTool {
 
     public init() {}
 
-    public func execute(input: [String: String], context: ToolExecutionContext) async throws -> ToolOutput {
+    public func execute(input: ToolInput, context: ToolExecutionContext) async throws -> ToolOutput {
         guard let pattern = input["pattern"] else {
             return .error("Missing required parameter: pattern")
         }

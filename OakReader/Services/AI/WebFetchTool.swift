@@ -31,7 +31,7 @@ struct WebFetchTool: AgentTool, Sendable {
         ]
     }
 
-    func execute(input: [String: String], context: ToolExecutionContext) async throws -> ToolOutput {
+    func execute(input: ToolInput, context: ToolExecutionContext) async throws -> ToolOutput {
         guard let urlString = input["url"], !urlString.isEmpty else {
             return .error("Missing required parameter: url")
         }

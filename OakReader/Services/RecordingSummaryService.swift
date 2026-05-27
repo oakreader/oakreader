@@ -48,7 +48,7 @@ actor RecordingSummaryService {
                     break
                 case .finished, .error:
                     break
-                case .toolUse:
+                case .toolUse, .toolInputDelta:
                     break
                 }
             }

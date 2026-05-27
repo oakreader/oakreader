@@ -58,7 +58,7 @@ struct UpdateMemoryTool: AgentTool {
 
     var category: ToolCategory { .write }
 
-    func execute(input: [String: String], context: ToolExecutionContext) async throws -> ToolOutput {
+    func execute(input: ToolInput, context: ToolExecutionContext) async throws -> ToolOutput {
         guard let section = input["section"], !section.isEmpty else {
             return ToolOutput(content: "Error: 'section' parameter is required.")
         }
@@ -159,7 +159,7 @@ struct UpdateUserProfileTool: AgentTool {
 
     var category: ToolCategory { .write }
 
-    func execute(input: [String: String], context: ToolExecutionContext) async throws -> ToolOutput {
+    func execute(input: ToolInput, context: ToolExecutionContext) async throws -> ToolOutput {
         guard let section = input["section"], !section.isEmpty else {
             return ToolOutput(content: "Error: 'section' parameter is required.")
         }
@@ -278,7 +278,7 @@ struct LogLearningTool: AgentTool {
 
     var category: ToolCategory { .write }
 
-    func execute(input: [String: String], context: ToolExecutionContext) async throws -> ToolOutput {
+    func execute(input: ToolInput, context: ToolExecutionContext) async throws -> ToolOutput {
         guard let type = input["type"], !type.isEmpty else {
             return ToolOutput(content: "Error: 'type' parameter is required.")
         }
@@ -355,7 +355,7 @@ struct PromoteMemoryTool: AgentTool {
 
     var category: ToolCategory { .write }
 
-    func execute(input: [String: String], context: ToolExecutionContext) async throws -> ToolOutput {
+    func execute(input: ToolInput, context: ToolExecutionContext) async throws -> ToolOutput {
         guard let target = input["target"], !target.isEmpty else {
             return ToolOutput(content: "Error: 'target' parameter is required.")
         }
@@ -459,7 +459,7 @@ struct SearchLearningLogTool: AgentTool {
 
     var category: ToolCategory { .readOnly }
 
-    func execute(input: [String: String], context: ToolExecutionContext) async throws -> ToolOutput {
+    func execute(input: ToolInput, context: ToolExecutionContext) async throws -> ToolOutput {
         let query = input["query"]?.lowercased()
         let subjectFilter = input["subject"]?.lowercased()
         let typeFilter = input["type_filter"]

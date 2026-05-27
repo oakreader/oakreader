@@ -205,7 +205,7 @@ public struct OpenAIResponsesProvider: LLMProviderService {
                     for part in msg.content {
                         if case .toolUse(let call) = part {
                             let argsJSON: String
-                            if let data = try? JSONSerialization.data(withJSONObject: call.input),
+                            if let data = try? JSONSerialization.data(withJSONObject: call.input.jsonObject),
                                let str = String(data: data, encoding: .utf8) {
                                 argsJSON = str
                             } else {
@@ -258,8 +258,11 @@ public struct OpenAIResponsesProvider: LLMProviderService {
         bytes: URLSession.AsyncBytes,
         continuation: AsyncThrowingStream<StreamChunk, Error>.Continuation
     ) async throws {
-        // Accumulate function calls: callId → (name, arguments)
-        var toolCallAccumulators: [String: (name: String, arguments: String)] = [:]
+        // Accumulate function calls keyed by ITEM id (`item_id`), because that is
+        // what the `response.function_call_arguments.delta`/`.done` events carry —
+        // they do NOT include `call_id`. We still remember `call_id` separately
+        // since that is the id the tool result must reference on the way back.
+        var toolCallAccumulators: [String: (callId: String, name: String, arguments: String)] = [:]
 
         for try await line in bytes.lines {
             guard !Task.isCancelled else {
@@ -295,27 +298,40 @@ public struct OpenAIResponsesProvider: LLMProviderService {
                 if let item = json["item"] as? [String: Any],
                    let itemType = item["type"] as? String,
                    itemType == "function_call",
-                   let callId = item["call_id"] as? String
+                   let itemId = item["id"] as? String
                 {
+                    let callId = item["call_id"] as? String ?? itemId
                     let name = item["name"] as? String ?? ""
-                    toolCallAccumulators[callId] = (name: name, arguments: "")
+                    toolCallAccumulators[itemId] = (
+                        callId: callId,
+                        name: name,
+                        arguments: item["arguments"] as? String ?? ""
+                    )
                 }
 
-            // Function call arguments streaming
+            // Function call arguments streaming — keyed by `item_id`.
             case "response.function_call_arguments.delta":
-                if let callId = json["call_id"] as? String,
+                if let itemId = json["item_id"] as? String,
                    let delta = json["delta"] as? String
                 {
-                    toolCallAccumulators[callId]?.arguments += delta
+                    toolCallAccumulators[itemId]?.arguments += delta
+                    if let acc = toolCallAccumulators[itemId] {
+                        continuation.yield(.toolInputDelta(
+                            id: acc.callId, name: acc.name, partialJSON: acc.arguments
+                        ))
+                    }
                 }
 
-            // Function call arguments complete
+            // Function call arguments complete — keyed by `item_id`. The event's
+            // own `arguments` field is the authoritative full string; fall back
+            // to what we accumulated from deltas.
             case "response.function_call_arguments.done":
-                if let callId = json["call_id"] as? String,
-                   let acc = toolCallAccumulators.removeValue(forKey: callId)
+                if let itemId = json["item_id"] as? String,
+                   let acc = toolCallAccumulators.removeValue(forKey: itemId)
                 {
-                    let input = parseToolInput(acc.arguments)
-                    let toolCall = ToolCall(id: callId, name: acc.name, input: input)
+                    let argsString = (json["arguments"] as? String) ?? acc.arguments
+                    let input = parseToolInput(argsString)
+                    let toolCall = ToolCall(id: acc.callId, name: acc.name, input: input)
                     continuation.yield(.toolUse(toolCall))
                 }
 
@@ -328,9 +344,9 @@ public struct OpenAIResponsesProvider: LLMProviderService {
                     stopReason = "stop"
                 }
                 // Flush any remaining tool calls
-                for (callId, acc) in toolCallAccumulators {
+                for (_, acc) in toolCallAccumulators {
                     let input = parseToolInput(acc.arguments)
-                    continuation.yield(.toolUse(ToolCall(id: callId, name: acc.name, input: input)))
+                    continuation.yield(.toolUse(ToolCall(id: acc.callId, name: acc.name, input: input)))
                 }
                 toolCallAccumulators.removeAll()
                 continuation.yield(.finished(stopReason: stopReason))
@@ -366,16 +382,7 @@ public struct OpenAIResponsesProvider: LLMProviderService {
         continuation.finish()
     }
 
-    private func parseToolInput(_ jsonString: String) -> [String: String] {
-        guard !jsonString.isEmpty,
-              let data = jsonString.data(using: .utf8),
-              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else { return [:] }
-
-        var result: [String: String] = [:]
-        for (key, value) in obj {
-            result[key] = "\(value)"
-        }
-        return result
+    private func parseToolInput(_ jsonString: String) -> ToolInput {
+        ToolInput(json: jsonString)
     }
 }
