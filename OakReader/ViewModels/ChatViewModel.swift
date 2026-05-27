@@ -236,9 +236,11 @@ class ChatViewModel {
             ))
         }
 
-        // 2. Full-text content search (FTS5 over the indexed library)
+        // 2. Full-text content search (FTS5 over the indexed library), plus a
+        //    research subagent for deep multi-document questions (its own loop).
         if let semanticService = appState?.semanticIndexService {
             tools.append(SemanticSearchTool(service: semanticService))
+            tools.append(ResearchTool(searchService: semanticService, config: currentConfig))
         }
 
         // 3. Web search (always)

@@ -13,8 +13,21 @@ final class SemanticDatabase: @unchecked Sendable {
             withIntermediateDirectories: true
         )
 
+        // Clean up the legacy vector index left by pre-FTS5 builds (regenerable cache,
+        // never read again). Best-effort — failure here must not block opening the DB.
+        let legacyVectorIndex = dbURL.deletingLastPathComponent().appendingPathComponent("semantic.usearch")
+        try? FileManager.default.removeItem(at: legacyVectorIndex)
+
         var config = Configuration()
         config.foreignKeysEnabled = false // no FK to catalog.db
+        // The index is opened on more than one connection (background indexing +
+        // the settings stats poll / Rebuild button). Use WAL + a busy timeout so a
+        // Rebuild's DELETE waits for an in-flight indexing write instead of failing
+        // immediately with SQLITE_BUSY.
+        config.busyMode = .timeout(5)
+        config.prepareDatabase { db in
+            try db.execute(sql: "PRAGMA journal_mode = WAL")
+        }
         dbQueue = try DatabaseQueue(path: dbURL.path, configuration: config)
         try Self.migrator.migrate(dbQueue)
     }
@@ -127,38 +140,67 @@ final class SemanticDatabase: @unchecked Sendable {
 
     // MARK: - FTS5 Search
 
-    /// A BM25-ranked full-text hit: chunk rowid plus a relevance score (higher = better).
+    /// A BM25-ranked full-text hit: chunk rowid, a relevance score (higher = better),
+    /// and a `snippet()` excerpt — the window of text around the matched terms.
     struct Hit: Sendable {
         let chunkId: Int64
         let score: Double
+        let snippet: String
     }
 
     /// BM25 keyword search on chunk text, ordered by relevance.
-    func bm25Search(query: String, maxResults: Int = 50) throws -> [Hit] {
+    /// - Parameter itemIds: when non-nil, restricts the search to chunks of those items.
+    func bm25Search(query: String, maxResults: Int = 50, itemIds: [String]? = nil) throws -> [Hit] {
         try dbQueue.read { db in
             let sanitized = Self.sanitizeFTS5Query(query)
             guard !sanitized.isEmpty else { return [] }
 
-            // FTS5 bm25() returns lower (more negative) values for better matches;
-            // negate so higher = more relevant for downstream sorting.
-            let rows = try Row.fetchAll(db, sql: """
-                SELECT rowid, bm25(chunks_fts) AS score FROM chunks_fts
-                WHERE chunks_fts MATCH ?
-                ORDER BY rank
-                LIMIT ?
-                """, arguments: [sanitized, maxResults])
-            return rows.map { Hit(chunkId: $0["rowid"], score: -($0["score"] as Double)) }
+            // snippet() returns the text window around the match (column 0 = chunk_text,
+            // up to 16 tokens) so the agent sees *why* a chunk matched, not a blind prefix.
+            // bm25() is lower (more negative) for better matches; negate so higher = better.
+            var sql = """
+                SELECT chunks_fts.rowid AS rowid,
+                       bm25(chunks_fts) AS score,
+                       snippet(chunks_fts, 0, '', '', '…', 16) AS snip
+                FROM chunks_fts
+                """
+            var arguments: [DatabaseValueConvertible] = [sanitized]
+            if let itemIds, !itemIds.isEmpty {
+                let placeholders = itemIds.map { _ in "?" }.joined(separator: ",")
+                sql += """
+                     JOIN chunks ON chunks.id = chunks_fts.rowid
+                    WHERE chunks_fts MATCH ? AND chunks.item_id IN (\(placeholders))
+                    """
+                arguments += itemIds
+            } else {
+                sql += " WHERE chunks_fts MATCH ?"
+            }
+            sql += " ORDER BY rank LIMIT ?"
+            arguments.append(maxResults)
+
+            let rows = try Row.fetchAll(db, sql: sql, arguments: StatementArguments(arguments))
+            return rows.map {
+                Hit(chunkId: $0["rowid"], score: -($0["score"] as Double), snippet: $0["snip"] ?? "")
+            }
         }
     }
 
-    /// Sanitize a user query for FTS5 MATCH syntax.
+    /// Build an FTS5 MATCH expression from a natural-language query.
+    /// Each term becomes a quoted prefix, joined by OR — so partial matches surface and
+    /// BM25 ranks documents containing more (and rarer) of the terms higher. This is far
+    /// more forgiving than ANDing every word, which often returns nothing.
     private static func sanitizeFTS5Query(_ query: String) -> String {
-        // Split into words, wrap each in quotes to treat as literal terms (implicit AND).
         let words = query.components(separatedBy: .whitespacesAndNewlines)
             .map { $0.trimmingCharacters(in: .punctuationCharacters) }
             .filter { !$0.isEmpty }
         guard !words.isEmpty else { return "" }
-        return words.map { "\"\($0)\"" }.joined(separator: " ")
+        // Double any interior quotes — FTS5 string tokens escape `"` as `""`.
+        // Without this a query containing a stray quote produces a malformed MATCH
+        // expression that throws and silently yields zero results. Trailing `*` makes
+        // each term a prefix match.
+        return words
+            .map { "\"\($0.replacingOccurrences(of: "\"", with: "\"\""))\"*" }
+            .joined(separator: " OR ")
     }
 }
 
