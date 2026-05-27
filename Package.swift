@@ -16,34 +16,20 @@ let package = Package(
         .package(url: "https://github.com/raspu/Highlightr.git", from: "2.3.0"),
         .package(url: "https://github.com/stackotter/swift-cmark-gfm", from: "1.0.2"),
         .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.0"),
-        .package(url: "https://github.com/ml-explore/mlx-swift", from: "0.31.3"),
-        .package(url: "https://github.com/ml-explore/mlx-swift-lm.git", from: "3.0.0"),
-        .package(url: "https://github.com/unum-cloud/usearch", "2.0.0"..<"2.17.0"),
 
         .package(url: "https://github.com/open-spaced-repetition/swift-fsrs", branch: "main"),
     ],
     targets: [
-        .target(
-            name: "ObjCExceptionCatcher",
-            path: "OakReader/Utilities",
-            sources: ["ObjCExceptionCatcher.m"],
-            publicHeadersPath: "."
-        ),
         .executableTarget(
             name: "OakReader",
             dependencies: [
                 "OakAgent",
                 "OakVoice",
-                "ObjCExceptionCatcher",
                 .product(name: "Textual", package: "textual"),
                 .product(name: "GRDB", package: "GRDB.swift"),
                 .product(name: "Highlightr", package: "Highlightr"),
                 .product(name: "CMarkGFM", package: "swift-cmark-gfm"),
                 .product(name: "Sparkle", package: "Sparkle"),
-                .product(name: "MLX", package: "mlx-swift"),
-                .product(name: "MLXEmbedders", package: "mlx-swift-lm"),
-                .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
-                .product(name: "USearch", package: "usearch"),
 
                 .product(name: "FSRS", package: "swift-fsrs"),
             ],
@@ -51,11 +37,8 @@ let package = Package(
             exclude: [
                 "App/Info.plist",
                 "OakReader.entitlements",
-                "OakReader-Bridging-Header.h",
                 "Resources/Assets.xcassets",
-                "Resources/DefaultStamps",
-                "Utilities/ObjCExceptionCatcher.h",
-                "Utilities/ObjCExceptionCatcher.m"
+                "Resources/DefaultStamps"
             ],
             resources: [
                 .copy("Resources/Assets.xcassets")

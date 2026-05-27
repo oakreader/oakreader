@@ -102,7 +102,7 @@ struct LibrarySettingsView: View {
 
     @MainActor
     private func loadStats() async {
-        let stats = try? SemanticDatabase().indexStats()
+        let stats = try? FTSDatabase().indexStats()
         let total: Int = (try? await store.database.dbQueue.read { db in
             try Int.fetchOne(db, sql: """
                 SELECT COUNT(*) FROM items i
@@ -122,9 +122,9 @@ struct LibrarySettingsView: View {
         isRebuilding = true
         Task {
             do {
-                try SemanticDatabase().destroyAll()
+                try FTSDatabase().destroyAll()
             } catch {
-                Log.error(Log.semantic, "Failed to clear semantic index: \(error)")
+                Log.error(Log.fts, "Failed to clear search index: \(error)")
             }
 
             await MainActor.run {
@@ -134,7 +134,7 @@ struct LibrarySettingsView: View {
                 }
             }
 
-            NotificationCenter.default.post(name: .semanticIndexRebuildRequested, object: nil)
+            NotificationCenter.default.post(name: .searchIndexRebuildRequested, object: nil)
 
             await MainActor.run {
                 isRebuilding = false

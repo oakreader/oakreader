@@ -315,7 +315,7 @@ struct LLMContextProvider {
             parts.append("""
                 You have tools to read document pages (read_document), search within the \
                 document (search_document), and find conceptually related items via vector \
-                search (search_semantic). Use the read tool to read note files by their \
+                search (search_content). Use the read tool to read note files by their \
                 path listed above. Use the oak tool to search the library \
                 (oak search <query>), read any item's content \
                 (oak items read <citeKey> --pages 1-5), list collections \
@@ -333,7 +333,7 @@ struct LLMContextProvider {
                 read any item's content (oak items read <citeKey> --pages 1-5), \
                 list collections (oak collections list), list tags (oak tags list), \
                 browse items (oak items list), and manage the library. \
-                Use search_semantic for conceptual/thematic queries and \
+                Use search_content for conceptual/thematic queries and \
                 search_academic to find papers on the web.
                 """)
         }
@@ -407,7 +407,7 @@ struct LLMContextProvider {
 
             // Cross-document references
             parts.append("""
-                For cross-document references (from search_semantic, \
+                For cross-document references (from search_content, \
                 oak search, or <referenced-documents> in the user message), \
                 use the target document's cite-key:
                 [citeKey, p. N](oak://cite/targetCiteKey?page=N)

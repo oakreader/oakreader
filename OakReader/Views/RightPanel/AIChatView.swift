@@ -224,12 +224,30 @@ struct AIChatView: View {
                             .transition(.opacity)
                     }
 
+                    // Research subagent live status (search / read / synthesize).
+                    if let activity = chatVM.researchActivity {
+                        HStack(spacing: 6) {
+                            Image(systemName: "sparkle.magnifyingglass")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(activity)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                        .padding(.leading, 4)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .transition(.opacity)
+                    }
+
                     // Invisible anchor at the very bottom — more reliable
                     // than scrolling to the last turn whose height is still growing.
                     Color.clear.frame(height: 1).id("bottom")
                 }
                 .padding(OakStyle.Spacing.sm)
                 .animation(.easeInOut(duration: 0.2), value: showWorkingIndicator)
+                .animation(.easeInOut(duration: 0.2), value: chatVM.researchActivity)
                 .animation(.spring(duration: 0.35, bounce: 0.15), value: chatVM.turns.count)
                 .background(
                     GeometryReader { inner in

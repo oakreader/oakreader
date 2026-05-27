@@ -114,8 +114,8 @@ extension ImportService {
         try? referenceService.saveMetadata(csl, forItemId: docId.uuidString)
         store.invalidate()
 
-        // Semantic index for vector search
-        if let service = semanticIndexService {
+        // Full-text search index (FTS5)
+        if let service = ftsIndexService {
             Task {
                 await service.indexItem(
                     itemId: docId.uuidString,

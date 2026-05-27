@@ -257,7 +257,7 @@ enum CommandRegistry {
             title: "Rebuild Search Index",
             category: .search,
             icon: "arrow.triangle.2.circlepath",
-            action: .rebuildSemanticIndex
+            action: .rebuildSearchIndex
         ),
     ]
 

@@ -21,6 +21,6 @@ enum DocumentAction: String {
 
 extension Notification.Name {
     static let documentAction = Notification.Name("OakReaderDocumentAction")
-    static let semanticIndexRebuildRequested = Notification.Name("OakReaderSemanticIndexRebuildRequested")
+    static let searchIndexRebuildRequested = Notification.Name("OakReaderSearchIndexRebuildRequested")
     static let settingsNavigateToTab = Notification.Name("OakReaderSettingsNavigateToTab")
 }

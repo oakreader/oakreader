@@ -41,7 +41,6 @@ public enum OAuthTokenStore: Sendable {
         let baseQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecUseDataProtectionKeychain as String: true,
         ]
 
         SecItemDelete(baseQuery as CFDictionary)
@@ -61,7 +60,6 @@ public enum OAuthTokenStore: Sendable {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecUseDataProtectionKeychain as String: true,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
         ]
@@ -76,7 +74,6 @@ public enum OAuthTokenStore: Sendable {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecUseDataProtectionKeychain as String: true,
         ]
         SecItemDelete(query as CFDictionary)
     }

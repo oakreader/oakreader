@@ -1,7 +1,7 @@
 import CMarkGFM
 import Foundation
 
-/// Chunks text content for semantic indexing.
+/// Chunks text content for full-text indexing.
 /// Two strategies: plain text (sentence-boundary) and markdown (heading-aware via cmark-gfm).
 enum ContentChunker {
 

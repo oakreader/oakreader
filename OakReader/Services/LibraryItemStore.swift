@@ -312,10 +312,10 @@ extension LibraryStore {
             let dir = CatalogDatabase.documentDirectory(storageKey: item.storageKey)
             try? FileManager.default.removeItem(at: dir)
 
-            // Clean up semantic chunks (GRDB side handled by CASCADE, explicit for safety)
+            // Clean up full-text chunks (GRDB side handled by CASCADE, explicit for safety)
             let itemIdForCleanup = item.id.uuidString
             Task { [weak self] in
-                await self?.semanticIndexService?.removeChunks(forItemId: itemIdForCleanup)
+                await self?.ftsIndexService?.removeChunks(forItemId: itemIdForCleanup)
             }
 
             invalidate()

@@ -522,7 +522,7 @@ private struct CollectionRowView: View {
                     }
                 }
 
-                if appState.semanticIndexService != nil {
+                if appState.ftsIndexService != nil {
                     Divider()
                     Button {
                         embedCollectionContent(collection)
@@ -570,7 +570,7 @@ private struct CollectionRowView: View {
     }
 
     private func embedCollectionContent(_ collection: PDFCollection) {
-        guard let service = appState.semanticIndexService else { return }
+        guard let service = appState.ftsIndexService else { return }
         let collectionItems = store.items.filter { $0.collections.contains { $0.id == collection.id } }
         let itemIds = collectionItems.map(\.id.uuidString)
         guard !itemIds.isEmpty else { return }

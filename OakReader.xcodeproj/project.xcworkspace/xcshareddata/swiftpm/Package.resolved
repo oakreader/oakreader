@@ -1,24 +1,6 @@
 {
-  "originHash" : "3bd693ed9839cd16a446fa5c50a682c6f9673d005237b62c220587c7b98c1b68",
+  "originHash" : "c4bef2bf0662ce507d93172fc92dcd3ee555ae31a36cc3ab1fcf4c0e5f60cf22",
   "pins" : [
-    {
-      "identity" : "dsfappearancemanager",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/dagronf/DSFAppearanceManager",
-      "state" : {
-        "revision" : "e9add5fdf05fe50950d105c77963b7373ddb5ad4",
-        "version" : "3.5.1"
-      }
-    },
-    {
-      "identity" : "dsfquickactionbar",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/dagronf/DSFQuickActionBar",
-      "state" : {
-        "revision" : "7be7b3bd2cebb19ee119ba1f972ecce581de5aeb",
-        "version" : "6.2.0"
-      }
-    },
     {
       "identity" : "grdb.swift",
       "kind" : "remoteSourceControl",
@@ -35,24 +17,6 @@
       "state" : {
         "revision" : "05e7fcc63b33925cd0c1faaa205cdd5681e7bbef",
         "version" : "2.3.0"
-      }
-    },
-    {
-      "identity" : "mlx-swift",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/ml-explore/mlx-swift.git",
-      "state" : {
-        "revision" : "61b9e011e09a62b489f6bd647958f1555bdf2896",
-        "version" : "0.31.3"
-      }
-    },
-    {
-      "identity" : "mlx-swift-lm",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/ml-explore/mlx-swift-lm.git",
-      "state" : {
-        "revision" : "1c05248bb0899e2a7a4962b84d319cf12f4e12aa",
-        "version" : "3.31.3"
       }
     },
     {
@@ -101,24 +65,6 @@
       }
     },
     {
-      "identity" : "swift-numerics",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-numerics",
-      "state" : {
-        "revision" : "0c0290ff6b24942dadb83a929ffaaa1481df04a2",
-        "version" : "1.1.1"
-      }
-    },
-    {
-      "identity" : "swift-syntax",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/swiftlang/swift-syntax.git",
-      "state" : {
-        "revision" : "0687f71944021d616d34d922343dcef086855920",
-        "version" : "600.0.1"
-      }
-    },
-    {
       "identity" : "swiftui-math",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/gonzalezreal/swiftui-math",
@@ -134,15 +80,6 @@
       "state" : {
         "revision" : "5b06b811c0f5313b6b84bbef98c635a630638c38",
         "version" : "0.3.1"
-      }
-    },
-    {
-      "identity" : "usearch",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/unum-cloud/usearch",
-      "state" : {
-        "revision" : "cfb5132dfb5a7a8292611398a0041b12d14eba09",
-        "version" : "2.16.10"
       }
     }
   ],

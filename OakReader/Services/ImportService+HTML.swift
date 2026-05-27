@@ -94,7 +94,7 @@ extension ImportService {
             return nil
         }
 
-        // Save extracted Markdown before semantic indexing starts so search prefers clean article text.
+        // Save extracted Markdown before full-text indexing starts so search prefers clean article text.
         if let contentMarkdown,
            !contentMarkdown.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             let mdURL = item.fileURL.deletingLastPathComponent().appendingPathComponent("content.md")
@@ -118,8 +118,8 @@ extension ImportService {
             }
         }
 
-        // Semantic index for vector search
-        if let service = semanticIndexService {
+        // Full-text search index (FTS5)
+        if let service = ftsIndexService {
             Task {
                 await service.indexItem(
                     itemId: docId.uuidString,

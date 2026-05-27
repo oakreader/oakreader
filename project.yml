@@ -28,20 +28,8 @@ packages:
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
     from: "2.6.0"
-  mlx-swift:
-    url: https://github.com/ml-explore/mlx-swift
-    from: "0.31.3"
-  mlx-swift-lm:
-    url: https://github.com/ml-explore/mlx-swift-lm.git
-    from: "3.0.0"
-  usearch:
-    url: https://github.com/unum-cloud/usearch
-    from: "2.0.0"
   OakVoice:
     path: Packages/OakVoice
-  DSFQuickActionBar:
-    url: https://github.com/dagronf/DSFQuickActionBar
-    from: "6.2.0"
   swift-fsrs:
     url: https://github.com/open-spaced-repetition/swift-fsrs
     branch: main
@@ -76,16 +64,7 @@ targets:
       - package: Highlightr
       - package: CMarkGFM
       - package: Sparkle
-      - package: mlx-swift
-        product: MLX
-      - package: mlx-swift-lm
-        product: MLXEmbedders
-      - package: mlx-swift-lm
-        product: MLXLMCommon
-      - package: usearch
-        product: USearch
       - package: OakVoice
-      - package: DSFQuickActionBar
       - package: swift-fsrs
         product: FSRS
       - target: oak
@@ -120,7 +99,6 @@ targets:
         ENABLE_HARDENED_RUNTIME: YES
         CODE_SIGN_IDENTITY: "-"
         SWIFT_STRICT_CONCURRENCY: minimal
-        SWIFT_OBJC_BRIDGING_HEADER: OakReader/OakReader-Bridging-Header.h
       configs:
         Debug:
           PRODUCT_BUNDLE_IDENTIFIER: com.oakreader.OakReader.dev
