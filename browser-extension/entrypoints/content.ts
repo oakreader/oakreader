@@ -4,31 +4,10 @@ import {
   detectContentKind,
   contentKindToPageType,
   extractLinkMetadata,
+  getTranslator,
 } from "@/src/lib/translators";
 import type { TranslatorResult } from "@/src/lib/translators";
-
-interface PageMeta {
-  type: "html" | "embed" | "pdf";
-  url: string;
-  title: string | null;
-  favicon: string | null;
-  contentKind?: string;
-}
-
-interface PageCapture {
-  type: "html" | "embed";
-  url: string;
-  title: string | null;
-  author?: string | null;
-  videoId?: string | null;
-  duration?: number | null;
-  thumbnailURL?: string | null;
-  transcript?: string | null;
-  description?: string | null;
-  embedType?: string;
-  biblio?: Record<string, unknown>;
-  markdown?: string | null;
-}
+import type { PageMeta, PageCapture } from "@/src/lib/types";
 
 // ─── Page Meta ──────────────────────────────────────────────────────────────────
 
@@ -70,9 +49,9 @@ function getPageMeta(): PageMeta {
   };
 }
 
-// ─── Translator → Legacy Payload Bridge ─────────────────────────────────────────
+// ─── Translator → PageCapture Bridge ─────────────────────────────────────────
 
-function toLegacyPayload(result: TranslatorResult): PageCapture {
+function toPageCapture(result: TranslatorResult): PageCapture {
   switch (result.kind) {
     case "youtube":
       return {
@@ -84,6 +63,7 @@ function toLegacyPayload(result: TranslatorResult): PageCapture {
         duration: result.duration,
         thumbnailURL: result.thumbnailURL,
         transcript: result.transcript,
+        embedType: "youtube",
       };
 
     case "link":
@@ -105,7 +85,7 @@ function toLegacyPayload(result: TranslatorResult): PageCapture {
         author: result.author,
         description: result.description,
         thumbnailURL: result.thumbnailURL,
-        biblio: result.biblio as unknown as Record<string, unknown>,
+        biblio: result.biblio,
       };
 
     case "webpage":
@@ -134,20 +114,34 @@ export default defineContentScript({
         return true;
       }
 
-      if (request.action === "extractLinkMeta") {
-        const result = extractLinkMetadata(document, location.href);
-        const payload = toLegacyPayload(result);
+      if (request.action === "extractMeta") {
+        // `forceLink` (Bookmark mode) bypasses URL detection and saves OG metadata
+        // as a generic link. Otherwise dispatch to the URL's translator (YouTube,
+        // scholarly, …) so embeds keep their rich type and content kind.
+        const extraction = request.forceLink
+          ? Promise.resolve(extractLinkMetadata(document, location.href))
+          : getTranslator(location.href).extract(document, location.href);
 
-        // Extract article markdown for AI chat context
-        try {
-          const defuddled = new Defuddle(document).parse();
-          const markdown = createMarkdownContent(defuddled.content, location.href);
-          if (markdown) payload.markdown = markdown;
-        } catch {
-          // Best effort — link save still works without markdown
-        }
+        extraction
+          .then((result) => {
+            const payload = toPageCapture(result);
 
-        sendResponse(payload);
+            // Extract article markdown for AI chat context
+            try {
+              const defuddled = new Defuddle(document).parse();
+              const markdown = createMarkdownContent(defuddled.content, location.href);
+              if (markdown) payload.markdown = markdown;
+            } catch {
+              // Best effort — save still works without markdown
+            }
+
+            sendResponse(payload);
+          })
+          .catch(() => {
+            // Fallback to lightweight link metadata if extraction throws
+            sendResponse(toPageCapture(extractLinkMetadata(document, location.href)));
+          });
+
         return true;
       }
 
