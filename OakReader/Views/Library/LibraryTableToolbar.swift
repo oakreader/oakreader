@@ -17,7 +17,6 @@ struct LibraryTableToolbar: View {
     private let filterableTypes: [(type: ContentType, label: String)] = [
         (.pdf, "PDF"),
         (.html, "Web"),
-        (.video, "Video"),
         (.link, "Bookmark"),
         (.markdown, "Note"),
         (.audio, "Audio"),

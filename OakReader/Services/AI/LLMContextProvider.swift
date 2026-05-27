@@ -88,7 +88,7 @@ struct LLMContextProvider {
             } else {
                 currentPageText = ""
             }
-        case .video, .link:
+        case .link:
             if let media = vm.mediaDocument {
                 if let url = media.transcriptURL,
                    let text = try? String(contentsOf: url, encoding: .utf8) {
@@ -391,7 +391,7 @@ struct LLMContextProvider {
 
                     Do not use page numbers — this document has no pages.
                     """)
-            case .video, .link, .audio:
+            case .link, .audio:
                 parts.append("""
                     This media's cite-key is "\(eck)". Citation format:
                     [MM:SS](oak://cite/\(eck)?time=SECONDS)
