@@ -40,8 +40,6 @@ final class CatalogDatabase {
                 (SystemCollectionID.html.uuidString, "Web", "globe", 3,
                  #"{"match":"any","conditions":[{"field":"content_type","op":"eq","value":"html"},"#
                      + #"{"field":"content_type","op":"eq","value":"link"}]}"#),
-                (SystemCollectionID.embeds.uuidString, "Videos", "play.rectangle", 4,
-                 #"{"match":"all","conditions":[{"field":"content_type","op":"eq","value":"video"}]}"#),
                 (SystemCollectionID.duplicates.uuidString, "Duplicates", "square.on.square", 5, nil),
                 (SystemCollectionID.quizCards.uuidString, "Quiz Cards", "rectangle.on.rectangle.angled", 6, nil),
                 (SystemCollectionID.bin.uuidString, "Bin", "trash", 7, nil),

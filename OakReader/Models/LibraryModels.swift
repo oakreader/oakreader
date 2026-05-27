@@ -30,7 +30,7 @@ struct Attachment: Identifiable, Hashable {
                 return dir.appendingPathComponent("metadata.json")
             }
             return dir.appendingPathComponent(fileName)
-        case .video, .link:
+        case .link:
             return dir.appendingPathComponent("metadata.json")
         case .markdown:
             return dir.appendingPathComponent(fileName)

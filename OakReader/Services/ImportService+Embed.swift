@@ -22,8 +22,8 @@ extension ImportService {
             return existing
         }
 
-        // YouTube embeds → .video; generic bookmarks → .link.
-        let resolvedContentType: ContentType = input.embedType == "link" ? .link : .video
+        // All embed clips are bookmarks/links (loaded on demand).
+        let resolvedContentType: ContentType = .link
 
         let docId = UUID()
         let attId = UUID()

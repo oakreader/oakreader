@@ -488,7 +488,7 @@ final class ZoteroMigrationService {
             let allAttachments = (attachmentsByParent[zItem.itemID] ?? [])
                 .sorted { a, _ in a.contentType == "application/pdf" ? true : false }
             let primaryAtt = allAttachments.first
-            var contentType: ContentType = isVideo ? .video : oakItemType(for: primaryAtt?.contentType)
+            var contentType: ContentType = isVideo ? .link : oakItemType(for: primaryAtt?.contentType)
             var attFileName = isVideo ? "metadata.json" : (contentType == .pdf ? "document.pdf" : "index.html")
             var attFileSize: Int64 = 0
             var attPageCount = 0
@@ -576,7 +576,7 @@ final class ZoteroMigrationService {
 
             let linkMode: LinkMode
             switch contentType {
-            case .video, .link: linkMode = .linkedURL
+            case .link: linkMode = .linkedURL
             case .html:         linkMode = .importedURL
             default:            linkMode = .importedFile
             }

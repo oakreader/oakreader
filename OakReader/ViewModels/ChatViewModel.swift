@@ -584,7 +584,7 @@ class ChatViewModel {
                 )
             }
 
-        case .video, .link, .audio:
+        case .link, .audio:
             // Embed/link/audio documents have no in-place navigation target.
             break
         }

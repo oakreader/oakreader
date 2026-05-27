@@ -70,7 +70,7 @@ final class SemanticIndexService: @unchecked Sendable {
             chunks += extractHTMLChunks(attachmentDir: attDir, htmlURL: fileURL)
         case "markdown":
             chunks += extractMarkdownChunks(fileURL: fileURL)
-        case "video", "link":
+        case "link":
             chunks += extractEmbedTextChunks(attachmentDir: attDir)
         default:
             break
@@ -364,7 +364,7 @@ final class SemanticIndexService: @unchecked Sendable {
                 SELECT i.id, i.storage_key, a.storage_key AS att_key, a.file_name, a.content_type
                 FROM items i
                 JOIN attachments a ON a.item_id = i.id AND a.is_primary = 1
-                WHERE a.content_type IN ('pdf', 'html', 'markdown', 'video', 'link')
+                WHERE a.content_type IN ('pdf', 'html', 'markdown', 'link')
                 """
             var arguments = StatementArguments()
             if let itemIds {

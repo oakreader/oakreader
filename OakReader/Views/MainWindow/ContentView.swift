@@ -36,7 +36,7 @@ struct ContentView: View {
 
                 // Main content column
                 VStack(spacing: 0) {
-                    if viewModel.contentType == .video || viewModel.contentType == .link {
+                    if viewModel.contentType == .link {
                         Spacer().frame(height: 8)
                     }
 
@@ -175,7 +175,7 @@ struct ContentView: View {
                     HTMLOverlayView(viewModel: viewModel)
                 }
             }
-        case .video, .link:
+        case .link:
             let isLiveLink = viewModel.liveURL != nil
             ZStack {
                 if isLiveLink {

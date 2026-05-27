@@ -324,6 +324,26 @@ extension CatalogDatabase {
             """, arguments: [webRule, now, SystemCollectionID.html.uuidString])
         }
 
+        // MARK: v11 — Remove the `video` content type (folded into `link`)
+
+        migrator.registerMigration("v11-remove-video-content-type") { db in
+            let now = Date().iso8601String
+
+            // YouTube playback was removed; former `video` embeds are now plain
+            // link bookmarks rendered as cards. Reclassify them.
+            try db.execute(sql: """
+                UPDATE attachments SET content_type = 'link', updated_at = ?
+                WHERE content_type = 'video'
+            """, arguments: [now])
+
+            // Drop the now-redundant "Videos" system collection (smart collection,
+            // no collection_items rows to clean up).
+            try db.execute(
+                sql: "DELETE FROM collections WHERE id = ?",
+                arguments: [SystemCollectionID.embeds.uuidString]
+            )
+        }
+
         return migrator
     }
 

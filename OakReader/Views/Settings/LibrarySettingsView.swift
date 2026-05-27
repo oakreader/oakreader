@@ -15,7 +15,6 @@ struct LibrarySettingsView: View {
         (SystemCollectionID.recentlyRead, "Recently Read", "book"),
         (SystemCollectionID.pdfs, "PDFs", "doc.fill"),
         (SystemCollectionID.html, "Web", "globe"),
-        (SystemCollectionID.embeds, "Embeds", "link"),
     ]
 
     private var isIndexing: Bool { indexedCount < totalCount }
@@ -108,7 +107,7 @@ struct LibrarySettingsView: View {
             try Int.fetchOne(db, sql: """
                 SELECT COUNT(*) FROM items i
                 JOIN attachments a ON a.item_id = i.id AND a.is_primary = 1
-                WHERE a.content_type IN ('pdf', 'html', 'markdown', 'video', 'link')
+                WHERE a.content_type IN ('pdf', 'html', 'markdown', 'link')
                 """)
         }) ?? 0
 
