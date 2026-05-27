@@ -74,7 +74,7 @@ final class SemanticIndexService: @unchecked Sendable {
             chunks += extractHTMLChunks(attachmentDir: attDir, htmlURL: fileURL)
         case "markdown":
             chunks += extractMarkdownChunks(fileURL: fileURL)
-        case "embed":
+        case "video", "link":
             chunks += extractEmbedTextChunks(attachmentDir: attDir)
         default:
             break
@@ -456,7 +456,7 @@ final class SemanticIndexService: @unchecked Sendable {
                 chunks += extractHTMLChunks(attachmentDir: attDir, htmlURL: fileURL)
             case "markdown":
                 chunks += extractMarkdownChunks(fileURL: fileURL)
-            case "embed":
+            case "video", "link":
                 chunks += extractEmbedTextChunks(attachmentDir: attDir)
             default:
                 break

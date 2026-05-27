@@ -15,11 +15,12 @@ struct MediaMetadata: Codable {
     let thumbnailURL: URL?
     let publishedAt: String?        // ISO 8601
     let description: String?
-    let embedType: String?          // "youtube" | "link", nil → defaults to "youtube"
+    let embedType: String?          // "youtube" | "link", nil → treated as link
 
-    /// Resolved enum from the optional string field (backward-compatible).
+    /// Resolved enum from the optional string field. A missing/unknown tag
+    /// resolves to `.link`, matching how `OakServer` defaults untagged clips.
     var resolvedEmbedType: EmbedType {
-        EmbedType(rawValue: embedType ?? "youtube") ?? .youtube
+        EmbedType(rawValue: embedType ?? "link") ?? .link
     }
 }
 

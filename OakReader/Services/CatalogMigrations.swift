@@ -4,6 +4,11 @@ import GRDB
 extension CatalogDatabase {
     // MARK: - Migrations
 
+    /// Database schema migrator.
+    ///
+    /// The schema is defined as a sequence of grouped migrations, each owning one
+    /// cohesive area of the model. Never edit a migration once it has shipped — add a
+    /// new `vN-…` step instead.
     static var migrator: DatabaseMigrator {
         var migrator = DatabaseMigrator()
 
@@ -86,7 +91,7 @@ extension CatalogDatabase {
             try db.create(index: "idx_collection_items_collection_id", on: "collection_items", columns: ["collection_id"], ifNotExists: true)
         }
 
-        // MARK: v3 — Properties
+        // MARK: v3 — Properties (tags, status, rating)
 
         migrator.registerMigration("v3-properties") { db in
             try db.create(table: "properties") { t in
@@ -205,20 +210,9 @@ extension CatalogDatabase {
             """)
         }
 
-        // MARK: v7 — Full-Text Search
+        // MARK: v7 — Item Relations
 
-        migrator.registerMigration("v7-search") { db in
-            try db.create(virtualTable: "items_fts", using: FTS5()) { t in
-                t.synchronize(withTable: "items")
-                t.tokenizer = .unicode61()
-                t.column("title")
-                t.column("author")
-            }
-        }
-
-        // MARK: v8 — Item Relations & Citation FTS
-
-        migrator.registerMigration("v8-relations-citation-fts") { db in
+        migrator.registerMigration("v7-item-relations") { db in
             try db.create(table: "item_relations") { t in
                 t.column("id", .text).primaryKey()
                 t.column("source_item_id", .text).notNull().references("items", onDelete: .cascade)
@@ -231,18 +225,11 @@ extension CatalogDatabase {
                 ON item_relations(source_item_id, target_item_id, relation_type)
             """)
             try db.create(index: "idx_item_relations_target", on: "item_relations", columns: ["target_item_id"])
-
-            try db.create(virtualTable: "citations_fts", using: FTS5()) { t in
-                t.synchronize(withTable: "citations")
-                t.tokenizer = .unicode61()
-                t.column("abstract")
-                t.column("container_title")
-            }
         }
 
-        // MARK: v9 — Quiz Cards & Review Log
+        // MARK: v8 — Quiz Cards & Review Log
 
-        migrator.registerMigration("v9-quiz-cards") { db in
+        migrator.registerMigration("v8-quiz-cards") { db in
             try db.create(table: "quiz_cards") { t in
                 t.column("id", .text).primaryKey()
                 t.column("item_id", .text).notNull().references("items", onDelete: .cascade)
@@ -288,21 +275,53 @@ extension CatalogDatabase {
             try db.create(index: "idx_quiz_review_log_card_id", on: "quiz_review_log", columns: ["card_id"])
         }
 
-        // MARK: v10 — Rename video → embed
+        // MARK: v9 — Full-Text Search (created last, after synchronized base tables exist)
 
-        migrator.registerMigration("v10-rename-video-to-embed") { db in
-            try db.execute(sql: "UPDATE attachments SET content_type = 'embed' WHERE content_type = 'video'")
+        migrator.registerMigration("v9-full-text-search") { db in
+            try db.create(virtualTable: "items_fts", using: FTS5()) { t in
+                t.synchronize(withTable: "items")
+                t.tokenizer = .unicode61()
+                t.column("title")
+                t.column("author")
+            }
 
-            // Update existing system collection for current users (INSERT OR IGNORE won't touch it)
-            let embedsId = SystemCollectionID.embeds.uuidString
-            try db.execute(
-                sql: """
-                    UPDATE collections SET name = 'Embeds', icon = 'link',
-                    filter_rules = '{"match":"all","conditions":[{"field":"content_type","op":"eq","value":"embed"}]}'
-                    WHERE id = ?
-                """,
-                arguments: [embedsId]
-            )
+            try db.create(virtualTable: "citations_fts", using: FTS5()) { t in
+                t.synchronize(withTable: "citations")
+                t.tokenizer = .unicode61()
+                t.column("abstract")
+                t.column("container_title")
+            }
+        }
+
+        // MARK: v10 — Split `embed` content type into `video` + `link`
+
+        migrator.registerMigration("v10-split-embed-content-type") { db in
+            let now = Date().iso8601String
+
+            // Reclassify legacy `embed` attachments: YouTube → `video`, everything else → `link`.
+            try db.execute(sql: """
+                UPDATE attachments SET content_type = 'video', updated_at = ?
+                WHERE content_type = 'embed'
+                  AND (source_url LIKE '%youtube.com%' OR source_url LIKE '%youtu.be%')
+            """, arguments: [now])
+            try db.execute(sql: """
+                UPDATE attachments SET content_type = 'link', updated_at = ?
+                WHERE content_type = 'embed'
+            """, arguments: [now])
+
+            // Repoint the former "Embeds" system collection at videos only.
+            let videoRule = #"{"match":"all","conditions":[{"field":"content_type","op":"eq","value":"video"}]}"#
+            try db.execute(sql: """
+                UPDATE collections SET name = 'Videos', icon = 'play.rectangle', filter_rules = ?, updated_at = ?
+                WHERE id = ?
+            """, arguments: [videoRule, now, SystemCollectionID.embeds.uuidString])
+
+            // "Web" now covers saved HTML snapshots *and* link bookmarks.
+            let webRule = #"{"match":"any","conditions":[{"field":"content_type","op":"eq","value":"html"},{"field":"content_type","op":"eq","value":"link"}]}"#
+            try db.execute(sql: """
+                UPDATE collections SET filter_rules = ?, updated_at = ?
+                WHERE id = ?
+            """, arguments: [webRule, now, SystemCollectionID.html.uuidString])
         }
 
         return migrator

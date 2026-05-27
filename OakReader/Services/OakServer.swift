@@ -1,9 +1,11 @@
 import Foundation
 import Network
 
-/// Lightweight HTTP server on `127.0.0.1:23119` that receives POST `/snapshot`
-/// payloads from the OakReader Chrome extension and routes them to `ImportService`.
-final class SnapshotServer {
+/// Lightweight HTTP server on `127.0.0.1:23119` that bridges the OakReader browser
+/// extension and the app: it receives clip payloads on `POST /clip` (routed to
+/// `ImportService`) and serves library data back via `GET /collections`, `/tags`,
+/// and `/selected-collection`.
+final class OakServer {
     private var listener: NWListener?
     private let importService: ImportService
     private let port: UInt16 = 23119
@@ -177,16 +179,16 @@ final class SnapshotServer {
             return
         }
 
-        // POST /snapshot
-        if method == "POST", path == "/snapshot" {
+        // POST /clip
+        if method == "POST", path == "/clip" {
             guard !bodyData.isEmpty else {
                 sendResponse(connection: connection, status: 400, body: #"{"status":"error","message":"Empty body"}"#)
                 return
             }
 
             do {
-                let payload = try JSONDecoder().decode(SnapshotPayload.self, from: Data(bodyData))
-                handlePayload(payload) { result in
+                let payload = try JSONDecoder().decode(ClipPayload.self, from: Data(bodyData))
+                handleClip(payload) { result in
                     switch result {
                     case .success:
                         self.sendResponse(connection: connection, status: 200, body: #"{"status":"ok"}"#)
@@ -293,7 +295,7 @@ final class SnapshotServer {
 
     // MARK: - Payload Dispatch
 
-    private func handlePayload(_ payload: SnapshotPayload, completion: @escaping (Result<Void, Error>) -> Void) {
+    private func handleClip(_ payload: ClipPayload, completion: @escaping (Result<Void, Error>) -> Void) {
         switch payload.type {
         case "html":
             handleHTMLSnapshot(payload, completion: completion)
@@ -306,7 +308,7 @@ final class SnapshotServer {
         }
     }
 
-    private func handleHTMLSnapshot(_ payload: SnapshotPayload, completion: @escaping (Result<Void, Error>) -> Void) {
+    private func handleHTMLSnapshot(_ payload: ClipPayload, completion: @escaping (Result<Void, Error>) -> Void) {
         guard let html = payload.html else {
             completion(.failure(OakReaderError.serverError("Missing html field")))
             return
@@ -407,13 +409,15 @@ final class SnapshotServer {
         }
     }
 
-    private func handleEmbed(_ payload: SnapshotPayload, completion: @escaping (Result<Void, Error>) -> Void) {
+    private func handleEmbed(_ payload: ClipPayload, completion: @escaping (Result<Void, Error>) -> Void) {
         guard let sourceURL = URL(string: payload.url) else {
             completion(.failure(OakReaderError.serverError("Invalid URL")))
             return
         }
 
-        let resolvedEmbedType = payload.embedType ?? Self.detectEmbedType(from: payload.url)
+        // The extension always tags embeds explicitly ("youtube" | "link");
+        // a missing tag falls back to a generic link rather than guessing from the URL.
+        let resolvedEmbedType = payload.embedType ?? "link"
 
         let metadata = MediaMetadata(
             title: payload.title ?? "Untitled",
@@ -453,16 +457,10 @@ final class SnapshotServer {
         }
     }
 
-    /// Infer embed type from URL when not explicitly provided by the extension.
-    private static func detectEmbedType(from urlString: String) -> String {
-        guard let url = URL(string: urlString), let host = url.host?.lowercased() else { return "youtube" }
-        if host.contains("youtube.com") || host.contains("youtu.be") { return "youtube" }
-        return "link"
-    }
 
     // MARK: - PDF Snapshot
 
-    private func handlePDFSnapshot(_ payload: SnapshotPayload, completion: @escaping (Result<Void, Error>) -> Void) {
+    private func handlePDFSnapshot(_ payload: ClipPayload, completion: @escaping (Result<Void, Error>) -> Void) {
         Log.info(Log.server, "handlePDFSnapshot: url=\(payload.url), pdfData=\(payload.pdfData != nil ? "\(payload.pdfData!.count) chars" : "nil"), cookies=\(payload.cookies != nil ? "yes" : "nil")")
 
         // Inline PDF data from Page.printToPDF (base64-encoded PDF bytes)
@@ -540,7 +538,7 @@ final class SnapshotServer {
     }
 
     /// Import a base64-encoded PDF received directly from the extension's Page.printToPDF.
-    private func handleInlinePDF(_ payload: SnapshotPayload, pdfBase64: String, completion: @escaping (Result<Void, Error>) -> Void) {
+    private func handleInlinePDF(_ payload: ClipPayload, pdfBase64: String, completion: @escaping (Result<Void, Error>) -> Void) {
         guard let pdfData = Data(base64Encoded: pdfBase64) else {
             completion(.failure(OakReaderError.serverError("Invalid base64 PDF data")))
             return
@@ -699,7 +697,7 @@ final class SnapshotServer {
 
 // MARK: - Payload
 
-struct SnapshotPayload: Codable {
+struct ClipPayload: Codable {
     let type: String            // "html" | "embed" | "pdf"
     let url: String
     let title: String?
@@ -716,7 +714,7 @@ struct SnapshotPayload: Codable {
     let collectionId: String?   // optional — target collection, nil = unsorted
     let tagOptionIds: [String]? // optional — tag option UUIDs to assign
     let newTags: [String]?      // optional — tag names to create and assign
-    let embedType: String?      // "youtube" | "link", nil → inferred from URL
+    let embedType: String?      // "youtube" | "link" (embed clips only), nil → treated as link
     let biblio: BiblioPayload?  // scholarly metadata from browser extension
 }
 
