@@ -302,6 +302,33 @@ jobs:
             --endpoint-url "$R2_ENDPOINT" \
             --cache-control "no-cache"
 
+      # ── Purge Cloudflare edge cache for the stable URLs ───────
+      # The custom domain is fronted by Cloudflare's CDN, which caches the stable
+      # DMG + appcast (~4h) and overrides the origin's no-cache. Versioned URLs
+      # are immutable so they don't matter; but the stable OakReader.dmg and
+      # appcast.xml change every release, so purge just those two by URL — keeping
+      # CDN caching between releases while making new content appear immediately.
+      # No-ops (with a notice) until CLOUDFLARE_API_TOKEN is set (Zone:Cache Purge).
+      - name: Purge Cloudflare cache
+        if: steps.check.outputs.skip == 'false'
+        env:
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ZONE_ID: "4c5dc9f18f814b359a79b7124d0fe681"
+        run: |
+          if [ -z "$CF_API_TOKEN" ]; then
+            echo "::notice::CLOUDFLARE_API_TOKEN not set — skipping cache purge (stable URLs follow the ~4h edge TTL)."
+            exit 0
+          fi
+          curl -sf -X POST \
+            "https://api.cloudflare.com/client/v4/zones/$CF_ZONE_ID/purge_cache" \
+            -H "Authorization: Bearer $CF_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data '{"files":[
+              "'"$DOWNLOAD_BASE_URL/$R2_PREFIX/${{ env.APP_NAME }}.dmg"'",
+              "'"$DOWNLOAD_BASE_URL/$R2_PREFIX/appcast.xml"'"
+            ]}' \
+            && echo "Purged stable DMG + appcast from Cloudflare cache"
+
       # ── Tag + GitHub Release (draft) ──────────────────────────
       - name: Create tag and GitHub Release
         if: steps.check.outputs.skip == 'false'
