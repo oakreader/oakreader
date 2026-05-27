@@ -132,23 +132,19 @@ jobs:
             -scheme ${{ env.SCHEME }}
 
       # ── Archive (version + build number injected here) ────────
+      # Signing (manual Developer ID + profile) is scoped to the OakReader
+      # target in project.yml's Release config — NOT passed globally here,
+      # which would break SPM package targets and the oak tool.
       - name: Build archive
         if: steps.check.outputs.skip == 'false'
-        env:
-          DEVELOPMENT_TEAM: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           xcodebuild archive \
             -project ${{ env.APP_NAME }}.xcodeproj \
             -scheme ${{ env.SCHEME }} \
             -configuration Release \
             -archivePath "$RUNNER_TEMP/${{ env.APP_NAME }}.xcarchive" \
-            DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM" \
-            CODE_SIGN_IDENTITY="Developer ID Application" \
-            CODE_SIGN_STYLE=Manual \
-            PROVISIONING_PROFILE_SPECIFIER="${{ steps.profile.outputs.name }}" \
             MARKETING_VERSION="${{ steps.version.outputs.version }}" \
             CURRENT_PROJECT_VERSION="${{ steps.build-number.outputs.build_number }}" \
-            OTHER_CODE_SIGN_FLAGS="--timestamp" \
             -skipPackagePluginValidation \
             -skipMacroValidation
 
