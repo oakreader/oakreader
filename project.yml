@@ -141,7 +141,7 @@ targets:
           # changes identity every build and re-fires those prompts.
           CODE_SIGN_STYLE: Automatic
           CODE_SIGN_IDENTITY: "Apple Development"
-          DEVELOPMENT_TEAM: "59X959HPTF"
+          DEVELOPMENT_TEAM: "5Y27G7B6D8"
         Release:
           PRODUCT_BUNDLE_IDENTIFIER: com.oakreader.OakReader
           BUNDLE_DISPLAY_NAME: "OakReader"
@@ -170,3 +170,8 @@ targets:
       base:
         PRODUCT_NAME: oak
         SWIFT_STRICT_CONCURRENCY: minimal
+        # Keep oak out of the archive's install products. It's embedded into the
+        # app bundle by the "Embed oak CLI" script; without this the archive holds
+        # both OakReader.app AND /usr/local/bin/oak, so -exportArchive can't choose
+        # a distribution method ("method expected one {} but found developer-id").
+        SKIP_INSTALL: YES

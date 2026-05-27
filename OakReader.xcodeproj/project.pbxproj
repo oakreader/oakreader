@@ -1493,6 +1493,9 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
+					A0AF4164203156FB9CC04DB4 = {
+						DevelopmentTeam = 5Y27G7B6D8;
+					};
 				};
 			};
 			buildConfigurationList = F0DCCA960664411963D48317 /* Build configuration list for PBXProject "OakReader" */;
@@ -1949,6 +1952,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.oakreader.oak;
 				PRODUCT_NAME = oak;
 				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
 				SWIFT_STRICT_CONCURRENCY = minimal;
 			};
 			name = Debug;
@@ -2020,6 +2024,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.oakreader.oak;
 				PRODUCT_NAME = oak;
 				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
 				SWIFT_STRICT_CONCURRENCY = minimal;
 			};
 			name = Release;
@@ -2034,7 +2039,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 59X959HPTF;
+				DEVELOPMENT_TEAM = 5Y27G7B6D8;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = OakReader/App/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
