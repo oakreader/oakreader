@@ -124,10 +124,14 @@ jobs:
         if: steps.check.outputs.skip == 'false'
         run: xcodegen generate
 
+      # -onlyUsePackageVersionsFromResolvedFile pins to the committed
+      # Package.resolved so CI uses the same dependency versions as local
+      # (otherwise newer usearch drops .F32 and breaks HybridSearchEngine).
       - name: Resolve packages
         if: steps.check.outputs.skip == 'false'
         run: |
           xcodebuild -resolvePackageDependencies \
+            -onlyUsePackageVersionsFromResolvedFile \
             -project ${{ env.APP_NAME }}.xcodeproj \
             -scheme ${{ env.SCHEME }}
 
@@ -145,6 +149,7 @@ jobs:
             -archivePath "$RUNNER_TEMP/${{ env.APP_NAME }}.xcarchive" \
             MARKETING_VERSION="${{ steps.version.outputs.version }}" \
             CURRENT_PROJECT_VERSION="${{ steps.build-number.outputs.build_number }}" \
+            -onlyUsePackageVersionsFromResolvedFile \
             -skipPackagePluginValidation \
             -skipMacroValidation
 
