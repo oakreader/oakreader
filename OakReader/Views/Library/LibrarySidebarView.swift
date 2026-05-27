@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct LibrarySidebarView: View {
     let appState: AppState
@@ -338,6 +339,7 @@ private struct CollectionRowView: View {
     @State private var isDropTargeted = false
     @State private var showingDeleteConfirmation = false
     @State private var dragExpandTask: Task<Void, Never>?
+    @State private var dropPulse = false
 
     private var isSelected: Bool {
         store.selectedCollectionId == collection.id && store.selectedTagOptionId == nil && appState.isLibraryActive
@@ -349,6 +351,39 @@ private struct CollectionRowView: View {
 
     private var isExpanded: Bool {
         expandedCollections.contains(collection.id)
+    }
+
+    /// Whether the drop highlight should be shown (targeted + a valid, non-smart destination).
+    private var isDropActive: Bool {
+        isDropTargeted && !collection.isSmart
+    }
+
+    /// Handles an item dragged from the library table (a plain-text item UUID) onto this collection.
+    private func handleItemDrop(_ providers: [NSItemProvider]) -> Bool {
+        guard !collection.isSmart else { return false }
+        var handled = false
+        for provider in providers where provider.canLoadObject(ofClass: NSString.self) {
+            handled = true
+            provider.loadObject(ofClass: NSString.self) { object, _ in
+                guard let raw = (object as? NSString) as String?,
+                      let uuid = UUID(uuidString: raw) else { return }
+                Task { @MainActor in
+                    guard let item = store.findItem(byId: uuid) else { return }
+                    store.addItem(item, to: collection)
+                    triggerDropPulse()
+                }
+            }
+        }
+        return handled
+    }
+
+    /// Briefly flashes the collection row to confirm a successful drop.
+    private func triggerDropPulse() {
+        withAnimation(.easeOut(duration: 0.12)) { dropPulse = true }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(400))
+            withAnimation(.easeInOut(duration: 0.5)) { dropPulse = false }
+        }
     }
 
     var body: some View {
@@ -390,33 +425,43 @@ private struct CollectionRowView: View {
             .padding(.horizontal, 18)
             .padding(.vertical, 5)
             .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(isDropTargeted ? Color.accentColor.opacity(0.18) :
-                          isSelected ? Color.primary.opacity(0.08) : Color.clear)
+                Group {
+                    if isDropActive {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(.ultraThinMaterial)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color.accentColor.opacity(0.06))
+                            )
+                    } else if isSelected {
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(Color.primary.opacity(0.08))
+                    }
+                }
+                .padding(.horizontal, 12)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(isDropActive ? Color.accentColor.opacity(0.35) : Color.clear, lineWidth: 1)
                     .padding(.horizontal, 12)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 6)
-                    .strokeBorder(isDropTargeted ? Color.accentColor.opacity(0.5) : Color.clear, lineWidth: 1.5)
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.accentColor.opacity(dropPulse ? 0.22 : 0))
                     .padding(.horizontal, 12)
+                    .allowsHitTesting(false)
             )
+            .animation(.easeInOut(duration: 0.12), value: isDropActive)
             .contentShape(Rectangle())
             .onTapGesture {
                 store.selectCollection(collection.id)
                 appState.selectedLibraryItemIDs = []
                 appState.switchToLibrary()
             }
-            .dropDestination(for: String.self) { droppedIDs, _ in
-                guard !collection.isSmart else { return false }
-                for idString in droppedIDs {
-                    guard let uuid = UUID(uuidString: idString),
-                          let item = store.findItem(byId: uuid) else { continue }
-                    store.addItem(item, to: collection)
-                }
-                return !droppedIDs.isEmpty
-            } isTargeted: { targeted in
-                isDropTargeted = targeted && !collection.isSmart
-                // Auto-expand collapsed collections after hovering during drag (spring-loaded)
+            .onDrop(of: [.plainText, .utf8PlainText, .text], isTargeted: $isDropTargeted) { providers in
+                handleItemDrop(providers)
+            }
+            .onChange(of: isDropTargeted) { _, targeted in
                 dragExpandTask?.cancel()
                 if targeted && !collection.isSmart && hasChildren && !isExpanded {
                     let collectionId = collection.id
