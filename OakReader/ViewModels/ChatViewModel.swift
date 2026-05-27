@@ -583,16 +583,8 @@ class ChatViewModel {
             }
 
         case .video, .link, .audio:
-            if let time = anchor.time {
-                vm.media.requestSeek(seconds: time)
-            } else if let text = anchor.text {
-                // Search transcript entries for matching text, seek to that offset
-                if let entry = vm.media.transcriptEntries.first(where: {
-                    $0.text.localizedCaseInsensitiveContains(text)
-                }) {
-                    vm.media.requestSeek(seconds: entry.offset)
-                }
-            }
+            // Embed/link/audio documents have no in-place navigation target.
+            break
         }
     }
 

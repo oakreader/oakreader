@@ -1,4 +1,4 @@
-export type ContentKind = "webpage" | "youtube" | "scholarly" | "link";
+export type ContentKind = "webpage" | "scholarly" | "link";
 
 export interface BiblioMetadata {
   doi?: string | null;
@@ -21,10 +21,6 @@ export interface TranslatorResult {
   author?: string | null;
   thumbnailURL?: string | null;
   description?: string | null;
-  // YouTube-specific
-  videoId?: string | null;
-  duration?: number | null;
-  transcript?: string | null;
   html?: string;
   markdown?: string | null;
   // Scholarly-specific

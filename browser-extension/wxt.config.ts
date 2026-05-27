@@ -8,7 +8,7 @@ export default defineConfig({
   }),
   manifest: {
     name: "OakReader",
-    description: "Save web pages, YouTube videos, and podcasts to OakReader",
+    description: "Save web pages and articles to OakReader",
     permissions: ["activeTab", "scripting", "tabs", "webRequest", "cookies", "debugger", "storage"],
     host_permissions: ["http://localhost:23119/*", "https://*/*", "http://*/*"],
     action: {

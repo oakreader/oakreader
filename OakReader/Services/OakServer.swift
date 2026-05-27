@@ -440,7 +440,6 @@ final class OakServer {
                     sourceURL: sourceURL,
                     duration: payload.duration,
                     thumbnailData: thumbnailData,
-                    transcript: payload.transcript,
                     metadata: metadata,
                     embedType: resolvedEmbedType,
                     contentMarkdown: payload.markdown
@@ -704,17 +703,15 @@ struct ClipPayload: Codable {
     let author: String?
     let html: String?           // html only
     let markdown: String?       // html & pdf — Defuddle/Turndown extracted text
-    let videoId: String?        // embed (YouTube) only
     let duration: Int?
     let thumbnailURL: String?
-    let transcript: String?
     let description: String?
     let cookies: String?        // pdf only — forwarded cookies for authenticated downloads
     let pdfData: String?         // pdf only — base64-encoded PDF from Page.printToPDF
     let collectionId: String?   // optional — target collection, nil = unsorted
     let tagOptionIds: [String]? // optional — tag option UUIDs to assign
     let newTags: [String]?      // optional — tag names to create and assign
-    let embedType: String?      // "youtube" | "link" (embed clips only), nil → treated as link
+    let embedType: String?      // "link" (embed clips only), nil → treated as link
     let biblio: BiblioPayload?  // scholarly metadata from browser extension
 }
 

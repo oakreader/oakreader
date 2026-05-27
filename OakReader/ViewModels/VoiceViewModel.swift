@@ -21,41 +21,28 @@ class VoiceViewModel {
         isSpeaking = true
 
         let prefs = Preferences.shared
-        let ttsProviderType = VoiceProviderType(rawValue: prefs.voiceTTSProvider) ?? .onDevice
-        let defaultTTS = KnownModels.tts.first?.repo ?? ""
-        let ttsRepo = prefs.voiceTTSModel.isEmpty ? defaultTTS : prefs.voiceTTSModel
         let voice = prefs.voiceTTSVoice.isEmpty ? nil : prefs.voiceTTSVoice
-        let language = prefs.voiceLanguage
         let refAudioURL = prefs.voiceReferenceAudioURL
         let refText = prefs.voiceReferenceText.isEmpty ? nil : prefs.voiceReferenceText
         let outputUID = prefs.voiceOutputDeviceUID.isEmpty ? nil : prefs.voiceOutputDeviceUID
 
-        // Build a cache key that includes all voice config that affects audio output
-        let cacheKey: String
-        switch ttsProviderType {
-        case .onDevice:
-            cacheKey = "ondevice:\(ttsRepo):\(voice ?? ""):\(language)"
-        case .elevenLabs:
-            cacheKey = "elevenlabs:\(prefs.elevenLabsVoiceId):\(prefs.elevenLabsTTSModelId)"
+        // TTS is cloud-only (ElevenLabs). Bail out if it isn't configured.
+        guard !prefs.elevenLabsAPIKey.isEmpty, !prefs.elevenLabsVoiceId.isEmpty else {
+            isSpeaking = false
+            return
         }
+
+        // Build a cache key that includes all voice config that affects audio output
+        let cacheKey = "elevenlabs:\(prefs.elevenLabsVoiceId):\(prefs.elevenLabsTTSModelId)"
 
         // Reuse TTS provider if same config, otherwise create new one
         if standaloneTTSProvider == nil || standaloneTTSKey != cacheKey {
-            switch ttsProviderType {
-            case .onDevice:
-                standaloneTTSProvider = MLXTTSProvider(repoId: ttsRepo, language: language, manager: ModelManager.shared)
-            case .elevenLabs:
-                guard !prefs.elevenLabsAPIKey.isEmpty, !prefs.elevenLabsVoiceId.isEmpty else {
-                    isSpeaking = false
-                    return
-                }
-                let ttsConfig = ElevenLabsTTSConfig(
-                    apiKey: prefs.elevenLabsAPIKey,
-                    voiceId: prefs.elevenLabsVoiceId,
-                    modelId: prefs.elevenLabsTTSModelId
-                )
-                standaloneTTSProvider = ElevenLabsTTSProvider(config: ttsConfig)
-            }
+            let ttsConfig = ElevenLabsTTSConfig(
+                apiKey: prefs.elevenLabsAPIKey,
+                voiceId: prefs.elevenLabsVoiceId,
+                modelId: prefs.elevenLabsTTSModelId
+            )
+            standaloneTTSProvider = ElevenLabsTTSProvider(config: ttsConfig)
             standaloneTTSKey = cacheKey
         }
 

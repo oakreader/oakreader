@@ -13,7 +13,6 @@ class DocumentState {
     var selectedAnnotation: PDFAnnotation?
     var editorMode: EditorMode = .viewer
     var sidebarMode: SidebarMode = .thumbnails
-    var mediaSidebarMode: MediaSidebarMode = .outline
 
     var isSidebarVisible: Bool = true
     var rightPanelMode: RightPanelMode? = nil

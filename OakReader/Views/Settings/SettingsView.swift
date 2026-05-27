@@ -13,7 +13,6 @@ struct SettingsView: View {
         case audio
         case extensions
         case skills
-        case youtube
         case webSearch
         // Extension tabs
         case extensionNotes
@@ -31,7 +30,6 @@ struct SettingsView: View {
             case .audio: return "Audio"
             case .extensions: return "Extensions"
             case .skills: return "Skills"
-            case .youtube: return "YouTube"
             case .webSearch: return "Web Search"
             case .extensionNotes: return AppExtension.notes.label
             case .extensionTranslation: return AppExtension.translation.label
@@ -48,7 +46,6 @@ struct SettingsView: View {
             case .audio: return "speaker.wave.2"
             case .extensions: return "square.grid.2x2"
             case .skills: return "hammer"
-            case .youtube: return "play.rectangle"
             case .webSearch: return "magnifyingglass.circle"
             case .extensionNotes: return AppExtension.notes.systemImage
             case .extensionTranslation: return AppExtension.translation.systemImage
@@ -72,7 +69,7 @@ struct SettingsView: View {
         }
 
         /// Tabs exposed in the command palette for deep-linking.
-        static let paletteTabs: [Tab] = [.general, .library, .ai, .agent, .audio, .extensions, .youtube, .webSearch]
+        static let paletteTabs: [Tab] = [.general, .library, .ai, .agent, .audio, .extensions, .webSearch]
 
         static func tab(for ext: AppExtension) -> Tab {
             switch ext {
@@ -84,11 +81,10 @@ struct SettingsView: View {
     }
 
     /// Fixed tabs that always appear.
-    private static let fixedTabs: [Tab] = [.general, .library, .ai, .agent, .audio, .skills, .extensions, .youtube, .webSearch]
+    private static let fixedTabs: [Tab] = [.general, .library, .ai, .agent, .audio, .skills, .extensions, .webSearch]
 
     @State private var selectedTab: Tab = .general
     @State private var visibleTabs: [Tab] = Self.buildVisibleTabs()
-    @State private var modelStates = SharedModelStates()
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
     private static func buildVisibleTabs() -> [Tab] {
@@ -159,7 +155,7 @@ struct SettingsView: View {
         case .library:
             LibrarySettingsView(store: store)
         case .ai:
-            AISettingsView(modelStates: modelStates)
+            AISettingsView()
         case .agent:
             AgentSettingsView()
         case .audio:
@@ -168,8 +164,6 @@ struct SettingsView: View {
             AppExtensionSettingsView()
         case .skills:
             SkillManagementView()
-        case .youtube:
-            YouTubeSettingsView()
         case .webSearch:
             WebSearchSettingsView()
         case .extensionNotes:
@@ -179,40 +173,5 @@ struct SettingsView: View {
         case .extensionQuizCards:
             QuizCardSettingsView()
         }
-    }
-}
-
-// MARK: - Shared Model States
-
-/// Shared model download state observer, used by AISettingsView and LocalModelsSettingsView
-/// so only one observation loop runs regardless of which tab is active.
-@Observable
-final class SharedModelStates {
-    var states: [String: ModelManager.ModelState] = [:]
-    private var observeTask: Task<Void, Never>?
-    private var isObserving = false
-
-    func startIfNeeded() {
-        guard !isObserving else { return }
-        isObserving = true
-        observeTask = Task { [weak self] in
-            for await (repo, state) in ModelManager.shared.stateChanges {
-                await MainActor.run { self?.states[repo] = state }
-            }
-        }
-    }
-
-    func refresh(repos: [String]) {
-        startIfNeeded()
-        Task {
-            for repo in repos {
-                let state = await ModelManager.shared.state(for: repo)
-                await MainActor.run { self.states[repo] = state }
-            }
-        }
-    }
-
-    deinit {
-        observeTask?.cancel()
     }
 }

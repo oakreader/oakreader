@@ -53,19 +53,6 @@ function getPageMeta(): PageMeta {
 
 function toPageCapture(result: TranslatorResult): PageCapture {
   switch (result.kind) {
-    case "youtube":
-      return {
-        type: "embed",
-        url: result.url,
-        title: result.title,
-        author: result.author,
-        videoId: result.videoId,
-        duration: result.duration,
-        thumbnailURL: result.thumbnailURL,
-        transcript: result.transcript,
-        embedType: "youtube",
-      };
-
     case "link":
       return {
         type: "embed",
@@ -116,8 +103,8 @@ export default defineContentScript({
 
       if (request.action === "extractMeta") {
         // `forceLink` (Bookmark mode) bypasses URL detection and saves OG metadata
-        // as a generic link. Otherwise dispatch to the URL's translator (YouTube,
-        // scholarly, …) so embeds keep their rich type and content kind.
+        // as a generic link. Otherwise dispatch to the URL's translator (scholarly,
+        // generic webpage) so clips keep their rich type and content kind.
         const extraction = request.forceLink
           ? Promise.resolve(extractLinkMetadata(document, location.href))
           : getTranslator(location.href).extract(document, location.href);

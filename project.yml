@@ -22,15 +22,9 @@ packages:
   Highlightr:
     url: https://github.com/raspu/Highlightr.git
     from: "2.3.0"
-  YouTubePlayerKit:
-    url: https://github.com/SvenTiigi/YouTubePlayerKit.git
-    from: "2.0.0"
   CMarkGFM:
     url: https://github.com/stackotter/swift-cmark-gfm
     from: "1.0.2"
-  YoutubeTranscript:
-    url: https://github.com/skainguyen1412/swift-youtube-transcript.git
-    from: "1.0.0"
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
     from: "2.6.0"
@@ -81,8 +75,6 @@ targets:
         product: GRDB
       - package: Highlightr
       - package: CMarkGFM
-      - package: YouTubePlayerKit
-      - package: YoutubeTranscript
       - package: Sparkle
       - package: mlx-swift
         product: MLX
@@ -136,9 +128,9 @@ targets:
           # Sign local dev builds with a stable Apple Development identity, scoped
           # to THIS target only (same reasoning as Release: global xcodebuild
           # signing overrides break SPM package targets and the oak tool). A
-          # constant identity across rebuilds keeps keychain-access-groups and TCC
-          # grants (mic, local network) from being invalidated — ad-hoc ("-")
-          # changes identity every build and re-fires those prompts.
+          # constant identity across rebuilds keeps TCC grants (mic, local
+          # network) from being invalidated — ad-hoc ("-") changes identity
+          # every build and re-fires those prompts.
           CODE_SIGN_STYLE: Automatic
           CODE_SIGN_IDENTITY: "Apple Development"
           DEVELOPMENT_TEAM: "5Y27G7B6D8"
@@ -147,12 +139,12 @@ targets:
           BUNDLE_DISPLAY_NAME: "OakReader"
           # Developer ID signing for distribution, scoped to THIS target only.
           # (Passing these as global xcodebuild overrides breaks SPM package
-          # targets and the oak tool, which reject provisioning profiles.)
-          # CI installs the profile by this exact name before archiving.
+          # targets and the oak tool.) No provisioning profile: the entitlements
+          # carry no restricted keys, so Developer ID + hardened runtime signs
+          # directly during archive.
           CODE_SIGN_STYLE: Manual
           CODE_SIGN_IDENTITY: "Developer ID Application"
           DEVELOPMENT_TEAM: "5Y27G7B6D8"
-          PROVISIONING_PROFILE_SPECIFIER: "OakReader Developer ID"
           OTHER_CODE_SIGN_FLAGS: "--timestamp"
 
   oak:
@@ -170,8 +162,7 @@ targets:
       base:
         PRODUCT_NAME: oak
         SWIFT_STRICT_CONCURRENCY: minimal
-        # Keep oak out of the archive's install products. It's embedded into the
-        # app bundle by the "Embed oak CLI" script; without this the archive holds
-        # both OakReader.app AND /usr/local/bin/oak, so -exportArchive can't choose
-        # a distribution method ("method expected one {} but found developer-id").
+        # Keep oak out of the archive's install products — it's embedded into the
+        # app bundle by the "Embed oak CLI" script, not shipped as a standalone
+        # tool. Leaving it installed bloats the archive with a stray /usr/local/bin/oak.
         SKIP_INSTALL: YES

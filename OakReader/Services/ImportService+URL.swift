@@ -2,9 +2,7 @@ import Foundation
 import AppKit
 import OakAgent
 
-struct URLImportOptions {
-    var preferEmbedForMedia: Bool = true
-}
+struct URLImportOptions {}
 
 enum URLImportError: LocalizedError {
     case invalidURL
@@ -63,7 +61,6 @@ extension ImportService {
     /// Import a remote URL into the library.
     /// - PDF URLs are downloaded and imported as PDFs.
     /// - HTML pages are archived with monolith, converted to `content.md`, and imported as HTML documents.
-    /// - YouTube/X links use the existing embed importer when possible.
     @discardableResult
     func importURL(_ sourceURL: URL, options: URLImportOptions = URLImportOptions()) async throws -> LibraryItem? {
         guard sourceURL.scheme?.lowercased().hasPrefix("http") == true else {
@@ -72,10 +69,6 @@ extension ImportService {
 
         if let existing = await MainActor.run(body: { store.findItem(bySourceURL: sourceURL) }) {
             return existing
-        }
-
-        if options.preferEmbedForMedia, Self.isMediaEmbedURL(sourceURL) {
-            return try await importEmbedURL(sourceURL)
         }
 
         let info = await remoteInfo(for: sourceURL)
@@ -212,47 +205,6 @@ extension ImportService {
             .joined(separator: "\n\n")
     }
 
-    // MARK: - Embed URL Import
-
-    private func importEmbedURL(_ sourceURL: URL) async throws -> LibraryItem? {
-        let info = await remoteInfo(for: sourceURL)
-        let title = info.title ?? sourceURL.host ?? sourceURL.absoluteString
-        let author = info.author ?? ""
-        let embedType = Self.detectEmbedType(from: sourceURL)
-        let metadata = MediaMetadata(
-            title: title,
-            author: author,
-            sourceURL: sourceURL,
-            duration: nil,
-            thumbnailURL: info.thumbnailURL,
-            publishedAt: nil,
-            description: info.description,
-            embedType: embedType
-        )
-
-        let thumbnailData: Data?
-        if let thumbnailURL = info.thumbnailURL {
-            thumbnailData = try? await URLSession.shared.data(from: thumbnailURL).0
-        } else {
-            thumbnailData = nil
-        }
-
-        let item = await MainActor.run {
-            importEmbed(.init(
-                title: title,
-                author: author,
-                sourceURL: sourceURL,
-                duration: nil,
-                thumbnailData: thumbnailData,
-                transcript: nil,
-                metadata: metadata,
-                embedType: embedType
-            ))
-        }
-        guard let item else { throw URLImportError.importFailed }
-        return item
-    }
-
     // MARK: - URL Metadata
 
     private struct RemoteInfo {
@@ -320,18 +272,6 @@ extension ImportService {
     private static func isLikelyPDFURL(_ url: URL, contentType: String?) -> Bool {
         if url.pathExtension.lowercased() == "pdf" { return true }
         return contentType?.lowercased().contains("application/pdf") == true
-    }
-
-    private static func isMediaEmbedURL(_ url: URL) -> Bool {
-        let host = url.host?.lowercased() ?? ""
-        return host.contains("youtube.com")
-            || host.contains("youtu.be")
-    }
-
-    private static func detectEmbedType(from url: URL) -> String {
-        let host = url.host?.lowercased() ?? ""
-        if host.contains("youtube.com") || host.contains("youtu.be") { return "youtube" }
-        return "link"
     }
 
     private static func extractHTMLTitle(_ html: String) -> String? {

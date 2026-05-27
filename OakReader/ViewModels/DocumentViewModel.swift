@@ -115,14 +115,6 @@ class DocumentViewModel {
         return vm
     }
 
-    private var _media: MediaViewModel?
-    var media: MediaViewModel {
-        if let vm = _media { return vm }
-        let vm = MediaViewModel(parent: self)
-        _media = vm
-        return vm
-    }
-
     /// The item-level storage key, set externally by AppState when creating the tab.
     var itemStorageKey: String?
 
@@ -164,10 +156,6 @@ class DocumentViewModel {
         case .markdown: return markdownDocument != nil
         case .audio: return false
         }
-    }
-
-    var usesMediaSidebar: Bool {
-        contentType == .video
     }
 
     var fileName: String {
@@ -217,15 +205,11 @@ class DocumentViewModel {
         state.isSidebarVisible = false
     }
 
-    /// Last playback time (seconds) for embed videos, preserved across tab switches.
-    var lastPlaybackTime: Double?
-
     init(media: MediaDocument) {
         self.mediaDocument = media
         self.contentType = media.metadata.resolvedEmbedType == .youtube ? .video : .link
         self.state = DocumentState()
-        state.isSidebarVisible = media.metadata.resolvedEmbedType == .youtube
-        state.mediaSidebarMode = .outline
+        state.isSidebarVisible = false
     }
 
     init(markdown: MarkdownDocument) {
@@ -288,11 +272,7 @@ class DocumentViewModel {
         case .displayTwoUpContinuous:
             viewer.setDisplayMode(.twoUpContinuous)
         case .find:
-            if usesMediaSidebar {
-                state.mediaSidebarMode = .transcript
-            } else {
-                state.sidebarMode = .search
-            }
+            state.sidebarMode = .search
             state.isSidebarVisible = true
         case .accessibilityCheck:
             Task { @MainActor in

@@ -15,12 +15,9 @@ export interface PageCapture {
   url: string;
   title: string | null;
   author?: string | null;
-  videoId?: string | null;
-  duration?: number | null;
   thumbnailURL?: string | null;
-  transcript?: string | null;
   description?: string | null;
-  embedType?: "youtube" | "link";
+  embedType?: "link";
   biblio?: BiblioMetadata;
   markdown?: string | null;
 }
