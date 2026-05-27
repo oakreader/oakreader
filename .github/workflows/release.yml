@@ -21,9 +21,9 @@ env:
 
 jobs:
   release:
-    # macos-26 ships Xcode 26 (Swift 6.2+), required by transitive deps like
-    # mlx-audio-swift that pin Swift tools 6.2. macos-15 (Xcode 16/Swift 6.0)
-    # fails package resolution.
+    # macos-26 ships the current Xcode/Swift toolchain. (The build no longer
+    # depends on MLX/usearch, so an older image would likely work too, but
+    # macos-26 keeps CI on the same toolchain used locally.)
     runs-on: macos-26
     timeout-minutes: 60
     permissions:
@@ -104,8 +104,8 @@ jobs:
         run: xcodegen generate
 
       # -onlyUsePackageVersionsFromResolvedFile pins to the committed
-      # Package.resolved so CI uses the same dependency versions as local
-      # (otherwise newer usearch drops .F32 and breaks HybridSearchEngine).
+      # Package.resolved so CI builds the same dependency versions as local,
+      # keeping releases reproducible.
       - name: Resolve packages
         if: steps.check.outputs.skip == 'false'
         run: |
@@ -145,28 +145,48 @@ jobs:
             "$RUNNER_TEMP/${{ env.APP_NAME }}.xcarchive/Products/Applications/${{ env.APP_NAME }}.app" \
             "$RUNNER_TEMP/export/"
 
-      # ── Sign embedded oak CLI, then re-seal the app bundle ────
+      # ── Re-sign Sparkle + embedded oak CLI, then re-seal the bundle ────
       - name: Sign embedded binaries
         if: steps.check.outputs.skip == 'false'
         run: |
           APP="$RUNNER_TEMP/export/${{ env.APP_NAME }}.app"
           IDENTITY="Developer ID Application"
+          SIGN=(codesign --force --options runtime --timestamp --sign "$IDENTITY")
+
+          # Sparkle is built from SPM source, so its nested helpers are only
+          # ad-hoc signed — notarization rejects them ("not signed with a valid
+          # Developer ID certificate" / "no secure timestamp"). Developer ID
+          # signing in project.yml is scoped to the OakReader target, so it never
+          # reaches the framework. Re-sign Sparkle's components inside-out, in the
+          # order Sparkle documents, before sealing the outer bundle.
+          SPARKLE="$APP/Contents/Frameworks/Sparkle.framework"
+          if [ -d "$SPARKLE" ]; then
+            VER=$(readlink "$SPARKLE/Versions/Current" || echo B)
+            V="$SPARKLE/Versions/$VER"
+            for comp in \
+              "$V/XPCServices/Installer.xpc" \
+              "$V/XPCServices/Downloader.xpc" \
+              "$V/Autoupdate" \
+              "$V/Updater.app"; do
+              [ -e "$comp" ] && { echo "Signing: $comp"; "${SIGN[@]}" "$comp"; }
+            done
+            echo "Signing: $SPARKLE"
+            "${SIGN[@]}" "$SPARKLE"
+          fi
 
           # The oak CLI is copied into Contents/Resources by a build phase, so
           # Xcode's export may not sign it. Sign every loose Mach-O in Resources
           # with the hardened runtime (oak uses no restricted entitlements).
-          # Sparkle's frameworks/XPC services keep their own signatures — we do
-          # NOT --deep re-sign, which would clobber them.
           find "$APP/Contents/Resources" -type f -perm +111 | while read -r f; do
             if file "$f" | grep -q "Mach-O"; then
               echo "Signing: $f"
-              codesign --force --sign "$IDENTITY" --options runtime --timestamp "$f"
+              "${SIGN[@]}" "$f"
             fi
           done
 
-          # Re-seal the outer bundle so CodeResources covers the (re)signed oak.
-          codesign --force --sign "$IDENTITY" --options runtime --timestamp \
-            --entitlements OakReader/OakReader.entitlements "$APP"
+          # Re-seal the outer bundle so CodeResources covers everything (re)signed
+          # above. NOT --deep — the components are already correctly signed.
+          "${SIGN[@]}" --entitlements OakReader/OakReader.entitlements "$APP"
 
           codesign --verify --deep --strict --verbose=2 "$APP"
 
