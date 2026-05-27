@@ -16,6 +16,11 @@ public enum CredentialResolver: Sendable {
                     return value
                 }
             }
+            // Local providers (Ollama, LM Studio) need no credential — return an empty
+            // sentinel so the router builds a provider instead of throwing missingAPIKey.
+            if case .none = info.authStrategy {
+                return ""
+            }
         }
 
         // 3. OAuth token store

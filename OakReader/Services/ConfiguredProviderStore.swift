@@ -39,7 +39,13 @@ final class ConfiguredProviderStore {
     func refresh() {
         var ids = Set<String>()
         for provider in ProviderRegistry.shared.allProviders {
-            if CredentialResolver.hasCredentials(for: provider.id) {
+            if provider.isLocal {
+                // Local providers need no credential; they're "configured" once the user
+                // has added them (and thus discovered their models).
+                if LocalProviderStore.shared.isEnabled(provider.id) {
+                    ids.insert(provider.id)
+                }
+            } else if CredentialResolver.hasCredentials(for: provider.id) {
                 ids.insert(provider.id)
             }
         }

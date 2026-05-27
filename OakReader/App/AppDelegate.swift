@@ -25,6 +25,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillFinishLaunching(_ notification: Notification) {
         documentController.appState = appState
         NSApp.mainMenu = MainMenuBuilder.build(target: self)
+        // Restore local OpenAI-compatible providers (Ollama, LM Studio) into the registry
+        // before any AI feature reads the provider list.
+        LocalProviderStore.shared.applyAll()
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {

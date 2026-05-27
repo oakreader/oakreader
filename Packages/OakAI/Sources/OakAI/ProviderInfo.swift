@@ -75,6 +75,9 @@ public struct ProviderInfo: Identifiable, Sendable, Hashable {
     public let customHeaders: [String: String]
     /// Lower values appear first in the provider list. Default is 100.
     public let displayOrder: Int
+    /// True for on-machine OpenAI-compatible servers (Ollama, LM Studio): no API key,
+    /// editable base URL, and a model list discovered at runtime rather than hardcoded.
+    public let isLocal: Bool
 
     public init(
         id: String,
@@ -85,7 +88,8 @@ public struct ProviderInfo: Identifiable, Sendable, Hashable {
         models: [ModelInfo],
         authStrategy: AuthStrategy = .apiKey(envVar: nil),
         customHeaders: [String: String] = [:],
-        displayOrder: Int = 100
+        displayOrder: Int = 100,
+        isLocal: Bool = false
     ) {
         self.id = id
         self.displayName = displayName
@@ -96,6 +100,7 @@ public struct ProviderInfo: Identifiable, Sendable, Hashable {
         self.authStrategy = authStrategy
         self.customHeaders = customHeaders
         self.displayOrder = displayOrder
+        self.isLocal = isLocal
     }
 
     // MARK: - Hashable (by id only — AuthStrategy is not Hashable)
@@ -106,5 +111,38 @@ public struct ProviderInfo: Identifiable, Sendable, Hashable {
 
     public func hash(into hasher: inout Hasher) {
         hasher.combine(id)
+    }
+}
+
+// MARK: - Local Provider URL Helpers
+
+/// URL math for OpenAI-compatible local servers. A provider's `baseURL` stores the full
+/// chat-completions endpoint (e.g. `http://localhost:11434/v1/chat/completions`); these
+/// helpers convert between that, the API base (`.../v1`), and the models endpoint.
+public enum LocalProviderURL {
+    /// Strip a trailing `/chat/completions` to recover the API base (e.g. `.../v1`).
+    public static func apiBase(fromChatURL chatURL: URL) -> URL {
+        let s = chatURL.absoluteString
+        let suffix = "/chat/completions"
+        if s.hasSuffix(suffix) {
+            return URL(string: String(s.dropLast(suffix.count))) ?? chatURL
+        }
+        return chatURL
+    }
+
+    /// Append `/chat/completions` to an API base, tolerating a trailing slash.
+    public static func chatURL(fromAPIBase apiBase: URL) -> URL {
+        appending("chat/completions", to: apiBase)
+    }
+
+    /// Append `/models` to an API base, tolerating a trailing slash.
+    public static func modelsURL(fromAPIBase apiBase: URL) -> URL {
+        appending("models", to: apiBase)
+    }
+
+    private static func appending(_ path: String, to base: URL) -> URL {
+        var s = base.absoluteString
+        if s.hasSuffix("/") { s.removeLast() }
+        return URL(string: s + "/" + path) ?? base
     }
 }
