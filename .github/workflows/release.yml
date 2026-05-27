@@ -198,8 +198,15 @@ jobs:
           APP="$RUNNER_TEMP/export/${{ env.APP_NAME }}.app"
           DMG_PATH="$RUNNER_TEMP/${{ env.APP_NAME }}.dmg"
 
+          # Give the DMG (and its mounted volume) the app icon instead of the
+          # generic disk-image icon. The .app already carries AppIcon.icns.
+          VOLICON_ARGS=()
+          ICNS="$APP/Contents/Resources/AppIcon.icns"
+          [ -f "$ICNS" ] && VOLICON_ARGS=(--volicon "$ICNS")
+
           create-dmg \
             --volname "${{ env.APP_NAME }}" \
+            "${VOLICON_ARGS[@]}" \
             --window-pos 200 120 \
             --window-size 660 400 \
             --icon-size 160 \
@@ -278,13 +285,22 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.version }}"
 
+          # Versioned copy — the URL the appcast points at (immutable per release).
           aws s3 cp "$DMG_PATH" \
             "s3://$R2_BUCKET/$R2_PREFIX/v${VERSION}/${{ env.APP_NAME }}.dmg" \
             --endpoint-url "$R2_ENDPOINT"
 
+          # Stable "latest" copy — the website's Download button links here so it
+          # always serves the newest release without a code change per version.
+          aws s3 cp "$DMG_PATH" \
+            "s3://$R2_BUCKET/$R2_PREFIX/${{ env.APP_NAME }}.dmg" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --cache-control "no-cache"
+
           aws s3 cp "$RUNNER_TEMP/appcast.xml" \
             "s3://$R2_BUCKET/$R2_PREFIX/appcast.xml" \
-            --endpoint-url "$R2_ENDPOINT"
+            --endpoint-url "$R2_ENDPOINT" \
+            --cache-control "no-cache"
 
       # ── Tag + GitHub Release (draft) ──────────────────────────
       - name: Create tag and GitHub Release
