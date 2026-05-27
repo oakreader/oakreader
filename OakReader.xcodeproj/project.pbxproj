@@ -215,6 +215,7 @@
 		A16A89834DCA006809935BCC /* HTMLViewerRepresentable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BA0F12DFA84CBFFE95CD534 /* HTMLViewerRepresentable.swift */; };
 		A1FF6687AAE88ECA6BDA7180 /* TabBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EDAE070FD925FD55D45822B /* TabBarView.swift */; };
 		A265EBC715189BCDE92C6C6C /* LibraryCoverService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 213E072D4DBDA107DB9C8194 /* LibraryCoverService.swift */; };
+		A40F41BFE6740036C056CC9B /* VoiceProviderFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E4D810B1BF5A7040422507C /* VoiceProviderFactory.swift */; };
 		A4C849BCDFD7E58739BCE675 /* CompareSetupSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A546785A0819A73463325E1D /* CompareSetupSheet.swift */; };
 		A5044D8EBF0F8A518C537278 /* CLIImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EE6B08AE42F5F5093B698DF /* CLIImporter.swift */; };
 		A62A69DC501698A2DC0BEF2E /* ImportService+Markdown.swift in Sources */ = {isa = PBXBuildFile; fileRef = F567438B9F047B4A7C8C4594 /* ImportService+Markdown.swift */; };
@@ -376,6 +377,7 @@
 		0900EBB862D12D5EE4CCFBC5 /* ContentInsertionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentInsertionView.swift; sourceTree = "<group>"; };
 		0ADD810035D275B765C748C2 /* HeaderFooterViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeaderFooterViewModel.swift; sourceTree = "<group>"; };
 		0C0812413BD57A2054D10A83 /* RedactionBurnInSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RedactionBurnInSheet.swift; sourceTree = "<group>"; };
+		0E4D810B1BF5A7040422507C /* VoiceProviderFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceProviderFactory.swift; sourceTree = "<group>"; };
 		0E778748A8896A1883FEAAC7 /* LibraryTableToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryTableToolbar.swift; sourceTree = "<group>"; };
 		101914D5471BD54C347EA63C /* ContentChunker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentChunker.swift; sourceTree = "<group>"; };
 		10A6B5888A5CF5E18A2C1559 /* CSLTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSLTypes.swift; sourceTree = "<group>"; };
@@ -1016,6 +1018,7 @@
 				FADC7847A8EEE480FA43B301 /* SystemPermissionStatus.swift */,
 				7565F0D9DAFCB05C1541E163 /* SystemSettingsLauncher.swift */,
 				67A7297F5A3894E12796E73F /* TextExtractionService.swift */,
+				0E4D810B1BF5A7040422507C /* VoiceProviderFactory.swift */,
 				7A9D3622F2AF740C7B4DE15B /* WatermarkService.swift */,
 				60B1BE6A503FBBAE5E5F6D33 /* ZoteroFieldMapping.swift */,
 				1E682F4A12F66C8D3B12A14F /* ZoteroMigrationService.swift */,
@@ -1870,6 +1873,7 @@
 				C2252EFF5D2937ABBC360DF1 /* TranslationViewModel.swift in Sources */,
 				1D25C901096C9BAE25EB186F /* UndoCoordinator.swift in Sources */,
 				A0F345EB9B3741DCFE741698 /* ViewerViewModel.swift in Sources */,
+				A40F41BFE6740036C056CC9B /* VoiceProviderFactory.swift in Sources */,
 				E0D39B5BFE8AABDB87DBE98A /* VoiceSpeakerModels.swift in Sources */,
 				B4E30811EC8E73E6C02A7352 /* VoiceViewModel.swift in Sources */,
 				7E81C0C114AB4D91278EE378 /* WatermarkConfig.swift in Sources */,

@@ -145,7 +145,7 @@ struct AudioPlayerView: View {
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
-        .disabled(Preferences.shared.voiceSTTModel.isEmpty)
+        .disabled(!VoiceProviderFactory.isSTTConfigured)
     }
 
     // MARK: - Transcription Logic
@@ -162,13 +162,12 @@ struct AudioPlayerView: View {
     }
 
     private func startTranscription(itemKey: String, attKey: String) {
-        let sttModel = Preferences.shared.voiceSTTModel
-        guard !sttModel.isEmpty else { return }
+        guard VoiceProviderFactory.isSTTConfigured else { return }
 
         isTranscribing = true
         Task {
             do {
-                let text = try await transcriptionService.transcribe(audioURL: audioURL, sttModel: sttModel)
+                let text = try await transcriptionService.transcribe(audioURL: audioURL)
                 let url = CatalogDatabase.attachmentTranscriptURL(
                     itemStorageKey: itemKey,
                     attachmentStorageKey: attKey

@@ -21,12 +21,21 @@ struct AISettingsView: View {
     @State private var voiceLLMProviderId: String
     @State private var voiceLLMModel: String
 
-    // ElevenLabs TTS
+    // Voice providers
+    @State private var ttsProvider: String
+    @State private var sttProvider: String
     @State private var elevenLabsVoiceId: String
     @State private var elevenLabsTTSModelId: String
+    @State private var openAITTSVoice: String
+    @State private var geminiTTSVoice: String
+    @State private var fishAudioAPIKey: String
+    @State private var fishAudioReferenceId: String
 
     // Thinking
     @State private var thinkingBudget: Int
+
+    private let openAIVoices = ["alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse"]
+    private let geminiVoices = ["Kore", "Puck", "Zephyr", "Charon", "Fenrir", "Aoede", "Leda", "Orus"]
 
     // MARK: - Init
 
@@ -46,9 +55,15 @@ struct AISettingsView: View {
         let vlmProvider = Self.providerForModel(vlm.isEmpty ? (prefs.aiModel.isEmpty ? defaultModel : prefs.aiModel) : vlm) ?? pid
         _voiceLLMProviderId = State(initialValue: vlmProvider)
 
-        // ElevenLabs TTS
+        // Voice providers
+        _ttsProvider = State(initialValue: prefs.voiceTTSProvider)
+        _sttProvider = State(initialValue: prefs.voiceSTTProvider)
         _elevenLabsVoiceId = State(initialValue: prefs.elevenLabsVoiceId)
         _elevenLabsTTSModelId = State(initialValue: prefs.elevenLabsTTSModelId)
+        _openAITTSVoice = State(initialValue: prefs.openAITTSVoice)
+        _geminiTTSVoice = State(initialValue: prefs.geminiTTSVoice)
+        _fishAudioAPIKey = State(initialValue: prefs.fishAudioAPIKey)
+        _fishAudioReferenceId = State(initialValue: prefs.fishAudioReferenceId)
 
         // Thinking
         _thinkingBudget = State(initialValue: prefs.thinkingBudget)
@@ -233,14 +248,12 @@ struct AISettingsView: View {
     @ViewBuilder
     private var transcribeSection: some View {
         Section("Transcribe") {
-            Label {
-                Text("Cloud transcription is coming soon. On-device transcription has been removed.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } icon: {
-                Image(systemName: "waveform.badge.exclamationmark")
-                    .foregroundStyle(.secondary)
+            Picker("Provider", selection: $sttProvider) {
+                ForEach(VoiceProviderType.allCases, id: \.rawValue) { type in
+                    Text(type.displayName).tag(type.rawValue)
+                }
             }
+            providerCredentialRow(for: VoiceProviderType(rawValue: sttProvider) ?? .elevenLabs)
         }
     }
 
@@ -249,19 +262,85 @@ struct AISettingsView: View {
     @ViewBuilder
     private var ttsSection: some View {
         Section("Text-to-Speech") {
-            if store.isElevenLabsConfigured {
-                TextField("Voice ID", text: $elevenLabsVoiceId)
-                    .textFieldStyle(.roundedBorder)
-
-                Picker("TTS Model", selection: $elevenLabsTTSModelId) {
-                    Text("Turbo v2.5 (fastest)").tag("eleven_turbo_v2_5")
-                    Text("Flash v2.5 (fast)").tag("eleven_flash_v2_5")
-                    Text("Multilingual v2 (quality)").tag("eleven_multilingual_v2")
+            Picker("Provider", selection: $ttsProvider) {
+                ForEach(VoiceProviderType.allCases, id: \.rawValue) { type in
+                    Text(type.displayName).tag(type.rawValue)
                 }
-            } else {
-                Text("Add ElevenLabs above to enable text-to-speech.")
-                    .foregroundStyle(.secondary)
             }
+
+            switch VoiceProviderType(rawValue: ttsProvider) ?? .elevenLabs {
+            case .elevenLabs:
+                if store.isElevenLabsConfigured {
+                    TextField("Voice ID", text: $elevenLabsVoiceId)
+                        .textFieldStyle(.roundedBorder)
+                    Picker("TTS Model", selection: $elevenLabsTTSModelId) {
+                        Text("Turbo v2.5 (fastest)").tag("eleven_turbo_v2_5")
+                        Text("Flash v2.5 (fast)").tag("eleven_flash_v2_5")
+                        Text("Multilingual v2 (quality)").tag("eleven_multilingual_v2")
+                    }
+                } else {
+                    missingCredentialHint(.elevenLabs)
+                }
+            case .openAI:
+                Picker("Voice", selection: $openAITTSVoice) {
+                    ForEach(openAIVoices, id: \.self) { Text($0.capitalized).tag($0) }
+                }
+                providerCredentialRow(for: .openAI)
+            case .gemini:
+                Picker("Voice", selection: $geminiTTSVoice) {
+                    ForEach(geminiVoices, id: \.self) { Text($0).tag($0) }
+                }
+                providerCredentialRow(for: .gemini)
+            case .fishAudio:
+                fishAudioFields
+            }
+        }
+    }
+
+    // MARK: - Provider credential helpers
+
+    /// Whether a voice provider has the credentials it needs.
+    private func isConfigured(_ type: VoiceProviderType) -> Bool {
+        switch type {
+        case .elevenLabs: return store.isElevenLabsConfigured
+        case .fishAudio: return !fishAudioAPIKey.isEmpty
+        case .openAI: return store.configuredLLMProviderIds.contains("openai")
+        case .gemini: return store.configuredLLMProviderIds.contains("google")
+        }
+    }
+
+    @ViewBuilder
+    private func providerCredentialRow(for type: VoiceProviderType) -> some View {
+        switch type {
+        case .fishAudio:
+            fishAudioFields
+        case .elevenLabs:
+            if !store.isElevenLabsConfigured { missingCredentialHint(.elevenLabs) }
+        case .openAI, .gemini:
+            if !isConfigured(type) { missingCredentialHint(type) }
+        }
+    }
+
+    @ViewBuilder
+    private var fishAudioFields: some View {
+        SecureField("Fish Audio API Key", text: $fishAudioAPIKey)
+            .textFieldStyle(.roundedBorder)
+        TextField("Voice Reference ID (optional)", text: $fishAudioReferenceId)
+            .textFieldStyle(.roundedBorder)
+    }
+
+    private func missingCredentialHint(_ type: VoiceProviderType) -> some View {
+        Label(missingCredentialMessage(type), systemImage: "exclamationmark.triangle")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+    }
+
+    private func missingCredentialMessage(_ type: VoiceProviderType) -> String {
+        switch type {
+        case .elevenLabs: return "Add ElevenLabs in Providers above to use it."
+        case .openAI: return "Add an OpenAI provider in Providers above; its API key is reused here."
+        case .gemini: return "Add a Google Gemini provider in Providers above; its API key is reused here."
+        case .fishAudio: return "Enter a Fish Audio API key above."
         }
     }
 
@@ -317,9 +396,15 @@ struct AISettingsView: View {
         // Voice Chat LLM
         prefs.voiceLLMModel = voiceLLMUseChatDefault ? "" : voiceLLMModel
 
-        // ElevenLabs TTS
+        // Voice providers
+        prefs.voiceTTSProvider = ttsProvider
+        prefs.voiceSTTProvider = sttProvider
         prefs.elevenLabsVoiceId = elevenLabsVoiceId
         prefs.elevenLabsTTSModelId = elevenLabsTTSModelId
+        prefs.openAITTSVoice = openAITTSVoice
+        prefs.geminiTTSVoice = geminiTTSVoice
+        prefs.fishAudioAPIKey = fishAudioAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        prefs.fishAudioReferenceId = fishAudioReferenceId.trimmingCharacters(in: .whitespacesAndNewlines)
 
         // Thinking
         prefs.thinkingBudget = thinkingBudget
