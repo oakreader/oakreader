@@ -6,9 +6,3 @@ export {
   contentKindToLabel,
 } from "./registry";
 export { extractLinkMetadata } from "./link";
-export {
-  isYouTubeWatchURL,
-  isDOIURL,
-  isScholarlyDomain,
-  extractYouTubeVideoId,
-} from "./url-utils";

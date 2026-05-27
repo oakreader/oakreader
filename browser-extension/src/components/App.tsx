@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Archive, CheckCircle2, FileText, Link2, Sparkles } from "lucide-react";
 import { usePopupData } from "@/src/hooks/use-popup-data";
-import { postSnapshot } from "@/src/lib/api";
+import { postClip } from "@/src/lib/api";
 import type { PageCapture, PDFSavePayload } from "@/src/lib/types";
 import { PageCard } from "./PageCard";
 import { SaveButton, type SaveState } from "./SaveButton";
@@ -13,9 +13,9 @@ const SAVE_MODE_OPTIONS: Array<{
   title: string;
   description: string;
 }> = [
-  { mode: "html", title: "Archive", description: "Full page" },
-  { mode: "pdf", title: "PDF", description: "Printable" },
-  { mode: "link", title: "Link", description: "Fast save" },
+  { mode: "link", title: "Bookmark", description: "Link & text" },
+  { mode: "html", title: "Archive", description: "Offline snapshot" },
+  { mode: "pdf", title: "PDF", description: "PDF file" },
 ];
 
 const OAKREADER_DEEP_LINK = "oakreader://open";
@@ -38,7 +38,7 @@ export function App() {
   const { pageMeta, tabId, loading, error } = usePopupData();
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [errorMessage, setErrorMessage] = useState("");
-  const [saveMode, setSaveMode] = useState<SaveMode>("html");
+  const [saveMode, setSaveMode] = useState<SaveMode>("link");
   const [captureProgress, setCaptureProgress] = useState<CaptureProgress | null>(null);
 
   // Listen for SingleFile progress events from the content script
@@ -108,7 +108,7 @@ export function App() {
 
         try {
           payload = await Promise.race([
-            chrome.tabs.sendMessage(tabId, { action: "extractLinkMeta" }),
+            chrome.tabs.sendMessage(tabId, { action: "extractMeta", forceLink: true }),
             new Promise((_resolve, reject) =>
               setTimeout(() => reject(new Error("Capture timed out")), 5000)
             ),
@@ -142,7 +142,7 @@ export function App() {
           throw new Error(bgResult?.message || "Failed to capture HTML");
         }
 
-        // Background already saved — skip postSnapshot below
+        // Background already saved — skip postClip below
         setSaveState("saved");
         setTimeout(() => window.close(), 2500);
         return;
@@ -163,17 +163,17 @@ export function App() {
           throw new Error(bgResult?.message || "Failed to generate PDF");
         }
 
-        // Background already saved — skip postSnapshot below
+        // Background already saved — skip postClip below
         setSaveState("saved");
         setTimeout(() => window.close(), 2500);
         return;
       } else {
-        // Embed types (YouTube, Twitter, etc.): extract metadata via content script
+        // Embed types (YouTube, …): dispatch to the URL's translator via content script
         setSaveState("capturing");
 
         try {
           payload = await Promise.race([
-            chrome.tabs.sendMessage(tabId, { action: "extractLinkMeta" }),
+            chrome.tabs.sendMessage(tabId, { action: "extractMeta" }),
             new Promise((_resolve, reject) =>
               setTimeout(() => reject(new Error("Capture timed out")), 10000)
             ),
@@ -190,7 +190,7 @@ export function App() {
         setSaveState("saving");
       }
 
-      const result = await postSnapshot(payload);
+      const result = await postClip(payload);
 
       if (result.status === "ok") {
         setSaveState("saved");

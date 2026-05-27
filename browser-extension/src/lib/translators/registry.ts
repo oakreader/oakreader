@@ -25,7 +25,7 @@ export function detectContentKind(url: string): ContentKind {
 }
 
 /**
- * Maps ContentKind to legacy page type used by the popup and SnapshotServer.
+ * Maps ContentKind to the page type used by the popup and OakServer.
  */
 export function contentKindToPageType(kind: ContentKind): "html" | "embed" {
   switch (kind) {
@@ -48,7 +48,7 @@ export function contentKindToLabel(kind: ContentKind): string {
     case "scholarly":
       return "Article";
     case "link":
-      return "Link";
+      return "Bookmark";
     case "webpage":
       return "Web Page";
   }

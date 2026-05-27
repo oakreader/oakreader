@@ -33,7 +33,7 @@ export interface PDFSavePayload {
   cookies?: string;
 }
 
-/** Payload for saving an HTML snapshot (SingleFile capture). */
+/** Payload for a full-page HTML snapshot captured by SingleFile (sent by background). */
 export interface HTMLSnapshotPayload {
   type: "html";
   url: string;
@@ -42,5 +42,11 @@ export interface HTMLSnapshotPayload {
   markdown?: string | null;
 }
 
-/** @deprecated Use PageCapture for full data or PageMeta for lightweight detection. */
-export type PageData = PageCapture;
+/** Payload for a base64 PDF generated via the debugger (sent by background). */
+export interface PDFCapturePayload {
+  type: "pdf";
+  url: string;
+  title: string | null;
+  pdfData: string;
+  markdown?: string | null;
+}

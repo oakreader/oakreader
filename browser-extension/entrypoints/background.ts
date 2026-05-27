@@ -1,5 +1,7 @@
+import type { HTMLSnapshotPayload, PDFCapturePayload } from "@/src/lib/types";
+
 export default defineBackground(() => {
-  const SNAPSHOT_URL = "http://127.0.0.1:23119/snapshot";
+  const CLIP_URL = "http://127.0.0.1:23119/clip";
 
   // ─── PDF Detection via webRequest ──────────────────────────────────────────────
 
@@ -188,7 +190,7 @@ export default defineBackground(() => {
     }
 
     // 3. POST to OakReader server
-    const body: Record<string, unknown> = {
+    const body: HTMLSnapshotPayload = {
       type: "html",
       url: payload.url,
       title: payload.title,
@@ -196,7 +198,7 @@ export default defineBackground(() => {
       markdown,
     };
 
-    const response = await fetch(SNAPSHOT_URL, {
+    const response = await fetch(CLIP_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -300,7 +302,7 @@ export default defineBackground(() => {
     }
 
     // 2. POST directly to the OakReader server from background
-    const body: Record<string, unknown> = {
+    const body: PDFCapturePayload = {
       type: "pdf",
       url: payload.url,
       title: payload.title,
@@ -308,7 +310,7 @@ export default defineBackground(() => {
       markdown,
     };
 
-    const response = await fetch(SNAPSHOT_URL, {
+    const response = await fetch(CLIP_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

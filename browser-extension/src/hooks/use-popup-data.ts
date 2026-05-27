@@ -56,7 +56,7 @@ export function usePopupData(): PopupData {
         }
 
         // Ping the server to check if app is running
-        const pingPromise = fetch("http://127.0.0.1:23119/snapshot", {
+        const pingPromise = fetch("http://127.0.0.1:23119/clip", {
           method: "HEAD",
           signal: AbortSignal.timeout(5000),
         });
