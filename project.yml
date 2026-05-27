@@ -133,6 +133,15 @@ targets:
         Debug:
           PRODUCT_BUNDLE_IDENTIFIER: com.oakreader.OakReader.dev
           BUNDLE_DISPLAY_NAME: "OakReader Dev"
+          # Sign local dev builds with a stable Apple Development identity, scoped
+          # to THIS target only (same reasoning as Release: global xcodebuild
+          # signing overrides break SPM package targets and the oak tool). A
+          # constant identity across rebuilds keeps keychain-access-groups and TCC
+          # grants (mic, local network) from being invalidated — ad-hoc ("-")
+          # changes identity every build and re-fires those prompts.
+          CODE_SIGN_STYLE: Automatic
+          CODE_SIGN_IDENTITY: "Apple Development"
+          DEVELOPMENT_TEAM: "59X959HPTF"
         Release:
           PRODUCT_BUNDLE_IDENTIFIER: com.oakreader.OakReader
           BUNDLE_DISPLAY_NAME: "OakReader"
