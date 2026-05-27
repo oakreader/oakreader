@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Milkdown AI-Proofread POC</title>
+    <style>
+      :root { color-scheme: light dark; }
+      html, body { margin: 0; height: 100%; font-family: -apple-system, system-ui, sans-serif; }
+      #app { display: flex; flex-direction: column; height: 100%; }
+      #bar {
+        display: flex; gap: 8px; align-items: center;
+        padding: 8px 12px; border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+        flex: 0 0 auto;
+      }
+      #bar button {
+        font: inherit; padding: 5px 12px; border-radius: 7px; cursor: pointer;
+        border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+        background: color-mix(in srgb, currentColor 6%, transparent);
+      }
+      #bar button.primary { background: #1C5D33; color: white; border-color: #1C5D33; }
+      #bar .spacer { flex: 1; }
+      #status { font-size: 12px; opacity: 0.6; }
+      #editor { flex: 1; overflow: auto; }
+      /* Suggestion diff styling */
+      .pm-insertion, ins.suggestion { background: rgba(12,166,154,0.22); text-decoration: none; border-radius: 2px; }
+      .pm-deletion, del.suggestion { background: rgba(220,60,60,0.18); text-decoration: line-through; border-radius: 2px; }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div id="bar">
+        <button id="preset-grammar" class="primary">✓ 修正拼写和语法</button>
+        <button id="preset-improve">✦ 改善写作</button>
+        <button id="preset-shorter">⊟ 更简洁</button>
+        <span class="spacer"></span>
+        <span id="status">ready</span>
+      </div>
+      <div id="editor"></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
