@@ -210,6 +210,10 @@ final class LibraryStore {
         selectedCollectionId == SystemCollectionID.readingList
     }
 
+    var isRecentlyReadSelected: Bool {
+        selectedCollectionId == SystemCollectionID.recentlyRead
+    }
+
     var isBinSelected: Bool {
         selectedCollectionId == SystemCollectionID.bin
     }
@@ -427,16 +431,20 @@ final class LibraryStore {
     /// Apply the current sort order. Skipped when semantic search is active (sorted by relevance).
     private func applySort(to items: inout [LibraryItem]) {
         guard !(isSemanticSearchActive && !searchText.isEmpty) else { return }
+        // The Recently Read collection always orders by last-opened time (most recent first),
+        // matching its "Last Opened" column — regardless of the global sort default.
+        let effectiveSort: LibrarySortOrder = isRecentlyReadSelected ? .dateOpened : currentSort
+        let effectiveAscending = isRecentlyReadSelected ? false : sortAscending
         items.sort { a, b in
             let cmp: Bool
-            switch currentSort {
+            switch effectiveSort {
             case .dateAdded:  cmp = a.dateAdded < b.dateAdded
             case .dateOpened: cmp = (a.lastOpenedAt ?? .distantPast) < (b.lastOpenedAt ?? .distantPast)
             case .title:      cmp = a.title.localizedCaseInsensitiveCompare(b.title) == .orderedAscending
             case .author:     cmp = a.author.localizedCaseInsensitiveCompare(b.author) == .orderedAscending
             case .fileSize:   cmp = a.fileSize < b.fileSize
             }
-            return sortAscending ? cmp : !cmp
+            return effectiveAscending ? cmp : !cmp
         }
     }
 
