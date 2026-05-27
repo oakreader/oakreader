@@ -125,7 +125,6 @@ final class Preferences {
         static let globalFontSize = "globalFontSize"
         static let noteEditorFontOverridden = "noteEditorFontOverridden"
         // Voice AI
-        static let voiceSTTModel = "voiceSTTModel"
         static let voiceTTSVoice = "voiceTTSVoice"
         static let voiceReferenceAudioPath = "voiceReferenceAudioPath"
         static let voiceReferenceText = "voiceReferenceText"
@@ -139,6 +138,10 @@ final class Preferences {
         static let elevenLabsAPIKey = "elevenLabsAPIKey"
         static let elevenLabsVoiceId = "elevenLabsVoiceId"
         static let elevenLabsTTSModelId = "elevenLabsTTSModelId"
+        static let openAITTSVoice = "openAITTSVoice"
+        static let geminiTTSVoice = "geminiTTSVoice"
+        static let fishAudioAPIKey = "fishAudioAPIKey"
+        static let fishAudioReferenceId = "fishAudioReferenceId"
         // Disabled models
         static let disabledModelIds = "disabledModelIds"
         // Appearance
@@ -517,11 +520,6 @@ final class Preferences {
 
     // MARK: - Voice AI Preferences
 
-    var voiceSTTModel: String {
-        get { defaults.string(forKey: Keys.voiceSTTModel) ?? "" }
-        set { defaults.set(newValue, forKey: Keys.voiceSTTModel) }
-    }
-
     var voiceTTSVoice: String {
         get { defaults.string(forKey: Keys.voiceTTSVoice) ?? "" }
         set { defaults.set(newValue, forKey: Keys.voiceTTSVoice) }
@@ -614,6 +612,30 @@ final class Preferences {
     var elevenLabsTTSModelId: String {
         get { defaults.string(forKey: Keys.elevenLabsTTSModelId) ?? "eleven_turbo_v2_5" }
         set { defaults.set(newValue, forKey: Keys.elevenLabsTTSModelId) }
+    }
+
+    /// OpenAI TTS voice name (e.g. "alloy", "nova"). Uses the OpenAI chat API key.
+    var openAITTSVoice: String {
+        get { defaults.string(forKey: Keys.openAITTSVoice) ?? "alloy" }
+        set { defaults.set(newValue, forKey: Keys.openAITTSVoice) }
+    }
+
+    /// Gemini TTS voice name (e.g. "Kore"). Uses the Google/Gemini chat API key.
+    var geminiTTSVoice: String {
+        get { defaults.string(forKey: Keys.geminiTTSVoice) ?? "Kore" }
+        set { defaults.set(newValue, forKey: Keys.geminiTTSVoice) }
+    }
+
+    /// Fish Audio API key (shared by STT and TTS).
+    var fishAudioAPIKey: String {
+        get { defaults.string(forKey: Keys.fishAudioAPIKey) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.fishAudioAPIKey) }
+    }
+
+    /// Fish Audio voice model reference id (empty uses the account default).
+    var fishAudioReferenceId: String {
+        get { defaults.string(forKey: Keys.fishAudioReferenceId) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.fishAudioReferenceId) }
     }
 
     var voiceReferenceAudioURL: URL? {

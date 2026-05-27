@@ -23,3 +23,11 @@ public protocol STTService: Sendable {
     /// Stream transcription results from a continuous audio stream.
     func transcribeStream(audioStream: AsyncStream<AVAudioPCMBuffer>) -> AsyncThrowingStream<TranscriptionResult, Error>
 }
+
+public extension STTService {
+    /// Cloud STT providers transcribe complete uploads rather than live audio;
+    /// real-time streaming is unsupported by default.
+    func transcribeStream(audioStream: AsyncStream<AVAudioPCMBuffer>) -> AsyncThrowingStream<TranscriptionResult, Error> {
+        AsyncThrowingStream { $0.finish(throwing: VoiceAgentError.sttFailed("Streaming transcription is not supported by this provider")) }
+    }
+}

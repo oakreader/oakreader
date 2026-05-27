@@ -21,28 +21,20 @@ class VoiceViewModel {
         isSpeaking = true
 
         let prefs = Preferences.shared
-        let voice = prefs.voiceTTSVoice.isEmpty ? nil : prefs.voiceTTSVoice
         let refAudioURL = prefs.voiceReferenceAudioURL
         let refText = prefs.voiceReferenceText.isEmpty ? nil : prefs.voiceReferenceText
         let outputUID = prefs.voiceOutputDeviceUID.isEmpty ? nil : prefs.voiceOutputDeviceUID
 
-        // TTS is cloud-only (ElevenLabs). Bail out if it isn't configured.
-        guard !prefs.elevenLabsAPIKey.isEmpty, !prefs.elevenLabsVoiceId.isEmpty else {
+        // Build the configured cloud TTS provider. Bail out if not configured.
+        guard let built = VoiceProviderFactory.makeTTSProvider() else {
             isSpeaking = false
             return
         }
+        let cacheKey = built.cacheKey
 
-        // Build a cache key that includes all voice config that affects audio output
-        let cacheKey = "elevenlabs:\(prefs.elevenLabsVoiceId):\(prefs.elevenLabsTTSModelId)"
-
-        // Reuse TTS provider if same config, otherwise create new one
+        // Reuse the TTS provider if its config is unchanged, otherwise rebuild.
         if standaloneTTSProvider == nil || standaloneTTSKey != cacheKey {
-            let ttsConfig = ElevenLabsTTSConfig(
-                apiKey: prefs.elevenLabsAPIKey,
-                voiceId: prefs.elevenLabsVoiceId,
-                modelId: prefs.elevenLabsTTSModelId
-            )
-            standaloneTTSProvider = ElevenLabsTTSProvider(config: ttsConfig)
+            standaloneTTSProvider = built.provider
             standaloneTTSKey = cacheKey
         }
 
@@ -60,7 +52,7 @@ class VoiceViewModel {
                     // Cache miss: synthesize while collecting buffers for caching
                     let sourceStream = provider.synthesizeStream(
                         text: text,
-                        voice: voice,
+                        voice: nil,
                         referenceAudioURL: refAudioURL,
                         referenceText: refText
                     )

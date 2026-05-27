@@ -387,7 +387,7 @@ struct LibraryTableView: View {
                 Label("Transcribe", systemImage: "captions.bubble")
             }
             .disabled(
-                Preferences.shared.voiceSTTModel.isEmpty
+                !VoiceProviderFactory.isSTTConfigured
                 || item.processingStatus == .transcribed
                 || item.processingStatus == .transcribing
                 || transcribingItemId != nil
@@ -612,16 +612,14 @@ struct LibraryTableView: View {
 
     private func transcribeAudioItem(_ item: LibraryItem) {
         guard let attachment = item.primaryAttachment else { return }
-        let sttModel = Preferences.shared.voiceSTTModel
-        guard !sttModel.isEmpty else { return }
+        guard VoiceProviderFactory.isSTTConfigured else { return }
 
         transcribingItemId = item.id
         store.updateProcessingStatus(item, status: .transcribing)
         Task {
             do {
                 let text = try await transcriptionService.transcribe(
-                    audioURL: attachment.fileURL,
-                    sttModel: sttModel
+                    audioURL: attachment.fileURL
                 )
                 let url = CatalogDatabase.attachmentTranscriptURL(
                     itemStorageKey: attachment.itemStorageKey,
