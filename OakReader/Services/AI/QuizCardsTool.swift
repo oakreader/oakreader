@@ -4,7 +4,7 @@ import OakAgent
 /// Renders a group of quiz cards inline in the chat as a card carousel. The
 /// model passes the cards directly as the tool input; the carousel UI is drawn
 /// from `ToolUseRecord.input` in `ChatBubbleView`, which dispatches each card to
-/// its type-specific view (flashcard, cloze, choice, matching, ordering).
+/// its type-specific view (flashcard, cloze, occlusion).
 ///
 /// Execution itself only validates and acknowledges — the cards are *rendered*
 /// from the tool input, and persistence into the review deck happens when the
