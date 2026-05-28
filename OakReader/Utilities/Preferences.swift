@@ -282,7 +282,8 @@ final class Preferences {
 
         let currentFont = defaults.string(forKey: Keys.noteEditorFontFamily) ?? ".AppleSystemUIFont"
         let currentSize = defaults.double(forKey: Keys.noteEditorFontSize)
-        if currentFont != ".AppleSystemUIFont" || (currentSize != 0 && currentSize != 16.0) {
+        let defaultFontValues: Set<String> = ["", ".AppleSystemUIFont", "default", "system"]
+        if !defaultFontValues.contains(currentFont) || (currentSize != 0 && currentSize != 16.0) {
             defaults.set(true, forKey: Keys.noteEditorFontOverridden)
         }
     }
