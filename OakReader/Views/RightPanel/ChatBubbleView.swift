@@ -292,12 +292,21 @@ struct ChatBubbleView: View {
         // (`protectingMathBackslashes` + `sealIncompleteMarkdown` run per-block
         // inside `ChatMarkdownBlockView`, so settled blocks don't pay for them.)
         let blocks = MarkdownBlockSplitter.split(markdown)
+        // Selection and math attachments each install a `GeometryReader` inside a
+        // `Text.LayoutKey` preference reader; with both live in the same message
+        // the two layout→preference→layout loops never converge and spin the main
+        // thread (frozen UI). Gating per-block isn't enough — a message that
+        // interleaves selectable prose with math blocks still wedges — so we drop
+        // selection for the WHOLE message whenever it contains any math. This
+        // mirrors the streaming case (all blocks non-selectable), which is the
+        // configuration verified not to spin.
+        let messageHasMath = markdown.containsMath()
         VStack(alignment: .leading, spacing: 6) {
             ForEach(blocks) { block in
                 ChatMarkdownBlockView(
                     text: block.text,
                     seal: streaming && !block.isSettled,  // only the growing tail
-                    selectable: !streaming                 // never select mid-stream
+                    selectable: !streaming && !messageHasMath
                 )
                 .equatable()
                 .id(block.id)
