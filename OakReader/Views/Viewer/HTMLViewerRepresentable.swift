@@ -66,8 +66,70 @@ struct HTMLViewerRepresentable: NSViewRepresentable {
         WebViewCoordinator(viewModel: viewModel)
     }
 
+    /// Login-form detection / capture / autofill, injected into live web pages.
+    static let passwordManagerScript = """
+    (function() {
+        function pwField() { return document.querySelector('input[type="password"]'); }
+        function userField(pw) {
+            if (!pw) return null;
+            var form = pw.form || document;
+            var pref = form.querySelectorAll('input[autocomplete="username"], input[type="email"], input[name*="user" i], input[name*="email" i], input[id*="user" i], input[id*="email" i]');
+            for (var i = 0; i < pref.length; i++) {
+                if (pref[i].type !== 'password' && pref[i].offsetParent !== null) return pref[i];
+            }
+            var inputs = form.querySelectorAll('input');
+            var prev = null;
+            for (var j = 0; j < inputs.length; j++) {
+                if (inputs[j] === pw) break;
+                var t = inputs[j].type;
+                if (t === 'text' || t === 'email' || t === 'tel') prev = inputs[j];
+            }
+            return prev;
+        }
+        function setValue(el, val) {
+            if (!el) return;
+            el.focus();
+            el.value = val;
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        window.OakPasswords = {
+            fill: function(username, password) {
+                var pw = pwField();
+                if (!pw) return;
+                setValue(userField(pw), username);
+                setValue(pw, password);
+            }
+        };
+        function capture() {
+            var pw = pwField();
+            if (!pw || !pw.value) return;
+            var u = userField(pw);
+            try {
+                window.webkit.messageHandlers.passwordManager.postMessage({
+                    action: 'capture',
+                    username: u ? u.value : '',
+                    password: pw.value
+                });
+            } catch (e) {}
+        }
+        document.addEventListener('submit', capture, true);
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && e.target && e.target.type === 'password') capture();
+        }, true);
+    })();
+    """
+
     func makeNSView(context: Context) -> OakWebView {
         let config = WKWebViewConfiguration()
+
+        // Share a persistent data store across all live web views so cookies /
+        // login state persist between tabs and across launches.
+        config.websiteDataStore = BrowserSession.dataStore
+
+        // Enable the HTML5 Fullscreen API (element.requestFullscreen) — WKWebView
+        // disables it by default, which is why YouTube's fullscreen button no-ops.
+        config.preferences.isElementFullscreenEnabled = true
 
         // Register text selection handler — sends text + bounding rect for popup positioning.
         // Uses requestAnimationFrame tracking to follow the selection during scroll/zoom,
@@ -162,9 +224,13 @@ struct HTMLViewerRepresentable: NSViewRepresentable {
 
                 var rafId = 0;
                 function renderSelectionRects() {
-                    overlay.textContent = '';
                     var sel = window.getSelection();
-                    if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
+                    var hasSelection = sel && !sel.isCollapsed && sel.rangeCount > 0;
+                    if (!hasSelection) {
+                        if (overlay.firstChild) overlay.textContent = '';
+                        return;
+                    }
+                    overlay.textContent = '';
                     var range = sel.getRangeAt(0);
                     var rects = range.getClientRects();
                     for (var i = 0; i < rects.length; i++) {
@@ -179,13 +245,22 @@ struct HTMLViewerRepresentable: NSViewRepresentable {
                         overlay.appendChild(div);
                     }
                 }
+                // Bail immediately while nothing is selected: no rAF is scheduled and
+                // no DOM is touched, so plain scrolling stays on WebKit's async path.
                 function scheduleRender() {
-                    cancelAnimationFrame(rafId);
+                    var sel = window.getSelection();
+                    if (!sel || sel.isCollapsed) {
+                        if (overlay.firstChild) overlay.textContent = '';
+                        if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
+                        return;
+                    }
+                    if (rafId) cancelAnimationFrame(rafId);
                     rafId = requestAnimationFrame(renderSelectionRects);
                 }
                 document.addEventListener('selectionchange', scheduleRender);
-                window.addEventListener('scroll', scheduleRender, true);
-                window.addEventListener('resize', scheduleRender);
+                // Passive + capture: lets WebKit scroll off the main thread.
+                window.addEventListener('scroll', scheduleRender, { capture: true, passive: true });
+                window.addEventListener('resize', scheduleRender, { passive: true });
             })();
             """,
             injectionTime: .atDocumentEnd,
@@ -210,14 +285,35 @@ struct HTMLViewerRepresentable: NSViewRepresentable {
         config.userContentController.add(context.coordinator, name: "highlightEvent")
         config.userContentController.add(context.coordinator, name: "highlightContextMenu")
 
+        // Password autofill — live web pages only. Detects login forms, captures
+        // credentials on submit, and exposes OakPasswords.fill() for the coordinator
+        // to populate saved credentials on load. Not injected for local snapshots.
+        if viewModel.liveURL != nil {
+            let pwScript = WKUserScript(
+                source: Self.passwordManagerScript,
+                injectionTime: .atDocumentEnd,
+                forMainFrameOnly: true
+            )
+            config.userContentController.addUserScript(pwScript)
+            config.userContentController.add(context.coordinator, name: "passwordManager")
+        }
+
         let webView = OakWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
+        webView.uiDelegate = context.coordinator
         webView.allowsMagnification = true
+        #if DEBUG
+        // Enables Safari Web Inspector (Develop ▸ <host>) → use the Timeline tab to
+        // profile scrolling / main-thread work on live pages.
+        webView.isInspectable = true
+        #endif
         webView.coordinator = context.coordinator
         context.coordinator.webView = webView
         context.coordinator.setupScrollMonitor()
         context.coordinator.setupNotificationObservers()
         context.coordinator.setupProgressObservation()
+        context.coordinator.setupNavigationObservation()
+        context.coordinator.setupBrowserCommandObservers()
 
         // Load content: remote URL for live link embeds, local file for HTML snapshots
         if let liveURL = viewModel.liveURL {

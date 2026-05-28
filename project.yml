@@ -2,7 +2,7 @@ name: OakReader
 options:
   bundleIdPrefix: com.oakreader
   deploymentTarget:
-    macOS: "15.0"
+    macOS: "15.4"
   xcodeVersion: "16.0"
   createIntermediateGroups: true
   groupSortPosition: top
@@ -42,7 +42,7 @@ packages:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    MACOSX_DEPLOYMENT_TARGET: "15.0"
+    MACOSX_DEPLOYMENT_TARGET: "15.4"
     ENABLE_STRICT_OBJC_MSGSEND: YES
 
 targets:
