@@ -162,7 +162,16 @@ extension String {
             // group 1 = $$…$$, group 2 = $…$
             let isBlock = match.range(at: 1).location != NSNotFound
             let contentRange = match.range(at: isBlock ? 1 : 2)
-            let content = ns.substring(with: contentRange)
+            var content = ns.substring(with: contentRange)
+            // Textual splits markdown into blocks at newlines *before* its math
+            // tokenizer runs, so a multi-line display equation (`$$` on its own
+            // line, body on the next) never matches `(?s)\$\$(.+?)\$\$` and renders
+            // as raw LaTeX. Collapse soft newlines inside `$$…$$` to spaces so the
+            // whole equation stays on one line and tokenizes. LaTeX treats a bare
+            // newline as whitespace, and explicit `\\` line breaks survive intact.
+            if isBlock {
+                content = content.replacingOccurrences(of: "\n", with: " ")
+            }
             let protected = content.replacingOccurrences(of: "\\", with: "\\\\")
 
             result += isBlock ? "$$\(protected)$$" : "$\(protected)$"
@@ -171,5 +180,20 @@ extension String {
 
         result += ns.substring(from: cursor)
         return result
+    }
+
+    /// True if the string contains a closed math span (`$$…$$` or `$…$`) — the
+    /// same delimiters Textual's `.math` extension turns into layout attachments.
+    /// Used to keep text selection OFF for math blocks: a fragment with BOTH the
+    /// attachment overlay and the selection overlay (each a `GeometryReader`
+    /// inside a `Text.LayoutKey` preference reader) forms two competing
+    /// layout→preference→layout loops that never converge and spin the main
+    /// thread. Math-alone or selection-alone each converge; only the pair wedges.
+    func containsMath() -> Bool {
+        let ns = self as NSString
+        guard ns.length > 0 else { return false }
+        return Self.mathDelimiterPattern.firstMatch(
+            in: self, range: NSRange(location: 0, length: ns.length)
+        ) != nil
     }
 }
