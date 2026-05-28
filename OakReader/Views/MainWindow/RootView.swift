@@ -19,6 +19,14 @@ struct RootView: View {
             // Tab bar — sits in the title bar area (merged with traffic lights)
             if !isPresenting {
                 TabBarView(appState: appState)
+
+                // Browser toolbar — a single, active-tab-aware row shown only when
+                // the active tab is a live web page. Mirrors TabBarView's pattern of
+                // rendering chrome for appState.activeTab rather than per-ContentView.
+                if let vm = appState.activeTab?.viewModel,
+                   vm.contentType == .link, vm.liveURL != nil {
+                    BrowserChromeView(viewModel: vm)
+                }
             }
 
             // Content: all tabs coexist in a ZStack; only the active one is visible.
