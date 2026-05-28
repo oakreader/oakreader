@@ -1,0 +1,82 @@
+import SwiftUI
+
+/// Native, streaming-friendly markdown renderer. Splits the (possibly growing) markdown
+/// into fence-aware blocks and renders each with the right native view: prose →
+/// `NSTextView` (swift-markdown attributed), code → Highlightr, display math → SwiftMath.
+/// Settled blocks are memoized (Equatable), so while streaming only the trailing block
+/// re-renders — feed it via `DeltaCoalescer` for Dia-grade smoothness.
+///
+/// Reusable: depends only on Highlightr + SwiftMath + swift-markdown. No chat/app concepts.
+public struct StreamingMarkdownView: View {
+    public var markdown: String
+    public var theme: MarkdownTheme
+    public var isStreaming: Bool
+
+    public init(markdown: String, theme: MarkdownTheme = .oak, isStreaming: Bool = false) {
+        self.markdown = markdown
+        self.theme = theme
+        self.isStreaming = isStreaming
+    }
+
+    public var body: some View {
+        let blocks = MarkdownBlockSplitter.split(markdown)
+        VStack(alignment: .leading, spacing: theme.paragraphSpacing) {
+            ForEach(blocks) { block in
+                BlockRow(block: block, theme: theme, streaming: isStreaming && !block.isSettled)
+                    .equatable()
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// Equatable so SwiftUI skips `body` for settled blocks whose text/kind didn't change —
+/// the parser/typesetter never re-runs for them.
+private struct BlockRow: View, Equatable {
+    let block: MarkdownBlock
+    let theme: MarkdownTheme
+    let streaming: Bool
+
+    static func == (lhs: BlockRow, rhs: BlockRow) -> Bool {
+        lhs.block == rhs.block && lhs.streaming == rhs.streaming
+    }
+
+    @ViewBuilder
+    var body: some View {
+        switch block.kind {
+        case .prose:
+            ProseBlockView(
+                attributed: MarkdownAttributedBuilder.attributedString(for: block.text, theme: theme),
+                selectable: !streaming
+            )
+        case .code(let language):
+            CodeBlockView(code: CodeFence.strip(block.text), language: language, theme: theme)
+        case .mathDisplay:
+            MathBlockView(latex: MathDelimiters.stripDisplay(block.text), theme: theme)
+        }
+    }
+}
+
+enum CodeFence {
+    /// Drop the opening ```/~~~ (with language) and the closing fence line.
+    static func strip(_ text: String) -> String {
+        var lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        func isFence(_ s: String) -> Bool {
+            let t = s.trimmingCharacters(in: .whitespaces)
+            return t.hasPrefix("```") || t.hasPrefix("~~~")
+        }
+        if let first = lines.first, isFence(first) { lines.removeFirst() }
+        if let last = lines.last, isFence(last) { lines.removeLast() }
+        return lines.joined(separator: "\n")
+    }
+}
+
+enum MathDelimiters {
+    /// Strip the surrounding `$$` from a display-math block.
+    static func stripDisplay(_ text: String) -> String {
+        var t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if t.hasPrefix("$$") { t.removeFirst(2) }
+        if t.hasSuffix("$$") { t.removeLast(2) }
+        return t.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
