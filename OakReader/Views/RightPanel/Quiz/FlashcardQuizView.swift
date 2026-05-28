@@ -48,7 +48,7 @@ struct FlashcardQuizView: View {
                 .font(.system(size: 9, weight: .heavy))
                 .tracking(1.0)
                 .foregroundStyle(accent)
-            StructuredText(markdown: text)
+            CardMarkdown(text: text)
                 .font(.system(size: 16))
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
