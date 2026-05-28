@@ -2,17 +2,21 @@ import SwiftUI
 
 struct NoteSettingsView: View {
     @State private var editorMode: String = Preferences.shared.noteEditorMode
-    @State private var fontFamily: String = Preferences.shared.noteEditorFontFamily
-    @State private var fontSize: CGFloat = Preferences.shared.noteEditorFontSize
+    @State private var fontFamily: String = NoteSettingsView.normalizedFont(Preferences.shared.noteEditorFontFamily)
     @State private var codeFontFamily: String = Preferences.shared.noteEditorCodeFontFamily
     @State private var lineHeight: CGFloat = Preferences.shared.noteEditorLineHeight
     @State private var lineSpacing: CGFloat = Preferences.shared.noteEditorLineSpacing
     @State private var letterSpacing: CGFloat = Preferences.shared.noteEditorLetterSpacing
     @State private var renderMath: Bool = Preferences.shared.noteEditorRenderMath
     @State private var accentColorHex: String = Preferences.shared.noteEditorAccentColor
-    @AppStorage("noteEditorFontOverridden") private var fontOverridden: Bool = false
-    @AppStorage("globalFontFamily") private var globalFontFamily: String = "system"
-    @AppStorage("globalFontSize") private var globalFontSize: Double = 14.0
+
+    /// Map legacy stored values onto current picker options so the selection shows.
+    static func normalizedFont(_ value: String) -> String {
+        switch value {
+        case "", ".AppleSystemUIFont": return value.isEmpty ? "default" : "system"
+        default: return value
+        }
+    }
 
     private static let presetColors: [(label: String, hex: String)] = [
         ("Teal", "#0CA69A"),
@@ -24,16 +28,18 @@ struct NoteSettingsView: View {
     ]
 
     private let fontOptions: [(label: String, value: String)] = [
-        ("TsangerJinKai (MiaoYan)", "TsangerJinKai02-W04"),
-        ("System (Sans-serif)", ".AppleSystemUIFont"),
+        ("Default (Serif)", "default"),
+        ("System (Sans-serif)", "system"),
         ("PingFang SC", "PingFang SC"),
         ("LXGW WenKai", "LXGW WenKai"),
-        ("Songti SC (Serif)", "Songti SC"),
-        ("Kaiti SC (Kai)", "STKaiti"),
-        ("Georgia (Serif)", "Georgia"),
-        ("Iowan Old Style (Serif)", "Iowan Old Style"),
+        ("Songti SC", "Songti SC"),
+        ("Kaiti SC", "STKaiti"),
+        ("TsangerJinKai", "TsangerJinKai02-W04"),
+        ("Georgia", "Georgia"),
+        ("Iowan Old Style", "Iowan Old Style"),
         ("Helvetica Neue", "Helvetica Neue"),
         ("Palatino", "Palatino"),
+        ("Monospace (PT Mono)", "mono"),
     ]
 
     private let codeFontOptions: [(label: String, value: String)] = [
@@ -60,33 +66,12 @@ struct NoteSettingsView: View {
             }
 
             Section("Typography") {
-                Toggle("Use custom font", isOn: $fontOverridden)
-
-                if fontOverridden {
-                    Picker("Body Font", selection: $fontFamily) {
-                        ForEach(fontOptions, id: \.value) { option in
-                            Text(option.label).tag(option.value)
-                        }
-                    }
-                    .onChange(of: fontFamily) { _, val in Preferences.shared.noteEditorFontFamily = val }
-
-                    LabeledContent("Font Size") {
-                        HStack {
-                            Slider(value: $fontSize, in: 13...24, step: 1)
-                            Text("\(Int(fontSize)) px")
-                                .foregroundStyle(.secondary)
-                                .monospacedDigit()
-                                .frame(width: 56, alignment: .trailing)
-                        }
-                    }
-                    .onChange(of: fontSize) { _, val in Preferences.shared.noteEditorFontSize = val }
-                } else {
-                    let familyName = FontFamily(rawValue: globalFontFamily)?.displayName ?? "System"
-                    LabeledContent("Using global font") {
-                        Text("\(familyName), \(Int(globalFontSize)) pt")
-                            .foregroundStyle(.secondary)
+                Picker("Body Font", selection: $fontFamily) {
+                    ForEach(fontOptions, id: \.value) { option in
+                        Text(option.label).tag(option.value)
                     }
                 }
+                .onChange(of: fontFamily) { _, val in Preferences.shared.noteEditorFontFamily = val }
 
                 Picker("Code Font", selection: $codeFontFamily) {
                     ForEach(codeFontOptions, id: \.value) { option in

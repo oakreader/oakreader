@@ -212,7 +212,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let bar = NSStackView()
         bar.orientation = .horizontal
         bar.edgeInsets = NSEdgeInsets(top: 6, left: 8, bottom: 6, right: 8)
-        let btn = NSButton(title: "Swift → JS: 触发 AI 校对", target: self, action: #selector(triggerProofread))
+        let btn = NSButton(title: "Swift → JS: Trigger AI proofread", target: self, action: #selector(triggerProofread))
         bar.addArrangedSubview(btn)
 
         let stack = NSStackView(views: [bar, webView])
