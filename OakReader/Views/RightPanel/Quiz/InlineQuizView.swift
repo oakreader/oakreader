@@ -49,10 +49,7 @@ struct InlineQuizView: View {
     private var quizBody: some View {
         switch content {
         case .cloze(let c):     ClozeQuizView(content: c)
-        case .choice(let c):    ChoiceQuizView(content: c)
         case .flashcard(let c): FlashcardQuizView(content: c)
-        case .matching(let c):  MatchingQuizView(content: c)
-        case .ordering(let c):  OrderingQuizView(content: c)
         case .occlusion(let c): OcclusionQuizView(content: c)
         }
     }
