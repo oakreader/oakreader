@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OakReader Note Editor</title>
+    <script>
+      // Surface load/parse errors to the Swift host (the module's own
+      // main().catch only covers errors after it starts executing).
+      function __oakLog(m) { window.webkit?.messageHandlers?.log?.postMessage(String(m)) }
+      window.addEventListener('error', (e) =>
+        __oakLog('window.error: ' + (e.message || e) + ' @ ' + (e.filename || '') + ':' + (e.lineno || '')))
+      window.addEventListener('unhandledrejection', (e) =>
+        __oakLog('unhandledrejection: ' + ((e.reason && e.reason.message) || e.reason)))
+    </script>
+    <style>
+      :root { color-scheme: light dark; }
+      html, body { margin: 0; height: 100%; background: transparent; }
+      #editor { height: 100%; overflow: auto; }
+
+      /* [[reference]] and #tag inline decorations (literal Markdown, styled + clickable) */
+      .oak-ref {
+        background: var(--type-ink-05, rgba(0,0,0,0.05));
+        border-bottom: 1.5px solid var(--type-ink-25, rgba(0,0,0,0.25));
+        border-radius: 3px;
+        padding: 0 2px;
+        cursor: pointer;
+      }
+      .oak-tag {
+        color: var(--crepe-color-on-surface-variant, #4d4d4d);
+        cursor: pointer;
+        font-weight: 600;
+      }
+      .oak-ref:hover { border-bottom-color: var(--type-ink-50, rgba(0,0,0,0.5)); }
+      .oak-tag:hover { text-decoration: underline; }
+    </style>
+    <script type="module" src="./assets/index-CJZ6tqRZ.js"></script>
+    <link rel="stylesheet" href="./assets/index-lLhmGpW4.css">
+  </head>
+  <body>
+    <div id="editor"></div>
+  </body>
+</html>
