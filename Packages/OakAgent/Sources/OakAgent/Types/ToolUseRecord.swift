@@ -12,7 +12,7 @@ public enum ToolUseStatus: String, Codable, Sendable {
 
 // MARK: - Tool Use Record (persisted in JSONL and rendered in UI)
 
-public struct ToolUseRecord: Identifiable, Codable, Sendable {
+public struct ToolUseRecord: Identifiable, Codable, Equatable, Sendable {
     public let id: String
     public let name: String
     public let input: ToolInput

@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Turn
 
-public struct Turn: Identifiable, Codable, Sendable {
+public struct Turn: Identifiable, Codable, Equatable, Sendable {
     public let id: UUID
     public let role: Role
     public var content: String
@@ -90,7 +90,7 @@ public struct Turn: Identifiable, Codable, Sendable {
 
 // MARK: - Turn Attachment
 
-public struct TurnAttachment: Identifiable, Codable, Sendable {
+public struct TurnAttachment: Identifiable, Codable, Equatable, Sendable {
     public let id: UUID
     public let type: AttachmentType
     public let label: String

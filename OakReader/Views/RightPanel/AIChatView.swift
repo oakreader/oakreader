@@ -27,8 +27,17 @@ struct AIChatView: View {
     /// Width of the centered content column in `.canvas` mode.
     private let canvasContentWidth: CGFloat = 760
 
+    @AppStorage("chatFontSize") private var chatFontSize: Double = 14
+
     @Environment(\.isTabActive) private var isTabActive
     @State private var playingTurnId: UUID?
+
+    /// Body text size of the surrounding messages, so the composer and its token
+    /// chips match the rendered body ("正文") size: the dia theme's 15pt on the
+    /// canvas, the user-configurable size in the right panel.
+    private var bodyFontSize: CGFloat {
+        presentation == .canvas ? MarkdownTheme.dia.bodyFont.pointSize : CGFloat(chatFontSize)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -138,8 +147,7 @@ struct AIChatView: View {
             } else if presentation == .canvas {
                 workspaceChip
             } else {
-                Text("AI Chat")
-                    .font(OakStyle.ChatFont.headerTitle)
+                OakAppIcon(size: 18)
             }
 
             Spacer()
@@ -218,12 +226,7 @@ struct AIChatView: View {
     @ViewBuilder
     private var emptyStateIcon: some View {
         if presentation == .canvas {
-            Image("MenuBarIcon")
-                .renderingMode(.template)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 44, height: 44)
-                .foregroundStyle(.tertiary)
+            OakAppIcon(size: 44)
         } else {
             Image(systemName: "bubble.left.and.text.bubble.right")
                 .font(.system(size: 40))
@@ -275,13 +278,12 @@ struct AIChatView: View {
 
     // MARK: - Message List
 
-    @State private var scrollOffset: CGFloat = 0
-    @State private var scrollContentHeight: CGFloat = 0
-    @State private var scrollViewHeight: CGFloat = 0
-    @State private var scrollBarOpacity: Double = 0
-    @State private var fadeTask: Task<Void, Never>?
-
-    @State private var isNearBottom = true
+    // Scroll position lives in an @Observable object, not @State on this view.
+    // Only the extracted ChatScrollbar reads `offset`/`barOpacity`, so a scroll
+    // (which fires the metrics preference every frame) re-renders the thin
+    // scrollbar capsule alone — never the eager message list. This mirrors how
+    // AppKit's NSScrollView scrolls content without re-running any view tree.
+    @State private var scrollState = ChatScrollState()
     @State private var scrollTask: Task<Void, Never>?
 
     private var messageList: some View {
@@ -306,6 +308,7 @@ struct AIChatView: View {
                             onSaveQuizCard: onSaveQuizCard,
                             markdownTheme: presentation == .canvas ? .dia : nil
                         )
+                            .equatable()
                             .id(turn.id)
                             .transition(
                                 .asymmetric(
@@ -376,47 +379,31 @@ struct AIChatView: View {
             .scrollContentBackground(.hidden)
             .defaultScrollAnchor(.bottom)
             .overlay(alignment: .trailing) {
-                GeometryReader { geo in
-                    let viewH = geo.size.height
-                    let ratio = scrollContentHeight > viewH
-                        ? viewH / scrollContentHeight : 1
-                    let thumbH = max(ratio * viewH, 28)
-                    let maxTravel = max(viewH - thumbH, 0)
-                    let scrollable = scrollContentHeight - viewH
-                    let progress = scrollable > 0
-                        ? min(max(scrollOffset / scrollable, 0), 1) : 0
-                    let thumbY = progress * maxTravel
-
-                    Capsule()
-                        .fill(Color.primary.opacity(0.18))
-                        .frame(width: 3, height: thumbH)
-                        .offset(y: thumbY)
-                        .padding(.trailing, 1.5)
-                        .opacity(ratio < 1 ? scrollBarOpacity : 0)
-                        .animation(.easeOut(duration: 0.15), value: scrollBarOpacity)
-                        .onAppear { scrollViewHeight = viewH }
-                        .onChange(of: geo.size.height) { _, h in scrollViewHeight = h }
-                }
+                ChatScrollbar(state: scrollState)
             }
             .onPreferenceChange(ScrollMetricsKey.self) { metrics in
-                scrollOffset = metrics.offset
-                scrollContentHeight = metrics.contentHeight
-                showScrollBar()
+                // Guard redundant writes: during a pure scroll only `offset`
+                // changes, so only the scrollbar (which reads it) is invalidated.
+                if scrollState.offset != metrics.offset { scrollState.offset = metrics.offset }
+                if scrollState.contentHeight != metrics.contentHeight {
+                    scrollState.contentHeight = metrics.contentHeight
+                }
+                scrollState.registerActivity()
 
                 // Track whether user is near the bottom (within 20px)
-                let scrollable = metrics.contentHeight - scrollViewHeight
-                isNearBottom = scrollable <= 0 || (scrollable - metrics.offset) < 20
+                let scrollable = metrics.contentHeight - scrollState.viewHeight
+                scrollState.isNearBottom = scrollable <= 0 || (scrollable - metrics.offset) < 20
             }
             .onChange(of: chatVM.turns.count) { _, _ in
                 withAnimation(.easeOut(duration: 0.2)) {
                     proxy.scrollTo("bottom")
                 }
-                isNearBottom = true
+                scrollState.isNearBottom = true
             }
-            .onChange(of: scrollContentHeight) { old, new in
+            .onChange(of: scrollState.contentHeight) { old, new in
                 guard new - old > 1 else { return }
                 // During streaming: always follow. Otherwise: respect user scroll.
-                guard chatVM.isStreaming || isNearBottom else { return }
+                guard chatVM.isStreaming || scrollState.isNearBottom else { return }
                 // Debounce: coalesce rapid height changes into one smooth scroll.
                 // Without this, 60fps height updates cause 60 discrete jumps.
                 scrollTask?.cancel()
@@ -438,16 +425,6 @@ struct AIChatView: View {
                     }
                 }
             }
-        }
-    }
-
-    private func showScrollBar() {
-        scrollBarOpacity = 1
-        fadeTask?.cancel()
-        fadeTask = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(1.2))
-            guard !Task.isCancelled else { return }
-            withAnimation(.easeOut(duration: 0.6)) { scrollBarOpacity = 0 }
         }
     }
 
@@ -486,6 +463,7 @@ struct AIChatView: View {
                 slashItems: chatVM.chatSlashItems,
                 onActiveTokensChanged: { tokens in chatVM.activeTokens = tokens },
                 resetToken: chatVM.inputResetToken,
+                fontSize: bodyFontSize,
                 focusRef: inputFocusRef
             )
             .frame(height: inputContentHeight)
@@ -811,5 +789,74 @@ private struct ScrollMetricsKey: PreferenceKey {
     static let defaultValue = ScrollMetrics()
     static func reduce(value: inout ScrollMetrics, nextValue: () -> ScrollMetrics) {
         value = nextValue()
+    }
+}
+
+// MARK: - Chat scroll state / scrollbar
+
+/// Holds live scroll position outside the chat view's `body`. Only `ChatScrollbar`
+/// reads `offset`/`barOpacity`, so a scroll (which fires the metrics preference
+/// every frame) re-renders just the scrollbar capsule — the eager message list is
+/// never invalidated by scrolling. `isNearBottom` is observation-ignored because it
+/// is only read inside event closures, never in a `body`.
+@MainActor
+@Observable
+final class ChatScrollState {
+    var offset: CGFloat = 0
+    var contentHeight: CGFloat = 0
+    var viewHeight: CGFloat = 0
+    var barOpacity: Double = 0
+    @ObservationIgnored var isNearBottom = true
+
+    @ObservationIgnored private var fadeTask: Task<Void, Never>?
+    @ObservationIgnored private var lastActivity = Date()
+
+    /// Show the scrollbar and (re)arm a single fade-out. Cheap to call every scroll
+    /// frame: it bumps a timestamp and reuses one task, instead of allocating and
+    /// cancelling a Task per frame as the old per-frame `showScrollBar()` did.
+    func registerActivity() {
+        lastActivity = .now
+        if barOpacity != 1 { barOpacity = 1 }
+        guard fadeTask == nil else { return }
+        fadeTask = Task { @MainActor [weak self] in
+            while true {
+                let idle: Double
+                if let self { idle = Date.now.timeIntervalSince(self.lastActivity) } else { return }
+                if idle >= 1.2 { break }
+                try? await Task.sleep(for: .milliseconds(Int((1.2 - idle) * 1000) + 16))
+                if Task.isCancelled { return }
+            }
+            guard let self else { return }
+            withAnimation(.easeOut(duration: 0.6)) { self.barOpacity = 0 }
+            self.fadeTask = nil
+        }
+    }
+}
+
+/// The custom trailing scrollbar. Reads scroll position from `ChatScrollState`, so
+/// it is the only view invalidated while scrolling.
+private struct ChatScrollbar: View {
+    let state: ChatScrollState
+
+    var body: some View {
+        GeometryReader { geo in
+            let viewH = geo.size.height
+            let ratio = state.contentHeight > viewH ? viewH / state.contentHeight : 1
+            let thumbH = max(ratio * viewH, 28)
+            let maxTravel = max(viewH - thumbH, 0)
+            let scrollable = state.contentHeight - viewH
+            let progress = scrollable > 0 ? min(max(state.offset / scrollable, 0), 1) : 0
+            let thumbY = progress * maxTravel
+
+            Capsule()
+                .fill(Color.primary.opacity(0.18))
+                .frame(width: 3, height: thumbH)
+                .offset(y: thumbY)
+                .padding(.trailing, 1.5)
+                .opacity(ratio < 1 ? state.barOpacity : 0)
+                .animation(.easeOut(duration: 0.15), value: state.barOpacity)
+                .onAppear { state.viewHeight = viewH }
+                .onChange(of: geo.size.height) { _, h in state.viewHeight = h }
+        }
     }
 }

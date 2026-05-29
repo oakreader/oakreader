@@ -18,6 +18,10 @@ struct ChatInputTextView: NSViewRepresentable {
     /// Incremented by the parent to force-clear rich text attachments after send.
     var resetToken: Int = 0
 
+    /// Body font size — aligned by the host to the surrounding message text so
+    /// the composer (and its token chips) match the rendered "正文" size.
+    var fontSize: CGFloat = 16
+
     static let minContentHeight: CGFloat = 40
     static let maxContentHeight: CGFloat = 180
 
@@ -55,7 +59,8 @@ struct ChatInputTextView: NSViewRepresentable {
         textView.onPasteImage = onPasteImage
         textView.isRichText = false
         textView.allowsUndo = true
-        textView.font = .systemFont(ofSize: 16)
+        textView.font = .systemFont(ofSize: fontSize)
+        textView.tokenFontSize = fontSize
         textView.textColor = .labelColor
         textView.drawsBackground = false
         textView.isVerticallyResizable = true
@@ -127,6 +132,10 @@ struct ChatInputTextView: NSViewRepresentable {
         textView.onSend = onSend
         textView.onPasteImage = onPasteImage
         textView.slashItems = slashItems
+        if textView.font?.pointSize != fontSize {
+            textView.font = .systemFont(ofSize: fontSize)
+        }
+        textView.tokenFontSize = fontSize
         textView.onTokensChanged = { tokens in
             context.coordinator.parent.onActiveTokensChanged?(tokens)
         }
@@ -228,6 +237,9 @@ final class ChatNSTextView: NSTextView {
 
     var slashItems: [ChatCompletionItem] = []
     var onTokensChanged: (([ChatCompletionItem]) -> Void)?
+    /// Font size used when rendering inserted token chips, kept in sync with the
+    /// text view's body font so chips match the typed text.
+    var tokenFontSize: CGFloat = 16
 
     private var completionPanel: ChatCompletionPanel?
     private var triggerChar: String?
@@ -493,13 +505,13 @@ final class ChatNSTextView: NSTextView {
         isRichText = true
 
         // Build attributed string with attachment
-        let attachment = ChatTokenAttachment(item: item)
+        let attachment = ChatTokenAttachment(item: item, fontSize: tokenFontSize)
         let attachStr = NSAttributedString(attachment: attachment)
 
         // Insert attachment + trailing space
         let mutable = NSMutableAttributedString(attributedString: attachStr)
         let spaceAttrs: [NSAttributedString.Key: Any] = [
-            .font: font ?? .systemFont(ofSize: 16),
+            .font: font ?? .systemFont(ofSize: tokenFontSize),
             .foregroundColor: NSColor.labelColor,
         ]
         mutable.append(NSAttributedString(string: " ", attributes: spaceAttrs))

@@ -4,7 +4,7 @@ import OakAgent
 import Textual
 import OakMarkdownUI
 
-struct ChatBubbleView: View {
+struct ChatBubbleView: View, Equatable {
     let turn: Turn
     var onPlayAudio: ((Turn) -> Void)?
     var isPlayingAudio: Bool = false
@@ -15,6 +15,16 @@ struct ChatBubbleView: View {
     /// When nil, falls back to the user-configured `.oak` theme.
     var markdownTheme: MarkdownTheme? = nil
 
+    // Memoization for `.equatable()`: only the parent-supplied inputs that change
+    // the rendered output drive a re-render. Closures are stable per host, and
+    // `markdownTheme` is fixed for the view's lifetime (panel vs canvas never
+    // toggles for an existing bubble), so both are excluded. Internal @State and
+    // @AppStorage still invalidate the view directly — EquatableView only
+    // short-circuits re-renders propagated from the parent's body.
+    static func == (lhs: ChatBubbleView, rhs: ChatBubbleView) -> Bool {
+        lhs.turn == rhs.turn && lhs.isPlayingAudio == rhs.isPlayingAudio
+    }
+
     @AppStorage("chatFontSize") private var chatFontSize: Double = 14
     @AppStorage("chatLineHeightScale") private var chatLineHeightScale: Double = 1.35
 
@@ -24,10 +34,9 @@ struct ChatBubbleView: View {
     @State private var showCopied = false
     @State private var reveal = StreamRevealController()
 
+    @ViewBuilder
     var body: some View {
-        if turn.role == .system { return AnyView(EmptyView()) }
-
-        return AnyView(
+        if turn.role != .system {
             HStack(alignment: .top) {
                 if turn.role == .user { Spacer(minLength: 40) }
 
@@ -150,7 +159,7 @@ struct ChatBubbleView: View {
             .onDisappear {
                 reveal.stop()
             }
-        )
+        }
     }
 
     // MARK: - Message Bubble
@@ -508,14 +517,23 @@ struct ChatBubbleView: View {
             $0.id.caseInsensitiveCompare(skillId) == .orderedSame
                 || $0.name.caseInsensitiveCompare(skillId) == .orderedSame
         }
+        // Mirror the input composer's token chip (ChatTokenAttachment): a soft
+        // accent fill + muted accent text, no border.
+        let softAccent = Color(nsColor: NSColor.controlAccentColor
+            .blended(withFraction: 0.5, of: .tertiaryLabelColor) ?? .controlAccentColor)
         return HStack(spacing: 3) {
             Image(systemName: skill?.icon ?? "sparkles")
                 .font(OakStyle.ChatFont.modelLabel)
-                .opacity(0.8)
             Text(skillId)
                 .font(OakStyle.ChatFont.modelLabel)
         }
-        .foregroundStyle(Color.accentColor)
+        .foregroundStyle(softAccent)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(
+            RoundedRectangle(cornerRadius: 4)
+                .fill(softAccent.opacity(0.13))
+        )
         .fixedSize()
     }
 

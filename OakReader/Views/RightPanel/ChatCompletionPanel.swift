@@ -32,7 +32,10 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
     fileprivate static let emptyHeight: CGFloat = 46
     private static let maxPanelHeight: CGFloat = 640
     private static let minPanelWidth: CGFloat = 300
-    private static let maxPanelWidth: CGFloat = 680
+    // Cap matches the canvas agent's composer column (AIChatView.canvasContentWidth)
+    // so the popup mirrors the input width there; the narrow right panel never
+    // reaches this cap.
+    private static let maxPanelWidth: CGFloat = 760
     private static let horizontalInset: CGFloat = 14
     private static let verticalInset: CGFloat = 10
 
