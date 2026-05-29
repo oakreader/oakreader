@@ -31,6 +31,10 @@ final class FTSDatabase: @unchecked Sendable {
         config.busyMode = .timeout(5)
         config.prepareDatabase { db in
             try db.execute(sql: "PRAGMA journal_mode = WAL")
+            // Register the CJK-aware tokenizer on every connection so both indexing
+            // and querying (and the eraseDatabaseOnSchemaChange reference schema) can
+            // resolve `tokenize = 'cjk_bigram'`.
+            db.add(tokenizer: CJKBigramTokenizer.self)
         }
         dbQueue = try DatabaseQueue(path: dbURL.path, configuration: config)
         try Self.migrator.migrate(dbQueue)
@@ -59,7 +63,7 @@ final class FTSDatabase: @unchecked Sendable {
 
             try db.create(virtualTable: "chunks_fts", using: FTS5()) { t in
                 t.synchronize(withTable: "chunks")
-                t.tokenizer = .unicode61()
+                t.tokenizer = CJKBigramTokenizer.tokenizerDescriptor()
                 t.column("chunk_text")
             }
         }

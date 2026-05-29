@@ -105,6 +105,7 @@
 		5167A5F178842356E9BA878D /* StatusBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F036BDBC2E3689EDC6245FB /* StatusBarView.swift */; };
 		51DDD612DD951C17BA95299E /* DocumentTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59FB3A6F3A3AEC3676C0F0F6 /* DocumentTabView.swift */; };
 		520E5FA7528766BF307F7F42 /* ItemType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 335E97E0E585E907F5DB4439 /* ItemType.swift */; };
+		52471CE8718A915D37987B3C /* CJKBigramTokenizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A42FC1665D3C0FC1A2667BB7 /* CJKBigramTokenizer.swift */; };
 		525DDC055DEF4B7A827759D7 /* RedactionBurnInSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C0812413BD57A2054D10A83 /* RedactionBurnInSheet.swift */; };
 		53561F934267B72C8D1035F7 /* RedactionRegion.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8D3F1C30CD4202DFA8C64B4 /* RedactionRegion.swift */; };
 		5552620EEB30835823F9CA6E /* WebSearchTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6D0591497C695399587D6CA /* WebSearchTool.swift */; };
@@ -613,6 +614,7 @@
 		A1A0EE8E4D060414A9DE9009 /* SecuritySettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecuritySettings.swift; sourceTree = "<group>"; };
 		A26EF5ADB699BB87E190D08D /* LibrarySidebarPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibrarySidebarPanel.swift; sourceTree = "<group>"; };
 		A304EA4B774CA7D0A5E8F053 /* NoteSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteSettingsView.swift; sourceTree = "<group>"; };
+		A42FC1665D3C0FC1A2667BB7 /* CJKBigramTokenizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CJKBigramTokenizer.swift; sourceTree = "<group>"; };
 		A4B69107E3E492061A5CADE5 /* BookmarkSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarkSidebarView.swift; sourceTree = "<group>"; };
 		A546785A0819A73463325E1D /* CompareSetupSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompareSetupSheet.swift; sourceTree = "<group>"; };
 		A882E2478B4C84047DD54FD0 /* WatermarkSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatermarkSheet.swift; sourceTree = "<group>"; };
@@ -992,6 +994,7 @@
 				DF16A725DAC68F199227892D /* CatalogStoragePaths.swift */,
 				321349C45AEC61F2E40F34B9 /* CitationFormatter.swift */,
 				21CDA00C280D985B61794989 /* CiteKeyService.swift */,
+				A42FC1665D3C0FC1A2667BB7 /* CJKBigramTokenizer.swift */,
 				C497912FB85EEFBF241327F9 /* ComparisonService.swift */,
 				ACEBA28EA4CB1D91190356B4 /* CompressionService.swift */,
 				AB52F4E998F30885954293C4 /* ConfiguredProviderStore.swift */,
@@ -1659,6 +1662,7 @@
 				868D5D5B5765772C33C950D9 /* BrowserTools.swift in Sources */,
 				08EADFE7731C4A6478DE09C8 /* CGContext+PDFDrawing.swift in Sources */,
 				BAD50B0EC547A5E9B57F8BC9 /* CGPDFDocument+Extensions.swift in Sources */,
+				52471CE8718A915D37987B3C /* CJKBigramTokenizer.swift in Sources */,
 				4D51082DD333DDDAE00CA3A4 /* CSLTypeFieldSpec.swift in Sources */,
 				3471F39243CDDFFC6E1476C2 /* CSLTypes.swift in Sources */,
 				D7C6AF398E55E834CC68EAA3 /* CardMarkdown.swift in Sources */,
