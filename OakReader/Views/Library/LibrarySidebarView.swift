@@ -1,5 +1,4 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct LibrarySidebarView: View {
     let appState: AppState
@@ -358,23 +357,18 @@ private struct CollectionRowView: View {
         isDropTargeted && !collection.isSmart
     }
 
-    /// Handles an item dragged from the library table (a plain-text item UUID) onto this collection.
-    private func handleItemDrop(_ providers: [NSItemProvider]) -> Bool {
+    /// Adds items (referenced by their UUID strings, dragged from the library table) to this collection.
+    private func handleItemDrop(_ idStrings: [String]) -> Bool {
         guard !collection.isSmart else { return false }
-        var handled = false
-        for provider in providers where provider.canLoadObject(ofClass: NSString.self) {
-            handled = true
-            provider.loadObject(ofClass: NSString.self) { object, _ in
-                guard let raw = (object as? NSString) as String?,
-                      let uuid = UUID(uuidString: raw) else { return }
-                Task { @MainActor in
-                    guard let item = store.findItem(byId: uuid) else { return }
-                    store.addItem(item, to: collection)
-                    triggerDropPulse()
-                }
-            }
+        var added = false
+        for idString in idStrings {
+            guard let uuid = UUID(uuidString: idString),
+                  let item = store.findItem(byId: uuid) else { continue }
+            store.addItem(item, to: collection)
+            added = true
         }
-        return handled
+        if added { triggerDropPulse() }
+        return added
     }
 
     /// Briefly flashes the collection row to confirm a successful drop.
@@ -458,8 +452,10 @@ private struct CollectionRowView: View {
                 appState.selectedLibraryItemIDs = []
                 appState.switchToLibrary()
             }
-            .onDrop(of: [.plainText, .utf8PlainText, .text], isTargeted: $isDropTargeted) { providers in
-                handleItemDrop(providers)
+            .dropDestination(for: String.self) { droppedIDs, _ in
+                handleItemDrop(droppedIDs)
+            } isTargeted: { targeted in
+                isDropTargeted = targeted && !collection.isSmart
             }
             .onChange(of: isDropTargeted) { _, targeted in
                 dragExpandTask?.cancel()
