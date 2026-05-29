@@ -203,7 +203,33 @@ private final class Renderer {
     private func paragraphStyled(_ attr: NSAttributedString, style: NSParagraphStyle) -> NSAttributedString {
         let m = NSMutableAttributedString(attributedString: attr)
         m.addAttribute(.paragraphStyle, value: style, range: NSRange(location: 0, length: m.length))
+        addInlineCodeSpacing(m)
         return m
+    }
+
+    /// Inline-code pills draw their rounded background a few points wider than the
+    /// glyphs (see `HuggingLayoutManager`). Without compensation that overshoot eats
+    /// the space between a code span and its neighboring words, so text ends up
+    /// touching the pill. Re-open that space by kerning the characters immediately
+    /// before and after each pill run by the amount the pill overshoots, which
+    /// restores a normal single-space gap. Skip newline neighbors.
+    private func addInlineCodeSpacing(_ m: NSMutableAttributedString) {
+        let ns = m.string as NSString
+        let gap = MarkdownInlineCodePill.horizontalPadding
+        var pillRanges: [NSRange] = []
+        m.enumerateAttribute(.inlineCodePill, in: NSRange(location: 0, length: m.length)) { value, range, _ in
+            if value != nil, range.length > 0 { pillRanges.append(range) }
+        }
+        for range in pillRanges {
+            let before = range.location - 1
+            if before >= 0, ns.character(at: before) != 10 {
+                m.addAttribute(.kern, value: gap, range: NSRange(location: before, length: 1))
+            }
+            let after = range.location + range.length
+            if after < ns.length, ns.character(at: after) != 10 {
+                m.addAttribute(.kern, value: gap, range: NSRange(location: after, length: 1))
+            }
+        }
     }
 
     private func addTrait(_ trait: NSFontDescriptor.SymbolicTraits, to attr: NSAttributedString) -> NSAttributedString {
@@ -227,6 +253,7 @@ private final class Renderer {
         let p = bodyParagraphStyle()
         p.paragraphSpacingBefore = theme.paragraphSpacing * 0.5
         m.addAttribute(.paragraphStyle, value: p, range: full)
+        addInlineCodeSpacing(m)
         return m
     }
 

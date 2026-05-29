@@ -6,6 +6,13 @@ extension NSAttributedString.Key {
     static let inlineCodePill = NSAttributedString.Key("OakMarkdownInlineCodePill")
 }
 
+enum MarkdownInlineCodePill {
+    /// Points the pill background extends past the code glyphs on each side. The
+    /// builder kerns the neighboring characters by the same amount so the overshoot
+    /// no longer eats the space between a code span and its surrounding words.
+    static let horizontalPadding: CGFloat = 4.5
+}
+
 /// Draws inline-code spans as rounded pills that hug the glyph height, while leaving
 /// everything else (notably the text selection) to the default drawing so multi-line
 /// selection stays continuous.
@@ -30,7 +37,7 @@ final class HuggingLayoutManager: NSLayoutManager {
         }
 
         let padding: CGFloat = 1.5
-        let expand: CGFloat = 4.5
+        let expand = MarkdownInlineCodePill.horizontalPadding
         // ascender is positive, descender negative → full glyph extent around the baseline.
         let height = ceil(font.ascender - font.descender) + padding * 2
 
