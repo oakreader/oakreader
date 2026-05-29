@@ -7,8 +7,14 @@ struct ChatContextSnapshot: Sendable {
     let activeCollectionName: String?
     let activeCollectionItemCount: Int?
     let activeCollectionItems: [CollectionItemSummary]
+    /// True when the active collection is a real (non-smart, non-"All Items")
+    /// user collection that the agent should scope its operations to.
+    let activeCollectionIsScopable: Bool
     let openTabTitles: [String]
     let activeTabTitle: String?
+    /// Filesystem path of the active agent workspace folder (nil unless the
+    /// full-page agent workspace is active). Source documents are CoW-mounted here.
+    let agentWorkspacePath: String?
 
     struct CollectionItemSummary: Sendable {
         let title: String

@@ -9,6 +9,8 @@ struct TabBarView: View {
 
     @State private var isFullScreen = false
     @State private var isPinnedHovering = false
+    @State private var isAgentHovering = false
+    @State private var isAgentCloseHovering = false
     @State private var pluginRefresh = false
 
     private var store: LibraryStore { appState.libraryStore }
@@ -36,7 +38,7 @@ struct TabBarView: View {
 
             // Pinned collection tab (always visible)
             Button {
-                appState.switchToLibrary()
+                appState.showLibraryBrowse()
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: pinnedTabIcon)
@@ -52,10 +54,71 @@ struct TabBarView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .foregroundStyle(appState.isLibraryActive ? Color(nsColor: .labelColor) : Color(nsColor: .secondaryLabelColor))
+            .foregroundStyle(appState.isLibraryBrowseActive ? Color(nsColor: .labelColor) : Color(nsColor: .secondaryLabelColor))
             .background(pinnedTabShape)
             .onHover { isPinnedHovering = $0 }
             .help("Library: \(pinnedTabTitle)")
+            .padding(.trailing, 4)
+
+            // Agent workspace pill (closeable; shown once opened).
+            // Matches the Library pinned tab's metrics; close button overlays the
+            // trailing edge so the pill width stays consistent with its sibling.
+            if appState.isAgentTabOpen {
+                HStack(spacing: 6) {
+                    Image("MenuBarIcon")
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: OakStyle.Font.icon, height: OakStyle.Font.icon)
+                    Text("Agent")
+                        .font(OakStyle.Font.styled(size: OakStyle.Font.body, weight: .regular))
+                        .lineLimit(1)
+                }
+                .padding(.leading, 16)
+                .padding(.trailing, 20)
+                .frame(height: OakStyle.Size.tabHeight)
+                .frame(maxWidth: OakStyle.Size.tabMax, alignment: .leading)
+                .foregroundStyle(appState.isAgentActive ? Color(nsColor: .labelColor) : Color(nsColor: .secondaryLabelColor))
+                .background(agentPillShape)
+                .overlay(alignment: .trailing) {
+                    Button {
+                        appState.closeAgentWorkspace()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(isAgentCloseHovering ? Color(nsColor: .labelColor) : .secondary)
+                            .frame(width: OakStyle.Size.closeButton, height: OakStyle.Size.closeButton)
+                            .background(
+                                RoundedRectangle(cornerRadius: OakStyle.Radius.small)
+                                    .fill(isAgentCloseHovering ? Color.primary.opacity(0.1) : Color.clear)
+                            )
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .onHover { isAgentCloseHovering = $0 }
+                    .opacity(appState.isAgentActive || isAgentHovering ? 1 : 0)
+                    .padding(.trailing, 4)
+                    .accessibilityLabel("Close Agent")
+                }
+                .contentShape(Rectangle())
+                .onTapGesture { appState.openAgentWorkspace() }
+                .onHover { isAgentHovering = $0 }
+                .help("AI Agent workspace")
+            }
+
+            // New agent chat
+            Button {
+                appState.openAgentWorkspace(newSession: true)
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 14, weight: .medium))
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+            .help("New agent chat")
+            .padding(.leading, appState.isAgentTabOpen ? 0 : 4)
             .padding(.trailing, 8)
 
             if !appState.openTabs.isEmpty || appState.quizReviewSession != nil {
@@ -96,8 +159,8 @@ struct TabBarView: View {
                     }
                 }
                 .padding(.trailing, 4)
-            } else if appState.isLibraryActive {
-                // Library tab: show library detail tabs
+            } else if appState.isLibraryBrowseActive {
+                // Library browser: show library detail tabs
                 HStack(spacing: 4) {
                     ForEach(LibraryDetailTab.allCases) { tab in
                         libraryTabButton(tab: tab)
@@ -169,7 +232,7 @@ struct TabBarView: View {
 
     @ViewBuilder
     private var pinnedTabShape: some View {
-        if appState.isLibraryActive {
+        if appState.isLibraryBrowseActive {
             RoundedRectangle(cornerRadius: OakStyle.Radius.standard)
                 .fill(OakStyle.Colors.activeTabBackground)
                 .padding(.vertical, 6)
@@ -179,6 +242,19 @@ struct TabBarView: View {
                 .padding(.vertical, 6)
         }
         // Inactive + not hovering: transparent (gray tab bar shows through)
+    }
+
+    @ViewBuilder
+    private var agentPillShape: some View {
+        if appState.isAgentActive {
+            RoundedRectangle(cornerRadius: OakStyle.Radius.standard)
+                .fill(OakStyle.Colors.activeTabBackground)
+                .padding(.vertical, 6)
+        } else if isAgentHovering {
+            RoundedRectangle(cornerRadius: OakStyle.Radius.standard)
+                .fill(Color.primary.opacity(0.08))
+                .padding(.vertical, 6)
+        }
     }
 }
 

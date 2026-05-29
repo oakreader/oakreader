@@ -7,8 +7,8 @@ public struct MarkdownTheme {
     public var codeFont: NSFont
     /// Heading point sizes h1…h6 (absolute, not multipliers).
     public var headingSizes: [CGFloat]
-    /// NSParagraphStyle.lineHeightMultiple for body text.
-    public var bodyLineHeightMultiple: CGFloat
+    /// Fixed body line height in points (applied as NSParagraphStyle.minimumLineHeight).
+    public var bodyLineHeight: CGFloat
     /// Extra space below a paragraph block (pt).
     public var paragraphSpacing: CGFloat
     public var codeLineHeightMultiple: CGFloat
@@ -29,7 +29,7 @@ public struct MarkdownTheme {
         bodyFont: NSFont,
         codeFont: NSFont,
         headingSizes: [CGFloat],
-        bodyLineHeightMultiple: CGFloat,
+        bodyLineHeight: CGFloat,
         paragraphSpacing: CGFloat,
         codeLineHeightMultiple: CGFloat,
         textColor: NSColor,
@@ -45,7 +45,7 @@ public struct MarkdownTheme {
         self.bodyFont = bodyFont
         self.codeFont = codeFont
         self.headingSizes = headingSizes
-        self.bodyLineHeightMultiple = bodyLineHeightMultiple
+        self.bodyLineHeight = bodyLineHeight
         self.paragraphSpacing = paragraphSpacing
         self.codeLineHeightMultiple = codeLineHeightMultiple
         self.textColor = textColor
@@ -59,13 +59,15 @@ public struct MarkdownTheme {
         self.codeThemeDark = codeThemeDark
     }
 
-    /// OakReader default — system fonts, ~15pt body (matches `OakStyle.ChatFont.messageBody`).
-    public static var oak: MarkdownTheme {
-        MarkdownTheme(
-            bodyFont: .systemFont(ofSize: 15, weight: .regular),
-            codeFont: .monospacedSystemFont(ofSize: 13, weight: .regular),
-            headingSizes: [24, 20, 17, 15, 14, 13],
-            bodyLineHeightMultiple: 1.45,
+    /// OakReader default — system fonts scaled from `fontSize`. Code, heading, and
+    /// line-height metrics are all derived from it so the whole block scales together.
+    public static func oak(fontSize: CGFloat = 14, lineHeightScale: CGFloat = 1.35) -> MarkdownTheme {
+        let headingScales: [CGFloat] = [1.6, 1.33, 1.13, 1.0, 0.93, 0.87]
+        return MarkdownTheme(
+            bodyFont: .systemFont(ofSize: fontSize, weight: .regular),
+            codeFont: .monospacedSystemFont(ofSize: max(fontSize - 2, 9), weight: .regular),
+            headingSizes: headingScales.map { ($0 * fontSize).rounded() },
+            bodyLineHeight: (fontSize * lineHeightScale).rounded(),
             paragraphSpacing: 10,
             codeLineHeightMultiple: 1.4,
             textColor: .labelColor,
@@ -83,8 +85,7 @@ public struct MarkdownTheme {
     /// Mirrors metrics measured from Dia 1.32.0: body ~15pt, line-height ~1.67, ¶ +12.5pt;
     /// code ~13pt mono ~1.4; hairline border #0F182C@8% / #787D86@32%.
     public static var dia: MarkdownTheme {
-        var t = MarkdownTheme.oak
-        t.bodyLineHeightMultiple = 1.67
+        var t = MarkdownTheme.oak(fontSize: 15, lineHeightScale: 1.67)
         t.paragraphSpacing = 12
         t.codeBlockBorder = NSColor(name: nil) { appearance in
             appearance.isDark

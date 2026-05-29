@@ -296,6 +296,18 @@ struct HTMLViewerRepresentable: NSViewRepresentable {
             )
             config.userContentController.addUserScript(pwScript)
             config.userContentController.add(context.coordinator, name: "passwordManager")
+
+            // defuddle reader — defines window.oakExtractReadableMarkdown() so the chat
+            // agent's read_current_page tool can extract the live page as readable markdown
+            // (same extractor the web-clip extension uses). Live pages only.
+            if let url = jsBundle?.appendingPathComponent("oak-defuddle.js"),
+               let src = try? String(contentsOf: url, encoding: .utf8) {
+                config.userContentController.addUserScript(WKUserScript(
+                    source: src,
+                    injectionTime: .atDocumentEnd,
+                    forMainFrameOnly: true
+                ))
+            }
         }
 
         let webView = OakWebView(frame: .zero, configuration: config)

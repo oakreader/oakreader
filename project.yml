@@ -15,6 +15,8 @@ packages:
     path: Packages/OakAI
   OakEditor:
     path: Packages/OakEditor
+  OakMarkdownUI:
+    path: Packages/OakMarkdownUI
   Textual:
     url: https://github.com/gonzalezreal/textual
     from: "0.1.0"
@@ -61,6 +63,7 @@ targets:
       - package: OakAI
       - package: OakEditor
       - package: OakAgent
+      - package: OakMarkdownUI
       - package: Textual
       - package: GRDB
         product: GRDB

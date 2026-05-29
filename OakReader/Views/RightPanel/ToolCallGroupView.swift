@@ -242,23 +242,20 @@ struct ToolCallGroupView: View {
 
     private var shimmerLabel: some View {
         HStack(spacing: 6) {
-            Image(systemName: "gearshape")
-                .font(.system(size: 11, weight: .medium))
+            // The same animated 3×3 "agent is working" indicator the chat uses
+            // elsewhere — replaces the static gear, which read as a Settings icon.
+            StreamingCursor()
             Text(executingText)
                 .font(OakStyle.ChatFont.messageBody)
                 .fontWeight(.medium)
-        }
-        .foregroundStyle(.secondary)
-        .overlay {
-            shimmerGradient
-                .mask {
-                    HStack(spacing: 6) {
-                        Image(systemName: "gearshape")
-                            .font(.system(size: 11, weight: .medium))
-                        Text(executingText)
-                            .font(OakStyle.ChatFont.messageBody)
-                            .fontWeight(.medium)
-                    }
+                .foregroundStyle(.secondary)
+                .overlay {
+                    shimmerGradient
+                        .mask {
+                            Text(executingText)
+                                .font(OakStyle.ChatFont.messageBody)
+                                .fontWeight(.medium)
+                        }
                 }
         }
     }

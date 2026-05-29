@@ -116,6 +116,17 @@ struct PDFViewerRepresentable: NSViewRepresentable {
                 pdfView.go(to: selection.bounds(for: page), on: page)
             }
         }
+
+        // Scroll a freshly-clicked citation into view exactly once. The visible highlight
+        // is a temporary annotation the view model draws (so it survives clicks); here we
+        // only recentre on the passage when a new citation arrives.
+        let citeSeq = viewModel.viewer.citationHighlightSeq
+        if citeSeq != context.coordinator.lastScrolledCitationSeq {
+            context.coordinator.lastScrolledCitationSeq = citeSeq
+            if let sel = viewModel.viewer.citationHighlight, let page = sel.pages.first {
+                pdfView.go(to: sel.bounds(for: page), on: page)
+            }
+        }
     }
 
     // MARK: - Dark Appearance

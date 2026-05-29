@@ -11,18 +11,24 @@ public struct StreamingMarkdownView: View {
     public var markdown: String
     public var theme: MarkdownTheme
     public var isStreaming: Bool
+    /// Intercepts link clicks in prose. Return `true` if handled, `false` to let the
+    /// system open the URL. Used by hosts to handle custom schemes (e.g. `oak://`).
+    public var onOpenURL: ((URL) -> Bool)?
 
-    public init(markdown: String, theme: MarkdownTheme = .oak, isStreaming: Bool = false) {
+    public init(markdown: String, theme: MarkdownTheme = .oak(), isStreaming: Bool = false,
+                onOpenURL: ((URL) -> Bool)? = nil) {
         self.markdown = markdown
         self.theme = theme
         self.isStreaming = isStreaming
+        self.onOpenURL = onOpenURL
     }
 
     public var body: some View {
         let blocks = MarkdownBlockSplitter.split(markdown)
         VStack(alignment: .leading, spacing: theme.paragraphSpacing) {
             ForEach(blocks) { block in
-                BlockRow(block: block, theme: theme, streaming: isStreaming && !block.isSettled)
+                BlockRow(block: block, theme: theme,
+                         streaming: isStreaming && !block.isSettled, onOpenURL: onOpenURL)
                     .equatable()
             }
         }
@@ -36,6 +42,9 @@ private struct BlockRow: View, Equatable {
     let block: MarkdownBlock
     let theme: MarkdownTheme
     let streaming: Bool
+    // Excluded from `==`: the handler is stable per host, and a closure isn't
+    // Equatable. Only block text/kind and streaming state drive re-rendering.
+    var onOpenURL: ((URL) -> Bool)?
 
     static func == (lhs: BlockRow, rhs: BlockRow) -> Bool {
         lhs.block == rhs.block && lhs.streaming == rhs.streaming
@@ -47,7 +56,8 @@ private struct BlockRow: View, Equatable {
         case .prose:
             ProseBlockView(
                 attributed: MarkdownAttributedBuilder.attributedString(for: block.text, theme: theme),
-                selectable: !streaming
+                selectable: !streaming,
+                onOpenURL: onOpenURL
             )
         case .code(let language):
             CodeBlockView(code: CodeFence.strip(block.text), language: language, theme: theme)

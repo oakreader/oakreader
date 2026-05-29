@@ -36,17 +36,28 @@ struct CitationAnchor {
             case "page":
                 if let v = item.value, let p = Int(v) { anchor.page = p - 1 }
             case "heading":
-                anchor.heading = item.value?.removingPercentEncoding ?? item.value
+                anchor.heading = formDecode(item.value)
             case "time":
                 if let v = item.value, let t = Double(v) { anchor.time = t }
             case "text":
-                anchor.text = item.value?.removingPercentEncoding ?? item.value
+                anchor.text = formDecode(item.value)
             default:
                 break
             }
         }
 
         return (citeKey, anchor)
+    }
+
+    /// Form-urlencoded decode for query values. `URLComponents.queryItems` already
+    /// percent-decodes `%XX`, but it does NOT turn `+` into a space — and the model
+    /// is told to encode spaces as `+` (see LLMContextProvider citation examples).
+    /// Without this, `text=a+b+c` would be searched literally (plus signs and all)
+    /// and never match the PDF, so the citation jumps to the page but never highlights.
+    private static func formDecode(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let spaced = value.replacingOccurrences(of: "+", with: " ")
+        return spaced.removingPercentEncoding ?? spaced
     }
 }
 
@@ -89,6 +100,11 @@ class ChatViewModel {
     var showHistory: Bool = false
     /// The item ID to associate sessions with (set externally for document-scoped chat).
     var itemId: String?
+
+    /// Working directory for the library agent workspace — a CoW-mounted folder
+    /// under `<dataDir>/workspace/`. When set, the agent's file tools are rooted
+    /// here (set externally by `AppState` when the agent workspace is active).
+    var workspaceDirectory: URL?
 
     // MARK: - Private
 
@@ -250,6 +266,12 @@ class ChatViewModel {
                 documentType: doc.contentType,
                 pageCount: doc.pageCount
             ))
+
+            // Browser tool — only when viewing a live web page (.link). Lets the agent
+            // pull the live, rendered, logged-in DOM as readable markdown on demand.
+            if doc.contentType == .link {
+                tools.append(ReadCurrentPageTool())
+            }
         }
 
         // 2. Full-text content search (FTS5 over the indexed library), plus a
@@ -284,8 +306,9 @@ class ChatViewModel {
         tools.append(PromoteMemoryTool())
         tools.append(SearchLearningLogTool())
 
-        // 4. Filesystem tools (user preference gated)
-        if prefs.agentToolsEnabled, toolContext != nil {
+        // 4. Filesystem tools (user preference gated). Available for a document's
+        //    storage dir or the library agent's CoW workspace folder.
+        if prefs.agentToolsEnabled, toolContext != nil || workspaceDirectory != nil {
             if prefs.agentReadFileEnabled { tools.append(ReadTool()) }
             if prefs.agentWriteFileEnabled { tools.append(WriteTool()) }
             tools.append(BashTool())
@@ -307,8 +330,10 @@ class ChatViewModel {
             }
             // Allow tools to access everything under ~/OakReader-Dev/ (debug) or ~/OakReader/ (prod)
             let allowed = [CatalogDatabase.dataDirectory]
+            // Prefer the agent workspace folder, then the document's storage dir.
+            let workingDir = workspaceDirectory ?? storagePath ?? URL(fileURLWithPath: NSTemporaryDirectory())
             effectiveToolContext = toolContext ?? ToolExecutionContext(
-                workingDirectory: storagePath ?? URL(fileURLWithPath: NSTemporaryDirectory()),
+                workingDirectory: workingDir,
                 allowedPaths: allowed
             )
         } else {
@@ -575,6 +600,11 @@ class ChatViewModel {
         guard let appState else { return }
         let store = appState.libraryStore
         guard let item = store.findItem(byCiteKey: citeKey) else { return }
+
+        // Media (podcast / video) has no local seekable copy — open the source
+        // platform at the timestamp instead of opening a document tab.
+        if let time = anchor.time, openSourceTimestamp(for: item, seconds: time) { return }
+
         appState.openLibraryItem(item)
 
         // Delay navigation until the new tab loads
@@ -591,9 +621,10 @@ class ChatViewModel {
                 vm.viewer.goToPage(page)
             }
             if let text = anchor.text {
-                // Search for text within the PDF (optionally narrowed by page)
+                // Tolerant search: the model's text= is often a paraphrase, so exact
+                // findString would miss it. Prefer the cited page when the phrase recurs.
                 Task { @MainActor in
-                    await vm.viewer.search(query: text)
+                    await vm.viewer.highlightCitation(text: text, page: anchor.page)
                 }
             }
 
@@ -609,9 +640,30 @@ class ChatViewModel {
             }
 
         case .link, .audio:
-            // Embed/link/audio documents have no in-place navigation target.
-            break
+            // No in-place target — open the source platform at the timestamp.
+            if let time = anchor.time, let source = vm.mediaDocument?.sourceURL {
+                NSWorkspace.shared.open(MediaTimestampLink.url(forSource: source, atSeconds: time))
+            }
         }
+    }
+
+    /// Opens a media item's source platform at `seconds` (YouTube / Apple Podcasts /
+    /// generic). Returns false if the item isn't media or has no resolvable source URL,
+    /// so the caller can fall back to opening it as a document.
+    private func openSourceTimestamp(for item: LibraryItem, seconds: Double) -> Bool {
+        guard item.contentType == .link || item.contentType == .audio else { return false }
+        let source: URL?
+        if let s = item.sourceURL {
+            source = s
+        } else if let dir = item.primaryAttachment?.documentDirectory,
+                  let media = try? MediaDocument(storageDirectory: dir) {
+            source = media.sourceURL
+        } else {
+            source = nil
+        }
+        guard let source else { return false }
+        NSWorkspace.shared.open(MediaTimestampLink.url(forSource: source, atSeconds: seconds))
+        return true
     }
 
     // MARK: - Stop Streaming
