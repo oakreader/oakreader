@@ -85,7 +85,7 @@ struct OcclusionQuizView: View {
                             .foregroundStyle(.secondary)
                             .frame(width: 16, height: 16)
                             .background(Color.primary.opacity(0.05), in: Circle())
-                        Text(label)
+                        CardMarkdown(text: label)
                             .font(.system(size: 12))
                     }
                 }

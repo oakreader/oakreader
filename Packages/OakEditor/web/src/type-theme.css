@@ -1,0 +1,331 @@
+/* qurle/type (type.baby) theme for Milkdown Crepe.
+ *
+ * Ports the look of qurle/type — a zen, book-like writing app — onto Crepe,
+ * keeping Crepe's batteries (AI diff-review, slash menu, toolbar, image block).
+ * Values are lifted from type's own stylesheets (src/styles/variables.sass,
+ * global.sass, blocks.sass, milkdown/crepe.sass):
+ *   - serif body (PT Serif), mono code (PT Mono) — vendored under ./fonts
+ *   - single ink + color-mix opacity ladder (--color-main-05/15/25/50)
+ *   - 640px reading column, line-height 1.4, no letter-spacing
+ *   - subtle underlined links, RED inline code, grey oklch palette
+ *
+ * Drive from the host (Crepe sets these on .milkdown / the app on <html>):
+ *   data-theme="light" | "dark"     (default follows prefers-color-scheme)
+ *   data-font="serif" | "sans" | "mono"   (default: serif, like type) */
+
+/* ---- Vendored fonts (PT Serif + PT Mono, latin) ---- */
+@font-face {
+  font-family: 'PT Serif'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('./fonts/PTSerif-Regular.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'PT Serif'; font-style: normal; font-weight: 700; font-display: swap;
+  src: url('./fonts/PTSerif-Bold.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'PT Serif'; font-style: italic; font-weight: 400; font-display: swap;
+  src: url('./fonts/PTSerif-Italic.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'PT Serif'; font-style: italic; font-weight: 700; font-display: swap;
+  src: url('./fonts/PTSerif-BoldItalic.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'PT Mono'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('./fonts/PTMono-Regular.woff2') format('woff2');
+}
+
+.milkdown {
+  /* ---- Base colors (light): pure white paper + near-black ink.
+          The ladder is mixed off --crepe-color-on-background. ---- */
+  --crepe-color-background: #fff;
+  --crepe-color-on-background: oklch(20% 0 0);
+
+  --type-ink-05: color-mix(in srgb, var(--crepe-color-on-background) 5%, transparent);
+  --type-ink-15: color-mix(in srgb, var(--crepe-color-on-background) 15%, transparent);
+  --type-ink-25: color-mix(in srgb, var(--crepe-color-on-background) 25%, transparent);
+  --type-ink-50: color-mix(in srgb, var(--crepe-color-on-background) 50%, transparent);
+
+  /* Crepe chrome (slash menu, toolbar, block handles) — type's grey scale. */
+  --crepe-color-surface: #f7f7f7;
+  --crepe-color-surface-low: #ededed;
+  --crepe-color-on-surface: #1c1c1c;
+  --crepe-color-on-surface-variant: #4d4d4d;
+  --crepe-color-outline: var(--type-ink-25);
+  --crepe-color-primary: #333333;
+  --crepe-color-secondary: color-mix(in srgb, var(--crepe-color-primary) 16%, transparent);
+  --crepe-color-on-secondary: var(--crepe-color-primary);
+  --crepe-color-inverse: var(--crepe-color-on-background);
+  --crepe-color-on-inverse: var(--crepe-color-background);
+  --crepe-color-inline-code: #ba1a1a; /* type's signature red inline code */
+  --crepe-color-error: #ba1a1a;
+  --crepe-color-hover: var(--type-ink-05);
+  --crepe-color-selected: var(--type-ink-15);
+  --crepe-color-inline-area: var(--type-ink-05);
+
+  /* AI diff review derives from these (theme/common/diff.css + ai.css action
+     bar). Match Notion's suggested-edits palette: inserted text in BLUE, deleted
+     text GRAY + strikethrough (a calm writing-review look, not a code-diff
+     green/red). The accept-all button inherits blue, reject-all gray. */
+  --crepe-color-diff-added: #2383e2;   /* Notion blue */
+  --crepe-color-diff-removed: #9b9a97; /* Notion gray */
+
+  --type-link-underline: var(--type-ink-15);
+  --type-link-underline-hover: var(--type-ink-50);
+
+  /* ---- Fonts. type is serif-first; --type-font-main swaps via [data-font]. ---- */
+  --type-font-serif: 'PT Serif', 'Songti SC', 'Source Han Serif SC', Georgia, 'Times New Roman', serif;
+  --type-font-sans: -apple-system, BlinkMacSystemFont, 'Mulish', 'Inter', 'Helvetica Neue', 'PingFang SC', 'Hiragino Sans GB', Arial, sans-serif;
+  --type-font-mono: 'PT Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --type-font-main: var(--type-font-serif);
+
+  /* Prose stays serif (set explicitly on .ProseMirror / headings). The editor
+     CHROME — slash menu, AI tooltip, diff controls — uses --crepe-font-default,
+     so keep that a UI sans; serif in menus looks wrong. */
+  --crepe-font-title: var(--type-font-main);
+  --crepe-font-default: var(--type-font-sans);
+  --crepe-font-code: var(--type-font-mono);
+
+  --crepe-shadow-1: 0px 1px 3px 1px rgba(0, 0, 0, 0.15), 0px 1px 2px 0px rgba(0, 0, 0, 0.3);
+  --crepe-shadow-2: 0px 2px 6px 2px rgba(0, 0, 0, 0.15), 0px 1px 2px 0px rgba(0, 0, 0, 0.3);
+
+  background: var(--crepe-color-background);
+  color: var(--crepe-color-on-background);
+
+  /* Fill the WKWebView container so the paper extends the full panel height and
+     clicking anywhere below the text still focuses the editor. (Absolutely
+     positioned slash menu / block handle are out of flow, so the column layout
+     just stretches the editable surface.) */
+  min-height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+.milkdown .ProseMirror { flex: 1 1 auto; }
+
+/* ---- Dark palette: type's --color-dark + light ink. ---- */
+@media (prefers-color-scheme: dark) {
+  .milkdown:not([data-theme='light']) {
+    --crepe-color-background: #23282d;
+    --crepe-color-on-background: oklch(92% 0 0);
+    --crepe-color-surface: #2b3036;
+    --crepe-color-surface-low: #20242a;
+    --crepe-color-on-surface: oklch(92% 0 0);
+    --crepe-color-on-surface-variant: var(--type-ink-50);
+    --crepe-color-primary: oklch(86% 0 0);
+    --crepe-color-inline-code: #ff6b6b;
+  }
+}
+[data-theme='dark'] .milkdown,
+.milkdown[data-theme='dark'],
+.dark .milkdown,
+.darkmode .milkdown {
+  --crepe-color-background: #23282d;
+  --crepe-color-on-background: oklch(92% 0 0);
+  --crepe-color-surface: #2b3036;
+  --crepe-color-surface-low: #20242a;
+  --crepe-color-on-surface: oklch(92% 0 0);
+  --crepe-color-on-surface-variant: var(--type-ink-50);
+  --crepe-color-primary: oklch(86% 0 0);
+  --crepe-color-inline-code: #ff6b6b;
+}
+
+/* ---- Font selection (type's [data-font] mechanism). ---- */
+[data-font='sans'] .milkdown,
+.milkdown[data-font='sans'] { --type-font-main: var(--type-font-sans); }
+[data-font='mono'] .milkdown,
+.milkdown[data-font='mono'] { --type-font-main: var(--type-font-mono); }
+
+/* ==================== Prose (type's milkdown/common.sass — its real Crepe metrics) ====
+   type uses fixed 60px/120px gutters in a full window; the notes panel is far
+   narrower, so the only adaptation is a responsive reading column. Everything
+   else (regular-weight serif headings, px sizes, link/code/quote) is type's. */
+.milkdown .ProseMirror {
+  padding: 48px max(24px, calc((100% - 640px) / 2)) 25vh;
+  font-family: var(--type-font-main);
+  color: var(--crepe-color-on-background);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.milkdown .ProseMirror :is(h1, h2, h3, h4, h5, h6) {
+  font-family: var(--crepe-font-title);
+  font-weight: 400;
+  padding: 2px 0;
+}
+.milkdown .ProseMirror h1 { font-size: 42px; line-height: 50px; margin-top: 32px; }
+.milkdown .ProseMirror h2 { font-size: 36px; line-height: 44px; margin-top: 28px; }
+.milkdown .ProseMirror h3 { font-size: 32px; line-height: 40px; margin-top: 24px; }
+.milkdown .ProseMirror h4 { font-size: 28px; line-height: 36px; margin-top: 20px; }
+.milkdown .ProseMirror h5 { font-size: 24px; line-height: 32px; margin-top: 16px; }
+.milkdown .ProseMirror h6 { font-size: 18px; font-weight: 700; line-height: 28px; margin-top: 16px; }
+
+.milkdown .ProseMirror p { font-size: 16px; line-height: 24px; padding: 4px 0; }
+.milkdown .ProseMirror strong { font-weight: 700; }
+.milkdown .ProseMirror em { font-style: italic; }
+
+/* Inline code: red ink on a faint wash (type's exact values). */
+.milkdown .ProseMirror code {
+  color: var(--crepe-color-inline-code);
+  background: color-mix(in srgb, var(--crepe-color-inline-area), transparent 40%);
+  font-family: var(--crepe-font-code);
+  padding: 0 10px;
+  border-radius: 4px;
+  font-size: 87.5%;
+  display: inline-block;
+  line-height: 1.4286;
+}
+.milkdown .ProseMirror a { color: var(--crepe-color-primary); text-decoration: underline; }
+
+.milkdown .ProseMirror pre {
+  background: color-mix(in srgb, var(--crepe-color-inline-area), transparent 40%);
+  padding: 10px;
+  border-radius: 4px;
+}
+.milkdown .ProseMirror pre code { padding: 0; background: transparent; }
+
+/* Blockquote: rounded rail via ::before (type's signature). */
+.milkdown .ProseMirror blockquote {
+  position: relative;
+  padding: 0 0 0 40px;
+  box-sizing: content-box;
+  margin: 4px 0;
+}
+.milkdown .ProseMirror blockquote::before {
+  content: "";
+  width: 4px;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  position: absolute;
+  background: var(--crepe-color-selected);
+  border-radius: 100px;
+}
+
+.milkdown .ProseMirror hr {
+  border: none;
+  background-color: color-mix(in srgb, var(--crepe-color-outline), transparent 80%);
+  background-clip: content-box;
+  padding: 6px 0;
+  height: 13px;
+}
+.milkdown .ProseMirror img { vertical-align: bottom; max-width: 100%; height: auto; }
+.milkdown .ProseMirror table {
+  border-collapse: collapse;
+  border: 1px solid var(--crepe-color-outline);
+}
+.milkdown .ProseMirror :is(th, td) { padding: 6px 8px; border: 1px solid var(--crepe-color-outline); }
+
+/* ==================== Code block chrome (Crepe CodeMirror feature) ====================
+   Crepe's code-mirror.css ships a heavy default: a near-black search-box ring
+   (--crepe-color-primary), 600-weight list text, and the OS scrollbar. Soften
+   it to match type's calm grey palette. (The slash menu / block handle are gone
+   — BlockEdit is disabled — so only the code-block language picker is themed.) */
+
+/* Block frame: rounded, hairline-bordered card with a condensed top. Crepe's
+   default reserves a tall header band for the (invisible-until-hover) language
+   button; floating .tools out of flow reclaims it so code sits near the top. */
+.milkdown .milkdown-code-block {
+  padding: 2px 12px 10px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--crepe-color-outline), transparent 70%);
+}
+.milkdown .milkdown-code-block .tools {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  left: auto;
+  width: auto;
+  gap: 8px;
+  z-index: 2;
+}
+.milkdown .milkdown-code-block .tools .language-button { margin-bottom: 0; }
+
+/* Active-line highlight: basicSetup keeps the line+gutter highlighted by cursor
+   position even when the block is blurred, so the last edited line reads as a
+   stray selection. Drop it entirely, then show only a faint band while focused
+   (and never the dark gutter box). */
+.milkdown .milkdown-code-block .cm-activeLine,
+.milkdown .milkdown-code-block .cm-activeLineGutter {
+  background-color: transparent !important;
+}
+.milkdown .milkdown-code-block .cm-editor.cm-focused .cm-activeLine {
+  background-color: var(--type-ink-05) !important;
+}
+
+/* The "language ▾" trigger + Copy pill that float over a code block. */
+.milkdown .milkdown-code-block .tools .language-button { font-weight: 500; }
+.milkdown .milkdown-code-block .tools .tools-button-group button {
+  background: var(--type-ink-05);
+  color: var(--crepe-color-on-surface-variant);
+  font-weight: 500;
+}
+.milkdown .milkdown-code-block .tools .tools-button-group button:hover { background: var(--type-ink-15); }
+
+/* Dropdown panel: surface + hairline border instead of the flat surface-low. */
+.milkdown .milkdown-code-block .list-wrapper {
+  background: var(--crepe-color-surface);
+  border: 1px solid color-mix(in srgb, var(--crepe-color-outline), transparent 60%);
+}
+
+/* Search field: drop the chunky black ring for a subtle hairline that firms up
+   (not blackens) on focus. */
+.milkdown .milkdown-code-block .search-box {
+  outline: 1px solid color-mix(in srgb, var(--crepe-color-outline), transparent 40%);
+}
+.milkdown .milkdown-code-block .search-box:has(input:focus) {
+  outline: 1.5px solid color-mix(in srgb, var(--crepe-color-primary), transparent 45%);
+}
+
+/* Language list: lighter weight + a thin, inset scrollbar. */
+.milkdown .milkdown-code-block .language-list-item { font-weight: 500; }
+.milkdown .milkdown-code-block .language-list { scrollbar-width: thin; }
+.milkdown .milkdown-code-block .language-list::-webkit-scrollbar { width: 10px; }
+.milkdown .milkdown-code-block .language-list::-webkit-scrollbar-thumb {
+  background: var(--type-ink-15);
+  border-radius: 100px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+.milkdown .milkdown-code-block .language-list::-webkit-scrollbar-thumb:hover { background: var(--type-ink-25); background-clip: content-box; }
+
+.milkdown .ProseMirror ::selection { background-color: var(--crepe-color-selected); }
+
+/* ==================== AI diff review (Notion-style, glass action bar) ====================
+   Notion doesn't clutter every change with inline accept/reject — you see the
+   suggestion inline (blue add / gray strike), then Accept all / Reject all from
+   one floating bar. Hide Crepe's per-change controls and restyle the bar to
+   match the native selection popup: a translucent glass pill. */
+.milkdown .milkdown-diff-controls,
+.milkdown .milkdown-diff-controls-block { display: none !important; }
+
+.milkdown .milkdown-ai-diff-actions {
+  background: color-mix(in srgb, var(--crepe-color-surface) 75%, transparent);
+  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  backdrop-filter: blur(24px) saturate(1.8);
+  border: 1px solid color-mix(in srgb, var(--crepe-color-on-background), transparent 88%);
+  border-radius: 12px;
+  box-shadow: var(--crepe-shadow-2);
+  padding: 5px;
+  gap: 2px;
+}
+.milkdown .milkdown-ai-diff-actions-btn {
+  border-radius: 8px;
+  padding: 7px 12px;
+}
+/* Accept = blue primary (Notion); Reject = neutral, not a red wash. */
+.milkdown .milkdown-ai-diff-actions-btn-reject {
+  color: var(--crepe-color-on-surface-variant);
+  background: transparent;
+}
+.milkdown .milkdown-ai-diff-actions-btn-reject:hover { background: var(--crepe-color-hover); }
+.milkdown .milkdown-ai-diff-actions-btn-accept {
+  color: #2383e2;
+  background: color-mix(in srgb, #2383e2 12%, transparent);
+}
+.milkdown .milkdown-ai-diff-actions-btn-accept:hover {
+  background: color-mix(in srgb, #2383e2 20%, transparent);
+}
+.milkdown .milkdown-ai-diff-actions-shortcut {
+  background: color-mix(in srgb, #2383e2 14%, transparent);
+}

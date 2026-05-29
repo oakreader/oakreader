@@ -4,33 +4,24 @@ import Foundation
 
 enum QuizType: String, Codable, CaseIterable, Identifiable {
     case cloze
-    case choice
     case flashcard
     case occlusion
-    case matching
-    case ordering
 
     var id: String { rawValue }
 
     var label: String {
         switch self {
         case .cloze: return "Cloze"
-        case .choice: return "Choice"
         case .flashcard: return "Flashcard"
         case .occlusion: return "Occlusion"
-        case .matching: return "Matching"
-        case .ordering: return "Ordering"
         }
     }
 
     var systemImage: String {
         switch self {
         case .cloze: return "text.redaction"
-        case .choice: return "checklist"
         case .flashcard: return "rectangle.on.rectangle.angled"
         case .occlusion: return "eye.slash"
-        case .matching: return "arrow.left.arrow.right"
-        case .ordering: return "list.number"
         }
     }
 }
@@ -66,22 +57,12 @@ enum ReviewRating: Int, Codable, CaseIterable {
 
 enum QuizContent: Codable, Hashable {
     case cloze(ClozeContent)
-    case choice(ChoiceContent)
     case flashcard(FlashcardContent)
     case occlusion(OcclusionContent)
-    case matching(MatchingContent)
-    case ordering(OrderingContent)
 
     struct ClozeContent: Codable, Hashable {
         let text: String           // "The {{c1::heart}} pumps {{c2::blood}}"
         let hint: String?
-    }
-
-    struct ChoiceContent: Codable, Hashable {
-        let question: String
-        let choices: [String]
-        let correctIndex: Int      // 0-based
-        let explanation: String?
     }
 
     struct FlashcardContent: Codable, Hashable {
@@ -93,19 +74,6 @@ enum QuizContent: Codable, Hashable {
         let imageURL: String       // relative path or base64
         let masks: [[String: Double]]  // [{x, y, w, h}]
         let labels: [String]
-    }
-
-    struct MatchingContent: Codable, Hashable {
-        let pairs: [Pair]
-        struct Pair: Codable, Hashable {
-            let left: String
-            let right: String
-        }
-    }
-
-    struct OrderingContent: Codable, Hashable {
-        let prompt: String
-        let items: [String]        // Correct order
     }
 
     // MARK: - Codable
@@ -120,16 +88,10 @@ enum QuizContent: Codable, Hashable {
         switch type {
         case "cloze":
             self = .cloze(try container.decode(ClozeContent.self, forKey: .data))
-        case "choice":
-            self = .choice(try container.decode(ChoiceContent.self, forKey: .data))
         case "flashcard":
             self = .flashcard(try container.decode(FlashcardContent.self, forKey: .data))
         case "occlusion":
             self = .occlusion(try container.decode(OcclusionContent.self, forKey: .data))
-        case "matching":
-            self = .matching(try container.decode(MatchingContent.self, forKey: .data))
-        case "ordering":
-            self = .ordering(try container.decode(OrderingContent.self, forKey: .data))
         default:
             throw DecodingError.dataCorruptedError(
                 forKey: .type, in: container,
@@ -144,20 +106,11 @@ enum QuizContent: Codable, Hashable {
         case .cloze(let c):
             try container.encode("cloze", forKey: .type)
             try container.encode(c, forKey: .data)
-        case .choice(let c):
-            try container.encode("choice", forKey: .type)
-            try container.encode(c, forKey: .data)
         case .flashcard(let c):
             try container.encode("flashcard", forKey: .type)
             try container.encode(c, forKey: .data)
         case .occlusion(let c):
             try container.encode("occlusion", forKey: .type)
-            try container.encode(c, forKey: .data)
-        case .matching(let c):
-            try container.encode("matching", forKey: .type)
-            try container.encode(c, forKey: .data)
-        case .ordering(let c):
-            try container.encode("ordering", forKey: .type)
             try container.encode(c, forKey: .data)
         }
     }
@@ -165,11 +118,8 @@ enum QuizContent: Codable, Hashable {
     var quizType: QuizType {
         switch self {
         case .cloze: return .cloze
-        case .choice: return .choice
         case .flashcard: return .flashcard
         case .occlusion: return .occlusion
-        case .matching: return .matching
-        case .ordering: return .ordering
         }
     }
 }
@@ -225,16 +175,10 @@ struct QuizCard: Identifiable, Hashable {
                 with: "___",
                 options: .regularExpression
             )
-        case .choice(let c):
-            return c.question
         case .flashcard(let c):
             return c.front
         case .occlusion:
             return "Image Occlusion"
-        case .matching(let c):
-            return "Match: \(c.pairs.first?.left ?? "")\u{2026}"
-        case .ordering(let c):
-            return c.prompt
         }
     }
 

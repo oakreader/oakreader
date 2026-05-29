@@ -37,9 +37,8 @@ enum MarkdownRenderer {
 
         // Build dynamic CSS for font overrides + accent color
         // swiftlint:disable:next line_length
-        let fontStack = "\"\(fontFamily)\", -apple-system, BlinkMacSystemFont, \"Helvetica Neue\", \"PingFang SC\", \"Hiragino Sans GB\", \"Microsoft YaHei\", Arial, sans-serif"
-        // swiftlint:disable:next line_length
-        let codeStack = "\"\(codeFontFamily)\", ui-monospace, Menlo, Consolas, \"Courier New\", monospace"
+        let fontStack = "\(cssFontFamilyToken(fontFamily)), -apple-system, BlinkMacSystemFont, \"Helvetica Neue\", \"PingFang SC\", \"Hiragino Sans GB\", \"Microsoft YaHei\", Arial, sans-serif"
+        let codeStack = "\(cssFontFamilyToken(codeFontFamily)), ui-monospace, Menlo, Consolas, \"Courier New\", monospace"
         let dynamicCSS = """
         \(fontFaceCSS)
         html { font-size: \(fontSize)px; }
@@ -56,6 +55,15 @@ enum MarkdownRenderer {
         html = html.replacingOccurrences(of: "CUSTOM_CSS", with: themeClass)
 
         return html
+    }
+
+    private static func cssFontFamilyToken(_ family: String) -> String {
+        let trimmed = family.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "serif" }
+        if trimmed.contains(",") || trimmed.hasPrefix("-") {
+            return trimmed
+        }
+        return "\"\(trimmed.replacingOccurrences(of: "\"", with: "\\\""))\""
     }
 
     /// Convert `[[references]]` to `<a href="oak-ref://...">` links before cmark processing.

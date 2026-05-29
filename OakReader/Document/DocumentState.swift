@@ -21,6 +21,16 @@ class DocumentState {
     var presentationSavedState: PresentationSavedState?
     var webLoadProgress: Double = 0
     var isLoading: Bool = false
+
+    // Live web browser navigation state (driven by KVO on WKWebView)
+    var currentURL: URL?
+    var pageTitle: String?
+    var canGoBack: Bool = false
+    var canGoForward: Bool = false
+
+    /// A captured login awaiting the user's decision to save it. Drives the
+    /// save-password banner in BrowserChromeView.
+    var pendingPasswordSave: PendingPasswordSave?
     var errorMessage: String?
     var showError: Bool = false
 
@@ -31,6 +41,12 @@ class DocumentState {
         errorMessage = message
         showError = true
     }
+}
+
+struct PendingPasswordSave: Equatable {
+    let host: String
+    let username: String
+    let password: String
 }
 
 struct PresentationSavedState {

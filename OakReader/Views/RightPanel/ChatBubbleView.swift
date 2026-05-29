@@ -284,13 +284,33 @@ struct ChatBubbleView: View {
     /// Selecting mid-stream text is pointless anyway.
     @ViewBuilder
     private func chatMarkdown(_ markdown: String, streaming: Bool = false) -> some View {
-        let text = StructuredText(markdown: protectMathBackslashes(markdown), syntaxExtensions: [.math])
-            .textual.headingStyle(ChatHeadingStyle())
-            .font(OakStyle.ChatFont.messageBody)
-        if streaming {
-            text
-        } else {
-            text.textual.textSelection(.enabled)
+        // Split into blank-line-separated, fence-aware blocks and render each as
+        // its own `EquatableView`. While streaming, only the last (tail) block
+        // re-parses on each commit; settled blocks above keep a stable identity
+        // and unchanged content, so SwiftUI skips their body and Textual never
+        // re-parses them — turning O(message length)/frame into ≈O(tail)/frame.
+        // (`protectingMathBackslashes` + `sealIncompleteMarkdown` run per-block
+        // inside `ChatMarkdownBlockView`, so settled blocks don't pay for them.)
+        let blocks = MarkdownBlockSplitter.split(markdown)
+        // Selection and math attachments each install a `GeometryReader` inside a
+        // `Text.LayoutKey` preference reader; with both live in the same message
+        // the two layout→preference→layout loops never converge and spin the main
+        // thread (frozen UI). Gating per-block isn't enough — a message that
+        // interleaves selectable prose with math blocks still wedges — so we drop
+        // selection for the WHOLE message whenever it contains any math. This
+        // mirrors the streaming case (all blocks non-selectable), which is the
+        // configuration verified not to spin.
+        let messageHasMath = markdown.containsMath()
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(blocks) { block in
+                ChatMarkdownBlockView(
+                    text: block.text,
+                    seal: streaming && !block.isSettled,  // only the growing tail
+                    selectable: !streaming && !messageHasMath
+                )
+                .equatable()
+                .id(block.id)
+            }
         }
     }
 
@@ -363,16 +383,11 @@ struct ChatBubbleView: View {
             let (_, stripped) = Self.extractReferencedDocuments(from: parsed.content)
             return stripped
         }
-        let content = reveal.displayedContent
-        // Seal incomplete markdown during streaming to prevent jitter.
-        // Without this, `**bold` flips between literal and bold rendering
-        // as the closing `**` arrives character by character.
-        // NOTE: protectMathBackslashes is applied once in chatMarkdown();
-        // applying it here too would double-escape backslashes in LaTeX.
-        if turn.isStreaming || reveal.isAnimating {
-            return content.sealIncompleteMarkdown()
-        }
-        return content
+        // Sealing of incomplete markdown (`**bold` → `**bold**`) and math
+        // backslash protection now happen per-block inside `ChatMarkdownBlockView`
+        // — only the still-growing tail block is sealed, so we never re-scan the
+        // whole message on every streaming commit.
+        return reveal.displayedContent
     }
 
     private var skillBadges: [String] {
@@ -540,44 +555,6 @@ struct ChatBubbleView: View {
         pattern: #"<note\s[^>]*?title="([^"]*)"[^>]*/>"#
     )
 
-    // Regex: display math $$...$$ (dotall) or inline math $...$ (no newlines)
-    // swiftlint:disable:next force_try
-    private static let mathPattern = try! NSRegularExpression(
-        pattern: #"\$\$(.+?)\$\$|\$(?!\$)((?:\\\$|[^$\n])+)\$"#,
-        options: [.dotMatchesLineSeparators]
-    )
-
-    /// Doubles backslashes inside math delimiters (`$$…$$` and `$…$`) so they
-    /// survive Foundation's markdown parser. Foundation treats `\\` as a valid
-    /// CommonMark escape (producing `\`), destroying LaTeX line breaks and
-    /// literal braces before Textual's math regex ever sees them.
-    private func protectMathBackslashes(_ text: String) -> String {
-        let ns = text as NSString
-        var result = ""
-        var cursor = 0
-
-        Self.mathPattern.enumerateMatches(in: text, range: NSRange(location: 0, length: ns.length)) { match, _, _ in
-            guard let match else { return }
-            let fullRange = match.range
-
-            // Append text before this match
-            result += ns.substring(with: NSRange(location: cursor, length: fullRange.location - cursor))
-
-            // Determine which group matched: group 1 = $$, group 2 = $
-            let isBlock = match.range(at: 1).location != NSNotFound
-            let contentRange = match.range(at: isBlock ? 1 : 2)
-            let content = ns.substring(with: contentRange)
-            let protected = content.replacingOccurrences(of: "\\", with: "\\\\")
-
-            result += isBlock ? "$$\(protected)$$" : "$\(protected)$"
-            cursor = fullRange.location + fullRange.length
-        }
-
-        // Append remaining text after last match
-        result += ns.substring(from: cursor)
-        return result
-    }
-
 }
 
 // MARK: - Assistant Bubble Style
@@ -597,7 +574,6 @@ private extension View {
         modifier(AssistantBubbleStyle())
     }
 }
-
 
 // MARK: - Thinking Disclosure View
 
@@ -1200,7 +1176,7 @@ private final class StreamRevealController {
 
 // MARK: - Compact heading style for chat bubbles
 
-private struct ChatHeadingStyle: StructuredText.HeadingStyle {
+struct ChatHeadingStyle: StructuredText.HeadingStyle {
     private static let fontScales: [CGFloat] = [1.3, 1.15, 1.05, 1.0, 0.9, 0.85]
 
     func makeBody(configuration: Configuration) -> some View {
