@@ -141,7 +141,7 @@ struct LibraryTableView: View {
                         .foregroundStyle(Color.primary.opacity(0.4))
                 }
             }
-            .width(min: 80, ideal: 150)
+            .width(min: 80, ideal: 150, max: 280)
 
             TableColumn(dateColumnTitle) { row in
                 switch row.kind {
@@ -157,7 +157,7 @@ struct LibraryTableView: View {
                     }
                 }
             }
-            .width(min: 80, ideal: 120)
+            .width(min: 80, ideal: 120, max: 200)
 
         } rows: {
             ForEach(items, id: \.id) { item in
