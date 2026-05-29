@@ -384,15 +384,18 @@ struct AIChatView: View {
             .onPreferenceChange(ScrollMetricsKey.self) { metrics in
                 // Guard redundant writes: during a pure scroll only `offset`
                 // changes, so only the scrollbar (which reads it) is invalidated.
+                let heightChanged = scrollState.contentHeight != metrics.contentHeight
                 if scrollState.offset != metrics.offset { scrollState.offset = metrics.offset }
-                if scrollState.contentHeight != metrics.contentHeight {
-                    scrollState.contentHeight = metrics.contentHeight
-                }
+                if heightChanged { scrollState.contentHeight = metrics.contentHeight }
                 scrollState.registerActivity()
 
-                // Track whether user is near the bottom (within 20px)
-                let scrollable = metrics.contentHeight - scrollState.viewHeight
-                scrollState.isNearBottom = scrollable <= 0 || (scrollable - metrics.offset) < 20
+                // Re-evaluate follow intent only on a pure scroll (height stable). During
+                // content growth the offset lags the new height for a frame, so recomputing
+                // here would misread "not near bottom" and abandon the auto-follow.
+                if !heightChanged {
+                    let scrollable = metrics.contentHeight - scrollState.viewHeight
+                    scrollState.isNearBottom = scrollable <= 0 || (scrollable - metrics.offset) < 20
+                }
             }
             .onChange(of: chatVM.turns.count) { _, _ in
                 withAnimation(.easeOut(duration: 0.2)) {
