@@ -4,7 +4,7 @@ import WebKit
 /// WKNavigationDelegate + WKScriptMessageHandler for the HTML document viewer.
 /// Blocks external navigation, handles text selection events from injected JS,
 /// and shows a popup panel for selected text.
-final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
+final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
     var viewModel: DocumentViewModel
     weak var webView: WKWebView?
 
@@ -13,6 +13,8 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessageH
     private var headingObserver: NSObjectProtocol?
     private var findTextObserver: NSObjectProtocol?
     private var progressObservation: NSKeyValueObservation?
+    private var navObservations: [NSKeyValueObservation] = []
+    private var commandObservers: [NSObjectProtocol] = []
 
     init(viewModel: DocumentViewModel) {
         self.viewModel = viewModel
@@ -26,6 +28,8 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessageH
         removeScrollMonitor()
         removeNotificationObservers()
         progressObservation?.invalidate()
+        navObservations.forEach { $0.invalidate() }
+        commandObservers.forEach { NotificationCenter.default.removeObserver($0) }
     }
 
     // MARK: - Active State
@@ -190,20 +194,25 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessageH
             return
         }
 
-        // Live mode: allow same-origin HTTP(S); open cross-origin clicks in system browser
-        guard url.scheme == "http" || url.scheme == "https" else {
-            decisionHandler(.allow)
-            return
-        }
+        // Live mode acts as a real browser: navigate every HTTP(S) link in place.
+        // The "Open in Browser" context-menu item remains the escape hatch to Safari.
+        decisionHandler(.allow)
+    }
 
-        let isCrossOriginClick = navigationAction.navigationType == .linkActivated
-            && url.host != viewModel.liveURL?.host
-        if isCrossOriginClick {
-            decisionHandler(.cancel)
-            NSWorkspace.shared.open(url)
-        } else {
-            decisionHandler(.allow)
+    // MARK: - WKUIDelegate
+
+    /// `target="_blank"` / `window.open` links return no web view from us, so WebKit
+    /// would silently drop them. Load the request in the current view instead.
+    func webView(
+        _ webView: WKWebView,
+        createWebViewWith configuration: WKWebViewConfiguration,
+        for navigationAction: WKNavigationAction,
+        windowFeatures: WKWindowFeatures
+    ) -> WKWebView? {
+        if let url = navigationAction.request.url {
+            webView.load(URLRequest(url: url))
         }
+        return nil
     }
 
     // MARK: - Navigation Lifecycle
@@ -213,6 +222,23 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessageH
         webView.evaluateJavaScript("OakHighlighter.init();") { [weak self] _, _ in
             self?.restoreSavedHighlights()
         }
+        autofillSavedCredentials()
+    }
+
+    /// Fill the first saved credential for the current host into the page's login form.
+    private func autofillSavedCredentials() {
+        guard isLiveMode, let webView, let host = webView.url?.host else { return }
+        guard let cred = PasswordStore.credentials(for: host).first else { return }
+        let user = cred.username
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "'", with: "\\'")
+        let pass = cred.password
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "'", with: "\\'")
+        webView.evaluateJavaScript(
+            "if (window.OakPasswords) OakPasswords.fill('\(user)', '\(pass)');",
+            completionHandler: nil
+        )
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
@@ -238,6 +264,57 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessageH
         }
     }
 
+    /// Mirror WKWebView navigation state into DocumentState so the browser chrome
+    /// (address bar, back/forward buttons) can bind to it.
+    func setupNavigationObservation() {
+        guard isLiveMode, let webView else { return }
+        navObservations.forEach { $0.invalidate() }
+
+        let urlObs = webView.observe(\.url, options: [.initial, .new]) { [weak self] wv, _ in
+            DispatchQueue.main.async { self?.viewModel.state.currentURL = wv.url }
+        }
+        let titleObs = webView.observe(\.title, options: [.initial, .new]) { [weak self] wv, _ in
+            DispatchQueue.main.async {
+                let title = wv.title
+                self?.viewModel.state.pageTitle = (title?.isEmpty == false) ? title : nil
+            }
+        }
+        let backObs = webView.observe(\.canGoBack, options: [.initial, .new]) { [weak self] wv, _ in
+            DispatchQueue.main.async { self?.viewModel.state.canGoBack = wv.canGoBack }
+        }
+        let fwdObs = webView.observe(\.canGoForward, options: [.initial, .new]) { [weak self] wv, _ in
+            DispatchQueue.main.async { self?.viewModel.state.canGoForward = wv.canGoForward }
+        }
+        navObservations = [urlObs, titleObs, backObs, fwdObs]
+    }
+
+    /// Observe browser chrome commands. Notifications are scoped to this tab's
+    /// view model via `object`, so multiple open browser tabs don't cross-fire.
+    func setupBrowserCommandObservers() {
+        guard isLiveMode else { return }
+        commandObservers.forEach { NotificationCenter.default.removeObserver($0) }
+        commandObservers = []
+
+        func observe(_ name: Notification.Name, _ action: @escaping (WKWebView, Notification) -> Void) {
+            let token = NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
+                guard let self,
+                      (note.object as AnyObject) === self.viewModel,
+                      let webView = self.webView else { return }
+                action(webView, note)
+            }
+            commandObservers.append(token)
+        }
+
+        observe(.webViewGoBack) { wv, _ in wv.goBack() }
+        observe(.webViewGoForward) { wv, _ in wv.goForward() }
+        observe(.webViewReload) { wv, _ in wv.reload() }
+        observe(.webViewStop) { wv, _ in wv.stopLoading() }
+        observe(.webViewLoadURL) { wv, note in
+            guard let url = note.userInfo?["url"] as? URL else { return }
+            wv.load(URLRequest(url: url))
+        }
+    }
+
     // MARK: - WKScriptMessageHandler
 
     func userContentController(
@@ -250,6 +327,22 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessageH
            let action = body["action"] as? String,
            action == "create" {
             persistWebHighlight(body)
+            return
+        }
+
+        // Captured login credentials → offer to save if new or changed.
+        if message.name == "passwordManager",
+           let body = message.body as? [String: Any],
+           body["action"] as? String == "capture",
+           let username = body["username"] as? String,
+           let password = body["password"] as? String,
+           !password.isEmpty,
+           let host = webView?.url?.host {
+            if PasswordStore.needsSave(host: host, username: username, password: password) {
+                viewModel.state.pendingPasswordSave = PendingPasswordSave(
+                    host: host, username: username, password: password
+                )
+            }
             return
         }
 
@@ -463,4 +556,11 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessageH
 extension Notification.Name {
     static let webViewScrollToHeading = Notification.Name("webViewScrollToHeading")
     static let webViewFindText = Notification.Name("webViewFindText")
+
+    // Browser chrome commands — posted with `object: viewModel` to scope to one tab.
+    static let webViewGoBack = Notification.Name("webViewGoBack")
+    static let webViewGoForward = Notification.Name("webViewGoForward")
+    static let webViewReload = Notification.Name("webViewReload")
+    static let webViewStop = Notification.Name("webViewStop")
+    static let webViewLoadURL = Notification.Name("webViewLoadURL")
 }

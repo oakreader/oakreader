@@ -12,9 +12,6 @@ enum QuizStyle {
         switch type {
         case .cloze:     return Color(red: 0.16, green: 0.68, blue: 0.63) // teal
         case .flashcard: return Color(red: 0.37, green: 0.44, blue: 0.93) // indigo
-        case .choice:    return Color(red: 0.95, green: 0.61, blue: 0.20) // amber
-        case .matching:  return Color(red: 0.91, green: 0.39, blue: 0.62) // pink
-        case .ordering:  return Color(red: 0.58, green: 0.40, blue: 0.92) // violet
         case .occlusion: return Color(red: 0.27, green: 0.72, blue: 0.45) // green
         }
     }

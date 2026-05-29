@@ -21,55 +21,22 @@ enum NoteEditorMode: String, CaseIterable {
     }
 }
 
-/// Note editor with Edit / Preview mode toggle.
-/// Replaces the old WYSIWYG WKWebView editor with a plain-text NSTextView
-/// and a Textual-based markdown preview.
+/// Note editor — Milkdown (Crepe) WYSIWYG hosted in a WKWebView.
+/// Markdown stays the source of truth; edits autosave through NotesViewModel.
 struct NoteEditorView: View {
     let notesVM: NotesViewModel
-
-    @AppStorage("noteEditorMode") private var currentModeRaw: String = "edit"
-    @AppStorage("noteEditorFontFamily") private var fontFamily = ".AppleSystemUIFont"
-    @AppStorage("noteEditorFontSize") private var fontSize: Double = 16
-    @AppStorage("noteEditorLineHeight") private var lineHeight: Double = 1.3
-    @AppStorage("noteEditorLineSpacing") private var lineSpacing: Double = 3.0
-    @AppStorage("noteEditorLetterSpacing") private var letterSpacing: Double = 0.5
-    @AppStorage("noteEditorAccentColor") private var accentColorHex: String = "#0CA69A"
-    @AppStorage("noteEditorFontOverridden") private var fontOverridden: Bool = false
-    @AppStorage("globalFontFamily") private var globalFontFamily: String = "system"
-    @AppStorage("globalFontSize") private var globalFontSize: Double = 14.0
-
-    @State private var editorCoordinator: MarkdownTextView.Coordinator?
-
-    private var currentMode: NoteEditorMode {
-        NoteEditorMode(rawValue: currentModeRaw) ?? .edit
-    }
-
-    private var effectiveFontFamily: String {
-        if fontOverridden { return fontFamily }
-        return FontFamily(rawValue: globalFontFamily)?.fontName ?? ".AppleSystemUIFont"
-    }
-
-    private var effectiveFontSize: CGFloat {
-        if fontOverridden { return CGFloat(fontSize) }
-        return CGFloat(globalFontSize)
-    }
-
-    private var editorFont: NSFont {
-        NSFont(name: effectiveFontFamily, size: effectiveFontSize)
-            ?? NSFont.systemFont(ofSize: effectiveFontSize)
-    }
 
     var body: some View {
         VStack(spacing: 0) {
             toolbar
 
-            switch currentMode {
-            case .edit:
-                editorPane
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            case .preview:
-                previewPane
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            if let noteId = notesVM.selectedNoteId {
+                MilkdownEditorView(
+                    notesVM: notesVM,
+                    noteId: noteId,
+                    onReferenceClick: handleReferenceClick
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
     }
@@ -92,18 +59,6 @@ struct NoteEditorView: View {
             .help("Back to notes list")
 
             Spacer()
-
-            // Mode toggle — segmented picker
-            Picker("Mode", selection: $currentModeRaw) {
-                ForEach(NoteEditorMode.allCases, id: \.rawValue) { mode in
-                    Image(systemName: mode.icon)
-                        .tag(mode.rawValue)
-                }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .frame(width: 60)
-            .help("Switch editor mode")
 
             // New note (compose)
             Button(action: { notesVM.createNote() }) {
@@ -143,46 +98,6 @@ struct NoteEditorView: View {
         }
         .padding(.horizontal, OakStyle.Spacing.sm)
         .padding(.vertical, OakStyle.Spacing.sm)
-    }
-
-    // MARK: - Editor Pane
-
-    private var editorPane: some View {
-        MarkdownTextView(
-            text: Binding(
-                get: { notesVM.editorContent },
-                set: { notesVM.editorContentDidChange($0) }
-            ),
-            font: editorFont,
-            lineHeight: CGFloat(lineHeight),
-            lineSpacing: CGFloat(lineSpacing),
-            letterSpacing: CGFloat(letterSpacing),
-            accentColorHex: accentColorHex,
-            onReferenceClick: handleReferenceClick,
-            onImagePaste: { data in notesVM.saveImage(data) },
-            onSelectionPopup: { screenPoint, text, range, textView in
-                MarkdownSelectionPopupPanel.show(
-                    at: screenPoint,
-                    text: text,
-                    range: range,
-                    textView: textView,
-                    viewModel: notesVM.parent
-                )
-            },
-            onCoordinatorReady: { coordinator in
-                editorCoordinator = coordinator
-            }
-        )
-    }
-
-    // MARK: - Preview Pane
-
-    private var previewPane: some View {
-        NotePreviewView(
-            content: notesVM.editorContent,
-            baseURL: notesVM.notesDirectoryURL,
-            onReferenceClick: handleReferenceClick
-        )
     }
 
     // MARK: - Reference Click

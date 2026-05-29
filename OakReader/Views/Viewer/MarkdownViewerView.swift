@@ -25,7 +25,7 @@ struct MarkdownViewerView: View {
     }
 
     private var effectiveFontFamily: String {
-        if fontOverridden { return fontFamily }
+        if fontOverridden { return Self.nsFontName(for: fontFamily) }
         return FontFamily(rawValue: globalFontFamily)?.fontName ?? ".AppleSystemUIFont"
     }
 
@@ -40,6 +40,19 @@ struct MarkdownViewerView: View {
     }
 
     private var isZenMode: Bool { viewModel.state.isZenMode }
+
+    private static func nsFontName(for value: String) -> String {
+        switch value {
+        case "", "default":
+            return "New York"
+        case "system":
+            return ".AppleSystemUIFont"
+        case "mono":
+            return "Menlo"
+        default:
+            return value
+        }
+    }
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
