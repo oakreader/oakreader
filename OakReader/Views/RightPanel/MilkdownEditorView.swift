@@ -11,6 +11,9 @@ struct MilkdownEditorView: View {
     let noteId: UUID
     var onReferenceClick: ((String) -> Void)?
 
+    /// Body-font choice from Settings ▸ Notes; observed so changes apply live.
+    @AppStorage("noteEditorFontFamily") private var noteFontFamily: String = "default"
+
     private var aiConfig: EditorAIConfig {
         let prefs = Preferences.shared
         let providerId = prefs.aiProviderId
@@ -25,6 +28,7 @@ struct MilkdownEditorView: View {
             content: notesVM.editorContent,
             identity: noteId,
             theme: .auto,
+            fontFamily: Self.cssFontStack(noteFontFamily),
             aiConfig: aiConfig,
             resourceBaseURL: notesVM.notesDirectoryURL,
             onChange: { notesVM.editorContentDidChange($0) },
@@ -43,6 +47,23 @@ struct MilkdownEditorView: View {
             },
             onSelectionCleared: { NoteSelectionPopupPanel.dismissCurrent() }
         )
+    }
+
+    /// Map a Settings ▸ Notes font choice to a CSS font-family stack for the
+    /// editor. `nil` keeps the theme's default serif. Picker values are either
+    /// sentinels ("default"/"system"/"mono") or a literal installed font name.
+    static func cssFontStack(_ family: String) -> String? {
+        switch family {
+        case "", "default":
+            return nil
+        case "system", ".AppleSystemUIFont":
+            return "-apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'PingFang SC', sans-serif"
+        case "mono":
+            return "'PT Mono', ui-monospace, 'SF Mono', Menlo, monospace"
+        default:
+            // A specific installed family; keep serif fallbacks for missing glyphs.
+            return "'\(family)', 'PT Serif', Georgia, serif"
+        }
     }
 
     private static let systemPrompt = """

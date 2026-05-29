@@ -11,7 +11,7 @@
 import { Crepe } from '@milkdown/crepe'
 import { editorViewCtx, commandsCtx } from '@milkdown/kit/core'
 import { replaceAll, $prose } from '@milkdown/kit/utils'
-import { Plugin, PluginKey, TextSelection } from '@milkdown/kit/prose/state'
+import { Plugin, PluginKey } from '@milkdown/kit/prose/state'
 import { Decoration, DecorationSet } from '@milkdown/kit/prose/view'
 
 import '@milkdown/crepe/theme/common/style.css'
@@ -31,6 +31,20 @@ function log(msg: string) {
 //   window.__OAK_NOTES_BASE__ = "file:///Users/.../OakReader/notes/"
 function notesBase(): string {
   return (window as unknown as { __OAK_NOTES_BASE__?: string }).__OAK_NOTES_BASE__ ?? ''
+}
+
+// Body font (a CSS font-family stack) injected by Swift; empty = theme default.
+function noteFont(): string {
+  return (window as unknown as { __OAK_NOTE_FONT__?: string }).__OAK_NOTE_FONT__ ?? ''
+}
+
+// Override the theme's --type-font-main on the .milkdown element (inline style
+// beats the theme rule + [data-font] presets). Empty restores the theme serif.
+function applyFont(css: string) {
+  const el = document.querySelector('.milkdown') as HTMLElement | null
+  if (!el) return
+  if (css) el.style.setProperty('--type-font-main', css)
+  else el.style.removeProperty('--type-font-main')
 }
 
 // --- AI provider: stream chunks from OakAI through Swift -----------------
@@ -93,11 +107,11 @@ const aiProvider = async function* (
 
 // Notion-style preset actions surfaced in the native AI tooltip.
 const PRESETS: Array<{ id: string; icon: string; label: string; prompt: string }> = [
-  { id: 'grammar', icon: '✓', label: '修正拼写和语法', prompt: 'Fix spelling and grammar' },
-  { id: 'improve', icon: '✦', label: '改善写作', prompt: 'Improve writing' },
-  { id: 'shorter', icon: '⊟', label: '更简洁', prompt: 'Make it more concise' },
-  { id: 'continue', icon: '⤳', label: '续写', prompt: 'Continue writing from here' },
-  { id: 'translate', icon: '⇄', label: '翻译成中文', prompt: 'Translate to Chinese' },
+  { id: 'grammar', icon: '✓', label: 'Fix spelling & grammar', prompt: 'Fix spelling and grammar' },
+  { id: 'improve', icon: '✦', label: 'Improve writing', prompt: 'Improve writing' },
+  { id: 'shorter', icon: '⊟', label: 'Make it more concise', prompt: 'Make it more concise' },
+  { id: 'continue', icon: '⤳', label: 'Continue writing', prompt: 'Continue writing from here' },
+  { id: 'translate', icon: '⇄', label: 'Translate to Chinese', prompt: 'Translate to Chinese' },
 ]
 
 // --- Image upload: hand bytes to Swift, get back a relative path ---------
@@ -215,7 +229,10 @@ async function main() {
       [Crepe.Feature.LinkTooltip]: true,
       [Crepe.Feature.Cursor]: true,
       [Crepe.Feature.ImageBlock]: true,
-      [Crepe.Feature.BlockEdit]: true,
+      // Slash menu + block drag handle are OFF — markdown input rules
+      // (#, -, 1., >, ---, ```, $$) cover block creation, so the `/` menu was
+      // redundant. (Disabling BlockEdit removes both the menu and the handle.)
+      [Crepe.Feature.BlockEdit]: false,
       // Crepe's built-in selection toolbar is OFF — the host shows its own
       // native glass popup (matching the rest of the app) and triggers AI via
       // window.oakEditor.runAI(), which still runs Crepe's RunAI + diff-review.
@@ -227,7 +244,7 @@ async function main() {
     },
     featureConfigs: {
       [Crepe.Feature.Placeholder]: {
-        text: '开始记笔记…  输入 / 唤起命令，选中文本召唤 AI',
+        text: 'Start writing…  type / for commands, select text to call AI',
       },
       [Crepe.Feature.ImageBlock]: {
         onUpload: uploadImage,
@@ -238,11 +255,11 @@ async function main() {
       [Crepe.Feature.AI]: {
         provider: aiProvider,
         diffReviewOnEnd: true,
-        instructionPlaceholder: '让 AI 帮你修改…（如：改善写作）',
+        instructionPlaceholder: 'Ask AI to edit… (e.g. improve writing)',
         diffActions: {
-          acceptAllLabel: '全部接受',
-          rejectAllLabel: '全部拒绝',
-          retryLabel: '重试',
+          acceptAllLabel: 'Accept all',
+          rejectAllLabel: 'Reject all',
+          retryLabel: 'Retry',
         },
         buildAISuggestions: (builder) => {
           for (const p of PRESETS) {
@@ -257,6 +274,9 @@ async function main() {
   crepe.editor.use(referenceDecorationPlugin)
 
   await crepe.create()
+
+  // Apply the host-injected body font now that .milkdown exists.
+  applyFont(noteFont())
 
   crepe.on((listener) => {
     listener.markdownUpdated((_ctx, markdown) => {
@@ -329,6 +349,9 @@ const oakEditor = {
   setTheme(theme: 'light' | 'dark') {
     document.documentElement.setAttribute('data-theme', theme)
   },
+  setFont(css: string) {
+    applyFont(css)
+  },
   focus() {
     crepe?.editor.action((c) => {
       try { c.get(editorViewCtx).focus() } catch { /* not ready */ }
@@ -344,19 +367,6 @@ const oakEditor = {
       } catch (e) {
         log('runAI error: ' + ((e as Error)?.message ?? String(e)))
       }
-    })
-  },
-  // Dev/harness helper: open the slash menu by inserting "/" in a fresh block.
-  __openSlash() {
-    crepe?.editor.action((c) => {
-      const view = c.get(editorViewCtx)
-      view.focus()
-      const end = view.state.doc.content.size
-      const para = view.state.schema.nodes.paragraph.create()
-      let tr = view.state.tr.insert(end, para)
-      tr = tr.setSelection(TextSelection.near(tr.doc.resolve(end + 1)))
-      view.dispatch(tr)
-      view.dispatch(view.state.tr.insertText('/', view.state.selection.from))
     })
   },
   // AI stream callbacks (Swift -> JS)

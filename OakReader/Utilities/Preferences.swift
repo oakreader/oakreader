@@ -174,7 +174,7 @@ final class Preferences {
             Keys.aiProvider: "anthropic",
             Keys.aiModel: "",
             Keys.noteEditorMode: "edit",
-            Keys.noteEditorFontFamily: ".AppleSystemUIFont",
+            Keys.noteEditorFontFamily: "default",
             Keys.noteEditorFontSize: 16.0,
             Keys.noteEditorCodeFontFamily: "Menlo",
             Keys.noteEditorLineHeight: 1.3,
@@ -300,7 +300,8 @@ final class Preferences {
 
         let currentFont = defaults.string(forKey: Keys.noteEditorFontFamily) ?? ".AppleSystemUIFont"
         let currentSize = defaults.double(forKey: Keys.noteEditorFontSize)
-        if currentFont != ".AppleSystemUIFont" || (currentSize != 0 && currentSize != 16.0) {
+        let defaultFontValues: Set<String> = ["", ".AppleSystemUIFont", "default", "system"]
+        if !defaultFontValues.contains(currentFont) || (currentSize != 0 && currentSize != 16.0) {
             defaults.set(true, forKey: Keys.noteEditorFontOverridden)
         }
     }
@@ -404,7 +405,7 @@ final class Preferences {
     }
 
     var noteEditorFontFamily: String {
-        get { defaults.string(forKey: Keys.noteEditorFontFamily) ?? ".AppleSystemUIFont" }
+        get { defaults.string(forKey: Keys.noteEditorFontFamily) ?? "default" }
         set { defaults.set(newValue, forKey: Keys.noteEditorFontFamily) }
     }
 
