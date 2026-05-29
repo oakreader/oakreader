@@ -45,6 +45,8 @@ final class CommandPaletteController: NSObject, CommandPalettePanelDelegate {
         case .html:     return [.always, .html]
         case .markdown: return [.always, .markdown]
         case .media:    return [.always, .media]
+        case .web:      return [.always, .media]
+        case .newTab:   return [.always]
         }
     }
 

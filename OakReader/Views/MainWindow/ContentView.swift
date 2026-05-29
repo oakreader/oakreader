@@ -36,13 +36,15 @@ struct ContentView: View {
 
                 // Main content column
                 VStack(spacing: 0) {
-                    if viewModel.contentType == .link {
+                    if viewModel.contentType == .link && !viewModel.isNewTab {
                         Spacer().frame(height: 8)
                     }
 
                     // Main content area
                     ZStack {
-                        if viewModel.hasDocument {
+                        if viewModel.isNewTab {
+                            NewTabView(viewModel: viewModel)
+                        } else if viewModel.hasDocument {
                             mainContentView
                         } else {
                             emptyStateView
@@ -123,6 +125,8 @@ struct ContentView: View {
     private var sidebarContentView: some View {
         if viewModel.contentType == .markdown {
             MarkdownOutlineSidebarView(viewModel: viewModel)
+        } else if viewModel.contentType == .link {
+            WebTOCSidebarView(viewModel: viewModel)
         } else {
             SidebarView(viewModel: viewModel)
         }

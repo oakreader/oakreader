@@ -10,6 +10,11 @@ enum TabContent {
     case html(HTMLDocument)
     case media(MediaDocument)
     case markdown(MarkdownDocument)
+    /// A transient live web page opened from the new-tab router (no library item).
+    case web(URL)
+    /// A blank new-tab page showing the Dia-style router omnibox. Becomes `.web`
+    /// once the user picks a destination (navigated in place).
+    case newTab
 }
 
 // MARK: - Document Tab
@@ -17,7 +22,9 @@ enum TabContent {
 @Observable
 final class DocumentTab: Identifiable {
     let id: UUID
-    let content: TabContent
+    /// Mutable so a `.newTab` page can navigate in place into `.web` once a
+    /// destination is chosen, keeping share/command context accurate.
+    var content: TabContent
     let viewModel: DocumentViewModel
     var title: String
     /// Storage key for this document's managed directory (nil for unsaved/blank documents).
@@ -64,6 +71,25 @@ final class DocumentTab: Identifiable {
         self.viewModel = DocumentViewModel(markdown: markdown)
         self.title = markdown.fileURL.deletingPathExtension().lastPathComponent
         self.storageKey = storageKey
+    }
+
+    /// A transient live web tab opened from the new-tab router. Holds only a URL —
+    /// nothing is persisted to the library.
+    init(webURL: URL) {
+        self.id = UUID()
+        self.content = .web(webURL)
+        self.viewModel = DocumentViewModel(liveURL: webURL)
+        self.title = webURL.host ?? webURL.absoluteString
+        self.storageKey = nil
+    }
+
+    /// A blank new-tab page (Dia-style router omnibox).
+    init(newTab: Bool) {
+        self.id = UUID()
+        self.content = .newTab
+        self.viewModel = DocumentViewModel(newTabPlaceholder: true)
+        self.title = "New Tab"
+        self.storageKey = nil
     }
 
 }
@@ -296,6 +322,19 @@ final class AppState {
             Log.error(Log.open, "Failed to open markdown: \(url.lastPathComponent) — \(error)")
             NSAlert(error: error).runModal()
         }
+    }
+
+    /// Open an arbitrary URL as a transient live web tab (from the new-tab router).
+    /// Nothing is imported into the library; the page loads directly in the web viewer.
+    func openWebTab(url: URL) {
+        let tab = DocumentTab(webURL: url)
+        tab.viewModel.database = libraryStore.database
+        tab.viewModel.referenceService = referenceService
+        tab.viewModel.libraryStore = libraryStore
+        tab.viewModel.appState = self
+        openTabs.append(tab)
+        activeTabID = tab.id
+        updateWindowTitle()
     }
 
     /// Open an HTML document.
@@ -590,6 +629,42 @@ final class AppState {
         activeTabID = nil
         librarySurface = .browse
         updateWindowTitle()
+    }
+
+    /// Open a real new tab showing the Dia-style router omnibox (browser-style:
+    /// a "New Tab" chip appears in the strip and becomes active).
+    func openNewTab() {
+        let tab = DocumentTab(newTab: true)
+        tab.viewModel.database = libraryStore.database
+        tab.viewModel.referenceService = referenceService
+        tab.viewModel.libraryStore = libraryStore
+        tab.viewModel.appState = self
+        openTabs.append(tab)
+        activeTabID = tab.id
+        updateWindowTitle()
+    }
+
+    /// Execute a new-tab router decision made from the omnibox in `viewModel`'s tab.
+    /// Navigate/search turn that same tab into a live web page (in place, like a
+    /// browser); ask hands the text to a fresh agent chat and drops the new tab.
+    @MainActor
+    func routeNewTab(_ route: BrowserSession.Route, from viewModel: DocumentViewModel) {
+        switch route {
+        case .navigate(let url), .search(let url):
+            viewModel.liveURL = url
+            viewModel.isNewTab = false
+            if let tab = openTabs.first(where: { $0.viewModel === viewModel }) {
+                tab.content = .web(url)
+                tab.title = url.host ?? url.absoluteString
+            }
+            updateWindowTitle()
+        case .ask(let text):
+            let newTabID = openTabs.first(where: { $0.viewModel === viewModel })?.id
+            openAgentWorkspace(newSession: true)
+            libraryChatVM.inputText = text
+            libraryChatVM.send()
+            if let id = newTabID { closeTab(id) }
+        }
     }
 
     /// Show the full-page AI agent workspace. Optionally start a fresh chat session.

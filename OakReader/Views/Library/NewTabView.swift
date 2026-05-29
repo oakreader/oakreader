@@ -1,0 +1,283 @@
+import SwiftUI
+
+/// Dia-style new-tab router. A centered unified omnibox that resolves typed text
+/// to one of three destinations — navigate to a URL, run a web search (Google),
+/// or hand the text to the AI agent. As the user types, the candidate routes show
+/// as a suggestion list with the auto-classified intent highlighted; the submit
+/// button is relabeled to the selected action. Matches Dia 1.33's Cmd+T page.
+struct NewTabView: View {
+    let viewModel: DocumentViewModel
+
+    @State private var text: String = ""
+    @State private var selectedIndex: Int = 0
+    @State private var fieldFocused: Bool = false
+
+    private let contentWidth: CGFloat = 640
+
+    private var routes: [BrowserSession.Route] {
+        BrowserSession.routes(for: text)
+    }
+
+    private var selectedRoute: BrowserSession.Route? {
+        let r = routes
+        guard !r.isEmpty else { return nil }
+        return r[min(selectedIndex, r.count - 1)]
+    }
+
+    var body: some View {
+        VStack(spacing: 18) {
+            Spacer()
+            OakAppIcon(size: 44)
+
+            omnibox
+                .frame(maxWidth: contentWidth)
+
+            if text.isEmpty {
+                Text("Search the web, open a link, or ask the AI.")
+                    .font(OakStyle.Font.styled(size: 13))
+                    .foregroundStyle(.tertiary)
+            }
+            Spacer()
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { fieldFocused = true }
+        }
+        .onChange(of: text) { _, _ in selectedIndex = 0 }
+    }
+
+    // MARK: - Omnibox
+
+    private var omnibox: some View {
+        VStack(spacing: 0) {
+            // Input row
+            HStack(spacing: 12) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 16, weight: .regular))
+                    .foregroundStyle(.tertiary)
+                OmniboxField(
+                    text: $text,
+                    isFocused: $fieldFocused,
+                    placeholder: "Ask anything…",
+                    font: OakStyle.Font.nsFont(size: 20),
+                    onMoveUp: { moveSelection(-1) },
+                    onMoveDown: { moveSelection(1) },
+                    onSubmit: submit
+                )
+                .frame(maxWidth: .infinity)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 18)
+
+            if !routes.isEmpty {
+                Divider().overlay(OakStyle.Colors.diaHairline)
+
+                // Suggestions
+                VStack(spacing: 2) {
+                    ForEach(Array(routes.enumerated()), id: \.element.id) { index, route in
+                        suggestionRow(route, isSelected: index == min(selectedIndex, routes.count - 1))
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                selectedIndex = index
+                                submit()
+                            }
+                    }
+                }
+                .padding(8)
+
+                // Action row
+                HStack {
+                    Spacer()
+                    submitButton
+                }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 12)
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 22)
+                .fill(Color(nsColor: .textBackgroundColor))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 22)
+                .stroke(OakStyle.Colors.diaHairline, lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.06), radius: 10, y: 3)
+    }
+
+    private func suggestionRow(_ route: BrowserSession.Route, isSelected: Bool) -> some View {
+        HStack(spacing: 10) {
+            rowIcon(for: route)
+                .frame(width: 18)
+            rowLabel(for: route)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            Spacer(minLength: 8)
+            Text(actionLabel(for: route))
+                .font(OakStyle.Font.styled(size: 11, weight: .medium))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(isSelected ? Color.primary.opacity(0.06) : .clear)
+        )
+    }
+
+    @ViewBuilder
+    private func rowLabel(for route: BrowserSession.Route) -> some View {
+        switch route {
+        case .ask, .search:
+            Text(text)
+                .font(OakStyle.Font.styled(size: 14))
+                .foregroundStyle(.primary)
+        case .navigate(let url):
+            HStack(spacing: 0) {
+                Text("Go to ")
+                    .foregroundStyle(.secondary)
+                Text(url.host ?? url.absoluteString)
+                    .foregroundStyle(.primary)
+            }
+            .font(OakStyle.Font.styled(size: 14))
+        }
+    }
+
+    private var submitButton: some View {
+        Button(action: submit) {
+            HStack(spacing: 5) {
+                Text(selectedRoute.map(actionLabel) ?? "Go")
+                    .font(OakStyle.Font.styled(size: 13, weight: .medium))
+                Image(systemName: "return")
+                    .font(.system(size: 11, weight: .semibold))
+            }
+            .foregroundStyle(Color(nsColor: .textBackgroundColor))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(Capsule().fill(text.isEmpty ? Color.gray.opacity(0.35) : Color.primary))
+        }
+        .buttonStyle(.plain)
+        .disabled(text.isEmpty)
+    }
+
+    // MARK: - Labels & icons
+
+    @ViewBuilder
+    private func rowIcon(for route: BrowserSession.Route) -> some View {
+        switch route {
+        case .ask:
+            // The ask route is answered by Oak (the agent), so brand it with the
+            // app icon rather than a generic chat-bubble symbol.
+            OakAppIcon(size: 16)
+        case .search:
+            symbolIcon("magnifyingglass")
+        case .navigate:
+            symbolIcon("globe")
+        }
+    }
+
+    private func symbolIcon(_ name: String) -> some View {
+        Image(systemName: name)
+            .font(.system(size: 14, weight: .regular))
+            .foregroundStyle(.secondary)
+    }
+
+    private func actionLabel(for route: BrowserSession.Route) -> String {
+        switch route {
+        case .ask: return "Oak"
+        case .search: return "Google"
+        case .navigate: return "Go"
+        }
+    }
+
+    // MARK: - Actions
+
+    private func moveSelection(_ delta: Int) {
+        let count = routes.count
+        guard count > 0 else { return }
+        selectedIndex = max(0, min(count - 1, selectedIndex + delta))
+    }
+
+    private func submit() {
+        guard let route = selectedRoute else { return }
+        viewModel.appState?.routeNewTab(route, from: viewModel)
+        text = ""
+        selectedIndex = 0
+    }
+}
+
+// MARK: - AppKit-backed omnibox field
+//
+// A plain SwiftUI `TextField` swallows ↑/↓ in its field editor (the keys move the
+// caret to the start/end of the text), so they never reach `.onKeyPress`. We back
+// the field with `NSTextField` and intercept the editor's `moveUp:`/`moveDown:`/
+// `insertNewline:` selectors to drive suggestion-list navigation instead.
+private struct OmniboxField: NSViewRepresentable {
+    @Binding var text: String
+    @Binding var isFocused: Bool
+    let placeholder: String
+    let font: NSFont
+    let onMoveUp: () -> Void
+    let onMoveDown: () -> Void
+    let onSubmit: () -> Void
+
+    func makeNSView(context: Context) -> NSTextField {
+        let field = NSTextField()
+        field.delegate = context.coordinator
+        field.isBordered = false
+        field.drawsBackground = false
+        field.focusRingType = .none
+        field.font = font
+        field.placeholderString = placeholder
+        field.usesSingleLineMode = true
+        field.lineBreakMode = .byTruncatingTail
+        field.cell?.isScrollable = true
+        field.stringValue = text
+        field.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        return field
+    }
+
+    func updateNSView(_ field: NSTextField, context: Context) {
+        context.coordinator.parent = self
+        if field.stringValue != text { field.stringValue = text }
+        field.font = font
+
+        if isFocused,
+           let window = field.window,
+           window.firstResponder !== field.currentEditor() {
+            window.makeFirstResponder(field)
+        }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    final class Coordinator: NSObject, NSTextFieldDelegate {
+        var parent: OmniboxField
+        init(_ parent: OmniboxField) { self.parent = parent }
+
+        func controlTextDidChange(_ obj: Notification) {
+            guard let field = obj.object as? NSTextField else { return }
+            parent.text = field.stringValue
+        }
+
+        func control(
+            _ control: NSControl,
+            textView: NSTextView,
+            doCommandBy commandSelector: Selector
+        ) -> Bool {
+            switch commandSelector {
+            case #selector(NSResponder.moveUp(_:)):
+                parent.onMoveUp(); return true
+            case #selector(NSResponder.moveDown(_:)):
+                parent.onMoveDown(); return true
+            case #selector(NSResponder.insertNewline(_:)):
+                parent.onSubmit(); return true
+            default:
+                return false
+            }
+        }
+    }
+}

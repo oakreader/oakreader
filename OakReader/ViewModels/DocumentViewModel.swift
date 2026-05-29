@@ -14,6 +14,9 @@ class DocumentViewModel {
     var markdownContent: String = ""
     /// When set, the viewer loads this URL directly instead of local HTML (used for `.link` embeds).
     var liveURL: URL?
+    /// True while this tab is showing the blank new-tab router omnibox (before a
+    /// destination is picked). Cleared when the tab navigates in place.
+    var isNewTab: Bool = false
     var contentType: ContentType
     var state: DocumentState
     /// Database reference, set by AppState when the tab is created.
@@ -152,7 +155,7 @@ class DocumentViewModel {
         switch contentType {
         case .pdf: return pdfDocument != nil
         case .html: return html != nil
-        case .link: return mediaDocument != nil
+        case .link: return mediaDocument != nil || liveURL != nil
         case .markdown: return markdownDocument != nil
         case .audio: return false
         }
@@ -217,6 +220,24 @@ class DocumentViewModel {
         self.contentType = .markdown
         self.state = DocumentState()
         state.isSidebarVisible = true
+    }
+
+    /// A transient live web page (no `MediaDocument`/library item). The `.link`
+    /// content path renders `liveURL` directly in the web viewer.
+    init(liveURL: URL) {
+        self.contentType = .link
+        self.liveURL = liveURL
+        self.state = DocumentState()
+        state.isSidebarVisible = false
+    }
+
+    /// A blank new-tab page (Dia-style router omnibox). `contentType` is `.link`
+    /// so navigating in place (setting `liveURL`) turns it into a live web page.
+    init(newTabPlaceholder: Bool) {
+        self.contentType = .link
+        self.isNewTab = true
+        self.state = DocumentState()
+        state.isSidebarVisible = false
     }
 
     // MARK: - Action Handling (called directly by AppState)

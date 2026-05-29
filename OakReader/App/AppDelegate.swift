@@ -6,7 +6,7 @@ import UniformTypeIdentifiers
 import SwiftUI
 import OakVoice
 
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     let documentController = PDFDocumentController()
     let appState = AppState()
     #if DEBUG
@@ -415,6 +415,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         appState.activeTab?.document?.printDocument(sender)
     }
 
+    @objc func newTab(_ sender: Any?) {
+        appState.openNewTab()
+    }
+
     @objc func closeTab(_ sender: Any?) {
         if !appState.isLibraryActive {
             appState.closeActiveTab()
@@ -723,6 +727,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 shareItems.append(doc.sourceURL)
             case .markdown(let doc):
                 shareItems.append(doc.fileURL)
+            case .web(let url):
+                shareItems.append(url)
+            case .newTab:
+                break
             }
         } else if let item = appState.selectedLibraryItem {
             if let sourceURL = item.sourceURL {
@@ -743,6 +751,38 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         appState.dispatchAction(action)
         // Also post notification for ContentView sheet handling
         NotificationCenter.default.post(name: .documentAction, object: action)
+    }
+
+    // MARK: - Menu Validation
+
+    /// Gates the page-navigation actions, which are bound to the bare ↑/↓ keys.
+    /// NSApplication resolves main-menu key equivalents *before* the keyDown reaches
+    /// the first responder, so an always-enabled "Previous/Next Page" item lets the
+    /// menu swallow bare ↑/↓ app-wide — stealing them from the new-tab omnibox or any
+    /// focused text field. Page flipping only applies to a paged (PDF) document and
+    /// never while the user is editing text, so the items are disabled otherwise; a
+    /// disabled item's key equivalent is not consumed, letting the arrows through.
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        guard menuItem.action == #selector(menuAction(_:)),
+              let actionName = menuItem.representedObject as? String,
+              let action = DocumentAction(rawValue: actionName) else {
+            return true
+        }
+
+        switch action {
+        case .previousPage, .nextPage, .firstPage, .lastPage:
+            guard !isEditingText, case .pdf = appState.activeTab?.content else { return false }
+            return true
+        default:
+            return true
+        }
+    }
+
+    /// True when a text-editing view holds focus. A focused `NSTextField` surfaces
+    /// its field editor (an `NSTextView`, hence `NSText`) as the window's first
+    /// responder, so this covers plain fields as well as `NSTextView`s.
+    private var isEditingText: Bool {
+        NSApp.keyWindow?.firstResponder is NSText
     }
 
 }

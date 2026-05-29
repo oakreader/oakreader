@@ -193,6 +193,17 @@ struct HTMLViewerRepresentable: NSViewRepresentable {
                     sendInfo(info);
                     if (info) startTracking();
                 });
+
+                // Authoritative dismiss signal: when the selection collapses to empty
+                // (e.g. clicking into an input or anywhere in the page), tell the native
+                // side to tear down the toolbar. Scroll never fires selectionchange nor
+                // collapses the selection, so this won't flicker mid-scroll.
+                document.addEventListener('selectionchange', function() {
+                    var sel = window.getSelection();
+                    if (!sel || sel.isCollapsed || sel.toString() === '') {
+                        window.webkit.messageHandlers.textSelected.postMessage({ text: '', cleared: true });
+                    }
+                });
             })();
             """,
             injectionTime: .atDocumentEnd,
@@ -311,6 +322,9 @@ struct HTMLViewerRepresentable: NSViewRepresentable {
         }
 
         let webView = OakWebView(frame: .zero, configuration: config)
+        // Present a complete Safari UA so UA-sniffing sites (Google, YouTube, …)
+        // serve their modern desktop layout instead of the legacy fallback.
+        webView.customUserAgent = BrowserSession.userAgent
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator
         webView.allowsMagnification = true

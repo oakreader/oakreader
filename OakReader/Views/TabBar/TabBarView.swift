@@ -65,11 +65,7 @@ struct TabBarView: View {
             // trailing edge so the pill width stays consistent with its sibling.
             if appState.isAgentTabOpen {
                 HStack(spacing: 6) {
-                    Image("MenuBarIcon")
-                        .renderingMode(.template)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: OakStyle.Font.icon, height: OakStyle.Font.icon)
+                    OakAppIcon(size: OakStyle.Font.icon)
                     Text("Agent")
                         .font(OakStyle.Font.styled(size: OakStyle.Font.body, weight: .regular))
                         .lineLimit(1)
@@ -106,21 +102,6 @@ struct TabBarView: View {
                 .help("AI Agent workspace")
             }
 
-            // New agent chat
-            Button {
-                appState.openAgentWorkspace(newSession: true)
-            } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 14, weight: .medium))
-                    .frame(width: 28, height: 28)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(Color(nsColor: .secondaryLabelColor))
-            .help("New agent chat")
-            .padding(.leading, appState.isAgentTabOpen ? 0 : 4)
-            .padding(.trailing, 8)
-
             if !appState.openTabs.isEmpty || appState.quizReviewSession != nil {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 0) {
@@ -144,7 +125,25 @@ struct TabBarView: View {
                         }
                     }
                 }
+                .layoutPriority(-1)
             }
+
+            // New tab (Dia-style router: navigate / search / ask) — sits at the
+            // end of the tab strip, like a browser's "+".
+            Button {
+                appState.openNewTab()
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 14, weight: .medium))
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+            .help("New Tab")
+            .accessibilityLabel("New Tab")
+            .padding(.leading, 4)
+            .padding(.trailing, 8)
 
             Spacer(minLength: 0)
 

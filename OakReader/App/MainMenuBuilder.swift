@@ -113,6 +113,17 @@ enum MainMenuBuilder {
     private static func buildFileMenu(target: AppDelegate) -> NSMenuItem {
         let fileMenu = NSMenu(title: "File")
 
+        let newTabItem = NSMenuItem(
+            title: "New Tab",
+            action: #selector(AppDelegate.newTab(_:)),
+            keyEquivalent: "t"
+        )
+        newTabItem.target = target
+        newTabItem.image = icon("plus")
+        fileMenu.addItem(newTabItem)
+
+        fileMenu.addItem(.separator())
+
         let openItem = NSMenuItem(
             title: "Open...",
             action: #selector(AppDelegate.openDocument(_:)),

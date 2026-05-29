@@ -234,6 +234,47 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
             self?.restoreSavedHighlights()
         }
         autofillSavedCredentials()
+        extractTableOfContents()
+    }
+
+    // MARK: - Table of Contents
+
+    /// Walks the live page's heading elements, tagging any without an id so the
+    /// sidebar can scroll back to them, and mirrors the outline into DocumentState.
+    private static let tocExtractionJS = """
+    (function () {
+      try {
+        var nodes = document.querySelectorAll('h1,h2,h3,h4,h5,h6');
+        var out = [];
+        var i = 0;
+        for (var n = 0; n < nodes.length; n++) {
+          var el = nodes[n];
+          var style = window.getComputedStyle(el);
+          if (!style || style.display === 'none' || style.visibility === 'hidden') continue;
+          var text = (el.innerText || el.textContent || '').trim();
+          if (!text) continue;
+          if (text.length > 200) { text = text.substring(0, 200); }
+          if (!el.id) { el.id = 'oak-toc-' + i; }
+          out.push({ level: parseInt(el.tagName.substring(1), 10), title: text, elementId: el.id });
+          i++;
+        }
+        return JSON.stringify(out);
+      } catch (e) { return '[]'; }
+    })();
+    """
+
+    private func extractTableOfContents() {
+        guard isLiveMode, let webView else { return }
+        webView.evaluateJavaScript(Self.tocExtractionJS) { [weak self] result, _ in
+            guard let self else { return }
+            guard let json = result as? String,
+                  let data = json.data(using: .utf8),
+                  let headings = try? JSONDecoder().decode([WebHeading].self, from: data) else {
+                self.viewModel.state.tableOfContents = []
+                return
+            }
+            self.viewModel.state.tableOfContents = headings
+        }
     }
 
     /// Fill the first saved credential for the current host into the page's login form.
@@ -324,6 +365,28 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
             guard let url = note.userInfo?["url"] as? URL else { return }
             wv.load(URLRequest(url: url))
         }
+        observe(.webViewScrollToTOC) { wv, note in
+            guard let elementId = note.userInfo?["id"] as? String else { return }
+            let escaped = elementId
+                .replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "'", with: "\\'")
+            let js = """
+            (function() {
+                var el = document.getElementById('\(escaped)');
+                if (!el) return;
+                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                var prevOutline = el.style.outline;
+                var prevOffset = el.style.outlineOffset;
+                el.style.outline = '2px solid rgba(255,190,30,0.9)';
+                el.style.outlineOffset = '2px';
+                setTimeout(function() {
+                    el.style.outline = prevOutline;
+                    el.style.outlineOffset = prevOffset;
+                }, 1600);
+            })();
+            """
+            wv.evaluateJavaScript(js, completionHandler: nil)
+        }
     }
 
     // MARK: - WKScriptMessageHandler
@@ -381,8 +444,18 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
 
         viewModel.state.selectedText = text.isEmpty ? nil : text
 
-        // Don't dismiss popup on empty text — the mouse monitor handles dismissal on click.
-        // This prevents the popup from vanishing during scroll when the selection briefly clears.
+        // A genuine selection clear (collapsed selection, e.g. clicking into an input)
+        // arrives flagged as `cleared` — dismiss the orphaned toolbar. Unflagged empty
+        // messages are still ignored so the popup doesn't vanish when the selection
+        // briefly clears mid-scroll; the mouse monitor handles outside-click dismissal.
+        if text.isEmpty {
+            if body["cleared"] as? Bool == true {
+                HTMLSelectionPopupPanel.dismissCurrent()
+                removeMouseMonitor()
+            }
+            return
+        }
+
         guard !text.isEmpty,
               let x = body["x"] as? CGFloat,
               let y = body["y"] as? CGFloat,
@@ -574,4 +647,5 @@ extension Notification.Name {
     static let webViewReload = Notification.Name("webViewReload")
     static let webViewStop = Notification.Name("webViewStop")
     static let webViewLoadURL = Notification.Name("webViewLoadURL")
+    static let webViewScrollToTOC = Notification.Name("webViewScrollToTOC")
 }

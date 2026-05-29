@@ -28,6 +28,10 @@ class DocumentState {
     var canGoBack: Bool = false
     var canGoForward: Bool = false
 
+    /// Heading outline extracted from the live web page's DOM, shown in the
+    /// left sidebar for `.link` tabs. Rebuilt on each navigation finish.
+    var tableOfContents: [WebHeading] = []
+
     /// A captured login awaiting the user's decision to save it. Drives the
     /// save-password banner in BrowserChromeView.
     var pendingPasswordSave: PendingPasswordSave?
