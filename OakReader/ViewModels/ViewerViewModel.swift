@@ -195,6 +195,88 @@ class ViewerViewModel {
         }
     }
 
+    /// Find and transiently highlight a citation's `text` (best-effort, tolerant of the
+    /// model wrapping a verbatim phrase in extra descriptive words). Prefers the cited
+    /// `page` (0-based) when the phrase recurs. The highlight is a temporary, non-persisted
+    /// annotation that lingers for `citationHighlightDuration` and survives clicks — it is
+    /// never written to the DB nor marks the document edited.
+    func highlightCitation(text: String, page: Int?) async {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let doc = pdfDocument else { return }
+
+        let results = await Task.detached { [trimmed, page] () -> [PDFSelection] in
+            doc.searchTolerant(trimmed, preferredPage: page)
+        }.value
+
+        await MainActor.run {
+            guard let selection = results.first, let firstPage = selection.pages.first else { return }
+            goToPage(doc.index(for: firstPage))
+            flashCitationHighlight(selection)
+        }
+    }
+
+    // MARK: - Citation Highlight (temporary, non-persisted)
+
+    /// The passage a citation click is currently highlighting. Drives a one-shot scroll
+    /// into view in `PDFViewerRepresentable` (the visible mark is the annotation below).
+    var citationHighlight: PDFSelection?
+    /// Bumped on each citation click so the viewer recentres on the new passage exactly once.
+    var citationHighlightSeq: Int = 0
+
+    private var citationAnnotations: [(page: PDFPage, annotation: PDFAnnotation)] = []
+    private var citationHighlightToken = 0
+
+    /// How long a citation highlight stays on screen. Generous so the reader has time to
+    /// find the passage; because it's an annotation (not a PDFView selection) it survives
+    /// clicks rather than vanishing on the first interaction.
+    private let citationHighlightDuration: TimeInterval = 10
+
+    @MainActor
+    private func flashCitationHighlight(_ selection: PDFSelection) {
+        clearCitationHighlight()
+        let color = PDFDefaults.searchHighlightColor
+        for page in selection.pages {
+            var quads: [NSValue] = []
+            var union = CGRect.null
+            for line in selection.selectionsByLine() {
+                let b = line.bounds(for: page)
+                guard b.width > 0, b.height > 0 else { continue }   // line not on this page
+                union = union.union(b)
+                quads.append(NSValue(point: NSPoint(x: b.minX, y: b.minY)))
+                quads.append(NSValue(point: NSPoint(x: b.maxX, y: b.minY)))
+                quads.append(NSValue(point: NSPoint(x: b.minX, y: b.maxY)))
+                quads.append(NSValue(point: NSPoint(x: b.maxX, y: b.maxY)))
+            }
+            guard !union.isNull else { continue }
+            let annotation = PDFAnnotation(bounds: union, forType: .highlight, withProperties: nil)
+            annotation.color = color
+            if !quads.isEmpty { annotation.setValue(quads, forAnnotationKey: .quadPoints) }
+            page.addAnnotation(annotation)
+            citationAnnotations.append((page, annotation))
+        }
+
+        citationHighlight = selection
+        citationHighlightSeq &+= 1
+
+        citationHighlightToken &+= 1
+        let token = citationHighlightToken
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(self?.citationHighlightDuration ?? 10))
+            guard let self, self.citationHighlightToken == token else { return }
+            self.clearCitationHighlight()
+        }
+    }
+
+    /// Remove the current temporary citation highlight, if any.
+    @MainActor
+    func clearCitationHighlight() {
+        for (page, annotation) in citationAnnotations {
+            page.removeAnnotation(annotation)
+        }
+        citationAnnotations.removeAll()
+        citationHighlight = nil
+    }
+
     func nextSearchResult() {
         guard !searchResults.isEmpty else { return }
         currentSearchIndex = (currentSearchIndex + 1) % searchResults.count

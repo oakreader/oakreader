@@ -18,26 +18,34 @@ struct LibraryRootView: View {
                 Divider()
             }
 
-            // Middle + Right panes (golden ratio: table ≥ 0.382, detail ≤ 0.618)
-            GeometryReader { geo in
-                let available = geo.size.width
-                let tableMin = available * 0.382
-                let detailMax = available * 0.618
-
-                HSplitView {
-                    tablePane(hasTrailingCorner: appState.libraryDetailTab == nil)
-                        .frame(minWidth: tableMin, maxWidth: .infinity, maxHeight: .infinity)
-                    // Detail content panel (only when a tab is selected)
-                    if appState.libraryDetailTab != nil {
-                        detailContentPanel
-                            .frame(minWidth: 480, idealWidth: available * 0.382, maxWidth: detailMax)
-                    }
-                }
+            // Right side: full-page agent workspace, or the classic catalog browser.
+            if appState.librarySurface == .agent {
+                AgentWorkspaceView(appState: appState)
+            } else {
+                browsePanes
             }
-
         }
         .background(libraryChromeBackground)
         .onHover { inside in if inside { NSCursor.arrow.set() } }
+    }
+
+    /// Middle + Right panes (golden ratio: table ≥ 0.382, detail ≤ 0.618).
+    private var browsePanes: some View {
+        GeometryReader { geo in
+            let available = geo.size.width
+            let tableMin = available * 0.382
+            let detailMax = available * 0.618
+
+            HSplitView {
+                tablePane(hasTrailingCorner: appState.libraryDetailTab == nil)
+                    .frame(minWidth: tableMin, maxWidth: .infinity, maxHeight: .infinity)
+                // Detail content panel (only when a tab is selected)
+                if appState.libraryDetailTab != nil {
+                    detailContentPanel
+                        .frame(minWidth: 480, idealWidth: available * 0.382, maxWidth: detailMax)
+                }
+            }
+        }
     }
 
     private var libraryChromeBackground: Color {

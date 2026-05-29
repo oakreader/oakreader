@@ -17,6 +17,12 @@ struct LLMContextProvider {
         let collection = appState?.libraryStore.selectedCollection
         let collectionName = collection?.name
         let collectionItemCount = collection?.itemCount
+        let collectionIsScopable = collection.map {
+            !$0.isSmart && $0.id != SystemCollectionID.allItems
+        } ?? false
+        let workspacePath = (appState?.isAgentActive == true)
+            ? appState?.agentWorkspaceDirectory?.path
+            : nil
 
         // Collect items in the active collection (up to 50 for prompt size)
         let collectionItems: [ChatContextSnapshot.CollectionItemSummary]
@@ -47,8 +53,10 @@ struct LLMContextProvider {
             activeCollectionName: collectionName,
             activeCollectionItemCount: collectionItemCount,
             activeCollectionItems: collectionItems,
+            activeCollectionIsScopable: collectionIsScopable,
             openTabTitles: openTabTitles,
             activeTabTitle: activeTabTitle,
+            agentWorkspacePath: workspacePath,
             document: docContext
         )
     }
@@ -322,6 +330,18 @@ struct LLMContextProvider {
                 (oak collections list), list tags (oak tags list), and manage items.
                 """)
 
+            // Browser-mode hint — the user is viewing a live web page (.link).
+            if doc.contentType == .link {
+                parts.append("""
+                    The user is viewing a LIVE web page in the browser. Use read_current_page \
+                    to get its content as readable markdown — this reads the rendered, \
+                    logged-in DOM the user actually sees, so prefer it over fetch_web_content \
+                    for anything about the page on screen, and never fetch the current page's \
+                    own URL. Use fetch_web_content only for OTHER URLs (links on the page, \
+                    search results, URLs the user names).
+                    """)
+            }
+
             // Abstract (outside document block to not crowd metadata)
             if let abstract = doc.abstract, !abstract.isEmpty {
                 parts.append("Document abstract:\n\"\"\"\n\(String(abstract.prefix(2_000)))\n\"\"\"")
@@ -338,6 +358,29 @@ struct LLMContextProvider {
                 """)
         }
 
+        // Agent workspace — the chat's working directory, with mounted documents.
+        if let wsPath = context.agentWorkspacePath {
+            parts.append("""
+                <workspace path="\(xmlEscape(wsPath))" />
+                You are working inside an agent workspace folder — your current \
+                working directory. The documents for this workspace are mounted \
+                here as editable copies (relative paths resolve to this folder). \
+                Read and edit them in place with the read/write/ls tools, and save \
+                any new content you produce (notes, drafts, summaries) as files in \
+                this folder.
+                """)
+        }
+
+        // Collection workspace scoping.
+        if context.activeCollectionIsScopable, let name = context.activeCollectionName {
+            parts.append("""
+                The user's current workspace is the "\(xmlEscape(name))" collection. \
+                Unless they ask about the whole library, scope searches, listings, \
+                and new content to this collection \
+                (e.g. oak items list --collection "\(xmlEscape(name))").
+                """)
+        }
+
         // Citation link instructions — MUST use oak://cite/{citeKey} for all refs
         if let doc = context.document, let ck = doc.citeKey {
             let eck = xmlEscape(ck)
@@ -351,20 +394,38 @@ struct LLMContextProvider {
                 current document AND any cross-document references.
                 """)
 
+            // Verbatim-anchor rule — the #1 cause of citations that don't highlight is a
+            // paraphrased ?text=. The visible label may be your own words, but the anchor
+            // must be an exact quote so the reader can locate it in the document.
+            parts.append("""
+                CRITICAL — The ?text= (and ?heading=) anchor MUST be copied \
+                VERBATIM from the document: an exact, contiguous run of words as \
+                it literally appears — same spelling, numbers, capitalization and \
+                punctuation. Do NOT paraphrase, summarize, reorder, abbreviate \
+                (e.g. "36 million" not "36M"), or stitch together non-adjacent \
+                words for the anchor. Keep it SHORT and unique: 4–8 consecutive \
+                words copied straight from the text. The link's visible [label] \
+                can be your own wording; only the anchor value must be the quote. \
+                If you are not certain of the exact wording, omit ?text= and cite \
+                the page alone — never invent a phrase.
+                """)
+
             // Format + example per document type
             switch doc.contentType {
             case .pdf:
                 parts.append("""
                     This PDF's cite-key is "\(eck)". Citation format:
                     [p. N](oak://cite/\(eck)?page=N)
-                    [p. N](oak://cite/\(eck)?page=N&text=phrase)
+                    [p. N](oak://cite/\(eck)?page=N&text=verbatim+quote)
 
-                    Prefer adding &text= with a distinctive 5-15 word phrase \
-                    from the page so the reader can jump to the exact passage.
+                    Add &text= with a SHORT phrase (4–8 words) copied VERBATIM from \
+                    that page (spaces encoded as +) so the reader jumps to the exact \
+                    passage. The quote must appear word-for-word on the page; if you \
+                    can't quote it exactly, give the page alone.
 
-                    Example — notice every page mention is a link:
+                    Example — the [label] is paraphrased, the &text= anchor is an exact quote:
                     \"The transformer replaces recurrence with self-attention \
-                    ([p. 2](oak://cite/\(eck)?page=2&text=entirely+on+attention+mechanisms)). \
+                    ([p. 2](oak://cite/\(eck)?page=2&text=based+solely+on+attention+mechanisms)). \
                     The scaled dot-product formula is defined on \
                     [p. 3](oak://cite/\(eck)?page=3&text=Scaled+Dot-Product+Attention), and \
                     multi-head attention extends it on [p. 4](oak://cite/\(eck)?page=4).\"
@@ -375,10 +436,10 @@ struct LLMContextProvider {
                     [§ Heading](oak://cite/\(eck)?heading=HeadingText)
                     ["quoted phrase"](oak://cite/\(eck)?text=quoted+text)
 
-                    For ?text= use a distinctive 5-15 word phrase copied from \
-                    the rendered text (not the raw markdown source). Matching \
-                    is case-insensitive and tolerates whitespace differences, \
-                    so focus on choosing a unique phrase rather than exact formatting.
+                    For ?text= copy a SHORT phrase (4–8 words) VERBATIM from the \
+                    rendered text (not the raw markdown source) — exact words in \
+                    order, no paraphrasing. Matching is case-insensitive, so only \
+                    casing may differ; the words themselves must match the page.
 
                     Prefer ?text= for referencing specific passages; use \
                     ?heading= only when pointing to a whole section.

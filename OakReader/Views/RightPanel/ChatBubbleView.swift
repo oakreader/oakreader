@@ -1,6 +1,8 @@
 import SwiftUI
+import AppKit
 import OakAgent
 import Textual
+import OakMarkdownUI
 
 struct ChatBubbleView: View {
     let turn: Turn
@@ -9,6 +11,12 @@ struct ChatBubbleView: View {
     var onStopAudio: (() -> Void)?
     var onOpenCitation: ((String, CitationAnchor) -> Void)?
     var onSaveQuizCard: ((QuizContent) -> Bool)?
+    /// Optional markdown theme override (e.g. `.dia` for the agent canvas).
+    /// When nil, falls back to the user-configured `.oak` theme.
+    var markdownTheme: MarkdownTheme? = nil
+
+    @AppStorage("chatFontSize") private var chatFontSize: Double = 14
+    @AppStorage("chatLineHeightScale") private var chatLineHeightScale: Double = 1.35
 
     @State private var isHovered = false
     @State private var isCopyHovered = false
@@ -284,34 +292,20 @@ struct ChatBubbleView: View {
     /// Selecting mid-stream text is pointless anyway.
     @ViewBuilder
     private func chatMarkdown(_ markdown: String, streaming: Bool = false) -> some View {
-        // Split into blank-line-separated, fence-aware blocks and render each as
-        // its own `EquatableView`. While streaming, only the last (tail) block
-        // re-parses on each commit; settled blocks above keep a stable identity
-        // and unchanged content, so SwiftUI skips their body and Textual never
-        // re-parses them — turning O(message length)/frame into ≈O(tail)/frame.
-        // (`protectingMathBackslashes` + `sealIncompleteMarkdown` run per-block
-        // inside `ChatMarkdownBlockView`, so settled blocks don't pay for them.)
-        let blocks = MarkdownBlockSplitter.split(markdown)
-        // Selection and math attachments each install a `GeometryReader` inside a
-        // `Text.LayoutKey` preference reader; with both live in the same message
-        // the two layout→preference→layout loops never converge and spin the main
-        // thread (frozen UI). Gating per-block isn't enough — a message that
-        // interleaves selectable prose with math blocks still wedges — so we drop
-        // selection for the WHOLE message whenever it contains any math. This
-        // mirrors the streaming case (all blocks non-selectable), which is the
-        // configuration verified not to spin.
-        let messageHasMath = markdown.containsMath()
-        VStack(alignment: .leading, spacing: 6) {
-            ForEach(blocks) { block in
-                ChatMarkdownBlockView(
-                    text: block.text,
-                    seal: streaming && !block.isSettled,  // only the growing tail
-                    selectable: !streaming && !messageHasMath
-                )
-                .equatable()
-                .id(block.id)
+        // Native renderer (OakMarkdownUI): swift-markdown + Highlightr + SwiftMath,
+        // block-stack with settled-block memoization + incremental tail editing —
+        // the same native stack Dia uses. Replaces the Textual path.
+        StreamingMarkdownView(
+            markdown: markdown,
+            theme: markdownTheme ?? .oak(fontSize: CGFloat(chatFontSize), lineHeightScale: CGFloat(chatLineHeightScale)),
+            isStreaming: streaming,
+            onOpenURL: { url in
+                // Intercept oak:// citation links; let everything else open in the browser.
+                guard let (citeKey, anchor) = CitationAnchor.parse(from: url) else { return false }
+                onOpenCitation?(citeKey, anchor)
+                return true
             }
-        }
+        )
     }
 
     /// Renders interleaved text segments, inline quiz views, and deck carousels.
@@ -341,7 +335,7 @@ struct ChatBubbleView: View {
                 .environment(\.openURL, citationOpenURLAction)
                 .assistantBubbleStyle()
         } else {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
+            HStack(alignment: .top, spacing: 6) {
                 ForEach(skillBadges, id: \.self) { skill in
                     skillBadge(skill)
                 }
@@ -349,7 +343,12 @@ struct ChatBubbleView: View {
                     referenceBadge(ref.title, icon: ref.icon)
                 }
                 if !renderedContent.isEmpty {
-                    chatMarkdown(renderedContent)
+                    // User messages render via SwiftUI Text, not the NSTextView-backed
+                    // StreamingMarkdownView: a static (non-streaming) turn inserted into
+                    // the live list during the spring transition can have its NSTextView
+                    // initial draw botched and — never updating again — stay blank. Text
+                    // has no such insertion-draw race, and user messages are short.
+                    userMessageText
                 }
             }
             .padding(.horizontal, 14)
@@ -374,6 +373,30 @@ struct ChatBubbleView: View {
         case .assistant, .system:
             return Color.clear
         }
+    }
+
+    /// User-message body rendered with a native SwiftUI `Text` (markdown-aware).
+    private var userMessageText: some View {
+        let size = markdownTheme?.bodyFont.pointSize ?? CGFloat(chatFontSize)
+        return Text(userAttributedContent)
+            .font(.system(size: size))
+            .textSelection(.enabled)
+            .tint(.accentColor)
+            .environment(\.openURL, citationOpenURLAction)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Parse the user message's inline markdown, preserving line breaks. Falls
+    /// back to plain text if parsing fails.
+    private var userAttributedContent: AttributedString {
+        let options = AttributedString.MarkdownParsingOptions(
+            interpretedSyntax: .inlineOnlyPreservingWhitespace
+        )
+        if let attributed = try? AttributedString(markdown: renderedContent, options: options) {
+            return attributed
+        }
+        return AttributedString(renderedContent)
     }
 
     private var renderedContent: String {
@@ -757,76 +780,136 @@ private struct OakScriptShape: Shape {
 // in a clockwise loop, each with a soft glow halo when active.
 // Sequence: 0→1→2→5→8→7→6→3 (outer ring), center dot pulses gently.
 
-struct StreamingCursor: View {
-    private static let dotSize: CGFloat = 2.5
-    private static let spacing: CGFloat = 2.5
-    private static let glowRadius: CGFloat = 2.5
-    // Perimeter traversal order (clockwise from top-left)
-    private static let sequence: [Int] = [0, 1, 2, 5, 8, 7, 6, 3]
-    private static let cycleDuration: Double = 1.0
+/// A 9-dot "agent is working" indicator: a comet chases the outer ring while the
+/// center dot pulses. Driven entirely by **Core Animation** (infinite
+/// `CAKeyframeAnimation`/`CABasicAnimation` with staggered `beginTime`), so it runs on
+/// the render server and stays smooth even while the main thread is saturated streaming
+/// and re-laying-out markdown. The previous main-thread `Timer` driver stuttered under
+/// that load. (Technique mirrors Dia's CADisplayLink/CAAnimation-driven loaders —
+/// reimplemented from a read-only study of the shipped app, not copied.)
+struct StreamingCursor: NSViewRepresentable {
+    fileprivate static let dotSize: CGFloat = 2.5
+    fileprivate static let spacing: CGFloat = 2.5
+    fileprivate static let cycle: CFTimeInterval = 1.0
+    // Perimeter traversal order (clockwise from top-left), as grid indices.
+    fileprivate static let sequence: [Int] = [0, 1, 2, 5, 8, 7, 6, 3]
+    fileprivate static var gridSize: CGFloat { dotSize * 3 + spacing * 2 }
 
-    @State private var step: Int = 0
-    @State private var centerPulse = false
+    func makeNSView(context: Context) -> DotGridView { DotGridView() }
+    func updateNSView(_ nsView: DotGridView, context: Context) {}
 
-    var body: some View {
-        let gridSize = Self.dotSize * 3 + Self.spacing * 2
-
-        ZStack {
-            // 3×3 grid
-            VStack(spacing: Self.spacing) {
-                ForEach(0..<3, id: \.self) { row in
-                    HStack(spacing: Self.spacing) {
-                        ForEach(0..<3, id: \.self) { col in
-                            let index = row * 3 + col
-                            let isCenter = index == 4
-                            let activeLevel = isCenter
-                                ? 0.0
-                                : trailIntensity(for: index)
-
-                            Circle()
-                                .fill(Color.primary)
-                                .frame(width: Self.dotSize, height: Self.dotSize)
-                                .opacity(isCenter ? (centerPulse ? 0.4 : 0.15) : (0.12 + 0.5 * activeLevel))
-                                .scaleEffect(isCenter ? (centerPulse ? 1.1 : 0.9) : (0.7 + 0.3 * activeLevel))
-                                .shadow(
-                                    color: Color.primary.opacity(activeLevel * 0.4),
-                                    radius: Self.glowRadius * activeLevel
-                                )
-                        }
-                    }
-                }
-            }
-        }
-        .frame(width: gridSize, height: gridSize)
-        .onAppear {
-            withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
-                centerPulse = true
-            }
-            startSpinning()
-        }
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: DotGridView, context: Context) -> CGSize? {
+        CGSize(width: Self.gridSize, height: Self.gridSize)
     }
 
-    /// Returns 1.0 for the head dot, fading trail for the 2 behind it, 0 for the rest.
-    private func trailIntensity(for gridIndex: Int) -> Double {
-        guard let seqPos = Self.sequence.firstIndex(of: gridIndex) else { return 0 }
-        let count = Self.sequence.count
-        let headPos = step % count
-        // Distance behind the head (wrapping)
-        let distance = (headPos - seqPos + count) % count
-        switch distance {
-        case 0: return 1.0   // head
-        case 1: return 0.5   // trail 1
-        case 2: return 0.2   // trail 2
-        default: return 0.0
-        }
-    }
+    final class DotGridView: NSView {
+        private var dots: [CALayer] = []
 
-    private func startSpinning() {
-        let interval = Self.cycleDuration / Double(Self.sequence.count)
-        Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { _ in
-            withAnimation(.easeOut(duration: interval * 0.9)) {
-                step += 1
+        override var intrinsicContentSize: NSSize {
+            NSSize(width: StreamingCursor.gridSize, height: StreamingCursor.gridSize)
+        }
+
+        override init(frame frameRect: NSRect) {
+            super.init(frame: frameRect)
+            wantsLayer = true
+            layer?.isGeometryFlipped = true   // row 0 at the top, so the ring runs clockwise
+            buildDots()
+            layoutDots()
+        }
+        required init?(coder: NSCoder) { fatalError("init(coder:) not used") }
+
+        override func layout() {
+            super.layout()
+            layoutDots()
+        }
+
+        // CA strips animations when a layer leaves the window; re-add on (re)attach.
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            if window != nil { animate() }
+        }
+
+        override func viewDidChangeEffectiveAppearance() {
+            super.viewDidChangeEffectiveAppearance()
+            applyColor()
+        }
+
+        private func buildDots() {
+            dots = (0..<9).map { _ in
+                let l = CALayer()
+                l.cornerRadius = StreamingCursor.dotSize / 2
+                l.opacity = 0.12
+                layer?.addSublayer(l)
+                return l
             }
+            applyColor()
+        }
+
+        private func applyColor() {
+            let cg = NSColor.labelColor.cgColor
+            for d in dots { d.backgroundColor = cg }
+        }
+
+        private func layoutDots() {
+            let d = StreamingCursor.dotSize, s = StreamingCursor.spacing
+            for i in 0..<9 {
+                let row = CGFloat(i / 3), col = CGFloat(i % 3)
+                dots[i].frame = CGRect(x: col * (d + s), y: row * (d + s), width: d, height: d)
+            }
+        }
+
+        private func animate() {
+            guard let host = layer else { return }
+            let cycle = StreamingCursor.cycle
+            let seq = StreamingCursor.sequence
+            let slot = cycle / Double(seq.count)
+            let now = host.convertTime(CACurrentMediaTime(), from: nil)
+
+            // Comet: a sharp head fading over two trailing dots, looping every `cycle`.
+            // One shared opacity/scale curve per dot, phase-shifted via `beginTime`.
+            let opKeyTimes: [NSNumber] = [0.0, 0.125, 0.25, 0.375, 0.875, 1.0]
+            let opValues: [CGFloat] = [0.62, 0.40, 0.24, 0.12, 0.12, 0.62]
+            let scValues: [CGFloat] = [1.0, 0.88, 0.78, 0.70, 0.70, 1.0]
+
+            for (pos, gridIndex) in seq.enumerated() {
+                let dot = dots[gridIndex]
+                let begin = now + Double(pos) * slot - cycle   // staggered, already running
+
+                let op = CAKeyframeAnimation(keyPath: "opacity")
+                op.keyTimes = opKeyTimes
+                op.values = opValues
+                op.duration = cycle
+                op.repeatCount = .infinity
+                op.beginTime = begin
+                op.isRemovedOnCompletion = false
+                dot.add(op, forKey: "comet.opacity")
+
+                let sc = CAKeyframeAnimation(keyPath: "transform.scale")
+                sc.keyTimes = opKeyTimes
+                sc.values = scValues
+                sc.duration = cycle
+                sc.repeatCount = .infinity
+                sc.beginTime = begin
+                sc.isRemovedOnCompletion = false
+                dot.add(sc, forKey: "comet.scale")
+            }
+
+            // Center dot: a slow breathing pulse.
+            let center = dots[4]
+            let ease = CAMediaTimingFunction(name: .easeInEaseOut)
+            let pulseOp = CABasicAnimation(keyPath: "opacity")
+            pulseOp.fromValue = 0.15; pulseOp.toValue = 0.40
+            pulseOp.duration = 0.8; pulseOp.autoreverses = true
+            pulseOp.repeatCount = .infinity; pulseOp.timingFunction = ease
+            pulseOp.isRemovedOnCompletion = false
+            center.add(pulseOp, forKey: "pulse.opacity")
+
+            let pulseSc = CABasicAnimation(keyPath: "transform.scale")
+            pulseSc.fromValue = 0.9; pulseSc.toValue = 1.1
+            pulseSc.duration = 0.8; pulseSc.autoreverses = true
+            pulseSc.repeatCount = .infinity; pulseSc.timingFunction = ease
+            pulseSc.isRemovedOnCompletion = false
+            center.add(pulseSc, forKey: "pulse.scale")
         }
     }
 }
