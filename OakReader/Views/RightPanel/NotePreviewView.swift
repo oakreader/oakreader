@@ -82,9 +82,13 @@ struct NotePreviewView: NSViewRepresentable {
 
         var resolved = html
         resolved = resolved.replacingOccurrences(
-            of: "href=\"css/", with: "href=\"\(bundleURL.absoluteString)css/")
+            of: "href=\"css/",
+            with: "href=\"\(bundleURL.absoluteString)css/"
+        )
         resolved = resolved.replacingOccurrences(
-            of: "src=\"js/", with: "src=\"\(bundleURL.absoluteString)js/")
+            of: "src=\"js/",
+            with: "src=\"\(bundleURL.absoluteString)js/"
+        )
 
         // Write HTML to a temp file so we can use loadFileURL (grants filesystem access)
         let tempFile = Self.previewCacheDir.appendingPathComponent("preview.html")
@@ -96,6 +100,17 @@ struct NotePreviewView: NSViewRepresentable {
 
     /// Resolve NSFont PostScript name to CSS font-family + @font-face if bundled.
     private static func resolveFontForCSS(postScriptName: String) -> (family: String, fontFace: String) {
+        switch postScriptName {
+        case "", "default":
+            return ("Georgia, \"Times New Roman\", serif", "")
+        case "system":
+            return ("-apple-system, BlinkMacSystemFont, \"Helvetica Neue\", \"PingFang SC\", sans-serif", "")
+        case "mono":
+            return ("\"PT Mono\", ui-monospace, Menlo, Consolas, monospace", "")
+        default:
+            break
+        }
+
         // System font: use CSS keyword (must not be quoted)
         if postScriptName.hasPrefix(".") {
             return ("-apple-system", "")

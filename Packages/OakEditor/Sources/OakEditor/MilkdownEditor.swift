@@ -53,6 +53,9 @@ public struct MilkdownEditor: NSViewRepresentable {
     public var content: String
     public var identity: AnyHashable
     public var theme: EditorTheme
+    /// Body font as a CSS font-family stack (e.g. "'LXGW WenKai', serif").
+    /// `nil` keeps the theme's default serif.
+    public var fontFamily: String?
     public var aiConfig: EditorAIConfig?
     /// Base directory used to resolve relative image paths to file:// URLs.
     public var resourceBaseURL: URL?
@@ -71,6 +74,7 @@ public struct MilkdownEditor: NSViewRepresentable {
         content: String,
         identity: AnyHashable,
         theme: EditorTheme = .auto,
+        fontFamily: String? = nil,
         aiConfig: EditorAIConfig? = nil,
         resourceBaseURL: URL? = nil,
         onChange: @escaping (String) -> Void,
@@ -83,6 +87,7 @@ public struct MilkdownEditor: NSViewRepresentable {
         self.content = content
         self.identity = identity
         self.theme = theme
+        self.fontFamily = fontFamily
         self.aiConfig = aiConfig
         self.resourceBaseURL = resourceBaseURL
         self.onChange = onChange
@@ -105,8 +110,10 @@ public struct MilkdownEditor: NSViewRepresentable {
         // Inject the resource base + initial theme before the module runs.
         let baseStr = context.coordinator.escapedBaseURL(resourceBaseURL)
         let themeStr = context.coordinator.resolvedTheme()
+        let fontLiteral = context.coordinator.escapedJSString(fontFamily ?? "")
         let bootstrap = """
         window.__OAK_NOTES_BASE__ = "\(baseStr)";
+        window.__OAK_NOTE_FONT__ = \(fontLiteral);
         document.documentElement.setAttribute('data-theme', '\(themeStr)');
         """
         controller.addUserScript(WKUserScript(source: bootstrap, injectionTime: .atDocumentStart, forMainFrameOnly: true))
@@ -135,6 +142,7 @@ public struct MilkdownEditor: NSViewRepresentable {
         context.coordinator.parent = self
         context.coordinator.syncContentIfNeeded()
         context.coordinator.syncThemeIfNeeded()
+        context.coordinator.syncFontIfNeeded()
     }
 
     // MARK: - Coordinator
@@ -148,6 +156,7 @@ public struct MilkdownEditor: NSViewRepresentable {
         private var loadedContent: String?
         private var lastEmitted: String?
         private var lastTheme: String?
+        private var lastFont: String?
         private let router = ProviderRouter()
         private var aiTasks: [Int: Task<Void, Never>] = [:]
 
@@ -181,6 +190,17 @@ public struct MilkdownEditor: NSViewRepresentable {
             eval("window.oakEditor && window.oakEditor.setTheme(\(jsString(theme)))")
         }
 
+        func syncFontIfNeeded() {
+            guard isReady else { return }
+            let font = parent.fontFamily ?? ""
+            guard font != lastFont else { return }
+            lastFont = font
+            eval("window.oakEditor && window.oakEditor.setFont(\(jsString(font)))")
+        }
+
+        /// JS string literal for `s` (with quotes), usable from `makeNSView`.
+        func escapedJSString(_ s: String) -> String { jsString(s) }
+
         // MARK: Content sync
 
         /// Push content when the document identity changes, or when `content`
@@ -206,6 +226,7 @@ public struct MilkdownEditor: NSViewRepresentable {
             case "ready":
                 isReady = true
                 lastTheme = resolvedTheme()
+                lastFont = parent.fontFamily ?? ""
                 loadedIdentity = parent.identity
                 pushContent(parent.content)
 
