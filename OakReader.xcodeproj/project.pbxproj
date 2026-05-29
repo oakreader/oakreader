@@ -290,6 +290,7 @@
 		CB8EC4E4E4FD6178EF4D7777 /* ChatCompletionItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = D44EE4D911E3EB343C72403A /* ChatCompletionItem.swift */; };
 		CBCD4E03D39EECC58E1311D6 /* MarkdownDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CD6BAACDEA9C3347F8D19E5 /* MarkdownDocument.swift */; };
 		CBD1428ED92037DE87AE9B92 /* CLIDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DF6BFDC7CE175A0B3CCB28A /* CLIDatabase.swift */; };
+		CBE3B2BF6507D35AC3F06CFD /* OakAppIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA77DDD4C28228A80CDD348A /* OakAppIcon.swift */; };
 		CC5F84581420C648776236D9 /* AgentWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5843A9CCB0DC5E19B4B54C79 /* AgentWorkspaceView.swift */; };
 		CC7D576D3A9990F1737D140D /* DuckDuckGoSearchProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7637FBE267CE1092647B935E /* DuckDuckGoSearchProvider.swift */; };
 		CD68F5844D15888537F54363 /* Marketplace.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10E57E661596E49EB03F2F2 /* Marketplace.swift */; };
@@ -699,6 +700,7 @@
 		E7CB0C597FBB0F0023496A41 /* CGPDFDocument+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CGPDFDocument+Extensions.swift"; sourceTree = "<group>"; };
 		E7DE8679D5490E12A4B04B7D /* DifferenceOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DifferenceOverlayView.swift; sourceTree = "<group>"; };
 		E9BAFC9D6C8A88AE38ECD4C8 /* QuizCardSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizCardSettingsView.swift; sourceTree = "<group>"; };
+		EA77DDD4C28228A80CDD348A /* OakAppIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OakAppIcon.swift; sourceTree = "<group>"; };
 		EA91E07EE10DFB021A1A92A7 /* AppIcon-Dev.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = "AppIcon-Dev.icon"; sourceTree = "<group>"; };
 		ECB7B68284A0E958AA74C670 /* SerperSearchProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SerperSearchProvider.swift; sourceTree = "<group>"; };
 		EE3C5AFB721EE407EADCAE17 /* ResearchTool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResearchTool.swift; sourceTree = "<group>"; };
@@ -1430,6 +1432,7 @@
 				D7F8A56EF5AEA94BAAD55EDB /* ColorPickerButton.swift */,
 				8BA004BD76C17A3C38A67CED /* DropZoneView.swift */,
 				49AA28C88AB1B1AA438078AF /* FontPickerButton.swift */,
+				EA77DDD4C28228A80CDD348A /* OakAppIcon.swift */,
 				D18E67DFB5D1EAA11B2B5A07 /* OakToolButton.swift */,
 				775D74C4CCC80BE808BFC226 /* PageRangeSelector.swift */,
 				5F08A21C55E4718377512E18 /* PopupComponents.swift */,
@@ -1822,6 +1825,7 @@
 				F6576D28DF9B1412AD616AF1 /* NoteService.swift in Sources */,
 				CB6B073F7410C25B7A6DEDA0 /* NoteSettingsView.swift in Sources */,
 				B8E4EFD9CE3A433CF854203D /* NotesViewModel.swift in Sources */,
+				CBE3B2BF6507D35AC3F06CFD /* OakAppIcon.swift in Sources */,
 				93988D0D369D24F7EA93C18A /* OakCLITool.swift in Sources */,
 				09611B6D3684448759E0A86B /* OakReaderApp.swift in Sources */,
 				B13E3E2BAD89594EEB6DAB21 /* OakReaderDocument.swift in Sources */,
