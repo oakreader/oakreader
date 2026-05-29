@@ -202,22 +202,9 @@ struct ContentView: View {
     // (RootView), not here — see BrowserChromeView. This keeps a single
     // active-tab-aware toolbar instead of one per kept-alive ContentView.
     private var liveWebView: some View {
+        // Load progress is shown inside the address field (BrowserChromeView),
+        // not as a separate bar over the page.
         HTMLViewerRepresentable(viewModel: viewModel)
-            .overlay(alignment: .top) {
-                // Slim 2px top loading bar (Safari/Chrome-style) — not the heavy
-                // full-width .linear ProgressView that read like a stray scrollbar.
-                let progress = viewModel.state.webLoadProgress
-                if progress > 0, progress < 1 {
-                    GeometryReader { geo in
-                        Rectangle()
-                            .fill(Color.accentColor)
-                            .frame(width: geo.size.width * progress)
-                            .animation(.linear(duration: 0.15), value: progress)
-                    }
-                    .frame(height: 2)
-                    .allowsHitTesting(false)
-                }
-            }
     }
 
     @ViewBuilder

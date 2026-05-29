@@ -23,7 +23,9 @@ struct BrowserChromeView: View {
                 savePasswordBanner(pending)
             }
         }
-        .background(.thinMaterial)
+        // Match the active tab's fill so the selected tab flows into the toolbar
+        // as one continuous chrome surface; the bottom divider splits it from the page.
+        .background(OakStyle.Colors.activeTabBackground)
         .overlay(alignment: .bottom) {
             Divider()
         }
@@ -142,10 +144,23 @@ struct BrowserChromeView: View {
             .onSubmit(navigate)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .background(
+            .background {
                 RoundedRectangle(cornerRadius: OakStyle.Radius.standard)
                     .fill(OakStyle.Colors.hoverBackground)
-            )
+                    // Page-load progress fills the field from the leading edge
+                    // (Safari/Arc-style) instead of a separate top bar.
+                    .overlay(alignment: .leading) {
+                        if isLoading {
+                            GeometryReader { geo in
+                                Rectangle()
+                                    .fill(Color.accentColor.opacity(0.18))
+                                    .frame(width: geo.size.width * state.webLoadProgress)
+                                    .animation(.linear(duration: 0.15), value: state.webLoadProgress)
+                            }
+                        }
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: OakStyle.Radius.standard))
+            }
             .overlay(
                 RoundedRectangle(cornerRadius: OakStyle.Radius.standard)
                     .stroke(addressFocused ? Color.accentColor : .clear, lineWidth: 1)
