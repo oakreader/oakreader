@@ -51,3 +51,33 @@ final class MediaDocument {
         self.embedHTMLURL = FileManager.default.fileExists(atPath: embedHTML.path) ? embedHTML : nil
     }
 }
+
+/// Builds a real, openable platform URL that jumps to `seconds` into a media item's
+/// source. Podcasts and videos have no local seekable copy, so a `?time=` citation
+/// must open the source platform at that moment: YouTube uses `&t=<n>s`, Apple
+/// Podcasts uses `&t=<n>` (integer seconds), and anything else falls back to a
+/// best-effort `#t=<n>` media fragment (honored by direct HTML5 audio/video).
+enum MediaTimestampLink {
+    static func url(forSource source: URL, atSeconds seconds: Double) -> URL {
+        let t = max(0, Int(seconds.rounded()))
+        guard var comps = URLComponents(url: source, resolvingAgainstBaseURL: false) else {
+            return source
+        }
+        let host = (comps.host ?? "").lowercased()
+
+        func setQuery(_ name: String, _ value: String) {
+            var items = (comps.queryItems ?? []).filter { $0.name != name }
+            items.append(URLQueryItem(name: name, value: value))
+            comps.queryItems = items
+        }
+
+        if host == "youtu.be" || host == "youtube.com" || host.hasSuffix(".youtube.com") {
+            setQuery("t", "\(t)s")
+        } else if host == "podcasts.apple.com" || host.hasSuffix(".podcasts.apple.com") {
+            setQuery("t", "\(t)")
+        } else {
+            comps.fragment = "t=\(t)"
+        }
+        return comps.url ?? source
+    }
+}

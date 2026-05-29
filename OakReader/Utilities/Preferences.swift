@@ -125,6 +125,8 @@ final class Preferences {
         // Global font
         static let globalFontFamily = "globalFontFamily"
         static let globalFontSize = "globalFontSize"
+        static let chatFontSize = "chatFontSize"
+        static let chatLineHeightScale = "chatLineHeightScale"
         static let noteEditorFontOverridden = "noteEditorFontOverridden"
         // Voice AI
         static let voiceTTSVoice = "voiceTTSVoice"
@@ -185,6 +187,8 @@ final class Preferences {
             Keys.noteEditorAccentColor: "#0CA69A",
             Keys.globalFontFamily: "system",
             Keys.globalFontSize: 14.0,
+            Keys.chatFontSize: 14.0,
+            Keys.chatLineHeightScale: 1.35,
             Keys.noteEditorFontOverridden: false,
             Keys.agentToolsEnabled: true,
             Keys.agentReadFileEnabled: true,
@@ -251,6 +255,20 @@ final class Preferences {
     var globalFontSize: CGFloat {
         get { CGFloat(defaults.double(forKey: Keys.globalFontSize)) }
         set { defaults.set(Double(newValue), forKey: Keys.globalFontSize) }
+    }
+
+    /// Base font size for the AI chat markdown renderer. Code, headings, and line
+    /// height all scale from this (see `MarkdownTheme.oak(fontSize:lineHeightScale:)`).
+    var chatFontSize: CGFloat {
+        get { CGFloat(defaults.double(forKey: Keys.chatFontSize)) }
+        set { defaults.set(Double(newValue), forKey: Keys.chatFontSize) }
+    }
+
+    /// Line-spacing multiplier for the AI chat markdown renderer (line height =
+    /// chatFontSize × this). Scales with the font so spacing stays proportional.
+    var chatLineHeightScale: CGFloat {
+        get { CGFloat(defaults.double(forKey: Keys.chatLineHeightScale)) }
+        set { defaults.set(Double(newValue), forKey: Keys.chatLineHeightScale) }
     }
 
     var noteEditorFontOverridden: Bool {

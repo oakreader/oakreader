@@ -101,6 +101,20 @@ enum OakStyle {
         static let buttonBackground = Color.primary.opacity(0.07)
         static let buttonBackgroundHover = Color.primary.opacity(0.12)
         static let buttonForeground = Color.primary.opacity(0.80)
+
+        // Dia chat-panel tokens (measured from Dia 1.32 — see dia-design-tokens).
+        /// Panel surface — #FEFFFF light / #2D2D2D dark (a mid-gray, not near-black).
+        static let diaSurface = Color(nsColor: NSColor(name: "DiaSurface") { appearance in
+            appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+                ? NSColor(srgbRed: 0x2D / 255.0, green: 0x2D / 255.0, blue: 0x2D / 255.0, alpha: 1)
+                : NSColor(srgbRed: 0xFE / 255.0, green: 0xFF / 255.0, blue: 0xFF / 255.0, alpha: 1)
+        })
+        /// Hairline border — #0F182C @8% light / #787D86 @32% dark.
+        static let diaHairline = Color(nsColor: NSColor(name: "DiaHairline") { appearance in
+            appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+                ? NSColor(srgbRed: 0x78 / 255.0, green: 0x7D / 255.0, blue: 0x86 / 255.0, alpha: 0.32)
+                : NSColor(srgbRed: 0x0F / 255.0, green: 0x18 / 255.0, blue: 0x2C / 255.0, alpha: 0.08)
+        })
     }
 
     // MARK: - Sizes

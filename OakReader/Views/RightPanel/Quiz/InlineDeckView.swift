@@ -345,5 +345,6 @@ private struct FullScreenDeckView: View {
             minWidth: 820, idealWidth: 1120, maxWidth: .infinity,
             minHeight: 640, idealHeight: 860, maxHeight: .infinity
         )
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 }

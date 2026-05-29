@@ -38,8 +38,11 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
     func setActive(_ active: Bool) {
         if active {
             if scrollMonitor == nil { setupScrollMonitor() }
+            // Expose this page to the chat agent's `read_current_page` tool while it's frontmost.
+            if isLiveMode, let webView { LivePageBridge.shared.setActiveWebView(webView) }
         } else {
             removeScrollMonitor()
+            if let webView { LivePageBridge.shared.clearWebView(webView) }
         }
     }
 
@@ -72,7 +75,15 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
                         }
                     }
                 }
-                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    // Briefly highlight the heading, matching the text-fragment cite.
+                    document.querySelectorAll('.oak-cite-hl').forEach(function(n) {
+                        n.classList.remove('oak-cite-hl');
+                    });
+                    el.classList.add('oak-cite-hl');
+                    setTimeout(function() { el.classList.remove('oak-cite-hl'); }, 3000);
+                }
             })();
             """
             webView.evaluateJavaScript(js, completionHandler: nil)

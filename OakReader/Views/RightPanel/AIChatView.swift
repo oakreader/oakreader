@@ -1,11 +1,31 @@
 import SwiftUI
 import UniformTypeIdentifiers
 import OakAgent
+import OakMarkdownUI
+
+/// How the chat surface presents itself.
+enum ChatPresentation {
+    /// Narrow inspector/right-panel column (the default everywhere it has lived).
+    case panel
+    /// Full-page, centered Dia-style agent canvas (the library agent workspace).
+    case canvas
+}
 
 struct AIChatView: View {
     let chatVM: ChatViewModel
     var voiceVM: VoiceViewModel?
     var onSaveQuizCard: ((QuizContent) -> Bool)?
+
+    /// Layout mode. `.panel` (default) preserves the existing right-panel behavior;
+    /// `.canvas` centers content into a comfortable reading column for the agent page.
+    var presentation: ChatPresentation = .panel
+    /// Name of the collection the agent is scoped to (nil = whole library). Canvas only.
+    var workspaceName: String? = nil
+    /// When non-nil, a "clear" affordance on the workspace chip resets scope to the whole library.
+    var onClearWorkspace: (() -> Void)? = nil
+
+    /// Width of the centered content column in `.canvas` mode.
+    private let canvasContentWidth: CGFloat = 760
 
     @Environment(\.isTabActive) private var isTabActive
     @State private var playingTurnId: UUID?
@@ -66,29 +86,45 @@ struct AIChatView: View {
     private var chatContent: some View {
         VStack(spacing: 0) {
             if chatVM.turns.isEmpty {
-                emptyState
+                canvasConstrained { emptyState }
             } else {
+                // messageList spans the full pane so its custom scrollbar sits at
+                // the pane's right edge; the message column is centered internally.
                 messageList
             }
 
             // Error banner
             if let error = chatVM.errorMessage {
-                errorBanner(error)
+                canvasConstrained { errorBanner(error) }
             }
 
             // Sticky tool confirmation bar
             if let pending = chatVM.pendingToolConfirmation {
-                ToolConfirmationBar(
-                    confirmation: pending,
-                    onApprove: { chatVM.approveToolCall() },
-                    onDeny: { chatVM.denyToolCall() }
-                )
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-                .animation(.spring(duration: 0.3, bounce: 0.15), value: chatVM.pendingToolConfirmation != nil)
-                .padding(.bottom, 4)
+                canvasConstrained {
+                    ToolConfirmationBar(
+                        confirmation: pending,
+                        onApprove: { chatVM.approveToolCall() },
+                        onDeny: { chatVM.denyToolCall() }
+                    )
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .animation(.spring(duration: 0.3, bounce: 0.15), value: chatVM.pendingToolConfirmation != nil)
+                    .padding(.bottom, 4)
+                }
             }
 
-            inputBar
+            canvasConstrained { inputBar }
+        }
+    }
+
+    /// Centers content into the Dia reading column in `.canvas` mode; no-op in `.panel`.
+    @ViewBuilder
+    private func canvasConstrained<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        if presentation == .canvas {
+            content()
+                .frame(maxWidth: canvasContentWidth)
+                .frame(maxWidth: .infinity)
+        } else {
+            content()
         }
     }
 
@@ -99,6 +135,8 @@ struct AIChatView: View {
             if chatVM.showHistory {
                 Text("History")
                     .font(OakStyle.ChatFont.headerTitle)
+            } else if presentation == .canvas {
+                workspaceChip
             } else {
                 Text("AI Chat")
                     .font(OakStyle.ChatFont.headerTitle)
@@ -127,27 +165,87 @@ struct AIChatView: View {
         .padding(.vertical, OakStyle.Spacing.sm)
     }
 
+    /// Pill in the canvas header showing the agent's current workspace (the
+    /// collection it is scoped to), with a clear affordance back to the whole library.
+    private var workspaceChip: some View {
+        HStack(spacing: 6) {
+            Image(systemName: workspaceName == nil ? "books.vertical" : "folder")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.secondary)
+            Text(workspaceName ?? "All Library")
+                .font(OakStyle.ChatFont.headerTitle)
+                .lineLimit(1)
+            if let onClearWorkspace, workspaceName != nil {
+                Button(action: onClearWorkspace) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.tertiary)
+                }
+                .buttonStyle(.plain)
+                .help("Clear workspace — chat across the whole library")
+            }
+        }
+        .padding(.leading, 10)
+        .padding(.trailing, workspaceName != nil && onClearWorkspace != nil ? 6 : 10)
+        .padding(.vertical, 4)
+        .background(
+            Capsule().fill(Color.primary.opacity(workspaceName == nil ? 0 : 0.06))
+        )
+    }
+
     // MARK: - Empty State
 
     @State private var emptyStateAppeared = false
 
-    private var emptyState: some View {
-        VStack(spacing: 12) {
-            Spacer()
+    private var emptyStateTitle: String {
+        if presentation == .canvas {
+            return workspaceName.map { "Ask anything about \($0)" } ?? "Ask anything"
+        }
+        return chatVM.parent != nil ? "Ask about this Document" : "Ask anything"
+    }
+
+    private var emptyStateSubtitle: String {
+        if presentation == .canvas {
+            return workspaceName != nil
+                ? "Ask questions, search, or create content in this collection."
+                : "Ask questions, search your library, or chat with AI."
+        }
+        return chatVM.parent != nil
+            ? "Ask questions, get summaries, or find information in your document."
+            : "Ask questions or chat with AI — no document needed."
+    }
+
+    @ViewBuilder
+    private var emptyStateIcon: some View {
+        if presentation == .canvas {
+            Image("MenuBarIcon")
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 44, height: 44)
+                .foregroundStyle(.tertiary)
+        } else {
             Image(systemName: "bubble.left.and.text.bubble.right")
                 .font(.system(size: 40))
                 .foregroundStyle(.tertiary)
+        }
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: presentation == .canvas ? 14 : 12) {
+            Spacer()
+            emptyStateIcon
                 .scaleEffect(emptyStateAppeared ? 1.0 : 0.8)
                 .opacity(emptyStateAppeared ? 1.0 : 0)
-            Text(chatVM.parent != nil ? "Ask about this Document" : "Ask anything")
-                .font(OakStyle.ChatFont.headerTitle)
-                .foregroundStyle(.secondary)
+            Text(emptyStateTitle)
+                .font(presentation == .canvas
+                      ? OakStyle.Font.styled(size: 24, weight: .semibold)
+                      : OakStyle.ChatFont.headerTitle)
+                .foregroundStyle(presentation == .canvas ? .primary : .secondary)
                 .offset(y: emptyStateAppeared ? 0 : 6)
                 .opacity(emptyStateAppeared ? 1.0 : 0)
-            Text(chatVM.parent != nil
-                 ? "Ask questions, get summaries, or find information in your document."
-                 : "Ask questions or chat with AI — no document needed.")
-                .font(OakStyle.Font.styled(size: 14))
+            Text(emptyStateSubtitle)
+                .font(OakStyle.Font.styled(size: presentation == .canvas ? 15 : 14))
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, OakStyle.Spacing.lg)
@@ -189,7 +287,13 @@ struct AIChatView: View {
     private var messageList: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: 12) {
+                // Eager VStack (not Lazy): each bubble's prose is an AppKit NSTextView,
+                // and LazyVStack dehydrates off-screen rows while a reply streams (content
+                // height changes every frame + scroll-to-bottom). Rehydrating an NSTextView
+                // means re-running makeNSView + TextKit layout + math/code image rendering,
+                // which blanks the whole history for ~1s at generation start/end. Keeping
+                // rows realized avoids the teardown/rebuild churn.
+                VStack(spacing: 12) {
                     ForEach(chatVM.turns) { turn in
                         ChatBubbleView(
                             turn: turn,
@@ -199,7 +303,8 @@ struct AIChatView: View {
                             onOpenCitation: { citeKey, anchor in
                                 chatVM.openCitation(citeKey: citeKey, anchor: anchor)
                             },
-                            onSaveQuizCard: onSaveQuizCard
+                            onSaveQuizCard: onSaveQuizCard,
+                            markdownTheme: presentation == .canvas ? .dia : nil
                         )
                             .id(turn.id)
                             .transition(
@@ -261,6 +366,10 @@ struct AIChatView: View {
                             )
                     }
                 )
+                // Center the message column inside the full-width scroll view so the
+                // trailing scrollbar overlay stays at the pane's right edge (canvas mode).
+                .frame(maxWidth: presentation == .canvas ? canvasContentWidth : .infinity)
+                .frame(maxWidth: .infinity, alignment: .center)
             }
             .coordinateSpace(name: "chatScroll")
             .scrollIndicators(.hidden)
@@ -445,15 +554,19 @@ struct AIChatView: View {
             .padding(.bottom, 10)
         }
         .background(
-            RoundedRectangle(cornerRadius: 18)
+            RoundedRectangle(cornerRadius: presentation == .canvas ? 22 : 18)
                 .fill(Color(nsColor: .textBackgroundColor))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 18)
-                .stroke(Color.primary.opacity(0.20), lineWidth: 1)
+            RoundedRectangle(cornerRadius: presentation == .canvas ? 22 : 18)
+                .stroke(presentation == .canvas ? OakStyle.Colors.diaHairline : Color.primary.opacity(0.20),
+                        lineWidth: 1)
         )
-        .padding(.horizontal, OakStyle.Spacing.sm)
-        .padding(.vertical, OakStyle.Spacing.xs)
+        .shadow(color: presentation == .canvas ? Color.black.opacity(0.06) : .clear,
+                radius: 8, y: 2)
+        .padding(.horizontal, presentation == .canvas ? 0 : OakStyle.Spacing.sm)
+        .padding(.bottom, presentation == .canvas ? OakStyle.Spacing.md : OakStyle.Spacing.xs)
+        .padding(.top, OakStyle.Spacing.xs)
     }
 
     // MARK: - Audio Playback
