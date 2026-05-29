@@ -50,7 +50,7 @@ struct TabBarView: View {
                 }
                 .padding(.horizontal, 16)
                 .frame(height: OakStyle.Size.tabHeight)
-                .frame(maxWidth: OakStyle.Size.tabMax, alignment: .leading)
+                .frame(width: OakStyle.Size.tabMax, alignment: .leading)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -73,7 +73,7 @@ struct TabBarView: View {
                 .padding(.leading, 16)
                 .padding(.trailing, 20)
                 .frame(height: OakStyle.Size.tabHeight)
-                .frame(maxWidth: OakStyle.Size.tabMax, alignment: .leading)
+                .frame(width: OakStyle.Size.tabMax, alignment: .leading)
                 .foregroundStyle(appState.isAgentActive ? Color(nsColor: .labelColor) : Color(nsColor: .secondaryLabelColor))
                 .background(agentPillShape)
                 .overlay(alignment: .trailing) {
@@ -102,50 +102,13 @@ struct TabBarView: View {
                 .help("AI Agent workspace")
             }
 
-            if !appState.openTabs.isEmpty || appState.quizReviewSession != nil {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 0) {
-                        ForEach(Array(appState.openTabs.enumerated()), id: \.element.id) { index, tab in
-                            DocumentTabView(
-                                tab: tab,
-                                isActive: tab.id == appState.activeTabID,
-                                isFirst: index == 0,
-                                onSelect: { appState.switchToTab(tab.id) },
-                                onClose: { appState.closeTab(tab.id) }
-                            )
-                        }
-
-                        if let session = appState.quizReviewSession {
-                            QuizTabView(
-                                isActive: appState.activeTabID == session.tabID,
-                                isFirst: appState.openTabs.isEmpty,
-                                onSelect: { appState.activeTabID = session.tabID },
-                                onClose: { appState.closeQuizReview() }
-                            )
-                        }
-                    }
-                }
-                .layoutPriority(-1)
-            }
-
-            // New tab (Dia-style router: navigate / search / ask) — sits at the
-            // end of the tab strip, like a browser's "+".
-            Button {
-                appState.openNewTab()
-            } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 14, weight: .medium))
-                    .frame(width: 28, height: 28)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(Color(nsColor: .secondaryLabelColor))
-            .help("New Tab")
-            .accessibilityLabel("New Tab")
-            .padding(.leading, 4)
-            .padding(.trailing, 8)
-
-            Spacer(minLength: 0)
+            // Document tabs share the strip width equally (Chrome-style): each tab
+            // divides the available space, capped at `tabMax` and floored at `tabMin`,
+            // scrolling only when even the floor overflows. The trailing "+" (Dia-style
+            // router) stays adjacent to the last tab; the strip's fill pushes the
+            // right-hand panel controls to the trailing edge.
+            DocumentTabStrip(appState: appState)
+                .frame(maxWidth: .infinity)
 
             // Panel mode tabs — context-dependent
             if let viewModel = appState.activeTab?.viewModel,
@@ -257,11 +220,96 @@ struct TabBarView: View {
     }
 }
 
+// MARK: - Document Tab Strip
+
+/// Chrome-style equal-width tab strip. Every document (and quiz) tab shares the
+/// available width equally — `clamp(available / count, tabMin, tabMax)` — so a few
+/// tabs sit at `tabMax` (uniform, with trailing space) and shrink together as more
+/// open. Only when even `tabMin` overflows does the strip fall back to scrolling.
+/// The trailing "+" router stays adjacent to the last tab.
+private struct DocumentTabStrip: View {
+    let appState: AppState
+
+    private let cr: CGFloat = 10           // concave radius (matches DocumentTabView)
+    private let plusWidth: CGFloat = 40    // "+" button + its horizontal padding
+
+    private var tabCount: Int {
+        appState.openTabs.count + (appState.quizReviewSession != nil ? 1 : 0)
+    }
+
+    var body: some View {
+        let maxW = OakStyle.Size.tabMax + cr * 2
+        let minW = OakStyle.Size.tabMin + cr * 2
+
+        GeometryReader { geo in
+            let available = max(0, geo.size.width - plusWidth)
+            let ideal = tabCount > 0 ? available / CGFloat(tabCount) : maxW
+            let width = min(maxW, max(minW, ideal))
+            let fits = CGFloat(tabCount) * minW <= available + 0.5
+
+            if fits {
+                row(width: width)
+                    .frame(width: geo.size.width, height: geo.size.height, alignment: .leading)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    row(width: minW)
+                }
+                .frame(width: geo.size.width, height: geo.size.height, alignment: .leading)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func row(width: CGFloat) -> some View {
+        HStack(spacing: 0) {
+            ForEach(Array(appState.openTabs.enumerated()), id: \.element.id) { index, tab in
+                DocumentTabView(
+                    tab: tab,
+                    isActive: tab.id == appState.activeTabID,
+                    isFirst: index == 0,
+                    width: width,
+                    onSelect: { appState.switchToTab(tab.id) },
+                    onClose: { appState.closeTab(tab.id) }
+                )
+            }
+
+            if let session = appState.quizReviewSession {
+                QuizTabView(
+                    isActive: appState.activeTabID == session.tabID,
+                    isFirst: appState.openTabs.isEmpty,
+                    width: width,
+                    onSelect: { appState.activeTabID = session.tabID },
+                    onClose: { appState.closeQuizReview() }
+                )
+            }
+
+            // New tab router (navigate / search / ask) — sits at the end of the strip.
+            Button {
+                appState.openNewTab()
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 14, weight: .medium))
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+            .help("New Tab")
+            .accessibilityLabel("New Tab")
+            .padding(.leading, 4)
+            .padding(.trailing, 8)
+
+            Spacer(minLength: 0)
+        }
+    }
+}
+
 // MARK: - Quiz Tab View
 
 struct QuizTabView: View {
     let isActive: Bool
     let isFirst: Bool
+    let width: CGFloat
     let onSelect: () -> Void
     let onClose: () -> Void
 
@@ -303,9 +351,7 @@ struct QuizTabView: View {
         }
         .padding(.leading, 10 + cr)
         .padding(.trailing, 10 + cr)
-        .frame(height: OakStyle.Size.tabHeight)
-        .frame(minWidth: OakStyle.Size.tabMin + cr * 2,
-               maxWidth: OakStyle.Size.tabMax + cr * 2)
+        .frame(width: width, height: OakStyle.Size.tabHeight)
         .foregroundStyle(isActive ? Color(nsColor: .labelColor) : Color(nsColor: .secondaryLabelColor))
         .background(tabShape)
         .padding(.leading, isFirst ? 0 : -cr + 3)

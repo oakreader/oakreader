@@ -79,6 +79,62 @@ extension ImportService {
         return try await importRemoteWebPage(sourceURL, fallbackHTML: info.html, title: info.title)
     }
 
+    // MARK: - Live Browser Bookmark
+
+    /// Save the current live browser page as a *bookmark* (`.link`) rather than an
+    /// offline HTML archive. Stores only the URL + a `content.md` (for AI/search),
+    /// so reopening loads the page live in the browser instead of a static snapshot.
+    /// `liveTitle`/`liveMarkdown` come from the rendered page (`LivePageBridge`),
+    /// which captures SPA content a server-side fetch would miss.
+    @discardableResult
+    func importBrowserLink(_ sourceURL: URL, liveTitle: String?, liveMarkdown: String?) async -> LibraryItem? {
+        guard sourceURL.scheme?.lowercased().hasPrefix("http") == true else { return nil }
+        if let existing = await MainActor.run(body: { store.findItem(bySourceURL: sourceURL) }) {
+            return existing
+        }
+
+        // Meta tags (og:title/og:image/description) live in the static head, so a
+        // light fetch still enriches even SPA pages with a thumbnail + description.
+        let info = await remoteInfo(for: sourceURL)
+        let title = [liveTitle, info.title, sourceURL.host, sourceURL.absoluteString]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty } ?? "Untitled"
+        let author = info.author ?? sourceURL.host ?? ""
+
+        var thumbnailData: Data?
+        if let thumbURL = info.thumbnailURL {
+            var req = URLRequest(url: thumbURL)
+            req.setValue(Self.browserUserAgent, forHTTPHeaderField: "User-Agent")
+            thumbnailData = try? await URLSession.shared.data(for: req).0
+        }
+
+        let metadata = MediaMetadata(
+            title: title,
+            author: author,
+            sourceURL: sourceURL,
+            duration: nil,
+            thumbnailURL: info.thumbnailURL,
+            publishedAt: nil,
+            description: info.description,
+            embedType: "link"
+        )
+
+        let markdown = liveMarkdown?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return await MainActor.run {
+            importEmbed(.init(
+                title: title,
+                author: author,
+                sourceURL: sourceURL,
+                duration: nil,
+                thumbnailData: thumbnailData,
+                metadata: metadata,
+                embedType: "link",
+                contentMarkdown: (markdown?.isEmpty == false) ? markdown : nil
+            ))
+        }
+    }
+
     // MARK: - PDF URL Import
 
     private func importRemotePDF(_ sourceURL: URL, suggestedTitle: String?) async throws -> LibraryItem? {

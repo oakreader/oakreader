@@ -121,6 +121,7 @@ struct DocumentTabView: View {
     let tab: DocumentTab
     let isActive: Bool
     let isFirst: Bool
+    let width: CGFloat
     let onSelect: () -> Void
     let onClose: () -> Void
 
@@ -170,9 +171,7 @@ struct DocumentTabView: View {
         }
         .padding(.leading, 10 + cr)
         .padding(.trailing, 10 + cr)
-        .frame(height: OakStyle.Size.tabHeight)
-        .frame(minWidth: OakStyle.Size.tabMin + cr * 2,
-               maxWidth: OakStyle.Size.tabMax + cr * 2)
+        .frame(width: width, height: OakStyle.Size.tabHeight)
         .foregroundStyle(isActive ? Color(nsColor: .labelColor) : Color(nsColor: .secondaryLabelColor))
         .background(tabShape)
         .padding(.leading, isFirst ? 0 : -cr + 3)

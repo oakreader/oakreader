@@ -11,6 +11,7 @@ struct NewTabView: View {
     @State private var text: String = ""
     @State private var selectedIndex: Int = 0
     @State private var fieldFocused: Bool = false
+    @Namespace private var highlight
 
     private let contentWidth: CGFloat = 640
 
@@ -79,10 +80,11 @@ struct NewTabView: View {
                     ForEach(Array(routes.enumerated()), id: \.element.id) { index, route in
                         suggestionRow(route, isSelected: index == min(selectedIndex, routes.count - 1))
                             .contentShape(Rectangle())
-                            .onTapGesture {
-                                selectedIndex = index
-                                submit()
+                            .onHover { hovering in
+                                guard hovering, selectedIndex != index else { return }
+                                withAnimation(.easeOut(duration: 0.13)) { selectedIndex = index }
                             }
+                            .onTapGesture { submit(route: route) }
                     }
                 }
                 .padding(8)
@@ -121,10 +123,13 @@ struct NewTabView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(isSelected ? Color.primary.opacity(0.06) : .clear)
-        )
+        .background {
+            if isSelected {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.primary.opacity(0.06))
+                    .matchedGeometryEffect(id: "omniboxSelection", in: highlight)
+            }
+        }
     }
 
     @ViewBuilder
@@ -197,11 +202,17 @@ struct NewTabView: View {
     private func moveSelection(_ delta: Int) {
         let count = routes.count
         guard count > 0 else { return }
-        selectedIndex = max(0, min(count - 1, selectedIndex + delta))
+        withAnimation(.easeOut(duration: 0.13)) {
+            selectedIndex = max(0, min(count - 1, selectedIndex + delta))
+        }
     }
 
     private func submit() {
         guard let route = selectedRoute else { return }
+        submit(route: route)
+    }
+
+    private func submit(route: BrowserSession.Route) {
         viewModel.appState?.routeNewTab(route, from: viewModel)
         text = ""
         selectedIndex = 0

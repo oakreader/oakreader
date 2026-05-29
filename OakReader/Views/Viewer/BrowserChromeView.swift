@@ -97,17 +97,23 @@ struct BrowserChromeView: View {
               url.scheme?.lowercased().hasPrefix("http") == true else { return }
 
         saveState = .saving
-        do {
-            let item = try await importService.importURL(url)
-            guard item != nil else { saveState = .failed; return }
-            saveState = .saved
-            viewModel.appState?.importNotification = "Saved to Reading List"
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
-            if saveState == .saved { saveState = .idle }
-        } catch {
+        // Read the rendered page (defuddle → markdown) so the saved bookmark keeps
+        // a content.md for AI/search; the page itself is reloaded live on reopen.
+        let readable = await LivePageBridge.shared.extractReadable(maxChars: 1_000_000)
+        let item = await importService.importBrowserLink(
+            url,
+            liveTitle: readable?.title,
+            liveMarkdown: readable?.markdown
+        )
+        guard item != nil else {
             saveState = .failed
-            viewModel.appState?.importNotification = "Couldn’t save: \(error.localizedDescription)"
+            viewModel.appState?.importNotification = "Couldn’t save to Reading List"
+            return
         }
+        saveState = .saved
+        viewModel.appState?.importNotification = "Saved to Reading List"
+        try? await Task.sleep(nanoseconds: 2_000_000_000)
+        if saveState == .saved { saveState = .idle }
     }
 
     private func savePasswordBanner(_ pending: PendingPasswordSave) -> some View {
