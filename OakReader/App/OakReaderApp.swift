@@ -17,10 +17,32 @@ enum DocumentAction: String {
     case firstPage, lastPage
     case toggleZenMode
     case togglePresentationMode
+
+    // Selection-anchored "instruments" — one per Marshall lifecycle bucket.
+    // The popup, the toolbar tool, and these keyboard handles all converge on
+    // the SAME application code (Beaudouin-Lafon polymorphism): the popup
+    // bypasses these and calls AnnotationViewModel directly because it already
+    // has a PDFSelection in hand; the keyboard path fires these so the active
+    // coordinator can resolve the current selection on the fly.
+    case highlightSelection
+    case underlineSelection
+    case attachSelectionToChat
+    case translateSelection
+    case askAISelection
+    case exitAnnotateMode
 }
 
 extension Notification.Name {
     static let documentAction = Notification.Name("OakReaderDocumentAction")
     static let searchIndexRebuildRequested = Notification.Name("OakReaderSearchIndexRebuildRequested")
     static let settingsNavigateToTab = Notification.Name("OakReaderSettingsNavigateToTab")
+
+    // Per-coordinator selection-action signals (one tab fires; both coordinators
+    // filter by `notification.object === viewModel`). Coordinators that own the
+    // active view resolve the current selection and apply.
+    static let selectionApplyHighlight  = Notification.Name("OakReaderSelectionApplyHighlight")
+    static let selectionApplyUnderline  = Notification.Name("OakReaderSelectionApplyUnderline")
+    static let selectionAttachToChat    = Notification.Name("OakReaderSelectionAttachToChat")
+    static let selectionTranslate       = Notification.Name("OakReaderSelectionTranslate")
+    static let selectionAskAI           = Notification.Name("OakReaderSelectionAskAI")
 }

@@ -26,6 +26,17 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
     private var selectionChangeObserver: Any?
     private var pendingPopupWork: DispatchWorkItem?
 
+    // Annotation-edit popup — Shneiderman direct-manipulation entry for the
+    // re-edit lifecycle. Click an existing annotation → popup appears anchored
+    // to its bounds. Right-click context menu remains as the parallel modeless
+    // alternative; both call into the same AnnotationViewModel mutations.
+    private var annotationEditPopup: AnnotationEditPopupPanel?
+
+    // Selection-instrument keyboard observers (⌃⌘H / U / C / T / K).
+    // Scoped to this tab's viewModel via notification.object so cross-tab
+    // shortcuts don't fire on the wrong document.
+    private var selectionInstrumentObservers: [Any] = []
+
     init(viewModel: DocumentViewModel) {
         self.viewModel = viewModel
         super.init()
@@ -72,6 +83,17 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
             guard let self,
                   let annotation = notification.userInfo?["PDFAnnotationHit"] as? PDFAnnotation else { return }
             self.viewModel.state.selectedAnnotation = annotation
+
+            // Direct-manipulation entry: clicking an annotation pops the edit
+            // panel. Skip widgets (form fields, handled separately) and skip
+            // when the user is actively marking up with a tool — they want
+            // to continue creating, not re-edit.
+            guard annotation.type != "Widget" else { return }
+            let mode = self.viewModel.state.editorMode
+            let tool = self.viewModel.annotation.currentTool
+            if mode == .annotate && tool != .none { return }
+
+            self.presentAnnotationEditPopup(for: annotation)
         }
 
         selectionChangeObserver = center.addObserver(
@@ -88,6 +110,66 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
         setupRightClickMonitor(for: pdfView)
         setupKeyMonitor()
         setupScrollMonitor(for: pdfView)
+        setupSelectionInstrumentObservers()
+    }
+
+    /// Listen for selection-anchored "instrument" notifications (highlight /
+    /// underline / attach-to-chat / translate / ask-AI). The popup bypasses
+    /// these because it already holds the PDFSelection; the keyboard path
+    /// (MainMenuBuilder shortcuts) and the toolbar's quick-actions enter here.
+    /// Both end up calling the same downstream code as the popup so all three
+    /// handles converge — Beaudouin-Lafon polymorphism over one instrument.
+    private func setupSelectionInstrumentObservers() {
+        removeSelectionInstrumentObservers()
+        let center = NotificationCenter.default
+
+        func observe(_ name: Notification.Name, _ handler: @escaping (PDFSelection) -> Void) {
+            let token = center.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
+                guard let self,
+                      (note.object as AnyObject) === self.viewModel,
+                      let pdfView = self.pdfView,
+                      let selection = pdfView.currentSelection,
+                      let text = selection.string,
+                      !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+                handler(selection)
+                pdfView.clearSelection()
+                self.dismissSelectionPopup()
+            }
+            selectionInstrumentObservers.append(token)
+        }
+
+        observe(.selectionApplyHighlight) { [weak self] sel in
+            self?.viewModel.annotation.addHighlight(for: sel)
+        }
+        observe(.selectionApplyUnderline) { [weak self] sel in
+            self?.viewModel.annotation.addUnderline(for: sel)
+        }
+        observe(.selectionAttachToChat) { [weak self] sel in
+            guard let self, let text = sel.string else { return }
+            self.viewModel.chat.addTextAttachment(text, pageIndex: self.viewModel.state.currentPageIndex)
+            self.viewModel.state.rightPanelMode = .aiChat
+        }
+        observe(.selectionTranslate) { [weak self] sel in
+            guard let self, let text = sel.string else { return }
+            self.viewModel.translation.setSourceText(text)
+            self.viewModel.state.rightPanelMode = .translation
+        }
+        observe(.selectionAskAI) { [weak self] sel in
+            guard let self, let text = sel.string else { return }
+            self.viewModel.chat.addTextAttachment(text, pageIndex: self.viewModel.state.currentPageIndex)
+            self.viewModel.state.rightPanelMode = .aiChat
+            // Caller (ChatViewModel/View) can pre-fill a canned prompt — for
+            // now we just stage the attachment and open Chat; the prompt-template
+            // system is a separate task.
+        }
+    }
+
+    private func removeSelectionInstrumentObservers() {
+        let center = NotificationCenter.default
+        for token in selectionInstrumentObservers {
+            center.removeObserver(token)
+        }
+        selectionInstrumentObservers.removeAll()
     }
 
     /// Install or remove global event monitors when the tab becomes active/inactive.
@@ -106,6 +188,7 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
             removeKeyMonitor()
             removeScrollMonitor()
             dismissSelectionPopup()
+            dismissAnnotationEditPopup()
         }
     }
 
@@ -118,13 +201,13 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
             guard let self,
                   let pdfView = self.pdfView else { return event }
 
-            // Dismiss popup on any mouse down (but not clicks on the popup itself or its sub-panels)
+            // Dismiss popups on any mouse down outside of them.
             if event.type == .leftMouseDown {
-                if let popup = self.selectionPopup, let eventWindow = event.window, popup.ownsWindow(eventWindow) {
-                    // Click is on the popup panel or its color sub-panel — let it handle it
-                } else {
-                    self.dismissSelectionPopup()
-                }
+                let eventWindow = event.window
+                let onSelectionPopup = (self.selectionPopup?.ownsWindow(eventWindow ?? NSWindow())) ?? false
+                let onAnnotationPopup = (self.annotationEditPopup?.ownsWindow(eventWindow ?? NSWindow())) ?? false
+                if !onSelectionPopup { self.dismissSelectionPopup() }
+                if !onAnnotationPopup { self.dismissAnnotationEditPopup() }
             }
 
             let mode = self.viewModel.state.editorMode
@@ -243,6 +326,31 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
         selectionPopup = nil
     }
 
+    // MARK: - Annotation Edit Popup
+
+    /// Replaces any open annotation popup (clicking a second annotation while
+    /// the first one's popup is showing should swap, not stack).
+    private func presentAnnotationEditPopup(for annotation: PDFAnnotation) {
+        dismissAnnotationEditPopup()
+        // Also dismiss any open selection popup — they're mutually exclusive
+        // contexts (one is about new marks, one is about existing marks).
+        dismissSelectionPopup()
+        guard let pdfView, let page = annotation.page else { return }
+        let popup = AnnotationEditPopupPanel(
+            viewModel: viewModel,
+            annotation: annotation,
+            pdfView: pdfView,
+            anchorPage: page,
+            onDismiss: { [weak self] in self?.annotationEditPopup = nil }
+        )
+        annotationEditPopup = popup
+    }
+
+    private func dismissAnnotationEditPopup() {
+        annotationEditPopup?.dismiss()
+        annotationEditPopup = nil
+    }
+
     // MARK: - Selection State for AI Chat
 
     private func updateSelectionState(pdfView: PDFView) {
@@ -334,11 +442,6 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
         if viewModel.state.currentPageIndex >= viewModel.pageCount - 1 { nextItem.isEnabled = false }
         menu.addItem(nextItem)
 
-        menu.addItem(.separator())
-
-        // Annotation tool toggles + color
-        appendToolItems(to: menu)
-
         return menu
     }
 
@@ -382,49 +485,7 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
         deleteItem.image = NSImage(systemSymbolName: "trash", accessibilityDescription: nil)
         menu.addItem(deleteItem)
 
-        menu.addItem(.separator())
-
-        // Annotation tool toggles + color
-        appendToolItems(to: menu)
-
         return menu
-    }
-
-    // MARK: - Shared Tool Items
-
-    /// Appends Highlight / Underline toggles, Annotation Color submenu, and Area Selection toggle.
-    private func appendToolItems(to menu: NSMenu) {
-        let isAnnotateMode = viewModel.state.editorMode == .annotate
-        let currentTool = viewModel.annotation.currentTool
-
-        let highlightItem = makeItem("Highlight", action: #selector(menuToggleHighlight), key: "", icon: "highlighter")
-        if isAnnotateMode && currentTool == .highlight { highlightItem.state = .on }
-        menu.addItem(highlightItem)
-
-        let underlineItem = makeItem("Underline", action: #selector(menuToggleUnderline), key: "", icon: "underline")
-        if isAnnotateMode && currentTool == .underline { underlineItem.state = .on }
-        menu.addItem(underlineItem)
-
-        // Annotation Color submenu (tool stroke color)
-        let toolColorItem = NSMenuItem(title: "Annotation Color", action: nil, keyEquivalent: "")
-        toolColorItem.image = NSImage(systemSymbolName: "paintpalette", accessibilityDescription: nil)
-        let toolColorMenu = NSMenu()
-        for entry in OakStyle.AnnotationColors.allColors {
-            let item = NSMenuItem(title: entry.name, action: #selector(changeToolColor(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = entry.nsColor
-            item.image = colorSwatchImage(entry.nsColor)
-            if colorsAreClose(viewModel.annotation.strokeColor, entry.nsColor) { item.state = .on }
-            toolColorMenu.addItem(item)
-        }
-        toolColorItem.submenu = toolColorMenu
-        menu.addItem(toolColorItem)
-
-        menu.addItem(.separator())
-
-        let areaItem = makeItem("Area Selection", action: #selector(menuToggleAreaSelection), key: "", icon: "rectangle.dashed")
-        if viewModel.state.editorMode == .snapshot { areaItem.state = .on }
-        menu.addItem(areaItem)
     }
 
     // MARK: - Menu Helpers
@@ -499,40 +560,6 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
         viewModel.viewer.goToPage(viewModel.state.currentPageIndex + 1)
     }
 
-    // MARK: - Menu Actions: Annotation Tools
-
-    @objc private func menuToggleHighlight() {
-        toggleAnnotationTool(.highlight)
-    }
-
-    @objc private func menuToggleUnderline() {
-        toggleAnnotationTool(.underline)
-    }
-
-    private func toggleAnnotationTool(_ tool: AnnotationTool) {
-        let isActive = viewModel.state.editorMode == .annotate && viewModel.annotation.currentTool == tool
-        if isActive {
-            viewModel.annotation.currentTool = .none
-            viewModel.setEditorMode(.viewer)
-        } else {
-            viewModel.annotation.currentTool = tool
-            viewModel.setEditorMode(.annotate)
-        }
-    }
-
-    @objc private func changeToolColor(_ sender: NSMenuItem) {
-        guard let color = sender.representedObject as? NSColor else { return }
-        viewModel.annotation.strokeColor = color
-    }
-
-    @objc private func menuToggleAreaSelection() {
-        if viewModel.state.editorMode == .snapshot {
-            viewModel.setEditorMode(.viewer)
-        } else {
-            viewModel.setEditorMode(.snapshot)
-        }
-    }
-
     // MARK: - Annotation Actions
 
     @objc private func changeAnnotationColor(_ sender: NSMenuItem) {
@@ -560,14 +587,31 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
         removeKeyMonitor()
 
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self,
-                  self.viewModel.state.editorMode == .annotate,
-                  let annotation = self.viewModel.state.selectedAnnotation else { return event }
+            guard let self else { return event }
 
-            // Delete or Backspace
-            if event.keyCode == 51 || event.keyCode == 117 {
+            // Escape: dismiss the annotation-edit popup if open, otherwise
+            // exit annotate / snapshot mode. Tesler "every mode needs a fast
+            // exit" — Escape is the universal one.
+            if event.keyCode == 53 {
+                if self.annotationEditPopup != nil {
+                    self.dismissAnnotationEditPopup()
+                    return nil
+                }
+                if self.viewModel.state.editorMode != .viewer {
+                    self.viewModel.annotation.currentTool = .none
+                    self.viewModel.setEditorMode(.viewer)
+                    self.pdfView?.window?.invalidateCursorRects(for: self.pdfView!)
+                    return nil
+                }
+            }
+
+            // Delete / Backspace removes the currently-selected annotation
+            // (only when in annotate mode with a selection).
+            if self.viewModel.state.editorMode == .annotate,
+               let annotation = self.viewModel.state.selectedAnnotation,
+               (event.keyCode == 51 || event.keyCode == 117) {
                 self.viewModel.annotation.deleteAnnotation(annotation)
-                return nil // Consume event
+                return nil
             }
             return event
         }
@@ -689,6 +733,7 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
         if let obs = scaleChangeObserver { center.removeObserver(obs) }
         if let obs = annotationHitObserver { center.removeObserver(obs) }
         if let obs = selectionChangeObserver { center.removeObserver(obs) }
+        removeSelectionInstrumentObservers()
         pageChangeObserver = nil
         scaleChangeObserver = nil
         annotationHitObserver = nil

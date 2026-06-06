@@ -340,6 +340,7 @@ struct HTMLViewerRepresentable: NSViewRepresentable {
         context.coordinator.setupProgressObservation()
         context.coordinator.setupNavigationObservation()
         context.coordinator.setupBrowserCommandObservers()
+        context.coordinator.setupSelectionInstrumentObservers()
 
         // Load content: remote URL for live link embeds, local file for HTML snapshots
         if let liveURL = viewModel.liveURL {

@@ -32,6 +32,7 @@
 		136093BE55B0DD09A6D7C24B /* TranslationSourceTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E9F2651F00EFFB87568A1CE /* TranslationSourceTextView.swift */; };
 		142C5FD3DCD265AD5C4315DF /* FormFieldOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49648117F5861D90E9E1FE53 /* FormFieldOverlay.swift */; };
 		1594C417D3246E27D360CA68 /* FormEditorViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8F15DB052AD5748299E47EA /* FormEditorViewModel.swift */; };
+		16863D0980B490617D5D6DA5 /* AnnotationEditPopupPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19548A405FBCC2C0C9A2E5EF /* AnnotationEditPopupPanel.swift */; };
 		19BF05E149357FDA5327599F /* LibraryCollectionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 412451D7D488F2DCEF2F1CF2 /* LibraryCollectionStore.swift */; };
 		1B3F3326B81994E9CC8AC3DA /* TagEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23FF5D2923FB73BB4FDA4652 /* TagEditorView.swift */; };
 		1C1463F40053DC9120B4720E /* CompressionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACEBA28EA4CB1D91190356B4 /* CompressionService.swift */; };
@@ -396,6 +397,7 @@
 		16C3E00AB1FA2424C9D33B5B /* DigitalSignatureSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DigitalSignatureSheet.swift; sourceTree = "<group>"; };
 		171E0A67F9A764F5C9264172 /* QuizXMLParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizXMLParser.swift; sourceTree = "<group>"; };
 		17EFE48B927C4FA692D2A3FB /* AgentSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSettingsView.swift; sourceTree = "<group>"; };
+		19548A405FBCC2C0C9A2E5EF /* AnnotationEditPopupPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationEditPopupPanel.swift; sourceTree = "<group>"; };
 		1BA0F12DFA84CBFFE95CD534 /* HTMLViewerRepresentable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTMLViewerRepresentable.swift; sourceTree = "<group>"; };
 		1BFBC7945B80E28C4BDE8F12 /* PermissionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsView.swift; sourceTree = "<group>"; };
 		1E17653B4A5B70DEDC4E21C1 /* AppExtensionSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppExtensionSettingsView.swift; sourceTree = "<group>"; };
@@ -745,6 +747,7 @@
 		0F0E857C79D6C846BBFC6963 /* Viewer */ = {
 			isa = PBXGroup;
 			children = (
+				19548A405FBCC2C0C9A2E5EF /* AnnotationEditPopupPanel.swift */,
 				CBDEAC41F0AF9C06236E365F /* AreaSelectionPopupPanel.swift */,
 				F62FA62E452AE2C6D5F47C62 /* AudioPlayerView.swift */,
 				77B8325AE459CB24E2335895 /* DocumentToolbarView.swift */,
@@ -1586,6 +1589,7 @@
 				A4BD890F14AF31B8DC398436 /* AgentWorkspace.swift in Sources */,
 				CC5F84581420C648776236D9 /* AgentWorkspaceView.swift in Sources */,
 				37128CF62FCF70A2582643FF /* AnnotationColorDropdown.swift in Sources */,
+				16863D0980B490617D5D6DA5 /* AnnotationEditPopupPanel.swift in Sources */,
 				00A5CCB098340CB80CB0B71D /* AnnotationListView.swift in Sources */,
 				BA681F5E1B8D6ABC7D0878ED /* AnnotationModel.swift in Sources */,
 				037D51736F4128F1CE62EADF /* AnnotationPosition.swift in Sources */,

@@ -441,8 +441,37 @@ struct AIChatView: View {
             || !chatVM.activeTokens.isEmpty
     }
 
+    /// The active document tab's current text selection, if any. Drives the
+    /// "selection ready" chip that surfaces ambient LLM context to the user.
+    private var currentSelectionText: String? {
+        guard let text = chatVM.parent?.state.selectedText else { return nil }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private func alreadyAttached(_ text: String) -> Bool {
+        chatVM.pendingAttachments.contains { att in
+            att.type == .textSelection && att.textContent == text
+        }
+    }
+
     private var inputBar: some View {
         VStack(spacing: 0) {
+            // "Selection ready" chip — passive Dia-style hint that the
+            // document has live-selected text the LLM already sees as ambient
+            // context (LLMContextProvider keeps it in the system prompt).
+            // Clicking promotes it into a real pendingAttachment so it appears
+            // in the conversation transcript too. Hidden once attached.
+            if let selText = currentSelectionText,
+               !alreadyAttached(selText) {
+                SelectionReadyChip(text: selText) {
+                    let pageIndex = chatVM.parent?.state.currentPageIndex ?? 0
+                    chatVM.addTextAttachment(selText, pageIndex: pageIndex)
+                }
+                .padding(.top, 6)
+                .padding(.horizontal, 10)
+            }
+
             // Attachment chips
             if !chatVM.pendingAttachments.isEmpty {
                 AttachmentPreviewStrip(
@@ -861,5 +890,61 @@ private struct ChatScrollbar: View {
                 .onAppear { state.viewHeight = viewH }
                 .onChange(of: geo.size.height) { _, h in state.viewHeight = h }
         }
+    }
+}
+
+/// Passive "selection ready" hint shown above the chat input when the active
+/// document tab has live-selected text that isn't yet a pendingAttachment.
+/// Dia inspired: makes the otherwise-invisible ambient LLM context (already
+/// piped via `LLMContextProvider`) visible to the user, while staying out of
+/// the way until they click. Click promotes the selection into a real
+/// attachment chip.
+private struct SelectionReadyChip: View {
+    let text: String
+    let onAttach: () -> Void
+
+    @State private var isHovering = false
+
+    private var truncated: String {
+        let single = text
+            .replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "  ", with: " ")
+        if single.count > 60 {
+            return String(single.prefix(60)) + "…"
+        }
+        return single
+    }
+
+    var body: some View {
+        Button(action: onAttach) {
+            HStack(spacing: 8) {
+                Image(systemName: "text.cursor")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+                Text(truncated)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Spacer(minLength: 6)
+                Text("Attach")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Color.accentColor)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(isHovering ? Color.primary.opacity(0.07) : Color.primary.opacity(0.04))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color.primary.opacity(0.10), lineWidth: 0.5)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovering = $0 }
+        .help("Attach the current document selection to your next message")
     }
 }

@@ -110,9 +110,10 @@ class AreaSelectionPopupPanel: NSPanel, AppResignDismissable {
     // MARK: - Content View (horizontal toolbar)
 
     private func buildContentView() -> NSView {
+        // Same Marshall-lifecycle grouping as TextSelectionPopupPanel.
         let mainStack = NSStackView()
         mainStack.orientation = .horizontal
-        mainStack.spacing = 2
+        mainStack.spacing = 4
         mainStack.edgeInsets = NSEdgeInsets(top: 8, left: 10, bottom: 8, right: 10)
         mainStack.alignment = .centerY
 
@@ -161,8 +162,8 @@ class AreaSelectionPopupPanel: NSPanel, AppResignDismissable {
         wrapper.translatesAutoresizingMaskIntoConstraints = false
         wrapper.addSubview(sep)
         NSLayoutConstraint.activate([
-            wrapper.widthAnchor.constraint(equalToConstant: 1),
-            wrapper.heightAnchor.constraint(equalToConstant: 20),
+            wrapper.widthAnchor.constraint(equalToConstant: 11),
+            wrapper.heightAnchor.constraint(equalToConstant: 22),
             sep.centerXAnchor.constraint(equalTo: wrapper.centerXAnchor),
             sep.topAnchor.constraint(equalTo: wrapper.topAnchor),
             sep.bottomAnchor.constraint(equalTo: wrapper.bottomAnchor),

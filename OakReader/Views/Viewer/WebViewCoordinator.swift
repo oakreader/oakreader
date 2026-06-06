@@ -15,6 +15,7 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
     private var progressObservation: NSKeyValueObservation?
     private var navObservations: [NSKeyValueObservation] = []
     private var commandObservers: [NSObjectProtocol] = []
+    private var selectionInstrumentObservers: [NSObjectProtocol] = []
 
     init(viewModel: DocumentViewModel) {
         self.viewModel = viewModel
@@ -30,6 +31,7 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
         progressObservation?.invalidate()
         navObservations.forEach { $0.invalidate() }
         commandObservers.forEach { NotificationCenter.default.removeObserver($0) }
+        selectionInstrumentObservers.forEach { NotificationCenter.default.removeObserver($0) }
     }
 
     // MARK: - Active State
@@ -151,6 +153,67 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
             NotificationCenter.default.removeObserver(obs)
             findTextObserver = nil
         }
+    }
+
+    // MARK: - Selection-instrument observers (HTML / live web side)
+
+    /// Mirror of `PDFViewCoordinator.setupSelectionInstrumentObservers` for the
+    /// web side. Selection text comes from `DocumentState.selectedText` (which
+    /// the bridge script keeps in sync); highlight/underline dispatch to the
+    /// OakHighlighter JS bridge — the same call the popup makes — so all three
+    /// handles (popup / shortcut / toolbar) converge on one instrument.
+    func setupSelectionInstrumentObservers() {
+        removeSelectionInstrumentObservers()
+        let center = NotificationCenter.default
+
+        func observe(_ name: Notification.Name, _ handler: @escaping (String) -> Void) {
+            let token = center.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
+                guard let self,
+                      (note.object as AnyObject) === self.viewModel,
+                      let text = self.viewModel.state.selectedText,
+                      !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+                handler(text)
+            }
+            selectionInstrumentObservers.append(token)
+        }
+
+        observe(.selectionApplyHighlight) { [weak self] _ in
+            self?.applyWebMarkup(type: "highlight")
+        }
+        observe(.selectionApplyUnderline) { [weak self] _ in
+            self?.applyWebMarkup(type: "underline")
+        }
+        observe(.selectionAttachToChat) { [weak self] text in
+            guard let self else { return }
+            self.viewModel.chat.addTextAttachment(text, pageIndex: 0)
+            self.viewModel.state.rightPanelMode = .aiChat
+        }
+        observe(.selectionTranslate) { [weak self] text in
+            guard let self else { return }
+            self.viewModel.translation.setSourceText(text)
+            self.viewModel.state.rightPanelMode = .translation
+        }
+        observe(.selectionAskAI) { [weak self] text in
+            guard let self else { return }
+            self.viewModel.chat.addTextAttachment(text, pageIndex: 0)
+            self.viewModel.state.rightPanelMode = .aiChat
+        }
+    }
+
+    private func removeSelectionInstrumentObservers() {
+        selectionInstrumentObservers.forEach { NotificationCenter.default.removeObserver($0) }
+        selectionInstrumentObservers.removeAll()
+    }
+
+    /// Dispatch a markup creation to the OakHighlighter JS bridge using the
+    /// currently-selected stroke color. JS reads the live DOM selection.
+    private func applyWebMarkup(type: String) {
+        guard let webView else { return }
+        let cssColor = viewModel.annotation.strokeColor.hexString
+        let escapedColor = cssColor.replacingOccurrences(of: "'", with: "\\'")
+        let escapedType = type.replacingOccurrences(of: "'", with: "\\'")
+        let js = "OakHighlighter.highlightSelection('\(escapedColor)', '\(escapedType)');"
+        webView.evaluateJavaScript(js, completionHandler: nil)
     }
 
     // MARK: - Setup

@@ -133,9 +133,14 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
     // MARK: - Content View (horizontal toolbar)
 
     private func buildContentView() -> NSView {
+        // Three logical groups separated by dividers, following Marshall's
+        // ecology of annotation: persistent marginalia (highlight/underline/
+        // color) | ephemeral AI actions (chat/translate/speak) | utility (copy).
+        // Spacing is wider around the dividers than within groups so the
+        // lifecycle distinction is visible at a glance — Gestalt proximity.
         let mainStack = NSStackView()
         mainStack.orientation = .horizontal
-        mainStack.spacing = 2
+        mainStack.spacing = 4
         mainStack.edgeInsets = NSEdgeInsets(top: 8, left: 10, bottom: 8, right: 10)
         mainStack.alignment = .centerY
 
@@ -215,16 +220,19 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
     }
 
     private func makeVerticalSeparator() -> NSView {
+        // 1pt separator inside an 11pt-wide wrapper: 5pt breathing room on
+        // each side. Combined with the 4pt mainStack spacing, that's ~9pt
+        // total gap around each divider vs ~4pt between buttons within a
+        // group — strong enough to read as a clear group boundary.
         let sep = NSBox()
         sep.boxType = .separator
         sep.translatesAutoresizingMaskIntoConstraints = false
-        // Rotate separator to be vertical within horizontal stack
         let wrapper = NSView()
         wrapper.translatesAutoresizingMaskIntoConstraints = false
         wrapper.addSubview(sep)
         NSLayoutConstraint.activate([
-            wrapper.widthAnchor.constraint(equalToConstant: 1),
-            wrapper.heightAnchor.constraint(equalToConstant: 20),
+            wrapper.widthAnchor.constraint(equalToConstant: 11),
+            wrapper.heightAnchor.constraint(equalToConstant: 22),
             sep.centerXAnchor.constraint(equalTo: wrapper.centerXAnchor),
             sep.topAnchor.constraint(equalTo: wrapper.topAnchor),
             sep.bottomAnchor.constraint(equalTo: wrapper.bottomAnchor),

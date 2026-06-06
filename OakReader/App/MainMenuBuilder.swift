@@ -321,6 +321,33 @@ enum MainMenuBuilder {
             key: "f", icon: "magnifyingglass", target: target
         ))
 
+        // Selection instruments (Kurtenbach-Buxton "expert tier") — same
+        // actions as the popup buttons, reachable without the popup. The
+        // popup teaches the vocabulary; the shortcuts let users skip it
+        // once muscle memory takes over. ⌃⌘ keeps a free namespace clear of
+        // the system's ⌘ standards (Copy, Find, etc.).
+        editMenu.addItem(.separator())
+        editMenu.addItem(actionItem(
+            "Highlight Selection", action: .highlightSelection,
+            key: "h", modifiers: [.command, .control], icon: "highlighter", target: target
+        ))
+        editMenu.addItem(actionItem(
+            "Underline Selection", action: .underlineSelection,
+            key: "u", modifiers: [.command, .control], icon: "underline", target: target
+        ))
+        editMenu.addItem(actionItem(
+            "Add Selection to Chat", action: .attachSelectionToChat,
+            key: "c", modifiers: [.command, .control], icon: "text.quote", target: target
+        ))
+        editMenu.addItem(actionItem(
+            "Translate Selection", action: .translateSelection,
+            key: "t", modifiers: [.command, .control], icon: "translate", target: target
+        ))
+        editMenu.addItem(actionItem(
+            "Ask AI About Selection", action: .askAISelection,
+            key: "k", modifiers: [.command, .control], icon: "sparkles", target: target
+        ))
+
         let editMenuItem = NSMenuItem(title: "Edit", action: nil, keyEquivalent: "")
         editMenuItem.submenu = editMenu
         return editMenuItem

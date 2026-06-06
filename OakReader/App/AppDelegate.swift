@@ -776,6 +776,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         case .previousPage, .nextPage, .firstPage, .lastPage:
             guard !isEditingText, case .pdf = appState.activeTab?.content else { return false }
             return true
+
+        // Selection instruments are only meaningful when the active tab has a
+        // current text selection. Disabled state grays out the menu item AND
+        // suppresses the key equivalent, so ⌃⌘H with nothing selected is a
+        // silent no-op rather than ringing the system bell.
+        case .highlightSelection, .underlineSelection,
+             .attachSelectionToChat, .translateSelection, .askAISelection:
+            guard let text = appState.activeTab?.viewModel.state.selectedText,
+                  !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+            return true
+
         default:
             return true
         }

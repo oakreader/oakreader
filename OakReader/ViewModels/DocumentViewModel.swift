@@ -307,6 +307,27 @@ class DocumentViewModel {
             viewer.goToPage(0)
         case .lastPage:
             viewer.goToPage(pageCount - 1)
+
+        // Selection instruments — the active view's coordinator resolves the
+        // current selection (PDFSelection / DOM range) and applies via the
+        // same code path as the popup, so all three handles (popup / toolbar /
+        // keyboard) land at one instrument.
+        case .highlightSelection:
+            NotificationCenter.default.post(name: .selectionApplyHighlight, object: self)
+        case .underlineSelection:
+            NotificationCenter.default.post(name: .selectionApplyUnderline, object: self)
+        case .attachSelectionToChat:
+            NotificationCenter.default.post(name: .selectionAttachToChat, object: self)
+        case .translateSelection:
+            NotificationCenter.default.post(name: .selectionTranslate, object: self)
+        case .askAISelection:
+            NotificationCenter.default.post(name: .selectionAskAI, object: self)
+
+        case .exitAnnotateMode:
+            if state.editorMode != .viewer {
+                annotation.currentTool = .none
+                setEditorMode(.viewer)
+            }
         }
     }
 

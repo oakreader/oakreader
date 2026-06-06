@@ -3,12 +3,30 @@ import PDFKit
 
 // Custom PDFView subclass that suppresses the native selection markup toolbar
 class OakReaderView: PDFView {
+    /// Held weak so we can pick a mode-appropriate cursor (iBeam in annotate
+    /// mode, crosshair in snapshot mode, arrow otherwise). Tesler mode-error
+    /// mitigation: the cursor itself reveals which mode is active so the user
+    /// doesn't have to read the toolbar to know what their next drag will do.
+    weak var documentViewModel: DocumentViewModel?
+
+    private var modeCursor: NSCursor {
+        guard let vm = documentViewModel else { return .arrow }
+        switch vm.state.editorMode {
+        case .snapshot: return .crosshair
+        case .annotate:
+            // Highlight / underline both consume a text selection, so the iBeam
+            // matches what's about to happen on click-drag.
+            return vm.annotation.currentTool == .none ? .arrow : .iBeam
+        case .viewer:   return .arrow
+        }
+    }
+
     override func resetCursorRects() {
-        addCursorRect(bounds, cursor: .arrow)
+        addCursorRect(bounds, cursor: modeCursor)
     }
 
     override func cursorUpdate(with event: NSEvent) {
-        NSCursor.arrow.set()
+        modeCursor.set()
     }
 
     override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
@@ -55,6 +73,7 @@ struct PDFViewerRepresentable: NSViewRepresentable {
 
         context.coordinator.setupObservers(for: pdfView)
         context.coordinator.pdfView = pdfView
+        pdfView.documentViewModel = viewModel
 
         return pdfView
     }

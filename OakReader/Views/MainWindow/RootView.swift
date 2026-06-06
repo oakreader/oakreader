@@ -19,15 +19,6 @@ struct RootView: View {
             // Tab bar — sits in the title bar area (merged with traffic lights)
             if !isPresenting {
                 TabBarView(appState: appState)
-
-                // Per-document toolbar — a single, active-tab-aware row that adapts
-                // to the active tab's content type (PDF / HTML snapshot / live web /
-                // markdown). Mirrors TabBarView's pattern of rendering chrome for
-                // appState.activeTab rather than mounting one per ContentView.
-                if let vm = appState.activeTab?.viewModel,
-                   shouldShowToolbar(for: vm) {
-                    DocumentToolbarView(viewModel: vm)
-                }
             }
 
             // Content: all tabs coexist in a ZStack; only the active one is visible.
@@ -134,15 +125,4 @@ struct RootView: View {
         }
     }
 
-    /// Suppress the toolbar for transitional states (new-tab router, empty tab,
-    /// no document yet) so it doesn't appear above the omnibox or empty state.
-    private func shouldShowToolbar(for vm: DocumentViewModel) -> Bool {
-        if vm.isNewTab { return false }
-        if vm.state.isPresentationMode { return false }
-        switch vm.contentType {
-        case .pdf, .html, .markdown: return vm.hasDocument
-        case .link:                   return vm.liveURL != nil || vm.hasDocument
-        case .audio:                  return false
-        }
-    }
 }

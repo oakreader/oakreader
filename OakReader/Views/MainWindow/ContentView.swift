@@ -34,8 +34,16 @@ struct ContentView: View {
                     }
                 }
 
-                // Main content column
+                // Main content column. The per-document toolbar sits at the
+                // top of THIS column (not the window's full width) so the
+                // sidebar / right panel can extend from below the tab bar all
+                // the way down — see DocumentToolbarView's doc comment for the
+                // rationale.
                 VStack(spacing: 0) {
+                    if shouldShowToolbar {
+                        DocumentToolbarView(viewModel: viewModel)
+                    }
+
                     // Main content area
                     ZStack {
                         if viewModel.isNewTab {
@@ -107,6 +115,21 @@ struct ContentView: View {
             setupActionObserver()
         }
         .onDisappear { removeActionObserver() }
+    }
+
+    /// Only render the per-document toolbar when it has content-specific
+    /// affordances to add (PDF nav/zoom/tools, HTML annotation tools, live web
+    /// address bar). Markdown notes, embed cards, the new-tab router, and
+    /// presentation mode all skip it — the tab-bar anchors suffice.
+    private var shouldShowToolbar: Bool {
+        if viewModel.isNewTab { return false }
+        if viewModel.state.isPresentationMode { return false }
+        switch viewModel.contentType {
+        case .pdf, .html: return viewModel.hasDocument
+        case .link:       return viewModel.liveURL != nil
+        case .markdown,
+             .audio:       return false
+        }
     }
 
     private var sidebarWidthRange: ClosedRange<CGFloat> {

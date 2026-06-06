@@ -1,15 +1,18 @@
 import SwiftUI
 import AppKit
 
-/// One-row, per-document toolbar mounted just below the tab bar. Replaces the
-/// `BrowserChromeView` shell: live web pages still get back/forward/reload +
-/// address bar, but PDFs, HTML snapshots, and markdown notes now share the
-/// same surface, with buttons gated by `contentType`.
+/// One-row, per-document toolbar. Mounted inside `ContentView`'s main content
+/// **column** (not at window width), so the left sidebar and right panel both
+/// extend from below the tab bar all the way down — Xcode/Mail/Notes pattern.
+/// Holds only content-specific controls (page nav, zoom, annotation tools,
+/// address bar).
 ///
-/// Layout follows the Zotero pattern — three clusters separated by dividers:
-/// `[nav]  │  [tools + shared color]  │  [actions]`. Each content type picks
-/// which clusters it wants; the tools cluster is only shown when the viewer
-/// supports text-markup annotations (PDF, HTML snapshot).
+/// **Why no sidebar / right-panel toggles here.** OakReader's tab bar already
+/// hosts those window-level anchors (sidebar toggle on the left, right-panel
+/// mode tabs on the right — see `TabBarView`). Duplicating them in the toolbar
+/// would be the literal Zotero/Preview pattern, but it competes with the
+/// existing chrome instead of complementing it. So this toolbar deliberately
+/// owns *only* the per-document affordances; the title bar owns the panels.
 struct DocumentToolbarView: View {
     let viewModel: DocumentViewModel
 
@@ -31,7 +34,7 @@ struct DocumentToolbarView: View {
         case .pdf:      pdfToolbar
         case .html:     htmlSnapshotToolbar
         case .link:     linkToolbar
-        case .markdown: markdownToolbar
+        case .markdown: EmptyView()  // nothing toolbar-worthy yet — tab-bar anchors suffice
         case .audio:    EmptyView()
         }
     }
@@ -40,67 +43,45 @@ struct DocumentToolbarView: View {
 // MARK: - PDF toolbar
 
 private extension DocumentToolbarView {
+    /// `[⊖ % ⊕ ↔]   [🖍 ▾] [□]`
+    /// Each bracket is a capsule pill (Apple Preview / Tahoe pattern). No page
+    /// field — scrolling handles motion and the page indicator lives in the
+    /// status overlay. No find button — the left sidebar's search mode owns
+    /// that affordance; duplicating it here violates "same vocabulary, single
+    /// authoritative entry" (Kurtenbach-Buxton).
     var pdfToolbar: some View {
-        HStack(spacing: 6) {
-            sidebarToggle
-            Divider().frame(height: 18)
-            pageNavGroup
+        HStack(spacing: 8) {
+            zoomPill
 
-            Spacer(minLength: 8)
+            Spacer(minLength: 12)
 
-            zoomGroup
-
-            Spacer(minLength: 8)
-
-            Divider().frame(height: 18)
-            annotationToolsGroup
-            colorSwatch
-            Divider().frame(height: 18)
-
-            findButton
-            rightPanelToggle
+            MarkupPill(viewModel: viewModel)
+            ToolPill { areaSelectionButton }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
     }
 
-    var pageNavGroup: some View {
+    var zoomPill: some View {
         let viewer = viewModel.viewer
-        return HStack(spacing: 2) {
-            OakToolButton(systemImage: "chevron.left", tooltip: "Previous Page") {
-                viewer.previousPage()
-            }
-            .disabled(!viewer.canGoToPreviousPage)
-            .opacity(viewer.canGoToPreviousPage ? 1 : 0.4)
-
-            OakToolButton(systemImage: "chevron.right", tooltip: "Next Page") {
-                viewer.nextPage()
-            }
-            .disabled(!viewer.canGoToNextPage)
-            .opacity(viewer.canGoToNextPage ? 1 : 0.4)
-
-            PageNumberField(viewModel: viewModel)
-        }
-    }
-
-    var zoomGroup: some View {
-        let viewer = viewModel.viewer
-        return HStack(spacing: 2) {
-            OakToolButton(systemImage: "minus.magnifyingglass", tooltip: "Zoom Out") {
-                viewer.zoomOut()
-            }
-            Text(viewer.zoomPercentage)
-                .font(.system(size: 12, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .frame(minWidth: 44)
-            OakToolButton(systemImage: "plus.magnifyingglass", tooltip: "Zoom In") {
-                viewer.zoomIn()
-            }
-            OakToolButton(
-                systemImage: "arrow.up.left.and.arrow.down.right.magnifyingglass",
-                tooltip: "Fit to Width"
-            ) {
-                viewer.zoomToFit()
+        return ToolPill {
+            HStack(spacing: 2) {
+                OakToolButton(systemImage: "minus.magnifyingglass", tooltip: "Zoom Out") {
+                    viewer.zoomOut()
+                }
+                Text(viewer.zoomPercentage)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .frame(minWidth: 36)
+                OakToolButton(systemImage: "plus.magnifyingglass", tooltip: "Zoom In") {
+                    viewer.zoomIn()
+                }
+                OakToolButton(
+                    systemImage: "arrow.up.left.and.arrow.down.right.magnifyingglass",
+                    tooltip: "Fit to Width"
+                ) {
+                    viewer.zoomToFit()
+                }
             }
         }
     }
@@ -109,123 +90,43 @@ private extension DocumentToolbarView {
 // MARK: - HTML snapshot toolbar
 
 private extension DocumentToolbarView {
+    /// HTML snapshots get just the annotation cluster — page nav and zoom
+    /// don't apply, and the title-bar anchors handle sidebar / panels.
     var htmlSnapshotToolbar: some View {
-        HStack(spacing: 6) {
-            sidebarToggle
-
-            Spacer(minLength: 8)
-
-            Divider().frame(height: 18)
-            annotationToolsGroup
-            colorSwatch
-            Divider().frame(height: 18)
-
-            rightPanelToggle
+        HStack(spacing: 8) {
+            Spacer()
+            MarkupPill(viewModel: viewModel)
+            ToolPill { areaSelectionButton }
+            Spacer()
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
     }
 }
 
 // MARK: - Link toolbar (live web pages and embed cards)
 
 private extension DocumentToolbarView {
-    /// Live web pages keep the full browser chrome: back / forward / reload +
-    /// editable address bar + save-to-Reading-List. Embed cards (no `liveURL`)
-    /// just get the sidebar + right-panel anchors.
+    /// Live web pages get the full browser chrome (back / forward / reload +
+    /// editable address bar + save-to-Reading-List). Embed cards (no `liveURL`)
+    /// have nothing toolbar-worthy — the tab bar already supplies the panels.
     @ViewBuilder
     var linkToolbar: some View {
-        if viewModel.liveURL != nil || viewModel.state.currentURL != nil || viewModel.isNewTab {
+        if viewModel.liveURL != nil || viewModel.state.currentURL != nil {
             LiveWebToolbarContent(viewModel: viewModel)
         } else {
-            HStack(spacing: 6) {
-                sidebarToggle
-                Spacer()
-                rightPanelToggle
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
+            EmptyView()
         }
     }
 }
 
-// MARK: - Markdown toolbar
+// MARK: - Shared groups
 
 private extension DocumentToolbarView {
-    var markdownToolbar: some View {
-        HStack(spacing: 6) {
-            sidebarToggle
-            Spacer()
-            rightPanelToggle
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-    }
-}
-
-// MARK: - Shared anchors and groups
-
-private extension DocumentToolbarView {
-    var sidebarToggle: some View {
-        OakToolButton(
-            systemImage: "sidebar.left",
-            isSelected: viewModel.state.isSidebarVisible,
-            tooltip: viewModel.state.isSidebarVisible ? "Hide Sidebar" : "Show Sidebar"
-        ) {
-            viewModel.state.isSidebarVisible.toggle()
-        }
-    }
-
-    var rightPanelToggle: some View {
-        OakToolButton(
-            systemImage: "sidebar.right",
-            isSelected: viewModel.state.rightPanelMode != nil,
-            tooltip: viewModel.state.rightPanelMode != nil ? "Hide Inspector" : "Show Inspector"
-        ) {
-            if viewModel.state.rightPanelMode != nil {
-                viewModel.state.rightPanelMode = nil
-            } else {
-                viewModel.state.rightPanelMode = .aiChat
-            }
-        }
-    }
-
-    var findButton: some View {
-        OakToolButton(
-            systemImage: "magnifyingglass",
-            isSelected: viewModel.state.sidebarMode == .search && viewModel.state.isSidebarVisible,
-            tooltip: "Find in Document"
-        ) {
-            viewModel.state.sidebarMode = .search
-            viewModel.state.isSidebarVisible = true
-        }
-    }
-
-    /// Highlight / underline / area-selection — internally each button drives the
-    /// existing `editorMode` + `currentTool` pair the PDFViewCoordinator already
-    /// observes. The mode is an implementation detail; from the user's POV they
-    /// just pick a tool.
-    var annotationToolsGroup: some View {
-        HStack(spacing: 2) {
-            annotationToolButton(.highlight, systemImage: "highlighter", tooltip: "Highlight")
-            annotationToolButton(.underline, systemImage: "underline", tooltip: "Underline")
-            areaSelectionButton
-        }
-    }
-
-    @ViewBuilder
-    func annotationToolButton(
-        _ tool: AnnotationTool,
-        systemImage: String,
-        tooltip: String
-    ) -> some View {
-        let isActive = viewModel.state.editorMode == .annotate
-            && viewModel.annotation.currentTool == tool
-        OakToolButton(systemImage: systemImage, isSelected: isActive, tooltip: tooltip) {
-            toggleAnnotationTool(tool)
-        }
-    }
-
+    /// Area selection (snapshot crop). OakReader-specific — Apple Preview has
+    /// no equivalent; it uses the Shapes tool's filled rectangle for a
+    /// visually-similar "area highlight," which is a different concept (a
+    /// persistent annotation vs. a one-shot crop). Lives in its own pill.
     var areaSelectionButton: some View {
         let isActive = viewModel.state.editorMode == .snapshot
         return OakToolButton(
@@ -240,138 +141,211 @@ private extension DocumentToolbarView {
             }
         }
     }
+}
 
-    func toggleAnnotationTool(_ tool: AnnotationTool) {
-        let isActive = viewModel.state.editorMode == .annotate
-            && viewModel.annotation.currentTool == tool
-        if isActive {
+// MARK: - Capsule pill container
+
+/// Thin wrapper that puts arbitrary toolbar content inside a soft capsule
+/// background — Apple Preview / Tahoe pattern. Use it once per "tool concept":
+/// either a single button (e.g. find, area) or a tight group of related
+/// controls (e.g. zoom +/–/fit).
+private struct ToolPill<Content: View>: View {
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        content()
+            .padding(.horizontal, 4)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(OakStyle.Colors.hoverBackground)
+            )
+    }
+}
+
+// MARK: - Markup pill (highlighter + chevron + popover)
+
+/// Apple Preview / Tahoe pattern: one pill combining the active markup tool's
+/// button with a chevron that opens a popover containing color choices and
+/// markup-type variants (Underline). Replaces the separate highlight /
+/// underline / color-swatch buttons — they were three pills' worth of chrome
+/// for what is really one "what kind of mark do I want to make" decision.
+private struct MarkupPill: View {
+    @Bindable var viewModel: DocumentViewModel
+    @State private var showMenu = false
+
+    private var currentTool: AnnotationTool { viewModel.annotation.currentTool }
+    private var isAnnotating: Bool {
+        viewModel.state.editorMode == .annotate && currentTool != .none
+    }
+
+    /// The pill's icon reflects the last-used markup tool, so the user sees
+    /// which markup type they're about to apply at a glance.
+    private var icon: String {
+        switch currentTool {
+        case .underline: return "underline"
+        default:         return "highlighter"
+        }
+    }
+
+    private var tooltip: String {
+        switch currentTool {
+        case .underline: return isAnnotating ? "Stop Underline" : "Underline"
+        default:         return isAnnotating ? "Stop Highlight" : "Highlight"
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            OakToolButton(
+                systemImage: icon,
+                isSelected: isAnnotating,
+                tooltip: tooltip
+            ) {
+                toggleMarkup()
+            }
+
+            ChevronButton {
+                showMenu = true
+            }
+            .popover(isPresented: $showMenu, arrowEdge: .bottom) {
+                MarkupMenu(viewModel: viewModel) { showMenu = false }
+            }
+            .foregroundStyle(activeAccentForeground)
+        }
+        .padding(.horizontal, 2)
+        .background(
+            Capsule(style: .continuous)
+                .fill(OakStyle.Colors.hoverBackground)
+        )
+    }
+
+    private var activeAccentForeground: Color {
+        isAnnotating ? Color.accentColor : Color(nsColor: .labelColor)
+    }
+
+    private func toggleMarkup() {
+        if isAnnotating {
             viewModel.annotation.currentTool = .none
             viewModel.setEditorMode(.viewer)
         } else {
+            // Re-activate the last-used tool, defaulting to highlight first time.
+            let tool: AnnotationTool = (currentTool == .none) ? .highlight : currentTool
             viewModel.annotation.currentTool = tool
             viewModel.setEditorMode(.annotate)
         }
     }
-
-    /// Single swatch reflecting the active tool's stroke color (Zotero pattern,
-    /// not Preview's per-attribute color triplet). Clicking pops a palette.
-    var colorSwatch: some View {
-        ColorSwatchButton(viewModel: viewModel)
-    }
 }
 
-// MARK: - Page-number field (PDF)
-
-private struct PageNumberField: View {
-    @Bindable var viewModel: DocumentViewModel
-    @State private var text: String = ""
-    @FocusState private var focused: Bool
-
-    var body: some View {
-        HStack(spacing: 4) {
-            TextField("", text: $text)
-                .textFieldStyle(.plain)
-                .multilineTextAlignment(.center)
-                .font(.system(size: 12, design: .monospaced))
-                .frame(width: 36)
-                .focused($focused)
-                .onSubmit(commit)
-                .onAppear { syncFromState() }
-                .onChange(of: viewModel.state.currentPageIndex) { _, _ in
-                    if !focused { syncFromState() }
-                }
-                .onChange(of: focused) { _, isFocused in
-                    if !isFocused { syncFromState() }
-                }
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-                .background {
-                    RoundedRectangle(cornerRadius: OakStyle.Radius.standard)
-                        .fill(OakStyle.Colors.hoverBackground)
-                }
-            Text("/ \(viewModel.pageCount)")
-                .font(.system(size: 12, design: .monospaced))
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    private func syncFromState() {
-        text = "\(viewModel.state.currentPageIndex + 1)"
-    }
-
-    private func commit() {
-        guard let value = Int(text.trimmingCharacters(in: .whitespaces)) else {
-            syncFromState()
-            return
-        }
-        viewModel.viewer.goToPage(value - 1)
-        focused = false
-    }
-}
-
-// MARK: - Color swatch
-
-private struct ColorSwatchButton: View {
-    @Bindable var viewModel: DocumentViewModel
-    @State private var showPalette = false
+private struct ChevronButton: View {
+    let action: () -> Void
     @State private var isHovering = false
 
     var body: some View {
-        Button {
-            showPalette = true
-        } label: {
-            ZStack {
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(Color(nsColor: viewModel.annotation.strokeColor))
-                    .frame(width: 16, height: 16)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 4)
-                            .stroke(Color.primary.opacity(0.18), lineWidth: 0.5)
-                    )
-            }
-            .frame(width: 28, height: 28)
-            .background(
-                RoundedRectangle(cornerRadius: OakStyle.Radius.standard)
-                    .fill(isHovering ? OakStyle.Colors.hoverBackground : .clear)
-            )
-            .contentShape(Rectangle())
+        Button(action: action) {
+            Image(systemName: "chevron.down")
+                .font(.system(size: 9, weight: .semibold))
+                .frame(width: 16, height: 28)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(isHovering ? OakStyle.Colors.activeBackground : .clear)
+        )
         .onHover { isHovering = $0 }
-        .accessibilityLabel("Annotation Color")
-        .background(TooltipTrigger(tooltip: "Annotation Color"))
-        .popover(isPresented: $showPalette, arrowEdge: .bottom) {
-            ColorPalettePopover { color in
-                viewModel.annotation.strokeColor = color
-                showPalette = false
-            }
-        }
+        .accessibilityLabel("Markup Options")
+        .background(TooltipTrigger(tooltip: "Markup Options"))
     }
 }
 
-private struct ColorPalettePopover: View {
-    let onPick: (NSColor) -> Void
+private struct MarkupMenu: View {
+    @Bindable var viewModel: DocumentViewModel
+    let onDismiss: () -> Void
 
     var body: some View {
-        let cols = [GridItem(.adaptive(minimum: 28, maximum: 28), spacing: 6)]
-        LazyVGrid(columns: cols, spacing: 6) {
+        VStack(alignment: .leading, spacing: 0) {
             ForEach(OakStyle.AnnotationColors.allColors, id: \.name) { entry in
-                Button {
-                    onPick(entry.nsColor)
-                } label: {
-                    RoundedRectangle(cornerRadius: 5)
-                        .fill(entry.color)
-                        .frame(width: 22, height: 22)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 5)
-                                .stroke(Color.primary.opacity(0.2), lineWidth: 0.5)
-                        )
-                }
-                .buttonStyle(.plain)
-                .help(entry.name)
+                colorRow(name: entry.name, color: entry.color, nsColor: entry.nsColor)
             }
+
+            Divider().padding(.vertical, 4)
+
+            toolRow(.underline, label: "Underline", systemImage: "underline")
         }
-        .padding(8)
+        .padding(.vertical, 6)
+        .frame(width: 200)
+    }
+
+    private func colorRow(name: String, color: Color, nsColor: NSColor) -> some View {
+        let isSelected = colorsAreClose(viewModel.annotation.strokeColor, nsColor)
+        return Button {
+            // Picking a color implicitly switches into markup mode with the
+            // highlight tool if we weren't already annotating — matches Preview.
+            viewModel.annotation.strokeColor = nsColor
+            if viewModel.state.editorMode != .annotate || viewModel.annotation.currentTool == .none {
+                viewModel.annotation.currentTool = .highlight
+                viewModel.setEditorMode(.annotate)
+            }
+            onDismiss()
+        } label: {
+            HStack(spacing: 10) {
+                Circle()
+                    .fill(color)
+                    .frame(width: 14, height: 14)
+                    .overlay(
+                        Circle().stroke(Color.primary.opacity(0.15), lineWidth: 0.5)
+                    )
+                Text(name)
+                    .font(.system(size: 13))
+                Spacer()
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 5)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func toolRow(_ tool: AnnotationTool, label: String, systemImage: String) -> some View {
+        let isActive = viewModel.state.editorMode == .annotate
+            && viewModel.annotation.currentTool == tool
+        return Button {
+            viewModel.annotation.currentTool = tool
+            viewModel.setEditorMode(.annotate)
+            onDismiss()
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: systemImage)
+                    .frame(width: 14)
+                    .foregroundStyle(.secondary)
+                Text(label)
+                    .font(.system(size: 13))
+                Spacer()
+                if isActive {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 5)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func colorsAreClose(_ a: NSColor, _ b: NSColor) -> Bool {
+        guard let aRGB = a.usingColorSpace(.deviceRGB),
+              let bRGB = b.usingColorSpace(.deviceRGB) else { return false }
+        let dr = abs(aRGB.redComponent - bRGB.redComponent)
+        let dg = abs(aRGB.greenComponent - bRGB.greenComponent)
+        let db = abs(aRGB.blueComponent - bRGB.blueComponent)
+        return dr < 0.02 && dg < 0.02 && db < 0.02
     }
 }
 
@@ -392,9 +366,24 @@ private struct LiveWebToolbarContent: View {
     private var isLoading: Bool { state.webLoadProgress > 0 && state.webLoadProgress < 1 }
 
     var body: some View {
-        HStack(spacing: 6) {
-            sidebarToggle
+        HStack(spacing: 8) {
+            navPill
+            addressField
+            savePill
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .onChange(of: state.currentURL) { _, newURL in
+            if !addressFocused { addressText = newURL?.absoluteString ?? "" }
+            saveState = .idle
+        }
+        .onAppear {
+            addressText = state.currentURL?.absoluteString ?? ""
+        }
+    }
 
+    private var navPill: some View {
+        HStack(spacing: 2) {
             OakToolButton(systemImage: "chevron.left", tooltip: "Back") {
                 post(.webViewGoBack)
             }
@@ -413,44 +402,21 @@ private struct LiveWebToolbarContent: View {
             ) {
                 post(isLoading ? .webViewStop : .webViewReload)
             }
-
-            addressField
-            saveButton
-            rightPanelToggle
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        .onChange(of: state.currentURL) { _, newURL in
-            if !addressFocused { addressText = newURL?.absoluteString ?? "" }
-            saveState = .idle
-        }
-        .onAppear {
-            addressText = state.currentURL?.absoluteString ?? ""
-        }
+        .padding(.horizontal, 2)
+        .background(
+            Capsule(style: .continuous)
+                .fill(OakStyle.Colors.hoverBackground)
+        )
     }
 
-    private var sidebarToggle: some View {
-        OakToolButton(
-            systemImage: "sidebar.left",
-            isSelected: state.isSidebarVisible,
-            tooltip: state.isSidebarVisible ? "Hide Sidebar" : "Show Sidebar"
-        ) {
-            state.isSidebarVisible.toggle()
-        }
-    }
-
-    private var rightPanelToggle: some View {
-        OakToolButton(
-            systemImage: "sidebar.right",
-            isSelected: state.rightPanelMode != nil,
-            tooltip: state.rightPanelMode != nil ? "Hide Inspector" : "Show Inspector"
-        ) {
-            if state.rightPanelMode != nil {
-                state.rightPanelMode = nil
-            } else {
-                state.rightPanelMode = .aiChat
-            }
-        }
+    private var savePill: some View {
+        saveButton
+            .padding(.horizontal, 2)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(OakStyle.Colors.hoverBackground)
+            )
     }
 
     @ViewBuilder
