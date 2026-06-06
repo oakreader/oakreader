@@ -136,12 +136,6 @@ private struct LibraryCollectionSidebarPanel: View {
         switch appState.libraryDetailTab {
         case .chat:
             EmptyView() // Handled at detailContentPanel level for stable identity
-        case .notes:
-            CollectionNotesPanelView(
-                appState: appState,
-                title: contextTitle,
-                items: items
-            )
         case .quizCards:
             CollectionQuizCardsPanelView(appState: appState, title: contextTitle)
         case .metadata:
@@ -267,113 +261,6 @@ private struct CollectionMetadataPanelView: View {
         let start = fmt.string(from: range.earliest)
         let end = fmt.string(from: range.latest)
         return start == end ? start : "\(start) – \(end)"
-    }
-}
-
-private struct CollectionNotesPanelView: View {
-    @Bindable var appState: AppState
-    let title: String
-    let items: [LibraryItem]
-
-    @State private var noteRows: [CollectionNoteRow] = []
-
-    private var store: LibraryStore { appState.libraryStore }
-
-    private func loadData() {
-        let service = NoteService(database: store.database)
-        let itemIds = items.map { $0.id.uuidString }
-        let grouped = (try? service.fetchNotes(forItemIds: itemIds)) ?? [:]
-        var rows: [CollectionNoteRow] = []
-        for item in items {
-            let notes = grouped[item.id.uuidString] ?? []
-            rows.append(contentsOf: notes.map { CollectionNoteRow(item: item, note: $0) })
-        }
-        noteRows = rows.sorted { lhs, rhs in
-            if lhs.note.isPinned != rhs.note.isPinned {
-                return lhs.note.isPinned
-            }
-            return lhs.note.updatedAt > rhs.note.updatedAt
-        }
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            panelHeader("Notes", subtitle: "\(noteRows.count) notes in \(title)")
-
-            if items.isEmpty {
-                emptyState(icon: "note.text", title: "No Items", subtitle: "This collection has no items.")
-            } else if noteRows.isEmpty {
-                emptyState(icon: "note.text", title: "No Notes", subtitle: "No items in this collection have notes.")
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        ForEach(noteRows) { row in
-                            Button {
-                                appState.selectedLibraryItemIDs = [row.item.id]
-                            } label: {
-                                CollectionNoteListRow(row: row)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.bottom, 8)
-                }
-            }
-        }
-        .onAppear { loadData() }
-        .onChange(of: store.selectedCollectionId) { _, _ in loadData() }
-        .onChange(of: store.selectedTagOptionId) { _, _ in loadData() }
-        .onChange(of: store.revision) { _, _ in loadData() }
-    }
-}
-
-private struct CollectionNoteRow: Identifiable {
-    let item: LibraryItem
-    let note: Note
-
-    var id: String {
-        "\(item.id.uuidString)-\(note.id.uuidString)"
-    }
-}
-
-private struct CollectionNoteListRow: View {
-    let row: CollectionNoteRow
-
-    private static let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "dd/MM/yyyy"
-        return formatter
-    }()
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 5) {
-                if row.note.isPinned {
-                    Image(systemName: "pin.fill")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.orange)
-                }
-
-                Text(row.note.displayTitle)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-            }
-
-            Text(row.item.title)
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-
-            Text(Self.dateFormatter.string(from: row.note.updatedAt))
-                .font(.system(size: 11))
-                .foregroundStyle(.tertiary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 8)
-        .contentShape(Rectangle())
     }
 }
 

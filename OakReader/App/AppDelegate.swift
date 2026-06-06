@@ -365,7 +365,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     @objc func openDocument(_ sender: Any?) {
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.pdf, .html]
+        var allowed: [UTType] = [.pdf, .html]
+        if let md = UTType(filenameExtension: "md") { allowed.append(md) }
+        if let markdown = UTType(filenameExtension: "markdown") { allowed.append(markdown) }
+        panel.allowedContentTypes = allowed
         panel.allowsMultipleSelection = true
         panel.begin { [weak self] response in
             guard response == .OK else { return }

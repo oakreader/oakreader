@@ -7,7 +7,6 @@ struct ChatCompletionItem: Identifiable, Equatable {
     enum Kind {
         case installedSkill(Skill)
         case libraryReference(LibraryRefPayload)
-        case noteReference(NoteRefPayload)
     }
 
     struct LibraryRefPayload: Equatable {
@@ -17,12 +16,6 @@ struct ChatCompletionItem: Identifiable, Equatable {
         let citeKey: String?
         let contentType: String
         let pageCount: Int
-    }
-
-    struct NoteRefPayload: Equatable {
-        let noteId: UUID
-        let title: String
-        let path: String
     }
 
     let id: String
@@ -98,8 +91,6 @@ struct ChatCompletionItem: Identifiable, Equatable {
             return "Skills"
         case .libraryReference:
             return "Library"
-        case .noteReference:
-            return "Notes"
         }
     }
 

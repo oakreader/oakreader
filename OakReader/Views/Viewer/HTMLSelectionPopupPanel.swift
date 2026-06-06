@@ -211,7 +211,7 @@ class HTMLSelectionPopupPanel: NSPanel, AppResignDismissable {
         // Separator 2
         mainStack.addArrangedSubview(makeVerticalSeparator())
 
-        // Group 3: Clipboard + Note (copy, then note)
+        // Group 3: Clipboard (copy)
         let copyBtn = PopupIconButton(
             systemImage: "doc.on.doc",
             accessibilityLabel: "Copy"
@@ -219,16 +219,6 @@ class HTMLSelectionPopupPanel: NSPanel, AppResignDismissable {
             self?.copyText()
         }
         mainStack.addArrangedSubview(copyBtn)
-
-        if Preferences.shared.isExtensionEnabled(.notes) {
-            let noteBtn = PopupIconButton(
-                systemImage: "note.text.badge.plus",
-                accessibilityLabel: "Add to Note"
-            ) { [weak self] in
-                self?.addToNote()
-            }
-            mainStack.addArrangedSubview(noteBtn)
-        }
 
         // Background container
         return makePopupGlassContainer(content: mainStack)
@@ -345,12 +335,6 @@ class HTMLSelectionPopupPanel: NSPanel, AppResignDismissable {
     private func addToChat() {
         viewModel.chat.addTextAttachment(selectedText, pageIndex: 0)
         viewModel.state.rightPanelMode = .aiChat
-        dismiss()
-    }
-
-    private func addToNote() {
-        viewModel.notes.addTextToNote(selectedText, pageIndex: nil, source: "Web Page")
-        viewModel.state.rightPanelMode = .notes
         dismiss()
     }
 
@@ -514,19 +498,6 @@ class WebAreaPopupPanel: NSPanel, AppResignDismissable {
         chatBtn.leadingAnchor.constraint(equalTo: stack.leadingAnchor, constant: 6).isActive = true
         chatBtn.trailingAnchor.constraint(equalTo: stack.trailingAnchor, constant: -6).isActive = true
 
-        // Add to Note
-        if Preferences.shared.isExtensionEnabled(.notes) {
-            let noteBtn = PopupActionButton(
-                systemImage: "note.text.badge.plus",
-                title: "Add to Note"
-            ) { [weak self] in
-                self?.addToNote()
-            }
-            stack.addArrangedSubview(noteBtn)
-            noteBtn.leadingAnchor.constraint(equalTo: stack.leadingAnchor, constant: 6).isActive = true
-            noteBtn.trailingAnchor.constraint(equalTo: stack.trailingAnchor, constant: -6).isActive = true
-        }
-
         // Separator
         let sep = NSBox()
         sep.boxType = .separator
@@ -556,12 +527,6 @@ class WebAreaPopupPanel: NSPanel, AppResignDismissable {
     private func addToChat() {
         viewModel.chat.addImageAttachment(imageData, pageIndex: 0)
         viewModel.state.rightPanelMode = .aiChat
-        dismiss()
-    }
-
-    private func addToNote() {
-        viewModel.notes.addImageToNote(imageData, pageIndex: nil, source: "Web Page")
-        viewModel.state.rightPanelMode = .notes
         dismiss()
     }
 

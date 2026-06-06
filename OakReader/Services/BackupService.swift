@@ -60,7 +60,7 @@ final class BackupService {
     private let fm = FileManager.default
 
     /// Directories to include in backup (relative to ~/OakReader/).
-    private let includedDirectories = ["storage", "notes", "chats", "agent"]
+    private let includedDirectories = ["storage", "chats", "agent"]
 
     /// Files/directories to exclude from backup.
     private let excludedNames: Set<String> = [

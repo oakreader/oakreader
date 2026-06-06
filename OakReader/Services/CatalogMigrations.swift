@@ -344,6 +344,13 @@ extension CatalogDatabase {
             )
         }
 
+        // MARK: v12 — Remove the Notes feature
+
+        migrator.registerMigration("v12-remove-notes") { db in
+            try db.execute(sql: "DROP INDEX IF EXISTS idx_notes_item_id")
+            try db.execute(sql: "DROP TABLE  IF EXISTS notes")
+        }
+
         return migrator
     }
 

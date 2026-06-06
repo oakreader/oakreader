@@ -10,7 +10,6 @@ enum ZoteroMigrationPhase: String {
     case items = "Importing items..."
     case attachments = "Copying files..."
     case tags = "Importing tags..."
-    case notes = "Importing notes..."
     case collectionAssignments = "Assigning items to collections..."
     case done = "Done"
 }
@@ -28,7 +27,6 @@ struct ZoteroMigrationResult {
     var htmlCount: Int = 0
     var collectionCount: Int = 0
     var tagCount: Int = 0
-    var noteCount: Int = 0
     var errors: [String] = []
     var skippedDuplicates: Int = 0
 }
@@ -83,13 +81,6 @@ private struct ZoteroAttachment {
     let key: String
     let path: String?
     let contentType: String?
-}
-
-private struct ZoteroNote {
-    let itemID: Int
-    let parentItemID: Int
-    let note: String
-    let key: String
 }
 
 // MARK: - SQLite Reader
@@ -232,24 +223,6 @@ private class ZoteroSQLiteReader {
         }
     }
 
-    func fetchNotes() -> [ZoteroNote] {
-        let sql = """
-            SELECT in2.itemID, in2.parentItemID, in2.note, i.key
-            FROM itemNotes in2
-            JOIN items i ON in2.itemID = i.itemID
-            WHERE in2.parentItemID IS NOT NULL
-              AND i.itemID NOT IN (SELECT itemID FROM deletedItems)
-        """
-        return query(sql) { stmt in
-            ZoteroNote(
-                itemID: Int(sqlite3_column_int(stmt, 0)),
-                parentItemID: Int(sqlite3_column_int(stmt, 1)),
-                note: stringCol(stmt, 2) ?? "",
-                key: stringCol(stmt, 3) ?? ""
-            )
-        }
-    }
-
     // MARK: - Helpers
 
     private func query<T>(_ sql: String, map: (OpaquePointer?) -> T) -> [T] {
@@ -280,13 +253,11 @@ final class ZoteroMigrationService {
     private let store: LibraryStore
     private let coverService: LibraryCoverService
     private let referenceService: ReferenceService
-    private let noteService: NoteService
 
     init(store: LibraryStore, coverService: LibraryCoverService, referenceService: ReferenceService) {
         self.store = store
         self.coverService = coverService
         self.referenceService = referenceService
-        self.noteService = NoteService(database: store.database)
     }
 
     // MARK: - Detection
@@ -331,15 +302,13 @@ final class ZoteroMigrationService {
         let zTags = reader.fetchTags()
         let zItemTags = reader.fetchItemTags()
         let zAttachments = reader.fetchAttachments()
-        let zNotes = reader.fetchNotes()
 
-        Log.info(Log.zotero, "Read \(zItems.count) items, \(zCollections.count) collections, \(zTags.count) tags, \(zAttachments.count) attachments, \(zNotes.count) notes")
+        Log.info(Log.zotero, "Read \(zItems.count) items, \(zCollections.count) collections, \(zTags.count) tags, \(zAttachments.count) attachments")
 
         // Build lookup maps
         let fieldsByItem = Dictionary(grouping: zFields, by: \.itemID)
         let creatorsByItem = Dictionary(grouping: zCreators, by: \.itemID)
         let attachmentsByParent = Dictionary(grouping: zAttachments, by: \.parentItemID)
-        let notesByParent = Dictionary(grouping: zNotes, by: \.parentItemID)
         let tagMap = Dictionary(uniqueKeysWithValues: zTags.map { ($0.tagID, $0.name) })
         let tagsByItem = Dictionary(grouping: zItemTags, by: \.itemID)
         let collectionItemsByCollection = Dictionary(grouping: zCollectionItems, by: \.collectionID)
@@ -741,36 +710,7 @@ final class ZoteroMigrationService {
             }
         }
 
-        // Phase 5: Notes
-        prog.phase = .notes
-        prog.total = zNotes.count
-        prog.current = 0
-        progress(prog)
-
-        for zNote in zNotes {
-            prog.current += 1
-            guard let oakItemId = itemMap[zNote.parentItemID] else { continue }
-
-            let markdownContent = convertHTMLToMarkdown(zNote.note)
-            let noteTitle = extractNoteTitle(markdownContent)
-            prog.currentItemTitle = noteTitle
-            progress(prog)
-
-            do {
-                let note = try noteService.createNote(itemId: oakItemId)
-                try noteService.saveContent(
-                    noteId: note.id,
-                    title: noteTitle,
-                    content: markdownContent
-                )
-                result.noteCount += 1
-            } catch {
-                Log.error(Log.zotero, "Failed to create note: \(error)")
-                result.errors.append("Note import failed for item \(oakItemId)")
-            }
-        }
-
-        // Phase 6: Collection assignments
+        // Phase 5: Collection assignments
         prog.phase = .collectionAssignments
         prog.total = zCollectionItems.count
         prog.current = 0
@@ -801,7 +741,7 @@ final class ZoteroMigrationService {
 
         Log.info(Log.zotero, "Migration complete: \(result.itemCount) items, \(result.pdfCount) PDFs, " +
             "\(result.htmlCount) web pages, \(result.collectionCount) collections, " +
-            "\(result.tagCount) tags, \(result.noteCount) notes, \(result.errors.count) errors")
+            "\(result.tagCount) tags, \(result.errors.count) errors")
         return result
     }
 
@@ -981,68 +921,6 @@ final class ZoteroMigrationService {
 
         // Fallback: store as raw date
         return CSLDate(raw: trimmed)
-    }
-
-    /// Convert Zotero HTML notes to markdown (basic conversion).
-    private func convertHTMLToMarkdown(_ html: String) -> String {
-        var text = html
-
-        // Remove XML declaration and DOCTYPE
-        text = text.replacingOccurrences(of: "<\\?xml[^>]*\\?>", with: "", options: .regularExpression)
-        text = text.replacingOccurrences(of: "<!DOCTYPE[^>]*>", with: "", options: .regularExpression)
-
-        // Convert common elements
-        text = text.replacingOccurrences(of: "<h1[^>]*>(.*?)</h1>", with: "# $1\n", options: .regularExpression)
-        text = text.replacingOccurrences(of: "<h2[^>]*>(.*?)</h2>", with: "## $1\n", options: .regularExpression)
-        text = text.replacingOccurrences(of: "<h3[^>]*>(.*?)</h3>", with: "### $1\n", options: .regularExpression)
-        text = text.replacingOccurrences(of: "<h4[^>]*>(.*?)</h4>", with: "#### $1\n", options: .regularExpression)
-        text = text.replacingOccurrences(of: "<strong[^>]*>(.*?)</strong>", with: "**$1**", options: .regularExpression)
-        text = text.replacingOccurrences(of: "<b[^>]*>(.*?)</b>", with: "**$1**", options: .regularExpression)
-        text = text.replacingOccurrences(of: "<em[^>]*>(.*?)</em>", with: "*$1*", options: .regularExpression)
-        text = text.replacingOccurrences(of: "<i[^>]*>(.*?)</i>", with: "*$1*", options: .regularExpression)
-        text = text.replacingOccurrences(of: "<code[^>]*>(.*?)</code>", with: "`$1`", options: .regularExpression)
-        text = text.replacingOccurrences(of: "<blockquote[^>]*>(.*?)</blockquote>", with: "> $1\n", options: .regularExpression)
-
-        // Lists
-        text = text.replacingOccurrences(of: "<li[^>]*>(.*?)</li>", with: "- $1\n", options: .regularExpression)
-
-        // Line breaks
-        text = text.replacingOccurrences(of: "<br\\s*/?>", with: "\n", options: .regularExpression)
-        text = text.replacingOccurrences(of: "<p[^>]*>(.*?)</p>", with: "$1\n\n", options: .regularExpression)
-        text = text.replacingOccurrences(of: "<div[^>]*>(.*?)</div>", with: "$1\n", options: .regularExpression)
-
-        // Links
-        text = text.replacingOccurrences(
-            of: "<a[^>]*href=\"([^\"]*)\"[^>]*>(.*?)</a>",
-            with: "[$2]($1)",
-            options: .regularExpression
-        )
-
-        // Strip remaining HTML tags
-        text = text.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
-
-        // Decode common HTML entities
-        text = text.replacingOccurrences(of: "&amp;", with: "&")
-        text = text.replacingOccurrences(of: "&lt;", with: "<")
-        text = text.replacingOccurrences(of: "&gt;", with: ">")
-        text = text.replacingOccurrences(of: "&quot;", with: "\"")
-        text = text.replacingOccurrences(of: "&#39;", with: "'")
-        text = text.replacingOccurrences(of: "&nbsp;", with: " ")
-
-        // Collapse excessive whitespace
-        text = text.replacingOccurrences(of: "\n{3,}", with: "\n\n", options: .regularExpression)
-
-        return text.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    /// Extract a title from the first line of markdown content.
-    private func extractNoteTitle(_ markdown: String) -> String {
-        let firstLine = markdown.split(separator: "\n", maxSplits: 1).first.map(String.init) ?? ""
-        let clean = firstLine
-            .replacingOccurrences(of: "^#+\\s*", with: "", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        if clean.isEmpty { return "Zotero Note" }
-        return String(clean.prefix(100))
     }
 
     /// Topologically sort collections so that parent collections are processed before children.

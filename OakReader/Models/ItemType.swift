@@ -23,7 +23,7 @@ enum ContentType: String, Codable {
         switch self {
         case .pdf: return "PDF"
         case .html: return "Web"
-        case .markdown: return "Note"
+        case .markdown: return "Markdown"
         case .audio: return "Audio"
         case .link: return "Bookmark"
         }

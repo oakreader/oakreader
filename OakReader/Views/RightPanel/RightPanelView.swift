@@ -17,10 +17,6 @@ struct RightPanelContentView: View {
                         voiceVM: viewModel.voice,
                         onSaveQuizCard: saveQuizCardAction
                     )
-                case .notes:
-                    if Preferences.shared.isExtensionEnabled(.notes) {
-                        NotePanelView(notesVM: viewModel.notes)
-                    }
                 case .translation:
                     if Preferences.shared.isExtensionEnabled(.translation) {
                         TranslationPanelView(translationVM: viewModel.translation, voiceVM: viewModel.voice)

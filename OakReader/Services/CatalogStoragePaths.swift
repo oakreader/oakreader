@@ -27,31 +27,6 @@ extension CatalogDatabase {
         dataDirectory.appendingPathComponent("logs", isDirectory: true)
     }
 
-    /// ~/OakReader/notes/
-    static var notesDirectory: URL {
-        dataDirectory.appendingPathComponent("notes", isDirectory: true)
-    }
-
-    /// ~/OakReader/notes/attachments/
-    static var notesAttachmentsDirectory: URL {
-        notesDirectory.appendingPathComponent("attachments", isDirectory: true)
-    }
-
-    /// Centralized note file: ~/OakReader/notes/{noteId}.md
-    static func noteFileURL(noteId: UUID) -> URL {
-        notesDirectory.appendingPathComponent("\(noteId.uuidString).md")
-    }
-
-    /// ~/OakReader/notes/attachments/{noteId}/
-    static func noteAttachmentDirectory(noteId: UUID) -> URL {
-        notesAttachmentsDirectory.appendingPathComponent(noteId.uuidString, isDirectory: true)
-    }
-
-    /// ~/OakReader/notes/attachments/{noteId}/{fileName}
-    static func noteAttachmentURL(noteId: UUID, fileName: String) -> URL {
-        noteAttachmentDirectory(noteId: noteId).appendingPathComponent(fileName)
-    }
-
     /// ~/OakReader/agent/
     static var agentDirectory: URL {
         dataDirectory.appendingPathComponent("agent", isDirectory: true)
@@ -151,8 +126,6 @@ extension CatalogDatabase {
         try FileManager.default.createDirectory(at: dataDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: storageDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: logsDirectory, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: notesDirectory, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: notesAttachmentsDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: deckDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: deckAttachmentsDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: chatsDirectory, withIntermediateDirectories: true)

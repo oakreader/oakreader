@@ -131,7 +131,7 @@ private struct MergeGroupView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text("\(group.count) duplicate items")
                 .font(.system(size: 13, weight: .semibold))
-            Text("Select which item to keep. Attachments, tags, and notes from the others will be transferred to it.")
+            Text("Select which item to keep. Attachments and tags from the others will be transferred to it.")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
         }

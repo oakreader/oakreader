@@ -468,10 +468,6 @@ struct ChatBubbleView: View, Equatable {
             let title = xmlUnescape(xmlNS.substring(with: match.range(at: 1)))
             refs.append((title: title, icon: "doc.text"))
         }
-        for match in refNotePattern.matches(in: xmlBlock, range: fullRange) {
-            let title = xmlUnescape(xmlNS.substring(with: match.range(at: 1)))
-            refs.append((title: title, icon: "note.text"))
-        }
 
         return (refs, cleaned.trimmingCharacters(in: .whitespacesAndNewlines))
     }
@@ -586,14 +582,10 @@ struct ChatBubbleView: View, Equatable {
             .replacingOccurrences(of: "&quot;", with: "\"")
     }
 
-    // Regex: extract title from <doc> and <note> elements in <referenced-documents>
+    // Regex: extract title from <doc> elements in <referenced-documents>
     // swiftlint:disable:next force_try
     private static let refDocPattern = try! NSRegularExpression(
         pattern: #"<doc\s[^>]*?title="([^"]*)"[^>]*/>"#
-    )
-    // swiftlint:disable:next force_try
-    private static let refNotePattern = try! NSRegularExpression(
-        pattern: #"<note\s[^>]*?title="([^"]*)"[^>]*/>"#
     )
 
 }

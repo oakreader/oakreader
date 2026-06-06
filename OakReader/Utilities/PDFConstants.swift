@@ -132,7 +132,6 @@ enum LibrarySidebarMode: String, CaseIterable, Identifiable {
 
 enum RightPanelMode: String, CaseIterable, Identifiable {
     case aiChat
-    case notes
     case metadata
     case translation
     case quizCards = "flashcards"
@@ -143,7 +142,6 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
         switch self {
         case .metadata: return "list.bullet.rectangle.portrait"
         case .aiChat: return "bubble.left.and.bubble.right"
-        case .notes: return "note.text"
         case .translation: return "translate"
         case .quizCards: return "rectangle.on.rectangle.angled"
         }
@@ -153,7 +151,6 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
         switch self {
         case .metadata: return "Metadata"
         case .aiChat: return "AI Chat"
-        case .notes: return "Notes"
         case .translation: return "Translation"
         case .quizCards: return "Quiz Cards"
         }
@@ -161,7 +158,6 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
 }
 
 enum AppExtension: String, CaseIterable, Identifiable {
-    case notes
     case translation
     case quizCards = "flashcards"
 
@@ -169,7 +165,6 @@ enum AppExtension: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .notes: return "Notes"
         case .translation: return "Translation"
         case .quizCards: return "Quiz Cards"
         }
@@ -177,7 +172,6 @@ enum AppExtension: String, CaseIterable, Identifiable {
 
     var description: String {
         switch self {
-        case .notes: return "Rich markdown notes panel with Mermaid diagrams and image paste."
         case .translation: return "Translate selected text using AI-powered translation."
         case .quizCards: return "Spaced repetition quiz cards with FSRS scheduling."
         }
@@ -186,7 +180,6 @@ enum AppExtension: String, CaseIterable, Identifiable {
     /// SF Symbol name.
     var systemImage: String {
         switch self {
-        case .notes: return "note.text"
         case .translation: return "translate"
         case .quizCards: return "rectangle.on.rectangle.angled"
         }
@@ -199,7 +192,6 @@ enum AppExtension: String, CaseIterable, Identifiable {
 
     var rightPanelModes: [RightPanelMode] {
         switch self {
-        case .notes: return [.notes]
         case .translation: return [.translation]
         case .quizCards: return [.quizCards]
         }
@@ -236,7 +228,6 @@ enum MetadataInspectorTab: String, CaseIterable, Identifiable {
 enum LibraryDetailTab: String, CaseIterable, Identifiable {
     case chat
     case metadata
-    case notes
     case quizCards
 
     var id: String { rawValue }
@@ -245,7 +236,6 @@ enum LibraryDetailTab: String, CaseIterable, Identifiable {
         switch self {
         case .chat: return "bubble.left.and.text.bubble.right"
         case .metadata: return "list.bullet.rectangle.portrait"
-        case .notes: return "note.text"
         case .quizCards: return "rectangle.on.rectangle.angled"
         }
     }
@@ -254,7 +244,6 @@ enum LibraryDetailTab: String, CaseIterable, Identifiable {
         switch self {
         case .chat: return "AI Chat"
         case .metadata: return "Metadata"
-        case .notes: return "Notes"
         case .quizCards: return "Quiz Cards"
         }
     }

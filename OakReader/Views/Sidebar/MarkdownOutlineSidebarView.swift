@@ -88,7 +88,7 @@ struct MarkdownOutlineSidebarView: View {
     // MARK: - Outline Content
 
     private var headings: [MarkdownHeading] {
-        Self.extractHeadings(from: viewModel.markdownContent)
+        Self.extractHeadings(from: viewModel.markdownDocument?.content ?? "")
     }
 
     private var outlineContent: some View {

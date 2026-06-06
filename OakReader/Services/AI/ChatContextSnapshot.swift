@@ -52,8 +52,5 @@ struct ChatContextSnapshot: Sendable {
         let volume: String?
         let issue: String?
         let pages: String?
-
-        // Notes — title + absolute path so the AI can read them with ReadTool
-        let notes: [(title: String, path: String)]
     }
 }

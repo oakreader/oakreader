@@ -280,28 +280,17 @@ extension LibraryStore {
 
     func removeItem(_ item: LibraryItem) {
         do {
-            // Collect note IDs before deleting (cascade will remove DB records)
-            let noteIds = try database.dbQueue.read { db in
-                try Row.fetchAll(db, sql: "SELECT id FROM notes WHERE item_id = ?", arguments: [item.id.uuidString])
-                    .compactMap { UUID(uuidString: $0["id"] as String) }
-            }
             // Collect conversation IDs
             let convIds = try database.dbQueue.read { db in
                 try Row.fetchAll(db, sql: "SELECT id FROM conversations WHERE item_id = ?", arguments: [item.id.uuidString])
                     .compactMap { UUID(uuidString: $0["id"] as String) }
             }
 
-            // Delete from DB (cascades to notes, conversations records)
+            // Delete from DB (cascades to conversations records)
             try database.dbQueue.write { db in
                 try db.execute(sql: "DELETE FROM items WHERE id = ?", arguments: [item.id.uuidString])
             }
 
-            // Remove note files
-            for noteId in noteIds {
-                let url = CatalogDatabase.noteFileURL(noteId: noteId)
-                try? FileManager.default.removeItem(at: url)
-                try? FileManager.default.removeItem(at: CatalogDatabase.noteAttachmentDirectory(noteId: noteId))
-            }
             // Remove chat files
             for convId in convIds {
                 let url = CatalogDatabase.chatFileURL(sessionId: convId)
@@ -473,25 +462,19 @@ extension LibraryStore {
                         }
                     }
 
-                    // 4. Transfer notes
-                    try db.execute(
-                        sql: "UPDATE notes SET item_id = ?, updated_at = ? WHERE item_id = ?",
-                        arguments: [keeper.id.uuidString, now, dup.id.uuidString]
-                    )
-
-                    // 5. Transfer conversations
+                    // 4. Transfer conversations
                     try db.execute(
                         sql: "UPDATE conversations SET item_id = ?, updated_at = ? WHERE item_id = ?",
                         arguments: [keeper.id.uuidString, now, dup.id.uuidString]
                     )
 
-                    // 6. Transfer annotations
+                    // 5. Transfer annotations
                     try db.execute(
                         sql: "UPDATE annotations SET item_id = ?, updated_at = ? WHERE item_id = ?",
                         arguments: [keeper.id.uuidString, now, dup.id.uuidString]
                     )
 
-                    // 7. Transfer citation (if keeper lacks one)
+                    // 6. Transfer citation (if keeper lacks one)
                     let keeperHasCitation = try Int.fetchOne(db,
                         sql: "SELECT COUNT(*) FROM citations WHERE item_id = ?",
                         arguments: [keeper.id.uuidString]
@@ -504,8 +487,8 @@ extension LibraryStore {
                         )
                     }
 
-                    // 8. Delete the duplicate item and its DB records (CASCADE handles remaining references).
-                    //    Notes, conversations, annotations, and attachments were already re-parented above,
+                    // 7. Delete the duplicate item and its DB records (CASCADE handles remaining references).
+                    //    Conversations, annotations, and attachments were already re-parented above,
                     //    so CASCADE only cleans up orphaned collection_items, property_values, and citations.
                     try db.execute(
                         sql: "DELETE FROM items WHERE id = ?",

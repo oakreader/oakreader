@@ -530,11 +530,6 @@ struct LibraryTableView: View {
             .disabled(store.trashedItems.isEmpty)
         } else {
             Button {
-                createNewNote()
-            } label: {
-                Label("Add Note", systemImage: "note.text.badge.plus")
-            }
-            Button {
                 importPDFs()
             } label: {
                 Label("Import File...", systemImage: "square.and.arrow.up")
@@ -739,15 +734,6 @@ struct LibraryTableView: View {
                     break
                 }
             }
-        }
-    }
-
-    private func createNewNote() {
-        if let item = appState.importService.createStandaloneNote() {
-            if let collection = store.selectedCollection, !collection.isSmart {
-                store.addItem(item, to: collection)
-            }
-            appState.openLibraryItem(item)
         }
     }
 

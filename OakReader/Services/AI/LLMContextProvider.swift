@@ -144,17 +144,6 @@ struct LLMContextProvider {
         let ref = item?.referenceMetadata
         let csl = ref?.cslItem
 
-        // Notes — resolve to absolute paths so the AI can use ReadTool
-        var notes: [(title: String, path: String)] = []
-        if let db = vm.database, let storageKey = vm.itemStorageKey {
-            let noteService = NoteService(database: db)
-            if let fetched = try? noteService.fetchNotes(forItemId: storageKey) {
-                notes = fetched.map {
-                    ($0.displayTitle, CatalogDatabase.noteFileURL(noteId: $0.id).path)
-                }
-            }
-        }
-
         return ChatContextSnapshot.DocumentContext(
             fileName: vm.fileName,
             filePath: filePath,
@@ -176,8 +165,7 @@ struct LLMContextProvider {
             abstract: csl?.abstract,
             volume: csl?.volume,
             issue: csl?.issue,
-            pages: csl?.page,
-            notes: notes
+            pages: csl?.page
         )
     }
 
@@ -290,17 +278,6 @@ struct LLMContextProvider {
             // Collections
             if !doc.collectionNames.isEmpty {
                 docParts.append("  <collections>\(doc.collectionNames.joined(separator: ", "))</collections>")
-            }
-
-            // Notes with paths — AI can use ReadTool to read them
-            if !doc.notes.isEmpty {
-                var noteLines: [String] = []
-                for note in doc.notes {
-                    noteLines.append(
-                        "    <note title=\"\(xmlEscape(note.title))\" path=\"\(xmlEscape(note.path))\" />"
-                    )
-                }
-                docParts.append("  <notes count=\"\(doc.notes.count)\">\n\(noteLines.joined(separator: "\n"))\n  </notes>")
             }
 
             // Selected text

@@ -10,8 +10,6 @@ class DocumentViewModel {
     var html: HTMLDocument?
     var mediaDocument: MediaDocument?
     var markdownDocument: MarkdownDocument?
-    /// Observable markdown content for reactive outline updates.
-    var markdownContent: String = ""
     /// When set, the viewer loads this URL directly instead of local HTML (used for `.link` embeds).
     var liveURL: URL?
     /// True while this tab is showing the blank new-tab router omnibox (before a
@@ -83,14 +81,6 @@ class DocumentViewModel {
             vm.itemId = item.id.uuidString
         }
         _chat = vm
-        return vm
-    }
-
-    private var _notes: NotesViewModel?
-    var notes: NotesViewModel {
-        if let vm = _notes { return vm }
-        let vm = NotesViewModel(parent: self, database: database, storageKey: storageKey)
-        _notes = vm
         return vm
     }
 

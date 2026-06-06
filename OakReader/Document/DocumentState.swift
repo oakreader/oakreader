@@ -33,7 +33,7 @@ class DocumentState {
     var tableOfContents: [WebHeading] = []
 
     /// A captured login awaiting the user's decision to save it. Drives the
-    /// save-password banner in BrowserChromeView.
+    /// save-password banner in DocumentToolbarView.
     var pendingPasswordSave: PendingPasswordSave?
     var errorMessage: String?
     var showError: Bool = false

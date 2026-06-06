@@ -98,7 +98,6 @@ struct ZoteroImportProgressView: View {
                 statRow("Web pages", count: result.htmlCount)
                 statRow("Collections", count: result.collectionCount)
                 statRow("Tags", count: result.tagCount)
-                statRow("Notes", count: result.noteCount)
                 if result.skippedDuplicates > 0 {
                     statRow("Skipped (already imported)", count: result.skippedDuplicates)
                 }

@@ -440,8 +440,6 @@ private extension ChatCompletionItem {
                 .blended(withFraction: 0.5, of: .tertiaryLabelColor) ?? .controlAccentColor
         case .libraryReference:
             return .systemOrange
-        case .noteReference:
-            return .systemGreen
         }
     }
 }

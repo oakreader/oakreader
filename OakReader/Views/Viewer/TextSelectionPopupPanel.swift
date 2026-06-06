@@ -201,7 +201,7 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
         // Separator 2
         mainStack.addArrangedSubview(makeVerticalSeparator())
 
-        // Group 3: Clipboard + Note (copy, then note)
+        // Group 3: Clipboard (copy)
         let copyBtn = PopupIconButton(
             systemImage: "doc.on.doc",
             accessibilityLabel: "Copy"
@@ -209,16 +209,6 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
             self?.copySelection()
         }
         mainStack.addArrangedSubview(copyBtn)
-
-        if Preferences.shared.isExtensionEnabled(.notes) {
-            let noteBtn = PopupIconButton(
-                systemImage: "note.text.badge.plus",
-                accessibilityLabel: "Add to Note"
-            ) { [weak self] in
-                self?.addToNote()
-            }
-            mainStack.addArrangedSubview(noteBtn)
-        }
 
         // Background container
         return makePopupGlassContainer(content: mainStack)
@@ -316,15 +306,6 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
         let pageIndex = viewModel.state.currentPageIndex
         viewModel.chat.addTextAttachment(text, pageIndex: pageIndex)
         viewModel.state.rightPanelMode = .aiChat
-        pdfView?.clearSelection()
-        dismissWithAction()
-    }
-
-    private func addToNote() {
-        guard let text = selection.string, !text.isEmpty else { return }
-        let pageIndex = viewModel.state.currentPageIndex
-        viewModel.notes.addTextToNote(text, pageIndex: pageIndex, source: "PDF")
-        viewModel.state.rightPanelMode = .notes
         pdfView?.clearSelection()
         dismissWithAction()
     }

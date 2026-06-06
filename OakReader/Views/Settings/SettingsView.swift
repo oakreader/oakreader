@@ -15,7 +15,6 @@ struct SettingsView: View {
         case skills
         case webSearch
         // Extension tabs
-        case extensionNotes
         case extensionTranslation
         case extensionQuizCards
 
@@ -31,7 +30,6 @@ struct SettingsView: View {
             case .extensions: return "Extensions"
             case .skills: return "Skills"
             case .webSearch: return "Web Search"
-            case .extensionNotes: return AppExtension.notes.label
             case .extensionTranslation: return AppExtension.translation.label
             case .extensionQuizCards: return AppExtension.quizCards.label
             }
@@ -47,7 +45,6 @@ struct SettingsView: View {
             case .extensions: return "square.grid.2x2"
             case .skills: return "hammer"
             case .webSearch: return "magnifyingglass.circle"
-            case .extensionNotes: return AppExtension.notes.systemImage
             case .extensionTranslation: return AppExtension.translation.systemImage
             case .extensionQuizCards: return AppExtension.quizCards.systemImage
             }
@@ -61,7 +58,6 @@ struct SettingsView: View {
         /// The app extension this tab belongs to, if any.
         var appExtension: AppExtension? {
             switch self {
-            case .extensionNotes: return .notes
             case .extensionTranslation: return .translation
             case .extensionQuizCards: return .quizCards
             default: return nil
@@ -73,7 +69,6 @@ struct SettingsView: View {
 
         static func tab(for ext: AppExtension) -> Tab {
             switch ext {
-            case .notes: return .extensionNotes
             case .translation: return .extensionTranslation
             case .quizCards: return .extensionQuizCards
             }
@@ -166,8 +161,6 @@ struct SettingsView: View {
             SkillManagementView()
         case .webSearch:
             WebSearchSettingsView()
-        case .extensionNotes:
-            NoteSettingsView()
         case .extensionTranslation:
             TranslationSettingsView()
         case .extensionQuizCards:

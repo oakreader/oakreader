@@ -5,7 +5,6 @@ struct LibrarySidebarPanel: View {
     let item: LibraryItem
     @Bindable var appState: AppState
 
-    @State private var notesVM: NotesViewModel?
     @State private var metadataTab: MetadataInspectorTab = .info
     @State private var generatedCoverData: Data?
 
@@ -13,12 +12,7 @@ struct LibrarySidebarPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if appState.libraryDetailTab == .notes {
-                // NotePanelView manages its own scrolling
-                if let notesVM {
-                    NotePanelView(notesVM: notesVM)
-                }
-            } else if appState.libraryDetailTab == .metadata {
+            if appState.libraryDetailTab == .metadata {
                 metadataTabPicker
                 ScrollView {
                     VStack(alignment: .leading, spacing: 1) {
@@ -34,19 +28,6 @@ struct LibrarySidebarPanel: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .onChange(of: item.id) {
-            createNotesVM()
-        }
-        .onChange(of: appState.libraryDetailTab) {
-            if appState.libraryDetailTab == .notes && notesVM == nil {
-                createNotesVM()
-            }
-        }
-        .onAppear {
-            if appState.libraryDetailTab == .notes {
-                createNotesVM()
-            }
-        }
         .task(id: item.id) {
             generatedCoverData = nil
             guard item.coverImageData == nil, item.contentType == .html else { return }
@@ -82,15 +63,6 @@ struct LibrarySidebarPanel: View {
         sectionHeader("Reference")
         referenceContent
             .padding(.horizontal, OakStyle.Spacing.xs)
-    }
-
-    // MARK: - Notes VM
-
-    private func createNotesVM() {
-        notesVM = NotesViewModel(
-            database: store.database,
-            storageKey: item.storageKey
-        )
     }
 
     // MARK: - Metadata tab picker

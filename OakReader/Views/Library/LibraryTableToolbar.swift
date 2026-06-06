@@ -18,7 +18,7 @@ struct LibraryTableToolbar: View {
         (.pdf, "PDF"),
         (.html, "Web"),
         (.link, "Bookmark"),
-        (.markdown, "Note"),
+        (.markdown, "Markdown"),
         (.audio, "Audio"),
     ]
 

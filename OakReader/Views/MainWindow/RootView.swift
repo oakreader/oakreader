@@ -20,12 +20,13 @@ struct RootView: View {
             if !isPresenting {
                 TabBarView(appState: appState)
 
-                // Browser toolbar — a single, active-tab-aware row shown only when
-                // the active tab is a live web page. Mirrors TabBarView's pattern of
-                // rendering chrome for appState.activeTab rather than per-ContentView.
+                // Per-document toolbar — a single, active-tab-aware row that adapts
+                // to the active tab's content type (PDF / HTML snapshot / live web /
+                // markdown). Mirrors TabBarView's pattern of rendering chrome for
+                // appState.activeTab rather than mounting one per ContentView.
                 if let vm = appState.activeTab?.viewModel,
-                   vm.contentType == .link, vm.liveURL != nil {
-                    BrowserChromeView(viewModel: vm)
+                   shouldShowToolbar(for: vm) {
+                    DocumentToolbarView(viewModel: vm)
                 }
             }
 
@@ -130,6 +131,18 @@ struct RootView: View {
                     }
                 )
             }
+        }
+    }
+
+    /// Suppress the toolbar for transitional states (new-tab router, empty tab,
+    /// no document yet) so it doesn't appear above the omnibox or empty state.
+    private func shouldShowToolbar(for vm: DocumentViewModel) -> Bool {
+        if vm.isNewTab { return false }
+        if vm.state.isPresentationMode { return false }
+        switch vm.contentType {
+        case .pdf, .html, .markdown: return vm.hasDocument
+        case .link:                   return vm.liveURL != nil || vm.hasDocument
+        case .audio:                  return false
         }
     }
 }

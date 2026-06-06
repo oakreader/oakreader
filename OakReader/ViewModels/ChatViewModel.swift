@@ -211,19 +211,13 @@ class ChatViewModel {
         let sendText = text.isEmpty ? (effectiveSkill?.name ?? "Go") : text
         var userContent = effectiveSkill.map { Self.contentWithSkillTag(skillId: $0.id, text: text) } ?? sendText
 
-        // Extract library/note reference tokens and append XML block
+        // Extract library reference tokens and append XML block
         let libraryRefs = tokens.compactMap { token -> ChatCompletionItem.LibraryRefPayload? in
             if case .libraryReference(let p) = token.kind { return p }
             return nil
         }
-        let noteRefs = tokens.compactMap { token -> ChatCompletionItem.NoteRefPayload? in
-            if case .noteReference(let p) = token.kind { return p }
-            return nil
-        }
-        if !libraryRefs.isEmpty || !noteRefs.isEmpty {
-            userContent += "\n\n" + Self.buildReferencedDocumentsXML(
-                libraryRefs: libraryRefs, noteRefs: noteRefs
-            )
+        if !libraryRefs.isEmpty {
+            userContent += "\n\n" + Self.buildReferencedDocumentsXML(libraryRefs: libraryRefs)
         }
 
         // Create or update session record in DB
@@ -312,12 +306,6 @@ class ChatViewModel {
             if prefs.agentReadFileEnabled { tools.append(ReadTool()) }
             if prefs.agentWriteFileEnabled { tools.append(WriteTool()) }
             tools.append(BashTool())
-        }
-
-        // 5. ReadTool for notes (when document has notes or note references but ReadTool not already added)
-        let hasNoteContext = snapshot.document?.notes.isEmpty == false || !noteRefs.isEmpty
-        if hasNoteContext, !tools.contains(where: { $0.name == "read" }) {
-            tools.append(ReadTool())
         }
 
         let currentTools: [any AgentTool]? = tools.isEmpty ? nil : tools
@@ -867,8 +855,7 @@ class ChatViewModel {
     // MARK: - Referenced Documents XML
 
     private static func buildReferencedDocumentsXML(
-        libraryRefs: [ChatCompletionItem.LibraryRefPayload],
-        noteRefs: [ChatCompletionItem.NoteRefPayload]
+        libraryRefs: [ChatCompletionItem.LibraryRefPayload]
     ) -> String {
         var lines = ["<referenced-documents>"]
         for ref in libraryRefs {
@@ -878,11 +865,6 @@ class ChatViewModel {
                 + "author=\"\(xmlEsc(ref.author))\" pages=\"\(ref.pageCount)\" "
                 + "format=\"\(xmlEsc(ref.contentType))\" "
                 + "link=\"oak://cite/\(xmlEsc(ck))\" />"
-            )
-        }
-        for ref in noteRefs {
-            lines.append(
-                "  <note title=\"\(xmlEsc(ref.title))\" path=\"\(xmlEsc(ref.path))\" />"
             )
         }
         lines.append("</referenced-documents>")

@@ -91,19 +91,6 @@ final class Preferences {
         static let aiModel = "aiModel"
         /// Optional cheaper/faster model for the research subagent (empty = inherit chat model).
         static let researchModel = "researchModel"
-        // Note editor preferences
-        static let noteEditorMode = "noteEditorMode"
-        static let noteEditorFontFamily = "noteEditorFontFamily"
-        static let noteEditorFontSize = "noteEditorFontSize"
-        static let noteEditorCodeFontFamily = "noteEditorCodeFontFamily"
-        static let noteEditorLineHeight = "noteEditorLineHeight"
-        static let noteEditorLineSpacing = "noteEditorLineSpacing"
-        static let noteEditorLetterSpacing = "noteEditorLetterSpacing"
-        static let noteEditorShowLineNumbers = "noteEditorShowLineNumbers"
-        static let noteEditorRenderMath = "noteEditorRenderMath"
-        static let noteEditorRenderImages = "noteEditorRenderImages"
-        static let noteEditorHideSyntax = "noteEditorHideSyntax"
-        static let noteEditorAccentColor = "noteEditorAccentColor"
         // Plugins (extensions)
         static let disabledPlugins = "disabledPlugins"
         static let explicitlyToggledPlugins = "explicitlyToggledPlugins"
@@ -127,7 +114,6 @@ final class Preferences {
         static let globalFontSize = "globalFontSize"
         static let chatFontSize = "chatFontSize"
         static let chatLineHeightScale = "chatLineHeightScale"
-        static let noteEditorFontOverridden = "noteEditorFontOverridden"
         // Voice AI
         static let voiceTTSVoice = "voiceTTSVoice"
         static let voiceReferenceAudioPath = "voiceReferenceAudioPath"
@@ -156,7 +142,6 @@ final class Preferences {
 
     private init() {
         registerDefaults()
-        migrateNoteEditorFontOverride()
         migrateAgentPermissionLevel()
     }
 
@@ -173,23 +158,10 @@ final class Preferences {
             Keys.showStatusBar: true,
             Keys.aiProvider: "anthropic",
             Keys.aiModel: "",
-            Keys.noteEditorMode: "edit",
-            Keys.noteEditorFontFamily: "default",
-            Keys.noteEditorFontSize: 16.0,
-            Keys.noteEditorCodeFontFamily: "Menlo",
-            Keys.noteEditorLineHeight: 1.3,
-            Keys.noteEditorLineSpacing: 3.0,
-            Keys.noteEditorLetterSpacing: 0.5,
-            Keys.noteEditorShowLineNumbers: false,
-            Keys.noteEditorRenderMath: true,
-            Keys.noteEditorRenderImages: true,
-            Keys.noteEditorHideSyntax: true,
-            Keys.noteEditorAccentColor: "#0CA69A",
             Keys.globalFontFamily: "system",
             Keys.globalFontSize: 14.0,
             Keys.chatFontSize: 14.0,
             Keys.chatLineHeightScale: 1.35,
-            Keys.noteEditorFontOverridden: false,
             Keys.agentToolsEnabled: true,
             Keys.agentReadFileEnabled: true,
             Keys.agentWriteFileEnabled: true,
@@ -269,41 +241,6 @@ final class Preferences {
     var chatLineHeightScale: CGFloat {
         get { CGFloat(defaults.double(forKey: Keys.chatLineHeightScale)) }
         set { defaults.set(Double(newValue), forKey: Keys.chatLineHeightScale) }
-    }
-
-    var noteEditorFontOverridden: Bool {
-        get { defaults.bool(forKey: Keys.noteEditorFontOverridden) }
-        set { defaults.set(newValue, forKey: Keys.noteEditorFontOverridden) }
-    }
-
-    /// Effective font family for the note editor — note-specific if overridden, global otherwise.
-    var effectiveNoteEditorFontFamily: String {
-        if noteEditorFontOverridden {
-            return noteEditorFontFamily
-        }
-        return FontFamily(rawValue: globalFontFamily)?.fontName ?? ".AppleSystemUIFont"
-    }
-
-    /// Effective font size for the note editor — note-specific if overridden, global otherwise.
-    var effectiveNoteEditorFontSize: CGFloat {
-        if noteEditorFontOverridden {
-            return noteEditorFontSize
-        }
-        return globalFontSize
-    }
-
-    /// One-time migration: if user previously customized note font, mark it as overridden.
-    private func migrateNoteEditorFontOverride() {
-        let migrationKey = "noteEditorFontOverrideMigrated"
-        guard !defaults.bool(forKey: migrationKey) else { return }
-        defaults.set(true, forKey: migrationKey)
-
-        let currentFont = defaults.string(forKey: Keys.noteEditorFontFamily) ?? ".AppleSystemUIFont"
-        let currentSize = defaults.double(forKey: Keys.noteEditorFontSize)
-        let defaultFontValues: Set<String> = ["", ".AppleSystemUIFont", "default", "system"]
-        if !defaultFontValues.contains(currentFont) || (currentSize != 0 && currentSize != 16.0) {
-            defaults.set(true, forKey: Keys.noteEditorFontOverridden)
-        }
     }
 
     // MARK: - Appearance
@@ -395,68 +332,6 @@ final class Preferences {
     var researchModel: String {
         get { defaults.string(forKey: Keys.researchModel) ?? "" }
         set { defaults.set(newValue, forKey: Keys.researchModel) }
-    }
-
-    // MARK: - Note Editor Preferences
-
-    var noteEditorMode: String {
-        get { defaults.string(forKey: Keys.noteEditorMode) ?? "edit" }
-        set { defaults.set(newValue, forKey: Keys.noteEditorMode) }
-    }
-
-    var noteEditorFontFamily: String {
-        get { defaults.string(forKey: Keys.noteEditorFontFamily) ?? "default" }
-        set { defaults.set(newValue, forKey: Keys.noteEditorFontFamily) }
-    }
-
-    var noteEditorFontSize: CGFloat {
-        get { CGFloat(defaults.double(forKey: Keys.noteEditorFontSize)) }
-        set { defaults.set(Double(newValue), forKey: Keys.noteEditorFontSize) }
-    }
-
-    var noteEditorCodeFontFamily: String {
-        get { defaults.string(forKey: Keys.noteEditorCodeFontFamily) ?? "Menlo" }
-        set { defaults.set(newValue, forKey: Keys.noteEditorCodeFontFamily) }
-    }
-
-    var noteEditorLineHeight: CGFloat {
-        get { CGFloat(defaults.double(forKey: Keys.noteEditorLineHeight)) }
-        set { defaults.set(Double(newValue), forKey: Keys.noteEditorLineHeight) }
-    }
-
-    var noteEditorLineSpacing: CGFloat {
-        get { CGFloat(defaults.double(forKey: Keys.noteEditorLineSpacing)) }
-        set { defaults.set(Double(newValue), forKey: Keys.noteEditorLineSpacing) }
-    }
-
-    var noteEditorLetterSpacing: CGFloat {
-        get { CGFloat(defaults.double(forKey: Keys.noteEditorLetterSpacing)) }
-        set { defaults.set(Double(newValue), forKey: Keys.noteEditorLetterSpacing) }
-    }
-
-    var noteEditorShowLineNumbers: Bool {
-        get { defaults.bool(forKey: Keys.noteEditorShowLineNumbers) }
-        set { defaults.set(newValue, forKey: Keys.noteEditorShowLineNumbers) }
-    }
-
-    var noteEditorRenderMath: Bool {
-        get { defaults.bool(forKey: Keys.noteEditorRenderMath) }
-        set { defaults.set(newValue, forKey: Keys.noteEditorRenderMath) }
-    }
-
-    var noteEditorRenderImages: Bool {
-        get { defaults.bool(forKey: Keys.noteEditorRenderImages) }
-        set { defaults.set(newValue, forKey: Keys.noteEditorRenderImages) }
-    }
-
-    var noteEditorHideSyntax: Bool {
-        get { defaults.bool(forKey: Keys.noteEditorHideSyntax) }
-        set { defaults.set(newValue, forKey: Keys.noteEditorHideSyntax) }
-    }
-
-    var noteEditorAccentColor: String {
-        get { defaults.string(forKey: Keys.noteEditorAccentColor) ?? "#0CA69A" }
-        set { defaults.set(newValue, forKey: Keys.noteEditorAccentColor) }
     }
 
     // MARK: - Translation Preferences

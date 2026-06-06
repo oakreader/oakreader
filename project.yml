@@ -13,8 +13,6 @@ packages:
     path: Packages/OakAgent
   OakAI:
     path: Packages/OakAI
-  OakEditor:
-    path: Packages/OakEditor
   OakMarkdownUI:
     path: Packages/OakMarkdownUI
   Textual:
@@ -61,7 +59,6 @@ targets:
       - path: character
     dependencies:
       - package: OakAI
-      - package: OakEditor
       - package: OakAgent
       - package: OakMarkdownUI
       - package: Textual

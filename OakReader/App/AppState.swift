@@ -315,6 +315,7 @@ final class AppState {
             tab.viewModel.appState = self
 
             tab.title = url.deletingPathExtension().lastPathComponent
+            NSDocumentController.shared.noteNewRecentDocumentURL(url)
             openTabs.append(tab)
             activeTabID = tab.id
             updateWindowTitle()
@@ -534,7 +535,7 @@ final class AppState {
         let mdURL = item.fileURL
         guard FileManager.default.fileExists(atPath: mdURL.path) else {
             let alert = NSAlert()
-            alert.messageText = "Cannot Open Note"
+            alert.messageText = "Cannot Open Markdown"
             alert.informativeText = "The file \"\(item.title)\" could not be found in managed storage."
             alert.alertStyle = .warning
             alert.addButton(withTitle: "OK")

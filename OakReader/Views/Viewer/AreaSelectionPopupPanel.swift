@@ -140,7 +140,7 @@ class AreaSelectionPopupPanel: NSPanel, AppResignDismissable {
         // Separator 2
         mainStack.addArrangedSubview(makeVerticalSeparator())
 
-        // Group 3: Clipboard + Note (copy, then note)
+        // Group 3: Clipboard (copy image)
         let copyBtn = PopupIconButton(
             systemImage: "doc.on.doc",
             accessibilityLabel: "Copy Image"
@@ -148,16 +148,6 @@ class AreaSelectionPopupPanel: NSPanel, AppResignDismissable {
             self?.copyImage()
         }
         mainStack.addArrangedSubview(copyBtn)
-
-        if Preferences.shared.isExtensionEnabled(.notes) {
-            let noteBtn = PopupIconButton(
-                systemImage: "note.text.badge.plus",
-                accessibilityLabel: "Add to Note"
-            ) { [weak self] in
-                self?.addToNote()
-            }
-            mainStack.addArrangedSubview(noteBtn)
-        }
 
         // Background container
         return makePopupGlassContainer(content: mainStack)
@@ -256,16 +246,6 @@ class AreaSelectionPopupPanel: NSPanel, AppResignDismissable {
         }
         viewModel.chat.addImageAttachment(pngData, pageIndex: pageIndex)
         viewModel.state.rightPanelMode = .aiChat
-        dismiss()
-    }
-
-    private func addToNote() {
-        guard let pngData = renderAreaAsPNG() else {
-            dismiss()
-            return
-        }
-        viewModel.notes.addImageToNote(pngData, pageIndex: pageIndex, source: "PDF")
-        viewModel.state.rightPanelMode = .notes
         dismiss()
     }
 

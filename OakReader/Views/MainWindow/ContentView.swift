@@ -36,10 +36,6 @@ struct ContentView: View {
 
                 // Main content column
                 VStack(spacing: 0) {
-                    if viewModel.contentType == .link && !viewModel.isNewTab {
-                        Spacer().frame(height: 8)
-                    }
-
                     // Main content area
                     ZStack {
                         if viewModel.isNewTab {
@@ -194,7 +190,7 @@ struct ContentView: View {
             .padding(.horizontal, isLiveLink ? 0 : 8)
             .padding(.bottom, isLiveLink ? 0 : 8)
         case .markdown:
-            MarkdownViewerView(viewModel: viewModel)
+            MarkdownPreviewView(viewModel: viewModel)
         case .audio:
             Text("Audio playback not yet available")
                 .foregroundStyle(.secondary)
@@ -202,11 +198,11 @@ struct ContentView: View {
         }
     }
 
-    // Browser chrome (address bar + nav) lives in the shared window chrome
-    // (RootView), not here — see BrowserChromeView. This keeps a single
-    // active-tab-aware toolbar instead of one per kept-alive ContentView.
+    // The per-document toolbar (address bar + nav + tools) lives in the shared
+    // window chrome (RootView), not here — see DocumentToolbarView. This keeps a
+    // single active-tab-aware toolbar instead of one per kept-alive ContentView.
     private var liveWebView: some View {
-        // Load progress is shown inside the address field (BrowserChromeView),
+        // Load progress renders inside the address field (DocumentToolbarView),
         // not as a separate bar over the page.
         HTMLViewerRepresentable(viewModel: viewModel)
     }
