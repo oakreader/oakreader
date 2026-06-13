@@ -1,5 +1,5 @@
 import SwiftUI
-import Textual
+import OakMarkdownUI
 
 struct TranslationPanelView: View {
     @Bindable var translationVM: TranslationViewModel
@@ -136,13 +136,6 @@ struct TranslationPanelView: View {
 
     // MARK: - Target Section
 
-    private var displayText: String {
-        if translationVM.isTranslating {
-            return translationVM.translatedText.sealIncompleteMarkdown()
-        }
-        return translationVM.translatedText
-    }
-
     private var targetSection: some View {
         VStack(alignment: .leading, spacing: 0) {
             if translationVM.isTranslating && translationVM.translatedText.isEmpty {
@@ -177,12 +170,14 @@ struct TranslationPanelView: View {
             if translationVM.translatedText.isEmpty && !translationVM.isTranslating {
                 emptyState
             } else if !translationVM.translatedText.isEmpty {
-                StructuredText(markdown: displayText)
-                    .textual.textSelection(.enabled)
-                    .font(OakStyle.Font.styledBody)
-                    .frame(maxWidth: .infinity, minHeight: 60, alignment: .topLeading)
-                    .padding(.horizontal, OakStyle.Spacing.sm)
-                    .padding(.vertical, OakStyle.Spacing.xs)
+                StreamingMarkdownView(
+                    markdown: translationVM.translatedText,
+                    theme: .oak(fontSize: OakStyle.Font.body),
+                    isStreaming: translationVM.isTranslating
+                )
+                .frame(maxWidth: .infinity, minHeight: 60, alignment: .topLeading)
+                .padding(.horizontal, OakStyle.Spacing.sm)
+                .padding(.vertical, OakStyle.Spacing.xs)
 
                 targetToolbar
             }
@@ -228,13 +223,6 @@ struct TranslationPanelView: View {
 
     // MARK: - Word Explanation (inline, below source text)
 
-    private var explanationDisplayText: String {
-        if translationVM.isExplainingWord {
-            return translationVM.wordExplanation.sealIncompleteMarkdown()
-        }
-        return translationVM.wordExplanation
-    }
-
     private var wordExplanationSection: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 6) {
@@ -269,12 +257,14 @@ struct TranslationPanelView: View {
                     .frame(maxWidth: .infinity, minHeight: 40)
                     .padding(.bottom, OakStyle.Spacing.xs)
             } else {
-                StructuredText(markdown: explanationDisplayText)
-                    .textual.textSelection(.enabled)
-                    .font(OakStyle.Font.styled(size: 13))
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
-                    .padding(.horizontal, OakStyle.Spacing.sm)
-                    .padding(.vertical, OakStyle.Spacing.xs)
+                StreamingMarkdownView(
+                    markdown: translationVM.wordExplanation,
+                    theme: .oak(fontSize: 13),
+                    isStreaming: translationVM.isExplainingWord
+                )
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .padding(.horizontal, OakStyle.Spacing.sm)
+                .padding(.vertical, OakStyle.Spacing.xs)
             }
         }
         .background(

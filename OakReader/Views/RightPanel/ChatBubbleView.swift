@@ -1,7 +1,6 @@
 import SwiftUI
 import AppKit
 import OakAgent
-import Textual
 import OakMarkdownUI
 
 struct ChatBubbleView: View, Equatable {
@@ -280,26 +279,18 @@ struct ChatBubbleView: View, Equatable {
         turn.isStreaming || reveal.isAnimating
     }
 
-    /// Builds a `StructuredText` view with the shared chat styling applied.
+    /// Renders chat markdown via the native `StreamingMarkdownView` (OakMarkdownUI).
     ///
-    /// Math renders live (the `.math` extension stays on while streaming) so a
-    /// formula appears the instant its closing `$`/`$$` arrives. We never *seal*
-    /// incomplete math (see `sealIncompleteMarkdown`): Textual ignores an
-    /// unclosed `$`, so a half-written formula stays literal text until it
-    /// closes and Textual never lays out a malformed equation.
-    ///
-    /// Text *selection* is deferred until streaming settles. Textual's
-    /// `AttachmentView` reads `@Environment(TextSelectionModel.self)` per
-    /// attachment; with selection enabled the attachment overlay (a
-    /// `GeometryReader` inside `overlayPreferenceValue(Text.LayoutKey)`) can
-    /// enter a non-converging layout transaction that spins the main thread
-    /// (frozen "white screen"), and the 60fps reveal makes it far worse.
-    /// Selecting mid-stream text is pointless anyway.
+    /// It splits the (growing) markdown into fence-aware blocks and re-renders only the
+    /// trailing block while streaming. Incomplete math/markup needs no sealing — a
+    /// half-written `$…` or `**…` just stays literal until its closing delimiter arrives.
+    /// Text selection is disabled while `streaming` (a settled, selectable block is only
+    /// produced once the turn stops growing).
     @ViewBuilder
     private func chatMarkdown(_ markdown: String, streaming: Bool = false) -> some View {
         // Native renderer (OakMarkdownUI): swift-markdown + Highlightr + SwiftMath,
         // block-stack with settled-block memoization + incremental tail editing —
-        // the same native stack Dia uses. Replaces the Textual path.
+        // the same native stack Dia uses. This is the app's sole markdown renderer.
         StreamingMarkdownView(
             markdown: markdown,
             theme: markdownTheme ?? .oak(fontSize: CGFloat(chatFontSize), lineHeightScale: CGFloat(chatLineHeightScale)),
@@ -416,10 +407,9 @@ struct ChatBubbleView: View, Equatable {
             let (_, stripped) = Self.extractReferencedDocuments(from: parsed.content)
             return stripped
         }
-        // Sealing of incomplete markdown (`**bold` → `**bold**`) and math
-        // backslash protection now happen per-block inside `ChatMarkdownBlockView`
-        // — only the still-growing tail block is sealed, so we never re-scan the
-        // whole message on every streaming commit.
+        // No sealing/backslash protection needed: StreamingMarkdownView renders
+        // partial markdown as-is (unclosed markers stay literal) and handles math
+        // via its own block splitter, so we just hand it the raw revealed content.
         return reveal.displayedContent
     }
 
@@ -1268,19 +1258,3 @@ private final class StreamRevealController {
     }
 }
 
-// MARK: - Compact heading style for chat bubbles
-
-struct ChatHeadingStyle: StructuredText.HeadingStyle {
-    private static let fontScales: [CGFloat] = [1.3, 1.15, 1.05, 1.0, 0.9, 0.85]
-
-    func makeBody(configuration: Configuration) -> some View {
-        let level = min(configuration.headingLevel, 6)
-        let scale = Self.fontScales[level - 1]
-
-        configuration.label
-            .textual.fontScale(scale)
-            .textual.lineSpacing(.fontScaled(0.1))
-            .textual.blockSpacing(.fontScaled(top: 0.6, bottom: 0.3))
-            .fontWeight(.semibold)
-    }
-}

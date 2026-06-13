@@ -15,9 +15,6 @@ packages:
     path: Packages/OakAI
   OakMarkdownUI:
     path: Packages/OakMarkdownUI
-  Textual:
-    url: https://github.com/gonzalezreal/textual
-    from: "0.1.0"
   GRDB:
     url: https://github.com/groue/GRDB.swift
     from: "7.0.0"
@@ -58,7 +55,6 @@ targets:
       - package: OakAI
       - package: OakAgent
       - package: OakMarkdownUI
-      - package: Textual
       - package: GRDB
         product: GRDB
       - package: Highlightr

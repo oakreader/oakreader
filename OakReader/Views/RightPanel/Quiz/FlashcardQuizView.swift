@@ -1,5 +1,4 @@
 import SwiftUI
-import Textual
 
 /// Flashcard with a front/back flip. Chromeless — sits directly on the deck's
 /// card surface (no nested box), content centered, with a 3D flip on tap.
@@ -48,8 +47,7 @@ struct FlashcardQuizView: View {
                 .font(.system(size: 9, weight: .heavy))
                 .tracking(1.0)
                 .foregroundStyle(accent)
-            CardMarkdown(text: text)
-                .font(.system(size: 16))
+            CardMarkdown(text: text, fontSize: 16)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(maxWidth: .infinity, alignment: .leading)

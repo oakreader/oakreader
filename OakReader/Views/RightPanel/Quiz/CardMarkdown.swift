@@ -1,22 +1,18 @@
 import SwiftUI
-import Textual
+import OakMarkdownUI
 
 /// Shared markdown renderer for quiz / flashcard card content.
 ///
-/// Mirrors the chat rendering path (`ChatMarkdownBlockView`): it enables
-/// Textual's `.math` syntax extension and runs `protectingMathBackslashes()`
-/// first, so LaTeX (`$…$` / `$$…$$`) renders correctly. The plain
-/// `StructuredText(markdown:)` calls the cards used before did neither, so
-/// math was either left literal (no `.math`) or corrupted by Foundation's
-/// CommonMark parser eating backslashes (no protection).
-///
-/// Card content is short, so no block-splitting/streaming machinery is needed
-/// here — a single `StructuredText` is enough. Callers apply their own `.font`
-/// / `.foregroundStyle` modifiers on top, exactly as they did with `Text`.
+/// Uses the same native renderer as chat (`StreamingMarkdownView`), so cards and chat
+/// render identically — math (`$…$` / `$$…$$`), code, and bold/quote styling all match.
+/// Sizing comes from the `MarkdownTheme` rather than a SwiftUI `.font`, so callers pass
+/// `fontSize` instead of applying `.font` on top.
 struct CardMarkdown: View {
     let text: String
+    var fontSize: CGFloat = 15
 
     var body: some View {
-        StructuredText(markdown: text.protectingMathBackslashes(), syntaxExtensions: [.math])
+        StreamingMarkdownView(markdown: text, theme: .oak(fontSize: fontSize))
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

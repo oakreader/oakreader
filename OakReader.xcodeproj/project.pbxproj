@@ -29,7 +29,6 @@
 		16863D0980B490617D5D6DA5 /* AnnotationEditPopupPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19548A405FBCC2C0C9A2E5EF /* AnnotationEditPopupPanel.swift */; };
 		16F7523D2691D553CB16EF3B /* TableHorizontalScrollerDisabler.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEED6E60ACBAF7EBF98EA318 /* TableHorizontalScrollerDisabler.swift */; };
 		19BF05E149357FDA5327599F /* LibraryCollectionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 412451D7D488F2DCEF2F1CF2 /* LibraryCollectionStore.swift */; };
-		1F12C05244CD317724BFDF09 /* String+SealMarkdown.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D7E333AFEAE1845875EC321 /* String+SealMarkdown.swift */; };
 		1F29B2E20A85A5898E111553 /* PasswordStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80AB3683C597A5C3CC585FB3 /* PasswordStore.swift */; };
 		20A5EA555198EDD09927D2CE /* MediaSnapshotOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C893DD12AC4437684DB48663 /* MediaSnapshotOverlayView.swift */; };
 		21B88590AF81D94422233418 /* WebToolbarComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF54578B46A3D7CFAA043839 /* WebToolbarComponents.swift */; };
@@ -43,7 +42,7 @@
 		2C994311B6EF6ECF4E014F23 /* ImportService+Audio.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52295EE3D3631D17337FF543 /* ImportService+Audio.swift */; };
 		2D9994B860264CFE526D8F04 /* FTSDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAC1C7A6A23CBCC495C24F49 /* FTSDatabase.swift */; };
 		2DDC564360FD661498498235 /* ImportService+Embed.swift in Sources */ = {isa = PBXBuildFile; fileRef = 056A16C1DE874FC016E512AF /* ImportService+Embed.swift */; };
-		2EF9EF12D7A03AAADC42CD14 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = DBFC960D58BB4D238DFC9FF1 /* GRDB */; };
+		2EF9EF12D7A03AAADC42CD14 /* Highlightr in Frameworks */ = {isa = PBXBuildFile; productRef = 7AB56BF574F3683388F071F2 /* Highlightr */; };
 		2FE9ACB0BB25EED5ADE54692 /* TextExtractionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67A7297F5A3894E12796E73F /* TextExtractionService.swift */; };
 		312E8065353AA35E010D96CC /* FannedAttachmentStack.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9C644594425945C7B78ACFD /* FannedAttachmentStack.swift */; };
 		31D75CEE8AEEFE3C3681CB21 /* SkillCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE1B1725466F2575C959C69A /* SkillCommands.swift */; };
@@ -89,7 +88,7 @@
 		59AE79D7BB542D60DB5BFDCC /* CLIFormatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2983A71BA4770E4CA31A54D6 /* CLIFormatters.swift */; };
 		5B1003499D0DCB79CCBEFE65 /* ToolConfirmationBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CE29A2BBD053694A17B419D /* ToolConfirmationBar.swift */; };
 		5BE53BB1944B5092AA7CCE38 /* ItemQuizCardsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B278C1A3A744C2FD5F8DE893 /* ItemQuizCardsViewModel.swift */; };
-		5E203AE21E16EA6F26B580B6 /* Highlightr in Frameworks */ = {isa = PBXBuildFile; productRef = 7AB56BF574F3683388F071F2 /* Highlightr */; };
+		5E203AE21E16EA6F26B580B6 /* CMarkGFM in Frameworks */ = {isa = PBXBuildFile; productRef = EE983D369D941923AF2F04FF /* CMarkGFM */; };
 		5E8B8AB39E7BA7E9F8529E2F /* MainMenuBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86F8522DF838B0A5C1D31B28 /* MainMenuBuilder.swift */; };
 		5F912B6B746065725639A456 /* oak in Resources */ = {isa = PBXBuildFile; fileRef = DA9BE07C96577E1D03AA8D4F /* oak */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		5FAA0AB62E835FF6C66A904C /* OakStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD0666D04A8F068B01A5C328 /* OakStyle.swift */; };
@@ -117,7 +116,7 @@
 		785110B982E23861D414F9B1 /* AreaSelectionPopupPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBDEAC41F0AF9C06236E365F /* AreaSelectionPopupPanel.swift */; };
 		7C507FFF077224B55A687BA4 /* CommandPaletteRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 147FBC8F7EF60C47DCCF9556 /* CommandPaletteRowView.swift */; };
 		7CBC8504FA613CDF39CE8283 /* ClozeQuizView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF378933F3291D09342F746C /* ClozeQuizView.swift */; };
-		7CD7B12462D12E8B04AABBDA /* CMarkGFM in Frameworks */ = {isa = PBXBuildFile; productRef = EE983D369D941923AF2F04FF /* CMarkGFM */; };
+		7CD7B12462D12E8B04AABBDA /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = F10B728DCD9CF1D3612369BE /* Sparkle */; };
 		7E7586A8F4A8D8F88F0C7413 /* HTMLDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91FDAC96786D8B4011B623B5 /* HTMLDocument.swift */; };
 		806B3FDB25EF504E461636A4 /* PDFAnnotation+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BC5B006B91985952010BF6E /* PDFAnnotation+Extensions.swift */; };
 		80B0CA96D9643F36B4AA9E50 /* ChatHistoryDrawer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 203FB2B8AAC61EDD2FD22B9A /* ChatHistoryDrawer.swift */; };
@@ -148,7 +147,7 @@
 		986C134F1FD341E0D275E0DB /* CollectionEditorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFA59E881FAEADC7AB4ACA27 /* CollectionEditorSheet.swift */; };
 		9895930B7AB34DCA3685D778 /* SearchTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A5987B0AB524A0EDED7C3C3 /* SearchTools.swift */; };
 		98F56BC1BA4E498B56D1D476 /* ChatContextSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F7A8CF172099E0A02F7CA14 /* ChatContextSnapshot.swift */; };
-		98FA357C48DEAB6E8669CA3F /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = F10B728DCD9CF1D3612369BE /* Sparkle */; };
+		98FA357C48DEAB6E8669CA3F /* OakVoice in Frameworks */ = {isa = PBXBuildFile; productRef = 700CFFFFF234759D7CB6C385 /* OakVoice */; };
 		9AF259DE199FD7C80B076A8A /* OakServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90CA00E989DE8B804DE54C7 /* OakServer.swift */; };
 		9B9542A26B0276BDB55E969C /* LibraryEnums.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A68874A493BE4FAA33E42A1 /* LibraryEnums.swift */; };
 		9C0D39643C6F6C9114686235 /* HTMLSelectionPopupPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5BDDDE8E91B2FE0DB268BFD /* HTMLSelectionPopupPanel.swift */; };
@@ -184,8 +183,7 @@
 		B47BBACED773D14CCE38F4A3 /* AIChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5118CA820B8CFC61AF38EA47 /* AIChatView.swift */; };
 		B4E30811EC8E73E6C02A7352 /* VoiceViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DA5745F0584DA9C6E3AD3BA /* VoiceViewModel.swift */; };
 		B7D8F9FBB22A904C5496164E /* TavilySearchProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2C0A783E601F0D37DEFF58E /* TavilySearchProvider.swift */; };
-		B81B9BA647234E09506AC8D5 /* Textual in Frameworks */ = {isa = PBXBuildFile; productRef = 1EAE2888C4FE81992BDCCD25 /* Textual */; };
-		B9BE36D6C7401EE88CE7071D /* OakVoice in Frameworks */ = {isa = PBXBuildFile; productRef = 700CFFFFF234759D7CB6C385 /* OakVoice */; };
+		B81B9BA647234E09506AC8D5 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = DBFC960D58BB4D238DFC9FF1 /* GRDB */; };
 		BA0B19F86EAE8D9E358D8617 /* CommandPaletteController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEF098B7FA82F2D106A0F186 /* CommandPaletteController.swift */; };
 		BA0B27333EF86F5FC6F02701 /* OakAgent in Frameworks */ = {isa = PBXBuildFile; productRef = D1622ABDD098451C89D32128 /* OakAgent */; };
 		BA681F5E1B8D6ABC7D0878ED /* AnnotationModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CED884CFE0ED6221919B28F8 /* AnnotationModel.swift */; };
@@ -196,7 +194,6 @@
 		BF331128A5EB291CD2CE3563 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02CC2D250D2F0DC2A519B204 /* SidebarView.swift */; };
 		C0BB4EFB91FC8970E8BB9B7D /* ContentChunker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 101914D5471BD54C347EA63C /* ContentChunker.swift */; };
 		C1205D6CBED8E36E3DCFFFE0 /* ZoteroImportProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8769A6CEF743D0FD408B953D /* ZoteroImportProgressView.swift */; };
-		C163A7D801CD451EFC70BDFA /* ChatMarkdownBlocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62ADF2718CD95052DCDC5C6E /* ChatMarkdownBlocks.swift */; };
 		C2252EFF5D2937ABBC360DF1 /* TranslationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83F5836A81B34F501B65BBA1 /* TranslationViewModel.swift */; };
 		C41F3611D632FD05974FC81E /* CatalogStoragePaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF16A725DAC68F199227892D /* CatalogStoragePaths.swift */; };
 		C4A4B6846CACAAFC6BAC27E1 /* SystemPermissionStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = FADC7847A8EEE480FA43B301 /* SystemPermissionStatus.swift */; };
@@ -385,7 +382,6 @@
 		60B1BE6A503FBBAE5E5F6D33 /* ZoteroFieldMapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoteroFieldMapping.swift; sourceTree = "<group>"; };
 		6176ECEF16286177BB48421B /* SnapshotOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapshotOverlayView.swift; sourceTree = "<group>"; };
 		62560256F2EDCA5C146F6644 /* BrowserTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserTools.swift; sourceTree = "<group>"; };
-		62ADF2718CD95052DCDC5C6E /* ChatMarkdownBlocks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMarkdownBlocks.swift; sourceTree = "<group>"; };
 		62D62DFCF466824B7B1C5431 /* CitationHoverCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CitationHoverCard.swift; sourceTree = "<group>"; };
 		62D8CC8D7C726C11792024B3 /* OakReader.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OakReader.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		6540F0E88807D8C1B673F4C3 /* ChatBubbleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatBubbleView.swift; sourceTree = "<group>"; };
@@ -397,7 +393,6 @@
 		6BC5B006B91985952010BF6E /* PDFAnnotation+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PDFAnnotation+Extensions.swift"; sourceTree = "<group>"; };
 		6BCAD1385B34DBC5A6F33CD9 /* CatalogMigrations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogMigrations.swift; sourceTree = "<group>"; };
 		6D46DC9842C708EE4F886379 /* PDFViewCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFViewCoordinator.swift; sourceTree = "<group>"; };
-		6D7E333AFEAE1845875EC321 /* String+SealMarkdown.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "String+SealMarkdown.swift"; sourceTree = "<group>"; };
 		6F1E73B68CE5C3BAB49180CE /* ImportService+PDF.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ImportService+PDF.swift"; sourceTree = "<group>"; };
 		71025755C0E4031874CD681D /* AudioSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSettingsView.swift; sourceTree = "<group>"; };
 		7565F0D9DAFCB05C1541E163 /* SystemSettingsLauncher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemSettingsLauncher.swift; sourceTree = "<group>"; };
@@ -533,12 +528,11 @@
 				69646E7C83625923A7D82316 /* OakAI in Frameworks */,
 				8B2875617706938CE893A311 /* OakAgent in Frameworks */,
 				055A3A7F37ECA58BFCFE749A /* OakMarkdownUI in Frameworks */,
-				B81B9BA647234E09506AC8D5 /* Textual in Frameworks */,
-				2EF9EF12D7A03AAADC42CD14 /* GRDB in Frameworks */,
-				5E203AE21E16EA6F26B580B6 /* Highlightr in Frameworks */,
-				7CD7B12462D12E8B04AABBDA /* CMarkGFM in Frameworks */,
-				98FA357C48DEAB6E8669CA3F /* Sparkle in Frameworks */,
-				B9BE36D6C7401EE88CE7071D /* OakVoice in Frameworks */,
+				B81B9BA647234E09506AC8D5 /* GRDB in Frameworks */,
+				2EF9EF12D7A03AAADC42CD14 /* Highlightr in Frameworks */,
+				5E203AE21E16EA6F26B580B6 /* CMarkGFM in Frameworks */,
+				7CD7B12462D12E8B04AABBDA /* Sparkle in Frameworks */,
+				98FA357C48DEAB6E8669CA3F /* OakVoice in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -928,7 +922,6 @@
 				1EE2FC096373238DFBDE71E8 /* ChatCompletionPanel.swift */,
 				203FB2B8AAC61EDD2FD22B9A /* ChatHistoryDrawer.swift */,
 				79CDDA518E696E683F924E68 /* ChatInputTextView.swift */,
-				62ADF2718CD95052DCDC5C6E /* ChatMarkdownBlocks.swift */,
 				57AD1A032BEBDA96C018D84A /* ChatTokenAttachment.swift */,
 				62D62DFCF466824B7B1C5431 /* CitationHoverCard.swift */,
 				B9C644594425945C7B78ACFD /* FannedAttachmentStack.swift */,
@@ -1001,7 +994,6 @@
 				CD0666D04A8F068B01A5C328 /* OakStyle.swift */,
 				018A6B84B7C370D0CCFF1DD9 /* PDFConstants.swift */,
 				5535AEEAC468A3F63565D187 /* Preferences.swift */,
-				6D7E333AFEAE1845875EC321 /* String+SealMarkdown.swift */,
 			);
 			path = Utilities;
 			sourceTree = "<group>";
@@ -1109,7 +1101,6 @@
 				19E322BB594FF18127BAB222 /* OakAI */,
 				929A082BCE310B00A8C2BF6F /* OakAgent */,
 				8B97372BD4FBDFA89C43DD9C /* OakMarkdownUI */,
-				1EAE2888C4FE81992BDCCD25 /* Textual */,
 				DBFC960D58BB4D238DFC9FF1 /* GRDB */,
 				7AB56BF574F3683388F071F2 /* Highlightr */,
 				EE983D369D941923AF2F04FF /* CMarkGFM */,
@@ -1148,7 +1139,6 @@
 				DD10350F424FE099033E1375 /* XCRemoteSwiftPackageReference "GRDB.swift" */,
 				225B7FE5AC36B1D8CF482B3A /* XCRemoteSwiftPackageReference "Highlightr" */,
 				EC431EFA19C3F508366C9671 /* XCRemoteSwiftPackageReference "Sparkle" */,
-				F474D9310432E71E4A4CF5E8 /* XCRemoteSwiftPackageReference "textual" */,
 				B680BFA2F3935A70C71804BD /* XCRemoteSwiftPackageReference "swift-argument-parser" */,
 				F163331A134E539182CE77A7 /* XCLocalSwiftPackageReference "Packages/OakAI" */,
 				33DEE7E7B16365AF42655D31 /* XCLocalSwiftPackageReference "Packages/OakAgent" */,
@@ -1292,7 +1282,6 @@
 				98F56BC1BA4E498B56D1D476 /* ChatContextSnapshot.swift in Sources */,
 				80B0CA96D9643F36B4AA9E50 /* ChatHistoryDrawer.swift in Sources */,
 				AF69C97966EB24620D0D683B /* ChatInputTextView.swift in Sources */,
-				C163A7D801CD451EFC70BDFA /* ChatMarkdownBlocks.swift in Sources */,
 				88F0C0D87192EDD8E5FF4E97 /* ChatTokenAttachment.swift in Sources */,
 				D3FDC0F775EC2D91FF876566 /* ChatViewModel.swift in Sources */,
 				A11D9E56DCAEA0A563A18512 /* CitationFormatter.swift in Sources */,
@@ -1436,7 +1425,6 @@
 				AD65FC5A720D4B145AA9459F /* SnapshotHitTestNSView.swift in Sources */,
 				3361EE0F6F4FD80D6EFA1D5C /* SnapshotOverlayView.swift in Sources */,
 				3F859EB10C97917820558AF4 /* String+PDFSearch.swift in Sources */,
-				1F12C05244CD317724BFDF09 /* String+SealMarkdown.swift in Sources */,
 				C4A4B6846CACAAFC6BAC27E1 /* SystemPermissionStatus.swift in Sources */,
 				8DC2B9E6FC102BB649732E02 /* SystemSettingsLauncher.swift in Sources */,
 				C609C0587B9526025F590C39 /* TTSAudioCache.swift in Sources */,
@@ -1780,25 +1768,12 @@
 				minimumVersion = 2.6.0;
 			};
 		};
-		F474D9310432E71E4A4CF5E8 /* XCRemoteSwiftPackageReference "textual" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/gonzalezreal/textual";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.1.0;
-			};
-		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		19E322BB594FF18127BAB222 /* OakAI */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = OakAI;
-		};
-		1EAE2888C4FE81992BDCCD25 /* Textual */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = F474D9310432E71E4A4CF5E8 /* XCRemoteSwiftPackageReference "textual" */;
-			productName = Textual;
 		};
 		31814E54FBC46915CC246EF7 /* ArgumentParser */ = {
 			isa = XCSwiftPackageProductDependency;
