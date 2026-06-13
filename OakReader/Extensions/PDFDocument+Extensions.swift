@@ -45,60 +45,114 @@ extension PDFDocument {
         findString(query, withOptions: options) ?? []
     }
 
-    /// Search tolerant of extra words the model wraps around a verbatim quote.
-    /// `findString` only matches exact substrings, but a citation's `text=` is often a
-    /// paraphrase (e.g. "agent verification framework with Guideline-grounded Evidence
-    /// Accumulation") whose verbatim core is just a few of those words. We try the exact
-    /// phrase first, then progressively shorter contiguous word-windows (longest first),
-    /// returning the first that matches. Matches on `preferredPage` (0-based) are floated
-    /// to the front so a citation lands on its cited page when the phrase recurs.
-    func searchTolerant(_ query: String, preferredPage: Int? = nil) -> [PDFSelection] {
-        let opts: NSString.CompareOptions = [.caseInsensitive]
-        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return [] }
+    /// Locate a citation's quoted `text` and return a single selection for the matching
+    /// passage. Robust to the ways PDF text and AI-generated quotes drift apart:
+    ///   1. **Whitespace-tolerant whole-quote match** — collapses the runs of `\n`/spaces
+    ///      that PDFKit inserts at every visual line break, so a quote that straddles two
+    ///      lines still matches (plain `findString` misses these and is the #1 cause of a
+    ///      citation that highlights the wrong fragment).
+    ///   2. **Endpoint span** — match the quote's leading and trailing word-runs and take
+    ///      the text between them, so a quote whose middle was paraphrased, re-hyphenated,
+    ///      or OCR-garbled still anchors to the right passage (à la a Chrome text-fragment
+    ///      `textStart,textEnd`).
+    ///   3. **Fuzzy token-overlap fallback** for quotes that don't appear verbatim at all.
+    /// The returned selection is **exactly** the matched passage — it is NOT grown to the
+    /// enclosing sentence, so the highlight equals the quote shown in the citation hover
+    /// card. `preferredPage` (0-based) is searched first so a citation lands on its page.
+    func searchQuote(_ quote: String, preferredPage: Int? = nil) -> [PDFSelection] {
+        let trimmed = quote.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, pageCount > 0 else { return [] }
 
-        func ordered(_ results: [PDFSelection]) -> [PDFSelection] {
-            guard let preferredPage, results.count > 1 else { return results }
-            let onPage = results.filter { sel in
-                sel.pages.first.map { index(for: $0) == preferredPage } ?? false
+        let order: [Int]
+        if let p = preferredPage, (0..<pageCount).contains(p) {
+            order = [p] + (0..<pageCount).filter { $0 != p }
+        } else {
+            order = Array(0..<pageCount)
+        }
+
+        for idx in order {
+            guard let page = page(at: idx), let raw = page.string else { continue }
+            let ns = raw as NSString
+            let (norm, map) = Self.collapsedWhitespace(ns)
+            // 1. Whole quote, tolerant of the line-break whitespace PDFKit injects.
+            if let r = Self.rangeIn(norm, map, query: Self.collapsedQuery(trimmed), fromOriginal: 0),
+               let sel = page.selection(for: r) {
+                return [sel]
             }
-            return onPage.isEmpty ? results : onPage
-        }
-
-        // Order by cited page, then grow each hit out to its enclosing sentence so the
-        // highlight is a readable passage rather than a bare fragment.
-        func finalize(_ results: [PDFSelection]) -> [PDFSelection] {
-            ordered(results).map { $0.expandedToSentence() }
-        }
-
-        // 1. Exact phrase.
-        let exact = findString(trimmed, withOptions: opts)
-        if !exact.isEmpty { return finalize(exact) }
-
-        // 2. Longest contiguous word-window that occurs verbatim.
-        let words = trimmed.split(whereSeparator: { $0.isWhitespace }).map(String.init)
-        if words.count > 1 {
-            var attempts = 0
-            let maxAttempts = 60
-            contiguous: for windowLen in stride(from: words.count - 1, through: 2, by: -1) {
-                for start in 0...(words.count - windowLen) {
-                    let phrase = words[start..<(start + windowLen)].joined(separator: " ")
-                    guard phrase.count >= 8 else { continue }   // skip undistinctive fragments
-                    attempts += 1
-                    if attempts > maxAttempts { break contiguous }
-                    let hits = findString(phrase, withOptions: opts)
-                    if !hits.isEmpty { return finalize(hits) }
-                }
+            // 2. Endpoint span: leading words … trailing words.
+            if let r = Self.endpointSpan(of: trimmed, norm: norm, map: map),
+               let sel = page.selection(for: r) {
+                return [sel]
             }
         }
 
-        // 3. Fuzzy fallback. AI-generated citations are often not a verbatim quote — words
-        //    get reordered, dropped, paraphrased, or mangled by OCR/hyphenation. Fall back
-        //    to the page region with the best token overlap so we still land somewhere sane.
+        // 3. Fuzzy fallback (page-aware). AI quotes are often not verbatim — words get
+        //    reordered, dropped, paraphrased, or mangled by OCR. Fall back to the page
+        //    region with the best token overlap so we still land somewhere sane.
         if let fuzzy = fuzzyMatch(trimmed, preferredPage: preferredPage) {
-            return [fuzzy.expandedToSentence()]
+            return [fuzzy]
         }
         return []
+    }
+
+    /// A whitespace-collapsed, index-mapped copy of `pageText`: every run of whitespace
+    /// becomes a single space, and `map[i]` is the original UTF-16 index of the i-th
+    /// character of the result. Lets us match across PDF line breaks yet still resolve the
+    /// hit back to a real range on the page.
+    private static func collapsedWhitespace(_ pageText: NSString) -> (norm: NSString, map: [Int]) {
+        let len = pageText.length
+        var chars = [unichar](); chars.reserveCapacity(len)
+        var map = [Int](); map.reserveCapacity(len)
+        var inWS = false
+        for i in 0..<len {
+            let c = pageText.character(at: i)
+            let isWS = Unicode.Scalar(c).map { CharacterSet.whitespacesAndNewlines.contains($0) } ?? false
+            if isWS {
+                if !inWS { chars.append(32); map.append(i); inWS = true }   // single space
+            } else {
+                chars.append(c); map.append(i); inWS = false
+            }
+        }
+        return (NSString(characters: chars, length: chars.count), map)
+    }
+
+    /// `s` with leading/trailing whitespace dropped and internal whitespace runs collapsed
+    /// to single spaces — the query-side counterpart to `collapsedWhitespace`.
+    private static func collapsedQuery(_ s: String) -> String {
+        s.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
+    }
+
+    /// Find `qNorm` (already whitespace-collapsed) in the collapsed page `norm`, at or after
+    /// original index `fromOriginal`, and map the hit back to a range on the original page.
+    /// Case-insensitive.
+    private static func rangeIn(_ norm: NSString, _ map: [Int], query qNorm: String, fromOriginal: Int) -> NSRange? {
+        guard !qNorm.isEmpty, norm.length > 0 else { return nil }
+        let searchStart = fromOriginal > 0 ? (map.firstIndex { $0 >= fromOriginal } ?? norm.length) : 0
+        guard searchStart < norm.length else { return nil }
+        let hit = norm.range(of: qNorm, options: [.caseInsensitive],
+                             range: NSRange(location: searchStart, length: norm.length - searchStart))
+        guard hit.location != NSNotFound, hit.length > 0 else { return nil }
+        let start = map[hit.location]
+        let end = map[hit.location + hit.length - 1] + 1
+        return end > start ? NSRange(location: start, length: end - start) : nil
+    }
+
+    /// Match the quote's first and last few words and return the span between them, so a
+    /// quote whose middle differs from the page (paraphrase, OCR/hyphenation noise) still
+    /// anchors. Needs at least four words; caps the span so a bogus pairing can't highlight
+    /// half the page.
+    private static func endpointSpan(of quote: String, norm: NSString, map: [Int]) -> NSRange? {
+        let words = quote.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+        guard words.count >= 4 else { return nil }
+        let k = min(3, words.count / 2)
+        let head = collapsedQuery(words.prefix(k).joined(separator: " "))
+        let tail = collapsedQuery(words.suffix(k).joined(separator: " "))
+        guard let headR = rangeIn(norm, map, query: head, fromOriginal: 0),
+              let tailR = rangeIn(norm, map, query: tail, fromOriginal: headR.location) else { return nil }
+        let start = headR.location
+        let end = tailR.location + tailR.length
+        guard end > start, end - start <= 4000 else { return nil }
+        return NSRange(location: start, length: end - start)
     }
 
     /// Best fuzzy match for `query`: the page region whose words overlap the query most,
@@ -195,48 +249,6 @@ extension PDFDocument {
     func copyDocument() -> PDFDocument? {
         guard let data = dataRepresentation() else { return nil }
         return PDFDocument(data: data)
-    }
-}
-
-extension PDFSelection {
-    /// Returns a new selection grown outward from this one to the enclosing sentence
-    /// (bounded by `. ! ?`, line breaks, or `maxRadius` characters on each side), so a
-    /// citation highlights a readable passage rather than a bare matched fragment.
-    /// Falls back to `self` if the page text or range can't be resolved.
-    func expandedToSentence(maxRadius: Int = 320) -> PDFSelection {
-        guard let page = pages.first, let pageText = page.string else { return self }
-        let selString = string ?? ""
-        guard !selString.isEmpty else { return self }
-        let ns = pageText as NSString
-        let match = ns.range(of: selString, options: [.caseInsensitive])
-        guard match.location != NSNotFound else { return self }
-
-        let enders = CharacterSet(charactersIn: ".!?\n\r")
-        let ws = CharacterSet.whitespacesAndNewlines
-        let leftLimit = max(0, match.location - maxRadius)
-        let rightLimit = min(ns.length, match.location + match.length + maxRadius)
-
-        // Walk left to the start of the sentence.
-        var start = match.location
-        while start > leftLimit {
-            guard let s = Unicode.Scalar(ns.character(at: start - 1)), !enders.contains(s) else { break }
-            start -= 1
-        }
-        // Walk right to (and including) the sentence terminator.
-        var end = match.location + match.length
-        while end < rightLimit {
-            let isEnder = Unicode.Scalar(ns.character(at: end)).map { enders.contains($0) } ?? false
-            end += 1
-            if isEnder { break }
-        }
-        // Trim leading whitespace the left-walk picked up.
-        while start < match.location,
-              let s = Unicode.Scalar(ns.character(at: start)), ws.contains(s) {
-            start += 1
-        }
-
-        let range = NSRange(location: start, length: max(0, end - start))
-        return page.selection(for: range) ?? self
     }
 }
 

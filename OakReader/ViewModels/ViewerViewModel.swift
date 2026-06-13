@@ -205,7 +205,7 @@ class ViewerViewModel {
         guard !trimmed.isEmpty, let doc = pdfDocument else { return }
 
         let results = await Task.detached { [trimmed, page] () -> [PDFSelection] in
-            doc.searchTolerant(trimmed, preferredPage: page)
+            doc.searchQuote(trimmed, preferredPage: page)
         }.value
 
         await MainActor.run {

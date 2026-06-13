@@ -380,8 +380,10 @@ struct LLMContextProvider {
                 it literally appears — same spelling, numbers, capitalization and \
                 punctuation. Do NOT paraphrase, summarize, reorder, abbreviate \
                 (e.g. "36 million" not "36M"), or stitch together non-adjacent \
-                words for the anchor. Keep it SHORT and unique: 4–8 consecutive \
-                words copied straight from the text. The link's visible [label] \
+                words for the anchor. Copy a contiguous run of words exactly as \
+                they appear — from a few words up to a full sentence; prefer a \
+                complete, meaningful clause so the highlight reads as a passage \
+                (line breaks inside the quote are fine). The link's visible [label] \
                 can be your own wording; only the anchor value must be the quote. \
                 If you are not certain of the exact wording, omit ?text= and cite \
                 the page alone — never invent a phrase.
@@ -395,10 +397,11 @@ struct LLMContextProvider {
                     [p. N](oak://cite/\(eck)?page=N)
                     [p. N](oak://cite/\(eck)?page=N&text=verbatim+quote)
 
-                    Add &text= with a SHORT phrase (4–8 words) copied VERBATIM from \
-                    that page (spaces encoded as +) so the reader jumps to the exact \
-                    passage. The quote must appear word-for-word on the page; if you \
-                    can't quote it exactly, give the page alone.
+                    Add &text= with a verbatim phrase (a few words up to a full \
+                    sentence) copied from that page (spaces encoded as +) so the \
+                    reader jumps to the exact passage. The quote must appear \
+                    word-for-word on the page; if you can't quote it exactly, give \
+                    the page alone.
 
                     Example — the [label] is paraphrased, the &text= anchor is an exact quote:
                     \"The transformer replaces recurrence with self-attention \
