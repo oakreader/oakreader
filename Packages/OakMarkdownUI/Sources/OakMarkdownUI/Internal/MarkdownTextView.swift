@@ -5,6 +5,10 @@ extension NSAttributedString.Key {
     /// Marks an inline-code run so `HuggingLayoutManager` draws it as a padded
     /// rounded pill rather than a bare selection-style rect.
     static let inlineCodePill = NSAttributedString.Key("OakMarkdownInlineCodePill")
+    /// Fill color (`NSColor`) for a block-quote range — drawn as a rounded background.
+    static let blockquoteFill = NSAttributedString.Key("OakMarkdownBlockquoteFill")
+    /// Bar color (`NSColor`) for a block-quote range — drawn as a left vertical accent.
+    static let blockquoteBar = NSAttributedString.Key("OakMarkdownBlockquoteBar")
 }
 
 enum MarkdownInlineCodePill {
@@ -23,6 +27,49 @@ enum MarkdownInlineCodePill {
 /// those we draw a rounded rect sized to the font's ascent/descent and placed off the
 /// real text baseline (the line-fragment center is unreliable under `lineHeightMultiple`).
 final class HuggingLayoutManager: NSLayoutManager {
+    /// Paint block-quote decorations (rounded fill + left bar) behind the glyphs and
+    /// behind the selection highlight — so the quote reads as a contained block.
+    override func drawBackground(forGlyphRange glyphsToShow: NSRange, at origin: NSPoint) {
+        drawBlockquotes(forGlyphRange: glyphsToShow, at: origin)
+        super.drawBackground(forGlyphRange: glyphsToShow, at: origin)
+    }
+
+    private func drawBlockquotes(forGlyphRange glyphsToShow: NSRange, at origin: NSPoint) {
+        guard let storage = textStorage, storage.length > 0,
+              let container = textContainers.first else { return }
+        let charRange = characterRange(forGlyphRange: glyphsToShow, actualGlyphRange: nil)
+
+        storage.enumerateAttribute(.blockquoteFill, in: charRange, options: []) { value, range, _ in
+            guard let fill = value as? NSColor, range.length > 0 else { return }
+            let bar = storage.attribute(.blockquoteBar, at: range.location, effectiveRange: nil) as? NSColor
+
+            // Union the line fragments the quote occupies into one box.
+            let glyphRange = glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+            var box = CGRect.null
+            enumerateLineFragments(forGlyphRange: glyphRange) { rect, _, _, _, _ in
+                box = box.isNull ? rect : box.union(rect)
+            }
+            guard !box.isNull else { return }
+
+            let sideInset: CGFloat = 2
+            let vPad: CGFloat = 4
+            let width = max(container.size.width - sideInset * 2, 0)
+            let fillRect = CGRect(x: sideInset, y: box.minY - vPad,
+                                  width: width, height: box.height + vPad * 2)
+                .offsetBy(dx: origin.x, dy: origin.y)
+
+            fill.setFill()
+            NSBezierPath(roundedRect: fillRect, xRadius: 5, yRadius: 5).fill()
+
+            if let bar {
+                let barRect = CGRect(x: fillRect.minX + 4, y: fillRect.minY + 3,
+                                     width: 3, height: fillRect.height - 6)
+                bar.setFill()
+                NSBezierPath(roundedRect: barRect, xRadius: 1.5, yRadius: 1.5).fill()
+            }
+        }
+    }
+
     override func fillBackgroundRectArray(
         _ rectArray: UnsafePointer<NSRect>,
         count rectCount: Int,

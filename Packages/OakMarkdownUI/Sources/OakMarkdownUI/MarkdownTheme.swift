@@ -20,6 +20,8 @@ public struct MarkdownTheme {
     public var codeBlockBackground: NSColor
     public var codeBlockBorder: NSColor
     public var blockquoteBar: NSColor
+    /// Subtle fill drawn behind a block quote (rounded rect, painted by the layout manager).
+    public var blockquoteBackground: NSColor
 
     /// Highlightr theme names for light / dark appearance.
     public var codeThemeLight: String
@@ -39,6 +41,7 @@ public struct MarkdownTheme {
         codeBlockBackground: NSColor,
         codeBlockBorder: NSColor,
         blockquoteBar: NSColor,
+        blockquoteBackground: NSColor = NSColor.secondaryLabelColor.withAlphaComponent(0.06),
         codeThemeLight: String,
         codeThemeDark: String
     ) {
@@ -55,6 +58,7 @@ public struct MarkdownTheme {
         self.codeBlockBackground = codeBlockBackground
         self.codeBlockBorder = codeBlockBorder
         self.blockquoteBar = blockquoteBar
+        self.blockquoteBackground = blockquoteBackground
         self.codeThemeLight = codeThemeLight
         self.codeThemeDark = codeThemeDark
     }

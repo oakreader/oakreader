@@ -152,7 +152,9 @@ private final class Renderer {
         case CMARK_NODE_EMPH:
             return addTrait(.italic, to: renderInline(node))
         case CMARK_NODE_STRONG:
-            return addTrait(.bold, to: renderInline(node))
+            // Explicit .medium (500) reads lighter than the `.bold` symbolic trait,
+            // which SF resolves to ~semibold/bold (600–700) — too heavy at body size.
+            return addWeight(.medium, to: renderInline(node))
         case CMARK_NODE_CODE:
             return NSAttributedString(string: literal(node), attributes: [
                 .font: theme.codeFont,
@@ -244,6 +246,25 @@ private final class Renderer {
         return m
     }
 
+    /// Applies an explicit font weight while preserving any non-bold symbolic traits
+    /// already on each run (e.g. italic for `***both***`). Used for strong/bold so we
+    /// get a controlled medium weight rather than SF's heavy `.bold` trait.
+    private func addWeight(_ weight: NSFont.Weight, to attr: NSAttributedString) -> NSAttributedString {
+        let m = NSMutableAttributedString(attributedString: attr)
+        m.enumerateAttribute(.font, in: NSRange(location: 0, length: m.length)) { value, range, _ in
+            let f = (value as? NSFont) ?? theme.bodyFont
+            var desc = NSFont.systemFont(ofSize: f.pointSize, weight: weight).fontDescriptor
+            let symbolic = f.fontDescriptor.symbolicTraits.subtracting(.bold)
+            if !symbolic.isEmpty {
+                desc = desc.withSymbolicTraits(symbolic)
+            }
+            if let nf = NSFont(descriptor: desc, size: f.pointSize) {
+                m.addAttribute(.font, value: nf, range: range)
+            }
+        }
+        return m
+    }
+
     private func heading(_ node: MarkdownAttributedBuilder.Node) -> NSAttributedString {
         let m = NSMutableAttributedString(attributedString: renderInline(node))
         let full = NSRange(location: 0, length: m.length)
@@ -295,6 +316,10 @@ private final class Renderer {
         let full = NSRange(location: 0, length: m.length)
         m.addAttribute(.foregroundColor, value: theme.secondaryTextColor, range: full)
         m.addAttribute(.paragraphStyle, value: bodyParagraphStyle(headIndent: 16), range: full)
+        // Tag the range so `HuggingLayoutManager` paints a rounded fill + left bar
+        // behind it (the actual drawing can't be expressed as text attributes).
+        m.addAttribute(.blockquoteFill, value: theme.blockquoteBackground, range: full)
+        m.addAttribute(.blockquoteBar, value: theme.blockquoteBar, range: full)
         return m
     }
 }
