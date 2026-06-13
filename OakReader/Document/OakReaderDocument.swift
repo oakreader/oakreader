@@ -47,6 +47,7 @@ class OakReaderDocument: NSDocument {
 
         self.pdfDocument = document
         documentViewModel = DocumentViewModel(document: self)
+        installMarkupOverlay(on: document)
     }
 
     override func read(from data: Data, ofType typeName: String) throws {
@@ -56,6 +57,15 @@ class OakReaderDocument: NSDocument {
 
         self.pdfDocument = document
         documentViewModel = DocumentViewModel(document: self)
+        installMarkupOverlay(on: document)
+    }
+
+    /// Wire the overlay controller as the document delegate before the document
+    /// is handed to any view, so PDFKit instantiates `OverlayPDFPage` pages that
+    /// draw our DB-backed highlights. Set early — `classForPage()` only takes
+    /// effect for pages created after the delegate is assigned.
+    private func installMarkupOverlay(on document: PDFDocument) {
+        document.delegate = documentViewModel.markupOverlay
     }
 
     // MARK: - Writing
@@ -94,6 +104,7 @@ class OakReaderDocument: NSDocument {
         if success {
             passwordForSaving = password
             documentViewModel = DocumentViewModel(document: self)
+            installMarkupOverlay(on: pdfDocument)
         }
         return success
     }

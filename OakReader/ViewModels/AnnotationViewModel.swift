@@ -63,69 +63,184 @@ class AnnotationViewModel {
     // MARK: - Highlight / Underline / Strikethrough
 
     func addHighlight(for selection: PDFSelection) {
-        guard let doc = pdfDocument else { return }
-        let effectiveColor = strokeColor.withAlphaComponent(opacity * 0.5)
-        for page in selection.pages {
-            let selBounds = selection.bounds(for: page)
-
-            // Create one highlight annotation covering the full selection on this page
-            guard selBounds.width > 0, selBounds.height > 0 else { continue }
-            let annotation = PDFAnnotation(bounds: selBounds, forType: .highlight, withProperties: nil)
-            annotation.color = effectiveColor
-
-            // Set quadrilateral points per line for precise text coverage
-            let lineSelections = selection.selectionsByLine()
-            var quadPoints: [NSValue] = []
-            for lineSel in lineSelections {
-                let lb = lineSel.bounds(for: page)
-                guard lb.width > 0, lb.height > 0 else { continue }
-                // Quad points: bottom-left, bottom-right, top-left, top-right (PDFKit order)
-                quadPoints.append(NSValue(point: NSPoint(x: lb.minX, y: lb.minY)))
-                quadPoints.append(NSValue(point: NSPoint(x: lb.maxX, y: lb.minY)))
-                quadPoints.append(NSValue(point: NSPoint(x: lb.minX, y: lb.maxY)))
-                quadPoints.append(NSValue(point: NSPoint(x: lb.maxX, y: lb.maxY)))
-            }
-            if !quadPoints.isEmpty {
-                annotation.setValue(quadPoints, forAnnotationKey: .quadPoints)
-            }
-
-            page.addAnnotation(annotation)
-            let pageIndex = doc.index(for: page)
-
-            // Persist to DB
-            let selectedText = selection.string
-            persistToStore(
-                pdfAnnotation: annotation,
-                pageIndex: pageIndex,
-                selectedText: selectedText,
-                existingId: nil
-            )
-        }
-        parent?.markDocumentEdited()
-        refreshAnnotationModels()
+        addTextMarkup(for: selection, kind: .highlight)
     }
 
     func addUnderline(for selection: PDFSelection) {
-        guard let doc = pdfDocument else { return }
-        let effectiveColor = strokeColor.withAlphaComponent(opacity)
+        addTextMarkup(for: selection, kind: .underline)
+    }
+
+    /// Create a note: a highlighted markup carrying an (initially empty) comment,
+    /// so it draws a clickable marker. Returns the new markup's id so the caller
+    /// can open the comment editor anchored to it.
+    @discardableResult
+    func addNote(for selection: PDFSelection) -> String? {
+        addTextMarkup(for: selection, kind: .highlight, comment: "")
+    }
+
+    /// Persist a text markup to the DB and add it to the overlay — *not* baked
+    /// into the PDF. The original file stays untouched (no `markDocumentEdited`),
+    /// the DB is the source of truth, and the overlay draws it with a stable
+    /// color. See PDFMarkupOverlay for the rationale. Returns the id of the last
+    /// created markup (notes are single-selection, so this is the note's id).
+    @discardableResult
+    private func addTextMarkup(for selection: PDFSelection, kind: PDFMarkupKind, comment: String? = nil) -> String? {
+        guard let doc = pdfDocument, let overlay = parent?.markupOverlay else { return nil }
+        // Highlights read as a translucent marker; underline/strikethrough are
+        // drawn as opaque strokes. The overlay owns the blend, so we store the
+        // marker's intended alpha rather than pre-baking it into a fill.
+        let alpha = kind == .highlight ? opacity * 0.5 : opacity
+        let color = strokeColor.withAlphaComponent(alpha)
+        var lastId: String?
+
         for page in selection.pages {
-            let bounds = selection.bounds(for: page)
-            guard bounds.width > 0, bounds.height > 0 else { continue }
-            let annotation = PDFAnnotation.underline(bounds: bounds, color: effectiveColor)
-            page.addAnnotation(annotation)
             let pageIndex = doc.index(for: page)
 
-            // Persist to DB
-            let selectedText = selection.string
-            persistToStore(
-                pdfAnnotation: annotation,
+            // Per-line quads for precise text coverage.
+            var quads: [CGRect] = []
+            var quadPoints: [[CGFloat]] = []
+            for lineSel in selection.selectionsByLine() {
+                let lb = lineSel.bounds(for: page)
+                guard lb.width > 0, lb.height > 0 else { continue }
+                quads.append(lb)
+                quadPoints.append([lb.minX, lb.minY])
+                quadPoints.append([lb.maxX, lb.minY])
+                quadPoints.append([lb.minX, lb.maxY])
+                quadPoints.append([lb.maxX, lb.maxY])
+            }
+            guard !quads.isEmpty else { continue }
+
+            let id = UUID().uuidString
+            persistOverlayMarkup(
+                id: id,
+                kind: kind,
                 pageIndex: pageIndex,
-                selectedText: selectedText,
-                existingId: nil
+                bounds: selection.bounds(for: page),
+                quadPoints: quadPoints,
+                color: color,
+                selectedText: selection.string,
+                comment: comment
             )
+            overlay.add(
+                PDFTextMarkup(id: id, kind: kind, quads: quads, color: color, text: selection.string, comment: comment),
+                page: pageIndex
+            )
+            lastId = id
         }
-        parent?.markDocumentEdited()
         refreshAnnotationModels()
+        return lastId
+    }
+
+    /// Switch a markup's style (highlight ↔ underline) from the note editor.
+    func updateOverlayMarkupKind(id: String, kind: PDFMarkupKind) {
+        guard let store = annotationStore, let record = store.fetch(id: id) else { return }
+        var updated = record
+        updated.type = kind.rawValue
+        updated.updatedAt = Date().iso8601String
+        store.upsert(updated)
+        parent?.markupOverlay.updateKind(id: id, kind: kind)
+        refreshAnnotationModels()
+    }
+
+    /// Save (or clear) a note's comment. An empty/whitespace comment turns the
+    /// note back into a plain highlight (marker disappears).
+    func updateOverlayMarkupComment(id: String, comment: String) {
+        guard let store = annotationStore, let record = store.fetch(id: id) else { return }
+        let trimmed = comment.trimmingCharacters(in: .whitespacesAndNewlines)
+        let stored: String? = trimmed.isEmpty ? nil : comment
+        var updated = record
+        updated.comment = stored
+        updated.updatedAt = Date().iso8601String
+        store.upsert(updated)
+        parent?.markupOverlay.updateComment(id: id, comment: stored)
+        refreshAnnotationModels()
+    }
+
+    /// Delete an overlay markup by its DB id.
+    func deleteOverlayMarkup(id: String) {
+        annotationStore?.softDelete(id: id)
+        parent?.markupOverlay.remove(id: id)
+        refreshAnnotationModels()
+    }
+
+    /// Recolor an overlay markup, preserving its current alpha.
+    func updateOverlayMarkupColor(id: String, color: NSColor) {
+        guard let store = annotationStore, let record = store.fetch(id: id) else { return }
+        let alpha = AnnotationStyle.fromJSON(record.styleJson ?? "")?.opacity ?? color.alphaComponent
+        let newColor = color.withAlphaComponent(alpha)
+        var updated = record
+        updated.color = newColor.hexString
+        updated.updatedAt = Date().iso8601String
+        store.upsert(updated)
+        parent?.markupOverlay.updateColor(id: id, color: newColor)
+        refreshAnnotationModels()
+    }
+
+    /// Load all `pdf-overlay` markups for this attachment from the DB and hand
+    /// them to the overlay controller. Idempotent — safe to call on every open.
+    func loadOverlayMarkups() {
+        guard let store = annotationStore,
+              let attId = attachmentId,
+              let overlay = parent?.markupOverlay else { return }
+
+        // Greenfield: drop any old baked text markups so they don't double-draw
+        // against the overlay. We don't migrate them — overlay + DB is the only model.
+        stripBakedTextMarkups()
+
+        let records = store.fetch(attachmentId: attId)
+            .filter { $0.positionKind == "pdf-overlay" && $0.deletedAt == nil }
+
+        var byPage: [Int: [PDFTextMarkup]] = [:]
+        for record in records {
+            guard let position = PDFAnnotationPosition.fromJSON(record.positionJson),
+                  let kind = PDFMarkupKind(rawValue: record.type) else { continue }
+            let opacity = AnnotationStyle.fromJSON(record.styleJson ?? "")?.opacity ?? 1.0
+            let baseColor = NSColor(hex: record.color) ?? PDFDefaults.annotationDefaultColor
+            let color = baseColor.withAlphaComponent(opacity)
+            let markup = PDFTextMarkup(
+                id: record.id,
+                kind: kind,
+                quads: quadRects(from: position),
+                color: color,
+                text: record.text,
+                comment: record.comment
+            )
+            byPage[position.pageIndex, default: []].append(markup)
+        }
+        overlay.load(byPage)
+        refreshAnnotationModels()
+    }
+
+    /// Remove any text-markup annotations baked into the PDF file so they don't
+    /// double-draw against the overlay. The file is never rewritten, so this is
+    /// just an in-memory cleanup; shapes/ink/notes are left untouched.
+    private func stripBakedTextMarkups() {
+        guard let doc = pdfDocument else { return }
+        let nativeMarkupTypes: Set<String> = ["Highlight", "Underline", "StrikeOut"]
+        for i in 0..<doc.pageCount {
+            guard let page = doc.page(at: i) else { continue }
+            for annotation in page.annotations where nativeMarkupTypes.contains(annotation.type ?? "") {
+                page.removeAnnotation(annotation)
+            }
+        }
+    }
+
+    /// Reconstruct per-line rects from stored quad points (4 points per line:
+    /// bottom-left, bottom-right, top-left, top-right). Falls back to bounds.
+    private func quadRects(from position: PDFAnnotationPosition) -> [CGRect] {
+        guard let qp = position.quadPoints, qp.count >= 4 else { return [position.bounds] }
+        var rects: [CGRect] = []
+        var i = 0
+        while i + 3 < qp.count {
+            let pts = (0...3).map { CGPoint(x: qp[i + $0][0], y: qp[i + $0][1]) }
+            let minX = min(pts[0].x, pts[2].x)
+            let maxX = max(pts[1].x, pts[3].x)
+            let minY = min(pts[0].y, pts[1].y)
+            let maxY = max(pts[2].y, pts[3].y)
+            rects.append(CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY))
+            i += 4
+        }
+        return rects.isEmpty ? [position.bounds] : rects
     }
 
     // MARK: - Delete / Update
@@ -217,20 +332,27 @@ class AnnotationViewModel {
     // MARK: - Annotations Model List
 
     func refreshAnnotationModels() {
-        guard let doc = pdfDocument else {
-            annotationModels = []
-            return
-        }
-
         var models: [AnnotationModel] = []
-        for i in 0..<doc.pageCount {
-            guard let page = doc.page(at: i) else { continue }
-            for annotation in page.annotations {
-                // Skip widget (form field) annotations
-                if annotation.type == "Widget" { continue }
-                models.append(AnnotationModel(from: annotation, pageIndex: i))
+
+        // Native annotations still baked into the PDF (shapes, ink, notes, …).
+        if let doc = pdfDocument {
+            for i in 0..<doc.pageCount {
+                guard let page = doc.page(at: i) else { continue }
+                for annotation in page.annotations {
+                    // Skip widget (form field) annotations
+                    if annotation.type == "Widget" { continue }
+                    models.append(AnnotationModel(from: annotation, pageIndex: i))
+                }
             }
         }
+
+        // DB-backed text-markup highlights (not present in page.annotations).
+        if let overlay = parent?.markupOverlay {
+            for entry in overlay.allMarkups() {
+                models.append(AnnotationModel(overlayMarkup: entry.markup, pageIndex: entry.pageIndex))
+            }
+        }
+
         annotationModels = models
     }
 
@@ -250,6 +372,64 @@ class AnnotationViewModel {
     }
 
     // MARK: - Persistence Helpers
+
+    /// Persist a text-markup overlay (`positionKind: "pdf-overlay"`) — color +
+    /// alpha + per-line quad points. This is the single source of truth for
+    /// overlay highlights; nothing is written into the PDF file.
+    private func persistOverlayMarkup(
+        id: String,
+        kind: PDFMarkupKind,
+        pageIndex: Int,
+        bounds: CGRect,
+        quadPoints: [[CGFloat]],
+        color: NSColor,
+        selectedText: String?,
+        comment: String? = nil
+    ) {
+        guard let store = annotationStore,
+              let attId = attachmentId,
+              let itmId = itemId else { return }
+
+        let position = PDFAnnotationPosition(pageIndex: pageIndex, bounds: bounds, quadPoints: quadPoints)
+        guard let positionJson = position.toJSON() else { return }
+
+        // Alpha lives in styleJson.opacity (the hex color drops alpha), so the
+        // marker's translucency round-trips correctly on reload.
+        let style = AnnotationStyle(
+            lineWidth: nil,
+            opacity: color.alphaComponent,
+            fontName: nil,
+            fontSize: nil,
+            interiorColorHex: nil
+        )
+
+        let pageHeight = pdfDocument?.page(at: pageIndex)?.bounds(for: .mediaBox).height ?? 792
+        let now = Date().iso8601String
+        let record = AnnotationRecord(
+            id: id,
+            userId: localUserId,
+            itemId: itmId,
+            attachmentId: attId,
+            key: AnnotationStore.generateKey(),
+            type: kind.rawValue,
+            authorName: nil,
+            text: selectedText,
+            comment: comment,
+            color: color.hexString,
+            pageLabel: "\(pageIndex + 1)",
+            sortIndex: AnnotationStore.makeSortIndex(pageIndex: pageIndex, bounds: bounds, pageHeight: pageHeight),
+            positionKind: "pdf-overlay",
+            positionJson: positionJson,
+            styleJson: style.toJSON(),
+            source: "oakreader",
+            sourceKey: nil,
+            isExternal: false,
+            createdAt: now,
+            updatedAt: now,
+            deletedAt: nil
+        )
+        store.upsert(record)
+    }
 
     /// Persist (or re-persist) a PDFAnnotation to the database.
     private func persistToStore(

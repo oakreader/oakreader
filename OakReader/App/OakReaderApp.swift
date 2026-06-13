@@ -45,4 +45,9 @@ extension Notification.Name {
     static let selectionAttachToChat    = Notification.Name("OakReaderSelectionAttachToChat")
     static let selectionTranslate       = Notification.Name("OakReaderSelectionTranslate")
     static let selectionAskAI           = Notification.Name("OakReaderSelectionAskAI")
+    static let selectionAddNote         = Notification.Name("OakReaderSelectionAddNote")
+
+    /// Open the note/comment editor for an existing overlay markup.
+    /// `object` is the DocumentViewModel; userInfo["id"] is the markup's DB id.
+    static let openNoteEditor           = Notification.Name("OakReaderOpenNoteEditor")
 }

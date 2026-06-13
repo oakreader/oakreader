@@ -26,6 +26,10 @@ class DocumentViewModel {
     /// App state reference for navigation, set when the tab is created.
     weak var appState: AppState?
 
+    /// Renders DB-backed text-markup highlights as an overlay (not baked into
+    /// the PDF). Set as `pdfDocument.delegate` at read time. See PDFMarkupOverlay.
+    let markupOverlay = PDFMarkupOverlayController()
+
     // MARK: - Child ViewModels (lazy)
 
     private var _viewer: ViewerViewModel?
@@ -391,8 +395,20 @@ class DocumentViewModel {
 
     // MARK: - Document Mutation
 
+    /// Coalesces a burst of edits (e.g. several highlights in a row) into a single
+    /// near-immediate autosave so the PDF on disk — and the tab's "unsaved" dot —
+    /// catches up within ~1s instead of waiting for the 30s autosave tick.
+    private var autosaveDebounce: Timer?
+
     func markDocumentEdited() {
         document?.updateChangeCount(.changeDone)
+
+        autosaveDebounce?.invalidate()
+        autosaveDebounce = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: false) { [weak self] _ in
+            guard let document = self?.document,
+                  document.hasUnautosavedChanges || document.isDocumentEdited else { return }
+            document.autosave(withImplicitCancellability: true) { _ in }
+        }
     }
 
     func setEditorMode(_ mode: EditorMode) {

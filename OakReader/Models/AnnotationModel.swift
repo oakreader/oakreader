@@ -37,6 +37,22 @@ struct AnnotationModel: Identifiable, Equatable {
         }
     }
 
+    /// Build a sidebar model from a DB-backed overlay markup (no PDFAnnotation).
+    init(overlayMarkup markup: PDFTextMarkup, pageIndex: Int) {
+        self.id = UUID()
+        self.type = markup.kind.subtype
+        self.bounds = markup.quads.first ?? .zero
+        self.color = markup.color
+        self.contents = markup.comment
+        self.markedUpText = markup.text
+        self.fontName = nil
+        self.fontSize = nil
+        self.lineWidth = 1.0
+        self.opacity = markup.color.alphaComponent
+        self.pageIndex = pageIndex
+        self.interiorColor = nil
+    }
+
     init(type: PDFAnnotationSubtype, bounds: CGRect, pageIndex: Int) {
         self.id = UUID()
         self.type = type

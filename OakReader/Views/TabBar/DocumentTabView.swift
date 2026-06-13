@@ -132,13 +132,6 @@ struct DocumentTabView: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            // Dirty indicator
-            if tab.isDirty {
-                Circle()
-                    .fill(Color(hex: "FF8C19"))
-                    .frame(width: 6, height: 6)
-            }
-
             // Title
             Text(tab.title)
                 .font(OakStyle.Font.styled(size: OakStyle.Font.body, weight: .regular))

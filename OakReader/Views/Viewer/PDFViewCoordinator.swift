@@ -32,6 +32,9 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
     // alternative; both call into the same AnnotationViewModel mutations.
     private var annotationEditPopup: AnnotationEditPopupPanel?
 
+    // Markdown note/comment editor popover, anchored to an overlay markup.
+    private var noteEditorPanel: NoteEditorPopupPanel?
+
     // Selection-instrument keyboard observers (⌃⌘H / U / C / T / K).
     // Scoped to this tab's viewModel via notification.object so cross-tab
     // shortcuts don't fire on the wrong document.
@@ -162,6 +165,64 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
             // now we just stage the attachment and open Chat; the prompt-template
             // system is a separate task.
         }
+
+        // Open the note editor for an existing overlay markup (fired after the
+        // selection popup creates a note, or by a click on a note marker).
+        let noteToken = center.addObserver(forName: .openNoteEditor, object: nil, queue: .main) { [weak self] note in
+            guard let self,
+                  (note.object as AnyObject) === self.viewModel,
+                  let id = note.userInfo?["id"] as? String else { return }
+            self.presentNoteEditor(markupId: id)
+        }
+        selectionInstrumentObservers.append(noteToken)
+    }
+
+    // MARK: - Note Editor
+
+    private func presentNoteEditor(markupId: String) {
+        guard let pdfView,
+              let (pageIndex, markup) = viewModel.markupOverlay.markup(withId: markupId),
+              let page = pdfView.document?.page(at: pageIndex),
+              let firstQuad = markup.quads.first else { return }
+
+        dismissSelectionPopup()
+        dismissAnnotationEditPopup()
+        dismissNoteEditor()
+
+        let bounds = markup.quads.dropFirst().reduce(firstQuad) { $0.union($1) }
+        let panel = NoteEditorPopupPanel(
+            viewModel: viewModel,
+            markupId: markupId,
+            comment: markup.comment ?? "",
+            colorIndex: NoteEditorPopupPanel.nearestColorIndex(to: markup.color),
+            kind: markup.kind,
+            pdfView: pdfView,
+            anchorPage: page,
+            anchorBounds: bounds,
+            onDismiss: { [weak self] in self?.noteEditorPanel = nil }
+        )
+        noteEditorPanel = panel
+    }
+
+    private func dismissNoteEditor() {
+        noteEditorPanel?.dismiss()
+        noteEditorPanel = nil
+    }
+
+    /// Left-click on a note marker/highlight opens its editor. Returns true if handled.
+    private func handleOverlayNoteClick(at locationInPDFView: NSPoint) -> Bool {
+        guard let pdfView,
+              let page = pdfView.page(for: locationInPDFView, nearest: false),
+              let doc = pdfView.document else { return false }
+        // Ignore if the user is actively selecting text.
+        if let s = pdfView.currentSelection?.string,
+           !s.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return false }
+        let pagePoint = pdfView.convert(locationInPDFView, to: page)
+        let pageIndex = doc.index(for: page)
+        guard let markup = viewModel.markupOverlay.markup(at: pagePoint, pageIndex: pageIndex),
+              markup.isNote else { return false }
+        presentNoteEditor(markupId: markup.id)
+        return true
     }
 
     private func removeSelectionInstrumentObservers() {
@@ -189,6 +250,7 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
             removeScrollMonitor()
             dismissSelectionPopup()
             dismissAnnotationEditPopup()
+            dismissNoteEditor()
         }
     }
 
@@ -206,8 +268,10 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
                 let eventWindow = event.window
                 let onSelectionPopup = (self.selectionPopup?.ownsWindow(eventWindow ?? NSWindow())) ?? false
                 let onAnnotationPopup = (self.annotationEditPopup?.ownsWindow(eventWindow ?? NSWindow())) ?? false
+                let onNoteEditor = (self.noteEditorPanel?.ownsWindow(eventWindow ?? NSWindow())) ?? false
                 if !onSelectionPopup { self.dismissSelectionPopup() }
                 if !onAnnotationPopup { self.dismissAnnotationEditPopup() }
+                if !onNoteEditor { self.dismissNoteEditor() }
             }
 
             let mode = self.viewModel.state.editorMode
@@ -217,6 +281,7 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
                 if event.type == .leftMouseUp {
                     let locationInPDFView = pdfView.convert(event.locationInWindow, from: nil)
                     if pdfView.bounds.contains(locationInPDFView) {
+                        if self.handleOverlayNoteClick(at: locationInPDFView) { return event }
                         self.scheduleSelectionPopup(pdfView: pdfView)
                     }
                 }
@@ -232,6 +297,7 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
                 if event.type == .leftMouseUp {
                     let locationInPDFView = pdfView.convert(event.locationInWindow, from: nil)
                     if pdfView.bounds.contains(locationInPDFView) {
+                        if self.handleOverlayNoteClick(at: locationInPDFView) { return event }
                         self.scheduleSelectionPopup(pdfView: pdfView)
                     }
                 }
@@ -411,6 +477,12 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
             if let annotation {
                 self.viewModel.state.selectedAnnotation = annotation
                 menu = self.buildAnnotationContextMenu(for: annotation)
+            } else if let page,
+                      let overlayMarkup = self.viewModel.markupOverlay.markup(
+                          at: pdfView.convert(locationInPDFView, to: page),
+                          pageIndex: pdfView.document?.index(for: page) ?? -1
+                      ) {
+                menu = self.buildOverlayMarkupContextMenu(for: overlayMarkup)
             } else {
                 menu = self.buildGeneralContextMenu()
             }
@@ -486,6 +558,54 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
         menu.addItem(deleteItem)
 
         return menu
+    }
+
+    // MARK: - Overlay Markup Context Menu (right-click on a DB-backed highlight)
+
+    private func buildOverlayMarkupContextMenu(for markup: PDFTextMarkup) -> NSMenu {
+        let menu = NSMenu()
+
+        let colorItem = NSMenuItem(title: "Color", action: nil, keyEquivalent: "")
+        colorItem.image = NSImage(systemSymbolName: "paintpalette", accessibilityDescription: nil)
+        let colorMenu = NSMenu()
+        let colors: [(String, NSColor)] = [
+            ("Yellow", .systemYellow),
+            ("Red", .systemRed),
+            ("Green", .systemGreen),
+            ("Blue", .systemBlue),
+            ("Purple", .systemPurple),
+            ("Orange", .systemOrange),
+            ("Pink", .systemPink),
+            ("Gray", .systemGray),
+        ]
+        for (name, color) in colors {
+            let item = NSMenuItem(title: name, action: #selector(changeOverlayMarkupColor(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = OverlayColorChange(id: markup.id, color: color)
+            item.image = colorSwatchImage(color)
+            if colorsAreClose(markup.color, color) { item.state = .on }
+            colorMenu.addItem(item)
+        }
+        colorItem.submenu = colorMenu
+        menu.addItem(colorItem)
+
+        let deleteItem = NSMenuItem(title: "Delete", action: #selector(deleteOverlayMarkupFromMenu(_:)), keyEquivalent: "")
+        deleteItem.target = self
+        deleteItem.representedObject = markup.id
+        deleteItem.image = NSImage(systemSymbolName: "trash", accessibilityDescription: nil)
+        menu.addItem(deleteItem)
+
+        return menu
+    }
+
+    @objc private func changeOverlayMarkupColor(_ sender: NSMenuItem) {
+        guard let change = sender.representedObject as? OverlayColorChange else { return }
+        viewModel.annotation.updateOverlayMarkupColor(id: change.id, color: change.color)
+    }
+
+    @objc private func deleteOverlayMarkupFromMenu(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String else { return }
+        viewModel.annotation.deleteOverlayMarkup(id: id)
     }
 
     // MARK: - Menu Helpers
@@ -588,6 +708,13 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
 
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
+
+            // While the note editor is open, let it own the keyboard (so typing
+            // doesn't trip Delete/Escape mode handling); Esc closes it.
+            if let panel = self.noteEditorPanel {
+                if event.keyCode == 53 { panel.dismiss(); return nil }
+                return event
+            }
 
             // Escape: dismiss the annotation-edit popup if open, otherwise
             // exit annotate / snapshot mode. Tesler "every mode needs a fast

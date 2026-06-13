@@ -158,6 +158,14 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
         }
         mainStack.addArrangedSubview(colorBtn)
 
+        let noteBtn = PopupIconButton(
+            systemImage: "note.text",
+            accessibilityLabel: "Add Note"
+        ) { [weak self] in
+            self?.addNote()
+        }
+        mainStack.addArrangedSubview(noteBtn)
+
         // Separator 1
         mainStack.addArrangedSubview(makeVerticalSeparator())
 
@@ -308,6 +316,18 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
         dismissWithAction()
     }
 
+    /// Create a note on the selection and open the Markdown editor for it. The
+    /// markup is created synchronously (so the editor can look it up by id);
+    /// opening the editor is posted to the coordinator.
+    private func addNote() {
+        autoHighlightOnDismiss = false
+        if let id = viewModel.annotation.addNote(for: selection) {
+            NotificationCenter.default.post(name: .openNoteEditor, object: viewModel, userInfo: ["id": id])
+        }
+        pdfView?.clearSelection()
+        dismiss()
+    }
+
     private func copySelection() {
         if let text = selection.string {
             NSPasteboard.general.clearContents()
@@ -360,6 +380,18 @@ class AnnotationColorChange: NSObject {
 
     init(annotation: PDFAnnotation, color: NSColor) {
         self.annotation = annotation
+        self.color = color
+    }
+}
+
+/// Carries a recolor request for a DB-backed overlay markup (identified by its
+/// DB id rather than a `PDFAnnotation`).
+class OverlayColorChange: NSObject {
+    let id: String
+    let color: NSColor
+
+    init(id: String, color: NSColor) {
+        self.id = id
         self.color = color
     }
 }

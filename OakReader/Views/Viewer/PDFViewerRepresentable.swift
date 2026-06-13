@@ -71,6 +71,11 @@ struct PDFViewerRepresentable: NSViewRepresentable {
             viewModel.state.zoomLevel = pdfView.scaleFactor
         }
 
+        // Wire the markup overlay to this view and load saved highlights from
+        // the DB (the overlay is the source of truth, not the PDF file).
+        viewModel.markupOverlay.pdfView = pdfView
+        viewModel.annotation.loadOverlayMarkups()
+
         context.coordinator.setupObservers(for: pdfView)
         context.coordinator.pdfView = pdfView
         pdfView.documentViewModel = viewModel
@@ -95,6 +100,10 @@ struct PDFViewerRepresentable: NSViewRepresentable {
         if pdfView.document !== viewModel.pdfDocument {
             pdfView.document = viewModel.pdfDocument
             context.coordinator.setupObservers(for: pdfView)
+
+            // Re-wire and reload the overlay for the new document.
+            viewModel.markupOverlay.pdfView = pdfView
+            viewModel.annotation.loadOverlayMarkups()
 
             // Scale to fit when a new document is opened
             DispatchQueue.main.async {

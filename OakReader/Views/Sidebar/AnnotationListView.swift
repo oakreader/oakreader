@@ -75,18 +75,6 @@ struct AnnotationListView: View {
 private struct AnnotationRowView: View {
     let annotation: AnnotationModel
 
-    /// The best display text for this annotation.
-    private var displayText: String? {
-        // Prefer marked-up text (highlighted/underlined text), then user comment
-        if let text = annotation.markedUpText, !text.isEmpty {
-            return text
-        }
-        if let contents = annotation.contents, !contents.isEmpty {
-            return contents
-        }
-        return nil
-    }
-
     /// A human-readable label for the annotation type.
     private var typeLabel: String {
         let raw = annotation.type.rawValue
@@ -104,17 +92,35 @@ private struct AnnotationRowView: View {
     }
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(alignment: .top, spacing: 8) {
             Circle()
                 .fill(Color(nsColor: annotation.color))
                 .frame(width: 10, height: 10)
+                .padding(.top, 2)
 
-            VStack(alignment: .leading, spacing: 2) {
-                if let text = displayText {
+            VStack(alignment: .leading, spacing: 3) {
+                // A note: show the comment prominently, with the quoted text as
+                // muted context beneath it.
+                if let comment = annotation.contents, !comment.isEmpty {
+                    Text(comment)
+                        .font(.caption)
+                        .lineLimit(4)
+                    if let quoted = annotation.markedUpText, !quoted.isEmpty {
+                        Text(quoted)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                            .padding(.leading, 6)
+                            .overlay(alignment: .leading) {
+                                Rectangle()
+                                    .fill(Color(nsColor: annotation.color))
+                                    .frame(width: 2)
+                            }
+                    }
+                } else if let text = annotation.markedUpText, !text.isEmpty {
                     Text(text)
                         .font(.caption)
                         .lineLimit(3)
-
                     Text(typeLabel)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
