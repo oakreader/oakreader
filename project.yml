@@ -7,6 +7,22 @@ options:
   createIntermediateGroups: true
   groupSortPosition: top
   generateEmptyDirectories: true
+  developmentLanguage: en
+
+# Languages the app ships UI for. `en` is the source/development language
+# (its strings live inline in the SwiftUI code); the rest are translated in
+# OakReader/Resources/Localizable.xcstrings (the String Catalog). Adding a
+# region here makes Xcode emit its .lproj and exposes it for system-language
+# selection. Order is display-only.
+knownRegions:
+  - en
+  - zh-Hans
+  - zh-Hant
+  - ja
+  - ko
+  - de
+  - fr
+  - es
 
 packages:
   OakAgent:
@@ -32,6 +48,9 @@ packages:
   swift-argument-parser:
     url: https://github.com/apple/swift-argument-parser.git
     from: "1.3.0"
+  PostHog:
+    url: https://github.com/PostHog/posthog-ios
+    from: "3.60.0"
 
 settings:
   base:
@@ -61,6 +80,8 @@ targets:
       - package: CMarkGFM
       - package: Sparkle
       - package: OakVoice
+      - package: PostHog
+        product: PostHog
       - target: oak
     postCompileScripts:
       - script: |
