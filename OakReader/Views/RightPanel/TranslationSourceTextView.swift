@@ -6,6 +6,8 @@ import AppKit
 /// the selected word, sentence context, and screen position for popup placement.
 struct TranslationSourceTextView: NSViewRepresentable {
     @Binding var text: String
+    /// Reported back to SwiftUI so the view can size itself to its content (no inner scrolling).
+    @Binding var height: CGFloat
     var font: NSFont
     var placeholder: String = "Enter text"
     var onWordSelected: ((_ word: String, _ sentence: String, _ screenPoint: NSPoint) -> Void)?
@@ -16,7 +18,7 @@ struct TranslationSourceTextView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = NSScrollView()
-        scrollView.hasVerticalScroller = true
+        scrollView.hasVerticalScroller = false
         scrollView.hasHorizontalScroller = false
         scrollView.borderType = .noBorder
         scrollView.drawsBackground = false
@@ -54,6 +56,7 @@ struct TranslationSourceTextView: NSViewRepresentable {
         // Set initial text
         textView.string = text
         context.coordinator.updatePlaceholder()
+        context.coordinator.recalculateHeight()
 
         return scrollView
     }
@@ -69,6 +72,8 @@ struct TranslationSourceTextView: NSViewRepresentable {
         if textView.font != font {
             textView.font = font
         }
+        // Width may have changed (panel resize) → wrapping changes → recompute height.
+        context.coordinator.recalculateHeight()
     }
 
     // MARK: - Coordinator
@@ -89,6 +94,24 @@ struct TranslationSourceTextView: NSViewRepresentable {
             parent.text = textView.string
             updatePlaceholder()
             isUpdating = false
+            recalculateHeight()
+        }
+
+        /// Measures the text's laid-out height and reports it to SwiftUI via the binding.
+        func recalculateHeight() {
+            guard let textView,
+                  let layoutManager = textView.layoutManager,
+                  let textContainer = textView.textContainer else { return }
+            layoutManager.ensureLayout(for: textContainer)
+            let used = layoutManager.usedRect(for: textContainer).height
+            let newHeight = used + textView.textContainerInset.height * 2
+            // Avoid mutating SwiftUI state during a view-update pass.
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                if abs(self.parent.height - newHeight) > 0.5 {
+                    self.parent.height = newHeight
+                }
+            }
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {

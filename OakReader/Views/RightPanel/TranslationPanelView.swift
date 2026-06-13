@@ -6,6 +6,7 @@ struct TranslationPanelView: View {
     var voiceVM: VoiceViewModel?
 
     @State private var playingSection: PlayingSection?
+    @State private var sourceHeight: CGFloat = 90
 
     private enum PlayingSection {
         case source, target
@@ -50,31 +51,26 @@ struct TranslationPanelView: View {
     // MARK: - Language Bar
 
     private var languageBar: some View {
-        HStack(spacing: 4) {
-            languageMenuButton(
+        HStack(spacing: 6) {
+            Spacer(minLength: 0)
+
+            LanguagePillButton(
                 title: translationVM.sourceLang.nativeName,
                 languages: TranslationLanguage.allCases,
                 selection: $translationVM.sourceLang
             )
 
-            Button {
+            SwapLanguagesButton(disabled: translationVM.sourceLang == .auto) {
                 translationVM.swapLanguages()
-            } label: {
-                Image(systemName: "arrow.left.arrow.right")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 28, height: 28)
-                    .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            .disabled(translationVM.sourceLang == .auto)
-            .help("Swap languages")
 
-            languageMenuButton(
+            LanguagePillButton(
                 title: translationVM.targetLang.nativeName,
                 languages: TranslationLanguage.targetCases,
                 selection: $translationVM.targetLang
             )
+
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, OakStyle.Spacing.sm)
         .padding(.bottom, OakStyle.Spacing.xs)
@@ -92,13 +88,14 @@ struct TranslationPanelView: View {
         VStack(alignment: .leading, spacing: 0) {
             TranslationSourceTextView(
                 text: $translationVM.sourceText,
+                height: $sourceHeight,
                 font: OakStyle.Font.nsFont(size: OakStyle.Font.body),
                 placeholder: "Enter text",
                 onWordSelected: { word, sentence, _ in
                     translationVM.explainWord(word, inSentence: sentence)
                 }
             )
-            .frame(minHeight: 90, maxHeight: 200)
+            .frame(height: max(90, sourceHeight))
             .padding(.horizontal, OakStyle.Spacing.xs)
             .padding(.top, OakStyle.Spacing.xs)
             .onChange(of: translationVM.sourceText) { _, _ in
@@ -273,42 +270,6 @@ struct TranslationPanelView: View {
         )
     }
 
-    // MARK: - Language Menu Button
-
-    private func languageMenuButton(
-        title: String,
-        languages: [TranslationLanguage],
-        selection: Binding<TranslationLanguage>
-    ) -> some View {
-        Menu {
-            ForEach(languages) { lang in
-                Button {
-                    selection.wrappedValue = lang
-                } label: {
-                    if lang == selection.wrappedValue {
-                        Label(lang.nativeName, systemImage: "checkmark")
-                    } else {
-                        Text(lang.nativeName)
-                    }
-                }
-            }
-        } label: {
-            HStack(spacing: 4) {
-                Text(title)
-                    .font(OakStyle.Font.styled(size: 13, weight: .medium))
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 8, weight: .semibold))
-                    .foregroundStyle(.tertiary)
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 28)
-            .contentShape(Rectangle())
-        }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .fixedSize(horizontal: false, vertical: true)
-    }
-
     // MARK: - Shared Components
 
     private func toolbarButton(systemImage: String, tooltip: String, action: @escaping () -> Void) -> some View {
@@ -370,5 +331,81 @@ struct TranslationPanelView: View {
                 .foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity, minHeight: 120)
+    }
+}
+
+// MARK: - Language Pill
+
+/// A content-sized pull-down button styled like Apple's Translate language picker:
+/// language name + trailing chevron, with a subtle pill fill on hover.
+private struct LanguagePillButton: View {
+    let title: String
+    let languages: [TranslationLanguage]
+    @Binding var selection: TranslationLanguage
+
+    @State private var isHovering = false
+
+    var body: some View {
+        Menu {
+            ForEach(languages) { lang in
+                Button {
+                    selection = lang
+                } label: {
+                    if lang == selection {
+                        Label(lang.nativeName, systemImage: "checkmark")
+                    } else {
+                        Text(lang.nativeName)
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Text(title)
+                    .font(OakStyle.Font.styled(size: 13, weight: .medium))
+                    .foregroundStyle(.primary)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, OakStyle.Spacing.sm)
+            .padding(.vertical, 5)
+            .background(
+                RoundedRectangle(cornerRadius: OakStyle.Radius.standard)
+                    .fill(isHovering ? OakStyle.Colors.hoverBackground : .clear)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: OakStyle.Radius.standard))
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .onHover { isHovering = $0 }
+    }
+}
+
+// MARK: - Swap Languages Button
+
+/// Circular icon button between the two language pills.
+private struct SwapLanguagesButton: View {
+    let disabled: Bool
+    let action: () -> Void
+
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "arrow.left.arrow.right")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 26, height: 26)
+                .background(
+                    Circle()
+                        .fill(isHovering && !disabled ? OakStyle.Colors.hoverBackground : .clear)
+                )
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .onHover { isHovering = $0 }
+        .help("Swap languages")
     }
 }
