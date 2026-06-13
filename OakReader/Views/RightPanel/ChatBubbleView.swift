@@ -313,6 +313,11 @@ struct ChatBubbleView: View, Equatable {
                 guard let (citeKey, anchor) = CitationAnchor.parse(from: url) else { return false }
                 onOpenCitation?(citeKey, anchor)
                 return true
+            },
+            linkPreview: { url in
+                // Hovering a citation shows the cited source instead of the raw oak:// URL.
+                guard let (citeKey, anchor) = CitationAnchor.parse(from: url) else { return nil }
+                return AnyView(CitationHoverCard(citeKey: citeKey, anchor: anchor))
             }
         )
     }

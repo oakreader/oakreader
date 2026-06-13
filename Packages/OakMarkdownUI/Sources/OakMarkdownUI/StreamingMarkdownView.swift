@@ -14,13 +14,19 @@ public struct StreamingMarkdownView: View {
     /// Intercepts link clicks in prose. Return `true` if handled, `false` to let the
     /// system open the URL. Used by hosts to handle custom schemes (e.g. `oak://`).
     public var onOpenURL: ((URL) -> Bool)?
+    /// Supplies a rich hover-preview for a link. When it returns a non-nil view, hovering
+    /// the link shows that view in a popover and the default raw-URL tooltip is suppressed.
+    /// Returning nil leaves the link with the system's default hover behavior.
+    public var linkPreview: ((URL) -> AnyView?)?
 
     public init(markdown: String, theme: MarkdownTheme = .oak(), isStreaming: Bool = false,
-                onOpenURL: ((URL) -> Bool)? = nil) {
+                onOpenURL: ((URL) -> Bool)? = nil,
+                linkPreview: ((URL) -> AnyView?)? = nil) {
         self.markdown = markdown
         self.theme = theme
         self.isStreaming = isStreaming
         self.onOpenURL = onOpenURL
+        self.linkPreview = linkPreview
     }
 
     public var body: some View {
@@ -28,7 +34,8 @@ public struct StreamingMarkdownView: View {
         VStack(alignment: .leading, spacing: theme.paragraphSpacing) {
             ForEach(blocks) { block in
                 BlockRow(block: block, theme: theme,
-                         streaming: isStreaming && !block.isSettled, onOpenURL: onOpenURL)
+                         streaming: isStreaming && !block.isSettled,
+                         onOpenURL: onOpenURL, linkPreview: linkPreview)
                     .equatable()
             }
         }
@@ -45,6 +52,7 @@ private struct BlockRow: View, Equatable {
     // Excluded from `==`: the handler is stable per host, and a closure isn't
     // Equatable. Only block text/kind and streaming state drive re-rendering.
     var onOpenURL: ((URL) -> Bool)?
+    var linkPreview: ((URL) -> AnyView?)?
 
     static func == (lhs: BlockRow, rhs: BlockRow) -> Bool {
         lhs.block == rhs.block && lhs.streaming == rhs.streaming
@@ -57,7 +65,8 @@ private struct BlockRow: View, Equatable {
             ProseBlockView(
                 attributed: MarkdownAttributedBuilder.attributedString(for: block.text, theme: theme),
                 selectable: !streaming,
-                onOpenURL: onOpenURL
+                onOpenURL: onOpenURL,
+                linkPreview: linkPreview
             )
         case .code(let language):
             CodeBlockView(code: CodeFence.strip(block.text), language: language, theme: theme)

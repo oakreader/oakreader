@@ -12,18 +12,38 @@ struct ProseBlockView: NSViewRepresentable {
     /// browser). Lets the host intercept custom schemes (e.g. `oak://`) that the
     /// OS has no handler for, instead of letting AppKit fail to open them.
     var onOpenURL: ((URL) -> Bool)?
+    /// Optional rich hover-preview for a link (e.g. a citation card). See
+    /// `StreamingMarkdownView.linkPreview`.
+    var linkPreview: ((URL) -> AnyView?)?
 
-    func makeCoordinator() -> Coordinator { Coordinator(onOpenURL: onOpenURL) }
+    func makeCoordinator() -> Coordinator { Coordinator(onOpenURL: onOpenURL, linkPreview: linkPreview) }
 
     final class Coordinator: NSObject, NSTextViewDelegate {
         var onOpenURL: ((URL) -> Bool)?
-        init(onOpenURL: ((URL) -> Bool)?) { self.onOpenURL = onOpenURL }
+        var linkPreview: ((URL) -> AnyView?)?
+        init(onOpenURL: ((URL) -> Bool)?, linkPreview: ((URL) -> AnyView?)?) {
+            self.onOpenURL = onOpenURL
+            self.linkPreview = linkPreview
+        }
 
         func textView(_ textView: NSTextView, clickedOnLink link: Any, at charIndex: Int) -> Bool {
             let url = (link as? URL) ?? (link as? String).flatMap { URL(string: $0) }
             guard let url else { return false }
             // true → we handled it; false → NSTextView opens it via the default action.
             return onOpenURL?(url) ?? false
+        }
+
+        /// Suppress the default raw-URL tooltip for links that have a custom hover
+        /// preview — the popover shows the human-readable card instead. Links without a
+        /// preview keep their normal tooltip.
+        func textView(_ textView: NSTextView, willDisplayToolTip tooltip: String,
+                      forCharacterAt characterIndex: Int) -> String? {
+            guard let storage = textView.textStorage, characterIndex < storage.length,
+                  let value = storage.attribute(.link, at: characterIndex, effectiveRange: nil),
+                  let url = (value as? URL) ?? (value as? String).flatMap({ URL(string: $0) }),
+                  linkPreview?(url) != nil
+            else { return tooltip }
+            return nil
         }
     }
 
@@ -52,6 +72,8 @@ struct ProseBlockView: NSViewRepresentable {
 
     func updateNSView(_ tv: MarkdownTextView, context: Context) {
         context.coordinator.onOpenURL = onOpenURL
+        context.coordinator.linkPreview = linkPreview
+        tv.linkPreview = linkPreview
         tv.isSelectable = selectable
         guard let ts = tv.textStorage else { return }
         if ts.length == 0 {
