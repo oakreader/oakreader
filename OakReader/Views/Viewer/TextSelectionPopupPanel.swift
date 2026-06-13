@@ -29,16 +29,8 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
     // Speak button
     private weak var speakButton: PopupIconButton?
 
-    static let annotationColors: [(NSColor, String)] = [
-        (NSColor(red: 1.0, green: 0.83, blue: 0.0, alpha: 1.0), "Yellow"),
-        (NSColor(red: 1.0, green: 0.4, blue: 0.4, alpha: 1.0), "Red"),
-        (NSColor(red: 0.37, green: 0.70, blue: 0.21, alpha: 1.0), "Green"),
-        (NSColor(red: 0.18, green: 0.66, blue: 0.90, alpha: 1.0), "Blue"),
-        (NSColor(red: 0.64, green: 0.54, blue: 0.90, alpha: 1.0), "Purple"),
-        (NSColor(red: 0.90, green: 0.43, blue: 0.93, alpha: 1.0), "Magenta"),
-        (NSColor(red: 0.95, green: 0.60, blue: 0.22, alpha: 1.0), "Orange"),
-        (NSColor(red: 0.67, green: 0.67, blue: 0.67, alpha: 1.0), "Gray"),
-    ]
+    static let annotationColors: [(NSColor, String)] =
+        OakStyle.AnnotationColors.highlightColors.map { ($0.nsColor, $0.name) }
 
     init(at screenPoint: NSPoint, viewModel: DocumentViewModel, selection: PDFSelection, pdfView: PDFView, anchorPage: PDFPage, anchorPoint: NSPoint, onDismiss: @escaping () -> Void) {
         self.viewModel = viewModel
@@ -80,13 +72,7 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
         }
 
         self.setFrameOrigin(NSPoint(x: x, y: y))
-        self.orderFront(nil)
-
-        self.alphaValue = 0
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.12
-            self.animator().alphaValue = 1
-        }
+        animatePopupEntrance(self)
 
         observeScroll()
         observeAppResign()
@@ -141,7 +127,7 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
         let mainStack = NSStackView()
         mainStack.orientation = .horizontal
         mainStack.spacing = 4
-        mainStack.edgeInsets = NSEdgeInsets(top: 8, left: 10, bottom: 8, right: 10)
+        mainStack.edgeInsets = NSEdgeInsets(top: 8, left: 14, bottom: 8, right: 14)
         mainStack.alignment = .centerY
 
         // Group 1: Markup (highlight + underline + color picker)
@@ -220,25 +206,7 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
     }
 
     private func makeVerticalSeparator() -> NSView {
-        // 1pt separator inside an 11pt-wide wrapper: 5pt breathing room on
-        // each side. Combined with the 4pt mainStack spacing, that's ~9pt
-        // total gap around each divider vs ~4pt between buttons within a
-        // group — strong enough to read as a clear group boundary.
-        let sep = NSBox()
-        sep.boxType = .separator
-        sep.translatesAutoresizingMaskIntoConstraints = false
-        let wrapper = NSView()
-        wrapper.translatesAutoresizingMaskIntoConstraints = false
-        wrapper.addSubview(sep)
-        NSLayoutConstraint.activate([
-            wrapper.widthAnchor.constraint(equalToConstant: 11),
-            wrapper.heightAnchor.constraint(equalToConstant: 22),
-            sep.centerXAnchor.constraint(equalTo: wrapper.centerXAnchor),
-            sep.topAnchor.constraint(equalTo: wrapper.topAnchor),
-            sep.bottomAnchor.constraint(equalTo: wrapper.bottomAnchor),
-            sep.widthAnchor.constraint(equalToConstant: 1),
-        ])
-        return wrapper
+        makePopupVerticalSeparator()
     }
 
     // MARK: - Color Sub-Panel
@@ -253,37 +221,9 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
     }
 
     private func showColorSubPanel() {
-        let colorStack = NSStackView()
-        colorStack.orientation = .horizontal
-        colorStack.spacing = 8
-        colorStack.edgeInsets = NSEdgeInsets(top: 14, left: 10, bottom: 14, right: 10)
-
-        for (color, name) in Self.annotationColors {
-            let dot = ColorDotView(color: color, size: 20) { [weak self] in
-                self?.applyHighlight(color: color)
-            }
-            dot.toolTip = name
-            colorStack.addArrangedSubview(dot)
+        let panel = makeColorSwatchPanel(swatches: Self.annotationColors) { [weak self] index in
+            self?.applyHighlight(color: Self.annotationColors[index].0)
         }
-
-        let container = makePopupGlassContainer(content: colorStack)
-
-        let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 10, height: 10),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: true
-        )
-        panel.isOpaque = false
-        panel.backgroundColor = .clear
-        panel.level = .floating
-        panel.hasShadow = true
-        panel.ignoresMouseEvents = false
-        panel.contentView = container
-
-        let contentSize = container.fittingSize
-        panel.setContentSize(contentSize)
-
         colorSubPanel = panel
         repositionColorSubPanel()
         panel.orderFront(nil)

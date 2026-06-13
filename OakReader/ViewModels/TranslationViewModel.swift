@@ -35,8 +35,26 @@ class TranslationViewModel {
     /// Called from text selection popup — sets source text and auto-triggers translation.
     func setSourceText(_ text: String) {
         skipNextDebounce = true
-        sourceText = text
+        sourceText = Self.normalizeExtractedText(text)
         translate()
+    }
+
+    /// PDF text extraction carries hard line breaks (and hyphenated word
+    /// splits) mid-sentence; collapse them so the source reads as prose.
+    /// Blank lines (real paragraph breaks) are preserved, and CJK lines are
+    /// joined without inserting spaces.
+    private static func normalizeExtractedText(_ text: String) -> String {
+        var t = text.replacingOccurrences(of: "-\n", with: "")
+        t = t.replacingOccurrences(
+            of: "(?<=\\p{Han})\\n(?=\\p{Han})", with: "", options: .regularExpression
+        )
+        t = t.replacingOccurrences(
+            of: "(?<!\\n)\\n(?!\\n)", with: " ", options: .regularExpression
+        )
+        t = t.replacingOccurrences(
+            of: "[ \\t]{2,}", with: " ", options: .regularExpression
+        )
+        return t.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// Called when the user types in the source text editor (debounced).
@@ -83,7 +101,7 @@ class TranslationViewModel {
 
         streamTask = Task { @MainActor in
             do {
-                let svc = try router.provider(for: config)
+                let svc = try await router.provider(for: config)
                 let stream = svc.sendMessage(
                     messages: messages,
                     model: model,
@@ -265,7 +283,7 @@ class TranslationViewModel {
 
         wordExplanationTask = Task { @MainActor in
             do {
-                let svc = try router.provider(for: config)
+                let svc = try await router.provider(for: config)
                 let stream = svc.sendMessage(
                     messages: messages,
                     model: model,

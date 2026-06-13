@@ -119,7 +119,11 @@ struct ContentView: View {
         if viewModel.isNewTab { return false }
         if viewModel.state.isPresentationMode { return false }
         switch viewModel.contentType {
-        case .pdf, .html: return viewModel.hasDocument
+        // PDF dropped its per-document toolbar — zoom/markup/area now live in
+        // menus, the selection popup, and the Command Palette. HTML still keeps
+        // its annotation cluster, and live web keeps the address bar.
+        case .pdf:        return false
+        case .html:       return viewModel.hasDocument
         case .link:       return viewModel.liveURL != nil
         case .markdown,
              .audio:       return false

@@ -52,14 +52,6 @@ class DocumentViewModel {
         return vm
     }
 
-    private var _convert: ConvertViewModel?
-    var convert: ConvertViewModel {
-        if let vm = _convert { return vm }
-        let vm = ConvertViewModel(parent: self)
-        _convert = vm
-        return vm
-    }
-
     private var _security: SecurityViewModel?
     var security: SecurityViewModel {
         if let vm = _security { return vm }

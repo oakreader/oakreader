@@ -20,16 +20,10 @@ class HTMLSelectionPopupPanel: NSPanel, AppResignDismissable {
     private var colorSubPanel: NSPanel?
     var resignObserver: NSObjectProtocol?
 
-    static let highlightColors: [(NSColor, String, String)] = [
-        (NSColor(red: 1.0, green: 0.83, blue: 0.0, alpha: 1.0), "Yellow", "rgba(255,212,0,0.35)"),
-        (NSColor(red: 1.0, green: 0.4, blue: 0.4, alpha: 1.0), "Red", "rgba(255,102,102,0.35)"),
-        (NSColor(red: 0.37, green: 0.70, blue: 0.21, alpha: 1.0), "Green", "rgba(94,179,54,0.35)"),
-        (NSColor(red: 0.18, green: 0.66, blue: 0.90, alpha: 1.0), "Blue", "rgba(46,168,230,0.35)"),
-        (NSColor(red: 0.64, green: 0.54, blue: 0.90, alpha: 1.0), "Purple", "rgba(163,138,230,0.35)"),
-        (NSColor(red: 0.90, green: 0.43, blue: 0.93, alpha: 1.0), "Magenta", "rgba(230,110,237,0.35)"),
-        (NSColor(red: 0.95, green: 0.60, blue: 0.22, alpha: 1.0), "Orange", "rgba(242,153,56,0.35)"),
-        (NSColor(red: 0.67, green: 0.67, blue: 0.67, alpha: 1.0), "Gray", "rgba(171,171,171,0.35)"),
-    ]
+    static let highlightColors: [(NSColor, String, String)] =
+        OakStyle.AnnotationColors.highlightColors.map {
+            ($0.nsColor, $0.name, OakStyle.AnnotationColors.cssRGBA($0.nsColor))
+        }
 
     static func show(
         atTop topScreenPoint: NSPoint,
@@ -132,13 +126,7 @@ class HTMLSelectionPopupPanel: NSPanel, AppResignDismissable {
         }
 
         setFrameOrigin(NSPoint(x: x, y: y))
-        orderFront(nil)
-
-        alphaValue = 0
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.12
-            self.animator().alphaValue = 1
-        }
+        animatePopupEntrance(self)
 
         observeAppResign()
     }
@@ -151,7 +139,7 @@ class HTMLSelectionPopupPanel: NSPanel, AppResignDismissable {
         // Same Marshall-lifecycle grouping as TextSelectionPopupPanel — see
         // that file's `buildContentView` doc for the rationale.
         mainStack.spacing = 4
-        mainStack.edgeInsets = NSEdgeInsets(top: 8, left: 10, bottom: 8, right: 10)
+        mainStack.edgeInsets = NSEdgeInsets(top: 8, left: 14, bottom: 8, right: 14)
         mainStack.alignment = .centerY
 
         // Group 1: Markup (highlight + underline + color picker)
@@ -227,21 +215,7 @@ class HTMLSelectionPopupPanel: NSPanel, AppResignDismissable {
     }
 
     private func makeVerticalSeparator() -> NSView {
-        let sep = NSBox()
-        sep.boxType = .separator
-        sep.translatesAutoresizingMaskIntoConstraints = false
-        let wrapper = NSView()
-        wrapper.translatesAutoresizingMaskIntoConstraints = false
-        wrapper.addSubview(sep)
-        NSLayoutConstraint.activate([
-            wrapper.widthAnchor.constraint(equalToConstant: 11),
-            wrapper.heightAnchor.constraint(equalToConstant: 22),
-            sep.centerXAnchor.constraint(equalTo: wrapper.centerXAnchor),
-            sep.topAnchor.constraint(equalTo: wrapper.topAnchor),
-            sep.bottomAnchor.constraint(equalTo: wrapper.bottomAnchor),
-            sep.widthAnchor.constraint(equalToConstant: 1),
-        ])
-        return wrapper
+        makePopupVerticalSeparator()
     }
 
     // MARK: - Color Sub-Panel
@@ -256,42 +230,15 @@ class HTMLSelectionPopupPanel: NSPanel, AppResignDismissable {
     }
 
     private func showColorSubPanel() {
-        let colorStack = NSStackView()
-        colorStack.orientation = .horizontal
-        colorStack.spacing = 8
-        colorStack.edgeInsets = NSEdgeInsets(top: 14, left: 10, bottom: 14, right: 10)
-
-        for (index, (color, name, _)) in Self.highlightColors.enumerated() {
-            let dot = ColorDotView(color: color, size: 20) { [weak self] in
-                self?.applyHighlight(colorIndex: index)
-            }
-            dot.toolTip = name
-            colorStack.addArrangedSubview(dot)
+        let swatches = Self.highlightColors.map { ($0.0, $0.1) }
+        let panel = makeColorSwatchPanel(swatches: swatches, aqua: true) { [weak self] index in
+            self?.applyHighlight(colorIndex: index)
         }
-
-        let container = makePopupGlassContainer(content: colorStack)
-
-        let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 10, height: 10),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: true
-        )
-        panel.isOpaque = false
-        panel.backgroundColor = .clear
-        panel.level = .floating
-        panel.hasShadow = true
-        panel.ignoresMouseEvents = false
-        panel.appearance = NSAppearance(named: .aqua)
-        panel.contentView = container
-
-        let contentSize = container.fittingSize
-        panel.setContentSize(contentSize)
 
         // Position below the main toolbar, left-aligned
         let mainFrame = self.frame
         let x = mainFrame.origin.x + 6
-        let y = mainFrame.origin.y - contentSize.height - 2
+        let y = mainFrame.origin.y - panel.frame.height - 2
         panel.setFrameOrigin(NSPoint(x: x, y: y))
 
         colorSubPanel = panel
@@ -471,14 +418,7 @@ class WebAreaPopupPanel: NSPanel, AppResignDismissable {
         let x = screenPoint.x - contentSize.width / 2
         let y = screenPoint.y - contentSize.height - 8
         setFrameOrigin(NSPoint(x: x, y: y))
-
-        orderFront(nil)
-
-        alphaValue = 0
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.12
-            self.animator().alphaValue = 1
-        }
+        animatePopupEntrance(self)
 
         observeAppResign()
     }
@@ -518,7 +458,7 @@ class WebAreaPopupPanel: NSPanel, AppResignDismissable {
         copyBtn.trailingAnchor.constraint(equalTo: stack.trailingAnchor, constant: -6).isActive = true
 
         // Background
-        let container = makePopupGlassContainer(content: stack, cornerRadius: 6)
+        let container = makePopupGlassContainer(content: stack, cornerRadius: 10)
 
         // Match PDF popup width
         container.widthAnchor.constraint(equalToConstant: 246).isActive = true
@@ -544,63 +484,6 @@ class WebAreaPopupPanel: NSPanel, AppResignDismissable {
         showCopiedToast()
     }
 
-    private func showCopiedToast() {
-        guard let window = NSApp.keyWindow else { return }
-
-        let toast = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 180, height: 36),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: true
-        )
-        toast.isOpaque = false
-        toast.backgroundColor = .clear
-        toast.level = .floating
-        toast.ignoresMouseEvents = true
-
-        let bg = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: 180, height: 36))
-        bg.material = .hudWindow
-        bg.state = .active
-        bg.wantsLayer = true
-        bg.layer?.cornerRadius = 8
-
-        let icon = NSImageView(frame: NSRect(x: 12, y: 6, width: 24, height: 24))
-        if let img = NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: nil) {
-            let config = NSImage.SymbolConfiguration(pointSize: 16, weight: .medium)
-            icon.image = img.withSymbolConfiguration(config)
-            icon.contentTintColor = .systemGreen
-        }
-        bg.addSubview(icon)
-
-        let label = NSTextField(labelWithString: "Copied to clipboard")
-        label.font = NSFont.systemFont(ofSize: 12, weight: .medium)
-        label.textColor = .labelColor
-        label.frame = NSRect(x: 40, y: 8, width: 130, height: 20)
-        bg.addSubview(label)
-
-        toast.contentView = bg
-
-        let windowFrame = window.frame
-        let toastX = windowFrame.midX - 90
-        let toastY = windowFrame.midY - 18
-        toast.setFrameOrigin(NSPoint(x: toastX, y: toastY))
-        toast.orderFront(nil)
-
-        toast.alphaValue = 0
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.2
-            toast.animator().alphaValue = 1
-        }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            NSAnimationContext.runAnimationGroup({ ctx in
-                ctx.duration = 0.3
-                toast.animator().alphaValue = 0
-            }, completionHandler: {
-                toast.orderOut(nil)
-            })
-        }
-    }
 
     func dismiss() {
         removeAppResignObserver()

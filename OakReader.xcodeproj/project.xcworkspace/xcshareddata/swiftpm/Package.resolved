@@ -55,15 +55,6 @@
       }
     },
     {
-      "identity" : "swift-fsrs",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/open-spaced-repetition/swift-fsrs",
-      "state" : {
-        "branch" : "main",
-        "revision" : "a3dcee0599e4925380e1fca960cf46efbdac43cb"
-      }
-    },
-    {
       "identity" : "swiftui-math",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/gonzalezreal/swiftui-math",

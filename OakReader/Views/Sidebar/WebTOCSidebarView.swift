@@ -9,9 +9,9 @@ struct WebHeading: Identifiable, Decodable, Equatable {
     var id: String { elementId }
 }
 
-/// Left-sidebar table of contents for a live `.link` browser tab. Renders the
-/// page's heading outline as a flat, level-indented list; tapping a row scrolls
-/// the underlying WKWebView to that heading.
+/// Left sidebar for a live `.link` browser tab: chat history on top, the page's
+/// heading outline below. Tapping a chat loads it and opens the chat panel;
+/// tapping a heading scrolls the underlying WKWebView to it.
 struct WebTOCSidebarView: View {
     let viewModel: DocumentViewModel
 
@@ -25,7 +25,42 @@ struct WebTOCSidebarView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            header
+            chatsSection
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            Divider()
+
+            contentsSection
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - Chats Section
+
+    private var chatsSection: some View {
+        VStack(spacing: 0) {
+            sectionHeader(
+                icon: "bubble.left.and.text.bubble.right",
+                title: "Chats",
+                count: viewModel.chat.sessionList.count
+            )
+
+            ChatHistoryDrawer(chatVM: viewModel.chat) { _ in
+                viewModel.state.rightPanelMode = .aiChat
+            }
+        }
+    }
+
+    // MARK: - Contents Section
+
+    private var contentsSection: some View {
+        VStack(spacing: 0) {
+            sectionHeader(
+                icon: "list.bullet.indent",
+                title: "Contents",
+                count: headings.count
+            )
 
             if headings.isEmpty {
                 emptyState
@@ -41,25 +76,24 @@ struct WebTOCSidebarView: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Header
 
-    private var header: some View {
+    private func sectionHeader(icon: String, title: String, count: Int) -> some View {
         HStack(spacing: 6) {
-            Image(systemName: "list.bullet.indent")
+            Image(systemName: icon)
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
 
-            Text("Contents")
+            Text(title)
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.secondary)
 
             Spacer()
 
-            if !headings.isEmpty {
-                Text("\(headings.count)")
+            if count > 0 {
+                Text("\(count)")
                     .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
             }

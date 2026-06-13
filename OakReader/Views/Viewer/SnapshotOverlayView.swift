@@ -175,19 +175,3 @@ private struct SnapshotHitTestView: NSViewRepresentable {
     }
 }
 
-// MARK: - Crosshair cursor modifier
-
-private struct CursorModifier: ViewModifier {
-    let cursor: NSCursor
-    func body(content: Content) -> some View {
-        content.onHover { inside in
-            if inside { cursor.set() } else { NSCursor.arrow.set() }
-        }
-    }
-}
-
-extension View {
-    func cursor(_ cursor: NSCursor) -> some View {
-        modifier(CursorModifier(cursor: cursor))
-    }
-}

@@ -78,13 +78,7 @@ final class AnnotationEditPopupPanel: NSPanel, AppResignDismissable {
         let size = contentView.fittingSize
         self.setContentSize(size)
         positionAtAnchor()
-        self.orderFront(nil)
-
-        self.alphaValue = 0
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.12
-            self.animator().alphaValue = 1
-        }
+        animatePopupEntrance(self)
 
         observeScroll()
         observeAppResign()
@@ -150,7 +144,7 @@ final class AnnotationEditPopupPanel: NSPanel, AppResignDismissable {
         let mainStack = NSStackView()
         mainStack.orientation = .horizontal
         mainStack.spacing = 4
-        mainStack.edgeInsets = NSEdgeInsets(top: 8, left: 10, bottom: 8, right: 10)
+        mainStack.edgeInsets = NSEdgeInsets(top: 8, left: 14, bottom: 8, right: 14)
         mainStack.alignment = .centerY
 
         // Row 1 — persistent (Marshall): color palette
@@ -204,21 +198,7 @@ final class AnnotationEditPopupPanel: NSPanel, AppResignDismissable {
     }
 
     private func makeVerticalSeparator() -> NSView {
-        let sep = NSBox()
-        sep.boxType = .separator
-        sep.translatesAutoresizingMaskIntoConstraints = false
-        let wrapper = NSView()
-        wrapper.translatesAutoresizingMaskIntoConstraints = false
-        wrapper.addSubview(sep)
-        NSLayoutConstraint.activate([
-            wrapper.widthAnchor.constraint(equalToConstant: 11),
-            wrapper.heightAnchor.constraint(equalToConstant: 22),
-            sep.centerXAnchor.constraint(equalTo: wrapper.centerXAnchor),
-            sep.topAnchor.constraint(equalTo: wrapper.topAnchor),
-            sep.bottomAnchor.constraint(equalTo: wrapper.bottomAnchor),
-            sep.widthAnchor.constraint(equalToConstant: 1),
-        ])
-        return wrapper
+        makePopupVerticalSeparator()
     }
 
     // MARK: - Derived selection text

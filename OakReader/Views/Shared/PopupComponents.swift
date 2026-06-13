@@ -27,22 +27,38 @@ extension AppResignDismissable {
     }
 }
 
+// MARK: - Popup Style
+
+enum PopupStyle {
+    /// Neutral hover/press washes. Accent color is reserved for
+    /// selected/active state — never plain hover.
+    static var hoverBackground: NSColor { NSColor.labelColor.withAlphaComponent(0.07) }
+    static var pressedBackground: NSColor { NSColor.labelColor.withAlphaComponent(0.12) }
+}
+
 // MARK: - Glass Container Factory
 
 /// Creates a popup container with Liquid Glass on macOS 26+, falling back to NSVisualEffectView.
-func makePopupGlassContainer(content: NSView, cornerRadius: CGFloat = 8) -> NSView {
+/// Defaults to a capsule — floating glass bars are designed around fully-rounded
+/// shapes, not small fixed radii.
+func makePopupGlassContainer(content: NSView, cornerRadius: CGFloat? = nil) -> NSView {
+    let radius = cornerRadius ?? content.fittingSize.height / 2
     let container: NSView
+    var rim: NSView?
     if #available(macOS 26, *) {
         let glass = NSGlassEffectView()
-        glass.cornerRadius = cornerRadius
+        glass.cornerRadius = radius
         container = glass
     } else {
         let vev = NSVisualEffectView()
         vev.material = .popover
         vev.state = .active
         vev.wantsLayer = true
-        vev.layer?.cornerRadius = cornerRadius
+        vev.layer?.cornerRadius = radius
         container = vev
+        // Hand-clipping the material loses the system popover's edge
+        // treatment; restore the glass rim by hand.
+        rim = PopupRimView(cornerRadius: radius)
     }
     container.addSubview(content)
     content.translatesAutoresizingMaskIntoConstraints = false
@@ -52,7 +68,94 @@ func makePopupGlassContainer(content: NSView, cornerRadius: CGFloat = 8) -> NSVi
         content.leadingAnchor.constraint(equalTo: container.leadingAnchor),
         content.trailingAnchor.constraint(equalTo: container.trailingAnchor),
     ])
+    if let rim {
+        rim.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(rim)
+        NSLayoutConstraint.activate([
+            rim.topAnchor.constraint(equalTo: container.topAnchor),
+            rim.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            rim.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            rim.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+        ])
+    }
     return container
+}
+
+/// Dark outer hairline + light inner highlight around the glass edge —
+/// the depth cue system popovers draw and a plain masked layer lacks.
+private final class PopupRimView: NSView {
+    private let cornerRadius: CGFloat
+
+    init(cornerRadius: CGFloat) {
+        self.cornerRadius = cornerRadius
+        super.init(frame: .zero)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let isDark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+
+        let outer = NSBezierPath(
+            roundedRect: bounds.insetBy(dx: 0.25, dy: 0.25),
+            xRadius: cornerRadius, yRadius: cornerRadius
+        )
+        outer.lineWidth = 0.5
+        NSColor.black.withAlphaComponent(isDark ? 0.5 : 0.12).setStroke()
+        outer.stroke()
+
+        let innerRadius = max(cornerRadius - 0.5, 0)
+        let inner = NSBezierPath(
+            roundedRect: bounds.insetBy(dx: 0.75, dy: 0.75),
+            xRadius: innerRadius, yRadius: innerRadius
+        )
+        inner.lineWidth = 0.5
+        NSColor.white.withAlphaComponent(isDark ? 0.12 : 0.35).setStroke()
+        inner.stroke()
+    }
+}
+
+// MARK: - Popup Separator
+
+/// Short, faint vertical divider between popup button groups. 1pt line inside
+/// an 11pt wrapper (~5pt breathing room each side); shorter than the buttons
+/// so it reads as a group boundary without chopping the bar into boxes.
+func makePopupVerticalSeparator() -> NSView {
+    let sep = NSBox()
+    sep.boxType = .separator
+    sep.translatesAutoresizingMaskIntoConstraints = false
+    let wrapper = NSView()
+    wrapper.translatesAutoresizingMaskIntoConstraints = false
+    wrapper.alphaValue = 0.7
+    wrapper.addSubview(sep)
+    NSLayoutConstraint.activate([
+        wrapper.widthAnchor.constraint(equalToConstant: 11),
+        wrapper.heightAnchor.constraint(equalToConstant: 14),
+        sep.centerXAnchor.constraint(equalTo: wrapper.centerXAnchor),
+        sep.topAnchor.constraint(equalTo: wrapper.topAnchor),
+        sep.bottomAnchor.constraint(equalTo: wrapper.bottomAnchor),
+        sep.widthAnchor.constraint(equalToConstant: 1),
+    ])
+    return wrapper
+}
+
+// MARK: - Popup Entrance Animation
+
+/// Fade + 4pt rise into the final position — popover-style entrance instead
+/// of a flat fade. Call after the panel's final frame origin is set.
+func animatePopupEntrance(_ panel: NSPanel) {
+    let finalFrame = panel.frame
+    panel.setFrameOrigin(NSPoint(x: finalFrame.origin.x, y: finalFrame.origin.y - 4))
+    panel.alphaValue = 0
+    panel.orderFront(nil)
+    NSAnimationContext.runAnimationGroup { ctx in
+        ctx.duration = 0.16
+        ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        panel.animator().alphaValue = 1
+        panel.animator().setFrame(finalFrame, display: true)
+    }
 }
 
 // MARK: - Color Dot (OakReader-style round swatch)
@@ -159,130 +262,6 @@ class PopupActionButton: NSButton {
     }
 }
 
-// MARK: - Popup Labeled Button (icon + text label, hover highlight)
-
-class PopupLabeledButton: NSView {
-    private let onClick: () -> Void
-    private var isHovered = false
-    private var trackingArea: NSTrackingArea?
-    private let iconView: NSImageView
-    private let labelField: NSTextField
-
-    init(systemImage: String, title: String, onClick: @escaping () -> Void) {
-        self.onClick = onClick
-        self.iconView = NSImageView()
-        self.labelField = NSTextField(labelWithString: title)
-        super.init(frame: .zero)
-
-        wantsLayer = true
-        layer?.cornerRadius = 6
-        translatesAutoresizingMaskIntoConstraints = false
-        heightAnchor.constraint(equalToConstant: 32).isActive = true
-
-        if let img = NSImage(systemSymbolName: systemImage, accessibilityDescription: title) {
-            let config = NSImage.SymbolConfiguration(pointSize: 12, weight: .medium)
-            iconView.image = img.withSymbolConfiguration(config)
-        }
-        iconView.contentTintColor = .secondaryLabelColor
-        iconView.translatesAutoresizingMaskIntoConstraints = false
-
-        labelField.font = .systemFont(ofSize: 11, weight: .medium)
-        labelField.textColor = .secondaryLabelColor
-        labelField.translatesAutoresizingMaskIntoConstraints = false
-        labelField.setContentHuggingPriority(.required, for: .horizontal)
-
-        addSubview(iconView)
-        addSubview(labelField)
-        NSLayoutConstraint.activate([
-            iconView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 6),
-            iconView.centerYAnchor.constraint(equalTo: centerYAnchor),
-            iconView.widthAnchor.constraint(equalToConstant: 16),
-            iconView.heightAnchor.constraint(equalToConstant: 16),
-            labelField.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 3),
-            labelField.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
-            labelField.centerYAnchor.constraint(equalTo: centerYAnchor),
-        ])
-
-        toolTip = title
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-
-    // MARK: - Loading State
-
-    private var spinner: NSProgressIndicator?
-    private(set) var isLoading = false
-
-    func showLoading() {
-        guard !isLoading else { return }
-        isLoading = true
-        iconView.isHidden = true
-
-        let sp = NSProgressIndicator()
-        sp.style = .spinning
-        sp.controlSize = .small
-        sp.isIndeterminate = true
-        sp.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(sp)
-        NSLayoutConstraint.activate([
-            sp.centerXAnchor.constraint(equalTo: iconView.centerXAnchor),
-            sp.centerYAnchor.constraint(equalTo: iconView.centerYAnchor),
-            sp.widthAnchor.constraint(equalToConstant: 14),
-            sp.heightAnchor.constraint(equalToConstant: 14),
-        ])
-        sp.startAnimation(nil)
-        spinner = sp
-    }
-
-    func hideLoading() {
-        guard isLoading else { return }
-        isLoading = false
-        spinner?.stopAnimation(nil)
-        spinner?.removeFromSuperview()
-        spinner = nil
-        iconView.isHidden = false
-    }
-
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        if let ta = trackingArea { removeTrackingArea(ta) }
-        trackingArea = NSTrackingArea(
-            rect: bounds, options: [.mouseEnteredAndExited, .activeAlways], owner: self
-        )
-        addTrackingArea(trackingArea!)
-    }
-
-    override func mouseEntered(with event: NSEvent) {
-        isHovered = true
-        layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.10).cgColor
-        iconView.contentTintColor = .labelColor
-        labelField.textColor = .labelColor
-    }
-
-    override func mouseExited(with event: NSEvent) {
-        isHovered = false
-        layer?.backgroundColor = nil
-        iconView.contentTintColor = .secondaryLabelColor
-        labelField.textColor = .secondaryLabelColor
-    }
-
-    override func mouseDown(with event: NSEvent) {
-        guard !isLoading else { return }
-        layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.18).cgColor
-    }
-
-    override func mouseUp(with event: NSEvent) {
-        guard !isLoading else { return }
-        let pt = convert(event.locationInWindow, from: nil)
-        if bounds.contains(pt) {
-            onClick()
-        }
-        layer?.backgroundColor = isHovered
-            ? NSColor.controlAccentColor.withAlphaComponent(0.10).cgColor
-            : nil
-    }
-}
-
 // MARK: - Popup Icon Button (icon-only, hover highlight)
 
 class PopupIconButton: NSView {
@@ -297,7 +276,7 @@ class PopupIconButton: NSView {
         super.init(frame: NSRect(x: 0, y: 0, width: 32, height: 32))
 
         wantsLayer = true
-        layer?.cornerRadius = 6
+        layer?.cornerRadius = 16
         translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             widthAnchor.constraint(equalToConstant: 32),
@@ -341,7 +320,7 @@ class PopupIconButton: NSView {
 
     override func mouseEntered(with event: NSEvent) {
         isHovered = true
-        layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.10).cgColor
+        layer?.backgroundColor = PopupStyle.hoverBackground.cgColor
         iconView.contentTintColor = .labelColor
     }
 
@@ -352,7 +331,7 @@ class PopupIconButton: NSView {
     }
 
     override func mouseDown(with event: NSEvent) {
-        layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.18).cgColor
+        layer?.backgroundColor = PopupStyle.pressedBackground.cgColor
     }
 
     override func mouseUp(with event: NSEvent) {
@@ -361,7 +340,114 @@ class PopupIconButton: NSView {
             onClick()
         }
         layer?.backgroundColor = isHovered
-            ? NSColor.controlAccentColor.withAlphaComponent(0.10).cgColor
+            ? PopupStyle.hoverBackground.cgColor
             : nil
     }
+}
+
+// MARK: - "Copied" toast
+
+/// Brief HUD toast centered in the key window confirming a clipboard copy.
+/// Shared by the selection popups (area / HTML) so the look and timing stay in
+/// one place. Fades in (0.2s), holds (1.5s), fades out (0.3s); mouse-transparent.
+@MainActor
+func showCopiedToast(message: String = "Copied to clipboard") {
+    guard let window = NSApp.keyWindow else { return }
+
+    let toast = NSPanel(
+        contentRect: NSRect(x: 0, y: 0, width: 180, height: 36),
+        styleMask: [.borderless, .nonactivatingPanel],
+        backing: .buffered,
+        defer: true
+    )
+    toast.isOpaque = false
+    toast.backgroundColor = .clear
+    toast.level = .floating
+    toast.ignoresMouseEvents = true
+
+    let bg = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: 180, height: 36))
+    bg.material = .hudWindow
+    bg.state = .active
+    bg.wantsLayer = true
+    bg.layer?.cornerRadius = 8
+
+    let icon = NSImageView(frame: NSRect(x: 12, y: 6, width: 24, height: 24))
+    if let img = NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: nil) {
+        let config = NSImage.SymbolConfiguration(pointSize: 16, weight: .medium)
+        icon.image = img.withSymbolConfiguration(config)
+        icon.contentTintColor = .systemGreen
+    }
+    bg.addSubview(icon)
+
+    let label = NSTextField(labelWithString: message)
+    label.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+    label.textColor = .labelColor
+    label.frame = NSRect(x: 40, y: 8, width: 130, height: 20)
+    bg.addSubview(label)
+
+    toast.contentView = bg
+
+    let windowFrame = window.frame
+    let toastX = windowFrame.midX - 90
+    let toastY = windowFrame.midY - 18
+    toast.setFrameOrigin(NSPoint(x: toastX, y: toastY))
+    toast.orderFront(nil)
+
+    toast.alphaValue = 0
+    NSAnimationContext.runAnimationGroup { ctx in
+        ctx.duration = 0.2
+        toast.animator().alphaValue = 1
+    }
+
+    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = 0.3
+            toast.animator().alphaValue = 0
+        }, completionHandler: {
+            toast.orderOut(nil)
+        })
+    }
+}
+
+// MARK: - Color swatch sub-panel
+
+/// Builds the floating "pick a highlight color" sub-panel shown beneath a
+/// selection popup — a horizontal row of `ColorDotView` swatches in a glass
+/// container. Shared by the text / area / HTML selection popups; the caller
+/// owns positioning, the `colorSubPanel` reference, and the fade-in (those
+/// legitimately differ per popup). `onSelect` receives the swatch index.
+@MainActor
+func makeColorSwatchPanel(
+    swatches: [(NSColor, String)],
+    aqua: Bool = false,
+    onSelect: @escaping (Int) -> Void
+) -> NSPanel {
+    let colorStack = NSStackView()
+    colorStack.orientation = .horizontal
+    colorStack.spacing = 8
+    colorStack.edgeInsets = NSEdgeInsets(top: 14, left: 10, bottom: 14, right: 10)
+
+    for (index, swatch) in swatches.enumerated() {
+        let dot = ColorDotView(color: swatch.0, size: 20) { onSelect(index) }
+        dot.toolTip = swatch.1
+        colorStack.addArrangedSubview(dot)
+    }
+
+    let container = makePopupGlassContainer(content: colorStack)
+
+    let panel = NSPanel(
+        contentRect: NSRect(x: 0, y: 0, width: 10, height: 10),
+        styleMask: [.borderless, .nonactivatingPanel],
+        backing: .buffered,
+        defer: true
+    )
+    panel.isOpaque = false
+    panel.backgroundColor = .clear
+    panel.level = .floating
+    panel.hasShadow = true
+    panel.ignoresMouseEvents = false
+    if aqua { panel.appearance = NSAppearance(named: .aqua) }
+    panel.contentView = container
+    panel.setContentSize(container.fittingSize)
+    return panel
 }

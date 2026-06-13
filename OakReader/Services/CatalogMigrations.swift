@@ -391,6 +391,20 @@ extension CatalogDatabase {
             try db.execute(sql: "DROP TABLE IF EXISTS quiz_review_log")
         }
 
+        // MARK: v14 — Remove the "Quiz Cards" system collection
+        //
+        // The quiz feature is gone, so its seeded sidebar collection should disappear
+        // too. `CatalogDatabase` no longer seeds it for new libraries; this clears the
+        // already-persisted row from existing ones (cf. v11 dropping "Videos"). The id
+        // is hardcoded because the `SystemCollectionID.quizCards` constant was removed.
+
+        migrator.registerMigration("v14-remove-quiz-cards-collection") { db in
+            try db.execute(
+                sql: "DELETE FROM collections WHERE id = ?",
+                arguments: ["00000000-0000-0000-0000-00000000000D"]
+            )
+        }
+
         return migrator
     }
 

@@ -6,7 +6,6 @@ struct TranslationPanelView: View {
     var voiceVM: VoiceViewModel?
 
     @State private var playingSection: PlayingSection?
-    @State private var showWordPopover = false
 
     private enum PlayingSection {
         case source, target
@@ -16,15 +15,17 @@ struct TranslationPanelView: View {
         VStack(spacing: 0) {
             headerBar
             languageBar
+            Divider()
 
             ScrollView {
-                VStack(spacing: OakStyle.Spacing.sm) {
-                    sourceCard
-                    translateButton
-                    targetCard
+                VStack(alignment: .leading, spacing: 0) {
+                    sourceSection
+
+                    Divider()
+                        .padding(.horizontal, OakStyle.Spacing.sm)
+
+                    targetSection
                 }
-                .padding(.horizontal, OakStyle.Spacing.sm)
-                .padding(.vertical, OakStyle.Spacing.xs)
             }
             .scrollContentBackground(.hidden)
         }
@@ -75,16 +76,8 @@ struct TranslationPanelView: View {
                 selection: $translationVM.targetLang
             )
         }
-        .frame(height: 36)
-        .padding(.horizontal, OakStyle.Spacing.xs)
-        .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1)
-        )
         .padding(.horizontal, OakStyle.Spacing.sm)
-        .padding(.bottom, OakStyle.Spacing.sm)
+        .padding(.bottom, OakStyle.Spacing.xs)
         .onChange(of: translationVM.sourceLang) { _, _ in
             translationVM.onLanguageChange()
         }
@@ -93,9 +86,9 @@ struct TranslationPanelView: View {
         }
     }
 
-    // MARK: - Source Card
+    // MARK: - Source Section
 
-    private var sourceCard: some View {
+    private var sourceSection: some View {
         VStack(alignment: .leading, spacing: 0) {
             TranslationSourceTextView(
                 text: $translationVM.sourceText,
@@ -103,25 +96,22 @@ struct TranslationPanelView: View {
                 placeholder: "Enter text",
                 onWordSelected: { word, sentence, _ in
                     translationVM.explainWord(word, inSentence: sentence)
-                    showWordPopover = true
                 }
             )
-            .frame(minHeight: 100, maxHeight: 200)
+            .frame(minHeight: 90, maxHeight: 200)
+            .padding(.horizontal, OakStyle.Spacing.xs)
+            .padding(.top, OakStyle.Spacing.xs)
             .onChange(of: translationVM.sourceText) { _, _ in
                 translationVM.debouncedTranslate()
             }
 
-            // Toolbar
+            if !translationVM.explanationWord.isEmpty {
+                wordExplanationSection
+                    .padding(.horizontal, OakStyle.Spacing.sm)
+                    .padding(.bottom, OakStyle.Spacing.xs)
+            }
+
             sourceToolbar
-        }
-        .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1)
-        )
-        .popover(isPresented: $showWordPopover, arrowEdge: .bottom) {
-            wordExplanationPopover
         }
     }
 
@@ -134,7 +124,6 @@ struct TranslationPanelView: View {
             Spacer()
 
             if !translationVM.sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                // Copy source
                 toolbarButton(systemImage: "doc.on.doc", tooltip: "Copy") {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(translationVM.sourceText, forType: .string)
@@ -145,28 +134,7 @@ struct TranslationPanelView: View {
         .padding(.vertical, OakStyle.Spacing.xxs)
     }
 
-    // MARK: - Translate Button
-
-    private var translateButton: some View {
-        Button {
-            if translationVM.isTranslating {
-                translationVM.stopTranslation()
-            } else {
-                translationVM.translate()
-            }
-        } label: {
-            Label(
-                translationVM.isTranslating ? "Stop" : "Translate",
-                systemImage: translationVM.isTranslating ? "stop.fill" : "arrow.right.circle.fill"
-            )
-        }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.regular)
-        .disabled(translationVM.sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-        .frame(maxWidth: .infinity, alignment: .trailing)
-    }
-
-    // MARK: - Target Card
+    // MARK: - Target Section
 
     private var displayText: String {
         if translationVM.isTranslating {
@@ -175,8 +143,22 @@ struct TranslationPanelView: View {
         return translationVM.translatedText
     }
 
-    private var targetCard: some View {
+    private var targetSection: some View {
         VStack(alignment: .leading, spacing: 0) {
+            if translationVM.isTranslating && translationVM.translatedText.isEmpty {
+                HStack(spacing: 6) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Translating…")
+                        .font(OakStyle.Font.styled(size: 12))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    stopButton
+                }
+                .padding(.horizontal, OakStyle.Spacing.sm)
+                .padding(.vertical, OakStyle.Spacing.xs)
+            }
+
             if let error = translationVM.errorMessage {
                 HStack(spacing: 6) {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -194,7 +176,7 @@ struct TranslationPanelView: View {
 
             if translationVM.translatedText.isEmpty && !translationVM.isTranslating {
                 emptyState
-            } else {
+            } else if !translationVM.translatedText.isEmpty {
                 StructuredText(markdown: displayText)
                     .textual.textSelection(.enabled)
                     .font(OakStyle.Font.styledBody)
@@ -202,22 +184,19 @@ struct TranslationPanelView: View {
                     .padding(.horizontal, OakStyle.Spacing.sm)
                     .padding(.vertical, OakStyle.Spacing.xs)
 
-                // Toolbar
                 targetToolbar
             }
         }
-        .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1)
-        )
     }
 
     private var targetToolbar: some View {
         HStack(spacing: 4) {
             if voiceVM != nil && !translationVM.translatedText.isEmpty {
                 voiceButton(for: .target)
+            }
+
+            if translationVM.isTranslating {
+                stopButton
             }
 
             Spacer()
@@ -233,7 +212,21 @@ struct TranslationPanelView: View {
         .padding(.vertical, OakStyle.Spacing.xxs)
     }
 
-    // MARK: - Word Explanation Popover
+    private var stopButton: some View {
+        Button {
+            translationVM.stopTranslation()
+        } label: {
+            Image(systemName: "stop.fill")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .frame(width: 24, height: 24)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("Stop")
+    }
+
+    // MARK: - Word Explanation (inline, below source text)
 
     private var explanationDisplayText: String {
         if translationVM.isExplainingWord {
@@ -242,28 +235,30 @@ struct TranslationPanelView: View {
         return translationVM.wordExplanation
     }
 
-    private var wordExplanationPopover: some View {
+    private var wordExplanationSection: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 6) {
                 if translationVM.isExplainingWord {
                     ProgressView()
-                        .controlSize(.small)
+                        .controlSize(.mini)
                 }
                 Text(translationVM.explanationWord)
                     .font(OakStyle.Font.styled(size: 12, weight: .semibold))
                     .foregroundStyle(.secondary)
                 Spacer()
                 Button {
-                    showWordPopover = false
                     translationVM.stopWordExplanation()
                     translationVM.wordExplanation = ""
                     translationVM.explanationWord = ""
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                        .frame(width: 20, height: 20)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .help("Dismiss")
             }
             .padding(.horizontal, OakStyle.Spacing.sm)
             .padding(.top, OakStyle.Spacing.xs)
@@ -272,6 +267,7 @@ struct TranslationPanelView: View {
                 ProgressView()
                     .controlSize(.small)
                     .frame(maxWidth: .infinity, minHeight: 40)
+                    .padding(.bottom, OakStyle.Spacing.xs)
             } else {
                 StructuredText(markdown: explanationDisplayText)
                     .textual.textSelection(.enabled)
@@ -281,8 +277,10 @@ struct TranslationPanelView: View {
                     .padding(.vertical, OakStyle.Spacing.xs)
             }
         }
-        .frame(width: 280)
-        .padding(.bottom, OakStyle.Spacing.xs)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.primary.opacity(0.05))
+        )
     }
 
     // MARK: - Language Menu Button
@@ -305,19 +303,19 @@ struct TranslationPanelView: View {
                 }
             }
         } label: {
-            Text(title)
-                .font(OakStyle.Font.styled(size: 13, weight: .medium))
-                .frame(maxWidth: .infinity)
-                .frame(height: 28)
-                .contentShape(Rectangle())
-                .background(Color(nsColor: .controlBackgroundColor))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1)
-                )
+            HStack(spacing: 4) {
+                Text(title)
+                    .font(OakStyle.Font.styled(size: 13, weight: .medium))
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 28)
+            .contentShape(Rectangle())
         }
         .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
         .fixedSize(horizontal: false, vertical: true)
     }
 
@@ -373,16 +371,14 @@ struct TranslationPanelView: View {
     // MARK: - Empty State
 
     private var emptyState: some View {
-        VStack(spacing: 10) {
-            Spacer()
+        VStack(spacing: 8) {
             Image(systemName: "translate")
-                .font(.system(size: 36))
+                .font(.system(size: 24))
+                .foregroundStyle(.quaternary)
+            Text("Translation appears here")
+                .font(OakStyle.Font.styled(size: 12))
                 .foregroundStyle(.tertiary)
-            Text("Enter text to translate")
-                .font(OakStyle.Font.styled(size: 14))
-                .foregroundStyle(.secondary)
-            Spacer()
         }
-        .frame(maxWidth: .infinity, minHeight: 100)
+        .frame(maxWidth: .infinity, minHeight: 120)
     }
 }

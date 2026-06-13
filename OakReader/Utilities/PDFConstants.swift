@@ -76,39 +76,6 @@ enum AnnotationTool: String, CaseIterable, Identifiable {
     }
 }
 
-enum FormFieldType: String, CaseIterable, Identifiable {
-    case textField
-    case checkbox
-    case radioButton
-    case dropdown
-    case pushButton
-    case signature
-
-    var id: String { rawValue }
-
-    var label: String {
-        switch self {
-        case .textField: return "Text Field"
-        case .checkbox: return "Checkbox"
-        case .radioButton: return "Radio Button"
-        case .dropdown: return "Dropdown"
-        case .pushButton: return "Button"
-        case .signature: return "Signature"
-        }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .textField: return "character.cursor.ibeam"
-        case .checkbox: return "checkmark.square"
-        case .radioButton: return "circle.inset.filled"
-        case .dropdown: return "chevron.down.square"
-        case .pushButton: return "button.horizontal.top.press"
-        case .signature: return "signature"
-        }
-    }
-}
-
 enum LibrarySidebarMode: String, CaseIterable, Identifiable {
     case collections
     case tags

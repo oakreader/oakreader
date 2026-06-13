@@ -2,6 +2,8 @@ import SwiftUI
 
 struct ChatHistoryDrawer: View {
     let chatVM: ChatViewModel
+    /// Called after a session is loaded (e.g. so a sidebar host can open the chat panel).
+    var onSelect: ((UUID) -> Void)?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -53,7 +55,10 @@ struct ChatHistoryDrawer: View {
     @State private var hoveredSessionId: UUID?
 
     private func sessionRow(_ session: ConversationMeta) -> some View {
-        Button(action: { chatVM.loadSession(session.id) }) {
+        Button {
+            chatVM.loadSession(session.id)
+            onSelect?(session.id)
+        } label: {
             HStack(spacing: 8) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(session.title.isEmpty ? "New Chat" : session.title)

@@ -99,6 +99,15 @@ enum CommandRegistry {
             action: .documentAction(.zoomToFit)
         ),
         PaletteCommand(
+            id: "view.captureArea",
+            title: "Capture Area",
+            category: .view,
+            icon: "rectangle.dashed",
+            shortcut: "\u{21E7}\u{2318}A",
+            context: [.pdf, .html],
+            action: .documentAction(.snapshot)
+        ),
+        PaletteCommand(
             id: "view.displaySingle",
             title: "Single Page",
             category: .view,

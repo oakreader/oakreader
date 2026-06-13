@@ -84,28 +84,13 @@ class AreaSelectionPopupPanel: NSPanel, AppResignDismissable {
         let x = screenPoint.x - contentSize.width / 2
         let y = screenPoint.y - contentSize.height - 8
         setFrameOrigin(NSPoint(x: x, y: y))
-
-        orderFront(nil)
-
-        alphaValue = 0
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.12
-            self.animator().alphaValue = 1
-        }
+        animatePopupEntrance(self)
 
         observeAppResign()
     }
 
-    private static let annotationColors: [(NSColor, String)] = [
-        (NSColor(red: 1.0, green: 0.83, blue: 0.0, alpha: 1.0), "Yellow"),      // #ffd400
-        (NSColor(red: 1.0, green: 0.4, blue: 0.4, alpha: 1.0), "Red"),           // #ff6666
-        (NSColor(red: 0.37, green: 0.70, blue: 0.21, alpha: 1.0), "Green"),      // #5fb236
-        (NSColor(red: 0.18, green: 0.66, blue: 0.90, alpha: 1.0), "Blue"),       // #2ea8e5
-        (NSColor(red: 0.64, green: 0.54, blue: 0.90, alpha: 1.0), "Purple"),     // #a28ae5
-        (NSColor(red: 0.90, green: 0.43, blue: 0.93, alpha: 1.0), "Magenta"),    // #e56eee
-        (NSColor(red: 0.95, green: 0.60, blue: 0.22, alpha: 1.0), "Orange"),     // #f19837
-        (NSColor(red: 0.67, green: 0.67, blue: 0.67, alpha: 1.0), "Gray"),       // #aaaaaa
-    ]
+    private static let annotationColors: [(NSColor, String)] =
+        OakStyle.AnnotationColors.highlightColors.map { ($0.nsColor, $0.name) }
 
     // MARK: - Content View (horizontal toolbar)
 
@@ -114,7 +99,7 @@ class AreaSelectionPopupPanel: NSPanel, AppResignDismissable {
         let mainStack = NSStackView()
         mainStack.orientation = .horizontal
         mainStack.spacing = 4
-        mainStack.edgeInsets = NSEdgeInsets(top: 8, left: 10, bottom: 8, right: 10)
+        mainStack.edgeInsets = NSEdgeInsets(top: 8, left: 14, bottom: 8, right: 14)
         mainStack.alignment = .centerY
 
         // Group 1: Area annotation split button
@@ -155,21 +140,7 @@ class AreaSelectionPopupPanel: NSPanel, AppResignDismissable {
     }
 
     private func makeVerticalSeparator() -> NSView {
-        let sep = NSBox()
-        sep.boxType = .separator
-        sep.translatesAutoresizingMaskIntoConstraints = false
-        let wrapper = NSView()
-        wrapper.translatesAutoresizingMaskIntoConstraints = false
-        wrapper.addSubview(sep)
-        NSLayoutConstraint.activate([
-            wrapper.widthAnchor.constraint(equalToConstant: 11),
-            wrapper.heightAnchor.constraint(equalToConstant: 22),
-            sep.centerXAnchor.constraint(equalTo: wrapper.centerXAnchor),
-            sep.topAnchor.constraint(equalTo: wrapper.topAnchor),
-            sep.bottomAnchor.constraint(equalTo: wrapper.bottomAnchor),
-            sep.widthAnchor.constraint(equalToConstant: 1),
-        ])
-        return wrapper
+        makePopupVerticalSeparator()
     }
 
     // MARK: - Color Sub-Panel
@@ -184,37 +155,9 @@ class AreaSelectionPopupPanel: NSPanel, AppResignDismissable {
     }
 
     private func showColorSubPanel() {
-        let colorStack = NSStackView()
-        colorStack.orientation = .horizontal
-        colorStack.spacing = 8
-        colorStack.edgeInsets = NSEdgeInsets(top: 14, left: 10, bottom: 14, right: 10)
-
-        for (color, name) in Self.annotationColors {
-            let dot = ColorDotView(color: color, size: 20) { [weak self] in
-                self?.addAreaAnnotation(color: color)
-            }
-            dot.toolTip = name
-            colorStack.addArrangedSubview(dot)
+        let panel = makeColorSwatchPanel(swatches: Self.annotationColors) { [weak self] index in
+            self?.addAreaAnnotation(color: Self.annotationColors[index].0)
         }
-
-        let container = makePopupGlassContainer(content: colorStack)
-
-        let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 10, height: 10),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: true
-        )
-        panel.isOpaque = false
-        panel.backgroundColor = .clear
-        panel.level = .floating
-        panel.hasShadow = true
-        panel.ignoresMouseEvents = false
-        panel.contentView = container
-
-        let contentSize = container.fittingSize
-        panel.setContentSize(contentSize)
-
         colorSubPanel = panel
         repositionColorSubPanel()
         panel.orderFront(nil)
@@ -279,63 +222,6 @@ class AreaSelectionPopupPanel: NSPanel, AppResignDismissable {
         dismiss()
     }
 
-    private func showCopiedToast() {
-        guard let window = NSApp.keyWindow else { return }
-
-        let toast = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 180, height: 36),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: true
-        )
-        toast.isOpaque = false
-        toast.backgroundColor = .clear
-        toast.level = .floating
-        toast.ignoresMouseEvents = true
-
-        let bg = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: 180, height: 36))
-        bg.material = .hudWindow
-        bg.state = .active
-        bg.wantsLayer = true
-        bg.layer?.cornerRadius = 8
-
-        let icon = NSImageView(frame: NSRect(x: 12, y: 6, width: 24, height: 24))
-        if let img = NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: nil) {
-            let config = NSImage.SymbolConfiguration(pointSize: 16, weight: .medium)
-            icon.image = img.withSymbolConfiguration(config)
-            icon.contentTintColor = .systemGreen
-        }
-        bg.addSubview(icon)
-
-        let label = NSTextField(labelWithString: "Copied to clipboard")
-        label.font = NSFont.systemFont(ofSize: 12, weight: .medium)
-        label.textColor = .labelColor
-        label.frame = NSRect(x: 40, y: 8, width: 130, height: 20)
-        bg.addSubview(label)
-
-        toast.contentView = bg
-
-        let windowFrame = window.frame
-        let toastX = windowFrame.midX - 90
-        let toastY = windowFrame.midY - 18
-        toast.setFrameOrigin(NSPoint(x: toastX, y: toastY))
-        toast.orderFront(nil)
-
-        toast.alphaValue = 0
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.2
-            toast.animator().alphaValue = 1
-        }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            NSAnimationContext.runAnimationGroup({ ctx in
-                ctx.duration = 0.3
-                toast.animator().alphaValue = 0
-            }, completionHandler: {
-                toast.orderOut(nil)
-            })
-        }
-    }
 
     func dismiss() {
         removeAppResignObserver()
@@ -382,7 +268,7 @@ private class AreaSplitButton: NSView {
         super.init(frame: NSRect(x: 0, y: 0, width: 44, height: 32))
 
         wantsLayer = true
-        layer?.cornerRadius = 6
+        layer?.cornerRadius = 16
         translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             widthAnchor.constraint(equalToConstant: iconWidth + chevronWidth),
@@ -488,7 +374,7 @@ private class AreaSplitButton: NSView {
     override func mouseDown(with event: NSEvent) {
         let pt = convert(event.locationInWindow, from: nil)
         if bounds.contains(pt) {
-            layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.18).cgColor
+            layer?.backgroundColor = PopupStyle.pressedBackground.cgColor
         }
     }
 
@@ -509,7 +395,7 @@ private class AreaSplitButton: NSView {
 
     private func updateAppearance() {
         if iconHovered || chevronHovered {
-            layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.10).cgColor
+            layer?.backgroundColor = PopupStyle.hoverBackground.cgColor
             iconView.contentTintColor = .labelColor
             chevronView.contentTintColor = .secondaryLabelColor
         } else {

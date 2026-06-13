@@ -286,6 +286,22 @@ enum OakStyle {
             ("Gray", gray, NSColor(red: 0.667, green: 0.667, blue: 0.667, alpha: 1.0)),
             ("Black", black, NSColor(red: 0.0, green: 0.0, blue: 0.0, alpha: 1.0)),
         ]
+
+        /// The highlight/markup swatches shown in selection popups — `allColors`
+        /// minus Black (which isn't offered as a highlight tint). Single source
+        /// for every popup's color row; don't re-hardcode these RGB values.
+        static let highlightColors: [(name: String, color: Color, nsColor: NSColor)] =
+            allColors.filter { $0.name != "Black" }
+
+        /// CSS `rgba(...)` string for a swatch — used when tinting HTML snapshot
+        /// highlights. Default alpha matches the web highlight opacity.
+        static func cssRGBA(_ nsColor: NSColor, alpha: Double = 0.35) -> String {
+            let rgb = nsColor.usingColorSpace(.deviceRGB) ?? nsColor
+            let r = Int((rgb.redComponent * 255).rounded())
+            let g = Int((rgb.greenComponent * 255).rounded())
+            let b = Int((rgb.blueComponent * 255).rounded())
+            return "rgba(\(r),\(g),\(b),\(alpha))"
+        }
     }
 }
 

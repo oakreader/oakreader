@@ -110,9 +110,10 @@ struct TabBarView: View {
             DocumentTabStrip(appState: appState)
                 .frame(maxWidth: .infinity)
 
-            // Panel mode tabs — context-dependent
+            // Panel mode tabs — context-dependent. Live browser tabs have no
+            // storage key but still support chat/translation/cards panels.
             if let viewModel = appState.activeTab?.viewModel,
-               viewModel.storageKey != nil,
+               viewModel.storageKey != nil || viewModel.liveURL != nil,
                !viewModel.state.isZenMode {
                 // Document tab: show document panel modes
                 HStack(spacing: 4) {
@@ -234,7 +235,7 @@ private struct DocumentTabStrip: View {
     private let plusWidth: CGFloat = 40    // "+" button + its horizontal padding
 
     private var tabCount: Int {
-        appState.openTabs.count + (appState.quizReviewSession != nil ? 1 : 0)
+        appState.openTabs.count
     }
 
     var body: some View {
@@ -273,16 +274,6 @@ private struct DocumentTabStrip: View {
                 )
             }
 
-            if let session = appState.quizReviewSession {
-                QuizTabView(
-                    isActive: appState.activeTabID == session.tabID,
-                    isFirst: appState.openTabs.isEmpty,
-                    width: width,
-                    onSelect: { appState.activeTabID = session.tabID },
-                    onClose: { appState.closeQuizReview() }
-                )
-            }
-
             // New tab router (navigate / search / ask) — sits at the end of the strip.
             Button {
                 appState.openNewTab()
@@ -300,82 +291,6 @@ private struct DocumentTabStrip: View {
             .padding(.trailing, 8)
 
             Spacer(minLength: 0)
-        }
-    }
-}
-
-// MARK: - Quiz Tab View
-
-struct QuizTabView: View {
-    let isActive: Bool
-    let isFirst: Bool
-    let width: CGFloat
-    let onSelect: () -> Void
-    let onClose: () -> Void
-
-    @State private var isHovering = false
-    @State private var isCloseHovering = false
-
-    private let cr: CGFloat = 10
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "rectangle.on.rectangle.angled")
-                .font(.system(size: OakStyle.Font.icon))
-            Text("Quiz")
-                .font(OakStyle.Font.styled(size: OakStyle.Font.body, weight: .regular))
-                .lineLimit(1)
-
-            Spacer(minLength: 0)
-
-            Button {
-                onClose()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(isCloseHovering ? Color(nsColor: .labelColor) : .secondary)
-                    .frame(
-                        width: OakStyle.Size.closeButton,
-                        height: OakStyle.Size.closeButton
-                    )
-                    .background(
-                        RoundedRectangle(cornerRadius: OakStyle.Radius.small)
-                            .fill(isCloseHovering ? Color.primary.opacity(0.1) : Color.clear)
-                    )
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .onHover { isCloseHovering = $0 }
-            .opacity(isActive || isHovering ? 1 : 0)
-            .accessibilityLabel("Close Quiz")
-        }
-        .padding(.leading, 10 + cr)
-        .padding(.trailing, 10 + cr)
-        .frame(width: width, height: OakStyle.Size.tabHeight)
-        .foregroundStyle(isActive ? Color(nsColor: .labelColor) : Color(nsColor: .secondaryLabelColor))
-        .background(tabShape)
-        .padding(.leading, isFirst ? 0 : -cr + 3)
-        .padding(.trailing, -cr + 3)
-        .zIndex(isActive ? 2 : isHovering ? 1 : 0)
-        .contentShape(Rectangle())
-        .onTapGesture { onSelect() }
-        .onHover { isHovering = $0 }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Tab: Quiz")
-        .accessibilityAddTraits(isActive ? .isSelected : [])
-    }
-
-    @ViewBuilder
-    private var tabShape: some View {
-        if isActive {
-            BrowserTabShape(concaveRadius: cr)
-                .fill(OakStyle.Colors.activeTabBackground)
-                .padding(.top, 6)
-        } else if isHovering {
-            RoundedRectangle(cornerRadius: OakStyle.Radius.standard)
-                .fill(Color.primary.opacity(0.08))
-                .padding(.horizontal, cr)
-                .padding(.vertical, 5)
         }
     }
 }
@@ -468,25 +383,3 @@ private struct LibraryTabButtonView: View {
     }
 }
 
-// MARK: - Glass Group Modifier
-
-/// Wraps content in a Liquid Glass capsule on macOS 26+,
-/// falling back to ultraThinMaterial + stroke on older systems.
-private struct GlassGroupModifier: ViewModifier {
-    func body(content: Content) -> some View {
-        if #available(macOS 26, *) {
-            content
-                .glassEffect(.regular.interactive(), in: .capsule)
-        } else {
-            content
-                .background(
-                    .ultraThinMaterial,
-                    in: Capsule()
-                )
-                .overlay(
-                    Capsule()
-                        .strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5)
-                )
-        }
-    }
-}

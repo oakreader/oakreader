@@ -75,12 +75,9 @@ final class Preferences {
         static let sidebarMode = "sidebarMode"
         static let autoSave = "autoSave"
         static let compressionQuality = "compressionQuality"
-        static let recentSignatures = "recentSignatures"
-        static let defaultAnnotationColor = "defaultAnnotationColor"
         static let defaultFontName = "defaultFontName"
         static let defaultFontSize = "defaultFontSize"
         static let showStatusBar = "showStatusBar"
-        static let pageDisplayBackground = "pageDisplayBackground"
         // Library preferences
         static let librarySortOrder = "librarySortOrder"
         static let librarySortAscending = "librarySortAscending"
