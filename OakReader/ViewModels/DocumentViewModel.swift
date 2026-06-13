@@ -100,10 +100,11 @@ class DocumentViewModel {
         return vm
     }
 
-    private var _quizCards: QuizCardsViewModel?
-    var quizCards: QuizCardsViewModel {
+    private var _quizCards: ItemQuizCardsViewModel?
+    /// Read-only per-item view of quiz cards aggregated from the item's chat history.
+    var quizCards: ItemQuizCardsViewModel {
         if let vm = _quizCards { return vm }
-        let vm = QuizCardsViewModel(parent: self, database: database, storageKey: storageKey)
+        let vm = ItemQuizCardsViewModel(parent: self)
         _quizCards = vm
         return vm
     }

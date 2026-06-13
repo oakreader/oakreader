@@ -178,6 +178,7 @@ struct LibraryTableView: View {
             }
         }
         .tableStyle(.inset(alternatesRowBackgrounds: true))
+        .background(TableHorizontalScrollerDisabler())
         .contextMenu(forSelectionType: UUID.self) { ids in
             contextMenuItems(for: ids)
         } primaryAction: { ids in

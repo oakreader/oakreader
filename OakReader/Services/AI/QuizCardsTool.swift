@@ -7,10 +7,8 @@ import OakAgent
 /// its type-specific view (flashcard, cloze, occlusion).
 ///
 /// Execution itself only validates and acknowledges — the cards are *rendered*
-/// from the tool input, and persistence into the review deck happens when the
-/// user taps "Save" on a card (the existing `onSaveQuizCard` path). This keeps
-/// the tool free of database access and keeps the user in control of what
-/// enters their spaced-repetition queue.
+/// from the tool input and live in the chat history that produced them. There is
+/// no separate store: this keeps the tool free of database access.
 ///
 /// Cards travel as a structured `cards` array (`[{type, data}]`) — tool input is
 /// now structured JSON (`ToolInput`/`JSONValue`), so no NDJSON-string workaround
@@ -72,8 +70,18 @@ struct QuizCardsTool: AgentTool, Sendable {
         let titleSuffix = input["title"].flatMap { $0.isEmpty ? nil : " \"\($0)\"" } ?? ""
         return .success(
             "Rendered \(cards.count) quiz card(s)\(titleSuffix) to the user as an "
-                + "interactive carousel. The user can save any card to their review deck."
+                + "interactive carousel in the chat."
         )
+    }
+
+    /// Reconstruct a `QuizDeck` from a persisted `quiz_cards` tool-use record.
+    /// Returns nil if the record carries no decodable cards. Used to surface
+    /// cards from chat history (e.g. the per-item Quiz Cards panel).
+    static func deck(from record: ToolUseRecord) -> QuizDeck? {
+        guard let cardValues = record.input.array("cards") else { return nil }
+        let cards = cardValues.compactMap { decodeCard($0) }
+        guard !cards.isEmpty else { return nil }
+        return QuizDeck(title: record.input["title"] ?? "", cards: cards)
     }
 
     /// Decode a single `{type, data}` JSON value into a `QuizContent`.

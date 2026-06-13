@@ -16,8 +16,6 @@ let package = Package(
         .package(url: "https://github.com/raspu/Highlightr.git", from: "2.3.0"),
         .package(url: "https://github.com/stackotter/swift-cmark-gfm", from: "1.0.2"),
         .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.0"),
-
-        .package(url: "https://github.com/open-spaced-repetition/swift-fsrs", branch: "main"),
     ],
     targets: [
         .executableTarget(
@@ -30,8 +28,6 @@ let package = Package(
                 .product(name: "Highlightr", package: "Highlightr"),
                 .product(name: "CMarkGFM", package: "swift-cmark-gfm"),
                 .product(name: "Sparkle", package: "Sparkle"),
-
-                .product(name: "FSRS", package: "swift-fsrs"),
             ],
             path: "OakReader",
             exclude: [

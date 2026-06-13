@@ -218,10 +218,6 @@ final class LibraryStore {
         selectedCollectionId == SystemCollectionID.bin
     }
 
-    var isQuizCardsSelected: Bool {
-        selectedCollectionId == SystemCollectionID.quizCards
-    }
-
     var filteredItems: [LibraryItem] {
         // Special handling for Reading List collection (items not in any user collection)
         if isReadingListSelected {
@@ -236,11 +232,6 @@ final class LibraryStore {
         // Special handling for Duplicates collection
         if isDuplicatesSelected {
             return duplicatesFilteredItems
-        }
-
-        // Special handling for Quiz Cards collection (items with quiz cards)
-        if isQuizCardsSelected {
-            return quizCardsFilteredItems
         }
 
         var results = items
@@ -376,29 +367,10 @@ final class LibraryStore {
         if collection.id == SystemCollectionID.bin {
             return trashedItems.count
         }
-        if collection.id == SystemCollectionID.quizCards {
-            return quizCardsItemIds.count
-        }
         guard collection.isSmart, let rules = collection.filterRules else {
             return collection.itemCount
         }
         return items.filter { evaluateRules(rules, against: $0) }.count
-    }
-
-    // MARK: - Quiz Cards Filtered Items
-
-    /// Set of item IDs that have at least one quiz card.
-    private var quizCardsItemIds: Set<UUID> {
-        let ids = (try? database.dbQueue.read { db in
-            try String.fetchAll(db, sql: "SELECT DISTINCT item_id FROM quiz_cards WHERE is_suspended = 0")
-        }) ?? []
-        return Set(ids.compactMap { UUID(uuidString: $0) })
-    }
-
-    /// Items that have quiz cards saved.
-    private var quizCardsFilteredItems: [LibraryItem] {
-        let itemIds = quizCardsItemIds
-        return items.filter { itemIds.contains($0.id) }
     }
 
     // MARK: - Search & Sort Helpers

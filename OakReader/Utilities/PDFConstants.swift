@@ -159,21 +159,18 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
 
 enum AppExtension: String, CaseIterable, Identifiable {
     case translation
-    case quizCards = "flashcards"
 
     var id: String { rawValue }
 
     var label: String {
         switch self {
         case .translation: return "Translation"
-        case .quizCards: return "Quiz Cards"
         }
     }
 
     var description: String {
         switch self {
         case .translation: return "Translate selected text using AI-powered translation."
-        case .quizCards: return "Spaced repetition quiz cards with FSRS scheduling."
         }
     }
 
@@ -181,7 +178,6 @@ enum AppExtension: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .translation: return "translate"
-        case .quizCards: return "rectangle.on.rectangle.angled"
         }
     }
 
@@ -193,7 +189,6 @@ enum AppExtension: String, CaseIterable, Identifiable {
     var rightPanelModes: [RightPanelMode] {
         switch self {
         case .translation: return [.translation]
-        case .quizCards: return [.quizCards]
         }
     }
 
@@ -228,7 +223,6 @@ enum MetadataInspectorTab: String, CaseIterable, Identifiable {
 enum LibraryDetailTab: String, CaseIterable, Identifiable {
     case chat
     case metadata
-    case quizCards
 
     var id: String { rawValue }
 
@@ -236,7 +230,6 @@ enum LibraryDetailTab: String, CaseIterable, Identifiable {
         switch self {
         case .chat: return "bubble.left.and.text.bubble.right"
         case .metadata: return "list.bullet.rectangle.portrait"
-        case .quizCards: return "rectangle.on.rectangle.angled"
         }
     }
 
@@ -244,7 +237,6 @@ enum LibraryDetailTab: String, CaseIterable, Identifiable {
         switch self {
         case .chat: return "AI Chat"
         case .metadata: return "Metadata"
-        case .quizCards: return "Quiz Cards"
         }
     }
 }

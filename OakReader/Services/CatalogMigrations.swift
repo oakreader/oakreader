@@ -351,6 +351,46 @@ extension CatalogDatabase {
             try db.execute(sql: "DROP TABLE  IF EXISTS notes")
         }
 
+        // MARK: v13 — Anki export: collapse quiz_cards to a slim staging table
+        //
+        // The self-built FSRS scheduler/review UI is removed; cards are now generated
+        // in chat and exported to Anki. Only one kind of card remains (chat-generated),
+        // so the table sheds all FSRS columns, the dead annotation/origin columns, and
+        // the review log. `item_id`/`conversation_id` survive as provenance only.
+
+        migrator.registerMigration("v13-anki-export") { db in
+            // Rebuild the table (SQLite can't drop FK columns in place).
+            try db.execute(sql: """
+                CREATE TABLE quiz_cards_new (
+                    id              TEXT PRIMARY KEY,
+                    conversation_id TEXT REFERENCES conversations(id) ON DELETE SET NULL,
+                    item_id         TEXT REFERENCES items(id) ON DELETE SET NULL,
+                    type            TEXT NOT NULL,
+                    content_json    TEXT NOT NULL,
+                    source_text     TEXT,
+                    exported_at     TEXT,
+                    created_at      TEXT NOT NULL,
+                    updated_at      TEXT NOT NULL
+                )
+            """)
+            // Carry over the surviving columns. Legacy "annotation" rows keep their
+            // content and item_id; only the dead annotation link is dropped.
+            try db.execute(sql: """
+                INSERT INTO quiz_cards_new
+                    (id, conversation_id, item_id, type, content_json, source_text, exported_at, created_at, updated_at)
+                SELECT id, conversation_id, item_id, type, content_json, source_text, NULL, created_at, updated_at
+                FROM quiz_cards
+            """)
+            try db.execute(sql: "DROP TABLE quiz_cards")
+            try db.execute(sql: "ALTER TABLE quiz_cards_new RENAME TO quiz_cards")
+
+            try db.create(index: "idx_quiz_cards_item_id", on: "quiz_cards", columns: ["item_id"])
+            try db.create(index: "idx_quiz_cards_conversation", on: "quiz_cards", columns: ["conversation_id"])
+            try db.create(index: "idx_quiz_cards_exported", on: "quiz_cards", columns: ["exported_at"])
+
+            try db.execute(sql: "DROP TABLE IF EXISTS quiz_review_log")
+        }
+
         return migrator
     }
 

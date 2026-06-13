@@ -26,33 +26,6 @@ enum QuizType: String, Codable, CaseIterable, Identifiable {
     }
 }
 
-// MARK: - Card State (FSRS)
-
-enum QuizCardState: String, Codable {
-    case new
-    case learning
-    case review
-    case relearning
-}
-
-// MARK: - Review Rating (FSRS)
-
-enum ReviewRating: Int, Codable, CaseIterable {
-    case again = 1
-    case hard = 2
-    case good = 3
-    case easy = 4
-
-    var label: String {
-        switch self {
-        case .again: return "Again"
-        case .hard: return "Hard"
-        case .good: return "Good"
-        case .easy: return "Easy"
-        }
-    }
-}
-
 // MARK: - Quiz Content (type-specific payloads)
 
 enum QuizContent: Codable, Hashable {
@@ -127,85 +100,9 @@ enum QuizContent: Codable, Hashable {
 // MARK: - Quiz Deck (grouped cards for carousel display)
 
 /// A group of quiz cards wrapped in a `<deck>` tag, displayed as a navigable
-/// carousel in the chat. Each card can be individually saved to the review deck.
+/// carousel in the chat. Cards live in the chat history that produced them.
 struct QuizDeck: Identifiable, Hashable {
     let id = UUID()
     let title: String
     let cards: [QuizContent]
-}
-
-// MARK: - QuizCard (view-facing model)
-
-struct QuizCard: Identifiable, Hashable {
-    let id: UUID
-    let itemId: String
-    var conversationId: String?
-    var groupId: String?
-    let type: QuizType
-    let content: QuizContent
-    var state: QuizCardState
-    var dueAt: Date
-    var stability: Double
-    var difficulty: Double
-    var elapsedDays: Int
-    var scheduledDays: Int
-    var reps: Int
-    var lapses: Int
-    var lastReviewAt: Date?
-    var isSuspended: Bool
-    var annotationId: String?
-    var sourceText: String?
-    var pageContext: String?
-    var isPending: Bool
-    var createdAt: Date
-    var updatedAt: Date
-
-    /// Whether this card is currently due for review.
-    var isDue: Bool {
-        !isSuspended && dueAt <= Date()
-    }
-
-    /// Summary text for list display.
-    var displayTitle: String {
-        switch content {
-        case .cloze(let c):
-            // Strip cloze markers for display
-            return c.text.replacingOccurrences(
-                of: #"\{\{c\d+::([^}]*?)(?:::[^}]*)?\}\}"#,
-                with: "___",
-                options: .regularExpression
-            )
-        case .flashcard(let c):
-            return c.front
-        case .occlusion:
-            return "Image Occlusion"
-        }
-    }
-
-    // MARK: - Record conversion
-
-    init(record: QuizCardRecord) {
-        self.id = UUID(uuidString: record.id) ?? UUID()
-        self.itemId = record.itemId
-        self.conversationId = record.conversationId
-        self.groupId = record.groupId
-        self.type = QuizType(rawValue: record.type) ?? .flashcard
-        self.content = (try? JSONDecoder().decode(QuizContent.self, from: Data(record.contentJson.utf8))) ?? .flashcard(.init(front: "?", back: "?"))
-        self.state = QuizCardState(rawValue: record.state) ?? .new
-        self.dueAt = Date(iso8601String: record.dueAt) ?? Date()
-        self.stability = record.stability
-        self.difficulty = record.difficulty
-        self.elapsedDays = record.elapsedDays
-        self.scheduledDays = record.scheduledDays
-        self.reps = record.reps
-        self.lapses = record.lapses
-        self.lastReviewAt = record.lastReviewAt.flatMap { Date(iso8601String: $0) }
-        self.isSuspended = record.isSuspended
-        self.annotationId = record.annotationId
-        self.sourceText = record.sourceText
-        self.pageContext = record.pageContext
-        self.isPending = record.isPending
-        self.createdAt = Date(iso8601String: record.createdAt) ?? Date()
-        self.updatedAt = Date(iso8601String: record.updatedAt) ?? Date()
-    }
 }

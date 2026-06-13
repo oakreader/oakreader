@@ -35,7 +35,6 @@ enum SystemCollectionID {
     static let embeds       = UUID(uuidString: "00000000-0000-0000-0000-000000000007")!
     static let recentlyRead = UUID(uuidString: "00000000-0000-0000-0000-000000000008")!
     static let duplicates   = UUID(uuidString: "00000000-0000-0000-0000-00000000000A")!
-    static let quizCards    = UUID(uuidString: "00000000-0000-0000-0000-00000000000D")!
     static let bin          = UUID(uuidString: "00000000-0000-0000-0000-00000000000F")!
 
     static let all: [UUID] = [readingList, allItems, recentlyRead, pdfs, html, embeds, duplicates, bin]

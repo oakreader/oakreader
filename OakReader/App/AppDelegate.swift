@@ -45,9 +45,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let migration = MigrationService(store: appState.libraryStore, coverService: appState.coverService)
         migration.migrateIfNeeded()
 
-        // Migrate AppStorage keys: flashcard_ → quizCard_
-        UserDefaultsKeyMigration.migrateQuizCardKeys()
-
         installExternalLibraryChangeObserver()
 
         // Start the local server that bridges the browser extension

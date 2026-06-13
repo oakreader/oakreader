@@ -136,8 +136,6 @@ private struct LibraryCollectionSidebarPanel: View {
         switch appState.libraryDetailTab {
         case .chat:
             EmptyView() // Handled at detailContentPanel level for stable identity
-        case .quizCards:
-            CollectionQuizCardsPanelView(appState: appState, title: contextTitle)
         case .metadata:
             CollectionMetadataPanelView(appState: appState, title: contextTitle, items: items)
         case nil:

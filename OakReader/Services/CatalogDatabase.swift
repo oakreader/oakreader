@@ -41,7 +41,6 @@ final class CatalogDatabase {
                  #"{"match":"any","conditions":[{"field":"content_type","op":"eq","value":"html"},"#
                      + #"{"field":"content_type","op":"eq","value":"link"}]}"#),
                 (SystemCollectionID.duplicates.uuidString, "Duplicates", "square.on.square", 5, nil),
-                (SystemCollectionID.quizCards.uuidString, "Quiz Cards", "rectangle.on.rectangle.angled", 6, nil),
                 (SystemCollectionID.bin.uuidString, "Bin", "trash", 7, nil),
             ]
             for sc in systemCollections {
@@ -54,6 +53,15 @@ final class CatalogDatabase {
                     arguments: [sc.id, localUserId, sc.name, sc.icon, sc.order, sc.rules, now, now]
                 )
             }
+
+            // ── Remove obsolete system collections ──
+            // "Quiz Cards" was a seeded smart collection before quiz cards moved into the
+            // per-item right panel; databases seeded by older builds still carry the row.
+            // Scoped to the exact system UUID + is_system so user collections are never touched.
+            try db.execute(
+                sql: "DELETE FROM collections WHERE id = ? AND is_system = 1",
+                arguments: ["00000000-0000-0000-0000-00000000000D"]
+            )
 
             // ── System Properties ──
             // swiftlint:disable:next large_tuple

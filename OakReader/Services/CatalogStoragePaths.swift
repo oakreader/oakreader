@@ -77,26 +77,6 @@ extension CatalogDatabase {
         return agentMemoryLogsDirectory.appendingPathComponent(filename)
     }
 
-    /// ~/OakReader/deck/
-    static var deckDirectory: URL {
-        dataDirectory.appendingPathComponent("deck", isDirectory: true)
-    }
-
-    /// ~/OakReader/deck/attachments/
-    static var deckAttachmentsDirectory: URL {
-        deckDirectory.appendingPathComponent("attachments", isDirectory: true)
-    }
-
-    /// ~/OakReader/deck/attachments/{cardId}/
-    static func deckAttachmentDirectory(cardId: UUID) -> URL {
-        deckAttachmentsDirectory.appendingPathComponent(cardId.uuidString, isDirectory: true)
-    }
-
-    /// ~/OakReader/deck/attachments/{cardId}/{fileName}
-    static func deckAttachmentURL(cardId: UUID, fileName: String) -> URL {
-        deckAttachmentDirectory(cardId: cardId).appendingPathComponent(fileName)
-    }
-
     /// ~/OakReader/chats/
     static var chatsDirectory: URL {
         dataDirectory.appendingPathComponent("chats", isDirectory: true)
@@ -126,8 +106,6 @@ extension CatalogDatabase {
         try FileManager.default.createDirectory(at: dataDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: storageDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: logsDirectory, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: deckDirectory, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: deckAttachmentsDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: chatsDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: chatAttachmentsDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: agentDirectory, withIntermediateDirectories: true)

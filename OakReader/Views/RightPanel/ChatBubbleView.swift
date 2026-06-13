@@ -10,7 +10,6 @@ struct ChatBubbleView: View, Equatable {
     var isPlayingAudio: Bool = false
     var onStopAudio: (() -> Void)?
     var onOpenCitation: ((String, CitationAnchor) -> Void)?
-    var onSaveQuizCard: ((QuizContent) -> Bool)?
     /// Optional markdown theme override (e.g. `.dia` for the agent canvas).
     /// When nil, falls back to the user-configured `.oak` theme.
     var markdownTheme: MarkdownTheme? = nil
@@ -63,7 +62,7 @@ struct ChatBubbleView: View, Equatable {
                         }
                         ForEach(renderCardRecords) { record in
                             if let deck = Self.decodeCardDeck(from: record) {
-                                InlineDeckView(deck: deck, onSaveCard: onSaveQuizCard)
+                                InlineDeckView(deck: deck)
                                     .environment(\.openURL, citationOpenURLAction)
                             }
                         }
@@ -267,12 +266,9 @@ struct ChatBubbleView: View, Equatable {
     /// to `onOpenCitation`. Non-oak URLs fall through to the system handler.
     private var citationOpenURLAction: OpenURLAction {
         OpenURLAction { url in
-            print("[Citation] openURL fired: \(url)")
             guard let (citeKey, anchor) = CitationAnchor.parse(from: url) else {
-                print("[Citation] not an oak:// URL, falling through to system")
                 return .systemAction
             }
-            print("[Citation] parsed citeKey=\(citeKey) anchor=\(anchor)")
             onOpenCitation?(citeKey, anchor)
             return .handled
         }
@@ -332,9 +328,9 @@ struct ChatBubbleView: View, Equatable {
                 case .text(let markdown):
                     chatMarkdown(markdown)
                 case .quiz(let content):
-                    InlineQuizView(content: content, onSaveToDeck: onSaveQuizCard)
+                    InlineQuizView(content: content)
                 case .deck(let deck):
-                    InlineDeckView(deck: deck, onSaveCard: onSaveQuizCard)
+                    InlineDeckView(deck: deck)
                 }
             }
         }

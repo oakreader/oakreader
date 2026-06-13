@@ -16,7 +16,6 @@ struct SettingsView: View {
         case webSearch
         // Extension tabs
         case extensionTranslation
-        case extensionQuizCards
 
         var id: String { rawValue }
 
@@ -31,7 +30,6 @@ struct SettingsView: View {
             case .skills: return "Skills"
             case .webSearch: return "Web Search"
             case .extensionTranslation: return AppExtension.translation.label
-            case .extensionQuizCards: return AppExtension.quizCards.label
             }
         }
 
@@ -46,7 +44,6 @@ struct SettingsView: View {
             case .skills: return "hammer"
             case .webSearch: return "magnifyingglass.circle"
             case .extensionTranslation: return AppExtension.translation.systemImage
-            case .extensionQuizCards: return AppExtension.quizCards.systemImage
             }
         }
 
@@ -59,7 +56,6 @@ struct SettingsView: View {
         var appExtension: AppExtension? {
             switch self {
             case .extensionTranslation: return .translation
-            case .extensionQuizCards: return .quizCards
             default: return nil
             }
         }
@@ -70,7 +66,6 @@ struct SettingsView: View {
         static func tab(for ext: AppExtension) -> Tab {
             switch ext {
             case .translation: return .extensionTranslation
-            case .quizCards: return .extensionQuizCards
             }
         }
     }
@@ -163,8 +158,6 @@ struct SettingsView: View {
             WebSearchSettingsView()
         case .extensionTranslation:
             TranslationSettingsView()
-        case .extensionQuizCards:
-            QuizCardSettingsView()
         }
     }
 }

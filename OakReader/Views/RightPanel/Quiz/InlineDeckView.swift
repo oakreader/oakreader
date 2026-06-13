@@ -169,7 +169,7 @@ struct InlineDeckView: View {
     private func cardFace(_ card: QuizContent) -> some View {
         // Content is centered within the 16:9 face; rare over-tall content is
         // clipped to the rounded card rather than blowing out the layout.
-        InlineQuizView(content: card, onSaveToDeck: nil, chromeless: true)
+        InlineQuizView(content: card, chromeless: true)
             .padding(18)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(

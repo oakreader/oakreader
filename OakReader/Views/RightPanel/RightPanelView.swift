@@ -14,30 +14,17 @@ struct RightPanelContentView: View {
                 case .aiChat:
                     AIChatView(
                         chatVM: viewModel.chat,
-                        voiceVM: viewModel.voice,
-                        onSaveQuizCard: saveQuizCardAction
+                        voiceVM: viewModel.voice
                     )
                 case .translation:
                     if Preferences.shared.isExtensionEnabled(.translation) {
                         TranslationPanelView(translationVM: viewModel.translation, voiceVM: viewModel.voice)
                     }
                 case .quizCards:
-                    if Preferences.shared.isExtensionEnabled(.quizCards) {
-                        QuizCardsPanelView(quizCardsVM: viewModel.quizCards) {
-                            viewModel.appState?.openQuizReview(vm: viewModel.quizCards)
-                        }
-                    }
+                    ItemQuizCardsPanelView(viewModel: viewModel)
                 }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-
-    private var saveQuizCardAction: ((QuizContent) -> Bool)? {
-        Preferences.shared.isExtensionEnabled(.quizCards) ? saveQuizCard : nil
-    }
-
-    private func saveQuizCard(_ content: QuizContent) -> Bool {
-        viewModel.quizCards.saveCard(content: content)
     }
 }

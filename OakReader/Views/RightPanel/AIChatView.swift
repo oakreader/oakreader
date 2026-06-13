@@ -14,7 +14,6 @@ enum ChatPresentation {
 struct AIChatView: View {
     let chatVM: ChatViewModel
     var voiceVM: VoiceViewModel?
-    var onSaveQuizCard: ((QuizContent) -> Bool)?
 
     /// Layout mode. `.panel` (default) preserves the existing right-panel behavior;
     /// `.canvas` centers content into a comfortable reading column for the agent page.
@@ -305,7 +304,6 @@ struct AIChatView: View {
                             onOpenCitation: { citeKey, anchor in
                                 chatVM.openCitation(citeKey: citeKey, anchor: anchor)
                             },
-                            onSaveQuizCard: onSaveQuizCard,
                             markdownTheme: presentation == .canvas ? .dia : nil
                         )
                             .equatable()
