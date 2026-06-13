@@ -209,6 +209,7 @@
 		CC5F84581420C648776236D9 /* AgentWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5843A9CCB0DC5E19B4B54C79 /* AgentWorkspaceView.swift */; };
 		CC7D576D3A9990F1737D140D /* DuckDuckGoSearchProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7637FBE267CE1092647B935E /* DuckDuckGoSearchProvider.swift */; };
 		CD68F5844D15888537F54363 /* Marketplace.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10E57E661596E49EB03F2F2 /* Marketplace.swift */; };
+		CF1FE06115DEFE39C67CE511 /* Preview.bundle in Resources */ = {isa = PBXBuildFile; fileRef = B13F3C4D671B00C4C56C6096 /* Preview.bundle */; };
 		D203D0879C1D6334AA846B0D /* ReferenceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F738341643EF3BE5A70CB44 /* ReferenceService.swift */; };
 		D294996402B31860639694A0 /* QuizXMLParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 171E0A67F9A764F5C9264172 /* QuizXMLParser.swift */; };
 		D3FDC0F775EC2D91FF876566 /* ChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67058640A7746AEB945545CA /* ChatViewModel.swift */; };
@@ -449,6 +450,7 @@
 		AB52F4E998F30885954293C4 /* ConfiguredProviderStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfiguredProviderStore.swift; sourceTree = "<group>"; };
 		ABA66C5443CB2E4877801FD8 /* FlashcardQuizView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashcardQuizView.swift; sourceTree = "<group>"; };
 		AEED6E60ACBAF7EBF98EA318 /* TableHorizontalScrollerDisabler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TableHorizontalScrollerDisabler.swift; sourceTree = "<group>"; };
+		B13F3C4D671B00C4C56C6096 /* Preview.bundle */ = {isa = PBXFileReference; lastKnownFileType = wrapper.cfbundle; path = Preview.bundle; sourceTree = "<group>"; };
 		B1428432F0FC92A5486EAF1E /* ConversationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationService.swift; sourceTree = "<group>"; };
 		B26DDB8ABAE032A0D1F7C5F5 /* PDFViewerRepresentable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFViewerRepresentable.swift; sourceTree = "<group>"; };
 		B278C1A3A744C2FD5F8DE893 /* ItemQuizCardsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItemQuizCardsViewModel.swift; sourceTree = "<group>"; };
@@ -705,6 +707,7 @@
 				88A1DAF0FF249C2CCB62FE43 /* AppIcon.icon */,
 				CF758B038910E7989807B7E1 /* Assets.xcassets */,
 				35900F9BA497A3B47688C5D3 /* grant_voice.wav */,
+				B13F3C4D671B00C4C56C6096 /* Preview.bundle */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -1165,6 +1168,7 @@
 				12FA5F1FDBDA736CBBEF159E /* AppIcon.icon in Resources */,
 				FFE10D25C8CCA1B1A5982951 /* Assets.xcassets in Resources */,
 				E351F3911A686B291A25132E /* MEMORY.md in Resources */,
+				CF1FE06115DEFE39C67CE511 /* Preview.bundle in Resources */,
 				6EB17E48EFDF2EFCB2F8DDFA /* TsangerJinKai02-W04.ttf in Resources */,
 				DB38BB554B81F9147B134ABB /* USER.md in Resources */,
 				6239041962999CDBF1BD2D02 /* VOICE.md in Resources */,
