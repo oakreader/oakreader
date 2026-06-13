@@ -32,6 +32,12 @@ class DocumentState {
     /// left sidebar for `.link` tabs. Rebuilt on each navigation finish.
     var tableOfContents: [WebHeading] = []
 
+    /// Find-in-page state for the live web sidebar's Search tab. Counts are
+    /// written back by `WebViewCoordinator` after running the mark.js find;
+    /// `webSearchCurrentMatch` is 1-based (0 = no active match).
+    var webSearchMatchCount: Int = 0
+    var webSearchCurrentMatch: Int = 0
+
     /// A captured login awaiting the user's decision to save it. Drives the
     /// save-password banner in DocumentToolbarView.
     var pendingPasswordSave: PendingPasswordSave?

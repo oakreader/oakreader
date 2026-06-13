@@ -12,6 +12,7 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
     private var scrollMonitor: Any?
     private var headingObserver: NSObjectProtocol?
     private var findTextObserver: NSObjectProtocol?
+    private var webSidebarObservers: [NSObjectProtocol] = []
     private var progressObservation: NSKeyValueObservation?
     private var navObservations: [NSKeyValueObservation] = []
     private var commandObservers: [NSObjectProtocol] = []
@@ -142,6 +143,82 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
             """
             webView.evaluateJavaScript(js, completionHandler: nil)
         }
+
+        setupWebSidebarObservers()
+    }
+
+    /// Observers for the web sidebar (live *and* snapshot), which share the same
+    /// WKWebView. Covers the Search tab's find-in-page — unlike `.webViewFindText`
+    /// (a one-shot cite jump that highlights and fades), these maintain a
+    /// persistent set of `<mark>` matches the user can step through, reporting the
+    /// count + current index into `DocumentState` — plus the Contents tab's
+    /// scroll-to-heading. Both operate purely on the DOM, so they're ungated:
+    /// only genuine browser commands (back/forward/reload) stay live-only.
+    private func setupWebSidebarObservers() {
+        let center = NotificationCenter.default
+
+        func observe(_ name: Notification.Name, _ handler: @escaping (Notification) -> Void) {
+            let token = center.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
+                guard let self, (note.object as AnyObject) === self.viewModel else { return }
+                handler(note)
+            }
+            webSidebarObservers.append(token)
+        }
+
+        observe(.webViewFindInPage) { [weak self] note in
+            let text = (note.userInfo?["text"] as? String) ?? ""
+            self?.runWebFind(markJS(for: text))
+        }
+        observe(.webViewFindNext) { [weak self] _ in
+            self?.runWebFind(stepJS(direction: 1))
+        }
+        observe(.webViewFindPrev) { [weak self] _ in
+            self?.runWebFind(stepJS(direction: -1))
+        }
+        observe(.webViewClearFind) { [weak self] _ in
+            self?.runWebFind(clearJS())
+        }
+        observe(.webViewScrollToTOC) { [weak self] note in
+            guard let elementId = note.userInfo?["id"] as? String else { return }
+            self?.scrollToTOCElement(elementId)
+        }
+    }
+
+    /// Smooth-scroll the web view to a heading captured by `extractTableOfContents`,
+    /// flashing an outline so the target is easy to spot. Shared by live and snapshot.
+    private func scrollToTOCElement(_ elementId: String) {
+        let escaped = elementId
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "'", with: "\\'")
+        let js = """
+        (function() {
+            var el = document.getElementById('\(escaped)');
+            if (!el) return;
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            var prevOutline = el.style.outline;
+            var prevOffset = el.style.outlineOffset;
+            el.style.outline = '2px solid rgba(255,190,30,0.9)';
+            el.style.outlineOffset = '2px';
+            setTimeout(function() {
+                el.style.outline = prevOutline;
+                el.style.outlineOffset = prevOffset;
+            }, 1600);
+        })();
+        """
+        webView?.evaluateJavaScript(js, completionHandler: nil)
+    }
+
+    /// Run a find script that returns `{count, current}` JSON and mirror it into
+    /// `DocumentState` so the Search sidebar can render the status bar.
+    private func runWebFind(_ js: String) {
+        webView?.evaluateJavaScript(js) { [weak self] result, _ in
+            guard let self,
+                  let str = result as? String,
+                  let data = str.data(using: .utf8),
+                  let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Int] else { return }
+            self.viewModel.state.webSearchMatchCount = obj["count"] ?? 0
+            self.viewModel.state.webSearchCurrentMatch = obj["current"] ?? 0
+        }
     }
 
     private func removeNotificationObservers() {
@@ -153,6 +230,8 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
             NotificationCenter.default.removeObserver(obs)
             findTextObserver = nil
         }
+        webSidebarObservers.forEach { NotificationCenter.default.removeObserver($0) }
+        webSidebarObservers.removeAll()
     }
 
     // MARK: - Selection-instrument observers (HTML / live web side)
@@ -302,8 +381,10 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
 
     // MARK: - Table of Contents
 
-    /// Walks the live page's heading elements, tagging any without an id so the
+    /// Walks the page's heading elements, tagging any without an id so the
     /// sidebar can scroll back to them, and mirrors the outline into DocumentState.
+    /// Runs for both live pages and local snapshots — both share the same DOM and
+    /// the same Contents sidebar tab.
     private static let tocExtractionJS = """
     (function () {
       try {
@@ -327,7 +408,10 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
     """
 
     private func extractTableOfContents() {
-        guard isLiveMode, let webView else { return }
+        guard let webView else { return }
+        // A new page invalidates any prior find-in-page matches.
+        viewModel.state.webSearchMatchCount = 0
+        viewModel.state.webSearchCurrentMatch = 0
         webView.evaluateJavaScript(Self.tocExtractionJS) { [weak self] result, _ in
             guard let self else { return }
             guard let json = result as? String,
@@ -428,28 +512,8 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
             guard let url = note.userInfo?["url"] as? URL else { return }
             wv.load(URLRequest(url: url))
         }
-        observe(.webViewScrollToTOC) { wv, note in
-            guard let elementId = note.userInfo?["id"] as? String else { return }
-            let escaped = elementId
-                .replacingOccurrences(of: "\\", with: "\\\\")
-                .replacingOccurrences(of: "'", with: "\\'")
-            let js = """
-            (function() {
-                var el = document.getElementById('\(escaped)');
-                if (!el) return;
-                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                var prevOutline = el.style.outline;
-                var prevOffset = el.style.outlineOffset;
-                el.style.outline = '2px solid rgba(255,190,30,0.9)';
-                el.style.outlineOffset = '2px';
-                setTimeout(function() {
-                    el.style.outline = prevOutline;
-                    el.style.outlineOffset = prevOffset;
-                }, 1600);
-            })();
-            """
-            wv.evaluateJavaScript(js, completionHandler: nil)
-        }
+        // Note: `.webViewScrollToTOC` is registered in `setupWebSidebarObservers`
+        // (ungated) so snapshots get heading navigation too.
     }
 
     // MARK: - WKScriptMessageHandler
@@ -711,4 +775,98 @@ extension Notification.Name {
     static let webViewStop = Notification.Name("webViewStop")
     static let webViewLoadURL = Notification.Name("webViewLoadURL")
     static let webViewScrollToTOC = Notification.Name("webViewScrollToTOC")
+
+    // Live-web find-in-page (Search sidebar tab) — posted with `object: viewModel`.
+    // `webViewFindInPage` carries the query in `userInfo["text"]`.
+    static let webViewFindInPage = Notification.Name("webViewFindInPage")
+    static let webViewFindNext = Notification.Name("webViewFindNext")
+    static let webViewFindPrev = Notification.Name("webViewFindPrev")
+    static let webViewClearFind = Notification.Name("webViewClearFind")
+}
+
+// MARK: - Find-in-page JavaScript
+
+/// CSS injected once per page for the persistent find highlights. The base
+/// match is a soft yellow; the active match is a stronger orange, mirroring a
+/// browser's find bar.
+private let oakFindStyle = """
+mark.oak-find-hl{background:rgba(255,213,79,.45);color:inherit;border-radius:2px;}
+mark.oak-find-current{background:rgba(255,138,0,.95);color:#000;}
+"""
+
+/// Escape a string for embedding inside a single-quoted JS literal.
+private func jsEscape(_ s: String) -> String {
+    s.replacingOccurrences(of: "\\", with: "\\\\")
+        .replacingOccurrences(of: "'", with: "\\'")
+        .replacingOccurrences(of: "\n", with: "\\n")
+}
+
+/// Mark every occurrence of `text`, activate the first match, and return
+/// `{count, current}`. Uses mark.js without `acrossElements` so each match maps
+/// to exactly one `<mark>` — keeping the count accurate and every match
+/// individually navigable.
+private func markJS(for text: String) -> String {
+    let escaped = jsEscape(text)
+    return """
+    (function() {
+        if (!document.getElementById('oak-find-style')) {
+            var st = document.createElement('style');
+            st.id = 'oak-find-style';
+            st.textContent = '\(jsEscape(oakFindStyle))';
+            document.head.appendChild(st);
+        }
+        var ctx = document.querySelector('.heti') || document.body;
+        if (!window.__oakFindMark) { window.__oakFindMark = new Mark(ctx); }
+        var inst = window.__oakFindMark;
+        inst.unmark({ className: 'oak-find-hl' });
+        window.__oakFindIdx = -1;
+        var q = '\(escaped)';
+        if (!q) { return JSON.stringify({ count: 0, current: 0 }); }
+        inst.mark(q, {
+            separateWordSearch: false,
+            caseSensitive: false,
+            acrossElements: false,
+            className: 'oak-find-hl',
+            done: function() {
+                var marks = document.querySelectorAll('mark.oak-find-hl');
+                if (marks.length) {
+                    window.__oakFindIdx = 0;
+                    marks[0].classList.add('oak-find-current');
+                    marks[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+        });
+        var count = document.querySelectorAll('mark.oak-find-hl').length;
+        return JSON.stringify({ count: count, current: count ? 1 : 0 });
+    })();
+    """
+}
+
+/// Move the active match by `direction` (+1 / -1), wrapping around, and return
+/// the refreshed `{count, current}`.
+private func stepJS(direction: Int) -> String {
+    """
+    (function() {
+        var marks = Array.prototype.slice.call(document.querySelectorAll('mark.oak-find-hl'));
+        if (!marks.length) { return JSON.stringify({ count: 0, current: 0 }); }
+        var idx = window.__oakFindIdx;
+        if (idx == null || idx < 0) { idx = 0; }
+        else { idx = (idx + (\(direction)) + marks.length) % marks.length; }
+        window.__oakFindIdx = idx;
+        marks.forEach(function(m, i) { m.classList.toggle('oak-find-current', i === idx); });
+        marks[idx].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return JSON.stringify({ count: marks.length, current: idx + 1 });
+    })();
+    """
+}
+
+/// Remove all find highlights and reset the counters.
+private func clearJS() -> String {
+    """
+    (function() {
+        if (window.__oakFindMark) { window.__oakFindMark.unmark({ className: 'oak-find-hl' }); }
+        window.__oakFindIdx = -1;
+        return JSON.stringify({ count: 0, current: 0 });
+    })();
+    """
 }

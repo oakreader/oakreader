@@ -32,6 +32,7 @@
 		1F12C05244CD317724BFDF09 /* String+SealMarkdown.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D7E333AFEAE1845875EC321 /* String+SealMarkdown.swift */; };
 		1F29B2E20A85A5898E111553 /* PasswordStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80AB3683C597A5C3CC585FB3 /* PasswordStore.swift */; };
 		20A5EA555198EDD09927D2CE /* MediaSnapshotOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C893DD12AC4437684DB48663 /* MediaSnapshotOverlayView.swift */; };
+		21B88590AF81D94422233418 /* WebToolbarComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF54578B46A3D7CFAA043839 /* WebToolbarComponents.swift */; };
 		247565697261607937720B65 /* WebSearchSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 550762CBAFE2986E9180ED34 /* WebSearchSettingsView.swift */; };
 		249505FEB7F2FB8F5ABF87ED /* BackupProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08000CB32FE5FB153C8D346F /* BackupProgressView.swift */; };
 		27926C8DE8B6E9E53CF5553D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35C3D7C67DA37CE045FCE96F /* ContentView.swift */; };
@@ -509,6 +510,7 @@
 		EA91E07EE10DFB021A1A92A7 /* AppIcon-Dev.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = "AppIcon-Dev.icon"; sourceTree = "<group>"; };
 		ECB7B68284A0E958AA74C670 /* SerperSearchProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SerperSearchProvider.swift; sourceTree = "<group>"; };
 		EE3C5AFB721EE407EADCAE17 /* ResearchTool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResearchTool.swift; sourceTree = "<group>"; };
+		EF54578B46A3D7CFAA043839 /* WebToolbarComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebToolbarComponents.swift; sourceTree = "<group>"; };
 		F2C0A783E601F0D37DEFF58E /* TavilySearchProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TavilySearchProvider.swift; sourceTree = "<group>"; };
 		F4C58CEC604F626E69F05535 /* FilterRule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterRule.swift; sourceTree = "<group>"; };
 		F567438B9F047B4A7C8C4594 /* ImportService+Markdown.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ImportService+Markdown.swift"; sourceTree = "<group>"; };
@@ -1058,6 +1060,7 @@
 				4AF8923119F1FEC58431E571 /* ProgressOverlay.swift */,
 				55756F4EC8293A8706AA050E /* ProviderIconView.swift */,
 				AEED6E60ACBAF7EBF98EA318 /* TableHorizontalScrollerDisabler.swift */,
+				EF54578B46A3D7CFAA043839 /* WebToolbarComponents.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -1461,6 +1464,7 @@
 				247565697261607937720B65 /* WebSearchSettingsView.swift in Sources */,
 				5552620EEB30835823F9CA6E /* WebSearchTool.swift in Sources */,
 				D780F2292F24CD26A497D0A1 /* WebTOCSidebarView.swift in Sources */,
+				21B88590AF81D94422233418 /* WebToolbarComponents.swift in Sources */,
 				F5D77E842407DAEF697F4E0F /* WebViewCoordinator.swift in Sources */,
 				079EDE97CFC4C947DD1CB1DE /* ZoteroFieldMapping.swift in Sources */,
 				C1205D6CBED8E36E3DCFFFE0 /* ZoteroImportProgressView.swift in Sources */,

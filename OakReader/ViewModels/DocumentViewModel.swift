@@ -168,6 +168,11 @@ class DocumentViewModel {
     /// The library item's ID as a string, for annotation persistence.
     var itemId: String? { libraryItem?.id.uuidString }
 
+    /// When this snapshot was captured — drives the snapshot toolbar's archive
+    /// badge ("Snapshot · Saved Jun 3"). Bare file opens with no library item
+    /// fall back to `nil` (badge shows without a date).
+    var captureDate: Date? { libraryItem?.dateAdded }
+
     // MARK: - Initialization
 
     init(document: OakReaderDocument) {

@@ -142,7 +142,10 @@ struct ContentView: View {
     private var sidebarContentView: some View {
         if viewModel.contentType == .markdown {
             MarkdownOutlineSidebarView(viewModel: viewModel)
-        } else if viewModel.contentType == .link {
+        } else if viewModel.contentType == .link || viewModel.contentType == .html {
+            // Snapshots and live web render through the same WKWebView, so they
+            // share the same Contents (heading outline) + Search (find-in-page)
+            // sidebar instead of borrowing the PDF thumbnails/outline tabs.
             WebTOCSidebarView(viewModel: viewModel)
         } else {
             SidebarView(viewModel: viewModel)

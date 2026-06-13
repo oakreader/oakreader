@@ -35,12 +35,14 @@ struct DocumentToolbarView: View {
         // highlight/underline → text-selection popup & ⌃⌘H/⌃⌘U, area capture →
         // View ▸ Capture Area (⇧⌘A). The empty full-width bar wasn't earning
         // its keep, so it's gone.
-        // PDF & HTML have no per-document toolbar. Zoom → ⌘=/⌘-/⌘0 (+ Command
-        // Palette), highlight/underline + color → text-selection popup & ⌃⌘H/
-        // ⌃⌘U, area capture → View ▸ Capture Area (⇧⌘A). The empty full-width
-        // bar wasn't earning its keep, so it's gone. Live web keeps its chrome.
+        // PDF has no per-document toolbar. Zoom → ⌘=/⌘-/⌘0 (+ Command Palette),
+        // highlight/underline + color → text-selection popup & ⌃⌘H/⌃⌘U, area
+        // capture → View ▸ Capture Area (⇧⌘A). HTML snapshots get a read-only
+        // archive bar (badge + non-editable URL + "Open original"); live web
+        // gets the editable address-bar chrome. Same WKWebView underneath —
+        // only the chrome differs.
         case .pdf:      EmptyView()
-        case .html:     EmptyView()
+        case .html:     SnapshotToolbarContent(viewModel: viewModel)
         case .link:     linkToolbar
         case .markdown: EmptyView()  // nothing toolbar-worthy yet — tab-bar anchors suffice
         case .audio:    EmptyView()
@@ -98,40 +100,32 @@ private struct LiveWebToolbarContent: View {
     }
 
     private var navPill: some View {
-        HStack(spacing: 2) {
-            OakToolButton(systemImage: "chevron.left", tooltip: "Back") {
-                post(.webViewGoBack)
-            }
-            .disabled(!state.canGoBack)
-            .opacity(state.canGoBack ? 1 : 0.4)
+        ToolbarPill {
+            HStack(spacing: 2) {
+                OakToolButton(systemImage: "chevron.left", tooltip: "Back") {
+                    post(.webViewGoBack)
+                }
+                .disabled(!state.canGoBack)
+                .opacity(state.canGoBack ? 1 : 0.4)
 
-            OakToolButton(systemImage: "chevron.right", tooltip: "Forward") {
-                post(.webViewGoForward)
-            }
-            .disabled(!state.canGoForward)
-            .opacity(state.canGoForward ? 1 : 0.4)
+                OakToolButton(systemImage: "chevron.right", tooltip: "Forward") {
+                    post(.webViewGoForward)
+                }
+                .disabled(!state.canGoForward)
+                .opacity(state.canGoForward ? 1 : 0.4)
 
-            OakToolButton(
-                systemImage: isLoading ? "xmark" : "arrow.clockwise",
-                tooltip: isLoading ? "Stop" : "Reload"
-            ) {
-                post(isLoading ? .webViewStop : .webViewReload)
+                OakToolButton(
+                    systemImage: isLoading ? "xmark" : "arrow.clockwise",
+                    tooltip: isLoading ? "Stop" : "Reload"
+                ) {
+                    post(isLoading ? .webViewStop : .webViewReload)
+                }
             }
         }
-        .padding(.horizontal, 2)
-        .background(
-            Capsule(style: .continuous)
-                .fill(OakStyle.Colors.hoverBackground)
-        )
     }
 
     private var savePill: some View {
-        saveButton
-            .padding(.horizontal, 2)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(OakStyle.Colors.hoverBackground)
-            )
+        ToolbarPill { saveButton }
     }
 
     @ViewBuilder
@@ -223,6 +217,77 @@ private struct LiveWebToolbarContent: View {
 
     private func post(_ name: Notification.Name) {
         NotificationCenter.default.post(name: name, object: viewModel)
+    }
+}
+
+// MARK: - Snapshot toolbar (read-only archive bar)
+
+/// Read-only counterpart to `LiveWebToolbarContent`. A snapshot is the page
+/// frozen at clip time — there's nowhere to navigate, so the address bar is
+/// replaced by an archive badge (with capture date) + a non-editable URL. The
+/// one action is "Open original", which loads the live page in a fresh tab.
+private struct SnapshotToolbarContent: View {
+    let viewModel: DocumentViewModel
+
+    private var state: DocumentState { viewModel.state }
+
+    /// Prefer the original source URL over the local `file://` snapshot path.
+    private var displayURL: URL? { viewModel.html?.sourceURL ?? state.currentURL }
+
+    private var canOpenOriginal: Bool {
+        displayURL?.scheme?.lowercased().hasPrefix("http") == true
+    }
+
+    /// Warm sepia/amber — the "archived / offline" accent, kept distinct from
+    /// the neutral chrome of live browsing and away from security green/red.
+    private static let archiveTint = Color(red: 0.60, green: 0.43, blue: 0.18)
+
+    var body: some View {
+        HStack(spacing: 8) {
+            archiveBadge
+
+            URLLabel(url: displayURL)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            if canOpenOriginal {
+                ToolbarPill {
+                    OakToolButton(
+                        systemImage: "arrow.up.right",
+                        tooltip: "Open original page"
+                    ) {
+                        openOriginal()
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+    }
+
+    private var archiveBadge: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "archivebox.fill")
+                .font(.system(size: 11))
+            Text("Snapshot")
+                .font(.system(size: 12, weight: .medium))
+            if let date = viewModel.captureDate {
+                Text("· Saved \(date.formatted(.dateTime.month(.abbreviated).day()))")
+                    .font(.system(size: 12))
+                    .opacity(0.75)
+            }
+        }
+        .foregroundStyle(Self.archiveTint)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(
+            Capsule(style: .continuous)
+                .fill(Self.archiveTint.opacity(0.12))
+        )
+    }
+
+    private func openOriginal() {
+        guard let url = displayURL, canOpenOriginal else { return }
+        viewModel.appState?.openWebTab(url: url)
     }
 }
 
