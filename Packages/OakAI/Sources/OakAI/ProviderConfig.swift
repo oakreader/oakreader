@@ -1,30 +1,5 @@
 import Foundation
 
-// MARK: - AI Provider (deprecated — use ProviderRegistry + providerId strings)
-
-@available(*, deprecated, message: "Use ProviderRegistry with string provider IDs instead")
-public enum AIProvider: String, Codable, CaseIterable, Sendable, Identifiable {
-    case openai
-    case anthropic
-    case google
-
-    public var id: String { rawValue }
-
-    public var displayName: String {
-        ProviderRegistry.shared.provider(for: rawValue)?.displayName ?? rawValue
-    }
-
-    public var defaultModel: String {
-        ProviderRegistry.shared.provider(for: rawValue)?.defaultModelId ?? ""
-    }
-
-    public var models: [ModelInfo] {
-        ProviderRegistry.shared.provider(for: rawValue)?.models ?? []
-    }
-
-    public var supportsVision: Bool { true }
-}
-
 // MARK: - Model Info (per-model metadata)
 
 public struct ModelInfo: Identifiable, Codable, Sendable, Hashable {

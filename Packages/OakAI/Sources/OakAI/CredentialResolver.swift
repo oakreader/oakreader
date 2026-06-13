@@ -1,43 +1,82 @@
 import Foundation
 
 public enum CredentialResolver: Sendable {
-    /// Resolve credentials for a provider: Keychain API key → environment variable → OAuth token.
-    /// For GitHub Copilot, this also handles the two-step token exchange.
+    /// Synchronous resolve — returns whatever is immediately available without
+    /// touching the network. OAuth providers return nil here once their access
+    /// token expires, even if a refresh token is stored. Use [`resolveAsync`]
+    /// when you can `await` — that variant will refresh.
+    ///
+    /// Resolution order: Keychain API key → environment variable → cached OAuth access token.
     public static func resolve(for providerId: String) -> String? {
-        // 1. Keychain API key
-        if let key = KeychainService.apiKey(forProviderId: providerId) {
+        if let key = nonOAuthCredential(for: providerId) {
             return key
         }
 
-        // 2. Environment variable (if configured in provider info)
-        if let info = ProviderRegistry.shared.provider(for: providerId) {
-            if case .apiKey(let envVar) = info.authStrategy, let envName = envVar {
-                if let value = ProcessInfo.processInfo.environment[envName], !value.isEmpty {
-                    return value
-                }
-            }
-            // Local providers (Ollama, LM Studio) need no credential — return an empty
-            // sentinel so the router builds a provider instead of throwing missingAPIKey.
-            if case .none = info.authStrategy {
-                return ""
-            }
-        }
-
-        // 3. OAuth token store
+        // OAuth: cached access token only (no refresh in the sync path).
         if let token = OAuthTokenStore.accessToken(for: providerId) {
-            // GitHub Copilot needs a second token exchange: GitHub OAuth → Copilot API token
-            if providerId == "github-copilot" {
-                return CopilotTokenExchange.cachedCopilotToken(gitHubToken: token)
-            }
-            return token
+            return applyProviderSpecificExchange(token: token, providerId: providerId)
         }
-
         return nil
     }
 
-    /// Check if any credential is available for the given provider.
+    /// Async resolve — same as [`resolve`] but auto-refreshes OAuth access
+    /// tokens via the stored refresh token when the cached one has expired.
+    /// This is the path the chat / Test Connection / model-discovery flows
+    /// should use.
+    public static func resolveAsync(for providerId: String) async -> String? {
+        if let key = nonOAuthCredential(for: providerId) {
+            return key
+        }
+
+        if let token = await OAuthTokenStore.validAccessToken(for: providerId) {
+            return applyProviderSpecificExchange(token: token, providerId: providerId)
+        }
+        return nil
+    }
+
+    /// True iff we either have valid credentials right now OR can recover them
+    /// without user interaction (i.e. an OAuth refresh token is stored).
+    ///
+    /// This is what drives the "Connected" badge in Settings, so it needs to
+    /// stay true through expiry — otherwise the badge ping-pongs every hour as
+    /// the access token rolls over.
     public static func hasCredentials(for providerId: String) -> Bool {
-        resolve(for: providerId) != nil
+        if nonOAuthCredential(for: providerId) != nil {
+            return true
+        }
+        return OAuthTokenStore.hasRecoverableTokenSet(for: providerId)
+    }
+
+    // MARK: - Shared helpers
+
+    /// API-key / env-var / local-provider sentinel. Pulled out so the sync
+    /// and async resolvers can share the non-OAuth path.
+    private static func nonOAuthCredential(for providerId: String) -> String? {
+        if let key = KeychainService.apiKey(forProviderId: providerId) {
+            return key
+        }
+        guard let info = ProviderRegistry.shared.provider(for: providerId) else {
+            return nil
+        }
+        if case .apiKey(let envVar) = info.authStrategy, let envName = envVar,
+           let value = ProcessInfo.processInfo.environment[envName], !value.isEmpty {
+            return value
+        }
+        // Local providers (Ollama, LM Studio) need no credential — return an empty
+        // sentinel so the router builds a provider instead of throwing missingAPIKey.
+        if case .none = info.authStrategy {
+            return ""
+        }
+        return nil
+    }
+
+    /// GitHub Copilot is special — its OAuth token is exchanged for a short-lived
+    /// Copilot API token via a second API call.
+    private static func applyProviderSpecificExchange(token: String, providerId: String) -> String? {
+        if providerId == "github-copilot" {
+            return CopilotTokenExchange.cachedCopilotToken(gitHubToken: token)
+        }
+        return token
     }
 }
 
@@ -90,12 +129,16 @@ enum CopilotTokenExchange {
         }
 
         let expiresAt = json["expires_at"] as? Int
-
-        lock.lock()
-        cachedToken = token
-        cachedExpiry = expiresAt.map { Date(timeIntervalSince1970: TimeInterval($0)) }
-        lock.unlock()
-
+        cacheToken(token, expiresAt: expiresAt.map { Date(timeIntervalSince1970: TimeInterval($0)) })
         return token
+    }
+
+    /// Sync writer pulled out so async callers don't lock NSLock directly —
+    /// Swift 6 forbids `NSLock.lock()` inside async functions.
+    private static func cacheToken(_ token: String, expiresAt: Date?) {
+        lock.lock()
+        defer { lock.unlock() }
+        cachedToken = token
+        cachedExpiry = expiresAt
     }
 }

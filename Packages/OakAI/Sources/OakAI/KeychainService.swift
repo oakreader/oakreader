@@ -101,21 +101,4 @@ public enum KeychainService: Sendable {
         SecItemDelete(query as CFDictionary)
     }
 
-    // MARK: - Deprecated AIProvider-based API (delegates to string-based)
-
-    @available(*, deprecated, message: "Use apiKey(forProviderId:) instead")
-    public static func apiKey(for provider: AIProvider) -> String? {
-        apiKey(forProviderId: provider.rawValue)
-    }
-
-    @available(*, deprecated, message: "Use setAPIKey(_:forProviderId:) instead")
-    @discardableResult
-    public static func setAPIKey(_ key: String, for provider: AIProvider) -> Bool {
-        setAPIKey(key, forProviderId: provider.rawValue)
-    }
-
-    @available(*, deprecated, message: "Use deleteAPIKey(forProviderId:) instead")
-    public static func deleteAPIKey(for provider: AIProvider) {
-        deleteAPIKey(forProviderId: provider.rawValue)
-    }
 }

@@ -524,7 +524,7 @@ private struct ProviderDetailView: View {
                 if let credential {
                     svc = try router.provider(for: config, credential: credential)
                 } else {
-                    svc = try router.provider(for: config)
+                    svc = try await router.provider(for: config)
                 }
                 let messages = [LLMMessage(role: .user, text: "Say 'OK' and nothing else.")]
                 let stream = svc.sendMessage(

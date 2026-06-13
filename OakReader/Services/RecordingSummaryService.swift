@@ -21,7 +21,7 @@ actor RecordingSummaryService {
         do {
             let config = ProviderConfig(providerId: providerId, model: model)
             let router = ProviderRouter()
-            let provider = try router.provider(for: config)
+            let provider = try await router.provider(for: config)
 
             let systemPrompt = """
                 You are a meeting notes assistant. Analyze the transcript and produce a JSON object with exactly two keys:

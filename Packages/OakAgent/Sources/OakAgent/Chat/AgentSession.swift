@@ -65,7 +65,7 @@ public actor AgentSession {
                     )
 
                     // 4. Get provider
-                    let provider = try router.provider(for: config)
+                    let provider = try await router.provider(for: config)
 
                     // 5. Determine tools
                     let activeTools = tools ?? []

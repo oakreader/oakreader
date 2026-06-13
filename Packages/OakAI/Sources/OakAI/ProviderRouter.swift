@@ -4,8 +4,8 @@ import Foundation
 public struct ProviderRouter: Sendable {
     public init() {}
 
-    public func provider(for config: ProviderConfig) throws -> LLMProviderService {
-        guard let credential = CredentialResolver.resolve(for: config.providerId) else {
+    public func provider(for config: ProviderConfig) async throws -> LLMProviderService {
+        guard let credential = await CredentialResolver.resolveAsync(for: config.providerId) else {
             throw LLMProviderError.missingAPIKey
         }
         return try provider(for: config, credential: credential)

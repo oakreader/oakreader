@@ -186,6 +186,61 @@ public actor OAuthService {
         return (deviceResponse, pollTask)
     }
 
+    // MARK: - Refresh
+
+    /// Exchange a long-lived refresh token for a fresh access/refresh pair.
+    ///
+    /// OpenAI (and most spec-compliant servers) rotate `refresh_token` on every refresh —
+    /// the old one is invalidated as soon as the response is issued. The caller MUST
+    /// persist the returned TokenSet immediately so the next refresh has the live token.
+    ///
+    /// Falls back to the existing refresh token if the server omits it from the response
+    /// (some servers — Google — only rotate occasionally).
+    public func refreshTokens(
+        refreshToken: String,
+        tokenURL: URL,
+        clientId: String
+    ) async throws -> OAuthTokenStore.TokenSet {
+        var request = URLRequest(url: tokenURL)
+        request.httpMethod = "POST"
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+
+        let params: [(String, String)] = [
+            ("grant_type", "refresh_token"),
+            ("refresh_token", refreshToken),
+            ("client_id", clientId),
+        ]
+        request.httpBody = Self.formURLEncode(params).data(using: .utf8)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            let body = String(data: data, encoding: .utf8) ?? "unknown error"
+            throw OAuthError.tokenExchangeFailed("Refresh failed (\((response as? HTTPURLResponse)?.statusCode ?? -1)): \(body)")
+        }
+
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let accessToken = json["access_token"] as? String
+        else {
+            throw OAuthError.tokenExchangeFailed("Invalid refresh response")
+        }
+
+        // Server may or may not rotate the refresh token — keep the old one if it didn't.
+        let newRefreshToken = (json["refresh_token"] as? String) ?? refreshToken
+        let expiresIn = json["expires_in"] as? Int
+        let tokenType = json["token_type"] as? String ?? "Bearer"
+
+        // 60s buffer so a token isn't used at the absolute edge of validity and
+        // killed by clock skew between us and the OAuth server.
+        let expiresAt = expiresIn.map { Date().addingTimeInterval(TimeInterval($0) - 60) }
+
+        return OAuthTokenStore.TokenSet(
+            accessToken: accessToken,
+            refreshToken: newRefreshToken,
+            expiresAt: expiresAt,
+            tokenType: tokenType
+        )
+    }
+
     // MARK: - Private PKCE Helpers
 
     private func generateCodeVerifier() -> String {
