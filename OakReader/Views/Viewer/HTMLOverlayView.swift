@@ -27,7 +27,8 @@ struct HTMLOverlayView: View {
                     isDragging = false
                     showSelection = true
                     finishSelection()
-                }
+                },
+                onCancel: { viewModel.setEditorMode(.viewer) }
             )
 
             // Selection rectangle (dashed border while dragging or popup is open)
@@ -126,12 +127,17 @@ struct HTMLOverlayView: View {
             }
 
             DispatchQueue.main.async {
-                WebAreaPopupPanel.show(
-                    at: screenPoint,
-                    imageData: pngData,
-                    viewModel: viewModel,
-                    onDismiss: { self.showSelection = false }
-                )
+                self.showSelection = false
+                if viewModel.state.snapshotForChat {
+                    viewModel.deliverAreaCaptureToChat(pngData, pageIndex: 0)
+                } else {
+                    WebAreaPopupPanel.show(
+                        at: screenPoint,
+                        imageData: pngData,
+                        viewModel: viewModel,
+                        onDismiss: {}
+                    )
+                }
             }
         }
     }
@@ -161,11 +167,13 @@ private struct HTMLHitTestView: NSViewRepresentable {
     let isActive: Bool
     let onDragChanged: (_ start: CGPoint, _ current: CGPoint) -> Void
     let onDragEnded: (_ start: CGPoint, _ end: CGPoint) -> Void
+    let onCancel: () -> Void
 
     func makeNSView(context: Context) -> HTMLHitTestNSView {
         let view = HTMLHitTestNSView()
         view.onDragChanged = onDragChanged
         view.onDragEnded = onDragEnded
+        view.onCancel = onCancel
         view.isActive = isActive
         return view
     }
@@ -173,6 +181,7 @@ private struct HTMLHitTestView: NSViewRepresentable {
     func updateNSView(_ nsView: HTMLHitTestNSView, context: Context) {
         nsView.onDragChanged = onDragChanged
         nsView.onDragEnded = onDragEnded
+        nsView.onCancel = onCancel
         nsView.updateActive(isActive)
     }
 }
@@ -186,6 +195,7 @@ class HTMLHitTestNSView: NSView {
     var isActive = false
     var onDragChanged: ((_ start: CGPoint, _ current: CGPoint) -> Void)?
     var onDragEnded: ((_ start: CGPoint, _ end: CGPoint) -> Void)?
+    var onCancel: (() -> Void)?
 
     private var mouseMonitor: Any?
     private var dragStartPoint: CGPoint?  // in flipped (SwiftUI) coords
@@ -209,9 +219,16 @@ class HTMLHitTestNSView: NSView {
     private func installMonitor() {
         removeMonitor()
         mouseMonitor = NSEvent.addLocalMonitorForEvents(
-            matching: [.leftMouseDown, .leftMouseDragged, .leftMouseUp]
+            matching: [.leftMouseDown, .leftMouseDragged, .leftMouseUp, .keyDown]
         ) { [weak self] event in
             guard let self, self.isActive else { return event }
+            if event.type == .keyDown {
+                if event.keyCode == 53 {  // Escape cancels the capture
+                    self.onCancel?()
+                    return nil
+                }
+                return event
+            }
             return self.handleMouseEvent(event)
         }
     }

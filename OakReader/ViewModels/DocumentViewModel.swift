@@ -412,6 +412,26 @@ class DocumentViewModel {
     }
 
     func setEditorMode(_ mode: EditorMode) {
+        // Leaving snapshot mode always clears the "route to chat" intent so a
+        // later menu/shortcut capture falls back to the annotation popup.
+        if mode != .snapshot { state.snapshotForChat = false }
         state.editorMode = mode
+    }
+
+    /// Begin a Dia-style region capture whose result is attached straight to the
+    /// AI chat composer. Triggered by the chat input's screenshot button: makes
+    /// sure chat is visible, then arms the crosshair overlay.
+    func beginAreaCaptureForChat() {
+        state.snapshotForChat = true
+        state.rightPanelMode = .aiChat
+        state.editorMode = .snapshot
+    }
+
+    /// Deliver a finished area capture into the chat composer and leave snapshot
+    /// mode. Used by the overlays when the capture was initiated for chat.
+    func deliverAreaCaptureToChat(_ pngData: Data, pageIndex: Int) {
+        chat.addImageAttachment(pngData, pageIndex: pageIndex)
+        state.rightPanelMode = .aiChat
+        setEditorMode(.viewer)
     }
 }

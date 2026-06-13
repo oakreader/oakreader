@@ -13,10 +13,10 @@ final class OakWebView: WKWebView {
     override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
         super.willOpenMenu(menu, with: event)
 
-        menu.addItem(.separator())
-
-        // "Open in Browser" for live link embeds
+        // "Open in Browser" for live link embeds. Region capture now lives in
+        // the AI chat composer (Dia-style), so it's no longer a page menu item.
         if coordinator?.isLiveMode == true {
+            menu.addItem(.separator())
             let openItem = NSMenuItem(
                 title: "Open in Browser",
                 action: #selector(openInBrowser),
@@ -26,31 +26,11 @@ final class OakWebView: WKWebView {
             openItem.image = NSImage(systemSymbolName: "safari", accessibilityDescription: nil)
             menu.addItem(openItem)
         }
-
-        let isAreaMode = coordinator?.viewModel.state.editorMode == .snapshot
-        let areaItem = NSMenuItem(
-            title: "Area Selection",
-            action: #selector(toggleAreaSelection),
-            keyEquivalent: ""
-        )
-        areaItem.target = self
-        areaItem.image = NSImage(systemSymbolName: "rectangle.dashed", accessibilityDescription: nil)
-        areaItem.state = isAreaMode ? .on : .off
-        menu.addItem(areaItem)
     }
 
     @objc private func openInBrowser() {
         guard let url = coordinator?.webView?.url ?? coordinator?.viewModel.liveURL else { return }
         NSWorkspace.shared.open(url)
-    }
-
-    @objc private func toggleAreaSelection() {
-        guard let vm = coordinator?.viewModel else { return }
-        if vm.state.editorMode == .snapshot {
-            vm.setEditorMode(.viewer)
-        } else {
-            vm.setEditorMode(.snapshot)
-        }
     }
 }
 

@@ -140,21 +140,6 @@ struct AIChatView: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            if chatVM.showHistory {
-                Text("History")
-                    .font(OakStyle.ChatFont.headerTitle)
-            } else if presentation == .canvas {
-                workspaceChip
-            } else {
-                OakAppIcon(size: 18)
-            }
-
-            Spacer()
-
-            OakToolButton(systemImage: "plus.bubble", tooltip: "New Chat") {
-                chatVM.newSession()
-            }
-
             OakToolButton(
                 systemImage: chatVM.showHistory ? "xmark" : "list.bullet",
                 isSelected: chatVM.showHistory,
@@ -166,6 +151,19 @@ struct AIChatView: View {
                     chatVM.loadSessionList()
                     chatVM.showHistory = true
                 }
+            }
+
+            if chatVM.showHistory {
+                Text("History")
+                    .font(OakStyle.ChatFont.headerTitle)
+            } else if presentation == .canvas {
+                workspaceChip
+            }
+
+            Spacer()
+
+            OakToolButton(systemImage: "plus.bubble", tooltip: "New Chat") {
+                chatVM.newSession()
             }
         }
         .padding(.horizontal, OakStyle.Spacing.sm)
@@ -524,6 +522,23 @@ struct AIChatView: View {
                 }
                 .buttonStyle(.plain)
                 .help("Add attachment")
+
+                // Dia-style region screenshot — arms a crosshair over the
+                // document and drops the crop straight into the composer.
+                if chatVM.parent != nil {
+                    Button(action: { chatVM.parent?.beginAreaCaptureForChat() }) {
+                        Image(systemName: "camera.viewfinder")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 28, height: 28)
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.primary.opacity(0.15), lineWidth: 0.5)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .help("Capture a region of the page")
+                }
 
                 settingsMenu
 

@@ -27,7 +27,8 @@ struct MediaSnapshotOverlayView: View {
                     isDragging = false
                     showSelection = true
                     finishSelection()
-                }
+                },
+                onCancel: { viewModel.setEditorMode(.viewer) }
             )
 
             // Selection rectangle (dashed border while dragging or popup is open)
@@ -126,15 +127,17 @@ struct MediaSnapshotOverlayView: View {
             }
 
             DispatchQueue.main.async {
-                WebAreaPopupPanel.show(
-                    at: screenPoint,
-                    imageData: pngData,
-                    viewModel: viewModel,
-                    onDismiss: {
-                        self.showSelection = false
-                        viewModel.setEditorMode(.viewer)
-                    }
-                )
+                self.showSelection = false
+                if viewModel.state.snapshotForChat {
+                    viewModel.deliverAreaCaptureToChat(pngData, pageIndex: 0)
+                } else {
+                    WebAreaPopupPanel.show(
+                        at: screenPoint,
+                        imageData: pngData,
+                        viewModel: viewModel,
+                        onDismiss: { viewModel.setEditorMode(.viewer) }
+                    )
+                }
             }
         }
     }
@@ -164,11 +167,13 @@ private struct MediaSnapshotHitTestView: NSViewRepresentable {
     let isActive: Bool
     let onDragChanged: (_ start: CGPoint, _ current: CGPoint) -> Void
     let onDragEnded: (_ start: CGPoint, _ end: CGPoint) -> Void
+    let onCancel: () -> Void
 
     func makeNSView(context: Context) -> MediaSnapshotHitTestNSView {
         let view = MediaSnapshotHitTestNSView()
         view.onDragChanged = onDragChanged
         view.onDragEnded = onDragEnded
+        view.onCancel = onCancel
         view.isActive = isActive
         return view
     }
@@ -176,6 +181,7 @@ private struct MediaSnapshotHitTestView: NSViewRepresentable {
     func updateNSView(_ nsView: MediaSnapshotHitTestNSView, context: Context) {
         nsView.onDragChanged = onDragChanged
         nsView.onDragEnded = onDragEnded
+        nsView.onCancel = onCancel
         nsView.updateActive(isActive)
     }
 }
@@ -189,6 +195,7 @@ class MediaSnapshotHitTestNSView: NSView {
     var isActive = false
     var onDragChanged: ((_ start: CGPoint, _ current: CGPoint) -> Void)?
     var onDragEnded: ((_ start: CGPoint, _ end: CGPoint) -> Void)?
+    var onCancel: (() -> Void)?
 
     private var mouseMonitor: Any?
     private var dragStartPoint: CGPoint?  // in flipped (SwiftUI) coords
@@ -212,9 +219,16 @@ class MediaSnapshotHitTestNSView: NSView {
     private func installMonitor() {
         removeMonitor()
         mouseMonitor = NSEvent.addLocalMonitorForEvents(
-            matching: [.leftMouseDown, .leftMouseDragged, .leftMouseUp]
+            matching: [.leftMouseDown, .leftMouseDragged, .leftMouseUp, .keyDown]
         ) { [weak self] event in
             guard let self, self.isActive else { return event }
+            if event.type == .keyDown {
+                if event.keyCode == 53 {  // Escape cancels the capture
+                    self.onCancel?()
+                    return nil
+                }
+                return event
+            }
             return self.handleMouseEvent(event)
         }
     }

@@ -120,6 +120,18 @@ struct SnapshotOverlayView: View {
         let windowPoint = hitTestView.convert(bottomCenterNS, to: nil)
         let screenPoint = window.convertPoint(toScreen: windowPoint)
 
+        // Dia-style chat capture: render the region and drop it straight into
+        // the composer, skipping the annotation popup.
+        if viewModel.state.snapshotForChat {
+            showSelection = false
+            if let pngData = Self.renderAreaAsPNG(page: page, region: pdfRect) {
+                viewModel.deliverAreaCaptureToChat(pngData, pageIndex: pageIndex)
+            } else {
+                viewModel.setEditorMode(.viewer)
+            }
+            return
+        }
+
         // Show the area selection popup
         AreaSelectionPopupPanel.show(
             at: screenPoint,
@@ -132,6 +144,18 @@ struct SnapshotOverlayView: View {
                 showSelection = false
             }
         )
+    }
+
+    /// Render a PDF page region to PNG at print quality — mirrors
+    /// `AreaSelectionPopupPanel.renderAreaAsPNG` for the direct-to-chat path.
+    private static func renderAreaAsPNG(page: PDFPage, region: CGRect) -> Data? {
+        let renderService = PDFRenderingService()
+        guard let cgImage = renderService.renderPageRegion(page, region: region, dpi: 300) else { return nil }
+        let nsImage = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+        guard let tiffData = nsImage.tiffRepresentation,
+              let bitmap = NSBitmapImageRep(data: tiffData),
+              let pngData = bitmap.representation(using: .png, properties: [:]) else { return nil }
+        return pngData
     }
 
     private func findPDFView(in view: NSView?) -> PDFView? {

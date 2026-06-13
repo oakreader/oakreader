@@ -12,6 +12,10 @@ class DocumentState {
     var currentSearchIndex: Int = 0
     var selectedAnnotation: PDFAnnotation?
     var editorMode: EditorMode = .viewer
+    /// When true, the next completed area capture is attached directly to the
+    /// AI chat composer (Dia-style) instead of showing the area-selection popup.
+    /// Set by the chat input's screenshot button; reset on leaving snapshot mode.
+    var snapshotForChat: Bool = false
     var sidebarMode: SidebarMode = .thumbnails
 
     var isSidebarVisible: Bool = true
