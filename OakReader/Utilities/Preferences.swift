@@ -78,6 +78,8 @@ final class Preferences {
         static let defaultFontName = "defaultFontName"
         static let defaultFontSize = "defaultFontSize"
         static let showStatusBar = "showStatusBar"
+        // Privacy
+        static let analyticsEnabled = "analyticsEnabled"
         // Library preferences
         static let librarySortOrder = "librarySortOrder"
         static let librarySortAscending = "librarySortAscending"
@@ -153,6 +155,7 @@ final class Preferences {
             Keys.defaultFontName: PDFDefaults.defaultFontName,
             Keys.defaultFontSize: PDFDefaults.defaultFontSize,
             Keys.showStatusBar: true,
+            Keys.analyticsEnabled: true,
             Keys.aiProvider: "anthropic",
             Keys.aiModel: "",
             Keys.globalFontFamily: "system",
@@ -212,6 +215,12 @@ final class Preferences {
     var showStatusBar: Bool {
         get { defaults.bool(forKey: Keys.showStatusBar) }
         set { defaults.set(newValue, forKey: Keys.showStatusBar) }
+    }
+
+    /// Whether anonymous product analytics (PostHog) may be sent. Opt-out; defaults on.
+    var analyticsEnabled: Bool {
+        get { defaults.bool(forKey: Keys.analyticsEnabled) }
+        set { defaults.set(newValue, forKey: Keys.analyticsEnabled) }
     }
 
     // MARK: - Global Font

@@ -231,10 +231,12 @@ final class AppState {
     func openDocument(url: URL) {
         let ext = url.pathExtension.lowercased()
         if ext == "html" || ext == "htm" {
+            Analytics.capture("document_opened", properties: ["type": "html"])
             openHTMLDocument(url: url)
             return
         }
         if ext == "md" || ext == "markdown" {
+            Analytics.capture("document_opened", properties: ["type": "markdown"])
             openExternalMarkdown(url: url)
             return
         }
@@ -268,6 +270,7 @@ final class AppState {
         }
 
         NSDocumentController.shared.noteNewRecentDocumentURL(url)
+        Analytics.capture("document_opened", properties: ["type": "pdf"])
 
         if let item {
             libraryStore.markOpened(item)
@@ -364,6 +367,9 @@ final class AppState {
         // Mark opened up front so re-opening an already-open item still refreshes
         // last_opened_at (the per-type open funcs return early when a tab exists).
         libraryStore.markOpened(item)
+        if item.contentType != .audio {
+            Analytics.capture("document_opened", properties: ["type": "\(item.contentType)"])
+        }
         switch item.contentType {
         case .html:
             openHTMLItem(item)

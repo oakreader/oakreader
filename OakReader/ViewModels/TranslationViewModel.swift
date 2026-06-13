@@ -81,6 +81,7 @@ class TranslationViewModel {
     func translate() {
         let text = sourceText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
+        Analytics.capture("translation_used")
 
         stopTranslation()
         translatedText = ""

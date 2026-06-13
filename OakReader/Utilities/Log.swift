@@ -25,6 +25,7 @@ enum Log {
     static let audio      = Logger(subsystem: subsystem, category: "audio")
     static let search     = Logger(subsystem: subsystem, category: "search")
     static let meeting    = Logger(subsystem: subsystem, category: "meeting")
+    static let analytics  = Logger(subsystem: subsystem, category: "analytics")
 
     private static let subsystem = Bundle.main.bundleIdentifier ?? "com.oakreader.OakReader"
 
@@ -94,6 +95,7 @@ private extension Logger {
         case Log.audio:      return "audio"
         case Log.search:     return "search"
         case Log.meeting:    return "meeting"
+        case Log.analytics:  return "analytics"
         default:             return "unknown"
         }
     }

@@ -296,6 +296,14 @@ final class OakServer {
     // MARK: - Payload Dispatch
 
     private func handleClip(_ payload: ClipPayload, completion: @escaping (Result<Void, Error>) -> Void) {
+        // Record a single content_imported(source: web_clip) on any successful clip,
+        // regardless of which handler ran.
+        let completion: (Result<Void, Error>) -> Void = { result in
+            if case .success = result {
+                Analytics.capture("content_imported", properties: ["source": "web_clip"])
+            }
+            completion(result)
+        }
         switch payload.type {
         case "html":
             handleHTMLSnapshot(payload, completion: completion)

@@ -183,6 +183,7 @@ class ChatViewModel {
         let parsedInput = Self.extractLeadingSkillTags(from: inputText.trimmingCharacters(in: .whitespacesAndNewlines))
         let text = parsedInput.content.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty || !parsedInput.skillIds.isEmpty || !activeTokens.isEmpty else { return }
+        Analytics.capture("ai_chat_sent")
 
         let attachments = pendingAttachments
         let tokens = activeTokens

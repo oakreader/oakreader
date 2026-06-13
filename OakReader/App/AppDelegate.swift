@@ -33,6 +33,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.servicesProvider = self
 
+        // Start product analytics (PostHog, EU). No-op if the user opted out.
+        Analytics.start()
+        Analytics.capture("app_launched")
+
         // Prewarm the emoji font so WebKit doesn't stall on first emoji render
         _ = CTFontCreateWithName("Apple Color Emoji" as CFString, 12, nil)
 

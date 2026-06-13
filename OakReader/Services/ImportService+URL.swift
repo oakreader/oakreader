@@ -50,10 +50,16 @@ extension ImportService {
     @discardableResult
     func importFileAsync(from sourceURL: URL) async -> LibraryItem? {
         let ext = sourceURL.pathExtension.lowercased()
+        let item: LibraryItem?
         if Self.audioExtensions.contains(ext) {
-            return await importAudioFile(from: sourceURL)
+            item = await importAudioFile(from: sourceURL)
+        } else {
+            item = await MainActor.run { importFile(from: sourceURL) }
         }
-        return await MainActor.run { importFile(from: sourceURL) }
+        if item != nil {
+            Analytics.capture("content_imported", properties: ["source": "file"])
+        }
+        return item
     }
 
     // MARK: - URL Imports
@@ -72,11 +78,16 @@ extension ImportService {
         }
 
         let info = await remoteInfo(for: sourceURL)
+        let imported: LibraryItem?
         if Self.isLikelyPDFURL(sourceURL, contentType: info.contentType) {
-            return try await importRemotePDF(sourceURL, suggestedTitle: info.title)
+            imported = try await importRemotePDF(sourceURL, suggestedTitle: info.title)
+        } else {
+            imported = try await importRemoteWebPage(sourceURL, fallbackHTML: info.html, title: info.title)
         }
-
-        return try await importRemoteWebPage(sourceURL, fallbackHTML: info.html, title: info.title)
+        if imported != nil {
+            Analytics.capture("content_imported", properties: ["source": "url"])
+        }
+        return imported
     }
 
     // MARK: - Live Browser Bookmark
