@@ -244,10 +244,10 @@ private struct SnapshotToolbarContent: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            archiveBadge
-
             URLLabel(url: displayURL)
                 .frame(maxWidth: .infinity, alignment: .leading)
+
+            archiveBadge
 
             if canOpenOriginal {
                 ToolbarPill {
