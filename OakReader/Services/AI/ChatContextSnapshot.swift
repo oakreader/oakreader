@@ -4,17 +4,28 @@ import Foundation
 /// Built once before each message send, capturing value-type data from the view model layer.
 struct ChatContextSnapshot: Sendable {
     // App-level context (always available)
-    let activeCollectionName: String?
-    let activeCollectionItemCount: Int?
-    let activeCollectionItems: [CollectionItemSummary]
-    /// True when the active collection is a real (non-smart, non-"All Items")
-    /// user collection that the agent should scope its operations to.
-    let activeCollectionIsScopable: Bool
+    /// The selected collection, if any. Present for every selected collection
+    /// (including smart / "All Items"); only `scopeId` is set when it is a real
+    /// collection the agent should ground to.
+    let activeCollection: ActiveCollection?
     let openTabTitles: [String]
     let activeTabTitle: String?
     /// Filesystem path of the active agent workspace folder (nil unless the
     /// full-page agent workspace is active). Source documents are CoW-mounted here.
     let agentWorkspacePath: String?
+
+    struct ActiveCollection: Sendable {
+        let name: String
+        let itemCount: Int?
+        let items: [CollectionItemSummary]
+        /// Catalog id (UUID string) when this is a real collection to ground to
+        /// (non-smart, non-"All Items"); `nil` otherwise. Doubles as the scope key
+        /// used to physically restrict retrieval to its members.
+        let scopeId: String?
+
+        /// True when the agent should scope its retrieval to this collection.
+        var isScopable: Bool { scopeId != nil }
+    }
 
     struct CollectionItemSummary: Sendable {
         let title: String

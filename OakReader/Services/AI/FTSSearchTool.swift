@@ -21,6 +21,12 @@ struct FTSSearchTool: AgentTool, Sendable {
         """
     let service: FTSIndexService
 
+    /// When set, retrieval is physically restricted to the members of this
+    /// collection (catalog id / UUID string). This is how GROUNDED mode enforces
+    /// scoping — the model cannot widen it because the collection is not a tool
+    /// parameter. `nil` means search the whole library.
+    var scopeCollectionId: String?
+
     /// One retrieved passage, in structured form. Used by the research subagent to
     /// build a deterministic source list from what was actually retrieved.
     struct CitedPassage: Sendable, Hashable {
@@ -66,7 +72,7 @@ struct FTSSearchTool: AgentTool, Sendable {
         let limit = min(Int(input["max_results"] ?? "10") ?? 10, 50)
 
         // Optional scope: resolve content_type → the set of item IDs to search within.
-        var scopeItemIds: [String]?
+        var contentTypeIds: [String]?
         if let contentType = input["content_type"], !contentType.isEmpty {
             do {
                 let ids = try await service.catalogDBQueue.read { db in
@@ -79,17 +85,51 @@ struct FTSSearchTool: AgentTool, Sendable {
                 if ids.isEmpty {
                     return .success("No \(contentType) documents in the library to search.")
                 }
-                scopeItemIds = ids
+                contentTypeIds = ids
             } catch {
                 return .error("Failed to resolve content_type filter: \(error.localizedDescription)")
             }
+        }
+
+        // GROUNDED scope: restrict to the active collection's members. Enforced by
+        // the host (not a tool parameter), so the model cannot search outside it.
+        var collectionIds: [String]?
+        if let collectionId = scopeCollectionId, !collectionId.isEmpty {
+            do {
+                let ids = try await service.catalogDBQueue.read { db in
+                    try String.fetchAll(db, sql:
+                        "SELECT item_id FROM collection_items WHERE collection_id = ?",
+                        arguments: [collectionId])
+                }
+                if ids.isEmpty {
+                    return .success("The active collection has no documents to search.")
+                }
+                collectionIds = ids
+            } catch {
+                return .error("Failed to resolve collection scope: \(error.localizedDescription)")
+            }
+        }
+
+        // Combine the two scopes by intersection (each is a whitelist of item ids).
+        let scopeItemIds: [String]?
+        switch (contentTypeIds, collectionIds) {
+        case (nil, nil): scopeItemIds = nil
+        case (let ct?, nil): scopeItemIds = ct
+        case (nil, let coll?): scopeItemIds = coll
+        case (let ct?, let coll?):
+            let inter = Set(ct).intersection(coll)
+            if inter.isEmpty {
+                return .success("No matching documents in this scope (the content_type filter excludes every document in the collection).")
+            }
+            scopeItemIds = Array(inter)
         }
 
         // Passages mode: return distinct top-ranked excerpts (not collapsed per item).
         let results = await service.search(query: query, maxResults: limit, itemIds: scopeItemIds, groupByItem: false)
 
         if results.isEmpty {
-            return .success("No documents matching \"\(query)\" were found in the library.")
+            let scope = scopeCollectionId != nil ? "the active collection" : "the library"
+            return .success("No documents matching \"\(query)\" were found in \(scope).")
         }
 
         // Enrich results with item metadata from catalog.db

@@ -61,7 +61,7 @@ struct AgentSettingsView: View {
                 Button {
                     showUserMemory = true
                 } label: {
-                    Label("Manage user memory…", systemImage: "brain.head.profile")
+                    Label("Manage user memory…", systemImage: "sparkles")
                 }
 
                 Toggle("Update memory in the background", isOn: $memoryEnabled)

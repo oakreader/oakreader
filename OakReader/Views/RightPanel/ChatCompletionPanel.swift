@@ -30,7 +30,9 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
     fileprivate static let rowHeight: CGFloat = 28
     fileprivate static let headerHeight: CGFloat = 22
     fileprivate static let emptyHeight: CGFloat = 46
-    private static let maxPanelHeight: CGFloat = 640
+    // ~9 rows tall, then scroll. Keeps the popup compact instead of ballooning to
+    // fill the pane when a trigger (e.g. `@`) surfaces dozens of items.
+    private static let maxPanelHeight: CGFloat = 300
     private static let minPanelWidth: CGFloat = 300
     // Cap matches the canvas agent's composer column (AIChatView.canvasContentWidth)
     // so the popup mirrors the input width there; the narrow right panel never

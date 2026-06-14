@@ -12,7 +12,7 @@ class OakReaderView: PDFView {
     private var modeCursor: NSCursor {
         guard let vm = documentViewModel else { return .arrow }
         switch vm.state.editorMode {
-        case .snapshot: return .crosshair
+        case .snapshot: return CaptureCursor.nsCursor
         case .annotate:
             // Highlight / underline both consume a text selection, so the iBeam
             // matches what's about to happen on click-drag.

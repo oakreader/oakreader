@@ -12,6 +12,8 @@ struct ChatInputTextView: NSViewRepresentable {
 
     /// Items shown when the user types `/`.
     var slashItems: [ChatCompletionItem] = []
+    /// Items shown when the user types `@` (library documents to attach as context).
+    var atItems: [ChatCompletionItem] = []
     /// Called whenever the set of active token chips changes.
     var onActiveTokensChanged: (([ChatCompletionItem]) -> Void)?
 
@@ -70,6 +72,7 @@ struct ChatInputTextView: NSViewRepresentable {
         textView.textContainer?.widthTracksTextView = true
 
         textView.slashItems = slashItems
+        textView.atItems = atItems
         textView.onTokensChanged = { tokens in
             context.coordinator.parent.onActiveTokensChanged?(tokens)
         }
@@ -132,6 +135,7 @@ struct ChatInputTextView: NSViewRepresentable {
         textView.onSend = onSend
         textView.onPasteImage = onPasteImage
         textView.slashItems = slashItems
+        textView.atItems = atItems
         if textView.font?.pointSize != fontSize {
             textView.font = .systemFont(ofSize: fontSize)
         }
@@ -236,6 +240,7 @@ final class ChatNSTextView: NSTextView {
     // MARK: - Completion State
 
     var slashItems: [ChatCompletionItem] = []
+    var atItems: [ChatCompletionItem] = []
     var onTokensChanged: (([ChatCompletionItem]) -> Void)?
     /// Font size used when rendering inserted token chips, kept in sync with the
     /// text view's body font so chips match the typed text.
@@ -325,7 +330,8 @@ final class ChatNSTextView: NSTextView {
             return
         }
 
-        // Detect "/" trigger for slash commands
+        // Detect "/" (skills, at input start) and "@" (context mentions, anywhere
+        // after a word boundary) completion triggers.
         if let chars = event.characters, chars.count == 1,
            !event.modifierFlags.contains(.command) {
             let ch = chars.first!
@@ -338,6 +344,14 @@ final class ChatNSTextView: NSTextView {
                         showCompletionPanel(trigger: "/", items: slashItems)
                         return
                     }
+                }
+            } else if ch == "@" {
+                // Trigger anywhere preceded by whitespace/start so mid-word "@"
+                // (e.g. an email address) doesn't pop the panel.
+                if !atItems.isEmpty && isAtMentionBoundary(selectedRange().location) {
+                    super.keyDown(with: event)
+                    showCompletionPanel(trigger: "@", items: atItems)
+                    return
                 }
             }
         }
@@ -486,7 +500,28 @@ final class ChatNSTextView: NSTextView {
         let curLoc = selectedRange().location
         let deleteRange = NSRange(location: startLoc, length: curLoc - startLoc)
 
+        // Dedupe library refs (same document twice): clear the typed "@query"
+        // but don't add a second pill.
+        if case .libraryReference = item.kind,
+           activeTokens().contains(where: { $0.id == item.id }) {
+            textStorage?.deleteCharacters(in: deleteRange)
+            setSelectedRange(NSRange(location: deleteRange.location, length: 0))
+            onPlainTextChanged?()
+            notifyTokensChanged()
+            return
+        }
+
         insertTokenAttachment(item, replacingRange: deleteRange)
+    }
+
+    /// Whether `@` typed at `location` is at a mention boundary: the start of
+    /// input, or immediately after whitespace/newline (not mid-word).
+    private func isAtMentionBoundary(_ location: Int) -> Bool {
+        guard location > 0 else { return true }
+        guard let storage = textStorage, location <= storage.length else { return true }
+        let prev = (storage.string as NSString).substring(with: NSRange(location: location - 1, length: 1))
+        guard let scalar = prev.unicodeScalars.first else { return false }
+        return CharacterSet.whitespacesAndNewlines.contains(scalar)
     }
 
     /// Insert a token from a drag-and-drop operation at the current insertion point.

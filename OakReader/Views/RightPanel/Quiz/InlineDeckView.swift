@@ -1,16 +1,16 @@
 import SwiftUI
 
-/// Renders a `QuizDeck` as an elegant, navigable card carousel inline in the chat.
+/// Renders a `QuizDeck` as a clean, navigable card carousel.
 ///
-/// Design: a single elevated card surface (no boxes-in-boxes) with a faint
-/// "stack" of cards peeking behind it, a per-type accent bar, dot-based
-/// progress, and a compact footer. Navigation is direction-aware (cards slide
-/// in from the side you're heading toward) and the whole thing is keyboard- and
-/// swipe-navigable.
+/// Design (Dia-inspired): a *single* card surface — no boxes-in-boxes, no
+/// colored chrome. A quiet title row floats above the card, a centered pager
+/// floats below it, both on the panel background. In `embeddedInSheet` mode the
+/// card fills the available height like a presentation slide.
 struct InlineDeckView: View {
     let deck: QuizDeck
     var onSaveCard: ((QuizContent) -> Bool)?
-    /// Expanded (sheet) presentation — hides its own expand button.
+    /// Full-screen "slide" presentation: the card fills the height, type is
+    /// larger, and the view's own expand button is hidden.
     var embeddedInSheet: Bool = false
 
     @State private var currentIndex = 0
@@ -19,6 +19,9 @@ struct InlineDeckView: View {
     @State private var savedIndices: Set<Int> = []
     @State private var savePop = false
     @State private var saveAllFailed = false
+
+    private var isSlide: Bool { embeddedInSheet }
+    private var cardRadius: CGFloat { isSlide ? 22 : 18 }
 
     private var clampedIndex: Int {
         guard !deck.cards.isEmpty else { return 0 }
@@ -38,59 +41,41 @@ struct InlineDeckView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: isSlide ? 16 : 9) {
             header
             cardStack
-                .padding(.horizontal, 14)
-                .padding(.bottom, showFooter ? 4 : 14)
             if showFooter { footerBar }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: QuizStyle.deckCornerRadius, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.7))
-        )
-        .overlay(alignment: .top) {
-            // Thin accent bar across the top, tinted by the current card type.
-            UnevenRoundedRectangle(
-                topLeadingRadius: QuizStyle.deckCornerRadius,
-                topTrailingRadius: QuizStyle.deckCornerRadius,
-                style: .continuous
-            )
-            .fill(accent)
-            .frame(height: 3)
-            .animation(.easeInOut(duration: 0.3), value: accent)
-        }
-        .overlay(
-            RoundedRectangle(cornerRadius: QuizStyle.deckCornerRadius, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
-        )
-        .shadow(color: Color.black.opacity(0.10), radius: 14, x: 0, y: 5)
+        .frame(maxWidth: .infinity, maxHeight: isSlide ? .infinity : nil, alignment: .top)
         .sheet(isPresented: $isFullScreen) {
             FullScreenDeckView(deck: deck, onSaveCard: onSaveCard)
         }
     }
 
-    // MARK: - Header
+    // MARK: - Header (quiet, on panel background)
 
     private var header: some View {
         HStack(spacing: 8) {
             if let type = currentCard?.quizType {
-                QuizTypeBadge(type: type)
-                    .transition(.opacity)
-                    .id(type)
+                HStack(spacing: 5) {
+                    Image(systemName: type.systemImage)
+                        .font(.system(size: isSlide ? 12 : 10, weight: .medium))
+                    Text(type.label)
+                        .font(.system(size: isSlide ? 13 : 11, weight: .semibold))
+                }
+                .foregroundStyle(.secondary)
+                .transition(.opacity)
+                .id(type)
             }
 
             if !deck.title.isEmpty {
                 Text(deck.title)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: isSlide ? 13 : 11, weight: .regular))
+                    .foregroundStyle(.tertiary)
                     .lineLimit(1)
             }
 
-            Spacer()
-
-            if deck.cards.count > 1 { progressDots }
+            Spacer(minLength: 8)
 
             if !embeddedInSheet {
                 Button { isFullScreen = true } label: {
@@ -104,83 +89,68 @@ struct InlineDeckView: View {
                 .help("Expand")
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.top, 12)
-        .padding(.bottom, 8)
+        .padding(.horizontal, 2)
     }
 
-    /// One pip per card: current is a wide accent capsule, saved are filled
-    /// accent dots, the rest faint. Tap a pip to jump to that card.
-    private var progressDots: some View {
-        HStack(spacing: 4) {
-            ForEach(0..<deck.cards.count, id: \.self) { idx in
-                let isCurrent = idx == clampedIndex
-                Capsule()
-                    .fill(pipColor(idx))
-                    .frame(width: isCurrent ? 14 : 6, height: 6)
-                    .contentShape(Rectangle())
-                    .onTapGesture { go(to: idx) }
-            }
-        }
-        .animation(QuizStyle.cardSpring, value: clampedIndex)
-        .animation(.easeInOut(duration: 0.2), value: savedIndices)
-    }
-
-    private func pipColor(_ idx: Int) -> Color {
-        if idx == clampedIndex { return accent }
-        if savedIndices.contains(idx) { return accent.opacity(0.55) }
-        return Color.primary.opacity(0.15)
-    }
-
-    // MARK: - Card stack
+    // MARK: - Card stack (the single surface)
 
     private var cardStack: some View {
+        sizedStack
+            .frame(maxWidth: .infinity)
+            .animation(QuizStyle.cardSpring, value: clampedIndex)
+            .gesture(swipeGesture)
+    }
+
+    @ViewBuilder
+    private var sizedStack: some View {
+        if isSlide {
+            stackContent.frame(maxHeight: .infinity)
+        } else {
+            stackContent.aspectRatio(QuizStyle.cardAspectRatio, contentMode: .fit)
+        }
+    }
+
+    private var stackContent: some View {
         ZStack {
-            // Faint stacked cards peeking behind — only when there's more ahead.
-            if deck.cards.count > 1 {
+            // Faint stacked cards peeking behind, hinting there's more ahead.
+            if deck.cards.count > 1 && !isSlide {
                 ForEach(1...2, id: \.self) { depth in
                     let hasMore = clampedIndex + depth < deck.cards.count
-                    RoundedRectangle(cornerRadius: QuizStyle.cardCornerRadius, style: .continuous)
-                        .fill(Color(nsColor: .controlBackgroundColor))
+                    RoundedRectangle(cornerRadius: cardRadius, style: .continuous)
+                        .fill(Color(nsColor: .textBackgroundColor))
                         .overlay(
-                            RoundedRectangle(cornerRadius: QuizStyle.cardCornerRadius, style: .continuous)
+                            RoundedRectangle(cornerRadius: cardRadius, style: .continuous)
                                 .strokeBorder(Color.primary.opacity(0.05), lineWidth: 1)
                         )
-                        .scaleEffect(1 - CGFloat(depth) * 0.04)
+                        .scaleEffect(1 - CGFloat(depth) * 0.035)
                         .offset(y: CGFloat(depth) * 7)
-                        .opacity(hasMore ? 0.6 : 0)
+                        .opacity(hasMore ? 0.5 : 0)
                         .animation(QuizStyle.cardSpring, value: clampedIndex)
                 }
             }
 
-            // Foreground card.
             if let card = currentCard {
                 cardFace(card)
                     .id(clampedIndex)
                     .transition(cardTransition)
             }
         }
-        .frame(maxWidth: .infinity)
-        .aspectRatio(QuizStyle.cardAspectRatio, contentMode: .fit)
-        .animation(QuizStyle.cardSpring, value: clampedIndex)
-        .gesture(swipeGesture)
     }
 
     private func cardFace(_ card: QuizContent) -> some View {
-        // Content is centered within the 16:9 face; rare over-tall content is
-        // clipped to the rounded card rather than blowing out the layout.
-        InlineQuizView(content: card, chromeless: true)
-            .padding(18)
+        InlineQuizView(content: card, chromeless: true, large: isSlide)
+            .padding(isSlide ? 40 : 22)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(
-                RoundedRectangle(cornerRadius: QuizStyle.cardCornerRadius, style: .continuous)
+                RoundedRectangle(cornerRadius: cardRadius, style: .continuous)
                     .fill(Color(nsColor: .textBackgroundColor))
             )
+            .clipShape(RoundedRectangle(cornerRadius: cardRadius, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: QuizStyle.cardCornerRadius, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.07), lineWidth: 1)
+                RoundedRectangle(cornerRadius: cardRadius, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: QuizStyle.cardCornerRadius, style: .continuous))
+            .shadow(color: Color.black.opacity(0.06), radius: isSlide ? 24 : 12, x: 0, y: isSlide ? 8 : 4)
     }
 
     /// Direction-aware slide + scale + fade.
@@ -215,39 +185,43 @@ struct InlineDeckView: View {
     private func next() { go(to: clampedIndex + 1) }
     private func prev() { go(to: clampedIndex - 1) }
 
-    // MARK: - Footer
+    // MARK: - Footer (centered pager, on panel background)
 
     private var footerBar: some View {
-        HStack(spacing: 12) {
+        ZStack {
             if deck.cards.count > 1 {
-                navButton("chevron.left", enabled: clampedIndex > 0, action: prev)
-                Text("\(clampedIndex + 1) / \(deck.cards.count)")
-                    .font(QuizStyle.counter)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-                    .contentTransition(.numericText())
-                navButton("chevron.right", enabled: clampedIndex < deck.cards.count - 1, action: next)
+                HStack(spacing: 14) {
+                    navButton("chevron.left", enabled: clampedIndex > 0, action: prev)
+                    Text("\(clampedIndex + 1) / \(deck.cards.count)")
+                        .font(QuizStyle.counter)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                        .contentTransition(.numericText())
+                        .frame(minWidth: 46)
+                    navButton("chevron.right", enabled: clampedIndex < deck.cards.count - 1, action: next)
+                }
             }
-
-            Spacer()
 
             if onSaveCard != nil {
-                saveCurrentButton
-                if deck.cards.count > 1 { saveAllButton }
+                HStack(spacing: 12) {
+                    Spacer()
+                    saveCurrentButton
+                    if deck.cards.count > 1 { saveAllButton }
+                }
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 2)
+        .padding(.top, 2)
     }
 
     private func navButton(_ icon: String, enabled: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(enabled ? accent : Color.secondary.opacity(0.3))
-                .frame(width: 26, height: 26)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(enabled ? Color.secondary : Color.secondary.opacity(0.3))
+                .frame(width: 28, height: 28)
                 .background(
-                    Circle().fill(enabled ? accent.opacity(0.12) : Color.primary.opacity(0.04))
+                    Circle().fill(Color.primary.opacity(enabled ? 0.06 : 0.03))
                 )
                 .contentShape(Circle())
         }
@@ -308,10 +282,10 @@ struct InlineDeckView: View {
     }
 }
 
-// MARK: - Full-Screen Deck
+// MARK: - Full-Screen Deck (presentation "slide")
 
 /// Expanded presentation of a deck shown in a resizable sheet for focused
-/// review. Reuses `InlineDeckView` (in `embeddedInSheet` mode) at a large frame.
+/// review. The card fills the sheet like a slide — no stranded whitespace.
 private struct FullScreenDeckView: View {
     let deck: QuizDeck
     var onSaveCard: ((QuizContent) -> Bool)?
@@ -320,30 +294,28 @@ private struct FullScreenDeckView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 6) {
-                Image(systemName: "rectangle.stack.fill")
-                    .foregroundStyle(Color.accentColor)
+            HStack(spacing: 8) {
                 Text(deck.title.isEmpty ? "Flashcards" : deck.title)
-                    .font(.headline)
+                    .font(.system(size: 15, weight: .semibold))
                     .lineLimit(1)
                 Spacer()
                 Button("Done") { dismiss() }
                     .keyboardShortcut(.cancelAction)
             }
-            .padding()
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
 
-            Divider()
+            Divider().opacity(0.5)
 
-            ScrollView {
-                InlineDeckView(deck: deck, onSaveCard: onSaveCard, embeddedInSheet: true)
-                    .frame(maxWidth: 960)
-                    .padding(32)
-                    .frame(maxWidth: .infinity)
-            }
+            InlineDeckView(deck: deck, onSaveCard: onSaveCard, embeddedInSheet: true)
+                .frame(maxWidth: 1040, maxHeight: .infinity)
+                .padding(.horizontal, 40)
+                .padding(.vertical, 28)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(
-            minWidth: 820, idealWidth: 1120, maxWidth: .infinity,
-            minHeight: 640, idealHeight: 860, maxHeight: .infinity
+            minWidth: 760, idealWidth: 1080, maxWidth: .infinity,
+            minHeight: 600, idealHeight: 780, maxHeight: .infinity
         )
         .background(Color(nsColor: .windowBackgroundColor))
     }

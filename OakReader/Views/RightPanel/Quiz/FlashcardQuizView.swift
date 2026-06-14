@@ -1,15 +1,19 @@
 import SwiftUI
 
 /// Flashcard with a front/back flip. Chromeless — sits directly on the deck's
-/// card surface (no nested box), content centered, with a 3D flip on tap.
+/// card surface (no nested box). Content is vertically centered like a slide,
+/// with the reveal affordance pinned near the bottom.
 struct FlashcardQuizView: View {
     let content: QuizContent.FlashcardContent
+    /// Slide-sized typography for the full-screen presentation.
+    var large: Bool = false
 
     @State private var isFlipped = false
-    private let accent = QuizStyle.accent(for: .flashcard)
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: large ? 22 : 14) {
+            Spacer(minLength: 0)
+
             ZStack {
                 face(tag: "QUESTION", text: content.front)
                     .opacity(isFlipped ? 0 : 1)
@@ -22,17 +26,19 @@ struct FlashcardQuizView: View {
             }
             .frame(maxWidth: .infinity)
 
+            Spacer(minLength: 0)
+
             // Flip affordance
-            HStack(spacing: 4) {
+            HStack(spacing: 5) {
                 Image(systemName: "hand.tap")
                 Text(isFlipped ? "Tap to see question" : "Tap to reveal answer")
             }
-            .font(.system(size: 11, weight: .medium))
+            .font(.system(size: large ? 13 : 11, weight: .medium))
             .foregroundStyle(.tertiary)
             .transition(.opacity)
             .id(isFlipped)
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(Rectangle())
         .onTapGesture {
             withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
@@ -42,12 +48,12 @@ struct FlashcardQuizView: View {
     }
 
     private func face(tag: String, text: String) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: large ? 14 : 9) {
             Text(tag)
-                .font(.system(size: 9, weight: .heavy))
-                .tracking(1.0)
-                .foregroundStyle(accent)
-            CardMarkdown(text: text, fontSize: 16)
+                .font(.system(size: large ? 11 : 9, weight: .heavy))
+                .tracking(1.2)
+                .foregroundStyle(.tertiary)
+            CardMarkdown(text: text, fontSize: large ? 23 : 16)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(maxWidth: .infinity, alignment: .leading)

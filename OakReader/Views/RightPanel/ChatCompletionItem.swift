@@ -50,9 +50,13 @@ struct ChatCompletionItem: Identifiable, Equatable {
 
     // MARK: - Factory - Library Reference (for drag-and-drop)
 
-    static func libraryReference(from item: LibraryItem) -> ChatCompletionItem {
+    /// Builds a library-reference item. `trigger` is `""` for drag-and-drop and
+    /// `"@"` when surfaced through the `@`-mention completion panel.
+    static func libraryReference(from item: LibraryItem, trigger: String = "") -> ChatCompletionItem {
         let label = item.title
-        let desc = item.author.isEmpty ? item.title : "\(item.author) — \(item.title)"
+        // Secondary text is the author only — the title is already the label, so
+        // repeating it (the old `author — title`) just overflowed the row.
+        let desc = item.author
         return ChatCompletionItem(
             id: "lib:\(item.storageKey)",
             icon: item.displayIcon,
@@ -66,7 +70,7 @@ struct ChatCompletionItem: Identifiable, Equatable {
                 contentType: item.contentType.rawValue,
                 pageCount: item.pageCount
             )),
-            trigger: ""
+            trigger: trigger
         )
     }
 

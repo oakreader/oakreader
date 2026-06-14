@@ -29,6 +29,9 @@ struct ResearchTool: AgentTool, Sendable {
     let searchService: FTSIndexService
     /// LLM provider/model config for the child loop (typically a cheaper/faster model).
     let config: ProviderConfig
+    /// GROUNDED scope: when set, the subagent's search is physically restricted to
+    /// this collection's members (catalog id / UUID string).
+    var scopeCollectionId: String?
     /// Optional progress sink: receives short human-readable status while the
     /// subagent runs (e.g. "Searching: attention", "Reading: items read Smith2021").
     var onActivity: (@Sendable (String) -> Void)?
@@ -92,6 +95,7 @@ struct ResearchTool: AgentTool, Sendable {
         // structured results into the log so we can build the Sources list
         // deterministically. Notably NOT the research tool itself (no recursion).
         var search = FTSSearchTool(service: searchService)
+        search.scopeCollectionId = scopeCollectionId
         search.onResults = { @Sendable passages in
             Task { await log.add(passages) }
         }
@@ -112,7 +116,9 @@ struct ResearchTool: AgentTool, Sendable {
             history: [],
             sessionId: UUID(),
             config: config,
-            systemPrompt: Self.systemPrompt,
+            systemPrompt: scopeCollectionId != nil
+                ? Self.systemPrompt + "\n\nSCOPE: search is restricted to the user's active collection — every result already belongs to it. If it contains nothing relevant, say so plainly."
+                : Self.systemPrompt,
             tools: childTools,
             toolContext: childContext,
             maxIterations: 8

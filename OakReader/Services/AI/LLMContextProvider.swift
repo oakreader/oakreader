@@ -13,33 +13,29 @@ struct LLMContextProvider {
         appState: AppState?,
         contextMode: ContextMode
     ) -> ChatContextSnapshot {
-        // App-level context
-        let collection = appState?.libraryStore.selectedCollection
-        let collectionName = collection?.name
-        let collectionItemCount = collection?.itemCount
-        let collectionIsScopable = collection.map {
-            !$0.isSmart && $0.id != SystemCollectionID.allItems
-        } ?? false
-        // The catalog id string, only when the collection is a real scopable one.
-        // Matches `collection_items.collection_id` (both are UUID().uuidString).
-        let collectionId = collectionIsScopable ? collection?.id.uuidString : nil
+        // App-level context — the selected collection, if any.
+        let activeCollection: ChatContextSnapshot.ActiveCollection?
+        if let collection = appState?.libraryStore.selectedCollection {
+            // Scope only to real user collections (not smart, not "All Items").
+            // The id matches `collection_items.collection_id` (both UUID().uuidString).
+            let isScopable = !collection.isSmart && collection.id != SystemCollectionID.allItems
+            let items = appState?.libraryStore.filteredItems.prefix(50).map {
+                ChatContextSnapshot.CollectionItemSummary(
+                    title: $0.title, author: $0.author, citeKey: $0.citeKey
+                )
+            } ?? []
+            activeCollection = ChatContextSnapshot.ActiveCollection(
+                name: collection.name,
+                itemCount: collection.itemCount,
+                items: items,
+                scopeId: isScopable ? collection.id.uuidString : nil
+            )
+        } else {
+            activeCollection = nil
+        }
         let workspacePath = (appState?.isAgentActive == true)
             ? appState?.agentWorkspaceDirectory?.path
             : nil
-
-        // Collect items in the active collection (up to 50 for prompt size)
-        let collectionItems: [ChatContextSnapshot.CollectionItemSummary]
-        if collection != nil, let store = appState?.libraryStore {
-            collectionItems = store.filteredItems.prefix(50).map {
-                ChatContextSnapshot.CollectionItemSummary(
-                    title: $0.title,
-                    author: $0.author,
-                    citeKey: $0.citeKey
-                )
-            }
-        } else {
-            collectionItems = []
-        }
 
         let openTabTitles = appState?.openTabs.map(\.title) ?? []
         let activeTabTitle = appState?.activeTab?.title
@@ -53,11 +49,7 @@ struct LLMContextProvider {
         }
 
         return ChatContextSnapshot(
-            activeCollectionName: collectionName,
-            activeCollectionItemCount: collectionItemCount,
-            activeCollectionItems: collectionItems,
-            activeCollectionIsScopable: collectionIsScopable,
-            activeCollectionId: collectionId,
+            activeCollection: activeCollection,
             openTabTitles: openTabTitles,
             activeTabTitle: activeTabTitle,
             agentWorkspacePath: workspacePath,
@@ -231,14 +223,14 @@ struct LLMContextProvider {
 
         // App context
         var appContextParts: [String] = []
-        if let name = context.activeCollectionName {
-            let countAttr = context.activeCollectionItemCount.map { " items=\"\($0)\"" } ?? ""
-            if context.activeCollectionItems.isEmpty {
-                appContextParts.append("  <active-collection name=\"\(xmlEscape(name))\"\(countAttr) />")
+        if let collection = context.activeCollection {
+            let countAttr = collection.itemCount.map { " items=\"\($0)\"" } ?? ""
+            if collection.items.isEmpty {
+                appContextParts.append("  <active-collection name=\"\(xmlEscape(collection.name))\"\(countAttr) />")
             } else {
                 var lines: [String] = []
-                lines.append("  <active-collection name=\"\(xmlEscape(name))\"\(countAttr)>")
-                for item in context.activeCollectionItems {
+                lines.append("  <active-collection name=\"\(xmlEscape(collection.name))\"\(countAttr)>")
+                for item in collection.items {
                     var attrs = "title=\"\(xmlEscape(item.title))\""
                     if !item.author.isEmpty { attrs += " author=\"\(xmlEscape(item.author))\"" }
                     if let ck = item.citeKey { attrs += " cite-key=\"\(xmlEscape(ck))\"" }
@@ -367,8 +359,9 @@ struct LLMContextProvider {
         // GROUNDED mode — scoped to a real collection. Retrieval (search_content /
         // research) is already PHYSICALLY restricted to this collection's members,
         // so the model cannot accidentally pull from the rest of the library.
-        if context.activeCollectionIsScopable, let name = context.activeCollectionName {
-            let countText = context.activeCollectionItemCount.map { " (\($0) sources)" } ?? ""
+        if let collection = context.activeCollection, collection.isScopable {
+            let name = collection.name
+            let countText = collection.itemCount.map { " (\($0) sources)" } ?? ""
             parts.append("""
                 GROUNDED MODE — you are scoped to the "\(xmlEscape(name))" collection\(countText).
                 Answer ONLY from the documents in this collection. Retrieve before \

@@ -11,6 +11,8 @@ import SwiftUI
 struct InlineQuizView: View {
     let content: QuizContent
     var chromeless: Bool = false
+    /// Slide-sized typography for the full-screen deck presentation.
+    var large: Bool = false
 
     var body: some View {
         if chromeless {
@@ -21,47 +23,45 @@ struct InlineQuizView: View {
     }
 
     private var standalone: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             QuizTypeBadge(type: content.quizType)
             quizBody
         }
-        .padding(14)
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: QuizStyle.cardCornerRadius)
-                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color(nsColor: .textBackgroundColor))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: QuizStyle.cardCornerRadius)
-                .strokeBorder(QuizStyle.accent(for: content.quizType).opacity(0.18), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
         )
+        .shadow(color: Color.black.opacity(0.06), radius: 12, x: 0, y: 4)
     }
 
     @ViewBuilder
     private var quizBody: some View {
         switch content {
         case .cloze(let c):     ClozeQuizView(content: c)
-        case .flashcard(let c): FlashcardQuizView(content: c)
+        case .flashcard(let c): FlashcardQuizView(content: c, large: large)
         case .occlusion(let c): OcclusionQuizView(content: c)
         }
     }
 }
 
-/// Small pill badge naming the card type, tinted with its accent hue.
+/// Quiet, monochrome label naming the card type — matches the deck header so
+/// inline quizzes and decks read as one family (no colored chrome).
 struct QuizTypeBadge: View {
     let type: QuizType
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 5) {
             Image(systemName: type.systemImage)
-                .font(.system(size: 9, weight: .semibold))
+                .font(.system(size: 10, weight: .medium))
             Text(type.label)
-                .font(QuizStyle.typeLabel)
+                .font(.system(size: 11, weight: .semibold))
         }
-        .foregroundStyle(QuizStyle.accent(for: type))
-        .padding(.horizontal, 8)
-        .padding(.vertical, 3)
-        .background(
-            Capsule().fill(QuizStyle.accent(for: type).opacity(0.12))
-        )
+        .foregroundStyle(.secondary)
     }
 }

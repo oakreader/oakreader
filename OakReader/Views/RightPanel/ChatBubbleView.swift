@@ -3,12 +3,22 @@ import AppKit
 import OakAgent
 import OakMarkdownUI
 
+/// Display metadata for a cited source, resolved from a citeKey by the host.
+struct ChatSourceMeta {
+    let title: String
+    let icon: String
+}
+
 struct ChatBubbleView: View, Equatable {
     let turn: Turn
     var onPlayAudio: ((Turn) -> Void)?
     var isPlayingAudio: Bool = false
     var onStopAudio: (() -> Void)?
     var onOpenCitation: ((String, CitationAnchor) -> Void)?
+    /// Resolves a citeKey to its display metadata (title + icon) for the per-answer
+    /// Sources footer. Supplied by the host (which owns the library store). Returns
+    /// nil for unknown keys, in which case the citeKey itself is shown.
+    var resolveSource: ((String) -> ChatSourceMeta?)?
     /// Optional markdown theme override (e.g. `.dia` for the agent canvas).
     /// When nil, falls back to the user-configured `.oak` theme.
     var markdownTheme: MarkdownTheme? = nil
@@ -31,6 +41,7 @@ struct ChatBubbleView: View, Equatable {
     @State private var isPlayHovered = false
     @State private var showCopied = false
     @State private var reveal = StreamRevealController()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @ViewBuilder
     var body: some View {
@@ -72,6 +83,16 @@ struct ChatBubbleView: View, Equatable {
                         messageBubble
                     }
 
+                    // Per-answer Sources footer — the documents this reply cited,
+                    // each a chip that jumps to the exact passage. Shown only once
+                    // the answer has settled (parsed from its oak://cite links).
+                    if turn.role == .assistant && !isRevealing {
+                        let sources = citedSources
+                        if !sources.isEmpty {
+                            sourcesFooter(sources)
+                        }
+                    }
+
                     // Streaming cursor — only while text is streaming, not while a
                     // tool-only turn is executing (the tool-call shimmer covers that).
                     if (turn.isStreaming || reveal.isAnimating) && shouldShowMessageBubble {
@@ -94,7 +115,7 @@ struct ChatBubbleView: View, Equatable {
                     if shouldShowActions {
                         HStack(spacing: 2) {
                             actionButton(
-                                systemImage: showCopied ? "checkmark" : "doc.on.doc",
+                                systemImage: showCopied ? "checkmark" : "square.on.square",
                                 foregroundStyle: showCopied ? .green : .secondary,
                                 isHovered: isCopyHovered,
                                 tooltip: showCopied ? "Copied!" : "Copy"
@@ -136,7 +157,8 @@ struct ChatBubbleView: View, Equatable {
             .onHover { isHovered = $0 }
             .animation(.spring(duration: 0.2, bounce: 0.15), value: isHovered)
             .onChange(of: turn.content) { _, newContent in
-                if turn.isStreaming && turn.role == .assistant {
+                // Reduce Motion: skip the typewriter reveal, show text as it lands.
+                if turn.isStreaming && turn.role == .assistant && !reduceMotion {
                     reveal.push(newContent)
                 } else {
                     reveal.flush(newContent)
@@ -148,7 +170,7 @@ struct ChatBubbleView: View, Equatable {
                 }
             }
             .onAppear {
-                if turn.isStreaming && turn.role == .assistant {
+                if turn.isStreaming && turn.role == .assistant && !reduceMotion {
                     reveal.push(turn.content)
                 } else {
                     reveal.flush(turn.content)
@@ -277,6 +299,126 @@ struct ChatBubbleView: View, Equatable {
     /// or the local reveal animation).
     private var isRevealing: Bool {
         turn.isStreaming || reveal.isAnimating
+    }
+
+    // MARK: - Sources footer
+
+    /// One source referenced by this answer, aggregated from its `oak://cite` links.
+    struct CitedSource: Identifiable {
+        let citeKey: String
+        let title: String
+        let icon: String
+        let pages: [Int]            // 1-based, for display
+        let anchor: CitationAnchor  // representative anchor for the jump
+        var id: String { citeKey }
+    }
+
+    /// The distinct sources this answer cites, in first-mention order.
+    private var citedSources: [CitedSource] {
+        Self.parseCitedSources(from: turn.content, resolve: resolveSource)
+    }
+
+    /// Low-key "Sources" strip under an answer: a wrapped row of jump chips.
+    @ViewBuilder
+    private func sourcesFooter(_ sources: [CitedSource]) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Divider().opacity(0.4)
+            Text("Sources")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.tertiary)
+            FlowLayout(spacing: 6) {
+                ForEach(sources) { source in
+                    sourceChip(source)
+                }
+            }
+        }
+        .padding(.top, 2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func sourceChip(_ source: CitedSource) -> some View {
+        Button {
+            onOpenCitation?(source.citeKey, source.anchor)
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: source.icon)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.secondary)
+                Text(source.title)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                if let page = source.pages.first {
+                    Text("p.\(page)")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(Color.primary.opacity(0.05))
+            )
+            .overlay(
+                Capsule(style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+            )
+        }
+        .buttonStyle(.plain)
+        .help("Jump to \(source.title)")
+    }
+
+    /// Parse `oak://cite/{citeKey}?page=&text=` links out of answer markdown and
+    /// aggregate them per source: title/icon (via `resolve`), the set of cited
+    /// pages, and a representative anchor (first, preferring one with a page).
+    static func parseCitedSources(
+        from content: String,
+        resolve: ((String) -> ChatSourceMeta?)?
+    ) -> [CitedSource] {
+        guard content.contains("oak://cite/"),
+              let regex = try? NSRegularExpression(
+                pattern: "oak://cite/[A-Za-z0-9_.:\\-]+(?:\\?[^)\\s\\]\"'<>]*)?")
+        else { return [] }
+
+        let ns = content as NSString
+        var order: [String] = []
+        var pages: [String: [Int]] = [:]
+        var anchors: [String: CitationAnchor] = [:]
+
+        for match in regex.matches(in: content, range: NSRange(location: 0, length: ns.length)) {
+            let urlString = ns.substring(with: match.range)
+            guard let url = URL(string: urlString),
+                  let (citeKey, anchor) = CitationAnchor.parse(from: url),
+                  !citeKey.isEmpty else { continue }
+
+            if anchors[citeKey] == nil {
+                order.append(citeKey)
+                anchors[citeKey] = anchor
+                pages[citeKey] = []
+            }
+            // Prefer an anchor that can actually navigate (has a page/heading/text).
+            if anchors[citeKey]?.page == nil, anchor.page != nil {
+                anchors[citeKey] = anchor
+            }
+            if let page = anchor.page {
+                let display = page + 1  // anchor.page is 0-based
+                if !(pages[citeKey]?.contains(display) ?? false) {
+                    pages[citeKey]?.append(display)
+                }
+            }
+        }
+
+        return order.map { key in
+            let meta = resolve?(key)
+            return CitedSource(
+                citeKey: key,
+                title: meta?.title ?? key,
+                icon: meta?.icon ?? "doc",
+                pages: (pages[key] ?? []).sorted(),
+                anchor: anchors[key] ?? CitationAnchor()
+            )
+        }
     }
 
     /// Renders chat markdown via the native `StreamingMarkdownView` (OakMarkdownUI).
@@ -615,6 +757,7 @@ private struct ThinkingDisclosureView: View {
     @State private var elapsedSeconds: Int = 0
     @State private var timer: Timer?
     @State private var oakStrokeProgress: CGFloat = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -677,9 +820,14 @@ private struct ThinkingDisclosureView: View {
             streamStartTime = Date()
             if isStreaming {
                 startTimer()
-                oakStrokeProgress = 0
-                withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
+                if reduceMotion {
+                    // Reduce Motion: show the full stroke, no repeating draw-on.
                     oakStrokeProgress = 1.0
+                } else {
+                    oakStrokeProgress = 0
+                    withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
+                        oakStrokeProgress = 1.0
+                    }
                 }
             } else {
                 elapsedSeconds = max(1, thinking.count / 10)
@@ -775,49 +923,55 @@ private struct OakScriptShape: Shape {
     }
 }
 
-// MARK: - Streaming Cursor (Spinning Grid with Glow)
+// MARK: - Streaming Cursor (Three-Dot Wave)
 //
-// 3×3 dot grid where dots light up sequentially around the perimeter
-// in a clockwise loop, each with a soft glow halo when active.
-// Sequence: 0→1→2→5→8→7→6→3 (outer ring), center dot pulses gently.
-
-/// A 9-dot "agent is working" indicator: a comet chases the outer ring while the
-/// center dot pulses. Driven entirely by **Core Animation** (infinite
-/// `CAKeyframeAnimation`/`CABasicAnimation` with staggered `beginTime`), so it runs on
-/// the render server and stays smooth even while the main thread is saturated streaming
-/// and re-laying-out markdown. The previous main-thread `Timer` driver stuttered under
-/// that load. (Technique mirrors Dia's CADisplayLink/CAAnimation-driven loaders —
-/// reimplemented from a read-only study of the shipped app, not copied.)
+// Three dots in a row, each doing a small staggered vertical bob with a coupled
+// opacity lift — Dia's gentle "typing" wobble. Driven entirely by **Core
+// Animation** (infinite `CAKeyframeAnimation` with staggered `beginTime`), so it
+// runs on the render server and stays smooth even while the main thread is
+// saturated streaming + re-laying-out markdown — a main-thread `Timer` driver
+// stutters under that load. Honors Reduce Motion (static dots). Reimplemented
+// from a read-only study of the shipped app, not copied.
 struct StreamingCursor: NSViewRepresentable {
-    fileprivate static let dotSize: CGFloat = 2.5
-    fileprivate static let spacing: CGFloat = 2.5
-    fileprivate static let cycle: CFTimeInterval = 1.0
-    // Perimeter traversal order (clockwise from top-left), as grid indices.
-    fileprivate static let sequence: [Int] = [0, 1, 2, 5, 8, 7, 6, 3]
-    fileprivate static var gridSize: CGFloat { dotSize * 3 + spacing * 2 }
+    fileprivate static let dotSize: CGFloat = 5.0
+    fileprivate static let gap: CGFloat = 4.5
+    fileprivate static let amplitude: CGFloat = 3.0
+    fileprivate static let cycle: CFTimeInterval = 1.2
+    fileprivate static let count = 3
+    fileprivate static var contentWidth: CGFloat { dotSize * CGFloat(count) + gap * CGFloat(count - 1) }
+    fileprivate static var contentHeight: CGFloat { dotSize + amplitude * 2 }
 
-    func makeNSView(context: Context) -> DotGridView { DotGridView() }
-    func updateNSView(_ nsView: DotGridView, context: Context) {}
+    func makeNSView(context: Context) -> DotRowView { DotRowView() }
+    func updateNSView(_ nsView: DotRowView, context: Context) {}
 
-    func sizeThatFits(_ proposal: ProposedViewSize, nsView: DotGridView, context: Context) -> CGSize? {
-        CGSize(width: Self.gridSize, height: Self.gridSize)
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: DotRowView, context: Context) -> CGSize? {
+        CGSize(width: Self.contentWidth, height: Self.contentHeight)
     }
 
-    final class DotGridView: NSView {
+    final class DotRowView: NSView {
         private var dots: [CALayer] = []
 
         override var intrinsicContentSize: NSSize {
-            NSSize(width: StreamingCursor.gridSize, height: StreamingCursor.gridSize)
+            NSSize(width: StreamingCursor.contentWidth, height: StreamingCursor.contentHeight)
         }
 
         override init(frame frameRect: NSRect) {
             super.init(frame: frameRect)
             wantsLayer = true
-            layer?.isGeometryFlipped = true   // row 0 at the top, so the ring runs clockwise
             buildDots()
             layoutDots()
+            // Re-evaluate when the user toggles "Reduce Motion" mid-session.
+            NSWorkspace.shared.notificationCenter.addObserver(
+                self, selector: #selector(reduceMotionChanged),
+                name: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil)
         }
         required init?(coder: NSCoder) { fatalError("init(coder:) not used") }
+
+        deinit { NSWorkspace.shared.notificationCenter.removeObserver(self) }
+
+        @objc private func reduceMotionChanged() {
+            if window != nil { animate() }
+        }
 
         override func layout() {
             super.layout()
@@ -836,10 +990,10 @@ struct StreamingCursor: NSViewRepresentable {
         }
 
         private func buildDots() {
-            dots = (0..<9).map { _ in
+            dots = (0..<StreamingCursor.count).map { _ in
                 let l = CALayer()
                 l.cornerRadius = StreamingCursor.dotSize / 2
-                l.opacity = 0.12
+                l.opacity = 0.35
                 layer?.addSublayer(l)
                 return l
             }
@@ -852,65 +1006,56 @@ struct StreamingCursor: NSViewRepresentable {
         }
 
         private func layoutDots() {
-            let d = StreamingCursor.dotSize, s = StreamingCursor.spacing
-            for i in 0..<9 {
-                let row = CGFloat(i / 3), col = CGFloat(i % 3)
-                dots[i].frame = CGRect(x: col * (d + s), y: row * (d + s), width: d, height: d)
+            let d = StreamingCursor.dotSize, g = StreamingCursor.gap
+            let y = (bounds.height - d) / 2   // rest at vertical center; bob room above
+            for i in 0..<dots.count {
+                dots[i].frame = CGRect(x: CGFloat(i) * (d + g), y: y, width: d, height: d)
             }
         }
 
         private func animate() {
             guard let host = layer else { return }
+
+            // Reduce Motion: no bobbing — quiet, evenly-dimmed dots.
+            dots.forEach { $0.removeAllAnimations() }
+            if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+                for d in dots {
+                    d.opacity = 0.35
+                    d.transform = CATransform3DIdentity
+                }
+                return
+            }
+
             let cycle = StreamingCursor.cycle
-            let seq = StreamingCursor.sequence
-            let slot = cycle / Double(seq.count)
+            let amp = StreamingCursor.amplitude
             let now = host.convertTime(CACurrentMediaTime(), from: nil)
+            let stagger = cycle / Double(dots.count)   // each dot trails the last by a third
+            let ease = CAMediaTimingFunction(name: .easeInEaseOut)
+            let keyTimes: [NSNumber] = [0.0, 0.5, 1.0]
 
-            // Comet: a sharp head fading over two trailing dots, looping every `cycle`.
-            // One shared opacity/scale curve per dot, phase-shifted via `beginTime`.
-            let opKeyTimes: [NSNumber] = [0.0, 0.125, 0.25, 0.375, 0.875, 1.0]
-            let opValues: [CGFloat] = [0.62, 0.40, 0.24, 0.12, 0.12, 0.62]
-            let scValues: [CGFloat] = [1.0, 0.88, 0.78, 0.70, 0.70, 1.0]
+            for (i, dot) in dots.enumerated() {
+                let begin = now + Double(i) * stagger - cycle   // staggered, already mid-loop
 
-            for (pos, gridIndex) in seq.enumerated() {
-                let dot = dots[gridIndex]
-                let begin = now + Double(pos) * slot - cycle   // staggered, already running
+                let bob = CAKeyframeAnimation(keyPath: "transform.translation.y")
+                bob.values = [0, amp, 0]
+                bob.keyTimes = keyTimes
+                bob.timingFunctions = [ease, ease]
+                bob.duration = cycle
+                bob.repeatCount = .infinity
+                bob.beginTime = begin
+                bob.isRemovedOnCompletion = false
+                dot.add(bob, forKey: "wobble.y")
 
                 let op = CAKeyframeAnimation(keyPath: "opacity")
-                op.keyTimes = opKeyTimes
-                op.values = opValues
+                op.values = [0.35, 0.70, 0.35]
+                op.keyTimes = keyTimes
+                op.timingFunctions = [ease, ease]
                 op.duration = cycle
                 op.repeatCount = .infinity
                 op.beginTime = begin
                 op.isRemovedOnCompletion = false
-                dot.add(op, forKey: "comet.opacity")
-
-                let sc = CAKeyframeAnimation(keyPath: "transform.scale")
-                sc.keyTimes = opKeyTimes
-                sc.values = scValues
-                sc.duration = cycle
-                sc.repeatCount = .infinity
-                sc.beginTime = begin
-                sc.isRemovedOnCompletion = false
-                dot.add(sc, forKey: "comet.scale")
+                dot.add(op, forKey: "wobble.opacity")
             }
-
-            // Center dot: a slow breathing pulse.
-            let center = dots[4]
-            let ease = CAMediaTimingFunction(name: .easeInEaseOut)
-            let pulseOp = CABasicAnimation(keyPath: "opacity")
-            pulseOp.fromValue = 0.15; pulseOp.toValue = 0.40
-            pulseOp.duration = 0.8; pulseOp.autoreverses = true
-            pulseOp.repeatCount = .infinity; pulseOp.timingFunction = ease
-            pulseOp.isRemovedOnCompletion = false
-            center.add(pulseOp, forKey: "pulse.opacity")
-
-            let pulseSc = CABasicAnimation(keyPath: "transform.scale")
-            pulseSc.fromValue = 0.9; pulseSc.toValue = 1.1
-            pulseSc.duration = 0.8; pulseSc.autoreverses = true
-            pulseSc.repeatCount = .infinity; pulseSc.timingFunction = ease
-            pulseSc.isRemovedOnCompletion = false
-            center.add(pulseSc, forKey: "pulse.scale")
         }
     }
 }

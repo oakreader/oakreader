@@ -310,13 +310,11 @@ class ChatViewModel {
         if let ftsService = appState?.ftsIndexService {
             // GROUNDED scope: when a real collection is selected, physically restrict
             // retrieval to its members so the agent literally cannot answer from
-            // outside the user's sources.
-            let scopeId = snapshot.activeCollectionIsScopable ? snapshot.activeCollectionId : nil
-            let scopeName = snapshot.activeCollectionIsScopable ? snapshot.activeCollectionName : nil
+            // outside the user's sources. `scopeId` is nil for smart / "All Items".
+            let scopeId = snapshot.activeCollection?.scopeId
 
             var fts = FTSSearchTool(service: ftsService)
             fts.scopeCollectionId = scopeId
-            fts.scopeCollectionName = scopeName
             tools.append(fts)
 
             let activitySink: @Sendable (String) -> Void = { [weak self] status in
@@ -328,7 +326,6 @@ class ChatViewModel {
                 onActivity: activitySink
             )
             research.scopeCollectionId = scopeId
-            research.scopeCollectionName = scopeName
             tools.append(research)
         }
 

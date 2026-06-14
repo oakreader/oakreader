@@ -40,34 +40,26 @@ struct ItemQuizCardsPanelView: View {
 
     private var cardList: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 18) {
+            LazyVStack(alignment: .leading, spacing: 26) {
                 ForEach(model.sections) { section in
-                    VStack(alignment: .leading, spacing: 8) {
-                        sectionHeader(section)
+                    VStack(alignment: .leading, spacing: 14) {
+                        // A quiet date label only earns its place when more than
+                        // one conversation produced cards; otherwise the panel
+                        // subtitle ("N cards · 1 chat") already says it.
+                        if model.sections.count > 1 {
+                            Text(section.date, format: .dateTime.month().day().year())
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(.tertiary)
+                                .padding(.horizontal, 2)
+                        }
                         ForEach(Array(section.decks.enumerated()), id: \.offset) { _, deck in
                             InlineDeckView(deck: deck)
                         }
                     }
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-        }
-    }
-
-    private func sectionHeader(_ section: ItemQuizCardsViewModel.Section) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: "bubble.left.and.bubble.right")
-                .font(.system(size: 10))
-                .foregroundStyle(.tertiary)
-            Text(section.title)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-            Spacer()
-            Text(section.date, format: .dateTime.month().day())
-                .font(.system(size: 10))
-                .foregroundStyle(.tertiary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 14)
         }
     }
 }
