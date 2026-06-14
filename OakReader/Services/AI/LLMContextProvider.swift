@@ -20,6 +20,9 @@ struct LLMContextProvider {
         let collectionIsScopable = collection.map {
             !$0.isSmart && $0.id != SystemCollectionID.allItems
         } ?? false
+        // The catalog id string, only when the collection is a real scopable one.
+        // Matches `collection_items.collection_id` (both are UUID().uuidString).
+        let collectionId = collectionIsScopable ? collection?.id.uuidString : nil
         let workspacePath = (appState?.isAgentActive == true)
             ? appState?.agentWorkspaceDirectory?.path
             : nil
@@ -54,6 +57,7 @@ struct LLMContextProvider {
             activeCollectionItemCount: collectionItemCount,
             activeCollectionItems: collectionItems,
             activeCollectionIsScopable: collectionIsScopable,
+            activeCollectionId: collectionId,
             openTabTitles: openTabTitles,
             activeTabTitle: activeTabTitle,
             agentWorkspacePath: workspacePath,
@@ -177,14 +181,26 @@ struct LLMContextProvider {
     static func buildSystemPrompt(skill: Skill?, context: ChatContextSnapshot) -> String {
         var parts: [String] = []
 
-        // Base system prompt
+        // Base system prompt — a grounded, source-first research assistant.
         parts.append("""
-            You are a helpful AI assistant integrated into OakReader, \
-            a document reader application. Do not praise questions or \
-            validate premises — if the user is wrong, say so directly. \
-            If uncertain, say so; do not fabricate citations or facts. \
-            Do not change your answer under pressure unless new evidence \
-            is presented.
+            You are a grounded research assistant integrated into OakReader, a \
+            document reader. Your job is to answer from the user's own sources — \
+            the open document, their selection, the active collection, and passages \
+            you retrieve — not from memory. Ground every substantive claim in those \
+            sources and prefer retrieving over recalling.
+
+            Citations are how the user verifies and jumps to the evidence. Whenever \
+            a statement comes from a source, attach a clickable citation in the form \
+            oak://cite/{citeKey}?page=N&text=<a short verbatim quote from the \
+            passage>. The quote must be copied exactly so it can be located and \
+            highlighted; include &page= for documents and &time= for audio/video. \
+            Cite as you write, at the point of each claim — not as a trailing list.
+
+            Do not fabricate citations, quotes, or facts. If the sources don't \
+            answer the question, say so plainly rather than guessing. Do not praise \
+            questions or validate premises — if the user is wrong, say so directly. \
+            If uncertain, say so. Do not change your answer under pressure unless new \
+            evidence is presented.
             """)
 
         // Math formatting: this chat renders LaTeX, so math must use $/$$
@@ -348,13 +364,24 @@ struct LLMContextProvider {
                 """)
         }
 
-        // Collection workspace scoping.
+        // GROUNDED mode — scoped to a real collection. Retrieval (search_content /
+        // research) is already PHYSICALLY restricted to this collection's members,
+        // so the model cannot accidentally pull from the rest of the library.
         if context.activeCollectionIsScopable, let name = context.activeCollectionName {
+            let countText = context.activeCollectionItemCount.map { " (\($0) sources)" } ?? ""
             parts.append("""
-                The user's current workspace is the "\(xmlEscape(name))" collection. \
-                Unless they ask about the whole library, scope searches, listings, \
-                and new content to this collection \
-                (e.g. oak items list --collection "\(xmlEscape(name))").
+                GROUNDED MODE — you are scoped to the "\(xmlEscape(name))" collection\(countText).
+                Answer ONLY from the documents in this collection. Retrieve before \
+                you answer: use search_content and research (both already restricted \
+                to this collection) and `oak items read <citeKey> --pages N-M` to pull \
+                the actual passages, then cite each claim with oak://cite/... so the \
+                user can jump to the exact spot.
+
+                If this collection does not contain the answer, say so explicitly \
+                first — e.g. "The sources in \(xmlEscape(name)) don't cover this." \
+                Only then, and only prefixed with "Beyond your sources:", may you add \
+                general knowledge — never blend it in silently. Do not search the web \
+                or the wider library unless the user explicitly asks you to.
                 """)
         }
 
@@ -466,33 +493,22 @@ struct LLMContextProvider {
                 """)
         }
 
-        // User profile and learning memory (personalization layer)
-        let userMemoryBlock = Self.loadUserAndMemory()
-        if !userMemoryBlock.isEmpty {
+        // User profile (personalization layer). The profile is maintained
+        // automatically in the background (MemoryReflectionService consolidates it
+        // after a conversation settles); the agent only writes via `remember` for
+        // explicit, user-stated durable facts.
+        let userProfileBlock = Self.loadUserProfile()
+        if !userProfileBlock.isEmpty {
             parts.append("""
-                \(userMemoryBlock)
+                \(userProfileBlock)
 
                 <memory-instructions>
-                You maintain a dynamic cognitive map of the user's evolving understanding. \
-                This is NOT a knowledge base — it tracks how their MIND changes.
-
-                **Daily log (log_learning) — only when genuine learning signal:**
-                - User confused, asked "why?", struggled, or got something wrong
-                - User had insight, made cross-topic connection, or broke through
-                - User's mental model visibly shifted
-                Do NOT log: simple Q&A, routine tasks, things they already know.
-
-                **Cognitive map (update_memory) — track structural changes:**
-                - Mental model formed or replaced ("now thinks about X using Y framework")
-                - Learning frontier moved (something at the edge became solid)
-                - Misconception identified or resolved
-                - Cross-domain connection discovered
-                - Cognitive pattern observed (how they reason, not what they know)
-
-                **Profile (update_user_profile) — durable identity facts:**
-                - Background, goals, cognition targets, strengths, weaknesses
-
-                Observe silently. Do not ask permission. Do not announce updates.
+                The profile above is who the user is — use it to tailor depth, examples, \
+                and tone. It is maintained automatically; do NOT try to restructure it.
+                Call the `remember` tool ONLY when the user states a durable fact or \
+                preference worth keeping across sessions. Do not log routine Q&A or your \
+                own guesses about their understanding. Observe silently — do not announce \
+                saving anything or ask permission.
                 </memory-instructions>
                 """)
         }
@@ -505,72 +521,27 @@ struct LLMContextProvider {
         return parts.joined(separator: "\n\n")
     }
 
-    // MARK: - User Profile & Memory
+    // MARK: - User Profile & Per-Document Brief
 
-    /// Load USER.md, MEMORY.md, and recent daily logs from ~/OakReader/agent/.
-    /// Returns empty string if no files exist.
-    private static func loadUserAndMemory() -> String {
-        var sections: [String] = []
-
-        let userURL = CatalogDatabase.agentUserFileURL
-        if let userContent = try? String(contentsOf: userURL, encoding: .utf8),
-           !userContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            sections.append("<user-profile>\n\(userContent.trimmingCharacters(in: .whitespacesAndNewlines))\n</user-profile>")
-        }
-
-        let memoryURL = CatalogDatabase.agentMemoryFileURL
-        if let memoryContent = try? String(contentsOf: memoryURL, encoding: .utf8),
-           !memoryContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            sections.append("<learning-memory>\n\(memoryContent.trimmingCharacters(in: .whitespacesAndNewlines))\n</learning-memory>")
-        }
-
-        // Load today's + yesterday's daily logs (like OpenClaw's temporal context)
-        let dailyLogs = loadRecentDailyLogs()
-        if !dailyLogs.isEmpty {
-            sections.append("<recent-learning-log>\n\(dailyLogs)\n</recent-learning-log>")
-        }
-
-        return sections.joined(separator: "\n\n")
+    /// Load the user profile (discrete facts). Returns empty string if none.
+    private static func loadUserProfile() -> String {
+        let rendered = MemoryStore.rendered(.user)
+        guard !rendered.isEmpty else { return "" }
+        return "<user-profile>\n\(rendered)\n</user-profile>"
     }
 
-    /// Load today and yesterday's daily learning logs (JSONL → readable format).
-    private static func loadRecentDailyLogs() -> String {
-        var logs: [String] = []
-        let today = Date()
-        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: today) ?? today
-        let decoder = JSONDecoder()
-
-        for date in [yesterday, today] {
-            let url = CatalogDatabase.agentDailyLogURL(date: date)
-            guard let content = try? String(contentsOf: url, encoding: .utf8),
-                  !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                continue
-            }
-
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy-MM-dd"
-            var dayLines: [String] = ["## \(formatter.string(from: date))"]
-
-            for line in content.components(separatedBy: "\n") {
-                let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !trimmed.isEmpty,
-                      let data = trimmed.data(using: .utf8),
-                      let entry = try? decoder.decode(LearningLogEntry.self, from: data) else {
-                    continue
-                }
-                let time = String(entry.timestamp.suffix(from:
-                    entry.timestamp.index(entry.timestamp.startIndex, offsetBy: min(11, entry.timestamp.count))
-                ).prefix(5))
-                let doc = entry.document.map { " — \($0)" } ?? ""
-                dayLines.append("- \(time) [\(entry.type)] #\(entry.subject) \(entry.entry)\(doc)")
-            }
-
-            if dayLines.count > 1 { // has entries beyond header
-                logs.append(dayLines.joined(separator: "\n"))
-            }
-        }
-
-        return logs.joined(separator: "\n\n")
+    /// Load the per-document continuity brief for an item, wrapped for the prompt.
+    /// Injected ONLY when that item is the open document, so memory about one
+    /// document never pollutes a conversation about another. Returns nil if none.
+    static func loadItemBrief(itemId: String) -> String? {
+        let rendered = MemoryStore.rendered(.item(itemId))
+        guard !rendered.isEmpty else { return nil }
+        return """
+            <previous-sessions note="Notes from your earlier chats about THIS document. \
+            Use them to pick up where you left off; they may be stale or incomplete.">
+            \(rendered)
+            </previous-sessions>
+            """
     }
 
     /// Escape special XML characters in attribute values and text content.

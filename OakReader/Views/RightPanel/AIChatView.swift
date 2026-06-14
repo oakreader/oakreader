@@ -31,6 +31,7 @@ struct AIChatView: View {
     @Environment(\.isTabActive) private var isTabActive
     @State private var playingTurnId: UUID?
     @State private var showItemMemory = false
+    @State private var showUserMemory = false
 
     /// Body text size of the surrounding messages, so the composer and its token
     /// chips match the rendered body ("正文") size: the dia theme's 15pt on the
@@ -47,8 +48,11 @@ struct AIChatView: View {
             // Content: either history drawer or chat
             Group {
                 if chatVM.showHistory {
-                    ChatHistoryDrawer(chatVM: chatVM)
-                        .transition(.move(edge: .leading))
+                    ChatHistoryDrawer(
+                        chatVM: chatVM,
+                        onOpenMemory: chatVM.itemId != nil ? { showItemMemory = true } : nil
+                    )
+                    .transition(.move(edge: .leading))
                 } else {
                     chatContent
                         .transition(.move(edge: .trailing))
@@ -79,6 +83,9 @@ struct AIChatView: View {
             if let item = chatVM.itemId {
                 MemoryManagerView(scope: .item(item), title: "Document Memory")
             }
+        }
+        .sheet(isPresented: $showUserMemory) {
+            MemoryManagerView(scope: .user, title: "User Memory")
         }
     }
 
@@ -127,8 +134,40 @@ struct AIChatView: View {
                 }
             }
 
+            // Transient "memory updated / saved" notice — surfaces background
+            // reflection + explicit `remember` saves, tappable to inspect.
+            if let notice = chatVM.memoryNotice {
+                canvasConstrained { memoryNoticeBar(notice) }
+            }
+
             canvasConstrained { inputBar }
         }
+        .animation(.spring(duration: 0.3, bounce: 0.15), value: chatVM.memoryNotice)
+    }
+
+    /// Dia-style pill announcing a memory write; tap to open the manager.
+    private func memoryNoticeBar(_ text: String) -> some View {
+        Button {
+            if chatVM.itemId != nil { showItemMemory = true } else { showUserMemory = true }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 11, weight: .medium))
+                Text(text)
+                    .font(.system(size: 11, weight: .medium))
+                Text("· View")
+                    .font(.system(size: 11))
+                    .foregroundStyle(OakStyle.Colors.textTertiary)
+            }
+            .foregroundStyle(OakStyle.Colors.textSecondary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(Capsule().fill(OakStyle.Colors.diaSurface))
+            .overlay(Capsule().stroke(OakStyle.Colors.diaHairline, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .padding(.bottom, 6)
+        .transition(.move(edge: .bottom).combined(with: .opacity))
     }
 
     /// Centers content into the Dia reading column in `.canvas` mode; no-op in `.panel`.
@@ -169,12 +208,6 @@ struct AIChatView: View {
 
             Spacer()
 
-            if chatVM.itemId != nil {
-                OakToolButton(systemImage: "brain", tooltip: "Document Memory") {
-                    showItemMemory = true
-                }
-            }
-
             OakToolButton(systemImage: "plus.bubble", tooltip: "New Chat") {
                 chatVM.newSession()
             }
@@ -185,6 +218,13 @@ struct AIChatView: View {
 
     /// Pill in the canvas header showing the agent's current workspace (the
     /// collection it is scoped to), with a clear affordance back to the whole library.
+    /// Resolve a citeKey to display metadata for the per-answer Sources footer.
+    private func resolveCitedSource(_ citeKey: String) -> ChatSourceMeta? {
+        let state = chatVM.appState ?? chatVM.parent?.appState
+        guard let item = state?.libraryStore.findItem(byCiteKey: citeKey) else { return nil }
+        return ChatSourceMeta(title: item.title, icon: item.contentType.icon)
+    }
+
     private var workspaceChip: some View {
         HStack(spacing: 6) {
             Image(systemName: workspaceName == nil ? "books.vertical" : "folder")
@@ -315,6 +355,7 @@ struct AIChatView: View {
                             onOpenCitation: { citeKey, anchor in
                                 chatVM.openCitation(citeKey: citeKey, anchor: anchor)
                             },
+                            resolveSource: resolveCitedSource,
                             markdownTheme: presentation == .canvas ? .dia : nil
                         )
                             .equatable()

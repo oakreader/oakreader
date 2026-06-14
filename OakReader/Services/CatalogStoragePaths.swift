@@ -37,49 +37,40 @@ extension CatalogDatabase {
         agentDirectory.appendingPathComponent("USER.md")
     }
 
-    /// ~/OakReader/agent/MEMORY.md
-    static var agentMemoryFileURL: URL {
-        agentDirectory.appendingPathComponent("MEMORY.md")
-    }
-
     /// ~/OakReader/agent/VOICE.md
     static var agentVoiceFileURL: URL {
         agentDirectory.appendingPathComponent("VOICE.md")
     }
 
-    /// ~/OakReader/agent/memory/ — learning logs (legacy)
-    static var agentMemoryLogsDirectory: URL {
-        agentDirectory.appendingPathComponent("memory", isDirectory: true)
+    /// ~/OakReader/agent/profile.jsonl — user memory as discrete facts (one JSON per line).
+    static var agentProfileFactsURL: URL {
+        agentDirectory.appendingPathComponent("profile.jsonl")
     }
 
-
-    /// ~/OakReader/agent/memory/YYYY-MM-DD.jsonl — daily learning log (one JSON per line)
-    static func agentDailyLogURL(date: Date = Date()) -> URL {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        let filename = formatter.string(from: date) + ".jsonl"
-        return agentMemoryLogsDirectory.appendingPathComponent(filename)
-    }
-
-    /// ~/OakReader/agent/memory/YYYY-MM.md — monthly summary (markdown, curated)
-    static func agentMonthlyLogURL(date: Date = Date()) -> URL {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM"
-        let filename = formatter.string(from: date) + ".md"
-        return agentMemoryLogsDirectory.appendingPathComponent(filename)
-    }
-
-    /// ~/OakReader/agent/memory/YYYY.md — yearly trajectory (markdown, curated)
-    static func agentYearlyLogURL(date: Date = Date()) -> URL {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy"
-        let filename = formatter.string(from: date) + ".md"
-        return agentMemoryLogsDirectory.appendingPathComponent(filename)
+    /// ~/OakReader/agent/memory-log.jsonl — append-only audit log of memory operations.
+    static var agentMemoryLogURL: URL {
+        agentDirectory.appendingPathComponent("memory-log.jsonl")
     }
 
     /// ~/OakReader/chats/
     static var chatsDirectory: URL {
         dataDirectory.appendingPathComponent("chats", isDirectory: true)
+    }
+
+    /// ~/OakReader/chats/briefs/ — per-document conversation briefs (auto-summarized
+    /// continuity notes, one markdown file per item). Injected only when that item is open.
+    static var chatBriefsDirectory: URL {
+        chatsDirectory.appendingPathComponent("briefs", isDirectory: true)
+    }
+
+    /// ~/OakReader/chats/briefs/{itemId}.md — legacy prose brief (migration source).
+    static func chatBriefURL(itemId: String) -> URL {
+        chatBriefsDirectory.appendingPathComponent("\(itemId).md")
+    }
+
+    /// ~/OakReader/chats/briefs/{itemId}.jsonl — item memory as discrete facts.
+    static func chatBriefFactsURL(itemId: String) -> URL {
+        chatBriefsDirectory.appendingPathComponent("\(itemId).jsonl")
     }
 
     /// ~/OakReader/chats/attachments/
@@ -108,17 +99,16 @@ extension CatalogDatabase {
         try FileManager.default.createDirectory(at: logsDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: chatsDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: chatAttachmentsDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: chatBriefsDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: agentDirectory, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: agentMemoryLogsDirectory, withIntermediateDirectories: true)
         bootstrapAgentFiles()
     }
 
-    /// Copy USER.md and MEMORY.md templates into ~/OakReader/agent/ on first launch.
+    /// Copy USER.md and VOICE.md templates into ~/OakReader/agent/ on first launch.
     private static func bootstrapAgentFiles() {
         let fm = FileManager.default
         let templates: [(resource: String, destination: URL)] = [
             ("USER", agentUserFileURL),
-            ("MEMORY", agentMemoryFileURL),
             ("VOICE", agentVoiceFileURL)
         ]
         for template in templates {

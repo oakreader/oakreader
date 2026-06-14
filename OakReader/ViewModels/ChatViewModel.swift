@@ -87,6 +87,11 @@ class ChatViewModel {
     /// Live status from the research subagent while it runs (nil when idle).
     var researchActivity: String?
 
+    /// Transient "memory updated / saved" notice shown in the chat (nil when idle).
+    /// Set by the `remember` tool and by background reflection; auto-clears.
+    var memoryNotice: String?
+    private var memoryNoticeToken: Int = 0
+
     /// Set by external actions (e.g. context menu "Add to Chat") and consumed by AIChatView.
     var pendingLibraryRef: LibraryItem?
 
@@ -115,6 +120,12 @@ class ChatViewModel {
     private var sessionRecordCreated: Bool = false
     /// Tool context for AI agent tool use (path sandbox).
     private var toolContext: ToolExecutionContext?
+
+    /// Background memory consolidation (USER.md profile + per-document brief).
+    /// We only reflect once enough new material has accumulated, and never while
+    /// a reflection is already running — see reflectIfDue().
+    private var lastReflectedTurnCount = 0
+    private var reflectionInFlight = false
 
     init(parent: DocumentViewModel, documentStoragePath: URL? = nil) {
         self.parent = parent
@@ -176,6 +187,24 @@ class ChatViewModel {
         )
     }
 
+    /// Items shown in the `@`-mention panel: recent library documents the user can
+    /// attach as context (the keyboard path to what drag-and-drop already does).
+    /// Cached in a stored property because the DB fetch is too costly to run on
+    /// every SwiftUI update — `refreshAtMentionItems()` repopulates it on appear
+    /// and when a new session starts.
+    var atMentionItems: [ChatCompletionItem] = []
+
+    @MainActor
+    func refreshAtMentionItems() {
+        guard let store = parent?.libraryStore ?? appState?.libraryStore else {
+            atMentionItems = []
+            return
+        }
+        let items = (try? store.fetchAllItems()) ?? []
+        let recent = items.sorted { $0.dateAdded > $1.dateAdded }.prefix(60)
+        atMentionItems = recent.map { ChatCompletionItem.libraryReference(from: $0, trigger: "@") }
+    }
+
     // MARK: - Send Message
 
     @MainActor
@@ -232,12 +261,19 @@ class ChatViewModel {
             contextMode: contextMode
         )
 
-        // Build system prompt from snapshot
+        // Build system prompt from snapshot, appending the per-document continuity
+        // brief (auto-summary of earlier chats about THIS item) when one exists.
         let currentSkill = effectiveSkill
-        let systemPrompt = LLMContextProvider.buildSystemPrompt(
+        let baseSystemPrompt = LLMContextProvider.buildSystemPrompt(
             skill: currentSkill,
             context: snapshot
         )
+        let systemPrompt: String
+        if let item = itemId, let brief = LLMContextProvider.loadItemBrief(itemId: item) {
+            systemPrompt = baseSystemPrompt + "\n\n" + brief
+        } else {
+            systemPrompt = baseSystemPrompt
+        }
 
         let currentHistory = turns.filter { !$0.isStreaming }
         let currentSessionId = sessionId
@@ -272,15 +308,28 @@ class ChatViewModel {
         // 2. Full-text content search (FTS5 over the indexed library), plus a
         //    research subagent for deep multi-document questions (its own loop).
         if let ftsService = appState?.ftsIndexService {
-            tools.append(FTSSearchTool(service: ftsService))
+            // GROUNDED scope: when a real collection is selected, physically restrict
+            // retrieval to its members so the agent literally cannot answer from
+            // outside the user's sources.
+            let scopeId = snapshot.activeCollectionIsScopable ? snapshot.activeCollectionId : nil
+            let scopeName = snapshot.activeCollectionIsScopable ? snapshot.activeCollectionName : nil
+
+            var fts = FTSSearchTool(service: ftsService)
+            fts.scopeCollectionId = scopeId
+            fts.scopeCollectionName = scopeName
+            tools.append(fts)
+
             let activitySink: @Sendable (String) -> Void = { [weak self] status in
                 Task { @MainActor in self?.researchActivity = status }
             }
-            tools.append(ResearchTool(
+            var research = ResearchTool(
                 searchService: ftsService,
                 config: researchConfig,
                 onActivity: activitySink
-            ))
+            )
+            research.scopeCollectionId = scopeId
+            research.scopeCollectionName = scopeName
+            tools.append(research)
         }
 
         // 3. Web search (always)
@@ -294,12 +343,10 @@ class ChatViewModel {
         // 3b-ii. Flashcards — render front/back cards inline as a carousel
         tools.append(QuizCardsTool())
 
-        // 3c. Memory tools (always available for personalization)
-        tools.append(UpdateMemoryTool())
-        tools.append(UpdateUserProfileTool())
-        tools.append(LogLearningTool())
-        tools.append(PromoteMemoryTool())
-        tools.append(SearchLearningLogTool())
+        // 3c. Memory — single hot-path affordance for explicit "remember that …".
+        //     The profile and per-document brief are maintained automatically in
+        //     the background (see reflectIfDue() / MemoryReflectionService).
+        tools.append(RememberTool())
 
         // 4. Filesystem tools (user preference gated). Available for a document's
         //    storage dir or the library agent's CoW workspace folder.
@@ -357,6 +404,10 @@ class ChatViewModel {
                 var assistantTurnId: UUID?
 
                 for try await event in stream {
+                    // The user switched/cleared/loaded a different session mid-stream.
+                    // Stop before writing the old response into the new chat (and
+                    // before flipping its `isStreaming`/indicator state).
+                    if sessionId != currentSessionId { break }
                     switch event {
                     case .delta(let delta):
                         if let id = assistantTurnId,
@@ -472,6 +523,10 @@ class ChatViewModel {
                         {
                             turns[idx].toolUses[toolIdx] = record
                         }
+                        // Surface explicit "remember that …" saves in the UI.
+                        if record.name == "remember" {
+                            self?.flashMemoryNotice("Saved to memory")
+                        }
 
                     case .finished(let turn):
                         if turn.role == .user {
@@ -512,13 +567,95 @@ class ChatViewModel {
                     }
                 }
             } catch {
-                if !(error is CancellationError) {
+                if !(error is CancellationError) && sessionId == currentSessionId {
                     errorMessage = error.localizedDescription
                 }
             }
 
-            isStreaming = false
-            researchActivity = nil
+            // Only clear streaming state if we're still on the same session — a
+            // switch already reset it for the new chat, and clobbering it here
+            // would stop the new chat's indicator.
+            if sessionId == currentSessionId {
+                isStreaming = false
+                researchActivity = nil
+            }
+            self?.reflectIfDue()
+        }
+    }
+
+    // MARK: - Background Memory Reflection
+
+    /// After a chat round settles, consolidate memory in the background if enough
+    /// new material has accumulated. Off the hot path, fail-soft — never blocks or
+    /// surfaces errors into the conversation.
+    private func reflectIfDue() {
+        guard Preferences.shared.memoryReflectionEnabled else { return }
+        let settled = turns.filter { !$0.isStreaming && $0.role != .system }
+        guard settled.count - lastReflectedTurnCount >= Preferences.shared.memoryReflectionFrequency else { return }
+        runReflection(on: settled)
+    }
+
+    /// When leaving a session (new/load), flush any unreflected material so the
+    /// profile and brief capture the conversation we're walking away from.
+    private func flushReflectionBeforeSwitch() {
+        guard Preferences.shared.memoryReflectionEnabled else { return }
+        let settled = turns.filter { !$0.isStreaming && $0.role != .system }
+        guard settled.count > lastReflectedTurnCount, settled.count >= 2 else { return }
+        runReflection(on: settled)
+    }
+
+    /// Config for the background reflection: the configured memory model (empty =
+    /// inherit research/chat model), never extended thinking.
+    private var memoryReflectionConfig: ProviderConfig {
+        let model = Preferences.shared.memoryReflectionModel
+        let base = researchConfig
+        return ProviderConfig(
+            providerId: base.providerId,
+            model: model.isEmpty ? base.model : model,
+            thinkingBudget: nil,
+            thinkingEffort: nil
+        )
+    }
+
+    private func runReflection(on settled: [Turn]) {
+        guard !reflectionInFlight else { return }
+        reflectionInFlight = true
+        lastReflectedTurnCount = settled.count
+
+        let prefs = Preferences.shared
+        let cfg = memoryReflectionConfig
+        let profilePrompt = prefs.memoryProfilePrompt.isEmpty
+            ? MemoryReflectionService.defaultProfileSystem : prefs.memoryProfilePrompt
+        let briefPrompt = prefs.memoryBriefPrompt.isEmpty
+            ? MemoryReflectionService.defaultBriefSystem : prefs.memoryBriefPrompt
+        let item = itemId
+
+        Task.detached(priority: .background) { [weak self] in
+            let service = MemoryReflectionService(
+                config: cfg,
+                profilePrompt: profilePrompt,
+                briefPrompt: briefPrompt
+            )
+            var changes = await service.consolidateProfile(recentTurns: settled)
+            if let item { changes += await service.updateItemBrief(itemId: item, recentTurns: settled) }
+            let updated = changes
+            await MainActor.run {
+                self?.reflectionInFlight = false
+                if updated > 0 { self?.flashMemoryNotice("Memory updated") }
+            }
+        }
+    }
+
+    /// Briefly surface a memory-write in the chat UI (auto-clears). Tappable in
+    /// AIChatView to open the memory manager.
+    func flashMemoryNotice(_ text: String) {
+        memoryNoticeToken &+= 1
+        let token = memoryNoticeToken
+        memoryNotice = text
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            guard let self, self.memoryNoticeToken == token else { return }
+            self.memoryNotice = nil
         }
     }
 
@@ -734,7 +871,19 @@ class ChatViewModel {
 
     // MARK: - Session Management
 
+    /// Cancel any in-flight stream before switching sessions, so the old response
+    /// can't keep streaming into — or finalize into — the new chat. The loop's
+    /// `sessionId` guard is the backstop; this stops the work promptly.
+    private func cancelActiveStreamForSwitch() {
+        streamTask?.cancel()
+        streamTask = nil
+        isStreaming = false
+        researchActivity = nil
+    }
+
     func newSession() {
+        cancelActiveStreamForSwitch()
+        flushReflectionBeforeSwitch()
         turns = []
         sessionId = UUID()
         sessionRecordCreated = false
@@ -744,13 +893,17 @@ class ChatViewModel {
         inputText = ""
         errorMessage = nil
         showHistory = false
+        lastReflectedTurnCount = 0
     }
 
     func loadSession(_ id: UUID) {
+        cancelActiveStreamForSwitch()
+        flushReflectionBeforeSwitch()
         sessionId = id
         sessionRecordCreated = true  // already exists in DB
         turns = []
         showHistory = false
+        lastReflectedTurnCount = 0
         Task { @MainActor in
             do {
                 turns = Self.normalizedSkillMetadata(try await engine.loadSession(id))
@@ -761,6 +914,7 @@ class ChatViewModel {
     }
 
     func clearSession() {
+        cancelActiveStreamForSwitch()
         let oldSessionId = sessionId
         Task {
             await engine.deleteSession(oldSessionId)

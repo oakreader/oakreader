@@ -105,6 +105,16 @@ final class Preferences {
         static let agentWriteFileEnabled = "agentWriteFileEnabled"
         static let agentRequireConfirmation = "agentRequireConfirmation"
         static let agentPermissionLevel = "agentPermissionLevel"
+        // Background memory reflection ("dreaming") — consolidates USER.md profile
+        // and per-document briefs off the hot path.
+        static let memoryReflectionEnabled = "memoryReflectionEnabled"
+        /// Optional model for the background reflection (empty = inherit research/chat model).
+        static let memoryReflectionModel = "memoryReflectionModel"
+        /// Reflect after every N settled turns of new material.
+        static let memoryReflectionFrequency = "memoryReflectionFrequency"
+        /// Optional system-prompt overrides (empty = built-in default).
+        static let memoryProfilePrompt = "memoryProfilePrompt"
+        static let memoryBriefPrompt = "memoryBriefPrompt"
         // Thinking budget
         static let thinkingBudget = "thinkingBudget"
         static let thinkingEffort = "thinkingEffort"
@@ -338,6 +348,43 @@ final class Preferences {
     var researchModel: String {
         get { defaults.string(forKey: Keys.researchModel) ?? "" }
         set { defaults.set(newValue, forKey: Keys.researchModel) }
+    }
+
+    // MARK: - Background Memory Reflection ("dreaming")
+
+    /// Whether the agent consolidates the profile + per-document brief in the
+    /// background after a conversation settles. Defaults to ON.
+    var memoryReflectionEnabled: Bool {
+        get { defaults.object(forKey: Keys.memoryReflectionEnabled) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: Keys.memoryReflectionEnabled) }
+    }
+
+    /// Optional model id for the background reflection. Empty = inherit the
+    /// research model (which itself falls back to the chat model).
+    var memoryReflectionModel: String {
+        get { defaults.string(forKey: Keys.memoryReflectionModel) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.memoryReflectionModel) }
+    }
+
+    /// Reflect after every N settled turns of new material (clamped 2…20).
+    var memoryReflectionFrequency: Int {
+        get {
+            let value = defaults.integer(forKey: Keys.memoryReflectionFrequency)
+            return value > 0 ? min(max(value, 2), 20) : 4
+        }
+        set { defaults.set(min(max(newValue, 2), 20), forKey: Keys.memoryReflectionFrequency) }
+    }
+
+    /// System-prompt override for profile consolidation. Empty = built-in default.
+    var memoryProfilePrompt: String {
+        get { defaults.string(forKey: Keys.memoryProfilePrompt) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.memoryProfilePrompt) }
+    }
+
+    /// System-prompt override for the per-document brief. Empty = built-in default.
+    var memoryBriefPrompt: String {
+        get { defaults.string(forKey: Keys.memoryBriefPrompt) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.memoryBriefPrompt) }
     }
 
     // MARK: - Translation Preferences
