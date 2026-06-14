@@ -321,19 +321,33 @@ private struct PanelTabButtonView: View {
                 viewModel.state.rightPanelMode = mode
             }
         } label: {
-            Image(systemName: mode.systemImage)
-                .font(.system(size: 14, weight: .medium))
-                .frame(width: 34, height: 26)
-                .background(
-                    Capsule()
-                        .fill(Color.primary.opacity(fillOpacity))
-                )
-                .contentShape(Capsule())
+            HStack(spacing: 5) {
+                Image(systemName: mode.systemImage)
+                    .font(.system(size: 14, weight: .medium))
+                if isActive {
+                    Text(mode.label)
+                        .font(.system(size: 12.5, weight: .medium))
+                        .fixedSize(horizontal: true, vertical: false)
+                        .transition(.move(edge: .leading).combined(with: .opacity))
+                }
+            }
+            .frame(height: 26)
+            .padding(.leading, 9)
+            .padding(.trailing, isActive ? 10 : 9)
+            .frame(minWidth: 34, alignment: .leading)
+            .background(
+                Capsule()
+                    .fill(Color.primary.opacity(fillOpacity))
+            )
+            .clipShape(Capsule())
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .foregroundStyle(isActive ? Color(nsColor: .labelColor) : Color(nsColor: .secondaryLabelColor))
         .onHover { isHovering = $0 }
-        .animation(.easeInOut(duration: 0.15), value: isActive)
+        // Asymmetric, bounce-0: slow graceful expand, fast clean collapse so the
+        // previous pill's label leaves before the new one finishes growing.
+        .animation(isActive ? .smooth(duration: 0.55) : .smooth(duration: 0.15), value: isActive)
         .animation(.easeInOut(duration: 0.12), value: isHovering)
         .help(mode.label)
     }
@@ -365,19 +379,33 @@ private struct LibraryTabButtonView: View {
                 appState.libraryDetailTab = tab
             }
         } label: {
-            Image(systemName: tab.systemImage)
-                .font(.system(size: 14, weight: .medium))
-                .frame(width: 34, height: 26)
-                .background(
-                    Capsule()
-                        .fill(Color.primary.opacity(fillOpacity))
-                )
-                .contentShape(Capsule())
+            HStack(spacing: 5) {
+                Image(systemName: tab.systemImage)
+                    .font(.system(size: 14, weight: .medium))
+                if isActive {
+                    Text(tab.label)
+                        .font(.system(size: 12.5, weight: .medium))
+                        .fixedSize(horizontal: true, vertical: false)
+                        .transition(.move(edge: .leading).combined(with: .opacity))
+                }
+            }
+            .frame(height: 26)
+            .padding(.leading, 9)
+            .padding(.trailing, isActive ? 10 : 9)
+            .frame(minWidth: 34, alignment: .leading)
+            .background(
+                Capsule()
+                    .fill(Color.primary.opacity(fillOpacity))
+            )
+            .clipShape(Capsule())
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .foregroundStyle(isActive ? Color(nsColor: .labelColor) : Color(nsColor: .secondaryLabelColor))
         .onHover { isHovering = $0 }
-        .animation(.easeInOut(duration: 0.15), value: isActive)
+        // Asymmetric, bounce-0: slow graceful expand, fast clean collapse so the
+        // previous pill's label leaves before the new one finishes growing.
+        .animation(isActive ? .smooth(duration: 0.55) : .smooth(duration: 0.15), value: isActive)
         .animation(.easeInOut(duration: 0.12), value: isHovering)
         .help(tab.label)
     }
