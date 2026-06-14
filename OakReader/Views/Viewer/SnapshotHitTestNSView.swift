@@ -12,6 +12,7 @@ class SnapshotHitTestNSView: NSView {
     private var mouseMonitor: Any?
     private var dragStartPoint: CGPoint?  // in flipped (SwiftUI) coords
     private var isDragging = false
+    private var savedAcceptsMouseMoved = false
 
     // Always transparent to hit-testing — never blocks scrollbars or scroll events
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
@@ -30,11 +31,35 @@ class SnapshotHitTestNSView: NSView {
 
     private func installMonitor() {
         removeMonitor()
+        if let window {
+            savedAcceptsMouseMoved = window.acceptsMouseMovedEvents
+            window.acceptsMouseMovedEvents = true
+        }
         mouseMonitor = NSEvent.addLocalMonitorForEvents(
-            matching: [.leftMouseDown, .leftMouseDragged, .leftMouseUp]
+            matching: [.leftMouseDown, .leftMouseDragged, .leftMouseUp, .mouseMoved]
         ) { [weak self] event in
             guard let self, self.isActive else { return event }
+            // The transparent overlay can't own the cursor via cursor-rects (its
+            // hitTest is nil), and PDFKit re-asserts its own cursor on every move.
+            // So re-assert the crosshair *after* the event is processed — but only
+            // while the pointer is actually over the document (not the chat panel),
+            // since this monitor is app-wide.
+            if event.type == .mouseMoved || event.type == .leftMouseDragged,
+               event.window === self.window,
+               self.bounds.contains(self.convert(event.locationInWindow, from: nil)) {
+                self.enforceCrosshair()
+            }
             return self.handleMouseEvent(event)
+        }
+        enforceCrosshair()
+    }
+
+    /// Re-assert the crosshair on the next runloop tick so it wins over the
+    /// cursor PDFKit sets synchronously while handling the same mouse event.
+    private func enforceCrosshair() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.isActive else { return }
+            CaptureCursor.nsCursor.set()
         }
     }
 
@@ -43,6 +68,7 @@ class SnapshotHitTestNSView: NSView {
             NSEvent.removeMonitor(monitor)
             mouseMonitor = nil
         }
+        window?.acceptsMouseMovedEvents = savedAcceptsMouseMoved
         dragStartPoint = nil
         isDragging = false
     }
@@ -124,7 +150,7 @@ class SnapshotHitTestNSView: NSView {
 
     override func resetCursorRects() {
         if isActive {
-            addCursorRect(bounds, cursor: .crosshair)
+            addCursorRect(bounds, cursor: CaptureCursor.nsCursor)
         }
     }
 
@@ -143,7 +169,7 @@ class SnapshotHitTestNSView: NSView {
 
     override func cursorUpdate(with event: NSEvent) {
         if isActive {
-            NSCursor.crosshair.set()
+            CaptureCursor.nsCursor.set()
         } else {
             super.cursorUpdate(with: event)
         }

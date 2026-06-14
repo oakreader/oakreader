@@ -36,8 +36,8 @@ struct MediaSnapshotOverlayView: View {
                 let rect = normalizedRect(from: dragStart, to: dragEnd)
                 Rectangle()
                     .strokeBorder(
-                        Color.accentColor,
-                        style: StrokeStyle(lineWidth: 2, dash: [6, 3])
+                        Color.secondary,
+                        style: StrokeStyle(lineWidth: 1.5, dash: [6, 3])
                     )
                     .frame(width: rect.width, height: rect.height)
                     .position(x: rect.midX, y: rect.midY)
@@ -231,6 +231,7 @@ class MediaSnapshotHitTestNSView: NSView {
             }
             return self.handleMouseEvent(event)
         }
+        setCaptureCursor(true)
     }
 
     private func removeMonitor() {
@@ -238,8 +239,35 @@ class MediaSnapshotHitTestNSView: NSView {
             NSEvent.removeMonitor(monitor)
             mouseMonitor = nil
         }
+        setCaptureCursor(false)
         dragStartPoint = nil
         isDragging = false
+    }
+
+    /// The WKWebView owns its cursor via CSS, so force a crosshair on the page
+    /// itself while capture is armed (see WebCaptureCursor / HTMLHitTestNSView).
+    private weak var capturedWebView: WKWebView?
+    private func setCaptureCursor(_ on: Bool) {
+        if on {
+            let webView = capturedWebView ?? findWebView(in: window?.contentView)
+            capturedWebView = webView
+            Log.debug(Log.ui, "[capture-cursor] Media on — webView found: \(webView != nil)")
+            webView?.evaluateJavaScript(WebCaptureCursor.js(on: true)) { _, error in
+                if let error { Log.debug(Log.ui, "[capture-cursor] Media on JS error: \(error)") }
+            }
+        } else {
+            capturedWebView?.evaluateJavaScript(WebCaptureCursor.js(on: false), completionHandler: nil)
+            capturedWebView = nil
+        }
+    }
+
+    private func findWebView(in view: NSView?) -> WKWebView? {
+        guard let view else { return nil }
+        if let webView = view as? WKWebView { return webView }
+        for subview in view.subviews {
+            if let found = findWebView(in: subview) { return found }
+        }
+        return nil
     }
 
     private func handleMouseEvent(_ event: NSEvent) -> NSEvent? {

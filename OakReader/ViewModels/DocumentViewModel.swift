@@ -422,6 +422,7 @@ class DocumentViewModel {
     /// AI chat composer. Triggered by the chat input's screenshot button: makes
     /// sure chat is visible, then arms the crosshair overlay.
     func beginAreaCaptureForChat() {
+        Log.debug(Log.ui, "[capture-cursor] beginAreaCaptureForChat — contentType: \(contentType)")
         state.snapshotForChat = true
         state.rightPanelMode = .aiChat
         state.editorMode = .snapshot

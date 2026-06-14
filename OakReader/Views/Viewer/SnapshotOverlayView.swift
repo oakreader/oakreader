@@ -36,8 +36,8 @@ struct SnapshotOverlayView: View {
                 let rect = normalizedRect(from: dragStart, to: dragEnd)
                 Rectangle()
                     .strokeBorder(
-                        Color(nsColor: viewModel.annotation.strokeColor),
-                        style: StrokeStyle(lineWidth: 2, dash: [6, 3])
+                        Color.secondary,
+                        style: StrokeStyle(lineWidth: 1.5, dash: [6, 3])
                     )
                     .frame(width: rect.width, height: rect.height)
                     .position(x: rect.midX, y: rect.midY)
