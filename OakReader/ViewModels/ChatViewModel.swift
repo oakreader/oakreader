@@ -118,6 +118,8 @@ class ChatViewModel {
     private var streamTask: Task<Void, Never>?
     /// Whether a DB record has been created for the current session.
     private var sessionRecordCreated: Bool = false
+    /// Whether an auto title has been generated for the current session (once per chat).
+    private var titleGenerated: Bool = false
     /// Tool context for AI agent tool use (path sandbox).
     private var toolContext: ToolExecutionContext?
 
@@ -340,10 +342,11 @@ class ChatViewModel {
         // 3b-ii. Flashcards — render front/back cards inline as a carousel
         tools.append(QuizCardsTool())
 
-        // 3c. Memory — single hot-path affordance for explicit "remember that …".
-        //     The profile and per-document brief are maintained automatically in
-        //     the background (see reflectIfDue() / MemoryReflectionService).
-        tools.append(RememberTool())
+        // 3c. Memory — explicit, user-directed lane only (view/add/update/remove).
+        //     Passive capture happens automatically in the background (see
+        //     reflectIfDue() / MemoryReflectionService); the model is told to use
+        //     this tool ONLY when the user explicitly asks.
+        tools.append(MemoryTool(itemId: itemId))
 
         // 4. Filesystem tools (user preference gated). Available for a document's
         //    storage dir or the library agent's CoW workspace folder.
@@ -520,9 +523,10 @@ class ChatViewModel {
                         {
                             turns[idx].toolUses[toolIdx] = record
                         }
-                        // Surface explicit "remember that …" saves in the UI.
-                        if record.name == "remember" {
-                            self?.flashMemoryNotice("Saved to memory")
+                        // Surface explicit memory writes (not plain `list` reads).
+                        if record.name == "manage_memory", !record.isError {
+                            let op = (record.input["operation"] ?? "").lowercased()
+                            if op != "list" { self?.flashMemoryNotice("Memory updated") }
                         }
 
                     case .finished(let turn):
@@ -577,6 +581,7 @@ class ChatViewModel {
                 researchActivity = nil
             }
             self?.reflectIfDue()
+            self?.titleIfNeeded()
         }
     }
 
@@ -590,6 +595,38 @@ class ChatViewModel {
         let settled = turns.filter { !$0.isStreaming && $0.role != .system }
         guard settled.count - lastReflectedTurnCount >= Preferences.shared.memoryReflectionFrequency else { return }
         runReflection(on: settled)
+    }
+
+    // MARK: - Auto Chat Title
+
+    /// After the first exchange settles, generate a short title in the background.
+    /// Runs once per chat, off the hot path, fail-soft — keeps the truncated
+    /// first-message placeholder on any failure.
+    private func titleIfNeeded() {
+        guard !titleGenerated, sessionRecordCreated else { return }
+        let settled = turns.filter { !$0.isStreaming && $0.role != .system }
+        guard let firstUser = settled.first(where: { $0.role == .user })?.content,
+              let firstAssistant = settled.first(where: { $0.role == .assistant })?.content,
+              !firstUser.isEmpty, !firstAssistant.isEmpty
+        else { return }
+
+        titleGenerated = true
+        let sid = sessionId
+        let cfg = researchConfig  // cheaper/faster model when `researchModel` is set; no thinking
+        let count = settled.count
+
+        Task { @MainActor [weak self] in
+            guard let self,
+                  let title = await ChatTitleService.generate(
+                      firstUser: firstUser, firstAssistant: firstAssistant, config: cfg
+                  )
+            else { return }
+            // Persist and reflect into the in-memory list so the sidebar updates live.
+            try? self.sessionService?.updateSession(id: sid, title: title, messageCount: count)
+            if let idx = self.sessionList.firstIndex(where: { $0.id == sid }) {
+                self.sessionList[idx].title = title
+            }
+        }
     }
 
     /// When leaving a session (new/load), flush any unreflected material so the
@@ -884,6 +921,7 @@ class ChatViewModel {
         turns = []
         sessionId = UUID()
         sessionRecordCreated = false
+        titleGenerated = false
         selectedSkill = nil
         activeTokens = []
         pendingAttachments = []
@@ -898,6 +936,7 @@ class ChatViewModel {
         flushReflectionBeforeSwitch()
         sessionId = id
         sessionRecordCreated = true  // already exists in DB
+        titleGenerated = true  // existing session already has a title; don't overwrite
         turns = []
         showHistory = false
         lastReflectedTurnCount = 0
@@ -923,6 +962,7 @@ class ChatViewModel {
         errorMessage = nil
         sessionId = UUID()
         sessionRecordCreated = false
+        titleGenerated = false
     }
 
     // MARK: - Session History

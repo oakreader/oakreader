@@ -486,25 +486,29 @@ struct LLMContextProvider {
                 """)
         }
 
-        // User profile (personalization layer). The profile is maintained
-        // automatically in the background (MemoryReflectionService consolidates it
-        // after a conversation settles); the agent only writes via `remember` for
-        // explicit, user-stated durable facts.
+        // User profile + memory instructions. Two lanes, split by initiator:
+        // passive facts the agent merely notices are consolidated automatically in
+        // the background; the `manage_memory` tool is ONLY for explicit user
+        // requests. The instructions are always emitted (even with empty memory) so
+        // the agent knows to honor "add … to my memory" on a fresh profile.
+        var memoryParts: [String] = []
         let userProfileBlock = Self.loadUserProfile()
-        if !userProfileBlock.isEmpty {
-            parts.append("""
-                \(userProfileBlock)
-
-                <memory-instructions>
-                The profile above is who the user is — use it to tailor depth, examples, \
-                and tone. It is maintained automatically; do NOT try to restructure it.
-                Call the `remember` tool ONLY when the user states a durable fact or \
-                preference worth keeping across sessions. Do not log routine Q&A or your \
-                own guesses about their understanding. Observe silently — do not announce \
-                saving anything or ask permission.
-                </memory-instructions>
-                """)
-        }
+        if !userProfileBlock.isEmpty { memoryParts.append(userProfileBlock) }
+        memoryParts.append("""
+            <memory-instructions>
+            The <user-profile> above (when present) is who the user is — use it to \
+            tailor depth, examples, and tone. It is maintained automatically in the \
+            background; do NOT proactively save things you merely noticed, and do not \
+            announce background updates.
+            Use the `manage_memory` tool ONLY when the user EXPLICITLY asks you to \
+            view, add, change, or remove a memory — e.g. "remember that …", "add … to \
+            my memory", "what do you remember about me?", "update …", "forget …". \
+            For add/update/remove, briefly confirm in plain language what you saved, \
+            updated, or removed. Default scope is the user's global memory; use scope \
+            "item" for a note about the document currently open.
+            </memory-instructions>
+            """)
+        parts.append(memoryParts.joined(separator: "\n\n"))
 
         // Skill prompt (after context so the skill can reference it)
         if let skill {
