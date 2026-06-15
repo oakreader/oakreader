@@ -123,8 +123,9 @@ final class HuggingLayoutManager: NSLayoutManager {
 /// `linkPreview` recognizes, it shows the supplied SwiftUI view in a popover anchored to
 /// the link's glyphs (the default raw-URL tooltip is suppressed by the coordinator).
 final class MarkdownTextView: NSTextView {
-    /// Host-supplied preview content for a link URL (see `ProseBlockView.linkPreview`).
-    var linkPreview: ((URL) -> AnyView?)?
+    /// Host-supplied preview content for a link, given its URL and visible label text
+    /// (see `ProseBlockView.linkPreview`).
+    var linkPreview: ((URL, String) -> AnyView?)?
 
     private var hoverTrackingArea: NSTrackingArea?
     private var hoverPopover: NSPopover?
@@ -194,8 +195,10 @@ final class MarkdownTextView: NSTextView {
         guard charIndex < storage.length else { cancelHover(); return }
 
         var range = NSRange(location: 0, length: 0)
-        guard let url = linkURL(in: storage, at: charIndex, effectiveRange: &range),
-              preview(url) != nil else { cancelHover(); return }
+        guard let url = linkURL(in: storage, at: charIndex, effectiveRange: &range)
+        else { cancelHover(); return }
+        let label = storage.attributedSubstring(from: range).string
+        guard preview(url, label) != nil else { cancelHover(); return }
 
         // `glyphIndex(for:)` returns the *nearest* glyph, so confirm the point really
         // lands on the link's glyphs before showing anything.
@@ -210,12 +213,12 @@ final class MarkdownTextView: NSTextView {
         let anchorRect = linkRect.offsetBy(dx: origin.x, dy: origin.y)
         hoverTimer = Timer.scheduledTimer(withTimeInterval: hoverDelay, repeats: false) {
             [weak self] _ in
-            self?.showPreview(url: url, anchorRect: anchorRect)
+            self?.showPreview(url: url, label: label, anchorRect: anchorRect)
         }
     }
 
-    private func showPreview(url: URL, anchorRect: NSRect) {
-        guard let content = linkPreview?(url), window != nil else { return }
+    private func showPreview(url: URL, label: String, anchorRect: NSRect) {
+        guard let content = linkPreview?(url, label), window != nil else { return }
         let popover = NSPopover()
         popover.behavior = .applicationDefined  // we control dismissal via hover tracking
         popover.animates = true

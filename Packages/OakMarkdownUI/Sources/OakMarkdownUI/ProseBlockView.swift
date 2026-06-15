@@ -14,14 +14,14 @@ struct ProseBlockView: NSViewRepresentable {
     var onOpenURL: ((URL) -> Bool)?
     /// Optional rich hover-preview for a link (e.g. a citation card). See
     /// `StreamingMarkdownView.linkPreview`.
-    var linkPreview: ((URL) -> AnyView?)?
+    var linkPreview: ((URL, String) -> AnyView?)?
 
     func makeCoordinator() -> Coordinator { Coordinator(onOpenURL: onOpenURL, linkPreview: linkPreview) }
 
     final class Coordinator: NSObject, NSTextViewDelegate {
         var onOpenURL: ((URL) -> Bool)?
-        var linkPreview: ((URL) -> AnyView?)?
-        init(onOpenURL: ((URL) -> Bool)?, linkPreview: ((URL) -> AnyView?)?) {
+        var linkPreview: ((URL, String) -> AnyView?)?
+        init(onOpenURL: ((URL) -> Bool)?, linkPreview: ((URL, String) -> AnyView?)?) {
             self.onOpenURL = onOpenURL
             self.linkPreview = linkPreview
         }
@@ -33,17 +33,18 @@ struct ProseBlockView: NSViewRepresentable {
             return onOpenURL?(url) ?? false
         }
 
-        /// Suppress the default raw-URL tooltip for links that have a custom hover
-        /// preview — the popover shows the human-readable card instead. Links without a
-        /// preview keep their normal tooltip.
+        /// Suppress the default raw-URL tooltip for custom-scheme links (e.g.
+        /// `oak://cite/…`) — their hover affordance is the preview card, not the raw URI,
+        /// and that's true even when the card itself is suppressed as redundant. Plain
+        /// web links (http/https) keep their normal tooltip.
         func textView(_ textView: NSTextView, willDisplayToolTip tooltip: String,
                       forCharacterAt characterIndex: Int) -> String? {
             guard let storage = textView.textStorage, characterIndex < storage.length,
                   let value = storage.attribute(.link, at: characterIndex, effectiveRange: nil),
-                  let url = (value as? URL) ?? (value as? String).flatMap({ URL(string: $0) }),
-                  linkPreview?(url) != nil
+                  let url = (value as? URL) ?? (value as? String).flatMap({ URL(string: $0) })
             else { return tooltip }
-            return nil
+            let scheme = url.scheme?.lowercased()
+            return (scheme == "http" || scheme == "https") ? tooltip : nil
         }
     }
 

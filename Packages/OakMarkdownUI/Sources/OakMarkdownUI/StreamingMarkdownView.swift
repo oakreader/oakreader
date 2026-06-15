@@ -14,14 +14,16 @@ public struct StreamingMarkdownView: View {
     /// Intercepts link clicks in prose. Return `true` if handled, `false` to let the
     /// system open the URL. Used by hosts to handle custom schemes (e.g. `oak://`).
     public var onOpenURL: ((URL) -> Bool)?
-    /// Supplies a rich hover-preview for a link. When it returns a non-nil view, hovering
-    /// the link shows that view in a popover and the default raw-URL tooltip is suppressed.
-    /// Returning nil leaves the link with the system's default hover behavior.
-    public var linkPreview: ((URL) -> AnyView?)?
+    /// Supplies a rich hover-preview for a link, given its URL and visible label text.
+    /// When it returns a non-nil view, hovering the link shows that view in a popover.
+    /// Returning nil shows no popover — the host can use the label to skip a preview
+    /// that would merely echo the link's own visible text. (The raw-URL tooltip is
+    /// suppressed for custom-scheme links regardless.)
+    public var linkPreview: ((URL, String) -> AnyView?)?
 
     public init(markdown: String, theme: MarkdownTheme = .oak(), isStreaming: Bool = false,
                 onOpenURL: ((URL) -> Bool)? = nil,
-                linkPreview: ((URL) -> AnyView?)? = nil) {
+                linkPreview: ((URL, String) -> AnyView?)? = nil) {
         self.markdown = markdown
         self.theme = theme
         self.isStreaming = isStreaming
@@ -52,7 +54,7 @@ private struct BlockRow: View, Equatable {
     // Excluded from `==`: the handler is stable per host, and a closure isn't
     // Equatable. Only block text/kind and streaming state drive re-rendering.
     var onOpenURL: ((URL) -> Bool)?
-    var linkPreview: ((URL) -> AnyView?)?
+    var linkPreview: ((URL, String) -> AnyView?)?
 
     static func == (lhs: BlockRow, rhs: BlockRow) -> Bool {
         lhs.block == rhs.block && lhs.streaming == rhs.streaming
