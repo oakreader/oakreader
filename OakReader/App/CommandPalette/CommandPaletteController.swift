@@ -8,7 +8,8 @@ final class CommandPaletteController: NSObject, CommandPalettePanelDelegate {
     }()
 
     private weak var appDelegate: AppDelegate?
-    private var filteredCommands: [PaletteCommand] = []
+    /// Flat lookup of every command currently in the palette, keyed by id.
+    private var commandsByID: [String: PaletteCommand] = [:]
 
     init(appDelegate: AppDelegate) {
         self.appDelegate = appDelegate
@@ -25,9 +26,30 @@ final class CommandPaletteController: NSObject, CommandPalettePanelDelegate {
             return
         }
 
-        filteredCommands = availableCommands()
-        panel.updateRows(filteredCommands)
+        let sections = sectioned(availableCommands())
+        indexCommands(in: sections)
+        panel.updateSections(sections, emptyMessage: nil)
         panel.present(relativeTo: window)
+    }
+
+    // MARK: - Grouping
+
+    /// Group commands by category into ordered sections, mirroring GatherOS's
+    /// QuickSwitcher (Collections / Tags / Saves). Category order is fixed; the
+    /// caller controls the order of commands within each category.
+    private func sectioned(_ commands: [PaletteCommand]) -> [PaletteSection] {
+        CommandCategory.allCases.compactMap { category in
+            let group = commands.filter { $0.category == category }
+            guard !group.isEmpty else { return nil }
+            return PaletteSection(title: category.rawValue, commands: group)
+        }
+    }
+
+    private func indexCommands(in sections: [PaletteSection]) {
+        commandsByID = Dictionary(
+            sections.flatMap(\.commands).map { ($0.id, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
     }
 
     // MARK: - Context
@@ -102,23 +124,27 @@ final class CommandPaletteController: NSObject, CommandPalettePanelDelegate {
         let term = text.trimmingCharacters(in: .whitespaces)
         let available = availableCommands()
 
+        let matches: [PaletteCommand]
         if term.isEmpty {
-            filteredCommands = available
+            matches = available
         } else {
-            filteredCommands = available
+            matches = available
                 .map { (cmd: $0, score: score(command: $0, query: term)) }
                 .filter { $0.score > 0 }
                 .sorted { $0.score > $1.score }
                 .map(\.cmd)
         }
 
-        panel.updateRows(filteredCommands)
+        let sections = sectioned(matches)
+        indexCommands(in: sections)
+        let emptyMessage = matches.isEmpty ? "No matches for \u{201C}\(term)\u{201D}" : nil
+        panel.updateSections(sections, emptyMessage: emptyMessage)
     }
 
-    func commandPaletteDidActivate(_ panel: CommandPalettePanel, at index: Int) {
-        guard index >= 0, index < filteredCommands.count else { return }
+    func commandPaletteDidActivate(_ panel: CommandPalettePanel, commandID: String) {
+        guard let command = commandsByID[commandID] else { return }
         panel.dismiss()
-        execute(filteredCommands[index])
+        execute(command)
     }
 
     func commandPaletteDidDismiss(_ panel: CommandPalettePanel) {

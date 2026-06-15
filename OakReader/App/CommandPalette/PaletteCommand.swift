@@ -46,6 +46,13 @@ enum PaletteAction {
 
 // MARK: - Palette Command
 
+/// A titled group of commands, rendered under a monospace section header.
+/// Mirrors GatherOS's QuickSwitcher grouping (Collections / Tags / Saves).
+struct PaletteSection {
+    let title: String
+    let commands: [PaletteCommand]
+}
+
 struct PaletteCommand: Identifiable {
     let id: String
     let title: String
