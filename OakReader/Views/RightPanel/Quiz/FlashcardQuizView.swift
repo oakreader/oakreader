@@ -1,61 +1,159 @@
 import SwiftUI
 
-/// Flashcard with a front/back flip. Chromeless — sits directly on the deck's
-/// card surface (no nested box). Content is vertically centered like a slide,
-/// with the reveal affordance pinned near the bottom.
+/// Flashcard with a front/back flip.
+///
+/// Two hosting modes:
+/// - **`surface: true`** (deck): the whole card — surface included — flips as one
+///   physical object, with a depth lift and a shadow that grows at the edge-on
+///   midpoint. This is the "real" flashcard flip.
+/// - **`surface: false`** (inline, host supplies the box): only the inner content
+///   flips inside a frame the host already drew.
+///
+/// Either way a single animatable angle drives everything, so the visible face
+/// swaps exactly at the 90° edge-on instant — the two faces never crossfade
+/// through each other (no double-image ghost).
 struct FlashcardQuizView: View {
     let content: QuizContent.FlashcardContent
     /// Slide-sized typography for the full-screen presentation.
     var large: Bool = false
+    /// Draw a physical card surface and flip the whole card (depth + shadow).
+    var surface: Bool = false
+    var cornerRadius: CGFloat = 18
+    var surfacePadding: CGFloat = 22
+    /// Opens a tapped citation (`oak://cite/…`) at its source. When set, citation
+    /// links navigate; either way, tapping one never flips the card.
+    var onOpenCitation: ((String, CitationAnchor) -> Void)? = nil
 
-    @State private var isFlipped = false
+    /// 0 = front, 180 = back. The single source of truth for the flip; the
+    /// visible side and every depth cue are derived from its live value.
+    @State private var angle: Double = 0
+    /// A citation tap and the card's tap-to-flip both fire from the same click,
+    /// in an unspecified order. We defer the flip by one run-loop turn (so it
+    /// runs after the click is fully processed) and skip it if a citation was
+    /// opened within this window — the link always wins, ordering be damned.
+    @State private var suppressFlipUntil: Date = .distantPast
 
     var body: some View {
-        VStack(spacing: large ? 22 : 14) {
-            Spacer(minLength: 0)
-
+        Flip3D(angle: angle,
+               perspective: 0.4,
+               lift: surface ? 0.04 : 0.02,
+               shadowBase: surface ? (radius: large ? 24 : 12, y: large ? 8 : 4) : nil) { showBack in
             ZStack {
-                face(tag: "QUESTION", text: content.front)
-                    .opacity(isFlipped ? 0 : 1)
-                    .rotation3DEffect(.degrees(isFlipped ? 180 : 0),
-                                      axis: (x: 0, y: 1, z: 0), perspective: 0.4)
-                face(tag: "ANSWER", text: content.back)
-                    .opacity(isFlipped ? 1 : 0)
-                    .rotation3DEffect(.degrees(isFlipped ? 0 : -180),
-                                      axis: (x: 0, y: 1, z: 0), perspective: 0.4)
+                side(tag: "QUESTION", text: content.front, hint: "Tap to reveal answer")
+                    .opacity(showBack ? 0 : 1)
+                side(tag: "ANSWER", text: content.back, hint: "Tap to see question")
+                    .opacity(showBack ? 1 : 0)
+                    // The whole card is mirrored at 180°; counter-rotate the back
+                    // side so its text reads the right way round.
+                    .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
             }
-            .frame(maxWidth: .infinity)
-
-            Spacer(minLength: 0)
-
-            // Flip affordance
-            HStack(spacing: 5) {
-                Image(systemName: "hand.tap")
-                Text(isFlipped ? "Tap to see question" : "Tap to reveal answer")
-            }
-            .font(.system(size: large ? 13 : 11, weight: .medium))
-            .foregroundStyle(.tertiary)
-            .transition(.opacity)
-            .id(isFlipped)
+            .modifier(CardSurface(enabled: surface, radius: cornerRadius, padding: surfacePadding))
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(Rectangle())
-        .onTapGesture {
-            withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
-                isFlipped.toggle()
+        .onTapGesture(perform: requestFlip)
+    }
+
+    /// Handles a link tapped inside the card. Marks the flip suppressed first so
+    /// the deferred flip bails out, then navigates known citations.
+    private func handleLink(_ url: URL) -> Bool {
+        suppressFlipUntil = Date().addingTimeInterval(0.25)
+        guard let (citeKey, anchor) = CitationAnchor.parse(from: url) else { return false }
+        onOpenCitation?(citeKey, anchor)
+        return true
+    }
+
+    private func requestFlip() {
+        DispatchQueue.main.async {
+            guard Date() >= suppressFlipUntil else { return }   // a citation won this click
+            // Sturdy, near-overshoot-free — a card settling, not a spring toy.
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) {
+                angle = angle < 90 ? 180 : 0
             }
         }
     }
 
-    private func face(tag: String, text: String) -> some View {
-        VStack(alignment: .leading, spacing: large ? 14 : 9) {
-            Text(tag)
-                .font(.system(size: large ? 11 : 9, weight: .heavy))
-                .tracking(1.2)
-                .foregroundStyle(.tertiary)
-            CardMarkdown(text: text, fontSize: large ? 23 : 16)
-                .frame(maxWidth: .infinity, alignment: .leading)
+    private func side(tag: String, text: String, hint: String) -> some View {
+        VStack(spacing: large ? 22 : 14) {
+            Spacer(minLength: 0)
+
+            VStack(alignment: .leading, spacing: large ? 14 : 9) {
+                Text(tag)
+                    .font(.system(size: large ? 11 : 9, weight: .heavy))
+                    .tracking(1.2)
+                    .foregroundStyle(.tertiary)
+                CardMarkdown(text: text, fontSize: large ? 23 : 16, onOpenURL: handleLink)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Spacer(minLength: 0)
+
+            HStack(spacing: 5) {
+                Image(systemName: "hand.tap")
+                Text(hint)
+            }
+            .font(.system(size: large ? 13 : 11, weight: .medium))
+            .foregroundStyle(.tertiary)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// Drives a Y-axis flip from a single animatable angle (0…180°). Because the
+/// view is `Animatable`, `body` re-runs at every interpolated frame, so the
+/// face swap, the depth lift, and the shadow all stay locked to the *live*
+/// angle rather than to a separate, possibly-drifting timeline.
+private struct Flip3D<Content: View>: View, Animatable {
+    var angle: Double
+    var perspective: CGFloat
+    /// Extra scale at the 90° midpoint — the card rising toward the viewer.
+    var lift: CGFloat
+    /// Resting shadow (radius, y). `nil` = no shadow (host owns the surface).
+    var shadowBase: (radius: CGFloat, y: CGFloat)?
+    @ViewBuilder var content: (Bool) -> Content
+
+    var animatableData: Double {
+        get { angle }
+        set { angle = newValue }
+    }
+
+    var body: some View {
+        let showBack = angle >= 90
+        // 0 when flat, 1 when edge-on; `abs` keeps spring overshoot well-behaved.
+        let edge = abs(sin(angle * .pi / 180))
+        content(showBack)
+            .rotation3DEffect(.degrees(angle), axis: (x: 0, y: 1, z: 0), perspective: perspective)
+            .scaleEffect(1 + lift * edge)
+            .shadow(color: .black.opacity(shadowBase == nil ? 0 : 0.06 + 0.05 * edge),
+                    radius: (shadowBase?.radius ?? 0) + (shadowBase == nil ? 0 : 8 * edge),
+                    x: 0,
+                    y: (shadowBase?.y ?? 0) + (shadowBase == nil ? 0 : 5 * edge))
+    }
+}
+
+/// The card's rounded surface — extracted so the deck and the flip share one
+/// definition and can't drift apart. A no-op when the host already drew a box.
+private struct CardSurface: ViewModifier {
+    let enabled: Bool
+    let radius: CGFloat
+    let padding: CGFloat
+
+    func body(content: Content) -> some View {
+        if enabled {
+            content
+                .padding(padding)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(
+                    RoundedRectangle(cornerRadius: radius, style: .continuous)
+                        .fill(Color(nsColor: .textBackgroundColor))
+                )
+                .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: radius, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
+                )
+        } else {
+            content
+        }
     }
 }

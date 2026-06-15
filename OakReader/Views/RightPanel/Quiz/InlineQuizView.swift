@@ -13,6 +13,8 @@ struct InlineQuizView: View {
     var chromeless: Bool = false
     /// Slide-sized typography for the full-screen deck presentation.
     var large: Bool = false
+    /// Opens a tapped citation at its source (forwarded to the card body).
+    var onOpenCitation: ((String, CitationAnchor) -> Void)? = nil
 
     var body: some View {
         if chromeless {
@@ -44,7 +46,7 @@ struct InlineQuizView: View {
     private var quizBody: some View {
         switch content {
         case .cloze(let c):     ClozeQuizView(content: c)
-        case .flashcard(let c): FlashcardQuizView(content: c, large: large)
+        case .flashcard(let c): FlashcardQuizView(content: c, large: large, onOpenCitation: onOpenCitation)
         case .occlusion(let c): OcclusionQuizView(content: c)
         }
     }

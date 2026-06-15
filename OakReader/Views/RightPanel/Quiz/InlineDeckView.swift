@@ -9,6 +9,8 @@ import SwiftUI
 struct InlineDeckView: View {
     let deck: QuizDeck
     var onSaveCard: ((QuizContent) -> Bool)?
+    /// Opens a tapped citation at its source (forwarded to each card body).
+    var onOpenCitation: ((String, CitationAnchor) -> Void)? = nil
     /// Full-screen "slide" presentation: the card fills the height, type is
     /// larger, and the view's own expand button is hidden.
     var embeddedInSheet: Bool = false
@@ -48,7 +50,7 @@ struct InlineDeckView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: isSlide ? .infinity : nil, alignment: .top)
         .sheet(isPresented: $isFullScreen) {
-            FullScreenDeckView(deck: deck, onSaveCard: onSaveCard)
+            FullScreenDeckView(deck: deck, onSaveCard: onSaveCard, onOpenCitation: onOpenCitation)
         }
     }
 
@@ -130,15 +132,31 @@ struct InlineDeckView: View {
             }
 
             if let card = currentCard {
-                cardFace(card)
+                currentCardView(card)
                     .id(clampedIndex)
                     .transition(cardTransition)
             }
         }
     }
 
+    /// Flashcards flip the whole card surface as one physical object, so they
+    /// draw their own surface; other quiz types sit on the shared static surface.
+    @ViewBuilder
+    private func currentCardView(_ card: QuizContent) -> some View {
+        if case .flashcard(let flashcard) = card {
+            FlashcardQuizView(content: flashcard,
+                              large: isSlide,
+                              surface: true,
+                              cornerRadius: cardRadius,
+                              surfacePadding: isSlide ? 40 : 22,
+                              onOpenCitation: onOpenCitation)
+        } else {
+            cardFace(card)
+        }
+    }
+
     private func cardFace(_ card: QuizContent) -> some View {
-        InlineQuizView(content: card, chromeless: true, large: isSlide)
+        InlineQuizView(content: card, chromeless: true, large: isSlide, onOpenCitation: onOpenCitation)
             .padding(isSlide ? 40 : 22)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(
@@ -289,6 +307,7 @@ struct InlineDeckView: View {
 private struct FullScreenDeckView: View {
     let deck: QuizDeck
     var onSaveCard: ((QuizContent) -> Bool)?
+    var onOpenCitation: ((String, CitationAnchor) -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
 
@@ -307,7 +326,7 @@ private struct FullScreenDeckView: View {
 
             Divider().opacity(0.5)
 
-            InlineDeckView(deck: deck, onSaveCard: onSaveCard, embeddedInSheet: true)
+            InlineDeckView(deck: deck, onSaveCard: onSaveCard, onOpenCitation: onOpenCitation, embeddedInSheet: true)
                 .frame(maxWidth: 1040, maxHeight: .infinity)
                 .padding(.horizontal, 40)
                 .padding(.vertical, 28)
