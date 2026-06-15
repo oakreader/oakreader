@@ -112,7 +112,7 @@ struct NewTabView: View {
     private func suggestionRow(_ route: BrowserSession.Route, isSelected: Bool) -> some View {
         HStack(spacing: 10) {
             rowIcon(for: route)
-                .frame(width: 18)
+                .frame(width: 20)
             rowLabel(for: route)
                 .lineLimit(1)
                 .truncationMode(.tail)
@@ -174,10 +174,20 @@ struct NewTabView: View {
         switch route {
         case .ask:
             // The ask route is answered by Oak (the agent), so brand it with the
-            // app icon rather than a generic chat-bubble symbol.
-            OakAppIcon(size: 16)
+            // app icon rather than a generic chat-bubble symbol. App-icon squircles
+            // ship with transparent margin, so render it larger than the full-bleed
+            // Google mark to carry equal optical weight.
+            OakAppIcon(size: 19)
         case .search:
-            symbolIcon("magnifyingglass")
+            // The search route hands off to Google, so brand the row with the
+            // Google "G" mark rather than a generic magnifying glass — mirroring
+            // how the .ask row carries Oak's app icon.
+            Image("SearchEngineGoogle")
+                .resizable()
+                .interpolation(.high)
+                .scaledToFit()
+                .frame(width: 15, height: 15)
+                .accessibilityLabel("Google")
         case .navigate:
             symbolIcon("globe")
         }
