@@ -15,6 +15,19 @@ final class LibraryStore {
     var selectedCollectionId: UUID? = SystemCollectionID.readingList
     var selectedTagOptionId: UUID?
 
+    // Middle-pane presentation (Finder-style list vs. masonry card grid), persisted.
+    // The card grid's column count is responsive (derived from the pane width in
+    // `LibraryCardGridView`), so there is no stored/user-set column count.
+    var viewMode: LibraryViewMode = Preferences.shared.libraryViewMode {
+        didSet { Preferences.shared.libraryViewMode = viewMode }
+    }
+
+    /// Lightweight signal that the background sweep wrote new cover files to disk. Card views
+    /// observe this to re-read their cover — it does NOT refetch items (unlike `invalidate()`),
+    /// so backfilling covers never triggers a full library reload.
+    private(set) var coverRevision: Int = 0
+    func bumpCoverRevision() { coverRevision &+= 1 }
+
     // Full-text search state
     var isFullTextSearchActive: Bool = false
     var fullTextSearchResults: [UUID: FTSIndexService.SearchResult]?
@@ -253,31 +266,37 @@ final class LibraryStore {
         }
 
         // Apply toolbar filters (OR within category, AND between categories)
-        if hasActiveFilters {
-            results = results.filter { item in
-                // Type filter: item matches any selected type (OR)
-                if !selectedTypes.isEmpty {
-                    guard selectedTypes.contains(item.contentType.rawValue) else { return false }
-                }
-                // Tag filter: item has any selected tag option (OR)
-                if !selectedTagOptionIds.isEmpty {
-                    let itemTagIds = Set(item.propertyValues.compactMap { $0.option?.id })
-                    guard !itemTagIds.isDisjoint(with: selectedTagOptionIds) else { return false }
-                }
-                // Status filter: item has any selected status option (OR)
-                if !selectedStatusOptionIds.isEmpty {
-                    let itemStatusIds = Set(item.propertyValues.compactMap { $0.option?.id })
-                    guard !itemStatusIds.isDisjoint(with: selectedStatusOptionIds) else { return false }
-                }
-                return true
-            }
-        }
+        applyToolbarFilters(to: &results)
 
         // Apply search & sort
         applySearch(to: &results)
         applySort(to: &results)
 
         return results
+    }
+
+    /// Applies the toolbar Type/Tags/Status filters (OR within a category, AND
+    /// between categories). Shared by `filteredItems` and the special pseudo-
+    /// collections (Reading List, Duplicates, Bin) so the filter menu works there too.
+    private func applyToolbarFilters(to results: inout [LibraryItem]) {
+        guard hasActiveFilters else { return }
+        results = results.filter { item in
+            // Type filter: item matches any selected type (OR)
+            if !selectedTypes.isEmpty {
+                guard selectedTypes.contains(item.contentType.rawValue) else { return false }
+            }
+            // Tag filter: item has any selected tag option (OR)
+            if !selectedTagOptionIds.isEmpty {
+                let itemTagIds = Set(item.propertyValues.compactMap { $0.option?.id })
+                guard !itemTagIds.isDisjoint(with: selectedTagOptionIds) else { return false }
+            }
+            // Status filter: item has any selected status option (OR)
+            if !selectedStatusOptionIds.isEmpty {
+                let itemStatusIds = Set(item.propertyValues.compactMap { $0.option?.id })
+                guard !itemStatusIds.isDisjoint(with: selectedStatusOptionIds) else { return false }
+            }
+            return true
+        }
     }
 
     // MARK: - Rule Evaluation
@@ -431,6 +450,7 @@ final class LibraryStore {
     private var readingListFilteredItems: [LibraryItem] {
         let ids = readingListItemIds
         var results = items.filter { ids.contains($0.id) }
+        applyToolbarFilters(to: &results)
         applySearch(to: &results)
         applySort(to: &results)
         return results
@@ -448,6 +468,7 @@ final class LibraryStore {
             }
             results.append(contentsOf: sorted)
         }
+        applyToolbarFilters(to: &results)
         applySearch(to: &results)
         return results
     }
@@ -462,6 +483,7 @@ final class LibraryStore {
     /// Trashed items filtered by search text.
     private var binFilteredItems: [LibraryItem] {
         var results = trashedItems
+        applyToolbarFilters(to: &results)
         applySearch(to: &results)
 
         // Sort by deleted_at descending (most recently trashed first)

@@ -66,7 +66,12 @@ struct LibraryRootView: View {
             VStack(spacing: 0) {
                 LibraryTableToolbar(appState: appState)
                 Divider()
-                LibraryTableView(appState: appState, selection: $appState.selectedLibraryItemIDs)
+                switch store.viewMode {
+                case .list:
+                    LibraryTableView(appState: appState, selection: $appState.selectedLibraryItemIDs)
+                case .card:
+                    LibraryCardGridView(appState: appState, selection: $appState.selectedLibraryItemIDs)
+                }
             }
             .background(Color(nsColor: .controlBackgroundColor), in: paneShape)
             .clipShape(paneShape)

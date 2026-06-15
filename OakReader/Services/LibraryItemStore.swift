@@ -88,15 +88,17 @@ extension LibraryStore {
                 let attachments = attRecords.map { Attachment(record: $0, itemStorageKey: item.storageKey) }
                 let propValues = itemPropertyValuesMap[item.id] ?? []
                 let collections = itemCollectionsMap[item.id] ?? []
-                let primary = attachments.first { $0.isPrimary } ?? attachments.first
-                let coverData = primary.flatMap { Self.loadCoverData(attachment: $0) }
                 let citation = citationMap[item.id]
+                // Covers are NOT loaded here: at 10k items that would pin every cover image in
+                // memory (hundreds of MB) and re-read them all from disk on each invalidate().
+                // The views that actually show a cover (card grid, sidebar) load it lazily from
+                // `attachment.coverURL`, decoded off-main and cached. The list view never needs it.
                 return LibraryItem(
                     record: item,
                     attachments: attachments,
                     propertyValues: propValues,
                     collections: collections,
-                    coverImageData: coverData,
+                    coverImageData: nil,
                     referenceMetadata: citation
                 )
             }

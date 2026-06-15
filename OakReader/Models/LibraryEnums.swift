@@ -27,6 +27,22 @@ enum LibrarySortOrder: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+/// Middle-pane presentation for the Library: Finder-style list vs. masonry card grid.
+enum LibraryViewMode: String, CaseIterable, Identifiable {
+    case list
+    case card
+
+    var id: String { rawValue }
+
+    /// SF Symbol for the segmented toggle.
+    var symbol: String {
+        switch self {
+        case .list: return "list.bullet"
+        case .card: return "square.grid.2x2"
+        }
+    }
+}
+
 enum SystemCollectionID {
     static let readingList  = UUID(uuidString: "00000000-0000-0000-0000-00000000000E")!
     static let allItems     = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!

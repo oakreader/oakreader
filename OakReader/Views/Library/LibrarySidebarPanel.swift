@@ -30,10 +30,27 @@ struct LibrarySidebarPanel: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .task(id: item.id) {
             generatedCoverData = nil
-            guard item.coverImageData == nil, item.contentType == .html else { return }
+            // Covers are no longer eager-loaded onto the item — read an existing one from disk first.
+            if let url = item.primaryAttachment?.coverURL,
+               let data = try? Data(contentsOf: url) {
+                generatedCoverData = data
+                return
+            }
+            // None on disk → generate one. The sidebar shows a single item, so this is bounded
+            // (unlike the card grid, which must never generate covers on scroll).
             let coverService = appState.coverService
-            let fileURL = item.fileURL
-            if let coverData = await coverService.generateHTMLCover(for: fileURL) {
+            var coverData: Data?
+            switch item.contentType {
+            case .html:
+                coverData = await coverService.generateHTMLCover(for: item.fileURL)
+            case .link:
+                if let sourceURL = item.sourceURL {
+                    coverData = await coverService.generateLinkCover(for: sourceURL)
+                }
+            default:
+                break
+            }
+            if let coverData {
                 store.updateCover(item, imageData: coverData)
                 generatedCoverData = coverData
             }

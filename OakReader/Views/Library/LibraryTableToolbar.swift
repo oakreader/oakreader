@@ -14,6 +14,10 @@ struct LibraryTableToolbar: View {
         store.properties.first { $0.name == "Status" && $0.isSystem }
     }
 
+    private var viewModeBinding: Binding<LibraryViewMode> {
+        Binding(get: { store.viewMode }, set: { store.viewMode = $0 })
+    }
+
     private let filterableTypes: [(type: ContentType, label: String)] = [
         (.pdf, "PDF"),
         (.html, "Web"),
@@ -90,6 +94,18 @@ struct LibraryTableToolbar: View {
                 .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 6))
 
                 Spacer()
+
+                // List / card view-mode toggle
+                Picker("View", selection: viewModeBinding) {
+                    ForEach(LibraryViewMode.allCases) { mode in
+                        Image(systemName: mode.symbol).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+                .help("Switch between list and card view")
+                .accessibilityLabel("Library view mode")
 
                 // Filter menu
                 Menu {

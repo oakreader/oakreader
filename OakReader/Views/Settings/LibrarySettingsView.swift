@@ -5,6 +5,7 @@ struct LibrarySettingsView: View {
     let store: LibraryStore
 
     @State private var indexedCount = 0
+    @State private var processedCount = 0
     @State private var totalCount = 0
     @State private var chunkCount = 0
     @State private var isRebuilding = false
@@ -17,7 +18,12 @@ struct LibrarySettingsView: View {
         (SystemCollectionID.html, "Web", "globe"),
     ]
 
-    private var isIndexing: Bool { indexedCount < totalCount }
+    /// Real work only: items we haven't attempted yet. Skipped (empty) items are
+    /// already processed, so this goes to zero when the background pass finishes.
+    private var isIndexing: Bool { processedCount < totalCount }
+
+    /// Processed but produced no chunks (image-only PDFs, links/HTML with no text).
+    private var skippedCount: Int { max(0, processedCount - indexedCount) }
 
     var body: some View {
         Form {
@@ -56,19 +62,23 @@ struct LibrarySettingsView: View {
                 }
 
                 if totalCount > 0 {
-                    ProgressView(value: Double(indexedCount), total: Double(totalCount))
-                        .animation(.default, value: indexedCount)
+                    ProgressView(value: Double(processedCount), total: Double(totalCount))
+                        .animation(.default, value: processedCount)
                 }
 
                 if isIndexing {
                     HStack(spacing: 6) {
                         ProgressView()
                             .controlSize(.small)
-                        let remaining = totalCount - indexedCount
+                        let remaining = totalCount - processedCount
                         Text("Indexing... \(remaining) item(s) remaining")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+                } else if skippedCount > 0 {
+                    Text("\(skippedCount) item(s) skipped — no extractable text (e.g. scanned PDFs)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 Button {
@@ -113,6 +123,7 @@ struct LibrarySettingsView: View {
 
         withAnimation {
             indexedCount = stats?.indexedItemCount ?? 0
+            processedCount = stats?.processedItemCount ?? 0
             chunkCount = stats?.totalChunkCount ?? 0
             totalCount = total
         }
@@ -130,6 +141,7 @@ struct LibrarySettingsView: View {
             await MainActor.run {
                 withAnimation {
                     indexedCount = 0
+                    processedCount = 0
                     chunkCount = 0
                 }
             }

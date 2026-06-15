@@ -106,11 +106,17 @@ extension ImportService {
             return nil
         }
 
-        // Generate cover thumbnail asynchronously
+        // Render the PDF's first page as the cover — the most recognizable preview for a document.
+        // If rendering fails (encrypted/corrupt page), the item is left cover-less and the
+        // background sweep retries (falling back to a synthetic typographic cover).
         Task {
             if let coverData = await coverService.generateCover(for: destURL) {
                 await MainActor.run {
                     store.updateCover(item, imageData: coverData)
+                }
+                // Tag it a real render so the background sweep doesn't redundantly re-render it.
+                if let attachment = item.primaryAttachment {
+                    try? Data().write(to: LibraryCoverSweeper.renderMarkerURL(for: attachment), options: .atomic)
                 }
             }
         }

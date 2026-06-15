@@ -83,6 +83,7 @@ final class Preferences {
         // Library preferences
         static let librarySortOrder = "librarySortOrder"
         static let librarySortAscending = "librarySortAscending"
+        static let libraryViewMode = "libraryViewMode"
         // Library smart collections
         static let hiddenSystemCollectionIds = "hiddenSystemCollectionIds"
         // AI preferences
@@ -179,6 +180,7 @@ final class Preferences {
             Keys.agentPermissionLevel: AgentPermissionLevel.smart.rawValue,
             Keys.thinkingBudget: 10000,
             Keys.appearanceMode: "system",
+            Keys.libraryViewMode: LibraryViewMode.list.rawValue,
         ])
     }
 
@@ -276,6 +278,11 @@ final class Preferences {
     var librarySortAscending: Bool {
         get { defaults.bool(forKey: Keys.librarySortAscending) }
         set { defaults.set(newValue, forKey: Keys.librarySortAscending) }
+    }
+
+    var libraryViewMode: LibraryViewMode {
+        get { LibraryViewMode(rawValue: defaults.string(forKey: Keys.libraryViewMode) ?? "") ?? .list }
+        set { defaults.set(newValue.rawValue, forKey: Keys.libraryViewMode) }
     }
 
     // MARK: - Library Smart Collections

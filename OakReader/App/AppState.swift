@@ -219,6 +219,8 @@ final class AppState {
                 }
                 Log.info(Log.fts, "Full-text index service initialized")
                 await service.backgroundIndexAll()
+                // Lower-priority second pass: OCR the image-only PDFs left empty above.
+                await service.backgroundOCRBackfill()
             } catch {
                 Log.error(Log.fts, "Failed to initialize full-text index service: \(error)")
             }

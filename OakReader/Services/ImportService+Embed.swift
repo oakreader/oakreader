@@ -127,6 +127,20 @@ extension ImportService {
             }
         }
 
+        // Generate a static preview cover when the extension didn't supply a thumbnail
+        // (e.g. a pasted/typed YouTube or web URL). YouTube derives its poster; other links
+        // scrape og:image. Mirrors the HTML-import cover task.
+        if input.thumbnailData == nil {
+            let sourceURL = input.sourceURL
+            Task {
+                if let coverData = await coverService.generateLinkCover(for: sourceURL) {
+                    await MainActor.run {
+                        store.updateCover(item, imageData: coverData)
+                    }
+                }
+            }
+        }
+
         return item
     }
 
