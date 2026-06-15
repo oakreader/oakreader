@@ -67,6 +67,13 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
                 .replacingOccurrences(of: "\n", with: "\\n")
             let js = """
             (function() {
+                if (!document.getElementById('oak-cite-style')) {
+                    var st = document.createElement('style');
+                    st.id = 'oak-cite-style';
+                    st.textContent = '.oak-cite-hl{background-color:rgba(255,214,10,0.45)!important;'
+                        + 'border-radius:2px;transition:background-color .3s;}';
+                    document.head.appendChild(st);
+                }
                 // Try by ID first (set by setupHeaderAnchors)
                 var el = document.getElementById('\(escapedHeading)');
                 if (!el) {
@@ -103,37 +110,36 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
                 .replacingOccurrences(of: "\\", with: "\\\\")
                 .replacingOccurrences(of: "'", with: "\\'")
                 .replacingOccurrences(of: "\n", with: "\\n")
-            // Use mark.js for cross-node, case-insensitive, whitespace-normalized
-            // text matching. Temporarily wraps the first match in a <mark> element,
-            // scrolls to it, then removes the wrapper after 3 seconds.
+            // Primary path: the bundled dom-anchor-text-quote hook (oak-cite-anchor.js)
+            // fuzzily anchors the quote — handling the model's paraphrases/abbreviations
+            // ("93 last month" vs the page's "93% a month") via diff-match-patch — then
+            // flashes + scrolls to it. Fallback (bundle absent or no anchor found):
+            // mark.js exact phrase, which still covers verbatim quotes.
             let js = """
             (function() {
+                var query = '\(escapedText)';
+                if (window.oakHighlightCitation &&
+                    window.oakHighlightCitation(JSON.stringify({ exact: query }))) {
+                    return;
+                }
                 var ctx = document.querySelector('.heti') || document.body;
                 var instance = new Mark(ctx);
-                // Remove any previous citation highlight.
                 instance.unmark({ className: 'oak-cite-hl' });
-
                 var scrolled = false;
-                instance.mark('\(escapedText)', {
+                instance.mark(query, {
                     acrossElements: true,
                     caseSensitive: false,
                     separateWordSearch: false,
+                    ignorePunctuation: "\\"'’“”.,;:!?()%-",
                     className: 'oak-cite-hl',
                     each: function(el) {
-                        // Scroll only to the first <mark> element of the first match.
                         if (!scrolled) {
                             scrolled = true;
                             el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                         }
                     },
-                    noMatch: function() {
-                        // Last resort: try the deprecated window.find for simple cases.
-                        window.getSelection().removeAllRanges();
-                        window.find('\(escapedText)', false, false, true);
-                    },
                     done: function(count) {
                         if (count === 0) return;
-                        // Remove the highlight after 3 seconds.
                         setTimeout(function() {
                             instance.unmark({ className: 'oak-cite-hl' });
                         }, 3000);

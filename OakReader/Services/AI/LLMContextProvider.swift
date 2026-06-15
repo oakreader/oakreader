@@ -7,11 +7,28 @@ struct LLMContextProvider {
 
     // MARK: - Context Snapshot
 
+    /// How many characters of document body text to embed in the prompt, derived
+    /// from the active model's context window. Replaces the old fixed 4 000-char
+    /// cap so a whole short document (e.g. a 20-page PDF) loads in full on a large
+    /// window, while small local-model windows stay bounded.
+    ///
+    /// Heuristic: spend ~40% of the window on the open document, at ~3 chars/token
+    /// (conservative for mixed Latin/CJK text). Floored so even tiny windows beat
+    /// the old 4 000-char cap. The 40% fraction is a starting point — see
+    /// `docs/backlog/citation-grounding-redesign.md` (open decision).
+    static func documentCharBudget(contextWindow: Int) -> Int {
+        let docTokens = max(2_000, Int(Double(contextWindow) * 0.4))
+        return docTokens * 3
+    }
+
     /// Build a ``ChatContextSnapshot`` capturing all app + document context for the AI.
+    /// `documentCharBudget` bounds how much body text each source contributes; pass
+    /// the value from ``documentCharBudget(contextWindow:)`` for the active model.
     static func buildContextSnapshot(
         from documentVM: DocumentViewModel?,
         appState: AppState?,
-        contextMode: ContextMode
+        contextMode: ContextMode,
+        documentCharBudget: Int
     ) -> ChatContextSnapshot {
         // App-level context — the selected collection, if any.
         let activeCollection: ChatContextSnapshot.ActiveCollection?
@@ -43,7 +60,7 @@ struct LLMContextProvider {
         // Document context
         let docContext: ChatContextSnapshot.DocumentContext?
         if let vm = documentVM {
-            docContext = buildDocumentContext(from: vm, contextMode: contextMode)
+            docContext = buildDocumentContext(from: vm, contextMode: contextMode, charBudget: documentCharBudget)
         } else {
             docContext = nil
         }
@@ -59,7 +76,8 @@ struct LLMContextProvider {
 
     private static func buildDocumentContext(
         from vm: DocumentViewModel,
-        contextMode: ContextMode
+        contextMode: ContextMode,
+        charBudget: Int
     ) -> ChatContextSnapshot.DocumentContext {
         let textExtractor = TextExtractionService()
 
@@ -81,10 +99,10 @@ struct LLMContextProvider {
                 let mdURL = snapshot.htmlURL.deletingLastPathComponent()
                     .appendingPathComponent("content.md")
                 if let md = try? String(contentsOf: mdURL, encoding: .utf8), !md.isEmpty {
-                    currentPageText = String(md.prefix(4_000))
+                    currentPageText = String(md.prefix(charBudget))
                 } else if let data = try? Data(contentsOf: snapshot.htmlURL) {
                     currentPageText = String(
-                        HTMLTextExtractor.extractText(from: data).prefix(4_000)
+                        HTMLTextExtractor.extractText(from: data).prefix(charBudget)
                     )
                 } else {
                     currentPageText = ""
@@ -96,13 +114,13 @@ struct LLMContextProvider {
             if let media = vm.mediaDocument {
                 if let url = media.transcriptURL,
                    let text = try? String(contentsOf: url, encoding: .utf8) {
-                    currentPageText = String(text.prefix(4_000))
+                    currentPageText = String(text.prefix(charBudget))
                 } else {
                     // Check for article content saved by browser extension
                     let mdURL = media.storageDirectory
                         .appendingPathComponent("content.md")
                     if let md = try? String(contentsOf: mdURL, encoding: .utf8), !md.isEmpty {
-                        currentPageText = String(md.prefix(4_000))
+                        currentPageText = String(md.prefix(charBudget))
                     } else {
                         currentPageText = media.metadata.description ?? ""
                     }
@@ -112,7 +130,7 @@ struct LLMContextProvider {
             }
         case .markdown:
             if let mdDoc = vm.markdownDocument {
-                currentPageText = String(mdDoc.content.prefix(4_000))
+                currentPageText = String(mdDoc.content.prefix(charBudget))
             } else {
                 currentPageText = ""
             }
@@ -140,10 +158,19 @@ struct LLMContextProvider {
         let ref = item?.referenceMetadata
         let csl = ref?.cslItem
 
+        // A `.link` is a timeline medium (cite by `?time=`) only when it carries a
+        // duration/YouTube embed; a live web page is `.link` with no timeline and is
+        // cited like HTML. `.audio` is always a timeline medium.
+        let isTimelineMedia = vm.contentType == .audio
+            || (vm.mediaDocument.map {
+                $0.metadata.resolvedEmbedType == .youtube || $0.metadata.duration != nil
+            } ?? false)
+
         return ChatContextSnapshot.DocumentContext(
             fileName: vm.fileName,
             filePath: filePath,
             contentType: vm.contentType,
+            isTimelineMedia: isTimelineMedia,
             pageCount: pageCount,
             currentPageIndex: currentPageIndex,
             currentPageText: currentPageText,
@@ -170,7 +197,20 @@ struct LLMContextProvider {
     /// Build a system prompt from a skill and enriched context snapshot.
     /// Uses structured XML for metadata, includes current page text, and references
     /// available tools for on-demand document reading.
-    static func buildSystemPrompt(skill: Skill?, context: ChatContextSnapshot) -> String {
+    /// A current-page passage injected as a citable `?c=` unit, sourced from the FTS
+    /// index so its id resolves through the shared `ChunkCitationResolver`.
+    struct CurrentPageChunk: Sendable {
+        let id: Int64
+        let page: Int?   // 0-based
+        let text: String
+    }
+
+    static func buildSystemPrompt(
+        skill: Skill?,
+        context: ChatContextSnapshot,
+        documentCharBudget: Int,
+        currentPageChunks: [CurrentPageChunk] = []
+    ) -> String {
         var parts: [String] = []
 
         // Base system prompt — a grounded, source-first research assistant.
@@ -181,12 +221,22 @@ struct LLMContextProvider {
             you retrieve — not from memory. Ground every substantive claim in those \
             sources and prefer retrieving over recalling.
 
-            Citations are how the user verifies and jumps to the evidence. Whenever \
-            a statement comes from a source, attach a clickable citation in the form \
-            oak://cite/{citeKey}?page=N&text=<a short verbatim quote from the \
-            passage>. The quote must be copied exactly so it can be located and \
-            highlighted; include &page= for documents and &time= for audio/video. \
-            Cite as you write, at the point of each claim — not as a trailing list.
+            Citations are how the user verifies and jumps to the evidence, in the \
+            form oak://cite/{citeKey}?page=N&text=<a verbatim quote from the \
+            passage> (include &page= for documents and &time= for audio/video).
+
+            What to cite — and what NOT to. A citation marks the EVIDENCE FOR A \
+            CLAIM, not every sentence that touches a source. Cite: the thesis or \
+            main conclusion of a passage you report; a specific claim, finding, or \
+            causal statement ("X reduces Y by 40%"); named statistics, dates, \
+            definitions, and direct quotations. Do NOT cite: transitions, generic \
+            background, your own paraphrase of something you cited one sentence \
+            earlier, restatements, or your own synthesis/reasoning. Prefer ONE \
+            citation on the load-bearing claim over several on incidental phrases — \
+            over-citing buries the source that actually matters. If a paragraph \
+            makes one real claim, it usually needs one citation, on that claim's \
+            sentence. Cite as you write, at the point of the claim — not as a \
+            trailing list.
 
             Do not fabricate citations, quotes, or facts. If the sources don't \
             answer the question, say so plainly rather than guessing. Do not praise \
@@ -293,9 +343,23 @@ struct LLMContextProvider {
                 docParts.append("  <selected-text>\n\(selected)\n  </selected-text>")
             }
 
-            // Current page text (always include — immediately relevant)
-            if !doc.currentPageText.isEmpty {
-                let truncated = String(doc.currentPageText.prefix(4_000))
+            // Current page / document body text (always include — immediately
+            // relevant). When the open page is indexed, inject it as numbered
+            // [c<id>] passages so the model cites it by ?c= (validated, page-accurate)
+            // exactly like retrieved passages; otherwise fall back to raw page text
+            // (cited via ?text=). Bounded by the model-window budget either way.
+            if !currentPageChunks.isEmpty {
+                var lines = ["  <current-page index=\"\(doc.currentPageIndex + 1)\" note=\"each [c&lt;id&gt;] is a citable passage — cite it as oak://cite/CITEKEY?c=&lt;id&gt;&amp;text=&lt;verbatim claim sentence&gt;\">"]
+                var remaining = documentCharBudget
+                for ch in currentPageChunks where remaining > 0 {
+                    let snippet = String(ch.text.prefix(remaining))
+                    lines.append("    [c\(ch.id)] \(snippet)")
+                    remaining -= snippet.count
+                }
+                lines.append("  </current-page>")
+                docParts.append(lines.joined(separator: "\n"))
+            } else if !doc.currentPageText.isEmpty {
+                let truncated = String(doc.currentPageText.prefix(documentCharBudget))
                 docParts.append("  <current-page index=\"\(doc.currentPageIndex + 1)\">\n\(truncated)\n  </current-page>")
             }
 
@@ -340,6 +404,14 @@ struct LLMContextProvider {
                 browse items (oak items list), and manage the library. \
                 Use search_content for conceptual/thematic queries and \
                 search_academic to find papers on the web.
+
+                Cite every claim. When you cite a passage returned by search_content \
+                or research, it carries a "Cite this passage as: ?c=<id>" handle — \
+                cite using that id and copy the single sentence that states the claim:
+                [your own label](oak://cite/{citeKey}?c=<id>&text=<verbatim claim sentence>)
+                The app resolves the id to the exact page and verifies the quote. The \
+                [label] is your own wording; the ?text= value is copied word-for-word. \
+                Cite the load-bearing claim, not incidental phrases — one cite per claim.
                 """)
         }
 
@@ -400,28 +472,47 @@ struct LLMContextProvider {
                 it literally appears — same spelling, numbers, capitalization and \
                 punctuation. Do NOT paraphrase, summarize, reorder, abbreviate \
                 (e.g. "36 million" not "36M"), or stitch together non-adjacent \
-                words for the anchor. Copy a contiguous run of words exactly as \
-                they appear — from a few words up to a full sentence; prefer a \
-                complete, meaningful clause so the highlight reads as a passage \
-                (line breaks inside the quote are fine). The link's visible [label] \
-                can be your own wording; only the anchor value must be the quote. \
-                If you are not certain of the exact wording, omit ?text= and cite \
-                the page alone — never invent a phrase.
+                words for the anchor. Anchor on the CLAIM, not a catchy fragment: \
+                copy the clause or sentence that actually states the point you are \
+                citing (the span a reader would underline as "this is it"), exactly \
+                as it appears — typically a full clause up to one sentence (line \
+                breaks inside the quote are fine). Do not shrink it to a short, \
+                quotable noun-phrase just because that is easier to copy. If the \
+                claim sentence is long, anchor on its core assertion (subject + verb \
+                + object), still a single contiguous verbatim run. The link's \
+                visible [label] can be your own wording; only the anchor value must \
+                be the quote. If you are not certain of the exact wording, omit \
+                ?text= and cite the page alone — never invent a phrase.
                 """)
 
-            // Format + example per document type
+            // Format + example per citation style. A live web page is `.link` with
+            // no timeline, so it cites like HTML (textual) rather than by `?time=`.
+            enum CitationStyle { case paged, textual, timeline }
+            let style: CitationStyle
             switch doc.contentType {
-            case .pdf:
+            case .pdf:                  style = .paged
+            case .html, .markdown:      style = .textual
+            case .link:                 style = doc.isTimelineMedia ? .timeline : .textual
+            case .audio:                style = .timeline
+            }
+
+            switch style {
+            case .paged:
                 parts.append("""
                     This PDF's cite-key is "\(eck)". Citation format:
                     [p. N](oak://cite/\(eck)?page=N)
                     [p. N](oak://cite/\(eck)?page=N&text=verbatim+quote)
 
-                    Add &text= with a verbatim phrase (a few words up to a full \
-                    sentence) copied from that page (spaces encoded as +) so the \
-                    reader jumps to the exact passage. The quote must appear \
-                    word-for-word on the page; if you can't quote it exactly, give \
-                    the page alone.
+                    Add &text= with the verbatim clause or sentence that states the \
+                    claim (not a catchy fragment), copied from that page (spaces \
+                    encoded as +) so the reader jumps to the load-bearing passage. \
+                    The quote must appear word-for-word on the page; if you can't \
+                    quote it exactly, give the page alone.
+
+                    If the <current-page> above is shown as [c<id>] passages, cite \
+                    those by oak://cite/\(eck)?c=<id>&text=<claim sentence> rather \
+                    than writing the page number yourself — the app resolves the id \
+                    to the exact page and verifies the quote.
 
                     Example — the [label] is paraphrased, the &text= anchor is an exact quote:
                     \"The transformer replaces recurrence with self-attention \
@@ -430,29 +521,31 @@ struct LLMContextProvider {
                     [p. 3](oak://cite/\(eck)?page=3&text=Scaled+Dot-Product+Attention), and \
                     multi-head attention extends it on [p. 4](oak://cite/\(eck)?page=4).\"
                     """)
-            case .html, .markdown:
+            case .textual:
                 parts.append("""
                     This document's cite-key is "\(eck)". Citation format:
                     [§ Heading](oak://cite/\(eck)?heading=HeadingText)
-                    ["quoted phrase"](oak://cite/\(eck)?text=quoted+text)
+                    [your own label](oak://cite/\(eck)?text=verbatim+claim+sentence)
 
-                    For ?text= copy a SHORT phrase (4–8 words) VERBATIM from the \
-                    rendered text (not the raw markdown source) — exact words in \
+                    For ?text= copy the clause or sentence that STATES THE CLAIM \
+                    you're citing — not a catchy fragment — VERBATIM from the \
+                    rendered text (not the raw markdown source), exact words in \
                     order, no paraphrasing. Matching is case-insensitive, so only \
-                    casing may differ; the words themselves must match the page.
+                    casing may differ; the words themselves must match the page. The \
+                    [label] is your own wording; the anchor is the quote.
 
                     Prefer ?text= for referencing specific passages; use \
                     ?heading= only when pointing to a whole section.
 
-                    Example:
-                    \"The API supports batch processing \
+                    Example — the label names the idea, the anchor is the claim sentence:
+                    \"Batch jobs are processed asynchronously \
                     ([§ Batch Endpoints](oak://cite/\(eck)?heading=Batch%20Endpoints)), \
-                    which the docs call 'fire-and-forget' \
-                    (["fire-and-forget strategy"](oak://cite/\(eck)?text=fire-and-forget+strategy+for+asynchronous+jobs)).\"
+                    and the docs guarantee completion \
+                    ([within 24 hours](oak://cite/\(eck)?text=batch+jobs+are+processed+asynchronously+within+24+hours)).\"
 
                     Do not use page numbers — this document has no pages.
                     """)
-            case .link, .audio:
+            case .timeline:
                 parts.append("""
                     This media's cite-key is "\(eck)". Citation format:
                     [MM:SS](oak://cite/\(eck)?time=SECONDS)
@@ -478,6 +571,18 @@ struct LLMContextProvider {
                 For <note> elements, read them with the read tool using the \
                 provided path.
                 Only cite content you have actually read or found via tools.
+                """)
+
+            // Chunk-id citations for retrieved passages — the most reliable anchor.
+            parts.append("""
+                PREFERRED — When you cite a passage returned by search_content or \
+                research, it carries a "Cite this passage as: ?c=<id>" handle. Cite \
+                using that id and copy the single sentence that states the claim:
+                [your own label](oak://cite/{citeKey}?c=<id>&text=<verbatim claim sentence>)
+                The app resolves the id to the exact page and verifies the quote, so \
+                this is more reliable than writing a page number yourself. The \
+                [label] is your own wording; the ?text= value must be copied \
+                word-for-word from that passage.
                 """)
         } else if context.document != nil {
             parts.append("""

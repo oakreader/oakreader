@@ -6,6 +6,7 @@
   "scripts": {
     "build:singlefile": "rollup -c rollup.singlefile.config.js",
     "build:defuddle": "rollup -c rollup.defuddle.config.js",
+    "build:cite-anchor": "rollup -c rollup.cite-anchor.config.js",
     "dev": "pnpm run build:singlefile && wxt",
     "build": "pnpm run build:singlefile && wxt build",
     "zip": "pnpm run build:singlefile && wxt zip",
@@ -16,6 +17,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "defuddle": "^0.18.1",
+    "dom-anchor-text-quote": "^4.0.2",
     "lucide-react": "^1.14.0",
     "react": "^19",
     "react-dom": "^19",

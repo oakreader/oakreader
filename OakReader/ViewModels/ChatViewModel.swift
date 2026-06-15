@@ -255,27 +255,24 @@ class ChatViewModel {
         // Create or update session record in DB
         persistSessionMetadata(firstUserMessage: sendText)
 
-        // Build enriched context snapshot
+        // Build enriched context snapshot. The document-text budget scales with the
+        // active model's context window (replaces the old fixed 4 000-char cap), so a
+        // whole short document loads in full on a large window.
         let contextMode = effectiveSkill?.contextMode ?? .currentPage
+        let docCharBudget = LLMContextProvider.documentCharBudget(
+            contextWindow: config.modelInfo?.contextWindow ?? 200_000
+        )
         let snapshot = LLMContextProvider.buildContextSnapshot(
             from: parent,
             appState: parent?.appState ?? appState,
-            contextMode: contextMode
+            contextMode: contextMode,
+            documentCharBudget: docCharBudget
         )
 
-        // Build system prompt from snapshot, appending the per-document continuity
-        // brief (auto-summary of earlier chats about THIS item) when one exists.
+        // The system prompt is assembled inside the stream task below, where we can
+        // await the open document's current-page chunks (injected as citable `?c=`
+        // passages). `currentSkill` is also reused for `turnMetadata`.
         let currentSkill = effectiveSkill
-        let baseSystemPrompt = LLMContextProvider.buildSystemPrompt(
-            skill: currentSkill,
-            context: snapshot
-        )
-        let systemPrompt: String
-        if let item = itemId, let brief = LLMContextProvider.loadItemBrief(itemId: item) {
-            systemPrompt = baseSystemPrompt + "\n\n" + brief
-        } else {
-            systemPrompt = baseSystemPrompt
-        }
 
         let currentHistory = turns.filter { !$0.isStreaming }
         let currentSessionId = sessionId
@@ -385,6 +382,22 @@ class ChatViewModel {
 
         streamTask = Task { @MainActor [weak self] in
             do {
+                // Inject the open document's current page as citable `?c=` passages
+                // (PDF, when indexed) so the model cites the page it's reading the
+                // same validated way it cites retrieved passages. Built here, not in
+                // the synchronous prelude, because the chunk fetch is async.
+                let pageChunks = await self?.currentPageChunks(snapshot: snapshot) ?? []
+                var systemPrompt = LLMContextProvider.buildSystemPrompt(
+                    skill: currentSkill,
+                    context: snapshot,
+                    documentCharBudget: docCharBudget,
+                    currentPageChunks: pageChunks
+                )
+                if let item = self?.itemId,
+                   let brief = LLMContextProvider.loadItemBrief(itemId: item) {
+                    systemPrompt += "\n\n" + brief
+                }
+
                 let stream = await engine.send(
                     userContent: userContent,
                     attachments: attachments,
@@ -530,12 +543,18 @@ class ChatViewModel {
                         }
 
                     case .finished(let turn):
+                        // Resolve any chunk-id citations (`?c=<id>`) the model emitted
+                        // into durable, validated `?page=&text=` anchors before the
+                        // message settles into history. No-op when there are none.
+                        let resolvedContent = turn.role == .assistant
+                            ? await self?.resolveChunkCitations(turn.content) ?? turn.content
+                            : turn.content
                         if turn.role == .user {
                             turns.append(turn)
                         } else if let id = assistantTurnId,
                                   let idx = turns.lastIndex(where: { $0.id == id })
                         {
-                            turns[idx].content = turn.content
+                            turns[idx].content = resolvedContent
                             turns[idx].isStreaming = false
                             turns[idx].toolUses = turn.toolUses
                             if let thinking = turn.thinking {
@@ -549,6 +568,7 @@ class ChatViewModel {
                             }
                         } else {
                             var finalTurn = turn
+                            finalTurn.content = resolvedContent
                             finalTurn.isStreaming = false
                             turns.append(finalTurn)
 
@@ -774,7 +794,35 @@ class ChatViewModel {
         }
     }
 
+    /// Resolve `?c=<chunkId>` citations in a settled assistant message into durable
+    /// `?page=&text=` anchors, validated against the FTS chunk store. No-op without a
+    /// chunk id in the text or an available index service.
+    private func resolveChunkCitations(_ content: String) async -> String {
+        guard let fts = (appState ?? parent?.appState)?.ftsIndexService else { return content }
+        return await ChunkCitationResolver.resolve(in: content, using: fts)
+    }
+
+    /// The open document's current-page passages as citable `?c=` chunks (PDF only,
+    /// when indexed). Empty otherwise — the prompt then falls back to raw page text.
+    private func currentPageChunks(snapshot: ChatContextSnapshot) async -> [LLMContextProvider.CurrentPageChunk] {
+        guard let doc = snapshot.document, doc.contentType == .pdf,
+              let itemId,
+              let fts = (appState ?? parent?.appState)?.ftsIndexService
+        else { return [] }
+        let chunks = await fts.currentPageChunks(itemId: itemId, page: doc.currentPageIndex)
+        return chunks.compactMap { c in
+            c.id.map { LLMContextProvider.CurrentPageChunk(id: $0, page: c.pageStart, text: c.chunkText) }
+        }
+    }
+
     private func navigateInPlace(vm: DocumentViewModel, anchor: CitationAnchor) {
+        // A live web page is `.link` with no timeline; it navigates like HTML
+        // (find-text / scroll-to-heading) rather than opening a `?time=` source.
+        let isTimelineMedia = vm.contentType == .audio
+            || (vm.mediaDocument.map {
+                $0.metadata.resolvedEmbedType == .youtube || $0.metadata.duration != nil
+            } ?? false)
+
         switch vm.contentType {
         case .pdf:
             if let page = anchor.page {
@@ -789,21 +837,27 @@ class ChatViewModel {
             }
 
         case .html, .markdown:
-            if let heading = anchor.heading {
-                NotificationCenter.default.post(
-                    name: .webViewScrollToHeading, object: heading
-                )
-            } else if let text = anchor.text {
-                NotificationCenter.default.post(
-                    name: .webViewFindText, object: text
-                )
-            }
+            navigateWebView(anchor: anchor)
+
+        case .link where !isTimelineMedia:
+            // Live web page — same WKWebView highlight path as saved HTML clips.
+            navigateWebView(anchor: anchor)
 
         case .link, .audio:
-            // No in-place target — open the source platform at the timestamp.
+            // Timeline media — open the source platform at the timestamp.
             if let time = anchor.time, let source = vm.mediaDocument?.sourceURL {
                 NSWorkspace.shared.open(MediaTimestampLink.url(forSource: source, atSeconds: time))
             }
+        }
+    }
+
+    /// Drives the WKWebView citation highlight (mark.js find / scroll-to-heading)
+    /// used by saved HTML clips and live web pages alike.
+    private func navigateWebView(anchor: CitationAnchor) {
+        if let heading = anchor.heading {
+            NotificationCenter.default.post(name: .webViewScrollToHeading, object: heading)
+        } else if let text = anchor.text {
+            NotificationCenter.default.post(name: .webViewFindText, object: text)
         }
     }
 

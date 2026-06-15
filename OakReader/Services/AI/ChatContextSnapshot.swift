@@ -41,6 +41,10 @@ struct ChatContextSnapshot: Sendable {
         let fileName: String
         let filePath: String
         let contentType: ContentType
+        /// True when a `.link`/`.audio` document has a real timeline (YouTube video,
+        /// podcast) and should be cited by `?time=`. A live web page is also `.link`
+        /// but has no timeline — it is cited like HTML (`?text=`/`?heading=`).
+        let isTimelineMedia: Bool
         let pageCount: Int
         let currentPageIndex: Int
         let currentPageText: String

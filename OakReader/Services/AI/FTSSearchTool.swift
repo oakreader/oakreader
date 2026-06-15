@@ -35,6 +35,8 @@ struct FTSSearchTool: AgentTool, Sendable {
         let author: String?
         let page: Int?      // 1-based, nil for abstract/whole-doc chunks
         let snippet: String
+        /// Stable chunk rowid — the citable ID the model references as `?c=<chunkId>`.
+        let chunkId: Int64?
     }
 
     /// Optional sink invoked with the structured results of each successful search.
@@ -177,7 +179,8 @@ struct FTSSearchTool: AgentTool, Sendable {
                     title: meta?.title ?? "Unknown",
                     author: meta?.author,
                     page: r.pageStart.map { $0 + 1 },
-                    snippet: r.excerpt
+                    snippet: r.excerpt,
+                    chunkId: r.chunkId
                 )
             })
         }
@@ -222,11 +225,17 @@ struct FTSSearchTool: AgentTool, Sendable {
                 out += "\n   Best match: abstract"
             }
 
+            // Citable chunk handle — the host resolves `?c=<id>` back to this
+            // passage's exact page + verbatim text, so cite by this id.
+            if let cid = r.chunkId {
+                out += "\n   Cite this passage as: ?c=\(cid)"
+            }
+
             // Excerpt
             if !r.excerpt.isEmpty {
-                let truncated = String(r.excerpt.prefix(200))
+                let truncated = String(r.excerpt.prefix(400))
                 out += "\n   Excerpt: \(truncated)"
-                if r.excerpt.count > 200 { out += "..." }
+                if r.excerpt.count > 400 { out += "..." }
             }
 
             out += "\n"

@@ -120,8 +120,34 @@ struct HTMLViewerRepresentable: NSViewRepresentable {
                 var rafId = null;
                 var lastKey = '';
 
+                // True when the selection lives inside an editable field
+                // (<input>, <textarea>, or contenteditable). The 划词 toolbar must
+                // never cover a field the user is actively typing into.
+                function isEditableContext(sel) {
+                    var ae = document.activeElement;
+                    if (ae) {
+                        var tag = ae.tagName;
+                        if (tag === 'INPUT' || tag === 'TEXTAREA' || ae.isContentEditable) {
+                            return true;
+                        }
+                    }
+                    if (sel && sel.rangeCount > 0) {
+                        var node = sel.getRangeAt(0).commonAncestorContainer;
+                        if (node && node.nodeType !== 1) node = node.parentElement;
+                        while (node) {
+                            var t = node.tagName;
+                            if (t === 'INPUT' || t === 'TEXTAREA' || node.isContentEditable) {
+                                return true;
+                            }
+                            node = node.parentElement;
+                        }
+                    }
+                    return false;
+                }
+
                 function getSelectionInfo() {
                     var sel = window.getSelection();
+                    if (isEditableContext(sel)) return null;
                     var text = sel.toString();
                     if (text && sel.rangeCount > 0) {
                         var range = sel.getRangeAt(0);
@@ -259,10 +285,12 @@ struct HTMLViewerRepresentable: NSViewRepresentable {
         )
         config.userContentController.addUserScript(selectionOverlayScript)
 
-        // Inject libraries: mark.js (text finder), web-highlighter + bridge (order matters)
+        // Inject libraries: mark.js (text finder), web-highlighter + bridge (order matters),
+        // and oak-cite-anchor (dom-anchor-text-quote → window.oakHighlightCitation for
+        // fuzzy citation anchoring).
         let jsBundle = Bundle.main.resourceURL?
             .appendingPathComponent("Preview.bundle/js")
-        for jsFile in ["mark.min.js", "web-highlighter.min.js", "oak-web-highlighter.js"] {
+        for jsFile in ["mark.min.js", "web-highlighter.min.js", "oak-web-highlighter.js", "oak-cite-anchor.js"] {
             if let url = jsBundle?.appendingPathComponent(jsFile),
                let src = try? String(contentsOf: url, encoding: .utf8) {
                 let script = WKUserScript(

@@ -7,6 +7,9 @@ import OakMarkdownUI
 struct ChatSourceMeta {
     let title: String
     let icon: String
+    /// Only PDFs have pages — used to gate the `p.N` badge so a stray page anchor
+    /// on a pageless source (HTML / live web) never renders a misleading page chip.
+    let contentType: ContentType
 }
 
 struct ChatBubbleView: View, Equatable {
@@ -72,8 +75,7 @@ struct ChatBubbleView: View, Equatable {
                         }
                         ForEach(renderCardRecords) { record in
                             if let deck = Self.decodeCardDeck(from: record) {
-                                InlineDeckView(deck: deck)
-                                    .environment(\.openURL, citationOpenURLAction)
+                                InlineDeckView(deck: deck, onOpenCitation: onOpenCitation)
                             }
                         }
                     }
@@ -308,6 +310,7 @@ struct ChatBubbleView: View, Equatable {
         let citeKey: String
         let title: String
         let icon: String
+        let isPaged: Bool           // PDFs only — gates the `p.N` badge
         let pages: [Int]            // 1-based, for display
         let anchor: CitationAnchor  // representative anchor for the jump
         var id: String { citeKey }
@@ -348,7 +351,7 @@ struct ChatBubbleView: View, Equatable {
                     .font(.system(size: 11))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
-                if let page = source.pages.first {
+                if source.isPaged, let page = source.pages.first {
                     Text("p.\(page)")
                         .font(.system(size: 10))
                         .foregroundStyle(.tertiary)
@@ -367,6 +370,30 @@ struct ChatBubbleView: View, Equatable {
         }
         .buttonStyle(.plain)
         .help("Jump to \(source.title)")
+    }
+
+    /// Whether a citation hover card shows anything beyond the link's own visible text.
+    /// A page/heading/timestamp is always extra location info worth a card; a `?text=`
+    /// quote is only worth showing when it differs from the label the reader already sees.
+    static func citationCardAddsInfo(_ anchor: CitationAnchor, label: String) -> Bool {
+        if anchor.page != nil || anchor.time != nil { return true }
+        if let heading = anchor.heading, !heading.isEmpty,
+           !normalizedEqual(heading, label) { return true }
+        if let text = anchor.text, !text.isEmpty,
+           !normalizedEqual(text, label) { return true }
+        return false
+    }
+
+    /// Loose equality for citation text vs. its visible label: case-insensitive, with
+    /// surrounding quotes/whitespace and internal whitespace runs normalized away, so
+    /// `"93% last month"` (label) and `93% last month` (quote) count as the same.
+    private static func normalizedEqual(_ a: String, _ b: String) -> Bool {
+        func norm(_ s: String) -> String {
+            let stripped = s.trimmingCharacters(
+                in: CharacterSet(charactersIn: " \t\n\"“”'‘’"))
+            return stripped.lowercased().split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        }
+        return norm(a) == norm(b)
     }
 
     /// Parse `oak://cite/{citeKey}?page=&text=` links out of answer markdown and
@@ -415,6 +442,7 @@ struct ChatBubbleView: View, Equatable {
                 citeKey: key,
                 title: meta?.title ?? key,
                 icon: meta?.icon ?? "doc",
+                isPaged: meta?.contentType == .pdf,
                 pages: (pages[key] ?? []).sorted(),
                 anchor: anchors[key] ?? CitationAnchor()
             )
@@ -443,9 +471,13 @@ struct ChatBubbleView: View, Equatable {
                 onOpenCitation?(citeKey, anchor)
                 return true
             },
-            linkPreview: { url in
+            linkPreview: { url, label in
                 // Hovering a citation shows the cited source instead of the raw oak:// URL.
                 guard let (citeKey, anchor) = CitationAnchor.parse(from: url) else { return nil }
+                // Skip the card when it would only echo the link's own visible text.
+                // Web citations often inline the quote itself as the label, so a card
+                // repeating that quote adds nothing; a page/heading/timestamp still does.
+                guard Self.citationCardAddsInfo(anchor, label: label) else { return nil }
                 return AnyView(CitationHoverCard(citeKey: citeKey, anchor: anchor))
             }
         )
@@ -461,13 +493,12 @@ struct ChatBubbleView: View, Equatable {
                 case .text(let markdown):
                     chatMarkdown(markdown)
                 case .quiz(let content):
-                    InlineQuizView(content: content)
+                    InlineQuizView(content: content, onOpenCitation: onOpenCitation)
                 case .deck(let deck):
-                    InlineDeckView(deck: deck)
+                    InlineDeckView(deck: deck, onOpenCitation: onOpenCitation)
                 }
             }
         }
-        .environment(\.openURL, citationOpenURLAction)
         .assistantBubbleStyle()
     }
 

@@ -182,12 +182,19 @@ enum ContentChunker {
         max(1, Int(Double(text.count) * 0.75))
     }
 
+    /// Sentence terminators, including CJK fullwidth punctuation (。！？；…、 and the
+    /// fullwidth ．) so Chinese/Japanese text splits into real sentences rather than
+    /// one ~500-token blob — required for sentence-level citation highlighting in CJK.
+    private static let sentenceTerminators: Set<Character> = [
+        ".", "?", "!", "。", "！", "？", "；", "…", "．"
+    ]
+
     private static func splitSentences(_ text: String) -> [String] {
         var sentences: [String] = []
         var current = ""
         for char in text {
             current.append(char)
-            if char == "." || char == "?" || char == "!" {
+            if sentenceTerminators.contains(char) {
                 sentences.append(current)
                 current = ""
             }

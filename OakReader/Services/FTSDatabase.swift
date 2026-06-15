@@ -68,6 +68,33 @@ final class FTSDatabase: @unchecked Sendable {
             }
         }
 
+        // Tracks every item we've *attempted* to index, including ones that yield
+        // zero chunks (image-only PDFs, links/HTML with no extractable text). Without
+        // this, an empty item never appears in `chunks`, so it can never be counted as
+        // "done" and the indexer both retries it every launch and shows a perpetual
+        // "Indexing… N remaining" in settings. A row here means "processed — skip it".
+        migrator.registerMigration("v2-indexed-items") { db in
+            try db.create(table: "indexed_items") { t in
+                t.column("item_id", .text).primaryKey()
+                t.column("chunk_count", .integer).notNull()
+                t.column("indexed_at", .text).notNull()
+            }
+            // Backfill from already-indexed chunks so existing libraries don't trigger
+            // a full re-index — only the genuinely-empty items remain unprocessed.
+            try db.execute(sql: """
+                INSERT OR IGNORE INTO indexed_items (item_id, chunk_count, indexed_at)
+                SELECT item_id, COUNT(*), MIN(created_at) FROM chunks GROUP BY item_id
+                """)
+        }
+
+        // Records whether we've already run OCR on an empty (0-chunk) item, so a
+        // genuinely-blank scanned PDF isn't re-OCR'd (expensive) on every launch.
+        migrator.registerMigration("v3-ocr-attempted") { db in
+            try db.alter(table: "indexed_items") { t in
+                t.add(column: "ocr_attempted", .integer).notNull().defaults(to: 0)
+            }
+        }
+
         return migrator
     }
 
@@ -77,31 +104,37 @@ final class FTSDatabase: @unchecked Sendable {
     func destroyAll() throws {
         try dbQueue.write { db in
             try db.execute(sql: "DELETE FROM chunks")
+            try db.execute(sql: "DELETE FROM indexed_items")
         }
     }
 
     // MARK: - Chunk Operations
 
-    /// Insert chunks. Returns their assigned rowids.
-    @discardableResult
-    func insertChunks(_ chunks: [FTSChunk]) throws -> [Int64] {
+    /// Store an item's chunks and mark it processed, atomically. Deletes any existing
+    /// chunks for the item first, so a re-run (forced re-index, crash recovery) is
+    /// idempotent. `records` may be empty — the item is still marked (0 chunks) so it
+    /// counts as processed and is never retried.
+    func storeChunks(_ records: [FTSChunk], itemId: String, indexedAt: String) throws {
         try dbQueue.write { db in
-            var rowids: [Int64] = []
-            for var chunk in chunks {
+            try db.execute(sql: "DELETE FROM chunks WHERE item_id = ?", arguments: [itemId])
+            for var chunk in records {
                 try chunk.insert(db)
-                guard let id = chunk.id else {
-                    throw DatabaseError(message: "Failed to get rowid after insert")
-                }
-                rowids.append(id)
             }
-            return rowids
+            try db.execute(sql: """
+                INSERT INTO indexed_items (item_id, chunk_count, indexed_at) VALUES (?, ?, ?)
+                ON CONFLICT(item_id) DO UPDATE SET
+                    chunk_count = excluded.chunk_count,
+                    indexed_at = excluded.indexed_at
+                """, arguments: [itemId, records.count, indexedAt])
         }
     }
 
-    /// Delete all chunks for an item.
+    /// Delete all chunks for an item and clear its processed marker, so it will be
+    /// re-indexed on the next pass.
     func deleteChunks(forItemId itemId: String) throws {
         try dbQueue.write { db in
             try db.execute(sql: "DELETE FROM chunks WHERE item_id = ?", arguments: [itemId])
+            try db.execute(sql: "DELETE FROM indexed_items WHERE item_id = ?", arguments: [itemId])
         }
     }
 
@@ -116,33 +149,69 @@ final class FTSDatabase: @unchecked Sendable {
         }
     }
 
-    /// Count chunks for an item.
-    func chunkCount(forItemId itemId: String) throws -> Int {
+    /// Whether an item has already been processed (has a marker row), regardless of
+    /// whether it produced any chunks.
+    func isProcessed(itemId: String) throws -> Bool {
         try dbQueue.read { db in
-            try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM chunks WHERE item_id = ?", arguments: [itemId]) ?? 0
+            try Int.fetchOne(db, sql: "SELECT 1 FROM indexed_items WHERE item_id = ? LIMIT 1", arguments: [itemId]) != nil
         }
     }
 
-    /// Get all indexed item IDs.
-    func indexedItemIds() throws -> Set<String> {
+    /// Fetch the chunks covering a 0-based page of an item, ordered by rowid. Used to
+    /// inject the open document's current page as citable `?c=` passages (PDF, where
+    /// page_start == page_end == page index). Section chunks (NULL page) are excluded.
+    func fetchChunks(forItemId itemId: String, page: Int) throws -> [FTSChunk] {
         try dbQueue.read { db in
-            let ids = try String.fetchAll(db, sql: "SELECT DISTINCT item_id FROM chunks")
-            return Set(ids)
+            try FTSChunk.fetchAll(db, sql: """
+                SELECT * FROM chunks
+                WHERE item_id = ? AND page_start <= ? AND page_end >= ?
+                ORDER BY id
+                """, arguments: [itemId, page, page])
+        }
+    }
+
+    /// All item IDs we've attempted to index (processed set), including empty ones.
+    /// Used to skip both already-indexed and known-empty items on the background pass.
+    func processedItemIds() throws -> Set<String> {
+        try dbQueue.read { db in
+            Set(try String.fetchAll(db, sql: "SELECT item_id FROM indexed_items"))
+        }
+    }
+
+    /// Items that produced no text and haven't been OCR'd yet — candidates for the
+    /// OCR backfill pass (filtered to PDFs by the caller against the catalog).
+    func ocrPendingItemIds() throws -> Set<String> {
+        try dbQueue.read { db in
+            Set(try String.fetchAll(db, sql: """
+                SELECT item_id FROM indexed_items WHERE chunk_count = 0 AND ocr_attempted = 0
+                """))
+        }
+    }
+
+    /// Mark an item as OCR'd so it isn't reprocessed even if it yielded no text.
+    func markOCRAttempted(itemId: String) throws {
+        try dbQueue.write { db in
+            try db.execute(sql: "UPDATE indexed_items SET ocr_attempted = 1 WHERE item_id = ?", arguments: [itemId])
         }
     }
 
     // MARK: - Index Stats
 
     struct IndexStats {
+        /// Items that produced at least one chunk (genuinely searchable).
         let indexedItemCount: Int
+        /// Items we've attempted, including empty/skipped ones. Reaches the library
+        /// total once the background pass finishes, so the UI can stop the spinner.
+        let processedItemCount: Int
         let totalChunkCount: Int
     }
 
     func indexStats() throws -> IndexStats {
         try dbQueue.read { db in
             let itemCount = try Int.fetchOne(db, sql: "SELECT COUNT(DISTINCT item_id) FROM chunks") ?? 0
+            let processed = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM indexed_items") ?? 0
             let chunkCount = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM chunks") ?? 0
-            return IndexStats(indexedItemCount: itemCount, totalChunkCount: chunkCount)
+            return IndexStats(indexedItemCount: itemCount, processedItemCount: processed, totalChunkCount: chunkCount)
         }
     }
 

@@ -26,8 +26,8 @@ final class FTSIndexService: @unchecked Sendable {
 
     /// Index an item by type. Routes to the appropriate text extractor and chunker.
     func indexItem(itemId: String, contentType: String, storageKey: String, attStorageKey: String, fileName: String) async {
-        // Skip if already indexed.
-        if let count = try? ftsDB.chunkCount(forItemId: itemId), count > 0 {
+        // Skip if already processed (has chunks, or was attempted and yielded none).
+        if (try? ftsDB.isProcessed(itemId: itemId)) == true {
             return
         }
 
@@ -39,9 +39,10 @@ final class FTSIndexService: @unchecked Sendable {
             fileName: fileName
         )
 
-        guard !chunks.isEmpty else {
-            Log.info(Log.fts, "No text to index for item \(itemId)")
-            return
+        if chunks.isEmpty {
+            // Mark as processed anyway (0 chunks) so it isn't retried every launch and
+            // doesn't show as perpetually "remaining" in settings. Likely needs OCR.
+            Log.info(Log.fts, "No text to index for item \(itemId) — marking skipped")
         }
 
         storeChunks(itemId: itemId, chunks: chunks)
@@ -175,7 +176,7 @@ final class FTSIndexService: @unchecked Sendable {
             )
         }
         do {
-            try ftsDB.insertChunks(records)
+            try ftsDB.storeChunks(records, itemId: itemId, indexedAt: now)
             Log.info(Log.fts, "Indexed \(records.count) chunks for item \(itemId)")
         } catch {
             Log.error(Log.fts, "Failed to save chunk records for item \(itemId): \(error)")
@@ -191,6 +192,35 @@ final class FTSIndexService: @unchecked Sendable {
         let chunkType: String
         let pageStart: Int?
         let pageEnd: Int?
+        /// Stable chunk rowid — the citable ID. The model cites `?c=<chunkId>` and
+        /// the host resolves it back to the chunk's page + verbatim text, so a
+        /// citation never depends on the model reproducing an exact quote.
+        let chunkId: Int64?
+    }
+
+    /// The chunks covering a 0-based page of an item (PDF), for injecting the open
+    /// page as citable `?c=` passages. Empty when the item isn't indexed.
+    func currentPageChunks(itemId: String, page: Int) async -> [FTSChunk] {
+        do {
+            return try ftsDB.fetchChunks(forItemId: itemId, page: page)
+        } catch {
+            Log.error(Log.fts, "Failed to fetch current-page chunks: \(error)")
+            return []
+        }
+    }
+
+    /// Fetch full chunks by their stable ids, keyed by id. Used to resolve and
+    /// validate `?c=<chunkId>` citations against ground-truth chunk text.
+    func chunks(byIds ids: [Int64]) async -> [Int64: FTSChunk] {
+        let unique = Array(Set(ids))
+        guard !unique.isEmpty else { return [:] }
+        do {
+            let chunks = try ftsDB.fetchChunks(byIds: unique)
+            return Dictionary(uniqueKeysWithValues: chunks.compactMap { c in c.id.map { ($0, c) } })
+        } catch {
+            Log.error(Log.fts, "Failed to fetch chunks for citation resolution: \(error)")
+            return [:]
+        }
     }
 
     /// Full-text BM25 search.
@@ -230,7 +260,8 @@ final class FTSIndexService: @unchecked Sendable {
                 excerpt: excerpt,
                 chunkType: chunk.chunkType,
                 pageStart: chunk.pageStart,
-                pageEnd: chunk.pageEnd
+                pageEnd: chunk.pageEnd,
+                chunkId: chunk.id
             )
         }
 
@@ -282,11 +313,11 @@ final class FTSIndexService: @unchecked Sendable {
 
     /// Find unindexed items and index each one, recently opened first.
     func backgroundIndexAll() async {
-        let indexedIds: Set<String>
+        let processedIds: Set<String>
         do {
-            indexedIds = try ftsDB.indexedItemIds()
+            processedIds = try ftsDB.processedItemIds()
         } catch {
-            Log.error(Log.fts, "Failed to query indexed items: \(error)")
+            Log.error(Log.fts, "Failed to query processed items: \(error)")
             return
         }
 
@@ -298,7 +329,7 @@ final class FTSIndexService: @unchecked Sendable {
             return
         }
 
-        let itemsToIndex = allItems.filter { !indexedIds.contains($0.itemId) }
+        let itemsToIndex = allItems.filter { !processedIds.contains($0.itemId) }
 
         guard !itemsToIndex.isEmpty else {
             Log.info(Log.fts, "All items already indexed")
@@ -322,6 +353,53 @@ final class FTSIndexService: @unchecked Sendable {
         Log.info(Log.fts, "Background indexing complete")
     }
 
+    /// Second, lower-priority pass: OCR the image-only PDFs that the normal pass marked
+    /// empty (0 chunks). Runs after `backgroundIndexAll` so plain text indexing isn't
+    /// blocked by the much slower OCR. Each PDF is OCR'd at most once — items that stay
+    /// blank are flagged so they're never reprocessed.
+    func backgroundOCRBackfill() async {
+        let pending: Set<String>
+        do {
+            pending = try ftsDB.ocrPendingItemIds()
+        } catch {
+            Log.error(Log.fts, "Failed to query OCR-pending items: \(error)")
+            return
+        }
+        guard !pending.isEmpty else { return }
+
+        let items: [IndexableItem]
+        do {
+            items = try await fetchIndexableItems(restrictedTo: Array(pending))
+        } catch {
+            Log.error(Log.fts, "Failed to query items for OCR backfill: \(error)")
+            return
+        }
+        let pdfItems = items.filter { $0.contentType == "pdf" }
+        guard !pdfItems.isEmpty else { return }
+
+        Log.info(Log.fts, "OCR backfill: \(pdfItems.count) image-only PDF(s)")
+
+        for item in pdfItems {
+            guard !Task.isCancelled else { break }
+
+            let fileURL = CatalogDatabase.attachmentFileURL(
+                itemStorageKey: item.storageKey,
+                attachmentStorageKey: item.attStorageKey,
+                fileName: item.fileName
+            )
+            let chunks = PDFOCRService.recognizeChunks(pdfURL: fileURL)
+            if !chunks.isEmpty {
+                storeChunks(itemId: item.itemId, chunks: chunks)
+                Log.info(Log.fts, "OCR indexed \(chunks.count) chunks for item \(item.itemId)")
+            }
+            try? ftsDB.markOCRAttempted(itemId: item.itemId)
+
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+
+        Log.info(Log.fts, "OCR backfill complete")
+    }
+
     /// Re-index specific items by their IDs (e.g. "Index All Content" on a collection).
     func indexItems(_ itemIds: [String]) async {
         let itemsToIndex: [IndexableItem]
@@ -337,9 +415,8 @@ final class FTSIndexService: @unchecked Sendable {
         for item in itemsToIndex {
             guard !Task.isCancelled else { break }
 
-            // Force re-index: delete existing chunks first.
-            try? ftsDB.deleteChunks(forItemId: item.itemId)
-
+            // Force re-index: storeChunks replaces existing chunks and re-marks the item
+            // (even with 0 chunks), so previously-skipped items don't linger as remaining.
             let chunks = await extractChunks(
                 itemId: item.itemId,
                 contentType: item.contentType,
@@ -347,7 +424,6 @@ final class FTSIndexService: @unchecked Sendable {
                 attStorageKey: item.attStorageKey,
                 fileName: item.fileName
             )
-            guard !chunks.isEmpty else { continue }
             storeChunks(itemId: item.itemId, chunks: chunks)
 
             try? await Task.sleep(for: .milliseconds(50))

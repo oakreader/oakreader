@@ -62,8 +62,14 @@ struct ResearchTool: AgentTool, Sendable {
            (e.g. `items read <citeKey> --pages 3-6`).
         4. Synthesize a concise, well-structured answer.
 
-        Citations are required: back every claim with an inline citation in the form \
-        `oak://cite/{citeKey}?page=N` so the answer links to the exact source page. \
+        Citations are required, on the load-bearing claims (the thesis, a specific \
+        finding, a statistic) — not on every sentence. Each search result carries a \
+        "Cite this passage as: ?c=<id>" handle. Cite using that id and copy the \
+        single sentence that STATES the claim as the anchor:
+        `oak://cite/{citeKey}?c=<id>&text=<the verbatim claim sentence from that passage>`
+        The visible [label] is your own words; the ?text= value must be copied \
+        word-for-word from that passage (the host verifies it). One citation per \
+        claim, on the sentence that carries it — never on an incidental phrase. \
         Do not append your own sources list — that is generated for you. \
         If the library contains nothing relevant, say so plainly rather than inventing an answer.
         """
@@ -151,8 +157,13 @@ struct ResearchTool: AgentTool, Sendable {
             return .success("The research subagent did not produce an answer.")
         }
 
-        let sources = await sourcesSection(answer: trimmed, log: log)
-        return .success(trimmed + sources)
+        // Resolve the subagent's chunk-id citations (`?c=<id>`) into the standard
+        // `?page=&text=` anchors the parent and UI understand, validating each
+        // quote against ground-truth chunk text. Done here (not in the parent) so
+        // the cross-context chunk ids never leak out of this tool.
+        let resolved = await ChunkCitationResolver.resolve(in: trimmed, using: searchService)
+        let sources = await sourcesSection(answer: resolved, log: log)
+        return .success(resolved + sources)
     }
 
     // MARK: - Progress

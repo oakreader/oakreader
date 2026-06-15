@@ -222,7 +222,7 @@ struct AIChatView: View {
     private func resolveCitedSource(_ citeKey: String) -> ChatSourceMeta? {
         let state = chatVM.appState ?? chatVM.parent?.appState
         guard let item = state?.libraryStore.findItem(byCiteKey: citeKey) else { return nil }
-        return ChatSourceMeta(title: item.title, icon: item.contentType.icon)
+        return ChatSourceMeta(title: item.title, icon: item.contentType.icon, contentType: item.contentType)
     }
 
     private var workspaceChip: some View {

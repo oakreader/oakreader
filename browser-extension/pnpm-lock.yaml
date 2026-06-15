@@ -20,6 +20,9 @@ importers:
       defuddle:
         specifier: ^0.18.1
         version: 0.18.1
+      dom-anchor-text-quote:
+        specifier: ^4.0.2
+        version: 4.0.2
       lucide-react:
         specifier: ^1.14.0
         version: 1.14.0(react@19.2.5)
@@ -831,6 +834,9 @@ packages:
     resolution: {integrity: sha512-+Ut8d9LLqwEvHHJl1+PIHqoyDxFgVN847JTVM3Izi3xHDWPE4UtzzXysMZQs64DMcrJfBeS/uoEP4AD3HQHnQQ==}
     engines: {node: '>=12.0'}
 
+  ancestors@0.0.3:
+    resolution: {integrity: sha512-hWePu8BinW3M5wSo2++ahS6mb3ZZcYWFIxrmOfJI4990DRQnM/OrMNWorjVotrrAkVxldBdF17TCKenwin4XzA==}
+
   ansi-align@3.0.1:
     resolution: {integrity: sha512-IOfwwBF5iczOjp/WeY4YxyjqAFMQoZufdQWDd19SEExbVLNXqvpzSJ/M7Za4/sCPmQ0+GRquoA7bGcINcxew6w==}
 
@@ -1092,6 +1098,21 @@ packages:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
     engines: {node: '>=8'}
 
+  diff-match-patch@1.0.5:
+    resolution: {integrity: sha512-IayShXAgj/QMXgB0IWmKx+rOPuGMhqm5w6jvFxmVenXKIzRqTAAsbBPT3kWQeGANj3jGgvcvv4yK6SxqYmikgw==}
+
+  dom-anchor-text-position@4.0.0:
+    resolution: {integrity: sha512-McGwz4XUK2ttClhYTMoeSuu5sCYYKG2UilW9rJg5n39byIpKtFQMviGPmjRuCWE4JWO8IIjCbAXQgGFVMCuUww==}
+
+  dom-anchor-text-quote@4.0.2:
+    resolution: {integrity: sha512-yM1Z/PYgh8hEnfijmTA14Z1XWvlN8P9wD6srBvRaTSktmtI+z5f2zr0r9hqr7ZMpmokW71MeDyOHBRqbXu0VXA==}
+
+  dom-node-iterator@3.5.3:
+    resolution: {integrity: sha512-B61Q0KVg/86rIT9C3zwq9ud495TI/4B/V0psFMNcNEn9UFVpG1JjY04jP57MUGUb6FRMozPzSSVXJvFyF0PQ+g==}
+
+  dom-seek@4.0.3:
+    resolution: {integrity: sha512-Tx9l8RmRkbqfIW0EXPPeKS5+2AJ2+9s2Sam+G+xi9JgPoYEwnSRg+6knLswI66QRD7DaVTI/GRS9qDWAMi/SPg==}
+
   dom-serializer@2.0.0:
     resolution: {integrity: sha512-wIkAryiqt/nV5EQKqQpo3SToSOV9J0DnbJqwK7Wv/Trc92zIAYZ4FlMu+JPFW1DfGFt81ZTCGgDEabffXeLyJg==}
 
@@ -1290,6 +1311,10 @@ packages:
 
   import-meta-resolve@4.2.0:
     resolution: {integrity: sha512-Iqv2fzaTQN28s/FwZAoFq0ZSs/7hMAHJVX+w8PZl3cY19Pxk6jFFalxQoIfW2826i/fDLXv8IiEZRIT0lDuWcg==}
+
+  index-of@0.2.0:
+    resolution: {integrity: sha512-VkoJmFW85R0il3IJJYCD7wdQ8pQgTtVoCSqu/BI/ZMy51qDJ618nQsiWmQ6tnyKZShEG2nLt7i7o3YJmEPJSyg==}
+    engines: {node: '>=0.10.0'}
 
   inherits@2.0.4:
     resolution: {integrity: sha512-k/vGaX4/Yla3WzyMCvTQOXYeIHvqOKtnqBduzTHpzpQZzAskKMhZ2K+EnBiSM9zGSoIFeMpXKxa4dYeZIQqewQ==}
@@ -2770,6 +2795,8 @@ snapshots:
 
   adm-zip@0.5.17: {}
 
+  ancestors@0.0.3: {}
+
   ansi-align@3.0.1:
     dependencies:
       string-width: 4.2.3
@@ -3005,6 +3032,25 @@ snapshots:
 
   detect-libc@2.1.2: {}
 
+  diff-match-patch@1.0.5: {}
+
+  dom-anchor-text-position@4.0.0:
+    dependencies:
+      dom-node-iterator: 3.5.3
+      dom-seek: 4.0.3
+
+  dom-anchor-text-quote@4.0.2:
+    dependencies:
+      diff-match-patch: 1.0.5
+      dom-anchor-text-position: 4.0.0
+
+  dom-node-iterator@3.5.3: {}
+
+  dom-seek@4.0.3:
+    dependencies:
+      ancestors: 0.0.3
+      index-of: 0.2.0
+
   dom-serializer@2.0.0:
     dependencies:
       domelementtype: 2.3.0
@@ -3191,6 +3237,8 @@ snapshots:
   immediate@3.0.6: {}
 
   import-meta-resolve@4.2.0: {}
+
+  index-of@0.2.0: {}
 
   inherits@2.0.4: {}
 
