@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Archive, CheckCircle2, FileText, Link2, Sparkles } from "lucide-react";
+import { Archive, CheckCircle2, Link2, Sparkles } from "lucide-react";
 import { usePopupData } from "@/src/hooks/use-popup-data";
 import { postClip } from "@/src/lib/api";
 import type { PageCapture, PDFSavePayload } from "@/src/lib/types";
@@ -15,7 +15,6 @@ const SAVE_MODE_OPTIONS: Array<{
 }> = [
   { mode: "link", title: "Bookmark", description: "Link & text" },
   { mode: "html", title: "Archive", description: "Offline snapshot" },
-  { mode: "pdf", title: "PDF", description: "PDF file" },
 ];
 
 const OAKREADER_DEEP_LINK = "oakreader://open";
@@ -146,27 +145,6 @@ export function App() {
         setSaveState("saved");
         setTimeout(() => window.close(), 2500);
         return;
-      } else if (saveMode === "pdf" && pageMeta.type === "html") {
-        // PDF save mode: background generates PDF via debugger and POSTs directly to server
-        setSaveState("capturing");
-
-        const bgResult = await chrome.runtime.sendMessage({
-          method: "captureAndSavePDF",
-          tabId,
-          payload: {
-            url: pageMeta.url,
-            title: pageMeta.title,
-          },
-        }) as { status: string; message?: string } | undefined;
-
-        if (!bgResult || bgResult.status === "error") {
-          throw new Error(bgResult?.message || "Failed to generate PDF");
-        }
-
-        // Background already saved — skip postClip below
-        setSaveState("saved");
-        setTimeout(() => window.close(), 2500);
-        return;
       } else {
         // Embed types (link bookmarks): dispatch to the URL's translator via content script
         setSaveState("capturing");
@@ -265,13 +243,7 @@ export function App() {
         <SaveButton
           state={saveState}
           label={"Saving to Inbox\u2026"}
-          capturingLabel={
-            saveMode === "pdf"
-              ? "Generating PDF\u2026"
-              : saveMode === "html"
-                ? "Capturing page\u2026"
-                : undefined
-          }
+          capturingLabel={saveMode === "html" ? "Capturing page\u2026" : undefined}
           errorMessage={errorMessage}
           onClick={handleSave}
         />
@@ -313,7 +285,7 @@ function SaveModePicker({
   return (
     <section className="space-y-1.5">
       <p className="text-[11px] font-semibold text-secondary">Capture style</p>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         {SAVE_MODE_OPTIONS.map((option) => {
           const selected = option.mode === value;
           return (
@@ -341,7 +313,6 @@ function SaveModePicker({
 function ModeIcon({ mode }: { mode: SaveMode }) {
   const className = "size-4 text-primary";
   if (mode === "html") return <Archive className={className} strokeWidth={2.2} />;
-  if (mode === "pdf") return <FileText className={className} strokeWidth={2.2} />;
   return <Link2 className={className} strokeWidth={2.2} />;
 }
 
@@ -358,8 +329,7 @@ function LoadingState() {
               <div className="h-3 w-2/3 rounded-full bg-fill oak-shimmer" />
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-2">
-            <div className="h-16 rounded-xl bg-fill oak-shimmer" />
+          <div className="grid grid-cols-2 gap-2">
             <div className="h-16 rounded-xl bg-fill oak-shimmer" />
             <div className="h-16 rounded-xl bg-fill oak-shimmer" />
           </div>
