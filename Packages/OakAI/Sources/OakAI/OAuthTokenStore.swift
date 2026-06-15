@@ -68,10 +68,10 @@ public enum OAuthTokenStore: Sendable {
         let service = "\(servicePrefix).\(providerId)"
         guard let data = try? JSONEncoder().encode(tokenSet) else { return false }
 
-        let baseQuery: [String: Any] = [
+        let baseQuery = KeychainConfig.scoped([
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-        ]
+        ])
 
         SecItemDelete(baseQuery as CFDictionary)
 
@@ -87,12 +87,12 @@ public enum OAuthTokenStore: Sendable {
 
     public static func loadTokenSet(for providerId: String) -> TokenSet? {
         let service = "\(servicePrefix).\(providerId)"
-        let query: [String: Any] = [
+        let query = KeychainConfig.scoped([
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
-        ]
+        ])
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
         guard status == errSecSuccess, let data = result as? Data else { return nil }
@@ -101,10 +101,10 @@ public enum OAuthTokenStore: Sendable {
 
     public static func delete(for providerId: String) {
         let service = "\(servicePrefix).\(providerId)"
-        let query: [String: Any] = [
+        let query = KeychainConfig.scoped([
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-        ]
+        ])
         SecItemDelete(query as CFDictionary)
     }
 }

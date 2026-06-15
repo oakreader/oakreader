@@ -132,12 +132,22 @@ targets:
           BUNDLE_DISPLAY_NAME: "OakReader"
           # Developer ID signing for distribution, scoped to THIS target only.
           # (Passing these as global xcodebuild overrides breaks SPM package
-          # targets and the oak tool.) No provisioning profile: the entitlements
-          # carry no restricted keys, so Developer ID + hardened runtime signs
-          # directly during archive.
+          # targets and the oak tool — which is also why the provisioning profile
+          # is set here, per-target, NOT on the archive command line: a command-
+          # line tool like `oak` rejects a global PROVISIONING_PROFILE_SPECIFIER.)
+          #
+          # The app carries the `keychain-access-groups` entitlement (data-
+          # protection keychain) — a RESTRICTED key, so a Developer ID build MUST
+          # embed a provisioning profile covering `5Y27G7B6D8.com.oakreader.keys`
+          # or AMFI SIGKILLs it at launch (notarization still passes). The release
+          # workflow decodes the PROVISIONING_PROFILE secret and installs a
+          # profile named EXACTLY "OakReader Developer ID" before archiving; the
+          # specifier below makes Xcode embed it. See the macos-release-setup
+          # skill, failure mode #4.
           CODE_SIGN_STYLE: Manual
           CODE_SIGN_IDENTITY: "Developer ID Application"
           DEVELOPMENT_TEAM: "5Y27G7B6D8"
+          PROVISIONING_PROFILE_SPECIFIER: "OakReader Developer ID"
           OTHER_CODE_SIGN_FLAGS: "--timestamp"
 
   oak:

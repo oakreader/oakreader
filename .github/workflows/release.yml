@@ -94,6 +94,55 @@ jobs:
             -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
 
+      # ── Import the Developer ID provisioning profile ──────────
+      # The app ships the restricted `keychain-access-groups` entitlement
+      # (data-protection keychain). A Developer ID app with a restricted
+      # entitlement is SIGKILLed by AMFI at launch unless a matching provisioning
+      # profile is embedded — notarization still passes, so a missing profile only
+      # surfaces as "the downloaded app won't open." We install the profile here
+      # so the archive step (PROVISIONING_PROFILE_SPECIFIER in project.yml's
+      # Release config) embeds it. Fail fast and loud if it's missing or wrong,
+      # BEFORE the long archive.
+      - name: Import provisioning profile
+        if: steps.check.outputs.skip == 'false'
+        env:
+          PROVISIONING_PROFILE: ${{ secrets.PROVISIONING_PROFILE }}
+        run: |
+          if [ -z "$PROVISIONING_PROFILE" ]; then
+            echo "::error::PROVISIONING_PROFILE secret is not set. The app declares the restricted keychain-access-groups entitlement, so the Developer ID build needs an embedded provisioning profile or it is SIGKILLed at launch. Create a Developer ID provisioning profile in the Apple Developer portal — App ID com.oakreader.OakReader, with the Keychain Sharing capability (group 5Y27G7B6D8.com.oakreader.keys), named EXACTLY 'OakReader Developer ID' — then run: base64 -i OakReader_Developer_ID.provisionprofile | gh secret set PROVISIONING_PROFILE --repo OWNER/REPO. See the macos-release-setup skill, failure mode #4."
+            exit 1
+          fi
+
+          PROFILE_PATH="$RUNNER_TEMP/oakreader.provisionprofile"
+          echo "$PROVISIONING_PROFILE" | base64 --decode > "$PROFILE_PATH"
+
+          # Decode the CMS-signed profile to inspect its embedded plist.
+          security cms -D -i "$PROFILE_PATH" > "$RUNNER_TEMP/profile.plist"
+
+          # Must grant our keychain group (exact, or a team wildcard 5Y27G7B6D8.*).
+          if ! /usr/libexec/PlistBuddy -c 'Print :Entitlements:keychain-access-groups' "$RUNNER_TEMP/profile.plist" 2>/dev/null \
+               | grep -qE '5Y27G7B6D8\.(com\.oakreader\.keys|\*)'; then
+            echo "::error::The provisioning profile does not grant keychain group 5Y27G7B6D8.com.oakreader.keys (or 5Y27G7B6D8.*). Recreate it with the Keychain Sharing capability for that group."
+            exit 1
+          fi
+
+          # Name must match project.yml's PROVISIONING_PROFILE_SPECIFIER exactly.
+          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c 'Print :Name' "$RUNNER_TEMP/profile.plist")
+          if [ "$PROFILE_NAME" != "OakReader Developer ID" ]; then
+            echo "::error::Provisioning profile name is '$PROFILE_NAME' but project.yml expects exactly 'OakReader Developer ID'. Rename the profile in the portal (or update PROVISIONING_PROFILE_SPECIFIER) so they match."
+            exit 1
+          fi
+
+          # Warn if it expires within 30 days (Developer ID profiles are time-limited).
+          EXP=$(/usr/libexec/PlistBuddy -c 'Print :ExpirationDate' "$RUNNER_TEMP/profile.plist" 2>/dev/null || echo "")
+          echo "Provisioning profile '$PROFILE_NAME' OK; expires: $EXP"
+
+          # Install where Xcode looks it up by name during the archive.
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$RUNNER_TEMP/profile.plist")
+          PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$PROFILE_DIR"
+          cp "$PROFILE_PATH" "$PROFILE_DIR/$PROFILE_UUID.provisionprofile"
+
       # ── Generate Xcode project from project.yml ───────────────
       - name: Install XcodeGen
         if: steps.check.outputs.skip == 'false'
@@ -153,6 +202,22 @@ jobs:
           IDENTITY="Developer ID Application"
           SIGN=(codesign --force --options runtime --timestamp --sign "$IDENTITY")
 
+          # The archive embedded the provisioning profile (project.yml's
+          # PROVISIONING_PROFILE_SPECIFIER) and `cp -R` preserved it. Confirm it's
+          # there — without it AMFI SIGKILLs the app at launch.
+          if [ ! -f "$APP/Contents/embedded.provisionprofile" ]; then
+            echo "::error::No embedded.provisionprofile in the archived app. The archive did not pick up the 'OakReader Developer ID' profile — verify it installed before the archive step."
+            exit 1
+          fi
+
+          # Capture the EXACT entitlements Xcode sealed during the archive. They
+          # include the expanded com.apple.application-identifier that pairs with
+          # the embedded profile; re-sealing the outer bundle (below) with the
+          # static OakReader.entitlements would drop it and break AMFI's profile
+          # authorization at launch. We re-seal with these instead.
+          ENTITLEMENTS="$RUNNER_TEMP/release.entitlements.plist"
+          codesign -d --entitlements - --xml "$APP" > "$ENTITLEMENTS"
+
           # Sparkle is built from SPM source, so its nested helpers are only
           # ad-hoc signed — notarization rejects them ("not signed with a valid
           # Developer ID certificate" / "no secure timestamp"). Developer ID
@@ -185,10 +250,19 @@ jobs:
           done
 
           # Re-seal the outer bundle so CodeResources covers everything (re)signed
-          # above. NOT --deep — the components are already correctly signed.
-          "${SIGN[@]}" --entitlements OakReader/OakReader.entitlements "$APP"
+          # above — including the embedded provisioning profile. Use the archive's
+          # own entitlements (captured above), NOT the static file, so the
+          # application-identifier that authorizes the profile survives. NOT --deep
+          # — the components are already correctly signed.
+          "${SIGN[@]}" --entitlements "$ENTITLEMENTS" "$APP"
 
           codesign --verify --deep --strict --verbose=2 "$APP"
+
+          # Surface the sealed entitlements + embedded profile in the log so a
+          # missing keychain group / application-identifier is caught here, not by
+          # a user whose app won't open.
+          echo "── Sealed entitlements ──"
+          codesign -d --entitlements - --xml "$APP" | plutil -p - || true
 
       # ── Package DMG ───────────────────────────────────────────
       - name: Create DMG

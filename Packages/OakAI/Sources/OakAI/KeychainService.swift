@@ -8,12 +8,12 @@ public enum KeychainService: Sendable {
 
     public static func apiKey(forProviderId providerId: String) -> String? {
         let service = "\(servicePrefix).\(providerId)"
-        let query: [String: Any] = [
+        let query = KeychainConfig.scoped([
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
-        ]
+        ])
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
         guard status == errSecSuccess, let data = result as? Data else { return nil }
@@ -23,10 +23,10 @@ public enum KeychainService: Sendable {
     @discardableResult
     public static func setAPIKey(_ key: String, forProviderId providerId: String) -> Bool {
         let service = "\(servicePrefix).\(providerId)"
-        let baseQuery: [String: Any] = [
+        let baseQuery = KeychainConfig.scoped([
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-        ]
+        ])
 
         guard !key.isEmpty else {
             SecItemDelete(baseQuery as CFDictionary)
@@ -43,10 +43,10 @@ public enum KeychainService: Sendable {
 
     public static func deleteAPIKey(forProviderId providerId: String) {
         let service = "\(servicePrefix).\(providerId)"
-        let query: [String: Any] = [
+        let query = KeychainConfig.scoped([
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-        ]
+        ])
         SecItemDelete(query as CFDictionary)
     }
 
@@ -57,12 +57,12 @@ public enum KeychainService: Sendable {
     /// Read a skill environment variable from Keychain.
     public static func skillEnvValue(skill: String, envName: String) -> String? {
         let service = "\(skillEnvPrefix).\(skill).\(envName)"
-        let query: [String: Any] = [
+        let query = KeychainConfig.scoped([
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
-        ]
+        ])
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
         guard status == errSecSuccess, let data = result as? Data else { return nil }
@@ -73,10 +73,10 @@ public enum KeychainService: Sendable {
     @discardableResult
     public static func setSkillEnvValue(_ value: String, skill: String, envName: String) -> Bool {
         let service = "\(skillEnvPrefix).\(skill).\(envName)"
-        let baseQuery: [String: Any] = [
+        let baseQuery = KeychainConfig.scoped([
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-        ]
+        ])
 
         guard !value.isEmpty else {
             SecItemDelete(baseQuery as CFDictionary)
@@ -94,10 +94,10 @@ public enum KeychainService: Sendable {
     /// Remove a skill environment variable from Keychain.
     public static func deleteSkillEnvValue(skill: String, envName: String) {
         let service = "\(skillEnvPrefix).\(skill).\(envName)"
-        let query: [String: Any] = [
+        let query = KeychainConfig.scoped([
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-        ]
+        ])
         SecItemDelete(query as CFDictionary)
     }
 

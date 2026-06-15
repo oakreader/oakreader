@@ -10,5 +10,13 @@
 	<true/>
 	<key>com.apple.security.device.audio-input</key>
 	<true/>
+	<key>keychain-access-groups</key>
+	<array>
+		<!-- Hardcoded team prefix (NOT $(AppIdentifierPrefix)): the release
+		     workflow re-seals the bundle by passing this raw file to `codesign`,
+		     which does not expand Xcode build variables. Must equal
+		     KeychainConfig.accessGroup. Team 5Y27G7B6D8 is fixed for Debug+Release. -->
+		<string>5Y27G7B6D8.com.oakreader.keys</string>
+	</array>
 </dict>
 </plist>
