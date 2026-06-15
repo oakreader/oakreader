@@ -39,9 +39,11 @@ struct TranslationSourceTextView: NSViewRepresentable {
         textView.font = font
         textView.insertionPointColor = .controlAccentColor
 
-        // Increase line height for better readability
+        // Modest line height for readability. Kept fairly tight because the
+        // selection highlight fills the whole line fragment — a large multiplier
+        // makes the drag-select band look like a thick band around the text.
         let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.lineHeightMultiple = 1.4
+        paragraphStyle.lineHeightMultiple = 1.2
         textView.defaultParagraphStyle = paragraphStyle
         textView.typingAttributes[.paragraphStyle] = paragraphStyle
 
@@ -49,6 +51,13 @@ struct TranslationSourceTextView: NSViewRepresentable {
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
+
+        // Commit the explanation only when a selection gesture finishes (mouse-up),
+        // so a drag that sweeps out a phrase fires once with its final range rather
+        // than firing on every intermediate character during the drag.
+        textView.onSelectionCommitted = { [weak coordinator = context.coordinator] in
+            coordinator?.commitSelection()
+        }
 
         scrollView.documentView = textView
         context.coordinator.textView = textView
@@ -82,7 +91,9 @@ struct TranslationSourceTextView: NSViewRepresentable {
         var parent: TranslationSourceTextView
         weak var textView: TranslationNSTextView?
         var isUpdating = false
-        private var lastSelectionWasEmpty = true
+        /// The last selection we fired an explanation for — avoids re-firing for an
+        /// unchanged selection (e.g. mouse-up after the range already settled).
+        private var lastCommittedSelection = ""
 
         init(_ parent: TranslationSourceTextView) {
             self.parent = parent
@@ -115,28 +126,35 @@ struct TranslationSourceTextView: NSViewRepresentable {
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {
+            // Clearing the selection resets the dedup guard so re-selecting the same
+            // text fires a fresh explanation. The actual firing happens on mouse-up
+            // (commitSelection) so a drag commits once with its final range.
+            guard let textView else { return }
+            if textView.selectedRange().length == 0 {
+                lastCommittedSelection = ""
+            }
+        }
+
+        /// Called on mouse-up. Fires `onWordSelected` for the settled selection,
+        /// which may be a single word (double-click) or a phrase (drag).
+        func commitSelection() {
             guard let textView else { return }
             let range = textView.selectedRange()
-
-            // Only trigger on non-empty word selection (double-click selects a word)
-            guard range.length > 0 else {
-                lastSelectionWasEmpty = true
-                return
-            }
-
-            // Skip if the previous selection was already non-empty (drag extending)
-            if !lastSelectionWasEmpty { return }
-            lastSelectionWasEmpty = false
+            guard range.length > 0 else { return }
 
             let nsString = textView.string as NSString
-            let selectedWord = nsString.substring(with: range).trimmingCharacters(in: .whitespacesAndNewlines)
+            let selected = nsString.substring(with: range).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !selected.isEmpty else { return }
 
-            // Only trigger for single-word selections (no spaces)
-            guard !selectedWord.isEmpty,
-                  !selectedWord.contains(" "),
-                  selectedWord.count <= 30 else { return }
+            // Accept words and phrases, but not whole paragraphs — keep the selection
+            // to a meaningful phrase-sized unit.
+            let wordCount = selected.split { $0 == " " || $0 == "\n" || $0 == "\t" }.count
+            guard selected.count <= 200, wordCount <= 12 else { return }
 
-            // Extract sentence context
+            // Don't re-fire for the same settled selection.
+            guard selected != lastCommittedSelection else { return }
+            lastCommittedSelection = selected
+
             let sentence = extractSentence(from: textView.string, around: range)
 
             // Get screen point for popup positioning
@@ -147,7 +165,7 @@ struct TranslationSourceTextView: NSViewRepresentable {
             let pointInWindow = textView.convert(pointInView, to: nil)
             let screenPoint = textView.window?.convertPoint(toScreen: pointInWindow) ?? pointInWindow
 
-            parent.onWordSelected?(selectedWord, sentence, screenPoint)
+            parent.onWordSelected?(selected, sentence, screenPoint)
         }
 
         func updatePlaceholder() {
@@ -196,6 +214,17 @@ struct TranslationSourceTextView: NSViewRepresentable {
 class TranslationNSTextView: NSTextView {
     var showPlaceholder = true
     var placeholderString = "Enter text"
+    /// Fired after a mouse selection gesture finishes (the range is final here).
+    var onSelectionCommitted: (() -> Void)?
+
+    // NSTextView runs its own modal event-tracking loop inside `mouseDown` for the
+    // entire drag-select and swallows the matching `mouseUp` — so overriding
+    // `mouseUp` never fires. Instead, `super.mouseDown` returns only once that loop
+    // ends (on mouse-up), at which point the selection is final.
+    override func mouseDown(with event: NSEvent) {
+        super.mouseDown(with: event)
+        onSelectionCommitted?()
+    }
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)

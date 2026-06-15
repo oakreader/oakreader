@@ -1,6 +1,11 @@
 import SwiftUI
 import OakMarkdownUI
 
+/// Mobile-translate-style panel: a full-width language selector on top, then two
+/// stacked cards — a source (input) card and an emphasized result (output) card —
+/// each self-contained with its own language label and action row. Modeled on the
+/// Apple Translate / Google Translate / DeepL vertical layout, which reads well in
+/// OakReader's narrow right-panel column.
 struct TranslationPanelView: View {
     @Bindable var translationVM: TranslationViewModel
     var voiceVM: VoiceViewModel?
@@ -15,18 +20,15 @@ struct TranslationPanelView: View {
     var body: some View {
         VStack(spacing: 0) {
             headerBar
-            languageBar
-            Divider()
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    sourceSection
-
-                    Divider()
-                        .padding(.horizontal, OakStyle.Spacing.sm)
-
-                    targetSection
+                VStack(spacing: OakStyle.Spacing.sm) {
+                    languageSelector
+                    sourceCard
+                    resultCard
                 }
+                .padding(.horizontal, OakStyle.Spacing.sm)
+                .padding(.bottom, OakStyle.Spacing.md)
             }
             .scrollContentBackground(.hidden)
         }
@@ -41,24 +43,24 @@ struct TranslationPanelView: View {
         HStack(spacing: 8) {
             Text("Translation")
                 .font(OakStyle.ChatFont.headerTitle)
-
             Spacer()
         }
         .padding(.horizontal, OakStyle.Spacing.sm)
         .padding(.vertical, OakStyle.Spacing.sm)
     }
 
-    // MARK: - Language Bar
+    // MARK: - Language Selector
 
-    private var languageBar: some View {
-        HStack(spacing: 6) {
-            Spacer(minLength: 0)
-
+    /// Full-width selector bar: source pill · swap · target pill, each pill
+    /// expanding to fill half the bar (balanced like Google Translate).
+    private var languageSelector: some View {
+        HStack(spacing: 4) {
             LanguagePillButton(
                 title: translationVM.sourceLang.nativeName,
                 languages: TranslationLanguage.allCases,
                 selection: $translationVM.sourceLang
             )
+            .frame(maxWidth: .infinity)
 
             SwapLanguagesButton(disabled: translationVM.sourceLang == .auto) {
                 translationVM.swapLanguages()
@@ -69,11 +71,14 @@ struct TranslationPanelView: View {
                 languages: TranslationLanguage.targetCases,
                 selection: $translationVM.targetLang
             )
-
-            Spacer(minLength: 0)
+            .frame(maxWidth: .infinity)
         }
-        .padding(.horizontal, OakStyle.Spacing.sm)
-        .padding(.bottom, OakStyle.Spacing.xs)
+        .padding(.horizontal, OakStyle.Spacing.xs)
+        .padding(.vertical, OakStyle.Spacing.xs)
+        .background(
+            RoundedRectangle(cornerRadius: OakStyle.Radius.concave)
+                .fill(Color.primary.opacity(0.04))
+        )
         .onChange(of: translationVM.sourceLang) { _, _ in
             translationVM.onLanguageChange()
         }
@@ -82,126 +87,138 @@ struct TranslationPanelView: View {
         }
     }
 
-    // MARK: - Source Section
+    // MARK: - Source Card
 
-    private var sourceSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
+    private var sourceCard: some View {
+        VStack(alignment: .leading, spacing: OakStyle.Spacing.xs) {
+            cardLabel(translationVM.sourceLang.nativeName)
+
             TranslationSourceTextView(
                 text: $translationVM.sourceText,
                 height: $sourceHeight,
                 font: OakStyle.Font.nsFont(size: OakStyle.Font.body),
                 placeholder: "Enter text",
-                onWordSelected: { word, sentence, _ in
-                    translationVM.explainWord(word, inSentence: sentence)
+                onWordSelected: { selection, sentence, _ in
+                    translationVM.explainSelection(selection, inSentence: sentence)
                 }
             )
-            .frame(height: max(90, sourceHeight))
-            .padding(.horizontal, OakStyle.Spacing.xs)
-            .padding(.top, OakStyle.Spacing.xs)
+            .frame(height: max(72, sourceHeight))
             .onChange(of: translationVM.sourceText) { _, _ in
                 translationVM.debouncedTranslate()
             }
 
             if !translationVM.explanationWord.isEmpty {
                 wordExplanationSection
-                    .padding(.horizontal, OakStyle.Spacing.sm)
-                    .padding(.bottom, OakStyle.Spacing.xs)
             }
 
-            sourceToolbar
+            cardActionRow(
+                section: .source,
+                text: translationVM.sourceText,
+                copyTooltip: "Copy",
+                showStop: false
+            )
+        }
+        .padding(OakStyle.Spacing.sm)
+        .cardSurface(filled: false)
+    }
+
+    // MARK: - Result Card
+
+    private var resultCard: some View {
+        VStack(alignment: .leading, spacing: OakStyle.Spacing.xs) {
+            cardLabel(translationVM.targetLang.nativeName)
+
+            resultBody
+
+            if !translationVM.translatedText.isEmpty || translationVM.isTranslating {
+                cardActionRow(
+                    section: .target,
+                    text: translationVM.translatedText,
+                    copyTooltip: "Copy translation",
+                    showStop: translationVM.isTranslating
+                )
+            }
+        }
+        .padding(OakStyle.Spacing.sm)
+        .cardSurface(filled: true)
+    }
+
+    @ViewBuilder
+    private var resultBody: some View {
+        if let error = translationVM.errorMessage {
+            HStack(spacing: 6) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.yellow)
+                    .font(.caption)
+                Text(error)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } else if translationVM.translatedText.isEmpty && translationVM.isTranslating {
+            HStack(spacing: 6) {
+                ProgressView().controlSize(.small)
+                Text("Translating…")
+                    .font(OakStyle.Font.styled(size: 13))
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+            .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+        } else if translationVM.translatedText.isEmpty {
+            // Quiet placeholder — the result is the hero, so keep it understated.
+            Text("Translation appears here")
+                .font(OakStyle.Font.styled(size: 14))
+                .foregroundStyle(.tertiary)
+                .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+        } else {
+            // Result is the hero: render one step larger than the source text.
+            StreamingMarkdownView(
+                markdown: translationVM.translatedText,
+                theme: .oak(fontSize: OakStyle.Font.body + 1),
+                isStreaming: translationVM.isTranslating
+            )
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
     }
 
-    private var sourceToolbar: some View {
-        HStack(spacing: 4) {
-            if voiceVM != nil && !translationVM.sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                voiceButton(for: .source)
+    // MARK: - Card Building Blocks
+
+    /// Small uppercase language caption at the top of each card.
+    private func cardLabel(_ text: String) -> some View {
+        Text(text.uppercased())
+            .font(.system(size: 10, weight: .semibold))
+            .tracking(0.5)
+            .foregroundStyle(.tertiary)
+    }
+
+    /// Bottom action row: speaker (left) + stop/copy (right).
+    private func cardActionRow(
+        section: PlayingSection,
+        text: String,
+        copyTooltip: String,
+        showStop: Bool
+    ) -> some View {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return HStack(spacing: 2) {
+            if voiceVM != nil && !trimmed.isEmpty {
+                voiceButton(for: section)
             }
 
             Spacer()
 
-            if !translationVM.sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                toolbarButton(systemImage: "doc.on.doc", tooltip: "Copy") {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(translationVM.sourceText, forType: .string)
-                }
-            }
-        }
-        .padding(.horizontal, OakStyle.Spacing.xs)
-        .padding(.vertical, OakStyle.Spacing.xxs)
-    }
-
-    // MARK: - Target Section
-
-    private var targetSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if translationVM.isTranslating && translationVM.translatedText.isEmpty {
-                HStack(spacing: 6) {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text("Translating…")
-                        .font(OakStyle.Font.styled(size: 12))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    stopButton
-                }
-                .padding(.horizontal, OakStyle.Spacing.sm)
-                .padding(.vertical, OakStyle.Spacing.xs)
-            }
-
-            if let error = translationVM.errorMessage {
-                HStack(spacing: 6) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.yellow)
-                        .font(.caption)
-                    Text(error)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.primary)
-                        .lineLimit(2)
-                }
-                .padding(.horizontal, OakStyle.Spacing.sm)
-                .padding(.vertical, OakStyle.Spacing.xs)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            if translationVM.translatedText.isEmpty && !translationVM.isTranslating {
-                emptyState
-            } else if !translationVM.translatedText.isEmpty {
-                StreamingMarkdownView(
-                    markdown: translationVM.translatedText,
-                    theme: .oak(fontSize: OakStyle.Font.body),
-                    isStreaming: translationVM.isTranslating
-                )
-                .frame(maxWidth: .infinity, minHeight: 60, alignment: .topLeading)
-                .padding(.horizontal, OakStyle.Spacing.sm)
-                .padding(.vertical, OakStyle.Spacing.xs)
-
-                targetToolbar
-            }
-        }
-    }
-
-    private var targetToolbar: some View {
-        HStack(spacing: 4) {
-            if voiceVM != nil && !translationVM.translatedText.isEmpty {
-                voiceButton(for: .target)
-            }
-
-            if translationVM.isTranslating {
+            if showStop {
                 stopButton
             }
 
-            Spacer()
-
-            if !translationVM.translatedText.isEmpty {
-                toolbarButton(systemImage: "doc.on.doc", tooltip: "Copy translation") {
+            if !trimmed.isEmpty {
+                toolbarButton(systemImage: "doc.on.doc", tooltip: copyTooltip) {
                     NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(translationVM.translatedText, forType: .string)
+                    NSPasteboard.general.setString(text, forType: .string)
                 }
             }
         }
-        .padding(.horizontal, OakStyle.Spacing.xs)
-        .padding(.vertical, OakStyle.Spacing.xxs)
+        .frame(minHeight: 24)
     }
 
     private var stopButton: some View {
@@ -211,14 +228,14 @@ struct TranslationPanelView: View {
             Image(systemName: "stop.fill")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
-                .frame(width: 24, height: 24)
+                .frame(width: 26, height: 26)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .help("Stop")
     }
 
-    // MARK: - Word Explanation (inline, below source text)
+    // MARK: - Word Explanation (inline, inside source card)
 
     private var wordExplanationSection: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -275,9 +292,9 @@ struct TranslationPanelView: View {
     private func toolbarButton(systemImage: String, tooltip: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 14, weight: .medium))
+                .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.secondary)
-                .frame(width: 30, height: 30)
+                .frame(width: 26, height: 26)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -318,19 +335,22 @@ struct TranslationPanelView: View {
         voiceVM?.stopSpeaking()
         playingSection = nil
     }
+}
 
-    // MARK: - Empty State
+// MARK: - Card Surface
 
-    private var emptyState: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "translate")
-                .font(.system(size: 24))
-                .foregroundStyle(.quaternary)
-            Text("Translation appears here")
-                .font(OakStyle.Font.styled(size: 12))
-                .foregroundStyle(.tertiary)
-        }
-        .frame(maxWidth: .infinity, minHeight: 120)
+private extension View {
+    /// Rounded card surface. `filled` cards (the result) get a stronger fill to
+    /// distinguish output from input; unfilled cards (the source) get a hairline.
+    func cardSurface(filled: Bool) -> some View {
+        background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Color.primary.opacity(filled ? 0.05 : 0.02))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .strokeBorder(Color.primary.opacity(filled ? 0 : 0.07), lineWidth: 1)
+                )
+        )
     }
 }
 
@@ -363,12 +383,14 @@ private struct LanguagePillButton: View {
                 Text(title)
                     .font(OakStyle.Font.styled(size: 13, weight: .medium))
                     .foregroundStyle(.primary)
+                    .lineLimit(1)
                 Image(systemName: "chevron.down")
                     .font(.system(size: 9, weight: .semibold))
                     .foregroundStyle(.tertiary)
             }
+            .frame(maxWidth: .infinity)
             .padding(.horizontal, OakStyle.Spacing.sm)
-            .padding(.vertical, 5)
+            .padding(.vertical, 7)
             .background(
                 RoundedRectangle(cornerRadius: OakStyle.Radius.standard)
                     .fill(isHovering ? OakStyle.Colors.hoverBackground : .clear)
@@ -377,7 +399,6 @@ private struct LanguagePillButton: View {
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
-        .fixedSize()
         .onHover { isHovering = $0 }
     }
 }
@@ -396,7 +417,7 @@ private struct SwapLanguagesButton: View {
             Image(systemName: "arrow.left.arrow.right")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.secondary)
-                .frame(width: 26, height: 26)
+                .frame(width: 28, height: 28)
                 .background(
                     Circle()
                         .fill(isHovering && !disabled ? OakStyle.Colors.hoverBackground : .clear)

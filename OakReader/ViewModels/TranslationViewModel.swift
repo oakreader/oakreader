@@ -263,9 +263,13 @@ class TranslationViewModel {
 
     // MARK: - Word Explanation
 
-    func explainWord(_ word: String, inSentence sentence: String) {
+    /// Explains the selected text in context. The selection may be a single word
+    /// or a phrase / idiom / collocation pulled out of a sentence; the prompt
+    /// adapts to which it is.
+    func explainSelection(_ text: String, inSentence sentence: String) {
         stopWordExplanation()
-        explanationWord = word
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        explanationWord = trimmed
         wordExplanation = ""
         isExplainingWord = true
 
@@ -276,8 +280,8 @@ class TranslationViewModel {
             return m.isEmpty ? (ProviderRegistry.shared.provider(for: pid)?.defaultModelId ?? "") : m
         }()
 
-        let systemPrompt = buildWordExplanationSystemPrompt()
-        let userPrompt = buildWordExplanationUserPrompt(word: word, sentence: sentence)
+        let systemPrompt = buildExplanationSystemPrompt()
+        let userPrompt = buildExplanationUserPrompt(selection: trimmed, sentence: sentence)
 
         let config = ProviderConfig(providerId: pid, model: model)
         let messages = [LLMMessage(role: .user, text: userPrompt)]
@@ -317,7 +321,12 @@ class TranslationViewModel {
         isExplainingWord = false
     }
 
-    private func buildWordExplanationSystemPrompt() -> String {
+    /// True when the selection is a single word (no internal whitespace).
+    private func isSingleWord(_ text: String) -> Bool {
+        !text.contains { $0 == " " || $0 == "\n" || $0 == "\t" }
+    }
+
+    private func buildExplanationSystemPrompt() -> String {
         let accent = Preferences.shared.pronunciationAccent
         let targetLabel = targetLang.displayName
         let ipaNote = accent == .british
@@ -325,15 +334,22 @@ class TranslationViewModel {
             : "Use American English pronunciation (AmE IPA)."
 
         return """
-        You are an expert word analyst. \(ipaNote) \
-        Provide a deep, insightful explanation of the given word using the exact format specified. \
+        You are an expert language analyst. \(ipaNote) \
+        The user selects a word or a phrase from a sentence and you explain it. \
+        Provide a deep, insightful explanation using the exact format specified. \
         All translations and explanations should be in \(targetLabel). \
         Use markdown formatting. Be concise but illuminating. \
-        If the word appears in the given sentence context, tailor collocations and examples to that context.
+        Tailor your explanation to the given sentence context.
         """
     }
 
-    private func buildWordExplanationUserPrompt(word: String, sentence: String) -> String {
+    private func buildExplanationUserPrompt(selection: String, sentence: String) -> String {
+        isSingleWord(selection)
+            ? buildWordUserPrompt(word: selection, sentence: sentence)
+            : buildPhraseUserPrompt(phrase: selection, sentence: sentence)
+    }
+
+    private func buildWordUserPrompt(word: String, sentence: String) -> String {
         let targetLabel = targetLang.displayName
 
         var prompt = """
@@ -368,6 +384,47 @@ class TranslationViewModel {
 
         ### Memory
         Etymology-based deep memory technique.
+        """
+        return prompt
+    }
+
+    private func buildPhraseUserPrompt(phrase: String, sentence: String) -> String {
+        let targetLabel = targetLang.displayName
+
+        var prompt = """
+        Explain this phrase as it is used in context:
+
+        **Selection:** \(phrase)
+        """
+        if !sentence.isEmpty {
+            prompt += "\n**Sentence context:** \(sentence)"
+        }
+
+        prompt += """
+
+
+        The selection may be a loose fragment. If it is part of a larger meaningful unit \
+        in the sentence — an idiom, phrasal verb, or fixed collocation — identify that \
+        complete expression and explain it instead of the literal substring.
+
+        Use this exact format (translate all annotations and explanations into \(targetLabel)):
+
+        ## {phrase}  {\(targetLabel) translation}
+
+        ### Type
+        State whether it is an idiom, phrasal verb, collocation, set expression, or just a literal phrase.
+
+        ### Meaning
+        Clear meaning in \(targetLabel). Note literal vs. figurative sense if relevant.
+
+        ### In Context
+        How it functions in the given sentence — nuance, tone, and register.
+
+        ### Notes
+        Common variations, near-synonyms, or usage cautions.
+
+        ### Example
+        > "Natural English sentence using the phrase. \(targetLabel) translation."
         """
         return prompt
     }
