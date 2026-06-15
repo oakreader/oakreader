@@ -117,6 +117,20 @@ actor LibraryCoverService {
         return image.resizedToFit(maxDimension: maxDimension).jpegData(quality: 0.8)
     }
 
+    /// Cap dimension shared with `downloadCoverImage` so callers outside the actor can match it.
+    static let coverMaxDimension: CGFloat = 320
+
+    /// Re-encode an already-downloaded image as a capped JPEG cover. Use for thumbnails the
+    /// importer fetched itself (e.g. a page's og:image) so they don't land on disk raw and
+    /// full-size — an unbounded square og:image (YouTube channel avatars are 900×900) would
+    /// otherwise blow out the card grid. Rejects 1×1 tracking pixels / blank images.
+    nonisolated static func sanitizedCoverData(_ data: Data) -> Data? {
+        guard let image = NSImage(data: data), image.size.width > 1, image.size.height > 1 else {
+            return nil
+        }
+        return image.resizedToFit(maxDimension: coverMaxDimension).jpegData(quality: 0.8)
+    }
+
     // MARK: - Synthetic covers (typographic paper cover + favicon card)
 
     /// Curated, muted hues — picking from a small harmonious set avoids the neon/magenta a raw

@@ -41,11 +41,8 @@ extension ImportService {
             let encoded = try JSONEncoder().encode(input.metadata)
             try encoded.write(to: metadataURL, options: .atomic)
 
-            // Write thumbnail as cover to attachment directory
-            if let thumbnailData = input.thumbnailData {
-                let coverURL = CatalogDatabase.attachmentCoverURL(itemStorageKey: itemStorageKey, attachmentStorageKey: attStorageKey)
-                try thumbnailData.write(to: coverURL, options: .atomic)
-            }
+            // Cover is derived asynchronously below (see `deriveCover`) — never written raw here,
+            // so an unbounded/oddly-shaped supplied thumbnail can't reach the grid as-is.
 
             // Generate embed.html for non-YouTube types (link bookmarks)
             if input.embedType != "youtube" {
@@ -127,17 +124,25 @@ extension ImportService {
             }
         }
 
-        // Generate a static preview cover when the extension didn't supply a thumbnail
-        // (e.g. a pasted/typed YouTube or web URL). YouTube derives its poster; other links
-        // scrape og:image. Mirrors the HTML-import cover task.
-        if input.thumbnailData == nil {
-            let sourceURL = input.sourceURL
-            Task {
-                if let coverData = await coverService.generateLinkCover(for: sourceURL) {
-                    await MainActor.run {
-                        store.updateCover(item, imageData: coverData)
-                    }
-                }
+        // Derive the cover off the main thread. For YouTube we ALWAYS derive the poster from the
+        // video id (16:9 maxresdefault) and ignore any supplied thumbnail — a watch page's
+        // og:image is frequently the square channel avatar, which would otherwise be stored raw
+        // and render as an oversized tile in the grid. Non-YouTube links reuse the supplied
+        // thumbnail (capped/validated), falling back to scraping og:image / favicon.
+        let sourceURL = input.sourceURL
+        let suppliedThumbnail = input.thumbnailData
+        Task {
+            let coverData: Data?
+            if LibraryCoverService.youTubeVideoID(sourceURL) != nil {
+                coverData = await coverService.generateLinkCover(for: sourceURL)
+            } else if let suppliedThumbnail,
+                      let sanitized = LibraryCoverService.sanitizedCoverData(suppliedThumbnail) {
+                coverData = sanitized
+            } else {
+                coverData = await coverService.generateLinkCover(for: sourceURL)
+            }
+            if let coverData {
+                await MainActor.run { store.updateCover(item, imageData: coverData) }
             }
         }
 

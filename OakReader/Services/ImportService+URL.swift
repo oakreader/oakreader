@@ -112,8 +112,10 @@ extension ImportService {
             .first { !$0.isEmpty } ?? "Untitled"
         let author = info.author ?? sourceURL.host ?? ""
 
+        // Skip the og:image fetch for YouTube — the cover is derived from the video id downstream
+        // (a watch page's og:image is often the square channel avatar, not the video poster).
         var thumbnailData: Data?
-        if let thumbURL = info.thumbnailURL {
+        if LibraryCoverService.youTubeVideoID(sourceURL) == nil, let thumbURL = info.thumbnailURL {
             var req = URLRequest(url: thumbURL)
             req.setValue(Self.browserUserAgent, forHTTPHeaderField: "User-Agent")
             thumbnailData = try? await URLSession.shared.data(for: req).0
