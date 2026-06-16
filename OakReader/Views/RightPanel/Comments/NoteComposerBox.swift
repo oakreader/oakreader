@@ -20,6 +20,12 @@ struct NoteComposerBox: View {
     /// Bump to pull keyboard focus into the editor (e.g. a text selection started
     /// an anchored note).
     var focusSignal: Int = 0
+    /// When provided, the image button offers "Capture region" (a viewer crosshair
+    /// clip, like AI chat) alongside "Choose file"; nil → file picker only.
+    var onCaptureRegion: (() -> Void)? = nil
+    /// A finished region capture's `file://` URL to insert as a markdown image.
+    var captureURL: String? = nil
+    var onCaptureConsumed: (() -> Void)? = nil
 
     @State private var controller = MilkdownComposerController()
     @State private var isEmpty = true
@@ -60,6 +66,11 @@ struct NoteComposerBox: View {
         )
         .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
         .onChange(of: focusSignal) { _, _ in controller.focus() }
+        .onChange(of: captureURL) { _, url in
+            guard let url else { return }
+            controller.insertImage(url)
+            onCaptureConsumed?()
+        }
     }
 
     // MARK: Quote chip (anchored note)
@@ -95,8 +106,7 @@ struct NoteComposerBox: View {
         HStack(spacing: 2) {
             toolButton("number") { controller.cmd("tag") }
                 .help("Tag")
-            toolButton("photo") { pickImage() }
-                .help("Insert image")
+            imageButton
 
             toolDivider
 
@@ -153,6 +163,30 @@ struct NoteComposerBox: View {
             .buttonStyle(.plain)
             .disabled(isEmpty)
             .help(mode == .edit ? "Save (⌘↩)" : "Save note (⌘↩)")
+        }
+    }
+
+    /// Image affordance — a menu (capture a region of the document, like AI chat,
+    /// or choose a file) when capture is wired; otherwise a plain file picker.
+    @ViewBuilder
+    private var imageButton: some View {
+        if let onCaptureRegion {
+            Menu {
+                Button { onCaptureRegion() } label: { Label("Capture region…", systemImage: "viewfinder") }
+                Button { pickImage() } label: { Label("Choose file…", systemImage: "photo") }
+            } label: {
+                Image(systemName: "photo")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28, height: 28)
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("Add image")
+        } else {
+            toolButton("photo") { pickImage() }
+                .help("Insert image")
         }
     }
 

@@ -128,7 +128,9 @@ struct HTMLOverlayView: View {
 
             DispatchQueue.main.async {
                 self.showSelection = false
-                if viewModel.state.snapshotForChat {
+                if viewModel.state.snapshotForNote {
+                    viewModel.deliverAreaCaptureToNote(pngData, pageIndex: 0)
+                } else if viewModel.state.snapshotForChat {
                     viewModel.deliverAreaCaptureToChat(pngData, pageIndex: 0)
                 } else {
                     WebAreaPopupPanel.show(

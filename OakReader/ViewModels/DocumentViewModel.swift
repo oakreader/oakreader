@@ -426,9 +426,12 @@ class DocumentViewModel {
     }
 
     func setEditorMode(_ mode: EditorMode) {
-        // Leaving snapshot mode always clears the "route to chat" intent so a
+        // Leaving snapshot mode always clears the "route to chat/note" intent so a
         // later menu/shortcut capture falls back to the annotation popup.
-        if mode != .snapshot { state.snapshotForChat = false }
+        if mode != .snapshot {
+            state.snapshotForChat = false
+            state.snapshotForNote = false
+        }
         state.editorMode = mode
     }
 
@@ -447,6 +450,26 @@ class DocumentViewModel {
     func deliverAreaCaptureToChat(_ pngData: Data, pageIndex: Int) {
         chat.addImageAttachment(pngData, pageIndex: pageIndex)
         state.rightPanelMode = .aiChat
+        setEditorMode(.viewer)
+    }
+
+    /// Begin a region capture whose result is inserted as an image into the
+    /// Notes composer (flomo "clip a figure into your note"). Mirror of
+    /// `beginAreaCaptureForChat`, routed to the Notes panel.
+    func beginAreaCaptureForNote() {
+        Log.debug(Log.ui, "[capture-cursor] beginAreaCaptureForNote — contentType: \(contentType)")
+        state.snapshotForNote = true
+        state.rightPanelMode = .comments
+        state.editorMode = .snapshot
+    }
+
+    /// Persist a finished capture and route its markdown image into the active
+    /// note composer, then leave snapshot mode.
+    func deliverAreaCaptureToNote(_ pngData: Data, pageIndex: Int) {
+        if let url = NoteImageStore.save(pngData: pngData) {
+            comments.deliverCapturedImage(url)
+        }
+        state.rightPanelMode = .comments
         setEditorMode(.viewer)
     }
 }

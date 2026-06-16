@@ -33,7 +33,10 @@ struct CommentsPanelView: View {
                         model.addMemo(md)
                     }
                 },
-                focusSignal: focusSignal
+                focusSignal: focusSignal,
+                onCaptureRegion: { viewModel.beginAreaCaptureForNote() },
+                captureURL: model.pendingCaptureURL,
+                onCaptureConsumed: { model.pendingCaptureURL = nil }
             )
             .padding(.horizontal, 12)
             .padding(.top, 12)

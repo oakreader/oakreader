@@ -16,6 +16,9 @@ class DocumentState {
     /// AI chat composer (Dia-style) instead of showing the area-selection popup.
     /// Set by the chat input's screenshot button; reset on leaving snapshot mode.
     var snapshotForChat: Bool = false
+    /// Twin of `snapshotForChat` for the Notes composer: the next completed area
+    /// capture is inserted as an image into the active note instead of the popup.
+    var snapshotForNote: Bool = false
     var sidebarMode: SidebarMode = .thumbnails
 
     var isSidebarVisible: Bool = true

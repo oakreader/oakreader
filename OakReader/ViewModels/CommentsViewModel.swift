@@ -26,6 +26,16 @@ final class CommentsViewModel {
     /// or its sidebar entry). Cleared once consumed by the view.
     var focusedCardId: String?
 
+    /// A region capture (viewer crosshair) finished — its persisted `file://`
+    /// URL for the active composer to insert as a markdown image. Cleared once
+    /// the composer consumes it.
+    var pendingCaptureURL: String?
+
+    /// Route a finished area capture into the active note composer.
+    func deliverCapturedImage(_ url: String) {
+        pendingCaptureURL = url
+    }
+
     init(parent: DocumentViewModel?) {
         self.parent = parent
     }

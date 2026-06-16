@@ -17,6 +17,11 @@ enum NoteImageStore {
         return write(png, ext: "png")
     }
 
+    /// Store already-encoded PNG bytes (e.g. an area-capture from the viewer).
+    static func save(pngData: Data) -> String? {
+        write(pngData, ext: "png")
+    }
+
     /// Copy an existing image file (file picker / dropped file) into the store.
     static func save(fileAt url: URL) -> String? {
         guard let data = try? Data(contentsOf: url) else { return nil }
