@@ -24,10 +24,10 @@ struct AnnotationListView: View {
                     Image(systemName: "text.bubble")
                         .font(.largeTitle)
                         .foregroundStyle(.secondary)
-                    Text("No Notes")
+                    Text("No Comments")
                         .font(.headline)
                         .foregroundStyle(.secondary)
-                    Text("Notes you add to highlights will appear here.")
+                    Text("Comments you add to highlights will appear here.")
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                         .multilineTextAlignment(.center)
@@ -60,7 +60,7 @@ struct AnnotationListView: View {
             HStack {
                 Spacer()
 
-                Text("\(notes.count) notes")
+                Text("\(notes.count) comments")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }

@@ -187,7 +187,7 @@ class HTMLSelectionPopupPanel: NSPanel, AppResignDismissable {
 
         let noteBtn = PopupIconButton(
             systemImage: "text.bubble",
-            accessibilityLabel: "Add Note"
+            accessibilityLabel: "Add Comment"
         ) { [weak self] in
             self?.addNote()
         }

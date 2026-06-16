@@ -37,7 +37,7 @@ enum SidebarMode: String, CaseIterable, Identifiable {
         switch self {
         case .thumbnails: return "Thumbnails"
         case .outline: return "Outline"
-        case .annotations: return "Notes"
+        case .annotations: return "Comments"
         case .search: return "Search"
         }
     }

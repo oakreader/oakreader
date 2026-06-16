@@ -792,7 +792,7 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
         let menu = NSMenu()
 
         let noteItem = NSMenuItem(
-            title: hasNote ? "Edit Note" : "Add Note",
+            title: hasNote ? "Edit Comment" : "Add Comment",
             action: #selector(openWebHighlightNote(_:)),
             keyEquivalent: ""
         )

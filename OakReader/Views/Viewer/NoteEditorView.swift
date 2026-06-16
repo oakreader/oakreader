@@ -147,7 +147,7 @@ struct NoteEditorView: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
-            .help("Delete note")
+            .help("Delete comment")
 
             Spacer()
 

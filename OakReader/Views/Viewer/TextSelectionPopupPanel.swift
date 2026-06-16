@@ -157,7 +157,7 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
 
         let colorBtn = PopupIconButton(
             systemImage: "paintpalette",
-            accessibilityLabel: "Annotation Color"
+            accessibilityLabel: "Highlight Color"
         ) { [weak self] in
             self?.toggleColorSubPanel()
         }
@@ -165,7 +165,7 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
 
         let noteBtn = PopupIconButton(
             systemImage: "text.bubble",
-            accessibilityLabel: "Add Note"
+            accessibilityLabel: "Add Comment"
         ) { [weak self] in
             self?.addNote()
         }

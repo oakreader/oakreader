@@ -49,7 +49,7 @@ async function build(markdown, editable) {
       [CrepeFeature.TopBar]: false,
     },
     featureConfigs: {
-      [CrepeFeature.Placeholder]: { text: "Write a note…", mode: "doc" },
+      [CrepeFeature.Placeholder]: { text: "Write a comment…", mode: "doc" },
     },
   });
 

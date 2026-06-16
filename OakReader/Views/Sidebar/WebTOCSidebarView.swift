@@ -29,7 +29,7 @@ private enum WebSidebarMode: String, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .contents: return "Contents"
-        case .notes:    return "Notes"
+        case .notes:    return "Comments"
         case .search:   return "Search"
         }
     }
@@ -277,11 +277,11 @@ private struct WebNotesView: View {
                 .font(.system(size: 24))
                 .foregroundStyle(Color.primary.opacity(0.15))
 
-            Text("No Notes")
+            Text("No Comments")
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
 
-            Text("Notes you add to highlights will appear here.")
+            Text("Comments you add to highlights will appear here.")
                 .font(.system(size: 11))
                 .foregroundStyle(Color.primary.opacity(0.25))
                 .multilineTextAlignment(.center)

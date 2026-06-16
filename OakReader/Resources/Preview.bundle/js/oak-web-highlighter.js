@@ -57,6 +57,36 @@
         }
     }
 
+    // Post a highlight's on-screen rect to native so it can anchor the note
+    // editor. Payload shape matches `textSelected`. Shared by click-to-open and
+    // focusHighlight (sidebar).
+    function postFocus(id, el) {
+        var r = el.getBoundingClientRect();
+        try {
+            window.webkit.messageHandlers.highlightFocus.postMessage({
+                id: id,
+                x: r.left + r.width / 2,
+                y: r.top,
+                bottomY: r.bottom,
+                vpWidth: window.innerWidth,
+                vpHeight: window.innerHeight
+            });
+        } catch (e) {}
+    }
+
+    // Walk up from an event target to the enclosing highlight span, returning its id.
+    function highlightIdFromEvent(target) {
+        var el = target;
+        while (el && el !== document.body) {
+            if (el.classList && el.classList.contains(HL_CLASS)) {
+                var id = el.getAttribute('data-oak-hl-id');
+                if (id) return { id: id, el: el };
+            }
+            el = el.parentElement;
+        }
+        return null;
+    }
+
     window.OakHighlighter = {
 
         /**
@@ -79,26 +109,29 @@
 
             // Right-click on a highlight → notify native to show context menu
             document.addEventListener('contextmenu', function (e) {
-                var el = e.target;
-                while (el && el !== document.body) {
-                    if (el.classList && el.classList.contains(HL_CLASS)) {
-                        var hlId = el.getAttribute('data-oak-hl-id');
-                        if (hlId) {
-                            e.preventDefault();
-                            try {
-                                window.webkit.messageHandlers.highlightContextMenu.postMessage({
-                                    id: hlId,
-                                    x: e.clientX,
-                                    y: e.clientY,
-                                    vpWidth: window.innerWidth,
-                                    vpHeight: window.innerHeight
-                                });
-                            } catch (err) {}
-                            return;
-                        }
-                    }
-                    el = el.parentElement;
-                }
+                var hit = highlightIdFromEvent(e.target);
+                if (!hit) return;
+                e.preventDefault();
+                try {
+                    window.webkit.messageHandlers.highlightContextMenu.postMessage({
+                        id: hit.id,
+                        x: e.clientX,
+                        y: e.clientY,
+                        vpWidth: window.innerWidth,
+                        vpHeight: window.innerHeight
+                    });
+                } catch (err) {}
+            });
+
+            // Left-click on a highlight → open its note editor (anchored to it).
+            // Skipped while a text selection is in progress so dragging a new
+            // selection over a highlight still goes through the selection popup.
+            document.addEventListener('click', function (e) {
+                var sel = window.getSelection();
+                if (sel && !sel.isCollapsed) return;
+                var hit = highlightIdFromEvent(e.target);
+                if (!hit) return;
+                postFocus(hit.id, hit.el);
             });
         },
 
@@ -229,19 +262,7 @@
             }
 
             // Post the rect after the smooth scroll settles so coords are final.
-            setTimeout(function () {
-                var r = el.getBoundingClientRect();
-                try {
-                    window.webkit.messageHandlers.highlightFocus.postMessage({
-                        id: id,
-                        x: r.left + r.width / 2,
-                        y: r.top,
-                        bottomY: r.bottom,
-                        vpWidth: window.innerWidth,
-                        vpHeight: window.innerHeight
-                    });
-                } catch (e) {}
-            }, 320);
+            setTimeout(function () { postFocus(id, el); }, 320);
         }
     };
 })();
