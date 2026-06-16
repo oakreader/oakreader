@@ -63,8 +63,12 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
         let x = screenPoint.x - contentSize.width / 2
         var y = screenPoint.y + 6
 
-        // Fallback: if panel top edge exceeds screen top, position below
-        if let screen = NSScreen.main {
+        // Fallback: if panel top edge exceeds screen top, position below.
+        // Resolve the screen from the anchor point so we use the right monitor
+        // (the panel isn't ordered on-screen yet, so `window.screen`/`self.screen`
+        // can't help).
+        if let screen = NSScreen.screens.first(where: { $0.frame.contains(screenPoint) })
+            ?? pdfView.window?.screen ?? NSScreen.main {
             let screenTop = screen.visibleFrame.maxY
             if y + contentSize.height > screenTop {
                 y = screenPoint.y - contentSize.height - 6
@@ -103,7 +107,8 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
         var y = screenPoint.y + 6
 
         // Fallback: if panel top edge exceeds screen top, position below
-        if let screen = window.screen ?? NSScreen.main {
+        if let screen = NSScreen.screens.first(where: { $0.frame.contains(screenPoint) })
+            ?? window.screen ?? NSScreen.main {
             let screenTop = screen.visibleFrame.maxY
             if y + panelSize.height > screenTop {
                 y = screenPoint.y - panelSize.height - 6
@@ -159,7 +164,7 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
         mainStack.addArrangedSubview(colorBtn)
 
         let noteBtn = PopupIconButton(
-            systemImage: "note.text",
+            systemImage: "text.bubble",
             accessibilityLabel: "Add Note"
         ) { [weak self] in
             self?.addNote()

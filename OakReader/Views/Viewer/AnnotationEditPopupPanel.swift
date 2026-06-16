@@ -92,7 +92,10 @@ final class AnnotationEditPopupPanel: NSPanel, AppResignDismissable {
         var x = screenPoint.x - size.width / 2
         var y = screenPoint.y + 6
 
-        if let screen = self.screen ?? NSScreen.main {
+        // The panel isn't ordered on-screen yet, so `self.screen` is nil; using
+        // it would fall back to `NSScreen.main` and yank the panel onto the
+        // primary monitor. Resolve the screen from the anchor point instead.
+        if let screen = screenContaining(screenPoint) {
             let visible = screen.visibleFrame
             // Flip below if it would clip the top edge.
             if y + size.height > visible.maxY {
@@ -121,6 +124,15 @@ final class AnnotationEditPopupPanel: NSPanel, AppResignDismissable {
         let viewPoint = pdfView.convert(pagePoint, from: anchorPage)
         let windowPoint = pdfView.convert(viewPoint, to: nil)
         return window.convertPoint(toScreen: windowPoint)
+    }
+
+    /// The screen whose frame contains `point`, falling back to the PDF window's
+    /// screen and finally the main screen. Avoids `self.screen`, which is nil
+    /// before the panel is ordered on-screen.
+    private func screenContaining(_ point: NSPoint) -> NSScreen? {
+        NSScreen.screens.first { $0.frame.contains(point) }
+            ?? pdfView?.window?.screen
+            ?? NSScreen.main
     }
 
     private func observeScroll() {

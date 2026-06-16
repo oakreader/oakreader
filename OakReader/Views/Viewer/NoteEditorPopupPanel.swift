@@ -108,7 +108,10 @@ final class NoteEditorPopupPanel: NSPanel, AppResignDismissable {
         var x = below.x - size.width / 2
         var y = below.y - size.height - 8   // below the selection's bottom edge
 
-        if let screen = self.screen ?? NSScreen.main {
+        // The panel isn't ordered on-screen yet, so `self.screen` is nil; using
+        // it would fall back to `NSScreen.main` and yank the panel onto the
+        // primary monitor. Resolve the screen from the anchor point instead.
+        if let screen = screenContaining(below) {
             let visible = screen.visibleFrame
             // Clips the bottom of the screen → flip above the selection's top.
             if y < visible.minY + 4 {
@@ -134,6 +137,15 @@ final class NoteEditorPopupPanel: NSPanel, AppResignDismissable {
         let viewPoint = pdfView.convert(pagePoint, from: anchorPage)
         let windowPoint = pdfView.convert(viewPoint, to: nil)
         return window.convertPoint(toScreen: windowPoint)
+    }
+
+    /// The screen whose frame contains `point`, falling back to the PDF window's
+    /// screen and finally the main screen. Avoids `self.screen`, which is nil
+    /// before the panel is ordered on-screen.
+    private func screenContaining(_ point: NSPoint) -> NSScreen? {
+        NSScreen.screens.first { $0.frame.contains(point) }
+            ?? pdfView?.window?.screen
+            ?? NSScreen.main
     }
 
     private func observeScroll() {
