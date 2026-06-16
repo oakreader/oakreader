@@ -164,6 +164,8 @@ private final class Renderer {
             ])
         case CMARK_NODE_LINK:
             return link(node)
+        case CMARK_NODE_IMAGE:
+            return image(node)
         case CMARK_NODE_LIST:
             return list(node)
         case CMARK_NODE_ITEM:
@@ -275,6 +277,50 @@ private final class Renderer {
         p.paragraphSpacingBefore = theme.paragraphSpacing * 0.5
         m.addAttribute(.paragraphStyle, value: p, range: full)
         addInlineCodeSpacing(m)
+        return m
+    }
+
+    // Cache decoded local images by "path|width" so a streaming tail doesn't reload
+    // the same file every commit.
+    private static var fileImageCache: [String: NSImage] = [:]
+    private static let imageMaxWidth: CGFloat = 260
+
+    /// `![alt](url)` — render a *local* image (file URL or absolute path) as a
+    /// width-capped attachment. Remote/unloadable images fall back to alt text so
+    /// the renderer never blocks on the network.
+    private func image(_ node: MarkdownAttributedBuilder.Node) -> NSAttributedString {
+        func altText() -> NSAttributedString {
+            let alt = renderInline(node)
+            return alt.length > 0 ? alt : NSAttributedString(string: "🖼", attributes: base())
+        }
+        guard let urlPtr = cmark_node_get_url(node) else { return altText() }
+        let dest = String(cString: urlPtr)
+        let maxW = Renderer.imageMaxWidth
+        let key = "\(dest)|\(maxW)"
+
+        let loaded: NSImage?
+        if let cached = Renderer.fileImageCache[key] {
+            loaded = cached
+        } else if let url = URL(string: dest), url.isFileURL, let img = NSImage(contentsOf: url) {
+            loaded = img
+            Renderer.fileImageCache[key] = img
+        } else if dest.hasPrefix("/"), let img = NSImage(contentsOfFile: dest) {
+            loaded = img
+            Renderer.fileImageCache[key] = img
+        } else {
+            loaded = nil
+        }
+        guard let img = loaded, img.size.width > 0, img.size.height > 0 else { return altText() }
+
+        var size = img.size
+        if size.width > maxW {
+            size = CGSize(width: maxW, height: (size.height * maxW / size.width).rounded())
+        }
+        let attachment = NSTextAttachment()
+        attachment.image = img
+        attachment.bounds = CGRect(x: 0, y: 0, width: size.width, height: size.height)
+        let m = NSMutableAttributedString(attachment: attachment)
+        m.addAttribute(.paragraphStyle, value: bodyParagraphStyle(), range: NSRange(location: 0, length: m.length))
         return m
     }
 

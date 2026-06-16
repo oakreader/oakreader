@@ -8,6 +8,7 @@
     "build:defuddle": "rollup -c rollup.defuddle.config.js",
     "build:cite-anchor": "rollup -c rollup.cite-anchor.config.js",
     "build:mindmap": "rollup -c rollup.mindmap.config.js && cp node_modules/mind-elixir/dist/MindElixir.css ../OakReader/Resources/Preview.bundle/js/oak-mindmap.css",
+    "build:milkdown": "rollup -c rollup.milkdown.config.js && node scripts/build-milkdown-css.mjs",
     "dev": "pnpm run build:singlefile && wxt",
     "build": "pnpm run build:singlefile && wxt build",
     "zip": "pnpm run build:singlefile && wxt zip",
@@ -15,6 +16,9 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
+    "@milkdown/core": "^7.21.2",
+    "@milkdown/crepe": "^7.21.2",
+    "@milkdown/kit": "^7.21.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "defuddle": "^0.18.1",
