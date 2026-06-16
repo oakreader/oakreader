@@ -13,7 +13,7 @@ export default [
   {
     input: "src/oak-milkdown-entry.js",
     output: {
-      file: "../OakReader/Resources/Preview.bundle/js/oak-milkdown.js",
+      file: "../../OakReader/Resources/Preview.bundle/js/oak-milkdown.js",
       format: "iife",
       // Crepe lazy-loads some features via dynamic import; a single inlined IIFE
       // (no code-splitting) is what the WKWebView host injects.

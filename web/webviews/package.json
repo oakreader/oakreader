@@ -1,0 +1,31 @@
+{
+  "name": "oakreader-webviews",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Bundles for the OakReader app's embedded WKWebViews — built into ../../OakReader/Resources/Preview.bundle/js (committed artifacts, no Xcode build phase).",
+  "scripts": {
+    "build:defuddle": "rollup -c rollup.defuddle.config.js",
+    "build:cite-anchor": "rollup -c rollup.cite-anchor.config.js",
+    "build:mindmap": "rollup -c rollup.mindmap.config.js && cp node_modules/mind-elixir/dist/MindElixir.css ../../OakReader/Resources/Preview.bundle/js/oak-mindmap.css",
+    "build:milkdown": "rollup -c rollup.milkdown.config.js && node scripts/build-milkdown-css.mjs",
+    "build:all": "pnpm run build:defuddle && pnpm run build:cite-anchor && pnpm run build:mindmap && pnpm run build:milkdown"
+  },
+  "dependencies": {
+    "@milkdown/core": "^7.21.2",
+    "@milkdown/crepe": "^7.21.2",
+    "@milkdown/kit": "^7.21.2",
+    "defuddle": "^0.18.1",
+    "dom-anchor-text-quote": "^4.0.2",
+    "mind-elixir": "^5.12.2"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^29.0.2",
+    "@rollup/plugin-node-resolve": "^16.0.0",
+    "@rollup/plugin-replace": "^6.0.3",
+    "@rollup/plugin-terser": "^0.4.0",
+    "postcss": "^8.5.15",
+    "postcss-import": "^16.1.1",
+    "rollup": "^4.0.0"
+  }
+}

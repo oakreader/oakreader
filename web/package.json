@@ -1,0 +1,11 @@
+{
+  "name": "oakreader-web",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "OakReader web workspace — the browser extension and the app's embedded-WKWebView bundles (Preview.bundle).",
+  "scripts": {
+    "build:webviews": "pnpm --filter oakreader-webviews build:all",
+    "build:extension": "pnpm --filter oakreader-extension build"
+  }
+}

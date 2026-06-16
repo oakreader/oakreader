@@ -12,7 +12,7 @@ export default [
   {
     input: "src/oak-mindmap-entry.js",
     output: {
-      file: "../OakReader/Resources/Preview.bundle/js/oak-mindmap.js",
+      file: "../../OakReader/Resources/Preview.bundle/js/oak-mindmap.js",
       format: "iife",
     },
     plugins: [resolve({ browser: true }), commonjs(), terser()],

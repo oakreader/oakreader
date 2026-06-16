@@ -8,7 +8,7 @@ export default [
   {
     input: "src/oak-defuddle-entry.js",
     output: {
-      file: "../OakReader/Resources/Preview.bundle/js/oak-defuddle.js",
+      file: "../../OakReader/Resources/Preview.bundle/js/oak-defuddle.js",
       format: "iife",
     },
     plugins: [resolve({ browser: true }), commonjs(), terser()],

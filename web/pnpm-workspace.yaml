@@ -1,3 +1,7 @@
+packages:
+  - extension
+  - webviews
+
 allowBuilds:
   esbuild: true
   spawn-sync: true

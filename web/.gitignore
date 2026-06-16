@@ -2,4 +2,4 @@ node_modules/
 .output/
 .wxt/
 SingleFile-MV3/
-public/lib/
+extension/public/lib/
