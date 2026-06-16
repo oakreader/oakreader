@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Archive, CheckCircle2, Link2, Sparkles } from "lucide-react";
+import { Archive, CheckCircle2, Link2 } from "lucide-react";
 import { usePopupData } from "@/src/hooks/use-popup-data";
 import { postClip } from "@/src/lib/api";
 import type { PageCapture, PDFSavePayload } from "@/src/lib/types";
@@ -255,20 +255,13 @@ export function App() {
 function Header() {
   return (
     <div className="px-4 pt-4 pb-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="relative flex size-9 items-center justify-center rounded-2xl bg-grouped shadow-[var(--shadow-card)] ring-1 ring-white/80">
-            <img src="/oakreader-logo.svg" alt="" className="size-5" />
-            <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-success ring-2 ring-background" />
-          </div>
-          <div>
-            <p className="text-[15px] font-semibold leading-tight text-foreground tracking-[-0.02em]">OakReader</p>
-            <p className="text-[11px] leading-tight text-secondary">Clip into your reading library</p>
-          </div>
+      <div className="flex items-center gap-2.5">
+        <div className="flex size-8 items-center justify-center rounded-[10px] bg-card shadow-[var(--shadow-card)]">
+          <img src="/oakreader-logo.svg" alt="" className="size-[18px]" />
         </div>
-        <div className="inline-flex items-center gap-1 rounded-full bg-primary/8 px-2 py-1 text-[11px] font-medium text-primary">
-          <Sparkles className="size-3" strokeWidth={2.4} />
-          Ready
+        <div>
+          <p className="text-[15px] font-semibold leading-tight text-foreground">OakReader</p>
+          <p className="text-[11px] leading-tight text-secondary">Clip into your reading library</p>
         </div>
       </div>
     </div>
@@ -283,8 +276,8 @@ function SaveModePicker({
   onChange: (value: SaveMode) => void;
 }) {
   return (
-    <section className="space-y-1.5">
-      <p className="text-[11px] font-semibold text-secondary">Capture style</p>
+    <section className="space-y-2">
+      <p className="px-0.5 text-[11px] font-medium uppercase tracking-[0.04em] text-tertiary">Capture style</p>
       <div className="grid grid-cols-2 gap-2">
         {SAVE_MODE_OPTIONS.map((option) => {
           const selected = option.mode === value;
@@ -297,11 +290,11 @@ function SaveModePicker({
               aria-pressed={selected}
             >
               <span className="flex items-center justify-between">
-                <ModeIcon mode={option.mode} />
-                {selected && <CheckCircle2 className="size-3.5 text-primary" strokeWidth={2.4} />}
+                <ModeIcon mode={option.mode} selected={selected} />
+                {selected && <CheckCircle2 className="size-4 text-primary" strokeWidth={2.4} />}
               </span>
-              <span className="mt-2 block text-[12px] font-semibold text-foreground">{option.title}</span>
-              <span className="mt-0.5 block text-[10.5px] text-secondary">{option.description}</span>
+              <span className="mt-2.5 block text-[13px] font-semibold text-foreground">{option.title}</span>
+              <span className="mt-0.5 block text-[11px] text-secondary">{option.description}</span>
             </button>
           );
         })}
@@ -310,10 +303,10 @@ function SaveModePicker({
   );
 }
 
-function ModeIcon({ mode }: { mode: SaveMode }) {
-  const className = "size-4 text-primary";
-  if (mode === "html") return <Archive className={className} strokeWidth={2.2} />;
-  return <Link2 className={className} strokeWidth={2.2} />;
+function ModeIcon({ mode, selected }: { mode: SaveMode; selected: boolean }) {
+  const className = `size-[18px] ${selected ? "text-primary" : "text-secondary"}`;
+  if (mode === "html") return <Archive className={className} strokeWidth={2} />;
+  return <Link2 className={className} strokeWidth={2} />;
 }
 
 function LoadingState() {

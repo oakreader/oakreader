@@ -1,4 +1,3 @@
-import { ExternalLink } from "lucide-react";
 import type { PageMeta } from "@/src/lib/types";
 import { detectContentKind, contentKindToLabel } from "@/src/lib/translators";
 
@@ -66,14 +65,14 @@ export function PageCard({ pageMeta }: PageCardProps) {
   return (
     <article className="oak-glass-card p-3.5">
       <div className="flex items-start gap-3">
-        <div className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-fill ring-1 ring-black/5">
+        <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-fill">
           {isPDF ? (
             <PDFIcon />
           ) : (
             <img
               src={faviconSrc}
               alt=""
-              className="size-7 rounded-lg bg-white shadow-sm"
+              className="size-6 rounded-md"
               onError={(e) => {
                 (e.target as HTMLImageElement).style.display = "none";
               }}
@@ -81,17 +80,13 @@ export function PageCard({ pageMeta }: PageCardProps) {
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="mb-1 flex items-center gap-1.5 text-[11px] text-secondary">
+          <div className="mb-1.5 flex items-center gap-1.5">
             <span className="oak-chip">{typeLabel}</span>
-            <span className="truncate">{domain}</span>
+            <span className="truncate text-[11px] text-secondary">{domain}</span>
           </div>
-          <p className="text-[14px] font-semibold leading-snug text-foreground line-clamp-2 tracking-[-0.02em]">
+          <p className="text-[13px] font-semibold leading-snug text-foreground line-clamp-2">
             {displayTitle}
           </p>
-          <div className="mt-2 inline-flex max-w-full items-center gap-1 rounded-full bg-fill px-2 py-1 text-[10.5px] text-secondary">
-            <ExternalLink className="size-3 shrink-0" strokeWidth={2.2} />
-            <span className="truncate">Ready to capture</span>
-          </div>
         </div>
       </div>
     </article>
