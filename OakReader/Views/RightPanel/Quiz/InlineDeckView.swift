@@ -14,6 +14,9 @@ struct InlineDeckView: View {
     /// Full-screen "slide" presentation: the card fills the height, type is
     /// larger, and the view's own expand button is hidden.
     var embeddedInSheet: Bool = false
+    /// When set, the expand button routes through this closure (e.g. the Studio
+    /// full-window overlay) instead of the built-in centered sheet.
+    var onExpand: (() -> Void)? = nil
 
     @State private var currentIndex = 0
     @State private var navDirection = 1          // 1 = forward, -1 = back
@@ -80,7 +83,7 @@ struct InlineDeckView: View {
             Spacer(minLength: 8)
 
             if !embeddedInSheet {
-                Button { isFullScreen = true } label: {
+                Button { if let onExpand { onExpand() } else { isFullScreen = true } } label: {
                     Image(systemName: "arrow.up.left.and.arrow.down.right")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.tertiary)

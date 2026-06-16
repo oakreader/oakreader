@@ -175,6 +175,26 @@ final class StudioViewModel {
         generatingKind = nil
     }
 
+    // MARK: - Jump to source
+
+    /// Flash the document passage a mind-map node was drawn from. Mirrors the chat
+    /// citation jump: PDF uses the viewer's tolerant quote search; web / HTML / live
+    /// pages use the WKWebView find-text highlight (`oakHighlightCitation`).
+    @MainActor
+    func jumpToSource(anchorText: String) {
+        guard let parent else { return }
+        let text = anchorText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        switch parent.contentType {
+        case .pdf:
+            Task { @MainActor in await parent.viewer.highlightCitation(text: text, page: nil) }
+        case .html, .markdown, .link:
+            NotificationCenter.default.post(name: .webViewFindText, object: text)
+        case .audio:
+            break
+        }
+    }
+
     // MARK: - Delete
 
     func delete(_ artifact: StudioArtifact) {

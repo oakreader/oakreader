@@ -209,21 +209,33 @@ struct StudioGenerator {
         }
 
         let system = """
-            You are an expert at distilling a document into a MIND MAP, expressed as an \
-            indented bullet outline. \(detail) Ground every node in the document — do not \
-            invent content.
+            You are an expert at distilling a document into a MIND MAP for a reader who \
+            wants to actually understand it — not a table of contents. \(detail) Ground \
+            every node strictly in the document; never invent content.
+
+            STRUCTURE: organize around the document's central topic, its key claims, and \
+            the evidence, examples, or caveats that support each claim — the load-bearing \
+            ideas, not a chapter list.
+
+            NODES: each node is a short phrase (a few words) carrying a SPECIFIC, concrete \
+            point — a name, number, term, finding, or claim. Never use vague bucket labels \
+            like "Background", "Overview", "Details", or "Issues" on their own; say what \
+            the point actually is.
+
+            SOURCE ANCHORS: for every LEAF node (one with no children), append the exact \
+            passage it comes from, copied VERBATIM from the source, wrapped in ⟪ ⟫ — 4 to \
+            15 words, enough to locate it in the document. Do NOT anchor branch nodes that \
+            have children.
 
             Respond with ONLY the outline — no prose, no code fences, no '#' headings. \
-            Use EXACTLY ONE top-level bullet for the document's central topic, then nest \
-            branches and sub-branches with two-space indentation:
+            Use EXACTLY ONE top-level bullet for the central topic, then nest branches and \
+            sub-branches with two-space indentation:
             - <central topic>
-              - <main branch>
-                - <sub-point>
-                - <sub-point>
-              - <main branch>
-                - <sub-point>
-
-            Keep each node short — a few words or a short phrase, never a full sentence.
+              - <key claim or theme>
+                - <specific point> ⟪verbatim source quote⟫
+                - <specific point> ⟪verbatim source quote⟫
+              - <key claim or theme>
+                - <specific point> ⟪verbatim source quote⟫
             """
 
         var user = "Document title: \(documentTitle)\n\n"
@@ -301,9 +313,17 @@ struct StudioGenerator {
     static func titleFromOutline(_ outline: String) -> String? {
         for line in outline.components(separatedBy: "\n") {
             let t = line.trimmingCharacters(in: .whitespaces)
-            if t.hasPrefix("# ") { return String(t.dropFirst(2)).trimmingCharacters(in: .whitespaces) }
-            if t.hasPrefix("- ") || t.hasPrefix("* ") { return String(t.dropFirst(2)).trimmingCharacters(in: .whitespaces) }
+            if t.hasPrefix("# ") { return stripAnchor(String(t.dropFirst(2))) }
+            if t.hasPrefix("- ") || t.hasPrefix("* ") { return stripAnchor(String(t.dropFirst(2))) }
         }
         return nil
+    }
+
+    /// Strip a trailing `⟪…⟫` source anchor (and surrounding whitespace) off a node label.
+    static func stripAnchor(_ s: String) -> String {
+        guard let open = s.firstIndex(of: "⟪") else {
+            return s.trimmingCharacters(in: .whitespaces)
+        }
+        return String(s[..<open]).trimmingCharacters(in: .whitespaces)
     }
 }

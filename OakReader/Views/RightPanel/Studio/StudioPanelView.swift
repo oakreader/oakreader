@@ -9,6 +9,25 @@ struct StudioPanelView: View {
     private var model: StudioViewModel { viewModel.studio }
     @State private var sheetKind: StudioArtifactKind?
 
+    /// The mind-map's amber anchor color — the panel's single accent, so the
+    /// native chrome and the WKWebView map read as one surface.
+    static let accent = Color(hex: "C77A2E")
+
+    /// A consistent "Generating…" banner — faint amber wash, quiet medium type.
+    private func streamingHeader(_ title: String, count: Int? = nil) -> some View {
+        HStack(spacing: 6) {
+            ProgressView().controlSize(.small)
+            Text(title).font(.system(size: 12, weight: .medium)).foregroundStyle(.secondary)
+            Spacer()
+            if let count {
+                Text("\(count)").font(.system(size: 10)).foregroundStyle(.tertiary)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(RoundedRectangle(cornerRadius: 8).fill(StudioPanelView.accent.opacity(0.07)))
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             panelHeader("Studio", subtitle: subtitle)
@@ -48,15 +67,7 @@ struct StudioPanelView: View {
                 // The deck currently streaming in — grows card-by-card.
                 if let deck = model.streamingDeck {
                     VStack(alignment: .leading, spacing: 10) {
-                        HStack(spacing: 6) {
-                            ProgressView().controlSize(.small)
-                            Text("Generating flashcards…")
-                                .font(.system(size: 12, weight: .semibold))
-                            Spacer()
-                            Text("\(deck.cards.count)")
-                                .font(.system(size: 10))
-                                .foregroundStyle(.tertiary)
-                        }
+                        streamingHeader("Generating flashcards…", count: deck.cards.count)
                         if !deck.cards.isEmpty {
                             InlineDeckView(deck: deck)
                         }
@@ -66,16 +77,11 @@ struct StudioPanelView: View {
                 // The mind map currently streaming in — re-renders live.
                 if let outline = model.streamingMindmapOutline {
                     VStack(alignment: .leading, spacing: 10) {
-                        HStack(spacing: 6) {
-                            ProgressView().controlSize(.small)
-                            Text("Generating mind map…")
-                                .font(.system(size: 12, weight: .semibold))
-                            Spacer()
-                        }
-                        StudioWebView(outline: outline)
+                        streamingHeader("Generating mind map…")
+                        StudioWebView(outline: outline, onNodeClick: { model.jumpToSource(anchorText: $0) })
                             .frame(height: 420)
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.quaternary, lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(OakStyle.Colors.diaHairline, lineWidth: 1))
                     }
                 }
 
@@ -99,8 +105,8 @@ struct StudioPanelView: View {
 
     private var tileGrid: some View {
         LazyVGrid(
-            columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)],
-            spacing: 10
+            columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)],
+            spacing: 8
         ) {
             ForEach(StudioArtifactKind.allCases) { tile($0) }
         }
@@ -115,7 +121,7 @@ struct StudioPanelView: View {
                 HStack {
                     Image(systemName: kind.systemImage)
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(kind.isAvailable ? .primary : .tertiary)
+                        .foregroundStyle(kind.isAvailable ? StudioPanelView.accent : Color.secondary.opacity(0.5))
                     Spacer()
                     if model.generatingKind == kind {
                         ProgressView().controlSize(.small)
@@ -138,8 +144,9 @@ struct StudioPanelView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(12)
-            .background(RoundedRectangle(cornerRadius: 10).fill(Color(nsColor: .controlBackgroundColor)))
-            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.quaternary, lineWidth: 1))
+            .background(RoundedRectangle(cornerRadius: 10).fill(OakStyle.Colors.diaSurface))
+            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(OakStyle.Colors.diaHairline, lineWidth: 1))
+            .shadow(color: .black.opacity(0.04), radius: 2, y: 1)
         }
         .buttonStyle(.plain)
         .disabled(!kind.isAvailable || model.generatingKind != nil)
@@ -163,15 +170,17 @@ struct StudioPanelView: View {
             switch artifact.kind {
             case .quiz:
                 if let deck = artifact.quizDeck {
-                    InlineDeckView(deck: deck)
+                    InlineDeckView(deck: deck, onExpand: {
+                        viewModel.studioFullScreenArtifact = artifact
+                    })
                 } else {
                     unavailableBody
                 }
             case .mindmap:
-                StudioWebView(outline: artifact.body)
+                StudioWebView(outline: artifact.body, onNodeClick: { model.jumpToSource(anchorText: $0) })
                     .frame(height: 320)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.quaternary, lineWidth: 1))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(OakStyle.Colors.diaHairline, lineWidth: 1))
                     .overlay(alignment: .topTrailing) {
                         Button {
                             viewModel.studioFullScreenArtifact = artifact
