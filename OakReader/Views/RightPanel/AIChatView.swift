@@ -525,6 +525,8 @@ struct AIChatView: View {
 
             // Bottom row: attachment + send
             HStack(spacing: 6) {
+                // Single attachment entry point — mirrors Dia's command bar,
+                // where every attach type funnels through one borderless "+".
                 Menu {
                     Button(action: { uploadFile() }) {
                         Label("Upload File", systemImage: "arrow.up.doc")
@@ -533,36 +535,24 @@ struct AIChatView: View {
                         Button(action: { chatVM.addDocumentPageSnapshot() }) {
                             Label("Attach Page", systemImage: "doc.viewfinder")
                         }
+                        // Was a standalone camera button — folded in here so the
+                        // toolbar stays a single calm "+" like Dia's.
+                        Button(action: { chatVM.parent?.beginAreaCaptureForChat() }) {
+                            Label("Capture Region", systemImage: "viewfinder")
+                        }
                     }
                 } label: {
                     Image(systemName: "plus")
-                        .font(.system(size: 15, weight: .medium))
+                        .font(.system(size: 16, weight: .medium))
                         .foregroundStyle(.secondary)
                         .frame(width: 28, height: 28)
-                        .overlay(
-                            Circle()
-                                .stroke(Color.primary.opacity(0.15), lineWidth: 0.5)
-                        )
+                        .contentShape(Rectangle())
                 }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
                 .buttonStyle(.plain)
+                .fixedSize()
                 .help("Add attachment")
-
-                // Dia-style region screenshot — arms a crosshair over the
-                // document and drops the crop straight into the composer.
-                if chatVM.parent != nil {
-                    Button(action: { chatVM.parent?.beginAreaCaptureForChat() }) {
-                        Image(systemName: "camera.viewfinder")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 28, height: 28)
-                            .overlay(
-                                Circle()
-                                    .stroke(Color.primary.opacity(0.15), lineWidth: 0.5)
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .help("Capture a region of the page")
-                }
 
                 Spacer()
 

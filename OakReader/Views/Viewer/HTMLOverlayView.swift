@@ -407,97 +407,13 @@ enum WebCaptureCursor {
     }
 }
 
-// MARK: - Capture cursor (crosshair + camera)
+// MARK: - Capture cursor
 
-/// A custom area-capture cursor — a crosshair with a small camera at the
-/// upper-right — drawn from scratch (dark fill + white halo + soft shadow so it
-/// reads on any background). Exposed as both an `NSCursor` (for the PDF overlay)
-/// and a CSS `cursor: url(…)` value (injected into web pages).
+/// Area-capture cursor — the native macOS crosshair (the thin, precise `+` the
+/// system screenshot tool uses). Exposed as both an `NSCursor` (for the PDF
+/// overlay) and a CSS `cursor` keyword (injected into web pages) so the PDF and
+/// web capture paths show the exact same clean cursor.
 enum CaptureCursor {
-    static let size = NSSize(width: 46, height: 42)
-    /// Hot spot at the crosshair center, in top-left image coordinates.
-    static let hotSpot = NSPoint(x: 15, y: 28)
-
-    static let nsCursor: NSCursor = {
-        let image = NSImage(size: size, flipped: false) { _ in
-            drawArtwork()
-            return true
-        }
-        return NSCursor(image: image, hotSpot: hotSpot)
-    }()
-
-    /// CSS `cursor` value embedding the same artwork as a data-URI, with a
-    /// `crosshair` keyword fallback (used if a page's CSP blocks `data:` images).
-    static let cssCursorValue: String = {
-        guard let png = pngData() else { return "crosshair" }
-        let b64 = png.base64EncodedString()
-        return "url(\"data:image/png;base64,\(b64)\") \(Int(hotSpot.x)) \(Int(hotSpot.y)), crosshair"
-    }()
-
-    // MARK: Drawing
-
-    private static let darkColor = NSColor(srgbRed: 0.118, green: 0.157, blue: 0.192, alpha: 1)
-
-    /// Crosshair center in bottom-left drawing coordinates.
-    private static var crosshairCenter: NSPoint { NSPoint(x: hotSpot.x, y: size.height - hotSpot.y) }
-    /// Camera box in bottom-left drawing coordinates (upper-right of the image).
-    private static var cameraRect: NSRect { NSRect(x: 24, y: 23, width: 20, height: 16) }
-
-    private static func crosshairPath(inset: CGFloat) -> NSBezierPath {
-        let c = crosshairCenter
-        let armHalf: CGFloat = 11, thickness: CGFloat = 5, radius: CGFloat = 2.5
-        let h = NSRect(x: c.x - armHalf, y: c.y - thickness / 2, width: armHalf * 2, height: thickness)
-            .insetBy(dx: inset, dy: inset)
-        let v = NSRect(x: c.x - thickness / 2, y: c.y - armHalf, width: thickness, height: armHalf * 2)
-            .insetBy(dx: inset, dy: inset)
-        let path = NSBezierPath(roundedRect: h, xRadius: radius, yRadius: radius)
-        path.append(NSBezierPath(roundedRect: v, xRadius: radius, yRadius: radius))
-        return path
-    }
-
-    private static func cameraImage(_ color: NSColor) -> NSImage? {
-        guard let sym = NSImage(systemSymbolName: "camera.fill", accessibilityDescription: nil) else { return nil }
-        let cfg = NSImage.SymbolConfiguration(pointSize: 15, weight: .medium)
-        let configured = sym.withSymbolConfiguration(cfg) ?? sym
-        let tinted = NSImage(size: configured.size)
-        tinted.lockFocus()
-        configured.draw(at: .zero, from: NSRect(origin: .zero, size: configured.size), operation: .sourceOver, fraction: 1)
-        color.set()
-        NSRect(origin: .zero, size: configured.size).fill(using: .sourceAtop)
-        tinted.unlockFocus()
-        return tinted
-    }
-
-    private static func drawArtwork() {
-        // White halo + soft shadow drawn first; dark fill on top.
-        NSGraphicsContext.saveGraphicsState()
-        let shadow = NSShadow()
-        shadow.shadowColor = NSColor.black.withAlphaComponent(0.3)
-        shadow.shadowOffset = NSSize(width: 0, height: -1)
-        shadow.shadowBlurRadius = 2
-        shadow.set()
-
-        NSColor.white.set()
-        crosshairPath(inset: -2).fill()
-        cameraImage(.white)?.draw(in: cameraRect.insetBy(dx: -1.6, dy: -1.6))
-        NSGraphicsContext.restoreGraphicsState()
-
-        darkColor.set()
-        crosshairPath(inset: 0).fill()
-        cameraImage(darkColor)?.draw(in: cameraRect)
-    }
-
-    private static func pngData() -> Data? {
-        guard let rep = NSBitmapImageRep(
-            bitmapDataPlanes: nil,
-            pixelsWide: Int(size.width), pixelsHigh: Int(size.height),
-            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
-            colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
-        ) else { return nil }
-        NSGraphicsContext.saveGraphicsState()
-        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
-        drawArtwork()
-        NSGraphicsContext.restoreGraphicsState()
-        return rep.representation(using: .png, properties: [:])
-    }
+    static let nsCursor: NSCursor = .crosshair
+    static let cssCursorValue = "crosshair"
 }
