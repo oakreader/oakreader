@@ -35,7 +35,7 @@ struct GlobalOptions: ParsableArguments {
     @Flag(name: .long, help: "Suppress non-essential output.")
     var quiet = false
 
-    @Option(name: .long, help: "Path to database (default: ~/OakReader/library.sqlite).")
+    @Option(name: .long, help: "Path to database (default: the app's library.sqlite).")
     var db: String?
 }
 

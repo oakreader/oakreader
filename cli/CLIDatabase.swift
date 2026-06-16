@@ -106,8 +106,15 @@ final class CLIDatabase {
 
     init(path: String? = nil) throws {
         let dbPath = path ?? {
+            // Mirror the app's data directory split so a no-`--db` invocation in a
+            // dev shell hits the same database the Debug app uses.
             let home = FileManager.default.homeDirectoryForCurrentUser
-            return home.appendingPathComponent("OakReader/library.sqlite").path
+            #if DEBUG
+            let dir = "OakReader-Dev"
+            #else
+            let dir = "OakReader"
+            #endif
+            return home.appendingPathComponent("\(dir)/library.sqlite").path
         }()
 
         guard FileManager.default.fileExists(atPath: dbPath) else {
@@ -118,6 +125,16 @@ final class CLIDatabase {
         config.foreignKeysEnabled = true
         config.readonly = false
         dbQueue = try DatabaseQueue(path: dbPath, configuration: config)
+    }
+
+    /// Storage directory — a sibling of the database file, mirroring the app's
+    /// `<dataDir>/library.sqlite` + `<dataDir>/storage/` layout. Derived from the
+    /// DB path so it automatically follows `--db` (Debug uses `~/OakReader-Dev`,
+    /// Release uses `~/OakReader`) instead of being hardcoded to `~/OakReader`.
+    var storageDirectory: URL {
+        URL(fileURLWithPath: dbQueue.path)
+            .deletingLastPathComponent()
+            .appendingPathComponent("storage", isDirectory: true)
     }
 
     // MARK: - Date Helpers
@@ -663,11 +680,10 @@ final class CLIDatabase {
         let fileName: String
         let contentType: String
         let pageCount: Int
+        let storageDirectory: URL
 
         var fileURL: URL {
-            let home = FileManager.default.homeDirectoryForCurrentUser
-            return home
-                .appendingPathComponent("OakReader/storage", isDirectory: true)
+            storageDirectory
                 .appendingPathComponent(itemStorageKey, isDirectory: true)
                 .appendingPathComponent("attachments", isDirectory: true)
                 .appendingPathComponent(attachmentStorageKey, isDirectory: true)
@@ -677,7 +693,8 @@ final class CLIDatabase {
 
     /// Resolve an item ID to its primary attachment file path.
     func fetchItemFilePath(itemId: String) throws -> ItemFilePath? {
-        try dbQueue.read { db in
+        let storageDir = storageDirectory
+        return try dbQueue.read { db in
             let row = try Row.fetchOne(db, sql: """
                 SELECT i.storage_key, a.storage_key AS att_key, a.file_name,
                        a.content_type, a.page_count
@@ -691,7 +708,8 @@ final class CLIDatabase {
                 attachmentStorageKey: r["att_key"],
                 fileName: r["file_name"],
                 contentType: r["content_type"],
-                pageCount: r["page_count"]
+                pageCount: r["page_count"],
+                storageDirectory: storageDir
             )
         }
     }

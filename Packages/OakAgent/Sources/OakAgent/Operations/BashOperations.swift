@@ -1,8 +1,24 @@
 import Foundation
 
-/// Protocol for shell execution (pluggable for testing).
+/// Protocol for subprocess execution (pluggable for testing).
 public protocol BashOperations: Sendable {
-    func execute(command: String, workingDirectory: URL, timeout: TimeInterval) async throws -> BashResult
+    /// Run an executable directly with an argument vector. Arguments are passed
+    /// literally to the process — no shell is involved — so they are immune to
+    /// shell injection and quoting issues.
+    func execute(
+        executable: String, arguments: [String], workingDirectory: URL, timeout: TimeInterval
+    ) async throws -> BashResult
+}
+
+public extension BashOperations {
+    /// Convenience: run a command string through `/bin/bash -c`. Subject to shell
+    /// parsing — only use with trusted/escaped input.
+    func execute(command: String, workingDirectory: URL, timeout: TimeInterval) async throws -> BashResult {
+        try await execute(
+            executable: "/bin/bash", arguments: ["-c", command],
+            workingDirectory: workingDirectory, timeout: timeout
+        )
+    }
 }
 
 /// Result of a shell command execution.
@@ -30,10 +46,12 @@ public struct BashResult: Sendable {
 public struct LocalBashOperations: BashOperations, Sendable {
     public init() {}
 
-    public func execute(command: String, workingDirectory: URL, timeout: TimeInterval) async throws -> BashResult {
+    public func execute(
+        executable: String, arguments: [String], workingDirectory: URL, timeout: TimeInterval
+    ) async throws -> BashResult {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/bash")
-        process.arguments = ["-c", command]
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = arguments
         process.currentDirectoryURL = workingDirectory
 
         let stdoutPipe = Pipe()

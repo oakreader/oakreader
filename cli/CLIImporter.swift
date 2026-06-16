@@ -10,19 +10,17 @@ struct CLIImporter {
 
     // MARK: - Storage Layout (mirrors CatalogStoragePaths)
 
-    private static var storageDirectory: URL {
-        FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("OakReader/storage", isDirectory: true)
-    }
-
-    private static func attachmentDirectory(itemStorageKey: String, attachmentStorageKey: String) -> URL {
-        storageDirectory
+    // Storage lives in a sibling `storage/` dir of the database file, derived
+    // from `db.storageDirectory` so CLI imports follow `--db` (Debug vs Release)
+    // instead of being hardcoded to `~/OakReader/storage`.
+    private func attachmentDirectory(itemStorageKey: String, attachmentStorageKey: String) -> URL {
+        db.storageDirectory
             .appendingPathComponent(itemStorageKey, isDirectory: true)
             .appendingPathComponent("attachments", isDirectory: true)
             .appendingPathComponent(attachmentStorageKey, isDirectory: true)
     }
 
-    private static func attachmentFileURL(itemStorageKey: String, attachmentStorageKey: String, fileName: String) -> URL {
+    private func attachmentFileURL(itemStorageKey: String, attachmentStorageKey: String, fileName: String) -> URL {
         attachmentDirectory(itemStorageKey: itemStorageKey, attachmentStorageKey: attachmentStorageKey)
             .appendingPathComponent(fileName)
     }
@@ -55,7 +53,7 @@ struct CLIImporter {
 
         let paths = try db.findAttachmentPaths()
         for (itemStorageKey, attStorageKey, fileName) in paths {
-            let fileURL = Self.attachmentFileURL(
+            let fileURL = attachmentFileURL(
                 itemStorageKey: itemStorageKey,
                 attachmentStorageKey: attStorageKey,
                 fileName: fileName
@@ -87,8 +85,8 @@ struct CLIImporter {
         let attId = UUID().uuidString
         let itemStorageKey = Self.generateStorageKey()
         let attStorageKey = Self.generateStorageKey()
-        let attDir = Self.attachmentDirectory(itemStorageKey: itemStorageKey, attachmentStorageKey: attStorageKey)
-        let destURL = Self.attachmentFileURL(
+        let attDir = attachmentDirectory(itemStorageKey: itemStorageKey, attachmentStorageKey: attStorageKey)
+        let destURL = attachmentFileURL(
             itemStorageKey: itemStorageKey,
             attachmentStorageKey: attStorageKey,
             fileName: sourceURL.lastPathComponent
@@ -150,8 +148,8 @@ struct CLIImporter {
         let attId = UUID().uuidString
         let itemStorageKey = Self.generateStorageKey()
         let attStorageKey = Self.generateStorageKey()
-        let attDir = Self.attachmentDirectory(itemStorageKey: itemStorageKey, attachmentStorageKey: attStorageKey)
-        let destURL = Self.attachmentFileURL(
+        let attDir = attachmentDirectory(itemStorageKey: itemStorageKey, attachmentStorageKey: attStorageKey)
+        let destURL = attachmentFileURL(
             itemStorageKey: itemStorageKey,
             attachmentStorageKey: attStorageKey,
             fileName: sourceURL.lastPathComponent
@@ -209,8 +207,8 @@ struct CLIImporter {
         let attId = UUID().uuidString
         let itemStorageKey = Self.generateStorageKey()
         let attStorageKey = Self.generateStorageKey()
-        let attDir = Self.attachmentDirectory(itemStorageKey: itemStorageKey, attachmentStorageKey: attStorageKey)
-        let destURL = Self.attachmentFileURL(
+        let attDir = attachmentDirectory(itemStorageKey: itemStorageKey, attachmentStorageKey: attStorageKey)
+        let destURL = attachmentFileURL(
             itemStorageKey: itemStorageKey,
             attachmentStorageKey: attStorageKey,
             fileName: sourceURL.lastPathComponent

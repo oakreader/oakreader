@@ -20,6 +20,14 @@ struct OakCLITool: AgentTool, Sendable {
 
     private static let oakPath = "/usr/local/bin/oak"
 
+    /// The library database the running app uses. The `oak` CLI defaults to
+    /// `~/OakReader/library.sqlite`, but Debug builds store data under
+    /// `~/OakReader-Dev/`. Without this the agent queries the wrong (empty)
+    /// database and reports "0 items, 0 collections, 0 tags".
+    private static var databasePath: String {
+        CatalogDatabase.dataDirectory.appendingPathComponent("library.sqlite").path
+    }
+
     var inputSchema: [String: Any] {
         [
             "type": "object",
@@ -43,7 +51,7 @@ struct OakCLITool: AgentTool, Sendable {
         }
 
         // Safety net: items list always gets a tight limit (agent reads meta.count
-        // for totals); search gets capped at 50.
+        // for totals); search gets capped.
         var safeCommand = command
         if safeCommand.hasPrefix("items list") {
             // Strip any --limit the agent may have added and force --limit 5
@@ -55,15 +63,25 @@ struct OakCLITool: AgentTool, Sendable {
             safeCommand += " --limit 20"
         }
 
-        // Build the full shell command — always append --json for structured output
-        let hasJsonFlag = safeCommand.contains("--json")
-        let fullCommand = hasJsonFlag
-            ? "\(Self.oakPath) \(safeCommand)"
-            : "\(Self.oakPath) \(safeCommand) --json"
+        // Tokenize the agent-supplied command into an argument vector and run the
+        // binary directly — no shell — so collection/tag/search values containing
+        // spaces or shell metacharacters (e.g. "R&D") are passed literally and
+        // cannot be misinterpreted or injected.
+        var arguments = Self.tokenize(safeCommand)
+        guard !arguments.isEmpty else {
+            return .error("Missing required parameter: command")
+        }
+        // `--db` pins the CLI to the same database the app uses (Debug vs Release);
+        // it is a global flag valid before the subcommand. Always request JSON.
+        arguments.insert(contentsOf: ["--db", Self.databasePath], at: 0)
+        if !arguments.contains("--json") {
+            arguments.append("--json")
+        }
 
         do {
             let result = try await context.bashOperations.execute(
-                command: fullCommand,
+                executable: Self.oakPath,
+                arguments: arguments,
                 workingDirectory: context.workingDirectory,
                 timeout: 30
             )
@@ -82,5 +100,45 @@ struct OakCLITool: AgentTool, Sendable {
         } catch {
             return .error("Failed to execute oak command: \(error.localizedDescription)")
         }
+    }
+
+    /// Split a command string into argv tokens, honoring single/double quotes and
+    /// backslash escapes (POSIX-shell style) so quoted multi-word values stay
+    /// intact. The result is passed straight to the process — never re-parsed by a
+    /// shell — so the tokens are safe regardless of their contents.
+    static func tokenize(_ input: String) -> [String] {
+        var tokens: [String] = []
+        var current = ""
+        var hasToken = false
+        var inSingle = false
+        var inDouble = false
+        var escaped = false
+
+        for ch in input {
+            if escaped {
+                current.append(ch); escaped = false; continue
+            }
+            if inSingle {
+                if ch == "'" { inSingle = false } else { current.append(ch) }
+                continue
+            }
+            if ch == "\\" && !inSingle {
+                escaped = true; hasToken = true; continue
+            }
+            if inDouble {
+                if ch == "\"" { inDouble = false } else { current.append(ch) }
+                continue
+            }
+            switch ch {
+            case "'": inSingle = true; hasToken = true
+            case "\"": inDouble = true; hasToken = true
+            case " ", "\t", "\n", "\r":
+                if hasToken { tokens.append(current); current = ""; hasToken = false }
+            default:
+                current.append(ch); hasToken = true
+            }
+        }
+        if hasToken { tokens.append(current) }
+        return tokens
     }
 }
