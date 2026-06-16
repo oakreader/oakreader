@@ -80,8 +80,11 @@ window.oakMindmap = {
       editable: !!editable,
       draggable: !!editable,
       contextMenu: !!editable,
-      toolBar: false,
+      // Mind Elixir's own floating toolbar (zoom in/out, center, layout/expand)
+      // — the XMind-like control cluster, shown only in the full-screen editor.
+      toolBar: !!editable,
       keypress: !!editable,
+      allowUndo: !!editable,
       theme: XMIND_THEME,
     });
     mind.init(dataFromOutline(outline));
@@ -117,5 +120,41 @@ window.oakMindmap = {
     } catch (e) {
       return "";
     }
+  },
+
+  // Re-fit the whole map to the viewport.
+  fit() {
+    fit();
+  },
+
+  // Switch branch layout: 'right' (all branches to the right) or 'side' (split).
+  setLayout(dir) {
+    if (!mind) return;
+    try {
+      if (dir === "side") mind.initSide();
+      else mind.initRight();
+      fit();
+    } catch (e) {}
+  },
+
+  // Export the current map as an image and hand the data URL to native, which
+  // saves it via a Save dialog. format: 'png' | 'svg'.
+  async exportImage(format) {
+    if (!mind) return;
+    try {
+      const blob = format === "svg" ? mind.exportSvg() : await mind.exportPng();
+      if (!blob) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          window.webkit.messageHandlers.oakMindmap.postMessage({
+            action: "export",
+            format,
+            dataURL: reader.result,
+          });
+        } catch (e) {}
+      };
+      reader.readAsDataURL(blob);
+    } catch (e) {}
   },
 };
