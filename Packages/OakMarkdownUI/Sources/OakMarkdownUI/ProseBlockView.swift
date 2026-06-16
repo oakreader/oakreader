@@ -57,7 +57,6 @@ struct ProseBlockView: NSViewRepresentable {
         storage.addLayoutManager(layoutManager)
         let container = NSTextContainer(size: CGSize(width: CGFloat(0), height: .greatestFiniteMagnitude))
         container.lineFragmentPadding = 0
-        container.widthTracksTextView = true
         layoutManager.addTextContainer(container)
 
         let tv = MarkdownTextView(frame: .zero, textContainer: container)
@@ -66,6 +65,13 @@ struct ProseBlockView: NSViewRepresentable {
         tv.textContainerInset = .zero
         tv.isVerticallyResizable = true
         tv.isHorizontallyResizable = false
+        // The container's wrap width is the SwiftUI-proposed width set in
+        // `sizeThatFits`, NOT the text view's frame. `widthTracksTextView` must
+        // stay false or AppKit re-derives the container width from the (often
+        // stale/too-wide) frame, so long CJK lines stop wrapping and the whole
+        // bubble balloons past a narrow chat panel. Set AFTER
+        // `isHorizontallyResizable`, whose setter can flip tracking back on.
+        container.widthTracksTextView = false
         tv.setContentHuggingPriority(.defaultHigh, for: .vertical)
         tv.delegate = context.coordinator
         return tv
@@ -112,6 +118,9 @@ struct ProseBlockView: NSViewRepresentable {
     func sizeThatFits(_ proposal: ProposedViewSize, nsView tv: MarkdownTextView, context: Context) -> CGSize? {
         guard let container = tv.textContainer, let lm = tv.layoutManager else { return nil }
         let width = proposal.width ?? 320
+        // Defensive: keep tracking off so the width we set below actually governs
+        // wrapping (see makeNSView).
+        container.widthTracksTextView = false
         container.containerSize = CGSize(width: max(width, 1), height: .greatestFiniteMagnitude)
         lm.ensureLayout(for: container)
         let used = lm.usedRect(for: container)
