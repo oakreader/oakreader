@@ -1,0 +1,7 @@
+/* Aggregates Milkdown Crepe's stylesheet into a single file that postcss-import
+ * flattens (resolving the nested relative @imports inside common/style.css) into
+ * ../OakReader/Resources/Preview.bundle/js/oak-milkdown.css — inlined by
+ * MilkdownEditorView, mirroring oak-mindmap.css. Paths point straight at the
+ * resolved package files so postcss-import doesn't need export-map support. */
+@import "../node_modules/@milkdown/crepe/lib/theme/common/style.css";
+@import "../node_modules/@milkdown/crepe/lib/theme/frame/style.css";

@@ -13,6 +13,11 @@ class HTMLSelectionPopupPanel: NSPanel, AppResignDismissable {
     private weak var webView: WKWebView?
     private let onDismiss: () -> Void
 
+    // Selection anchor in screen coords (kept fresh on scroll) — reused to anchor
+    // the note editor when "Add Note" is tapped.
+    private var anchorTop: NSPoint
+    private var anchorBottom: NSPoint
+
     // Speak button (needs state tracking for icon toggle)
     private weak var speakButton: PopupIconButton?
 
@@ -55,13 +60,24 @@ class HTMLSelectionPopupPanel: NSPanel, AppResignDismissable {
         return window === self || window === colorSubPanel
     }
 
+    /// The screen whose frame contains `point`, falling back to the web view's
+    /// window screen and finally the main screen. Avoids `self.screen`/
+    /// `NSScreen.main`, which would yank the panel onto the primary monitor.
+    private func screenContaining(_ point: NSPoint) -> NSScreen? {
+        NSScreen.screens.first { $0.frame.contains(point) }
+            ?? webView?.window?.screen
+            ?? NSScreen.main
+    }
+
     /// Reposition the popup to follow scroll.
     func reposition(atTop topScreenPoint: NSPoint, atBottom bottomScreenPoint: NSPoint) {
+        anchorTop = topScreenPoint
+        anchorBottom = bottomScreenPoint
         let panelSize = self.frame.size
         let x = topScreenPoint.x - panelSize.width / 2
         var y = topScreenPoint.y + 6
 
-        if let screen = NSScreen.main {
+        if let screen = screenContaining(topScreenPoint) {
             let screenTop = screen.visibleFrame.maxY
             if y + panelSize.height > screenTop {
                 y = bottomScreenPoint.y - panelSize.height - 6
@@ -92,6 +108,8 @@ class HTMLSelectionPopupPanel: NSPanel, AppResignDismissable {
         self.selectedText = text
         self.webView = webView
         self.onDismiss = onDismiss
+        self.anchorTop = topScreenPoint
+        self.anchorBottom = bottomScreenPoint
 
         super.init(
             contentRect: NSRect(x: 0, y: 0, width: 10, height: 10),
@@ -118,7 +136,7 @@ class HTMLSelectionPopupPanel: NSPanel, AppResignDismissable {
         var y = topScreenPoint.y + 6
 
         // Fallback: if panel top edge exceeds screen top, position below selection bottom
-        if let screen = NSScreen.main {
+        if let screen = screenContaining(topScreenPoint) {
             let screenTop = screen.visibleFrame.maxY
             if y + contentSize.height > screenTop {
                 y = bottomScreenPoint.y - contentSize.height - 6
@@ -166,6 +184,14 @@ class HTMLSelectionPopupPanel: NSPanel, AppResignDismissable {
             self?.toggleColorSubPanel()
         }
         mainStack.addArrangedSubview(colorBtn)
+
+        let noteBtn = PopupIconButton(
+            systemImage: "text.bubble",
+            accessibilityLabel: "Add Note"
+        ) { [weak self] in
+            self?.addNote()
+        }
+        mainStack.addArrangedSubview(noteBtn)
 
         // Separator 1
         mainStack.addArrangedSubview(makeVerticalSeparator())
@@ -264,6 +290,36 @@ class HTMLSelectionPopupPanel: NSPanel, AppResignDismissable {
             "OakHighlighter.highlightSelection('\(cssColor)', 'highlight');",
             completionHandler: nil
         )
+        dismiss()
+    }
+
+    /// Highlight the selection (default color) and immediately open the Milkdown
+    /// note editor anchored to it. The highlight is persisted via the usual
+    /// `highlightEvent` → `persistWebHighlight` path; the editor fills the comment.
+    private func addNote() {
+        guard let webView else { dismiss(); return }
+        let cssColor = Self.highlightColors[0].2  // default yellow, matches Highlight
+        let vm = viewModel
+        let top = anchorTop
+        let bottom = anchorBottom
+
+        webView.evaluateJavaScript(
+            "OakHighlighter.highlightSelection('\(cssColor)', 'highlight');"
+        ) { [weak webView] result, _ in
+            guard let json = result as? String,
+                  let data = json.data(using: .utf8),
+                  let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let id = dict["id"] as? String else { return }
+            let target = WebNoteTarget(
+                highlightId: id,
+                comment: "",
+                colorCSS: cssColor,
+                type: "highlight",
+                anchorTopScreen: top,
+                anchorBottomScreen: bottom
+            )
+            WebNoteEditorPopupPanel.show(viewModel: vm, target: target, webView: webView, onDismiss: {})
+        }
         dismiss()
     }
 

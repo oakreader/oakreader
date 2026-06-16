@@ -1,12 +1,11 @@
 import SwiftUI
 import AppKit
-import OakMarkdownUI
 
 /// The note/comment editor shown in an anchored popover when the user adds or
 /// opens a note on a highlight. Design grounded in active-reading research:
 ///  - color + style live in the box (categorization — Marshall; PDF Expert),
-///  - a Markdown comment with **live preview** as you type (the explicit end of
-///    Marshall's telegraphic↔explicit annotation spectrum),
+///  - a **WYSIWYG Markdown** comment (Milkdown) — the explicit end of Marshall's
+///    telegraphic↔explicit annotation spectrum, edited as formatted text,
 ///  - keyboard-first save/dismiss (Readwise),
 ///  - anchored to the highlight so the note stays in context (LiquidText).
 struct NoteEditorView: View {
@@ -20,10 +19,8 @@ struct NoteEditorView: View {
     let onDelete: () -> Void
     let onClose: () -> Void
 
-    @State private var comment: String
     @State private var colorIndex: Int
     @State private var kind: PDFMarkupKind
-    @FocusState private var editorFocused: Bool
 
     private let palette = OakStyle.AnnotationColors.highlightColors
 
@@ -45,7 +42,6 @@ struct NoteEditorView: View {
         self.onCommentChange = onCommentChange
         self.onDelete = onDelete
         self.onClose = onClose
-        _comment = State(initialValue: initialComment)
         _colorIndex = State(initialValue: initialColorIndex)
         _kind = State(initialValue: initialKind)
     }
@@ -61,8 +57,6 @@ struct NoteEditorView: View {
             Divider()
             editor
             Divider()
-            preview
-            Divider()
             footer
         }
         .frame(width: Self.panelWidth, height: Self.panelHeight)
@@ -72,7 +66,6 @@ struct NoteEditorView: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
         )
-        .onAppear { editorFocused = true }
     }
 
     // MARK: - Color + style row
@@ -130,50 +123,16 @@ struct NoteEditorView: View {
         .help(target == .highlight ? "Highlight" : "Underline")
     }
 
-    // MARK: - Editor + live preview
+    // MARK: - WYSIWYG editor
 
+    /// A Milkdown WYSIWYG surface seeded with the note's markdown; edits stream
+    /// back as markdown and are persisted on dismiss by the hosting panel.
     private var editor: some View {
-        TextEditor(text: $comment)
-            .font(.system(size: 13))
-            .scrollContentBackground(.hidden)
-            .frame(height: 88)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .focused($editorFocused)
-            .overlay(alignment: .topLeading) {
-                if comment.isEmpty {
-                    Text("Write a note… (Markdown)")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.tertiary)
-                        .padding(.horizontal, 13)
-                        .padding(.vertical, 14)
-                        .allowsHitTesting(false)
-                }
-            }
-            .onChange(of: comment) { _, newValue in
-                onCommentChange(newValue)
-            }
-    }
-
-    private var preview: some View {
-        ScrollView {
-            if comment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                HStack {
-                    Text("Preview")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.tertiary)
-                    Spacer()
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-            } else {
-                StreamingMarkdownView(markdown: comment, theme: .oak(fontSize: 13))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        MilkdownEditorView(
+            initialMarkdown: initialComment,
+            onMarkdownChanged: onCommentChange
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Footer

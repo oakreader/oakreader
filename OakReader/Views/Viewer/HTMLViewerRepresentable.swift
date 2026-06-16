@@ -303,6 +303,7 @@ struct HTMLViewerRepresentable: NSViewRepresentable {
         }
         config.userContentController.add(context.coordinator, name: "highlightEvent")
         config.userContentController.add(context.coordinator, name: "highlightContextMenu")
+        config.userContentController.add(context.coordinator, name: "highlightFocus")
 
         // Password autofill — live web pages only. Detects login forms, captures
         // credentials on submit, and exposes OakPasswords.fill() for the coordinator

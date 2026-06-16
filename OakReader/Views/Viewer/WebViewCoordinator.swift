@@ -188,6 +188,14 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
             guard let elementId = note.userInfo?["id"] as? String else { return }
             self?.scrollToTOCElement(elementId)
         }
+        observe(.webViewFocusHighlight) { [weak self] note in
+            guard let id = note.userInfo?["id"] as? String else { return }
+            let escaped = id.replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "'", with: "\\'")
+            // Scrolls the highlight into view + flashes it, then posts `highlightFocus`
+            // back so we can anchor the note editor to its final on-screen rect.
+            self?.webView?.evaluateJavaScript("OakHighlighter.focusHighlight('\(escaped)');", completionHandler: nil)
+        }
     }
 
     /// Smooth-scroll the web view to a heading captured by `extractTableOfContents`,
@@ -537,6 +545,26 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
             return
         }
 
+        // A highlight asked to be focused (from the Notes sidebar) — it scrolled
+        // itself into view and posted its rect; open the note editor anchored to it.
+        if message.name == "highlightFocus",
+           let body = message.body as? [String: Any],
+           let hlId = body["id"] as? String,
+           let x = body["x"] as? CGFloat,
+           let y = body["y"] as? CGFloat,
+           let bottomY = body["bottomY"] as? CGFloat,
+           let vpWidth = body["vpWidth"] as? CGFloat, vpWidth > 0,
+           let vpHeight = body["vpHeight"] as? CGFloat, vpHeight > 0,
+           let webView = self.webView,
+           let window = webView.window {
+            let (top, bottom) = screenPoints(
+                x: x, topY: y, bottomY: bottomY,
+                vpWidth: vpWidth, vpHeight: vpHeight, webView: webView, window: window
+            )
+            presentWebNoteEditor(highlightId: hlId, topScreen: top, bottomScreen: bottom)
+            return
+        }
+
         // Captured login credentials → offer to save if new or changed.
         if message.name == "passwordManager",
            let body = message.body as? [String: Any],
@@ -600,20 +628,10 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
             return
         }
 
-        // Convert JS viewport coords to NSView coords using viewport-to-bounds scale.
-        // WKWebView is flipped (origin at top-left, Y down) matching JS viewport coords,
-        // so no Y-flip is needed. Non-flipped views need bounds.height - y.
-        let scaleX = webView.bounds.width / vpWidth
-        let scaleY = webView.bounds.height / vpHeight
-        let topViewY = webView.isFlipped ? y * scaleY : webView.bounds.height - y * scaleY
-        let topViewPoint = NSPoint(x: x * scaleX, y: topViewY)
-        let topWindowPoint = webView.convert(topViewPoint, to: nil)
-        let topScreenPoint = window.convertPoint(toScreen: topWindowPoint)
-
-        let bottomViewY = webView.isFlipped ? bottomY * scaleY : webView.bounds.height - bottomY * scaleY
-        let bottomViewPoint = NSPoint(x: x * scaleX, y: bottomViewY)
-        let bottomWindowPoint = webView.convert(bottomViewPoint, to: nil)
-        let bottomScreenPoint = window.convertPoint(toScreen: bottomWindowPoint)
+        let (topScreenPoint, bottomScreenPoint) = screenPoints(
+            x: x, topY: y, bottomY: bottomY,
+            vpWidth: vpWidth, vpHeight: vpHeight, webView: webView, window: window
+        )
 
         // Reposition existing popup on scroll, or create new one
         if let popup = HTMLSelectionPopupPanel.current {
@@ -631,6 +649,45 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
             )
             installMouseMonitor()
         }
+    }
+
+    // MARK: - Web Note Editor
+
+    /// Convert a JS viewport rect (selection or highlight) to top/bottom screen
+    /// points for anchoring a popup. WKWebView is flipped (origin top-left, Y down)
+    /// matching JS viewport coords, so no Y-flip is needed there.
+    func screenPoints(
+        x: CGFloat, topY: CGFloat, bottomY: CGFloat,
+        vpWidth: CGFloat, vpHeight: CGFloat, webView: WKWebView, window: NSWindow
+    ) -> (top: NSPoint, bottom: NSPoint) {
+        let scaleX = webView.bounds.width / vpWidth
+        let scaleY = webView.bounds.height / vpHeight
+        let topViewY = webView.isFlipped ? topY * scaleY : webView.bounds.height - topY * scaleY
+        let topWindowPoint = webView.convert(NSPoint(x: x * scaleX, y: topViewY), to: nil)
+        let top = window.convertPoint(toScreen: topWindowPoint)
+
+        let bottomViewY = webView.isFlipped ? bottomY * scaleY : webView.bounds.height - bottomY * scaleY
+        let bottomWindowPoint = webView.convert(NSPoint(x: x * scaleX, y: bottomViewY), to: nil)
+        let bottom = window.convertPoint(toScreen: bottomWindowPoint)
+        return (top, bottom)
+    }
+
+    /// Open the Milkdown note editor for a web highlight, seeded from its stored
+    /// annotation row. Reused by the selection-popup "Add Note" path (which posts
+    /// directly), the highlight context menu, and the Notes sidebar focus flow.
+    func presentWebNoteEditor(highlightId: String, topScreen: NSPoint, bottomScreen: NSPoint) {
+        guard let db = viewModel.database else { return }
+        let record = AnnotationStore(database: db).fetch(id: highlightId)
+        HTMLSelectionPopupPanel.dismissCurrent()
+        let target = WebNoteTarget(
+            highlightId: highlightId,
+            comment: record?.comment ?? "",
+            colorCSS: record?.color ?? OakStyle.AnnotationColors.cssRGBA(OakStyle.AnnotationColors.highlightColors[0].nsColor),
+            type: record?.type ?? "highlight",
+            anchorTopScreen: topScreen,
+            anchorBottomScreen: bottomScreen
+        )
+        WebNoteEditorPopupPanel.show(viewModel: viewModel, target: target, webView: webView, onDismiss: {})
     }
 
     // MARK: - Web Highlight Persistence
@@ -703,6 +760,13 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
 
             let js = "OakHighlighter.restore('\(record.id)', '\(escapedJson)', '\(escapedColor)', '\(escapedType)');"
             webView.evaluateJavaScript(js, completionHandler: nil)
+
+            // Re-show the note marker for highlights that carry a comment.
+            if let comment = record.comment,
+               !comment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                let escapedId = record.id.replacingOccurrences(of: "'", with: "\\'")
+                webView.evaluateJavaScript("OakHighlighter.setHasNote('\(escapedId)', true);", completionHandler: nil)
+            }
         }
     }
 
@@ -717,7 +781,30 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
         let viewY = webView.isFlipped ? jsY * scaleY : webView.bounds.height - jsY * scaleY
         let viewPoint = NSPoint(x: jsX * scaleX, y: viewY)
 
+        // Does this highlight already carry a note? Drives the "Add" vs "Edit" label.
+        let hasNote: Bool = {
+            guard let db = viewModel.database,
+                  let record = AnnotationStore(database: db).fetch(id: highlightId),
+                  let comment = record.comment else { return false }
+            return !comment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }()
+
         let menu = NSMenu()
+
+        let noteItem = NSMenuItem(
+            title: hasNote ? "Edit Note" : "Add Note",
+            action: #selector(openWebHighlightNote(_:)),
+            keyEquivalent: ""
+        )
+        noteItem.target = self
+        // Stash the highlight id + its screen anchor for the note editor.
+        let screenPoint = webView.window?.convertPoint(toScreen: webView.convert(viewPoint, to: nil)) ?? .zero
+        noteItem.representedObject = WebNoteMenuContext(highlightId: highlightId, screenPoint: screenPoint)
+        noteItem.image = NSImage(systemSymbolName: "text.bubble", accessibilityDescription: nil)
+        menu.addItem(noteItem)
+
+        menu.addItem(.separator())
+
         let deleteItem = NSMenuItem(
             title: "Delete",
             action: #selector(deleteWebHighlight(_:)),
@@ -729,6 +816,26 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
         menu.addItem(deleteItem)
 
         menu.popUp(positioning: nil, at: viewPoint, in: webView)
+    }
+
+    /// Carries a highlight + its screen anchor from the context menu to the editor.
+    private final class WebNoteMenuContext: NSObject {
+        let highlightId: String
+        let screenPoint: NSPoint
+        init(highlightId: String, screenPoint: NSPoint) {
+            self.highlightId = highlightId
+            self.screenPoint = screenPoint
+        }
+    }
+
+    @objc private func openWebHighlightNote(_ sender: NSMenuItem) {
+        guard let ctx = sender.representedObject as? WebNoteMenuContext else { return }
+        // Anchor the editor at the click point (used as both top and bottom).
+        presentWebNoteEditor(
+            highlightId: ctx.highlightId,
+            topScreen: ctx.screenPoint,
+            bottomScreen: ctx.screenPoint
+        )
     }
 
     @objc private func deleteWebHighlight(_ sender: NSMenuItem) {
@@ -788,6 +895,13 @@ extension Notification.Name {
     static let webViewFindNext = Notification.Name("webViewFindNext")
     static let webViewFindPrev = Notification.Name("webViewFindPrev")
     static let webViewClearFind = Notification.Name("webViewClearFind")
+
+    // Web notes — posted with `object: viewModel`.
+    // `webAnnotationsChanged` tells the Notes sidebar to refresh after a note is
+    // added/edited/deleted; `webViewFocusHighlight` (carries `userInfo["id"]`)
+    // asks the web view to scroll to + open the note for a highlight.
+    static let webAnnotationsChanged = Notification.Name("webAnnotationsChanged")
+    static let webViewFocusHighlight = Notification.Name("webViewFocusHighlight")
 }
 
 // MARK: - Find-in-page JavaScript

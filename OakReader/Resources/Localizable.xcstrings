@@ -297,48 +297,48 @@
       },
       "shouldTranslate": false
     },
-    "%@ annotations": {
+    "%@ notes": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ 条批注"
+            "value": "%@ 条笔记"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ 個註解"
+            "value": "%@ 則筆記"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ 件の注釈"
+            "value": "%@ 件のノート"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "주석 %@개"
+            "value": "노트 %@개"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ Anmerkungen"
+            "value": "%@ Notizen"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ annotations"
+            "value": "%@ notes"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ anotaciones"
+            "value": "%@ notas"
           }
         }
       }
@@ -1609,48 +1609,59 @@
         }
       }
     },
-    "Annotations added to the document will appear here.": {
+    "Notes": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "笔记" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "筆記" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "ノート" } },
+        "ko": { "stringUnit": { "state": "translated", "value": "노트" } },
+        "de": { "stringUnit": { "state": "translated", "value": "Notizen" } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Notes" } },
+        "es": { "stringUnit": { "state": "translated", "value": "Notas" } }
+      }
+    },
+    "Notes you add to highlights will appear here.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "添加到文稿的批注将显示在此处。"
+            "value": "你为高亮添加的笔记将显示在此处。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "新增至文件的註解將顯示於此。"
+            "value": "你為標示新增的筆記將顯示於此。"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "書類に追加した注釈がここに表示されます。"
+            "value": "ハイライトに追加したノートがここに表示されます。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "문서에 추가된 주석이 여기에 표시됩니다."
+            "value": "하이라이트에 추가한 노트가 여기에 표시됩니다."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Anmerkungen, die dem Dokument hinzugefügt werden, erscheinen hier."
+            "value": "Notizen, die du zu Markierungen hinzufügst, erscheinen hier."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Les annotations ajoutées au document apparaîtront ici."
+            "value": "Les notes que vous ajoutez aux surlignages apparaîtront ici."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Las anotaciones añadidas al documento aparecerán aquí."
+            "value": "Las notas que añadas a los resaltados aparecerán aquí."
           }
         }
       }
@@ -4783,48 +4794,48 @@
         }
       }
     },
-    "No Annotations": {
+    "No Notes": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "无批注"
+            "value": "无笔记"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "沒有註解"
+            "value": "沒有筆記"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "注釈なし"
+            "value": "ノートなし"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "주석 없음"
+            "value": "노트 없음"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Keine Anmerkungen"
+            "value": "Keine Notizen"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Aucune annotation"
+            "value": "Aucune note"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sin anotaciones"
+            "value": "Sin notas"
           }
         }
       }

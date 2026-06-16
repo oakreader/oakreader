@@ -13,6 +13,7 @@ struct WebHeading: Identifiable, Decodable, Equatable {
 /// tab-style mode picker.
 private enum WebSidebarMode: String, CaseIterable, Identifiable {
     case contents
+    case notes
     case search
 
     var id: String { rawValue }
@@ -20,6 +21,7 @@ private enum WebSidebarMode: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .contents: return "list.bullet.indent"
+        case .notes:    return "text.bubble"
         case .search:   return "magnifyingglass"
         }
     }
@@ -27,6 +29,7 @@ private enum WebSidebarMode: String, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .contents: return "Contents"
+        case .notes:    return "Notes"
         case .search:   return "Search"
         }
     }
@@ -48,6 +51,8 @@ struct WebTOCSidebarView: View {
             switch mode {
             case .contents:
                 WebContentsView(viewModel: viewModel)
+            case .notes:
+                WebNotesView(viewModel: viewModel)
             case .search:
                 WebSearchView(viewModel: viewModel)
             }
@@ -171,6 +176,130 @@ private struct WebContentsView: View {
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// MARK: - Notes (web highlights with a comment)
+
+/// Lists every web highlight on the page that carries a note. Tapping a row asks
+/// the web view to scroll to + flash the highlight and open its note editor.
+/// Reads straight from the shared `annotations` table (the same rows the PDF notes
+/// list uses, filtered to `positionKind == "web"`).
+private struct WebNotesView: View {
+    let viewModel: DocumentViewModel
+
+    @State private var notes: [AnnotationRecord] = []
+
+    var body: some View {
+        Group {
+            if notes.isEmpty {
+                emptyState
+            } else {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 2) {
+                        ForEach(notes, id: \.id) { note in
+                            row(note)
+                        }
+                    }
+                    .padding(.vertical, 6)
+                    .padding(.horizontal, 4)
+                }
+            }
+        }
+        .onAppear(perform: reload)
+        .onReceive(NotificationCenter.default.publisher(for: .webAnnotationsChanged)) { note in
+            guard (note.object as AnyObject) === viewModel else { return }
+            reload()
+        }
+    }
+
+    private func reload() {
+        guard let db = viewModel.database, let attId = viewModel.attachmentId else {
+            notes = []
+            return
+        }
+        notes = AnnotationStore(database: db)
+            .fetch(attachmentId: attId)
+            .filter {
+                $0.positionKind == "web"
+                    && $0.deletedAt == nil
+                    && ($0.comment?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
+            }
+    }
+
+    private func row(_ note: AnnotationRecord) -> some View {
+        Button {
+            NotificationCenter.default.post(
+                name: .webViewFocusHighlight,
+                object: viewModel,
+                userInfo: ["id": note.id]
+            )
+        } label: {
+            HStack(alignment: .top, spacing: 8) {
+                Circle()
+                    .fill(Self.color(fromCSSRGBA: note.color))
+                    .frame(width: 10, height: 10)
+                    .padding(.top, 3)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(note.comment ?? "")
+                        .font(.caption)
+                        .foregroundStyle(.primary)
+                        .lineLimit(4)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if let quoted = note.text, !quoted.isEmpty {
+                        Text(quoted)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.leading, 6)
+                            .overlay(alignment: .leading) {
+                                Rectangle()
+                                    .fill(Self.color(fromCSSRGBA: note.color))
+                                    .frame(width: 2)
+                            }
+                    }
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "text.bubble")
+                .font(.system(size: 24))
+                .foregroundStyle(Color.primary.opacity(0.15))
+
+            Text("No Notes")
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+
+            Text("Notes you add to highlights will appear here.")
+                .font(.system(size: 11))
+                .foregroundStyle(Color.primary.opacity(0.25))
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding()
+    }
+
+    /// Web highlight colors are stored as CSS `rgba(r,g,b,a)` strings.
+    private static func color(fromCSSRGBA css: String) -> Color {
+        let nums = css.components(separatedBy: CharacterSet(charactersIn: "0123456789").inverted)
+            .compactMap { Int($0) }
+        guard nums.count >= 3 else { return .yellow }
+        return Color(.sRGB,
+                     red: Double(nums[0]) / 255.0,
+                     green: Double(nums[1]) / 255.0,
+                     blue: Double(nums[2]) / 255.0,
+                     opacity: 1.0)
     }
 }
 

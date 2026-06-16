@@ -4,21 +4,30 @@ import PDFKit
 struct AnnotationListView: View {
     let viewModel: DocumentViewModel
 
+    /// Only true notes — annotations that carry a written comment. Plain
+    /// highlights, native PDF links, shapes and form widgets are intentionally
+    /// excluded so the list stays a focused list of what the reader wrote.
+    private var notes: [AnnotationModel] {
+        viewModel.annotation.annotationModels.filter {
+            ($0.contents?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
+        }
+    }
+
     private var annotationsByPage: [Int: [AnnotationModel]] {
-        Dictionary(grouping: viewModel.annotation.annotationModels, by: \.pageIndex)
+        Dictionary(grouping: notes, by: \.pageIndex)
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            if viewModel.annotation.annotationModels.isEmpty {
+            if notes.isEmpty {
                 VStack(spacing: 12) {
                     Image(systemName: "text.bubble")
                         .font(.largeTitle)
                         .foregroundStyle(.secondary)
-                    Text("No Annotations")
+                    Text("No Notes")
                         .font(.headline)
                         .foregroundStyle(.secondary)
-                    Text("Annotations added to the document will appear here.")
+                    Text("Notes you add to highlights will appear here.")
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                         .multilineTextAlignment(.center)
@@ -51,7 +60,7 @@ struct AnnotationListView: View {
             HStack {
                 Spacer()
 
-                Text("\(viewModel.annotation.annotationModels.count) annotations")
+                Text("\(notes.count) notes")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -75,22 +84,6 @@ struct AnnotationListView: View {
 private struct AnnotationRowView: View {
     let annotation: AnnotationModel
 
-    /// A human-readable label for the annotation type.
-    private var typeLabel: String {
-        let raw = annotation.type.rawValue
-        switch raw {
-        case "Highlight": return "Highlight"
-        case "Underline": return "Underline"
-        case "StrikeOut": return "Strikethrough"
-        case "FreeText": return "Text"
-        case "Text": return "Note"
-        case "Ink": return "Drawing"
-        case "Square": return "Rectangle"
-        case "Circle": return "Oval"
-        default: return raw.isEmpty ? "Annotation" : raw
-        }
-    }
-
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             Circle()
@@ -99,39 +92,28 @@ private struct AnnotationRowView: View {
                 .padding(.top, 2)
 
             VStack(alignment: .leading, spacing: 3) {
-                // A note: show the comment prominently, with the quoted text as
-                // muted context beneath it.
-                if let comment = annotation.contents, !comment.isEmpty {
-                    Text(comment)
-                        .font(.caption)
-                        .lineLimit(4)
-                    if let quoted = annotation.markedUpText, !quoted.isEmpty {
-                        Text(quoted)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-                            .padding(.leading, 6)
-                            .overlay(alignment: .leading) {
-                                Rectangle()
-                                    .fill(Color(nsColor: annotation.color))
-                                    .frame(width: 2)
-                            }
-                    }
-                } else if let text = annotation.markedUpText, !text.isEmpty {
-                    Text(text)
-                        .font(.caption)
-                        .lineLimit(3)
-                    Text(typeLabel)
+                // A note: show the comment prominently, with the quoted source
+                // text as muted context beneath it.
+                Text(annotation.contents ?? "")
+                    .font(.caption)
+                    .lineLimit(4)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if let quoted = annotation.markedUpText, !quoted.isEmpty {
+                    Text(quoted)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
-                } else {
-                    Text(typeLabel)
-                        .font(.caption)
-                        .fontWeight(.medium)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.leading, 6)
+                        .overlay(alignment: .leading) {
+                            Rectangle()
+                                .fill(Color(nsColor: annotation.color))
+                                .frame(width: 2)
+                        }
                 }
             }
-
-            Spacer()
         }
         .padding(.vertical, 2)
     }
