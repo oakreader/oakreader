@@ -17,6 +17,9 @@ struct InlineDeckView: View {
     /// When set, the expand button routes through this closure (e.g. the Studio
     /// full-window overlay) instead of the built-in centered sheet.
     var onExpand: (() -> Void)? = nil
+    /// Hide the deck's own title/expand header — used when a host (e.g. the
+    /// Studio artifact card) already supplies a title row, to avoid duplication.
+    var showHeader: Bool = true
 
     @State private var currentIndex = 0
     @State private var navDirection = 1          // 1 = forward, -1 = back
@@ -47,7 +50,7 @@ struct InlineDeckView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: isSlide ? 16 : 9) {
-            header
+            if showHeader { header }
             cardStack
             if showFooter { footerBar }
         }

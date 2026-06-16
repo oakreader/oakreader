@@ -170,9 +170,8 @@ struct StudioPanelView: View {
             switch artifact.kind {
             case .quiz:
                 if let deck = artifact.quizDeck {
-                    InlineDeckView(deck: deck, onExpand: {
-                        viewModel.studioFullScreenArtifact = artifact
-                    })
+                    InlineDeckView(deck: deck, showHeader: false)
+                        .overlay(alignment: .topTrailing) { expandButton(artifact) }
                 } else {
                     unavailableBody
                 }
@@ -181,19 +180,7 @@ struct StudioPanelView: View {
                     .frame(height: 320)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(OakStyle.Colors.diaHairline, lineWidth: 1))
-                    .overlay(alignment: .topTrailing) {
-                        Button {
-                            viewModel.studioFullScreenArtifact = artifact
-                        } label: {
-                            Image(systemName: "arrow.up.left.and.arrow.down.right")
-                                .font(.system(size: 11, weight: .semibold))
-                                .padding(6)
-                                .background(.thinMaterial, in: Circle())
-                        }
-                        .buttonStyle(.plain)
-                        .padding(6)
-                        .help("Open full-screen")
-                    }
+                    .overlay(alignment: .topTrailing) { expandButton(artifact) }
             case .deck, .audio:
                 unavailableBody
             }
@@ -205,6 +192,22 @@ struct StudioPanelView: View {
                 Label("Delete", systemImage: "trash")
             }
         }
+    }
+
+    /// The shared "open full-screen" affordance, floated top-trailing over an
+    /// artifact's preview (mind map / deck).
+    private func expandButton(_ artifact: StudioArtifact) -> some View {
+        Button {
+            viewModel.studioFullScreenArtifact = artifact
+        } label: {
+            Image(systemName: "arrow.up.left.and.arrow.down.right")
+                .font(.system(size: 11, weight: .semibold))
+                .padding(6)
+                .background(.thinMaterial, in: Circle())
+        }
+        .buttonStyle(.plain)
+        .padding(6)
+        .help("Open full-screen")
     }
 
     private var unavailableBody: some View {
