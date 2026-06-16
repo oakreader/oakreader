@@ -35,12 +35,19 @@ final class LibraryCoverSweeper {
         // Cheap pre-filter (type + has a source), no disk I/O, no main-thread stat storm.
         let candidates = items.filter { Self.couldHaveCover($0) && !attempted.contains($0.id) }
         guard !candidates.isEmpty else { return }
-        candidates.forEach { attempted.insert($0.id) }
 
         // Disk-existence check off the main thread (one stat per candidate).
         let targets = await Task.detached(priority: .utility) {
             candidates.filter { Self.needsCover($0) }
         }.value
+        // Candidates that already have a usable cover are settled — mark them so we don't re-stat
+        // them every sweep. Items that NEED a cover are marked attempted only once generation
+        // SUCCEEDS (below), so a transient failure or a sweep cancelled mid-run (view dismissed)
+        // leaves them retryable on the next grid appearance instead of stuck cover-less forever.
+        let targetIDs = Set(targets.map(\.id))
+        for candidate in candidates where !targetIDs.contains(candidate.id) {
+            attempted.insert(candidate.id)
+        }
         guard !targets.isEmpty else { return }
 
         var sinceBump = 0
@@ -50,10 +57,13 @@ final class LibraryCoverSweeper {
             let batch = targets[index..<min(index + maxConcurrent, targets.count)]
             index += maxConcurrent
 
-            let produced = await withTaskGroup(of: Bool.self) { group in
-                for item in batch { group.addTask { await self.generateCover(for: item) } }
+            let produced = await withTaskGroup(of: (UUID, Bool).self) { group in
+                for item in batch { group.addTask { (item.id, await self.generateCover(for: item)) } }
                 var count = 0
-                for await ok in group where ok { count += 1 }
+                for await (id, ok) in group where ok {
+                    attempted.insert(id) // mark attempted only on success → failures retry next sweep
+                    count += 1
+                }
                 return count
             }
 
@@ -89,7 +99,7 @@ final class LibraryCoverSweeper {
                 )
             }
         case .html:
-            data = await coverService.generateHTMLCover(for: item.fileURL)
+            data = await coverService.generateHTMLCover(for: item.fileURL, sourceURL: item.sourceURL)
         case .link:
             if let sourceURL = item.sourceURL {
                 data = await coverService.generateLinkCover(for: sourceURL)

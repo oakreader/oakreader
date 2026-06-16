@@ -111,7 +111,7 @@ extension ImportService {
 
         // Generate cover thumbnail asynchronously
         Task {
-            if let coverData = await coverService.generateHTMLCover(for: destURL) {
+            if let coverData = await coverService.generateHTMLCover(for: destURL, sourceURL: originalPageURL) {
                 await MainActor.run {
                     store.updateCover(item, imageData: coverData)
                 }

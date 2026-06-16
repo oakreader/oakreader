@@ -628,7 +628,7 @@ final class ZoteroMigrationService {
                     let coverData: Data?
                     switch capturedType {
                     case .html:
-                        coverData = await coverService.generateHTMLCover(for: destURL)
+                        coverData = await coverService.generateHTMLCover(for: destURL, sourceURL: capturedItem.sourceURL)
                     default:
                         coverData = await coverService.generateCover(for: destURL)
                     }

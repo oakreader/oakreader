@@ -42,7 +42,7 @@ struct LibrarySidebarPanel: View {
             var coverData: Data?
             switch item.contentType {
             case .html:
-                coverData = await coverService.generateHTMLCover(for: item.fileURL)
+                coverData = await coverService.generateHTMLCover(for: item.fileURL, sourceURL: item.sourceURL)
             case .link:
                 if let sourceURL = item.sourceURL {
                     coverData = await coverService.generateLinkCover(for: sourceURL)

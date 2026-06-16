@@ -22,8 +22,44 @@ actor LibraryCoverService {
         }
     }
 
-    /// Generate a cover thumbnail from an HTML document using an offscreen WKWebView.
-    func generateHTMLCover(for htmlURL: URL) async -> Data? {
+    /// Generate a cover for a saved HTML page.
+    ///
+    /// Prefers the page's own Open Graph / Twitter preview image — the canonical rich card
+    /// (the same one Notion/Raindrop/mymind show), read straight from the saved archive's
+    /// `<head>`. Only when no preview image is declared (or it fails to download) do we fall
+    /// back to an offscreen screenshot of the page, then to a branded favicon card so the grid
+    /// never shows a bare globe placeholder. `sourceURL` is the original page URL — used to
+    /// resolve a relative `og:image` and to brand the favicon fallback.
+    func generateHTMLCover(for htmlURL: URL, sourceURL: URL? = nil) async -> Data? {
+        // 1. og:image / twitter:image from the saved page — the canonical preview image.
+        if let html = htmlHead(of: htmlURL),
+           let raw = HTMLMeta.content(html, property: "og:image")
+                  ?? HTMLMeta.content(html, name: "twitter:image"),
+           let imageURL = HTMLMeta.resolveURL(raw, relativeTo: sourceURL ?? htmlURL),
+           let data = await downloadCoverImage(imageURL) {
+            return data
+        }
+        // 2. No usable preview image — snapshot the saved page itself.
+        if let snapshot = await renderHTMLSnapshot(htmlURL) { return snapshot }
+        // 3. Last resort — a branded favicon card (real site logo on a tinted card), matching how
+        //    `.link` items degrade, instead of leaving a colorless globe placeholder forever.
+        if let sourceURL { return await generateFaviconCover(for: sourceURL) }
+        return nil
+    }
+
+    /// Read the head of a (possibly multi-MB SingleFile) archive as text for meta-tag scraping,
+    /// without loading the whole file into memory — the og:image/twitter:image tags live near the
+    /// top of `<head>`, well within the first chunk. Lossy UTF-8 decode tolerates a byte-boundary
+    /// split and any stray non-UTF-8 bytes (only the ASCII meta tags need to survive).
+    private func htmlHead(of url: URL, maxBytes: Int = 512 * 1024) -> String? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        guard let data = try? handle.read(upToCount: maxBytes), !data.isEmpty else { return nil }
+        return String(decoding: data, as: UTF8.self)
+    }
+
+    /// Render a cover thumbnail from a local HTML document using an offscreen WKWebView.
+    private func renderHTMLSnapshot(_ htmlURL: URL) async -> Data? {
         return await withCheckedContinuation { continuation in
             DispatchQueue.main.async {
                 let config = WKWebViewConfiguration()
