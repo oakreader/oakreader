@@ -42,7 +42,6 @@ final class CommentsViewModel {
 
     // MARK: - Load
 
-    @MainActor
     func reload() {
         guard let store, let attId = parent?.attachmentId else {
             cards = []
@@ -62,7 +61,6 @@ final class CommentsViewModel {
 
     /// Begin writing the note for a freshly-created highlight. The highlight row
     /// already exists (empty comment); the composer commits the text into it.
-    @MainActor
     func startNote(forAnnotationId id: String) {
         pendingAnchorId = id
         pendingQuote = store?.fetch(id: id)?.text
@@ -70,14 +68,12 @@ final class CommentsViewModel {
         reload()
     }
 
-    @MainActor
     func cancelPending() {
         pendingAnchorId = nil
         pendingQuote = nil
     }
 
     /// Save the composer text into the pending highlight's comment.
-    @MainActor
     func commitPending(_ text: String) {
         guard let id = pendingAnchorId else { return }
         updateComment(id: id, text: text)
@@ -85,7 +81,6 @@ final class CommentsViewModel {
     }
 
     /// Ask the panel to scroll to + flash an existing card.
-    @MainActor
     func focusCard(id: String) {
         pendingAnchorId = nil
         focusedCardId = id
@@ -96,7 +91,6 @@ final class CommentsViewModel {
 
     /// Create a freestanding memo (no text selection needed).
     @discardableResult
-    @MainActor
     func addMemo(_ text: String) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty,
@@ -136,7 +130,6 @@ final class CommentsViewModel {
 
     /// Edit a card's comment text. Clearing it drops the card from the stream;
     /// for anchored notes the highlight row itself stays (just uncommented).
-    @MainActor
     func updateComment(id: String, text: String) {
         guard let store, var record = store.fetch(id: id) else { return }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -148,7 +141,6 @@ final class CommentsViewModel {
     }
 
     /// Delete a card. Anchored cards also drop their on-page highlight.
-    @MainActor
     func delete(_ record: AnnotationRecord) {
         switch record.positionKind {
         case "pdf-overlay":
@@ -167,7 +159,6 @@ final class CommentsViewModel {
     }
 
     /// Scroll the document to a card's source and surface it.
-    @MainActor
     func jump(_ record: AnnotationRecord) {
         switch record.positionKind {
         case "web":

@@ -300,25 +300,18 @@ class HTMLSelectionPopupPanel: NSPanel, AppResignDismissable {
         guard let webView else { dismiss(); return }
         let cssColor = Self.highlightColors[0].2  // default yellow, matches Highlight
         let vm = viewModel
-        let top = anchorTop
-        let bottom = anchorBottom
 
         webView.evaluateJavaScript(
             "OakHighlighter.highlightSelection('\(cssColor)', 'highlight');"
-        ) { [weak webView] result, _ in
+        ) { result, _ in
             guard let json = result as? String,
                   let data = json.data(using: .utf8),
                   let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let id = dict["id"] as? String else { return }
-            let target = WebNoteTarget(
-                highlightId: id,
-                comment: "",
-                colorCSS: cssColor,
-                type: "highlight",
-                anchorTopScreen: top,
-                anchorBottomScreen: bottom
-            )
-            WebNoteEditorPopupPanel.show(viewModel: vm, target: target, webView: webView, onDismiss: {})
+            // Single capture surface: open the right-panel Notes stream and start
+            // an anchored note for the just-created highlight.
+            vm.state.rightPanelMode = .comments
+            vm.comments.startNote(forAnnotationId: id)
         }
         dismiss()
     }

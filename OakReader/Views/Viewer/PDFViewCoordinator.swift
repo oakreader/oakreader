@@ -32,9 +32,6 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
     // alternative; both call into the same AnnotationViewModel mutations.
     private var annotationEditPopup: AnnotationEditPopupPanel?
 
-    // Markdown note/comment editor popover, anchored to an overlay markup.
-    private var noteEditorPanel: NoteEditorPopupPanel?
-
     // Selection-instrument keyboard observers (⌃⌘H / U / C / T / K).
     // Scoped to this tab's viewModel via notification.object so cross-tab
     // shortcuts don't fire on the wrong document.
@@ -166,50 +163,34 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
             // system is a separate task.
         }
 
-        // Open the note editor for an existing overlay markup (fired after the
-        // selection popup creates a note, or by a click on a note marker).
+        // Open the note in the right-panel Notes stream (fired after the selection
+        // popup creates a note, or by a click on a note marker).
         let noteToken = center.addObserver(forName: .openNoteEditor, object: nil, queue: .main) { [weak self] note in
             guard let self,
                   (note.object as AnyObject) === self.viewModel,
                   let id = note.userInfo?["id"] as? String else { return }
-            self.presentNoteEditor(markupId: id)
+            self.openNoteInPanel(markupId: id)
         }
         selectionInstrumentObservers.append(noteToken)
     }
 
-    // MARK: - Note Editor
+    // MARK: - Note → right-panel Notes stream
 
-    private func presentNoteEditor(markupId: String) {
-        guard let pdfView,
-              let (pageIndex, markup) = viewModel.markupOverlay.markup(withId: markupId),
-              let page = pdfView.document?.page(at: pageIndex),
-              let firstQuad = markup.quads.first else { return }
-
+    /// Route note capture/editing to the right-panel Notes stream (the single,
+    /// flomo-style surface). A freshly-created note (empty comment) starts an
+    /// anchored compose; an existing note scrolls to + flashes its card.
+    private func openNoteInPanel(markupId: String) {
         dismissSelectionPopup()
-        dismissAnnotationEditPopup()
-        dismissNoteEditor()
-
-        let bounds = markup.quads.dropFirst().reduce(firstQuad) { $0.union($1) }
-        let panel = NoteEditorPopupPanel(
-            viewModel: viewModel,
-            markupId: markupId,
-            comment: markup.comment ?? "",
-            colorIndex: NoteEditorPopupPanel.nearestColorIndex(to: markup.color),
-            kind: markup.kind,
-            pdfView: pdfView,
-            anchorPage: page,
-            anchorBounds: bounds,
-            onDismiss: { [weak self] in self?.noteEditorPanel = nil }
-        )
-        noteEditorPanel = panel
+        viewModel.state.rightPanelMode = .comments
+        let comment = viewModel.markupOverlay.markup(withId: markupId)?.markup.comment
+        if (comment?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false) {
+            viewModel.comments.focusCard(id: markupId)
+        } else {
+            viewModel.comments.startNote(forAnnotationId: markupId)
+        }
     }
 
-    private func dismissNoteEditor() {
-        noteEditorPanel?.dismiss()
-        noteEditorPanel = nil
-    }
-
-    /// Left-click on a note marker/highlight opens its editor. Returns true if handled.
+    /// Left-click on a note marker/highlight opens it in the Notes panel. Returns true if handled.
     private func handleOverlayNoteClick(at locationInPDFView: NSPoint) -> Bool {
         guard let pdfView,
               let page = pdfView.page(for: locationInPDFView, nearest: false),
@@ -221,7 +202,7 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
         let pageIndex = doc.index(for: page)
         guard let markup = viewModel.markupOverlay.markup(at: pagePoint, pageIndex: pageIndex),
               markup.isNote else { return false }
-        presentNoteEditor(markupId: markup.id)
+        openNoteInPanel(markupId: markup.id)
         return true
     }
 
@@ -250,7 +231,6 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
             removeScrollMonitor()
             dismissSelectionPopup()
             dismissAnnotationEditPopup()
-            dismissNoteEditor()
         }
     }
 
@@ -268,10 +248,8 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
                 let eventWindow = event.window
                 let onSelectionPopup = (self.selectionPopup?.ownsWindow(eventWindow ?? NSWindow())) ?? false
                 let onAnnotationPopup = (self.annotationEditPopup?.ownsWindow(eventWindow ?? NSWindow())) ?? false
-                let onNoteEditor = (self.noteEditorPanel?.ownsWindow(eventWindow ?? NSWindow())) ?? false
                 if !onSelectionPopup { self.dismissSelectionPopup() }
                 if !onAnnotationPopup { self.dismissAnnotationEditPopup() }
-                if !onNoteEditor { self.dismissNoteEditor() }
             }
 
             let mode = self.viewModel.state.editorMode
@@ -708,13 +686,6 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
 
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
-
-            // While the note editor is open, let it own the keyboard (so typing
-            // doesn't trip Delete/Escape mode handling); Esc closes it.
-            if let panel = self.noteEditorPanel {
-                if event.keyCode == 53 { panel.dismiss(); return nil }
-                return event
-            }
 
             // Escape: dismiss the annotation-edit popup if open, otherwise
             // exit annotate / snapshot mode. Tesler "every mode needs a fast

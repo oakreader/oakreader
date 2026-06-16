@@ -556,21 +556,12 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
 
         // A highlight asked to be focused (from the Notes sidebar) — it scrolled
         // itself into view and posted its rect; open the note editor anchored to it.
+        // A highlight was clicked / focused from the sidebar — `focusHighlight`
+        // already scrolled the page to it; open its note in the right panel.
         if message.name == "highlightFocus",
            let body = message.body as? [String: Any],
-           let hlId = body["id"] as? String,
-           let x = body["x"] as? CGFloat,
-           let y = body["y"] as? CGFloat,
-           let bottomY = body["bottomY"] as? CGFloat,
-           let vpWidth = body["vpWidth"] as? CGFloat, vpWidth > 0,
-           let vpHeight = body["vpHeight"] as? CGFloat, vpHeight > 0,
-           let webView = self.webView,
-           let window = webView.window {
-            let (top, bottom) = screenPoints(
-                x: x, topY: y, bottomY: bottomY,
-                vpWidth: vpWidth, vpHeight: vpHeight, webView: webView, window: window
-            )
-            presentWebNoteEditor(highlightId: hlId, topScreen: top, bottomScreen: bottom)
+           let hlId = body["id"] as? String {
+            openNoteInPanel(highlightId: hlId)
             return
         }
 
@@ -681,22 +672,21 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
         return (top, bottom)
     }
 
-    /// Open the Milkdown note editor for a web highlight, seeded from its stored
-    /// annotation row. Reused by the selection-popup "Add Note" path (which posts
-    /// directly), the highlight context menu, and the Notes sidebar focus flow.
-    func presentWebNoteEditor(highlightId: String, topScreen: NSPoint, bottomScreen: NSPoint) {
-        guard let db = viewModel.database else { return }
-        let record = AnnotationStore(database: db).fetch(id: highlightId)
+    /// Route a web highlight's note to the right-panel Notes stream (single
+    /// surface). Reused by the highlight context menu and the click/sidebar focus
+    /// flow. An existing note scrolls to + flashes its card; a fresh highlight
+    /// (empty comment) starts an anchored compose.
+    func openNoteInPanel(highlightId: String) {
         HTMLSelectionPopupPanel.dismissCurrent()
-        let target = WebNoteTarget(
-            highlightId: highlightId,
-            comment: record?.comment ?? "",
-            colorCSS: record?.color ?? OakStyle.AnnotationColors.cssRGBA(OakStyle.AnnotationColors.highlightColors[0].nsColor),
-            type: record?.type ?? "highlight",
-            anchorTopScreen: topScreen,
-            anchorBottomScreen: bottomScreen
-        )
-        WebNoteEditorPopupPanel.show(viewModel: viewModel, target: target, webView: webView, onDismiss: {})
+        viewModel.state.rightPanelMode = .comments
+        let comment = viewModel.database.flatMap {
+            AnnotationStore(database: $0).fetch(id: highlightId)?.comment
+        }
+        if (comment?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false) {
+            viewModel.comments.focusCard(id: highlightId)
+        } else {
+            viewModel.comments.startNote(forAnnotationId: highlightId)
+        }
     }
 
     // MARK: - Web Highlight Persistence
@@ -839,12 +829,7 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
 
     @objc private func openWebHighlightNote(_ sender: NSMenuItem) {
         guard let ctx = sender.representedObject as? WebNoteMenuContext else { return }
-        // Anchor the editor at the click point (used as both top and bottom).
-        presentWebNoteEditor(
-            highlightId: ctx.highlightId,
-            topScreen: ctx.screenPoint,
-            bottomScreen: ctx.screenPoint
-        )
+        openNoteInPanel(highlightId: ctx.highlightId)
     }
 
     @objc private func deleteWebHighlight(_ sender: NSMenuItem) {

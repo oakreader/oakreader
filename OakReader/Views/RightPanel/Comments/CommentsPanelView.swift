@@ -240,7 +240,12 @@ private struct CommentCardView: View {
                 .fill(Color.primary.opacity(isHovering ? 0.07 : 0.045))
         )
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(accent, lineWidth: isFlashing ? 2 : 0)
+        )
         .onHover { isHovering = $0 }
+        .animation(.easeOut(duration: 0.4), value: isFlashing)
     }
 
     // MARK: Display
