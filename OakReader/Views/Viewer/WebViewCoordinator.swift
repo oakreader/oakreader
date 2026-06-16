@@ -196,6 +196,15 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
             // back so we can anchor the note editor to its final on-screen rect.
             self?.webView?.evaluateJavaScript("OakHighlighter.focusHighlight('\(escaped)');", completionHandler: nil)
         }
+        observe(.webDeleteHighlight) { [weak self] note in
+            guard let self, let id = note.userInfo?["id"] as? String else { return }
+            let escaped = id.replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "'", with: "\\'")
+            self.webView?.evaluateJavaScript("OakHighlighter.remove('\(escaped)');", completionHandler: nil)
+            if let db = self.viewModel.database {
+                AnnotationStore(database: db).softDelete(id: id)
+            }
+        }
     }
 
     /// Smooth-scroll the web view to a heading captured by `extractTableOfContents`,
@@ -792,7 +801,7 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
         let menu = NSMenu()
 
         let noteItem = NSMenuItem(
-            title: hasNote ? "Edit Comment" : "Add Comment",
+            title: hasNote ? "Edit Note" : "Add Note",
             action: #selector(openWebHighlightNote(_:)),
             keyEquivalent: ""
         )
@@ -896,12 +905,15 @@ extension Notification.Name {
     static let webViewFindPrev = Notification.Name("webViewFindPrev")
     static let webViewClearFind = Notification.Name("webViewClearFind")
 
-    // Web notes — posted with `object: viewModel`.
-    // `webAnnotationsChanged` tells the Notes sidebar to refresh after a note is
-    // added/edited/deleted; `webViewFocusHighlight` (carries `userInfo["id"]`)
-    // asks the web view to scroll to + open the note for a highlight.
-    static let webAnnotationsChanged = Notification.Name("webAnnotationsChanged")
+    // Comments — posted with `object: viewModel`.
+    // `commentsDidChange` tells the Comments panel to refresh after any comment is
+    // added/edited/deleted (web popup, PDF popup, or the panel itself);
+    // `webViewFocusHighlight` (carries `userInfo["id"]`) asks the web view to scroll
+    // to + open the comment for a highlight; `webDeleteHighlight` (carries
+    // `userInfo["id"]`) asks the web view to remove a highlight + soft-delete it.
+    static let commentsDidChange = Notification.Name("commentsDidChange")
     static let webViewFocusHighlight = Notification.Name("webViewFocusHighlight")
+    static let webDeleteHighlight = Notification.Name("webDeleteHighlight")
 }
 
 // MARK: - Find-in-page JavaScript

@@ -297,7 +297,7 @@
       },
       "shouldTranslate": false
     },
-    "%@ comments": {
+    "%@ notes": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
@@ -326,19 +326,19 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ Kommentare"
+            "value": "%@ Notizen"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ commentaires"
+            "value": "%@ notes"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ comentarios"
+            "value": "%@ notas"
           }
         }
       }
@@ -1609,18 +1609,18 @@
         }
       }
     },
-    "Comments": {
+    "Notes": {
       "localizations": {
         "zh-Hans": { "stringUnit": { "state": "translated", "value": "笔记" } },
         "zh-Hant": { "stringUnit": { "state": "translated", "value": "筆記" } },
         "ja": { "stringUnit": { "state": "translated", "value": "ノート" } },
         "ko": { "stringUnit": { "state": "translated", "value": "노트" } },
-        "de": { "stringUnit": { "state": "translated", "value": "Kommentare" } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Commentaires" } },
-        "es": { "stringUnit": { "state": "translated", "value": "Comentarios" } }
+        "de": { "stringUnit": { "state": "translated", "value": "Notizen" } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Notes" } },
+        "es": { "stringUnit": { "state": "translated", "value": "Notas" } }
       }
     },
-    "Comments you add to highlights will appear here.": {
+    "Notes you add to highlights will appear here.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
@@ -1649,19 +1649,19 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Kommentare, die du zu Markierungen hinzufügst, erscheinen hier."
+            "value": "Notizen, die du zu Markierungen hinzufügst, erscheinen hier."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Les commentaires que vous ajoutez aux surlignages apparaîtront ici."
+            "value": "Les notes que vous ajoutez aux surlignages apparaîtront ici."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Los comentarios que añadas a los resaltados aparecerán aquí."
+            "value": "Las notas que añadas a los resaltados aparecerán aquí."
           }
         }
       }
@@ -4794,7 +4794,7 @@
         }
       }
     },
-    "No Comments": {
+    "No Notes": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
@@ -4823,19 +4823,19 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Keine Kommentare"
+            "value": "Keine Notizen"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Aucun commentaire"
+            "value": "Aucune note"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sin comentarios"
+            "value": "Sin notas"
           }
         }
       }

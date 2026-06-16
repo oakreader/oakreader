@@ -9,8 +9,8 @@ import WebKit
 ///
 /// Color/kind changes are pushed to the live highlight through `OakHighlighter`
 /// (`setStyle`); the comment is written on dismiss and the highlight's note marker
-/// toggled via `setHasNote`. A `.webAnnotationsChanged` notification refreshes the
-/// web Notes sidebar.
+/// toggled via `setHasNote`. A `.commentsDidChange` notification refreshes the
+/// right-panel Comments stream.
 /// Everything needed to open the note editor for one web highlight.
 struct WebNoteTarget {
     let highlightId: String
@@ -160,7 +160,7 @@ final class WebNoteEditorPopupPanel: NSPanel, AppResignDismissable {
     }
 
     private func postChanged() {
-        NotificationCenter.default.post(name: .webAnnotationsChanged, object: viewModel)
+        NotificationCenter.default.post(name: .commentsDidChange, object: viewModel)
     }
 
     private func evalJS(_ js: String) {

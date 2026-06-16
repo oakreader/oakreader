@@ -154,6 +154,7 @@ class AnnotationViewModel {
         store.upsert(updated)
         parent?.markupOverlay.updateComment(id: id, comment: stored)
         refreshAnnotationModels()
+        NotificationCenter.default.post(name: .commentsDidChange, object: parent)
     }
 
     /// Delete an overlay markup by its DB id.
@@ -161,6 +162,7 @@ class AnnotationViewModel {
         annotationStore?.softDelete(id: id)
         parent?.markupOverlay.remove(id: id)
         refreshAnnotationModels()
+        NotificationCenter.default.post(name: .commentsDidChange, object: parent)
     }
 
     /// Recolor an overlay markup, preserving its current alpha.

@@ -28,7 +28,6 @@ enum EditorMode: String, CaseIterable, Identifiable {
 enum SidebarMode: String, CaseIterable, Identifiable {
     case thumbnails
     case outline
-    case annotations
     case search
 
     var id: String { rawValue }
@@ -37,7 +36,6 @@ enum SidebarMode: String, CaseIterable, Identifiable {
         switch self {
         case .thumbnails: return "Thumbnails"
         case .outline: return "Outline"
-        case .annotations: return "Comments"
         case .search: return "Search"
         }
     }
@@ -46,7 +44,6 @@ enum SidebarMode: String, CaseIterable, Identifiable {
         switch self {
         case .thumbnails: return "rectangle.grid.2x2"
         case .outline: return "list.number"
-        case .annotations: return "text.bubble"
         case .search: return "magnifyingglass"
         }
     }
@@ -99,6 +96,7 @@ enum LibrarySidebarMode: String, CaseIterable, Identifiable {
 
 enum RightPanelMode: String, CaseIterable, Identifiable {
     case aiChat
+    case comments
     case metadata
     case translation
     case studio = "flashcards"
@@ -109,6 +107,7 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
         switch self {
         case .metadata: return "list.bullet.rectangle.portrait"
         case .aiChat: return "bubble.left.and.bubble.right"
+        case .comments: return "text.bubble"
         case .translation: return "translate"
         case .studio: return "wand.and.stars"
         }
@@ -118,6 +117,7 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
         switch self {
         case .metadata: return "Metadata"
         case .aiChat: return "AI Chat"
+        case .comments: return "Notes"
         case .translation: return "Translation"
         case .studio: return "Studio"
         }

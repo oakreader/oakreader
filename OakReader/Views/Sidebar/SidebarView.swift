@@ -43,8 +43,6 @@ struct SidebarView: View {
                 ThumbnailSidebarView(viewModel: viewModel)
             case .outline:
                 BookmarkSidebarView(viewModel: viewModel)
-            case .annotations:
-                AnnotationListView(viewModel: viewModel)
             case .search:
                 SearchSidebarView(viewModel: viewModel)
             }

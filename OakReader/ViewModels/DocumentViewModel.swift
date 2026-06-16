@@ -105,6 +105,16 @@ class DocumentViewModel {
         return vm
     }
 
+    private var _comments: CommentsViewModel?
+    /// Per-document comment stream (flomo-style): freestanding memos + the
+    /// selection-anchored notes, in one reverse-chronological list.
+    var comments: CommentsViewModel {
+        if let vm = _comments { return vm }
+        let vm = CommentsViewModel(parent: self)
+        _comments = vm
+        return vm
+    }
+
     /// When set, a wide Studio artifact (mind map / deck) is shown full-screen
     /// over the document. Cleared to dismiss.
     var studioFullScreenArtifact: StudioArtifact?
