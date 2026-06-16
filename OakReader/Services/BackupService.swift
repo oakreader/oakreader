@@ -373,7 +373,13 @@ final class BackupService {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/bin/sh")
         task.arguments = ["-c", script]
-        try? task.run()
+        do {
+            try task.run()
+        } catch {
+            // Relaunch is best-effort; if it fails the user must reopen manually,
+            // so surface it rather than swallowing the error silently.
+            NSLog("BackupService.relaunchApp: failed to spawn relaunch helper: \(error)")
+        }
 
         // Hard exit — terminate(nil) can be blocked by open sheets.
         // After a restore the data directory has already been replaced,
