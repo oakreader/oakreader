@@ -37,7 +37,7 @@ enum SidebarMode: String, CaseIterable, Identifiable {
         switch self {
         case .thumbnails: return "Thumbnails"
         case .outline: return "Outline"
-        case .annotations: return "Annotations"
+        case .annotations: return "Notes"
         case .search: return "Search"
         }
     }
@@ -101,7 +101,7 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
     case aiChat
     case metadata
     case translation
-    case quizCards = "flashcards"
+    case studio = "flashcards"
 
     var id: String { rawValue }
 
@@ -110,7 +110,7 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
         case .metadata: return "list.bullet.rectangle.portrait"
         case .aiChat: return "bubble.left.and.bubble.right"
         case .translation: return "translate"
-        case .quizCards: return "rectangle.on.rectangle.angled"
+        case .studio: return "wand.and.stars"
         }
     }
 
@@ -119,7 +119,7 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
         case .metadata: return "Metadata"
         case .aiChat: return "AI Chat"
         case .translation: return "Translation"
-        case .quizCards: return "Quiz Cards"
+        case .studio: return "Studio"
         }
     }
 }

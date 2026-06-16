@@ -405,6 +405,28 @@ extension CatalogDatabase {
             )
         }
 
+        // MARK: v15 — AI Studio artifacts
+        //
+        // Item-scoped generated artifacts (quiz, mind map, deck, audio). Replaces
+        // the chat-native quiz model: cards are no longer buried in chat turns but
+        // are first-class rows here, with a renderable `body` and generation params.
+
+        migrator.registerMigration("v15-studio-artifacts") { db in
+            try db.create(table: "studio_artifacts") { t in
+                t.column("id", .text).primaryKey()
+                t.column("user_id", .text).notNull()
+                t.column("item_id", .text).notNull().references("items", onDelete: .cascade)
+                t.column("kind", .text).notNull()
+                t.column("title", .text).notNull().defaults(to: "")
+                t.column("body", .text).notNull().defaults(to: "")
+                t.column("params_json", .text).notNull().defaults(to: "{}")
+                t.column("asset_path", .text)
+                t.column("created_at", .text).notNull()
+                t.column("updated_at", .text).notNull()
+            }
+            try db.create(index: "idx_studio_artifacts_item_id", on: "studio_artifacts", columns: ["item_id"])
+        }
+
         return migrator
     }
 

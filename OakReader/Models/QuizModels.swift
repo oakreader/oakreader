@@ -99,10 +99,121 @@ enum QuizContent: Codable, Hashable {
 
 // MARK: - Quiz Deck (grouped cards for carousel display)
 
-/// A group of quiz cards wrapped in a `<deck>` tag, displayed as a navigable
-/// carousel in the chat. Cards live in the chat history that produced them.
+/// A group of quiz cards, displayed as a navigable carousel.
 struct QuizDeck: Identifiable, Hashable {
     let id = UUID()
     let title: String
     let cards: [QuizContent]
+}
+
+// MARK: - Card Codec
+
+/// Encode/decode quiz cards stored as JSON. A Studio quiz artifact's body is a
+/// `{ "title": ..., "cards": [{type,data}, …] }` object; this is the single
+/// place that bridges that JSON and the `QuizDeck`/`QuizContent` model.
+enum QuizCardCodec {
+    /// Decode a deck from a `{ "title", "cards":[…] }` JSON object string.
+    /// Cards that fail to decode are skipped; returns nil if none survive.
+    static func deck(fromJSON json: String) -> QuizDeck? {
+        guard let data = json.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let cardsArray = obj["cards"] as? [Any]
+        else { return nil }
+        let cards = decodeCards(cardsArray)
+        guard !cards.isEmpty else { return nil }
+        return QuizDeck(title: obj["title"] as? String ?? "", cards: cards)
+    }
+
+    /// Decode an array of `{type,data}` JSON values into cards, skipping failures.
+    static func decodeCards(_ values: [Any]) -> [QuizContent] {
+        values.compactMap { element in
+            guard let d = try? JSONSerialization.data(withJSONObject: element) else { return nil }
+            return try? JSONDecoder().decode(QuizContent.self, from: d)
+        }
+    }
+
+    /// Extract the complete card objects from a still-streaming raw JSON buffer
+    /// (e.g. `{"title":"…","cards":[{…},{…},{…`). Finds the `cards` array and
+    /// pulls each balanced `{…}` object via brace counting (ignoring braces
+    /// inside strings), skipping a trailing half-written one — so a carousel can
+    /// grow card-by-card as the model streams.
+    static func cardsFromPartialJSON(_ raw: String) -> [QuizContent] {
+        guard let keyRange = raw.range(of: "\"cards\"") else { return [] }
+        let after = raw[keyRange.upperBound...]
+        guard let openBracket = after.firstIndex(of: "[") else { return [] }
+
+        let decoder = JSONDecoder()
+        var cards: [QuizContent] = []
+        var depth = 0
+        var inString = false
+        var escaped = false
+        var buf = ""
+
+        var i = after.index(after: openBracket)
+        while i < after.endIndex {
+            let c = after[i]
+            defer { i = after.index(after: i) }
+
+            if depth > 0 { buf.append(c) }
+
+            if escaped {
+                escaped = false
+            } else if c == "\\" {
+                escaped = true
+            } else if c == "\"" {
+                inString.toggle()
+            } else if !inString {
+                if c == "{" {
+                    if depth == 0 { buf = "{" }
+                    depth += 1
+                } else if c == "}" {
+                    depth -= 1
+                    if depth == 0 {
+                        if let data = buf.data(using: .utf8),
+                           let card = try? decoder.decode(QuizContent.self, from: data) {
+                            cards.append(card)
+                        }
+                        buf = ""
+                    }
+                } else if c == "]", depth == 0 {
+                    break
+                }
+            }
+        }
+        return cards
+    }
+
+    /// Best-effort extract the `"title"` string value from a (possibly partial)
+    /// JSON buffer.
+    static func titleFromJSON(_ raw: String) -> String? {
+        guard let keyRange = raw.range(of: "\"title\"") else { return nil }
+        let after = raw[keyRange.upperBound...]
+        guard let colon = after.firstIndex(of: ":") else { return nil }
+        let rest = after[after.index(after: colon)...]
+        guard let open = rest.firstIndex(of: "\"") else { return nil }
+        var value = ""
+        var escaped = false
+        var i = rest.index(after: open)
+        while i < rest.endIndex {
+            let c = rest[i]
+            if escaped { value.append(c); escaped = false }
+            else if c == "\\" { escaped = true }
+            else if c == "\"" { return value }
+            else { value.append(c) }
+            i = rest.index(after: i)
+        }
+        return nil  // closing quote not yet streamed
+    }
+
+    /// Encode a deck to the canonical `{ "title", "cards":[{type,data}] }` JSON
+    /// string used as a Studio quiz artifact's body.
+    static func bodyJSON(title: String, cards: [QuizContent]) -> String {
+        let cardsData = (try? JSONEncoder().encode(cards)) ?? Data("[]".utf8)
+        let cardsObj = (try? JSONSerialization.jsonObject(with: cardsData)) ?? []
+        let wrapper: [String: Any] = ["title": title, "cards": cardsObj]
+        guard let data = try? JSONSerialization.data(withJSONObject: wrapper),
+              let str = String(data: data, encoding: .utf8)
+        else { return "{\"title\":\"\",\"cards\":[]}" }
+        return str
+    }
 }

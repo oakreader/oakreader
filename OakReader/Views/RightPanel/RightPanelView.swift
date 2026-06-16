@@ -20,8 +20,8 @@ struct RightPanelContentView: View {
                     if Preferences.shared.isExtensionEnabled(.translation) {
                         TranslationPanelView(translationVM: viewModel.translation, voiceVM: viewModel.voice)
                     }
-                case .quizCards:
-                    ItemQuizCardsPanelView(viewModel: viewModel)
+                case .studio:
+                    StudioPanelView(viewModel: viewModel)
                 }
             }
         }

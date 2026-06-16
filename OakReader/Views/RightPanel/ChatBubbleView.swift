@@ -66,18 +66,10 @@ struct ChatBubbleView: View, Equatable {
                         )
                     }
 
-                    // Tool call cards for assistant messages. `quiz_cards` tool
-                    // calls are drawn as inline flashcard carousels; everything
-                    // else uses the generic collapsible tool-call summary.
+                    // Tool call cards for assistant messages — rendered via the
+                    // generic collapsible tool-call summary.
                     if turn.role == .assistant && !turn.toolUses.isEmpty {
-                        if !otherToolRecords.isEmpty {
-                            ToolCallGroupView(records: otherToolRecords)
-                        }
-                        ForEach(renderCardRecords) { record in
-                            if let deck = Self.decodeCardDeck(from: record) {
-                                InlineDeckView(deck: deck, onOpenCitation: onOpenCitation)
-                            }
-                        }
+                        ToolCallGroupView(records: turn.toolUses)
                     }
 
                     // Message content
@@ -188,101 +180,7 @@ struct ChatBubbleView: View, Equatable {
 
     @ViewBuilder
     private var messageBubble: some View {
-        // When assistant message is done streaming and contains quiz blocks, render segments
-        if turn.role == .assistant && !turn.isStreaming && !reveal.isAnimating && hasQuizContent {
-            quizSegmentedBubble
-        } else {
-            plainMessageBubble
-        }
-    }
-
-    /// Whether the fully revealed content contains quiz XML blocks.
-    private var hasQuizContent: Bool {
-        turn.role == .assistant && QuizXMLParser.containsQuiz(turn.content)
-    }
-
-    /// `quiz_cards` tool calls — rendered as inline flashcard carousels.
-    private var renderCardRecords: [ToolUseRecord] {
-        turn.toolUses.filter { $0.name == "quiz_cards" }
-    }
-
-    /// All other tool calls — rendered via the generic tool-call summary.
-    private var otherToolRecords: [ToolUseRecord] {
-        turn.toolUses.filter { $0.name != "quiz_cards" }
-    }
-
-    /// Decode the flashcards carried in a `quiz_cards` tool call into a
-    /// `QuizDeck` for carousel display. Cards arrive as a structured `cards`
-    /// array once the tool call completes, or as a still-streaming raw
-    /// tool-input buffer under `_partial` while the model is generating them.
-    /// In the streaming case only fully-written card objects are rendered, so
-    /// the carousel grows card-by-card.
-    private static func decodeCardDeck(from record: ToolUseRecord) -> QuizDeck? {
-        let cards: [QuizContent]
-        if let cardValues = record.input.array("cards") {
-            cards = cardValues.compactMap { QuizCardsTool.decodeCard($0) }
-        } else if let partial = record.input["_partial"] {
-            cards = cardsFromPartialJSON(partial)
-        } else {
-            return nil
-        }
-
-        guard !cards.isEmpty else { return nil }
-        return QuizDeck(
-            title: record.input["title"] ?? "",
-            cards: cards
-        )
-    }
-
-    /// Extract complete card objects from a still-streaming raw tool-input JSON
-    /// buffer (e.g. `{"title":"…","cards":[{…},{…},{…`). Finds the `cards`
-    /// array and pulls each balanced `{…}` object via brace counting (ignoring
-    /// braces inside strings), skipping a trailing half-written one — so the
-    /// carousel grows card-by-card.
-    private static func cardsFromPartialJSON(_ raw: String) -> [QuizContent] {
-        guard let keyRange = raw.range(of: "\"cards\"") else { return [] }
-        let after = raw[keyRange.upperBound...]
-        guard let openBracket = after.firstIndex(of: "[") else { return [] }
-
-        let decoder = JSONDecoder()
-        var cards: [QuizContent] = []
-        var depth = 0
-        var inString = false
-        var escaped = false
-        var buf = ""
-
-        var i = after.index(after: openBracket)
-        while i < after.endIndex {
-            let c = after[i]
-            defer { i = after.index(after: i) }
-
-            if depth > 0 { buf.append(c) }
-
-            if escaped {
-                escaped = false
-            } else if c == "\\" {
-                escaped = true
-            } else if c == "\"" {
-                inString.toggle()
-            } else if !inString {
-                if c == "{" {
-                    if depth == 0 { buf = "{" }
-                    depth += 1
-                } else if c == "}" {
-                    depth -= 1
-                    if depth == 0 {
-                        if let data = buf.data(using: .utf8),
-                           let card = try? decoder.decode(QuizContent.self, from: data) {
-                            cards.append(card)
-                        }
-                        buf = ""
-                    }
-                } else if c == "]", depth == 0 {
-                    break
-                }
-            }
-        }
-        return cards
+        plainMessageBubble
     }
 
     /// `OpenURLAction` that intercepts `oak://` citation links and delegates
@@ -481,25 +379,6 @@ struct ChatBubbleView: View, Equatable {
                 return AnyView(CitationHoverCard(citeKey: citeKey, anchor: anchor))
             }
         )
-    }
-
-    /// Renders interleaved text segments, inline quiz views, and deck carousels.
-    @ViewBuilder
-    private var quizSegmentedBubble: some View {
-        let segments = QuizXMLParser.parse(turn.content)
-        VStack(alignment: .leading, spacing: 8) {
-            ForEach(Array(segments.enumerated()), id: \.offset) { _, segment in
-                switch segment {
-                case .text(let markdown):
-                    chatMarkdown(markdown)
-                case .quiz(let content):
-                    InlineQuizView(content: content, onOpenCitation: onOpenCitation)
-                case .deck(let deck):
-                    InlineDeckView(deck: deck, onOpenCitation: onOpenCitation)
-                }
-            }
-        }
-        .assistantBubbleStyle()
     }
 
     @ViewBuilder

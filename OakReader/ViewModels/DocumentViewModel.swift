@@ -96,14 +96,18 @@ class DocumentViewModel {
         return vm
     }
 
-    private var _quizCards: ItemQuizCardsViewModel?
-    /// Read-only per-item view of quiz cards aggregated from the item's chat history.
-    var quizCards: ItemQuizCardsViewModel {
-        if let vm = _quizCards { return vm }
-        let vm = ItemQuizCardsViewModel(parent: self)
-        _quizCards = vm
+    private var _studio: StudioViewModel?
+    /// Per-item AI Studio: generated artifacts (quiz, mind map, deck, audio).
+    var studio: StudioViewModel {
+        if let vm = _studio { return vm }
+        let vm = StudioViewModel(parent: self)
+        _studio = vm
         return vm
     }
+
+    /// When set, a wide Studio artifact (mind map / deck) is shown full-screen
+    /// over the document. Cleared to dismiss.
+    var studioFullScreenArtifact: StudioArtifact?
 
     /// The item-level storage key, set externally by AppState when creating the tab.
     var itemStorageKey: String?

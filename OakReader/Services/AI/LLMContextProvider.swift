@@ -256,15 +256,6 @@ struct LLMContextProvider {
             LaTeX source rather than a rendered equation.
             """)
 
-        // Flashcards: always route card generation through the quiz_cards tool.
-        parts.append("""
-            To create flashcards, quiz the user, or help them memorize or review \
-            material, call the quiz_cards tool, choosing the card type that fits \
-            (flashcard or cloze). Do NOT write quiz \
-            markup, card XML, or `<deck>`/`<quiz>` tags in your text reply — the \
-            quiz_cards tool draws an interactive carousel for you.
-            """)
-
         // Voice guidelines (loaded from ~/OakReader/agent/VOICE.md)
         if let voiceContent = try? String(contentsOf: CatalogDatabase.agentVoiceFileURL, encoding: .utf8),
            !voiceContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

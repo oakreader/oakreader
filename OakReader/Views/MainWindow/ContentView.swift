@@ -61,6 +61,15 @@ struct ContentView: View {
                     }
                     .frame(minWidth: 300)
                     .frame(maxWidth: .infinity)
+                    // Clip the column to its laid-out bounds. The live-web
+                    // WKWebView is a heavyweight, layer-backed NSView that does
+                    // NOT respect its SwiftUI frame when the HStack shrinks this
+                    // column to make room for the right panel — it keeps drawing
+                    // at full width and, because native AppKit views always
+                    // composite above sibling SwiftUI content, bleeds over the
+                    // chat panel (making it look transparent). Clipping forces
+                    // the web view to stay inside the content column.
+                    .clipped()
                 }
                 .background(OakStyle.Colors.contentBackground)
 
@@ -86,6 +95,17 @@ struct ContentView: View {
             )
         }
         .background(Color(nsColor: .controlBackgroundColor))
+        .overlay {
+            if let artifact = viewModel.studioFullScreenArtifact {
+                StudioFullScreenView(
+                    artifact: artifact,
+                    onOutlineChanged: { outline in
+                        viewModel.studio.updateArtifactBody(artifact, outline: outline)
+                    },
+                    onClose: { viewModel.studioFullScreenArtifact = nil }
+                )
+            }
+        }
         .alert("Error", isPresented: Binding(
             get: { viewModel.state.showError },
             set: { viewModel.state.showError = $0 }

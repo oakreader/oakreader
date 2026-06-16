@@ -336,9 +336,6 @@ class ChatViewModel {
         // 3b. Oak CLI (library search, read items, list collections/tags, manage library)
         tools.append(OakCLITool())
 
-        // 3b-ii. Flashcards — render front/back cards inline as a carousel
-        tools.append(QuizCardsTool())
-
         // 3c. Memory — explicit, user-directed lane only (view/add/update/remove).
         //     Passive capture happens automatically in the background (see
         //     reflectIfDue() / MemoryReflectionService); the model is told to use
@@ -459,33 +456,10 @@ class ChatViewModel {
                             turns.append(newTurn)
                         }
 
-                    case .toolInputDelta(let id, let name, let partialJSON):
-                        // Stream the in-progress tool input so quiz cards render as
-                        // they're generated. Only materialize a provisional record
-                        // for quiz_cards (the only special inline renderer); the raw
-                        // partial JSON is parsed leniently by the card view.
-                        if name == "quiz_cards" {
-                            let targetIdx: Int
-                            if let aid = assistantTurnId,
-                               let idx = turns.lastIndex(where: { $0.id == aid }) {
-                                targetIdx = idx
-                            } else {
-                                let newTurn = Turn(role: .assistant, content: "", isStreaming: true)
-                                assistantTurnId = newTurn.id
-                                turns.append(newTurn)
-                                targetIdx = turns.count - 1
-                            }
-                            let provisional = ToolUseRecord(
-                                id: id, name: name,
-                                input: ["_partial": .string(partialJSON)],
-                                status: .executing
-                            )
-                            if let tIdx = turns[targetIdx].toolUses.firstIndex(where: { $0.id == id }) {
-                                turns[targetIdx].toolUses[tIdx] = provisional
-                            } else {
-                                turns[targetIdx].toolUses.append(provisional)
-                            }
-                        }
+                    case .toolInputDelta:
+                        // No tool renders in-progress input anymore; the completed
+                        // tool-use record is surfaced via the generic summary.
+                        break
 
                     case .toolUseStarted(let record):
                         // A tool-only iteration emits no text/thinking delta before
