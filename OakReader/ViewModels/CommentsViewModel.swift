@@ -168,6 +168,32 @@ final class CommentsViewModel {
         postChanged()
     }
 
+    /// A plain-text `NoteRef` (preview + time) for a card, for pickers / backlinks.
+    private func noteRef(_ record: AnnotationRecord) -> NoteRef {
+        let raw = record.comment ?? ""
+        // Drop images, then tags + collapse `[label](url)` links to clean text.
+        let preview = NoteTags.preview(NoteComposerBox.splitBody(raw).text)
+        return NoteRef(id: record.id, preview: preview,
+                       time: NoteTime.absolute(record.createdAt))
+    }
+
+    /// The memos the `@` reference picker can link to (every other card in this
+    /// doc), newest first, with a plain-text preview for matching/display.
+    func referenceableMemos(excluding excludeId: String?) -> [NoteRef] {
+        cards.compactMap { $0.id == excludeId ? nil : noteRef($0) }
+    }
+
+    /// Notes in this doc that reference the given card (`oak-note://<id>` in their
+    /// body) — the backlinks shown on the referenced memo. Derived in-memory from
+    /// the already-loaded cards; no relation table needed.
+    func backlinks(to id: String) -> [NoteRef] {
+        let href = NoteLink.href(id)
+        return cards.compactMap { record in
+            guard record.id != id, (record.comment ?? "").contains(href) else { return nil }
+            return noteRef(record)
+        }
+    }
+
     /// Scroll the document to a card's source and surface it.
     func jump(_ record: AnnotationRecord) {
         switch record.positionKind {

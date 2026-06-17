@@ -22,7 +22,7 @@ struct RightPanelContentView: View {
                     if Preferences.shared.isExtensionEnabled(.translation) {
                         TranslationPanelView(translationVM: viewModel.translation, voiceVM: viewModel.voice)
                     }
-                case .studio:
+                case .quiz:
                     StudioPanelView(viewModel: viewModel)
                 }
             }

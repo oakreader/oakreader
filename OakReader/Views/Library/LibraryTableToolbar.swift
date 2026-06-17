@@ -6,16 +6,11 @@ struct LibraryTableToolbar: View {
     let appState: AppState
 
     @State private var searchText = ""
-    @State private var showingAddSources = false
 
     private var store: LibraryStore { appState.libraryStore }
 
     private var statusProperty: PropertyDefinition? {
         store.properties.first { $0.name == "Status" && $0.isSystem }
-    }
-
-    private var viewModeBinding: Binding<LibraryViewMode> {
-        Binding(get: { store.viewMode }, set: { store.viewMode = $0 })
     }
 
     private let filterableTypes: [(type: ContentType, label: String)] = [
@@ -95,16 +90,19 @@ struct LibraryTableToolbar: View {
 
                 Spacer()
 
-                // List / card view-mode toggle
-                Picker("View", selection: viewModeBinding) {
+                // List / card view-mode toggle — same expanding-pill tabs as the
+                // title-bar panel tabs (active mode reveals its label).
+                HStack(spacing: 2) {
                     ForEach(LibraryViewMode.allCases) { mode in
-                        Image(systemName: mode.symbol).tag(mode)
+                        PillTabButton(
+                            systemImage: mode.symbol,
+                            label: mode.label,
+                            isActive: store.viewMode == mode
+                        ) {
+                            store.viewMode = mode
+                        }
                     }
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .fixedSize()
-                .help("Switch between list and card view")
                 .accessibilityLabel("Library view mode")
 
                 // Filter menu
@@ -159,9 +157,9 @@ struct LibraryTableToolbar: View {
                 .help("Sort Library")
                 .accessibilityLabel("Sort Library")
 
-                // Add sources button
+                // Add sources button — opens the native file picker directly
                 Button {
-                    showingAddSources = true
+                    chooseFiles()
                 } label: {
                     Image(systemName: "plus")
                         .font(.system(size: OakStyle.Font.icon))
@@ -169,17 +167,14 @@ struct LibraryTableToolbar: View {
                         .frame(width: OakStyle.Size.buttonStandard, height: OakStyle.Size.buttonStandard)
                 }
                 .buttonStyle(.borderless)
-                .help("Add Sources to Library")
-                .accessibilityLabel("Add Sources to Library")
+                .help("Add files to Library")
+                .accessibilityLabel("Add files to Library")
             }
             .padding(.horizontal, 8)
             .frame(height: 44)
 
         }
         .background(Color(nsColor: .windowBackgroundColor))
-        .sheet(isPresented: $showingAddSources) {
-            AddSourcesSheet(appState: appState)
-        }
     }
 
     @ViewBuilder
@@ -269,29 +264,47 @@ struct LibraryTableToolbar: View {
         }
     }
 
-    private func importPDFs() {
-        var contentTypes: [UTType] = [.pdf, .html]
-        if let mdType = UTType(filenameExtension: "md") {
-            contentTypes.append(mdType)
-        }
+    /// Opens the native macOS file picker and imports the chosen files (or folders)
+    /// straight into the library — same import path as drag-and-drop.
+    private func chooseFiles() {
+        var contentTypes: [UTType] = [.pdf, .html, .audio, .plainText]
+        if let mdType = UTType(filenameExtension: "md") { contentTypes.append(mdType) }
+        if let markdownType = UTType(filenameExtension: "markdown") { contentTypes.append(markdownType) }
+
         let panel = NSOpenPanel()
         panel.allowedContentTypes = contentTypes
         panel.allowsMultipleSelection = true
-        panel.message = "Select PDF, HTML, or Markdown files to add to your library"
+        panel.canChooseDirectories = true
+        panel.message = "Select files to add to your library"
+        panel.prompt = "Add"
         panel.begin { response in
             guard response == .OK else { return }
-            for url in panel.urls {
-                let ext = url.pathExtension.lowercased()
-                let item: LibraryItem?
-                if ext == "html" || ext == "htm" {
-                    item = appState.importService.importHTML(from: url)
-                } else if ext == "md" || ext == "markdown" {
-                    item = appState.importService.importMarkdown(from: url)
-                } else {
-                    item = appState.importService.importPDF(from: url)
+            importPicked(panel.urls)
+        }
+    }
+
+    private func importPicked(_ urls: [URL]) {
+        for url in urls {
+            var isDir: ObjCBool = false
+            let exists = FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir)
+            if exists, isDir.boolValue {
+                Task {
+                    let count = await store.importFolder(url, importService: appState.importService)
+                    await MainActor.run {
+                        withAnimation {
+                            appState.importNotification = "Imported \(count) item\(count == 1 ? "" : "s") from \"\(url.lastPathComponent)\""
+                        }
+                    }
                 }
-                if let item, let collection = store.selectedCollection, !collection.isSmart {
-                    store.addItem(item, to: collection)
+                continue
+            }
+            Task {
+                let item = await appState.importService.importFileAsync(from: url)
+                guard let item else { return }
+                await MainActor.run {
+                    if let collection = store.selectedCollection, !collection.isSmart {
+                        store.addItem(item, to: collection)
+                    }
                 }
             }
         }

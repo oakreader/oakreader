@@ -97,7 +97,7 @@ class DocumentViewModel {
     }
 
     private var _studio: StudioViewModel?
-    /// Per-item AI Studio: generated artifacts (quiz, mind map, deck, audio).
+    /// Per-item AI Studio: generated artifacts (quiz, concept map, deck, audio).
     var studio: StudioViewModel {
         if let vm = _studio { return vm }
         let vm = StudioViewModel(parent: self)
@@ -115,7 +115,7 @@ class DocumentViewModel {
         return vm
     }
 
-    /// When set, a wide Studio artifact (mind map / deck) is shown full-screen
+    /// When set, a wide Studio artifact (concept map / deck) is shown full-screen
     /// over the document. Cleared to dismiss.
     var studioFullScreenArtifact: StudioArtifact?
 

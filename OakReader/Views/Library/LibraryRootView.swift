@@ -91,13 +91,7 @@ struct LibraryRootView: View {
             )
 
             VStack(spacing: 0) {
-                if appState.libraryDetailTab == .chat {
-                    // Chat lives outside the item-selection branch so its
-                    // structural identity stays stable when the selection changes,
-                    // preventing AIChatView from being destroyed & recreated
-                    // (which would replay the empty-state entrance animation).
-                    AIChatView(chatVM: appState.libraryChatVM)
-                } else if store.isDuplicatesSelected {
+                if store.isDuplicatesSelected {
                     DuplicatesMergeView(appState: appState)
                 } else if let item = selectedItemInCurrentFilter {
                     LibrarySidebarPanel(item: item, appState: appState)
@@ -139,8 +133,6 @@ private struct LibraryCollectionSidebarPanel: View {
 
     var body: some View {
         switch appState.libraryDetailTab {
-        case .chat:
-            EmptyView() // Handled at detailContentPanel level for stable identity
         case .metadata:
             CollectionMetadataPanelView(appState: appState, title: contextTitle, items: items)
         case nil:

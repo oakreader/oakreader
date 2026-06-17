@@ -99,9 +99,6 @@ struct ContentView: View {
             if let artifact = viewModel.studioFullScreenArtifact {
                 StudioFullScreenView(
                     artifact: artifact,
-                    onBodyChanged: { body in
-                        viewModel.studio.updateArtifactBody(artifact, body: body)
-                    },
                     onClose: { viewModel.studioFullScreenArtifact = nil },
                     onJumpToSource: { quote, page in
                         viewModel.studio.jumpToSource(anchorText: quote, page1Based: page)

@@ -2,52 +2,19 @@ import Foundation
 
 // MARK: - Studio Artifact Kind
 
-/// The kind of artifact the AI Studio generates from a document's content.
-/// Each kind has a one-shot generator and a renderer; see `StudioGenerator`.
+/// The kind of artifact generated from a document's content. Only `quiz` remains
+/// (the concept-map / deck / audio kinds were removed — quiz cards were the one
+/// genuinely useful artifact). Kept as an enum so the store's `kind` column and
+/// the existing per-kind plumbing stay intact.
 enum StudioArtifactKind: String, Codable, CaseIterable, Identifiable {
     case quiz
-    case mindmap
-    case deck
-    case audio
 
     var id: String { rawValue }
-
-    var label: String {
-        switch self {
-        case .quiz: return "Quiz"
-        case .mindmap: return "Mind Map"
-        case .deck: return "Slide Deck"
-        case .audio: return "Audio Overview"
-        }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .quiz: return "rectangle.on.rectangle.angled"
-        case .mindmap: return "point.3.connected.trianglepath.dotted"
-        case .deck: return "play.rectangle"
-        case .audio: return "waveform"
-        }
-    }
-
+    var label: String { "Quiz" }
+    var systemImage: String { "rectangle.on.rectangle.angled" }
     /// A one-line description shown on the generator tile.
-    var blurb: String {
-        switch self {
-        case .quiz: return "Flashcards to test recall"
-        case .mindmap: return "A visual concept tree"
-        case .deck: return "Slides to present"
-        case .audio: return "A narrated overview"
-        }
-    }
-
-    /// Whether this kind is wired up yet. Tiles for unimplemented kinds render
-    /// disabled. Deck / audio land in later phases.
-    var isAvailable: Bool {
-        switch self {
-        case .quiz, .mindmap: return true
-        case .deck, .audio: return false
-        }
-    }
+    var blurb: String { "Flashcards to test recall" }
+    var isAvailable: Bool { true }
 }
 
 // MARK: - Generation Parameters
@@ -104,13 +71,8 @@ struct StudioGenerationParams: Codable, Hashable {
 
 // MARK: - Studio Artifact
 
-/// A generated, source-grounded artifact scoped to one library item.
-///
-/// `body` carries the renderable payload, by kind:
-/// - `.quiz` — a JSON object `{ "title": ..., "cards": [{type,data}, …] }`
-/// - `.mindmap` — a nested Markdown outline
-/// - `.deck` — Marp Markdown
-/// - `.audio` — the narration script (the synthesized file lives at `assetPath`)
+/// A generated, source-grounded quiz scoped to one library item. `body` is a JSON
+/// deck: `{ "title": ..., "cards": [{type,data}, …] }` (see `QuizCardCodec`).
 struct StudioArtifact: Identifiable, Hashable {
     let id: String
     let itemId: String
@@ -118,8 +80,6 @@ struct StudioArtifact: Identifiable, Hashable {
     var title: String
     /// The artifact payload, format depending on `kind`:
     /// - `.quiz`: a JSON deck (`QuizCardCodec`).
-    /// - `.mindmap`: the streamed bullet outline, or a Mind Elixir JSON object
-    ///   once the map has been hand-edited (so images / comments / math survive).
     var body: String
     var params: StudioGenerationParams
     /// Relative path under the studio assets directory (audio only).

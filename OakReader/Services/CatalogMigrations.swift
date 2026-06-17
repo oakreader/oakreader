@@ -407,7 +407,7 @@ extension CatalogDatabase {
 
         // MARK: v15 — AI Studio artifacts
         //
-        // Item-scoped generated artifacts (quiz, mind map, deck, audio). Replaces
+        // Item-scoped generated artifacts (quiz, concept map, deck, audio). Replaces
         // the chat-native quiz model: cards are no longer buried in chat turns but
         // are first-class rows here, with a renderable `body` and generation params.
 

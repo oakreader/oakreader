@@ -35,7 +35,8 @@ struct CommentsPanelView: View {
                 focusSignal: focusSignal,
                 onCaptureRegion: { viewModel.beginAreaCaptureForNote() },
                 captureURL: model.pendingCaptureURL,
-                onCaptureConsumed: { model.pendingCaptureURL = nil }
+                onCaptureConsumed: { model.pendingCaptureURL = nil },
+                memos: model.referenceableMemos(excluding: nil)
             )
             .padding(.horizontal, 12)
             .padding(.top, 12)
@@ -135,7 +136,10 @@ private struct CommentCardView: View {
     private var accent: Color { Self.color(from: record.color) }
     private var rawBody: String { record.comment ?? "" }
     private var tags: [String] { NoteTags.extract(rawBody) }
-    private var body0: String { NoteTags.strippedBody(rawBody) }
+    // Pull images out of the body so they render as native, tappable thumbnails
+    // (full-screen on click) instead of inert markdown attachments.
+    private var images: [String] { NoteComposerBox.splitBody(rawBody).images }
+    private var body0: String { NoteTags.strippedBody(NoteComposerBox.splitBody(rawBody).text) }
 
     var body: some View {
         Group {
@@ -150,7 +154,8 @@ private struct CommentCardView: View {
                         model.updateComment(id: record.id, text: md)
                         isEditing = false
                     },
-                    onCancel: { isEditing = false }
+                    onCancel: { isEditing = false },
+                    memos: model.referenceableMemos(excluding: record.id)
                 )
             } else {
                 card
@@ -184,7 +189,7 @@ private struct CommentCardView: View {
 
     private var header: some View {
         HStack {
-            Text(Self.absoluteTime(record.createdAt))
+            Text(NoteTime.absolute(record.createdAt))
                 .font(.system(size: 12))
                 .foregroundStyle(.tertiary)
             Spacer()
@@ -218,16 +223,83 @@ private struct CommentCardView: View {
             }
 
             if !body0.isEmpty {
-                StreamingMarkdownView(markdown: body0, theme: .oak(fontSize: 13))
+                StreamingMarkdownView(markdown: body0, theme: .oak(fontSize: 13), onOpenURL: openURL)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
+
+            ForEach(images, id: \.self) { cardImage($0) }
 
             if anchored, let quoted = record.text, !quoted.isEmpty {
                 sourceRow(quoted)
             }
+
+            let backlinks = model.backlinks(to: record.id)
+            if !backlinks.isEmpty {
+                backlinksSection(backlinks)
+            }
         }
         .contentShape(Rectangle())
         .onTapGesture { if anchored { model.jump(record) } }
+    }
+
+    /// flomo "关联" — the notes that reference this one. Each row jumps to the
+    /// referencing memo.
+    private func backlinksSection(_ refs: [NoteRef]) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Label(refs.count == 1 ? "1 reference" : "\(refs.count) references",
+                  systemImage: "arrow.turn.up.left")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.secondary)
+            ForEach(refs) { ref in
+                Button { model.focusCard(id: ref.id) } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "text.bubble")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.tertiary)
+                        Text(ref.preview.isEmpty ? "Untitled" : ref.preview)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        Spacer(minLength: 0)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Jump to the note that references this one")
+            }
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.primary.opacity(0.04)))
+    }
+
+    /// Handle a link tap in the card body. An `oak-note://<id>` reference jumps to
+    /// the linked memo (returning true to consume the click); other links fall
+    /// through to the default handler (open externally).
+    private func openURL(_ url: URL) -> Bool {
+        guard let id = NoteLink.id(from: url) else { return false }
+        model.focusCard(id: id)
+        return true
+    }
+
+    /// A native, tappable image thumbnail in a card — click opens it full screen.
+    @ViewBuilder
+    private func cardImage(_ urlString: String) -> some View {
+        if let url = URL(string: urlString), let img = NSImage(contentsOf: url) {
+            Image(nsImage: img)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(maxWidth: .infinity, maxHeight: 220, alignment: .leading)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.06))
+                )
+                .contentShape(Rectangle())
+                .onTapGesture { ImageLightbox.show(url: urlString) }
+                .help("Click to view full screen")
+        }
     }
 
     /// flomo "source" affordance — a circular badge (tinted with the highlight
@@ -282,15 +354,4 @@ private struct CommentCardView: View {
         return .yellow
     }
 
-    private static let isoParser = ISO8601DateFormatter()
-    private static let absFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd HH:mm"
-        return f
-    }()
-
-    static func absoluteTime(_ iso: String) -> String {
-        guard let date = isoParser.date(from: iso) else { return "" }
-        return absFormatter.string(from: date)
-    }
 }

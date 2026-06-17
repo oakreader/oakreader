@@ -69,7 +69,7 @@ targets:
           - "**/*.entitlements"
     resources:
       - path: skills
-      - path: character
+      - path: prompts
     dependencies:
       - package: OakAI
       - package: OakAgent

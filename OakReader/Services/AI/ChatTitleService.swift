@@ -3,8 +3,7 @@ import OakAgent
 
 /// Generates a short, human-readable title for a chat from its first exchange.
 ///
-/// Runs off the hot path as a single no-tools completion (mirrors
-/// `MemoryReflectionService.complete`). Fail-soft: any error returns `nil` and
+/// Runs off the hot path as a single no-tools completion. Fail-soft: any error returns `nil` and
 /// the caller keeps the existing placeholder title (truncated first message).
 struct ChatTitleService {
     /// Max characters of each side of the exchange we feed the model. The first

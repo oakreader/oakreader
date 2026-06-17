@@ -65,13 +65,14 @@ struct ProseBlockView: NSViewRepresentable {
         tv.textContainerInset = .zero
         tv.isVerticallyResizable = true
         tv.isHorizontallyResizable = false
-        // The container's wrap width is the SwiftUI-proposed width set in
-        // `sizeThatFits`, NOT the text view's frame. `widthTracksTextView` must
-        // stay false or AppKit re-derives the container width from the (often
-        // stale/too-wide) frame, so long CJK lines stop wrapping and the whole
-        // bubble balloons past a narrow chat panel. Set AFTER
-        // `isHorizontallyResizable`, whose setter can flip tracking back on.
-        container.widthTracksTextView = false
+        // Let AppKit keep the display container's wrap width synced to the text view's
+        // committed frame on every layout pass — including the moment a streamed answer
+        // settles, when nothing else re-pins it. This is the *only* thing that sets the
+        // display wrap width: `sizeThatFits` measures height through a separate, never-drawn
+        // container (see `MarkdownTextView.measuredHeight`), so a wide measurement probe can
+        // no longer leak into the rendered view and clip the settled bubble. Set AFTER
+        // `isHorizontallyResizable`, whose setter can flip tracking off.
+        container.widthTracksTextView = true
         tv.setContentHuggingPriority(.defaultHigh, for: .vertical)
         tv.delegate = context.coordinator
         return tv
@@ -116,21 +117,17 @@ struct ProseBlockView: NSViewRepresentable {
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, nsView tv: MarkdownTextView, context: Context) -> CGSize? {
-        guard let container = tv.textContainer, let lm = tv.layoutManager else { return nil }
         // Guard BOTH nil and non-finite proposals. SwiftUI probes a view's maximum
-        // width by proposing `.infinity`; if we laid the text out at infinity it would
-        // collapse to a single unwrapped line, and that natural single-line width would
-        // leak back as the view's intrinsic width — ballooning the bubble past a narrow
-        // chat panel where it gets clipped instead of wrapping. Clamp to a bounded
-        // default so the real (finite) layout proposal is what governs wrapping.
+        // width by proposing `.infinity`; measuring at infinity would collapse the text to
+        // a single unwrapped line and report that natural width back, ballooning the bubble
+        // past a narrow chat panel. Clamp to a bounded default so the real (finite) layout
+        // proposal is what governs wrapping.
         let proposed = proposal.width ?? 320
         let width = proposed.isFinite ? proposed : 320
-        // Defensive: keep tracking off so the width we set below actually governs
-        // wrapping (see makeNSView).
-        container.widthTracksTextView = false
-        container.containerSize = CGSize(width: max(width, 1), height: .greatestFiniteMagnitude)
-        lm.ensureLayout(for: container)
-        let used = lm.usedRect(for: container)
-        return CGSize(width: width, height: ceil(used.height))
+        // Measure height through the text view's *separate* measuring container, never the
+        // display container — so this measurement can't leak a wrap width into what's
+        // rendered (the display container's width is pinned to the frame by
+        // `widthTracksTextView`). This is what keeps a settled answer from clipping.
+        return CGSize(width: width, height: tv.measuredHeight(forWidth: width))
     }
 }

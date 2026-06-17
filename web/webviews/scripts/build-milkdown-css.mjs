@@ -1,7 +1,7 @@
 // Flattens Milkdown Crepe's stylesheet (src/oak-milkdown.css → its nested
 // relative + package-specifier @imports) into a single
 // ../../OakReader/Resources/Preview.bundle/js/oak-milkdown.css that the Swift host
-// inlines into the WKWebView — mirroring oak-mindmap.css.
+// inlines into the WKWebView — mirroring oak-concept.css.
 //
 // postcss-import can't resolve the `@milkdown/kit/...` package-specifier @imports
 // inside Crepe's CSS (they rely on the package's "exports" map), so we plug in a

@@ -45,7 +45,7 @@ External projects, libraries, apps, and codebases referenced during OakReader de
   - WKWebView preview with CSS/JS bundle (`DownView.bundle` → `Preview.bundle`, stripped from ~6MB to ~468KB)
   - cmark-gfm markdown-to-HTML conversion (`Markdown.swift` → `MarkdownRenderer.swift`)
   - CSS/JS for: highlight.js, KaTeX math, Lightense image zoom, Heti CJK typography
-  - Diagram support (Mermaid, PlantUML, Markmap via JS bundle)
+  - Diagram support (Mermaid, PlantUML via JS bundle)
   - TsangerJinKai02-W04 font bundled into OakReader
   - Color scheme inspiration (purple for headings, teal for links)
   - Sidebar collection UI spacing/sizing values
@@ -142,9 +142,6 @@ External projects, libraries, apps, and codebases referenced during OakReader de
 ### PlantUML
 - **URL**: https://www.plantuml.com/plantuml/svg/
 - **Role**: UML diagram rendering (server-side, requires network)
-
-### Markmap
-- **Role**: Mind map rendering from markdown (client-side with d3.js)
 
 ---
 

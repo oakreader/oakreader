@@ -53,14 +53,6 @@ enum AgentPermissionLevel: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Map legacy rawValues persisted before the rename.
-    init?(legacyRawValue: String) {
-        switch legacyRawValue {
-        case "auto": self = .full
-        case "full": self = .restricted
-        default: return nil
-        }
-    }
 }
 
 final class Preferences {
@@ -104,18 +96,10 @@ final class Preferences {
         static let agentToolsEnabled = "agentToolsEnabled"
         static let agentReadFileEnabled = "agentReadFileEnabled"
         static let agentWriteFileEnabled = "agentWriteFileEnabled"
-        static let agentRequireConfirmation = "agentRequireConfirmation"
         static let agentPermissionLevel = "agentPermissionLevel"
-        // Background memory reflection ("dreaming") — consolidates USER.md profile
-        // and per-document briefs off the hot path.
-        static let memoryReflectionEnabled = "memoryReflectionEnabled"
-        /// Optional model for the background reflection (empty = inherit research/chat model).
-        static let memoryReflectionModel = "memoryReflectionModel"
-        /// Reflect after every N settled turns of new material.
-        static let memoryReflectionFrequency = "memoryReflectionFrequency"
-        /// Optional system-prompt overrides (empty = built-in default).
-        static let memoryProfilePrompt = "memoryProfilePrompt"
-        static let memoryBriefPrompt = "memoryBriefPrompt"
+        // ChatGPT `bio`-style memory: the agent saves durable facts about the user
+        // (one global profile) and injects them into every conversation.
+        static let memoryEnabled = "memoryEnabled"
         // Thinking budget
         static let thinkingBudget = "thinkingBudget"
         static let thinkingEffort = "thinkingEffort"
@@ -152,7 +136,6 @@ final class Preferences {
 
     private init() {
         registerDefaults()
-        migrateAgentPermissionLevel()
     }
 
     private func registerDefaults() {
@@ -176,7 +159,6 @@ final class Preferences {
             Keys.agentToolsEnabled: true,
             Keys.agentReadFileEnabled: true,
             Keys.agentWriteFileEnabled: true,
-            Keys.agentRequireConfirmation: true,
             Keys.agentPermissionLevel: AgentPermissionLevel.smart.rawValue,
             Keys.thinkingBudget: 10000,
             Keys.appearanceMode: "system",
@@ -357,41 +339,14 @@ final class Preferences {
         set { defaults.set(newValue, forKey: Keys.researchModel) }
     }
 
-    // MARK: - Background Memory Reflection ("dreaming")
+    // MARK: - Memory
 
-    /// Whether the agent consolidates the profile + per-document brief in the
-    /// background after a conversation settles. Defaults to ON.
-    var memoryReflectionEnabled: Bool {
-        get { defaults.object(forKey: Keys.memoryReflectionEnabled) as? Bool ?? true }
-        set { defaults.set(newValue, forKey: Keys.memoryReflectionEnabled) }
-    }
-
-    /// Optional model id for the background reflection. Empty = inherit the
-    /// research model (which itself falls back to the chat model).
-    var memoryReflectionModel: String {
-        get { defaults.string(forKey: Keys.memoryReflectionModel) ?? "" }
-        set { defaults.set(newValue, forKey: Keys.memoryReflectionModel) }
-    }
-
-    /// Reflect after every N settled turns of new material (clamped 2…20).
-    var memoryReflectionFrequency: Int {
-        get {
-            let value = defaults.integer(forKey: Keys.memoryReflectionFrequency)
-            return value > 0 ? min(max(value, 2), 20) : 4
-        }
-        set { defaults.set(min(max(newValue, 2), 20), forKey: Keys.memoryReflectionFrequency) }
-    }
-
-    /// System-prompt override for profile consolidation. Empty = built-in default.
-    var memoryProfilePrompt: String {
-        get { defaults.string(forKey: Keys.memoryProfilePrompt) ?? "" }
-        set { defaults.set(newValue, forKey: Keys.memoryProfilePrompt) }
-    }
-
-    /// System-prompt override for the per-document brief. Empty = built-in default.
-    var memoryBriefPrompt: String {
-        get { defaults.string(forKey: Keys.memoryBriefPrompt) ?? "" }
-        set { defaults.set(newValue, forKey: Keys.memoryBriefPrompt) }
+    /// Whether the agent remembers durable facts about the user across
+    /// conversations (saved via the `manage_memory` tool, injected into every
+    /// chat). Defaults to ON. When off, the tool and profile are not present.
+    var memoryEnabled: Bool {
+        get { defaults.object(forKey: Keys.memoryEnabled) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: Keys.memoryEnabled) }
     }
 
     // MARK: - Translation Preferences
@@ -438,17 +393,10 @@ final class Preferences {
         set { defaults.set(newValue, forKey: Keys.agentWriteFileEnabled) }
     }
 
-    var agentRequireConfirmation: Bool {
-        get { defaults.bool(forKey: Keys.agentRequireConfirmation) }
-        set { defaults.set(newValue, forKey: Keys.agentRequireConfirmation) }
-    }
-
     var agentPermissionLevel: AgentPermissionLevel {
         get {
             let raw = defaults.string(forKey: Keys.agentPermissionLevel) ?? ""
-            return AgentPermissionLevel(rawValue: raw)
-                ?? AgentPermissionLevel(legacyRawValue: raw)
-                ?? .smart
+            return AgentPermissionLevel(rawValue: raw) ?? .smart
         }
         set { defaults.set(newValue.rawValue, forKey: Keys.agentPermissionLevel) }
     }
@@ -467,18 +415,6 @@ final class Preferences {
     var thinkingEffort: String {
         get { defaults.string(forKey: Keys.thinkingEffort) ?? "high" }
         set { defaults.set(newValue, forKey: Keys.thinkingEffort) }
-    }
-
-    /// Migrate old binary `agentRequireConfirmation` → 3-level permission.
-    private func migrateAgentPermissionLevel() {
-        let migrationKey = "agentPermissionLevelMigrated"
-        guard !defaults.bool(forKey: migrationKey) else { return }
-        defaults.set(true, forKey: migrationKey)
-
-        // Only migrate if the old key was explicitly set
-        guard defaults.object(forKey: Keys.agentRequireConfirmation) != nil else { return }
-        let oldValue = defaults.bool(forKey: Keys.agentRequireConfirmation)
-        agentPermissionLevel = oldValue ? .restricted : .full
     }
 
     // MARK: - Voice AI Preferences

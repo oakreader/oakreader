@@ -8,7 +8,7 @@ import terser from "@rollup/plugin-terser";
 // (OakReader/Resources/Preview.bundle/js/oak-milkdown.js). Exposes
 // window.oakMilkdown.{init,getMarkdown,setMarkdown,clear,focus,cmd,insertImage}.
 // Crepe's stylesheet is built separately into oak-milkdown.css (see the
-// build:milkdown script) and inlined by the Swift host, mirroring oak-mindmap.
+// build:milkdown script) and inlined by the Swift host, mirroring oak-concept.
 export default [
   {
     input: "src/oak-milkdown-entry.js",

@@ -12,9 +12,13 @@ final class MilkdownComposerController {
     func focus() { eval("window.oakMilkdown&&window.oakMilkdown.focus()") }
     func clear() { eval("window.oakMilkdown&&window.oakMilkdown.clear()") }
 
-    func insertImage(_ url: String) {
-        eval("window.oakMilkdown&&window.oakMilkdown.insertImage(\(MilkdownComposerView.jsString(url)))")
+    /// Insert a memo reference (link) at the caret, consuming a typed `@` trigger.
+    func insertReference(label: String, href: String) {
+        eval("window.oakMilkdown&&window.oakMilkdown.insertReference(\(MilkdownComposerView.jsString(label)),\(MilkdownComposerView.jsString(href)))")
     }
+
+    /// Open the `@` memo picker from the toolbar button (reports the caret coords).
+    func requestMention() { eval("window.oakMilkdown&&window.oakMilkdown.requestMention()") }
 
     func getMarkdown(_ completion: @escaping (String) -> Void) {
         guard let webView else { completion(""); return }
@@ -31,7 +35,7 @@ final class MilkdownComposerController {
 /// host. Seeds `initialMarkdown` after load; reports content height (for native
 /// auto-grow), emptiness + char count, and ⌘↩ submit back through the
 /// `oakMilkdown` message handler. Modeled on the (removed) MilkdownEditorView and
-/// the Mind Elixir / cite-anchor `Preview.bundle` hosts.
+/// the concept-map / cite-anchor `Preview.bundle` hosts.
 struct MilkdownComposerView: NSViewRepresentable {
     let initialMarkdown: String
     let controller: MilkdownComposerController
@@ -41,6 +45,10 @@ struct MilkdownComposerView: NSViewRepresentable {
     var minHeight: CGFloat = 44
     var maxHeight: CGFloat = 220
     var onSubmit: () -> Void = {}
+    /// The user typed `@` (or hit the button) — open the memo-reference picker,
+    /// anchored at the given caret point in the editor's coordinate space (nil if
+    /// coords were unavailable).
+    var onMention: (CGPoint?) -> Void = { _ in }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -91,6 +99,12 @@ struct MilkdownComposerView: NSViewRepresentable {
                 }
             case "submit":
                 parent.onSubmit()
+            case "mention":
+                if let left = body["left"] as? NSNumber, let bottom = body["bottom"] as? NSNumber {
+                    parent.onMention(CGPoint(x: left.doubleValue, y: bottom.doubleValue))
+                } else {
+                    parent.onMention(nil)
+                }
             default:
                 break
             }
@@ -112,6 +126,16 @@ struct MilkdownComposerView: NSViewRepresentable {
         return src
     }
 
+    /// The app accent as a CSS hex, so the in-editor `#tag` color tracks
+    /// `Color.accentColor` (matching the card's `NoteTagChip`).
+    private static var accentHex: String {
+        let c = NSColor.controlAccentColor.usingColorSpace(.sRGB) ?? .systemBlue
+        return String(format: "#%02X%02X%02X",
+                      Int(round(c.redComponent * 255)),
+                      Int(round(c.greenComponent * 255)),
+                      Int(round(c.blueComponent * 255)))
+    }
+
     private static let html: String = {
         let css = bundleFile("oak-milkdown.css")
         let js = bundleFile("oak-milkdown.js")
@@ -120,12 +144,23 @@ struct MilkdownComposerView: NSViewRepresentable {
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <style>\(css)</style>
         <style>
-          html,body{margin:0;padding:0;height:100%;background:transparent;}
-          #editor{height:100%;overflow:hidden;}
+          /* Content-driven height: the page grows to its content and the native
+             frame follows (see reportHeight). Pinning #editor to height:100%
+             would tie the measured height to the frame, ratcheting it up and
+             pinning the layout (first line jumps on a newline). */
+          html,body{margin:0;padding:0;background:transparent;}
+          /* Fade in after the first paint so the editor doesn't flash/resize
+             visibly when the Notes tab appears. */
+          body{opacity:0;transition:opacity .12s ease-out;}
+          body.ready{opacity:1;}
+          #editor{overflow:hidden;}
           /* Strip Crepe's frame card (the SwiftUI card already provides it). */
           .milkdown{background:transparent;box-shadow:none;border:none;}
           .milkdown .ProseMirror{padding:2px 2px 0;font-size:14px;line-height:1.5;}
           .milkdown .ProseMirror p{margin:0 0 4px;}
+          /* Inline #tag highlight (flomo-style) — accent text, no box, so it reads
+             as a tag while staying natural to edit. Matches the card's tag chip. */
+          .milkdown .ProseMirror .oak-tag{color:\(accentHex);font-weight:500;}
         </style>
         </head><body><div id="editor"></div>
         <script>\(js)</script>

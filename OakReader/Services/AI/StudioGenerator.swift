@@ -42,14 +42,28 @@ private struct SourceChunk {
 /// streaming pattern in `TranslationViewModel`: resolve the user's configured
 /// provider, send a single system+user prompt, accumulate the streamed text.
 ///
-/// Each kind has its own method. Phase 1 ships `generateQuiz`; mind map / deck /
-/// audio land in later phases.
+/// Each kind has its own method. Phase 1 ships `generateQuiz` and the concept
+/// map; deck / audio land in later phases.
 struct StudioGenerator {
     /// Page text budget per generation call. Large docs are split into several
     /// chunks of roughly this size so the whole document is covered (not just
     /// the first ~10 pages) and each chunk's cards cite pages within its range.
     private static let chunkCharLimit = 7_000
     private let router = ProviderRouter()
+
+    // MARK: - Built-in personas (the source of truth)
+
+    /// The Studio quiz generator's persona. This constant is the real, default prompt — a
+    /// user can override it at `~/OakReader/prompts/quiz.md` (see ``StudioPromptStore``), but
+    /// nothing is bundled, so by default this is what runs. `{{difficulty}}` / `{{count}}`
+    /// are substituted at call time.
+    private static let defaultQuizPersona = """
+        You are an expert educator creating study FLASHCARDS from a document. \
+        Target this cognitive level: {{difficulty}}. \
+        Generate about {{count}} flashcards covering the most important material in the \
+        text provided. Ground every card strictly in the text — never invent facts, \
+        names, or numbers that aren't supported by it.
+        """
 
     enum GeneratorError: LocalizedError {
         case provider(String)
@@ -222,13 +236,13 @@ struct StudioGenerator {
             ? "Include a short \"title\" for the whole deck. "
             : "Set \"title\" to an empty string. "
 
-        let system = """
-            You are an expert educator creating study FLASHCARDS from a document. \
-            Target this cognitive level: \(params.difficulty.promptPhrase). \
-            Generate about \(count) flashcards covering the most important material in the \
-            text provided. Ground every card strictly in the text — never invent facts, \
-            names, or numbers that aren't supported by it.
+        // Persona (editable, from prompts/quiz.md) + format contract (fixed, owned here so
+        // a user edit can never break QuizCardCodec's JSON parsing).
+        let persona = (StudioPromptStore.persona(for: .quiz) ?? Self.defaultQuizPersona)
+            .replacingOccurrences(of: "{{difficulty}}", with: params.difficulty.promptPhrase)
+            .replacingOccurrences(of: "{{count}}", with: String(count))
 
+        let envelope = """
             \(citeRule)
 
             Respond with ONLY a single JSON object — no prose, no explanation, no code \
@@ -241,6 +255,8 @@ struct StudioGenerator {
             Use ONLY the "flashcard" type. front and back are Markdown. Put one clear \
             question on the front and a concise, complete answer on the back.
             """
+
+        let system = persona + "\n\n" + envelope
 
         var user = "Document title: \(documentTitle)\n"
         if chunk.pageStart > 0 {
@@ -258,154 +274,6 @@ struct StudioGenerator {
         return (system, user)
     }
 
-    // MARK: - Mind Map
-
-    /// Stream a mind map grounded in `sourceText`, as an indented bullet outline
-    /// (Mind Elixir's plaintext format: one top-level bullet = the central topic,
-    /// two-space nesting for branches). Yields the accumulating outline per line
-    /// so the map fills in live, ending with the final outline.
-    func streamMindmap(
-        sourceText: String,
-        documentTitle: String,
-        params: StudioGenerationParams
-    ) -> AsyncThrowingStream<String, Error> {
-        AsyncThrowingStream { continuation in
-            let task = Task {
-                do {
-                    let prefs = Preferences.shared
-                    let providerId = prefs.aiProviderId
-                    let model = prefs.aiModel.isEmpty
-                        ? (ProviderRegistry.shared.provider(for: providerId)?.defaultModelId ?? "")
-                        : prefs.aiModel
-                    let config = ProviderConfig(providerId: providerId, model: model)
-                    let (system, user) = Self.mindmapPrompts(
-                        sourceText: sourceText, documentTitle: documentTitle, params: params
-                    )
-
-                    let svc = try await router.provider(for: config)
-                    let stream = svc.sendMessage(
-                        messages: [LLMMessage(role: .user, text: user)],
-                        model: model,
-                        systemPrompt: system,
-                        maxTokens: 2048
-                    )
-
-                    var raw = ""
-                    var lastLines = -1
-                    for try await chunk in stream {
-                        switch chunk {
-                        case .delta(let delta):
-                            raw += delta
-                            // Yield once per completed line (≈ one node) to keep
-                            // the live re-render cadence sane.
-                            let lines = raw.reduce(0) { $0 + ($1 == "\n" ? 1 : 0) }
-                            if lines > lastLines {
-                                lastLines = lines
-                                continuation.yield(Self.stripCodeFences(raw))
-                            }
-                        case .error(let message):
-                            throw GeneratorError.provider(message)
-                        case .thinking, .toolUse, .toolInputDelta, .finished:
-                            break
-                        }
-                    }
-
-                    let final = Self.stripCodeFences(raw).trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !final.isEmpty else { throw GeneratorError.emptyResult }
-                    continuation.yield(final)
-                    continuation.finish()
-                } catch {
-                    continuation.finish(throwing: error)
-                }
-            }
-            continuation.onTermination = { _ in task.cancel() }
-        }
-    }
-
-    private static func mindmapPrompts(
-        sourceText: String,
-        documentTitle: String,
-        params: StudioGenerationParams
-    ) -> (system: String, user: String) {
-        let detail: String
-        switch params.amount {
-        case .fewer: detail = "Keep it high-level: main themes and their key points only."
-        case .standard: detail = "Balance breadth and depth across the document."
-        case .more: detail = "Be thorough: include sub-points and supporting details."
-        }
-
-        let system = """
-            You are an expert at distilling a document into a MIND MAP for a reader who \
-            wants to actually understand it — not a table of contents. \(detail) Ground \
-            every node strictly in the document; never invent content.
-
-            STRUCTURE: organize around the document's central topic, its key claims, and \
-            the evidence, examples, or caveats that support each claim — the load-bearing \
-            ideas, not a chapter list.
-
-            NODES: each node is a short phrase (a few words) carrying a SPECIFIC, concrete \
-            point — a name, number, term, finding, or claim. Never use vague bucket labels \
-            like "Background", "Overview", "Details", or "Issues" on their own; say what \
-            the point actually is. When a point is inherently mathematical, you may write \
-            inline LaTeX between single dollar signs (e.g. $E=mc^2$); it renders as math.
-
-            SOURCE ANCHORS: for every LEAF node (one with no children), append the exact \
-            passage it comes from, copied VERBATIM from the source, wrapped in ⟪ ⟫ — 4 to \
-            15 words, enough to locate it in the document. Do NOT anchor branch nodes that \
-            have children.
-
-            Respond with ONLY the outline — no prose, no code fences, no '#' headings. \
-            Use EXACTLY ONE top-level bullet for the central topic, then nest branches and \
-            sub-branches with two-space indentation:
-            - <central topic>
-              - <key claim or theme>
-                - <specific point> ⟪verbatim source quote⟫
-                - <specific point> ⟪verbatim source quote⟫
-              - <key claim or theme>
-                - <specific point> ⟪verbatim source quote⟫
-            """
-
-        var user = "Document title: \(documentTitle)\n\n"
-        let custom = params.customPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !custom.isEmpty { user += "Additional focus from the user: \(custom)\n\n" }
-        user += "Source content:\n\n\(sourceText)"
-        return (system, user)
-    }
-
-    // MARK: - Core one-shot call
-
-    /// Send a single system+user prompt to the user's configured chat provider
-    /// and return the fully-accumulated text response.
-    private func complete(system: String, user: String, maxTokens: Int) async throws -> String {
-        let prefs = Preferences.shared
-        let providerId = prefs.aiProviderId
-        let model = prefs.aiModel.isEmpty
-            ? (ProviderRegistry.shared.provider(for: providerId)?.defaultModelId ?? "")
-            : prefs.aiModel
-        let config = ProviderConfig(providerId: providerId, model: model)
-
-        let svc = try await router.provider(for: config)
-        let stream = svc.sendMessage(
-            messages: [LLMMessage(role: .user, text: user)],
-            model: model,
-            systemPrompt: system,
-            maxTokens: maxTokens
-        )
-
-        var response = ""
-        for try await chunk in stream {
-            switch chunk {
-            case .delta(let delta):
-                response += delta
-            case .error(let message):
-                throw GeneratorError.provider(message)
-            case .thinking, .toolUse, .toolInputDelta, .finished:
-                break
-            }
-        }
-        return response
-    }
-
     // MARK: - Response cleanup
 
     /// Pull the first complete JSON object out of a model response, tolerating
@@ -421,54 +289,5 @@ struct StudioGenerator {
             return nil
         }
         return String(s[start...end])
-    }
-
-    /// Strip surrounding ```/```markdown code fences from a model response.
-    static func stripCodeFences(_ text: String) -> String {
-        var lines = text.components(separatedBy: "\n")
-        if let first = lines.first, first.trimmingCharacters(in: .whitespaces).hasPrefix("```") {
-            lines.removeFirst()
-        }
-        if let last = lines.last, last.trimmingCharacters(in: .whitespaces).hasPrefix("```") {
-            lines.removeLast()
-        }
-        return lines.joined(separator: "\n")
-    }
-
-    /// The central topic of a mind-map body, whichever format it's in: a Mind
-    /// Elixir JSON object (`{ "nodeData": { "topic": … } }`, once the map has been
-    /// hand-edited) or the streamed bullet outline. Falls back to `nil`.
-    static func titleFromBody(_ body: String) -> String? {
-        let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.hasPrefix("{") {
-            if let data = trimmed.data(using: .utf8),
-               let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let nodeData = root["nodeData"] as? [String: Any],
-               let topic = nodeData["topic"] as? String {
-                let title = stripAnchor(topic)
-                return title.isEmpty ? nil : title
-            }
-            return nil
-        }
-        return titleFromOutline(trimmed)
-    }
-
-    /// The central topic of an outline — the first `# Heading` or the first
-    /// top-level `-`/`*` bullet.
-    static func titleFromOutline(_ outline: String) -> String? {
-        for line in outline.components(separatedBy: "\n") {
-            let t = line.trimmingCharacters(in: .whitespaces)
-            if t.hasPrefix("# ") { return stripAnchor(String(t.dropFirst(2))) }
-            if t.hasPrefix("- ") || t.hasPrefix("* ") { return stripAnchor(String(t.dropFirst(2))) }
-        }
-        return nil
-    }
-
-    /// Strip a trailing `⟪…⟫` source anchor (and surrounding whitespace) off a node label.
-    static func stripAnchor(_ s: String) -> String {
-        guard let open = s.firstIndex(of: "⟪") else {
-            return s.trimmingCharacters(in: .whitespaces)
-        }
-        return String(s[..<open]).trimmingCharacters(in: .whitespaces)
     }
 }

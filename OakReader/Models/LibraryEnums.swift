@@ -34,11 +34,19 @@ enum LibraryViewMode: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    /// SF Symbol for the segmented toggle.
+    /// SF Symbol for the view-mode toggle.
     var symbol: String {
         switch self {
         case .list: return "list.bullet"
         case .card: return "square.grid.2x2"
+        }
+    }
+
+    /// Text label revealed when this mode is active in the pill toggle.
+    var label: String {
+        switch self {
+        case .list: return "List"
+        case .card: return "Cards"
         }
     }
 }

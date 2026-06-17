@@ -135,24 +135,6 @@ final class MarkdownTextView: NSTextView {
     /// Dwell before the preview appears — long enough to ignore a cursor passing through.
     private let hoverDelay: TimeInterval = 0.35
 
-    /// Pin the text container's wrap width to the committed frame on every layout pass.
-    ///
-    /// `widthTracksTextView` is off (so AppKit doesn't re-derive the container width from a
-    /// transiently-wide frame), which means the container width is otherwise only set as a
-    /// side effect of `ProseBlockView.sizeThatFits`. SwiftUI probes `sizeThatFits` with
-    /// several candidate widths during layout negotiation, and a probe *wider* than the final
-    /// frame can fire last — leaving the container wider than the view. Long lines then wrap
-    /// past the frame and get clipped at the panel edge. `layout()` runs after SwiftUI commits
-    /// the real frame, so syncing here guarantees wrapping matches what's actually drawn.
-    override func layout() {
-        super.layout()
-        guard let container = textContainer else { return }
-        let target = bounds.width
-        if target > 0, abs(container.size.width - target) > 0.5 {
-            container.size = NSSize(width: target, height: container.size.height)
-        }
-    }
-
     override func resignFirstResponder() -> Bool {
         let resigned = super.resignFirstResponder()
         if resigned {
@@ -164,6 +146,43 @@ final class MarkdownTextView: NSTextView {
     deinit {
         hoverTimer?.invalidate()
         hoverPopover?.close()
+    }
+
+    // MARK: - Sizing
+
+    /// SwiftUI drives this view's size through `ProseBlockView.sizeThatFits`. Report no
+    /// intrinsic size so AppKit's *natural* (unwrapped, single-line) text width can never
+    /// leak back as the view's own width — which would balloon the bubble past a narrow
+    /// chat panel and clip the text. The height likewise comes from `sizeThatFits`.
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: NSView.noIntrinsicMetric, height: NSView.noIntrinsicMetric)
+    }
+
+    /// A second layout stack that shares the display stack's `NSTextStorage` but is never
+    /// drawn. `sizeThatFits` measures height through THIS container so it never mutates the
+    /// *display* container's wrap width. That decouples measurement from display: a wide
+    /// measurement probe can no longer leak into the rendered view and stick after a
+    /// streamed answer settles (the "settle-clip" bug). The display container's width is
+    /// governed solely by `widthTracksTextView`, which pins it to the committed frame.
+    ///
+    /// Layout is lazy, so the secondary stack only does work when `measuredHeight` runs —
+    /// text edits merely invalidate it; they don't force a redundant relayout.
+    private lazy var measuringContainer: NSTextContainer = {
+        let container = NSTextContainer(size: CGSize(width: CGFloat(0), height: .greatestFiniteMagnitude))
+        container.lineFragmentPadding = 0
+        let lm = NSLayoutManager()
+        lm.addTextContainer(container)
+        textStorage?.addLayoutManager(lm)
+        return container
+    }()
+
+    /// Height the text needs when wrapped at `width`, measured without touching the display
+    /// container (so a probe width can never become the rendered wrap width).
+    func measuredHeight(forWidth width: CGFloat) -> CGFloat {
+        guard let lm = measuringContainer.layoutManager else { return 0 }
+        measuringContainer.size = CGSize(width: max(width, 1), height: .greatestFiniteMagnitude)
+        lm.ensureLayout(for: measuringContainer)
+        return ceil(lm.usedRect(for: measuringContainer).height)
     }
 
     // MARK: - Link hover preview

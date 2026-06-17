@@ -138,18 +138,37 @@ public struct AnthropicProvider: LLMProviderService {
             }
         }
 
-        if let system = systemPrompt {
-            body["system"] = system
+        // Prompt caching. Anthropic caches the request prefix in the order
+        // tools → system → messages, up to each `cache_control` breakpoint, and
+        // reads it back at ~10% of the input cost on the next turn (5-min TTL).
+        // We place a breakpoint on the (stable) tools block, on the system
+        // prompt, and on the last message (below) so a multi-turn chat — and
+        // especially a tool-result-heavy agent loop — reuses the bulk of its
+        // input instead of re-billing it every turn. Breakpoints are ignored
+        // for free when the prefix is below the cache minimum, so this is safe
+        // for short prompts. Anthropic-only; no other provider is affected.
+
+        if let system = systemPrompt, !system.isEmpty {
+            body["system"] = [
+                [
+                    "type": "text",
+                    "text": system,
+                    "cache_control": ["type": "ephemeral"],
+                ] as [String: Any]
+            ]
         }
 
         if let tools, !tools.isEmpty {
-            body["tools"] = tools.map { tool in
+            var toolBlocks: [[String: Any]] = tools.map { tool in
                 [
                     "name": tool.name,
                     "description": tool.description,
                     "input_schema": tool.inputSchema,
                 ] as [String: Any]
             }
+            // A breakpoint on the final tool caches the whole tools prefix.
+            toolBlocks[toolBlocks.count - 1]["cache_control"] = ["type": "ephemeral"]
+            body["tools"] = toolBlocks
         }
 
         let apiMessages: [[String: Any]] = messages.compactMap { msg in
@@ -204,7 +223,25 @@ public struct AnthropicProvider: LLMProviderService {
             }
         }
 
-        body["messages"] = apiMessages
+        // Cache the conversation history: put a breakpoint on the last message's
+        // final content block. Each turn appends after it, so the prior-turn
+        // prefix (tools + system + history) is served from cache next turn. The
+        // block must be in array form for `cache_control` to attach, so coerce a
+        // plain string body into a single text block first.
+        var cachedMessages = apiMessages
+        if let lastIdx = cachedMessages.indices.last {
+            var last = cachedMessages[lastIdx]
+            if let text = last["content"] as? String {
+                last["content"] = [["type": "text", "text": text] as [String: Any]]
+            }
+            if var blocks = last["content"] as? [[String: Any]], !blocks.isEmpty {
+                blocks[blocks.count - 1]["cache_control"] = ["type": "ephemeral"]
+                last["content"] = blocks
+                cachedMessages[lastIdx] = last
+            }
+        }
+
+        body["messages"] = cachedMessages
         return body
     }
 

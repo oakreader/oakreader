@@ -99,7 +99,7 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
     case comments
     case metadata
     case translation
-    case studio = "flashcards"
+    case quiz = "flashcards"
 
     var id: String { rawValue }
 
@@ -109,7 +109,7 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
         case .aiChat: return "bubble.left.and.bubble.right"
         case .comments: return "text.bubble"
         case .translation: return "translate"
-        case .studio: return "wand.and.stars"
+        case .quiz: return "rectangle.on.rectangle.angled"
         }
     }
 
@@ -119,7 +119,7 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
         case .aiChat: return "AI Chat"
         case .comments: return "Notes"
         case .translation: return "Translation"
-        case .studio: return "Studio"
+        case .quiz: return "Quiz"
         }
     }
 }
@@ -188,21 +188,18 @@ enum MetadataInspectorTab: String, CaseIterable, Identifiable {
 }
 
 enum LibraryDetailTab: String, CaseIterable, Identifiable {
-    case chat
     case metadata
 
     var id: String { rawValue }
 
     var systemImage: String {
         switch self {
-        case .chat: return "bubble.left.and.text.bubble.right"
         case .metadata: return "list.bullet.rectangle.portrait"
         }
     }
 
     var label: String {
         switch self {
-        case .chat: return "AI Chat"
         case .metadata: return "Metadata"
         }
     }

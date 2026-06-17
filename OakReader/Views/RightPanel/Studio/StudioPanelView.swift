@@ -2,15 +2,15 @@ import SwiftUI
 
 /// AI Studio — the per-item artifact surface. A grid of one-click generators
 /// (NotebookLM-style) sits above the list of artifacts generated for this
-/// document. Quiz/Flashcards is wired up; Mind Map / Deck / Audio land later.
+/// document. Quiz/Flashcards and Concept Map are wired up; Deck / Audio land later.
 struct StudioPanelView: View {
     let viewModel: DocumentViewModel
 
     private var model: StudioViewModel { viewModel.studio }
     @State private var sheetKind: StudioArtifactKind?
 
-    /// The mind-map's amber anchor color — the panel's single accent, so the
-    /// native chrome and the WKWebView map read as one surface.
+    /// The amber source-anchor color — the panel's single accent, so the native
+    /// chrome and the embedded WKWebView surfaces read as one.
     static let accent = Color(hex: "C77A2E")
 
     /// A consistent "Generating…" banner — faint amber wash, quiet medium type.
@@ -73,17 +73,6 @@ struct StudioPanelView: View {
                                 model.jumpToSource(anchorText: quote, page1Based: page)
                             })
                         }
-                    }
-                }
-
-                // The mind map currently streaming in — re-renders live.
-                if let outline = model.streamingMindmapOutline {
-                    VStack(alignment: .leading, spacing: 10) {
-                        streamingHeader("Generating mind map…")
-                        StudioWebView(outline: outline, onNodeClick: { model.jumpToSource(anchorText: $0) })
-                            .frame(height: 420)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(OakStyle.Colors.diaHairline, lineWidth: 1))
                     }
                 }
 
@@ -181,16 +170,6 @@ struct StudioPanelView: View {
                 } else {
                     unavailableBody
                 }
-            case .mindmap:
-                // Read-only preview: pan/zoom to explore, click a leaf to jump to
-                // source. Editing happens in the roomy full-screen editor.
-                StudioWebView(outline: artifact.body, onNodeClick: { model.jumpToSource(anchorText: $0) })
-                    .frame(height: 320)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(OakStyle.Colors.diaHairline, lineWidth: 1))
-                    .overlay(alignment: .topTrailing) { expandButton(artifact) }
-            case .deck, .audio:
-                unavailableBody
             }
         }
         .contextMenu {
@@ -203,7 +182,7 @@ struct StudioPanelView: View {
     }
 
     /// The shared "open full-screen" affordance, floated top-trailing over an
-    /// artifact's preview (mind map / deck).
+    /// artifact's preview (concept map / quiz).
     private func expandButton(_ artifact: StudioArtifact) -> some View {
         Button {
             viewModel.studioFullScreenArtifact = artifact
