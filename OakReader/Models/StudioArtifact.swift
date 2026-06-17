@@ -62,9 +62,25 @@ struct StudioGenerationParams: Codable, Hashable {
         }
     }
 
+    /// An inclusive, 1-based span of PDF pages to scope generation to. `nil` (the
+    /// default) means the whole document. Only meaningful for paginated sources.
+    struct PageRange: Codable, Hashable {
+        var start: Int
+        var end: Int
+        /// Clamped to `[1, max]` with `start ≤ end`.
+        func clamped(to max: Int) -> PageRange {
+            let hi = Swift.max(1, max)
+            let lo = Swift.min(Swift.max(1, start), hi)
+            let up = Swift.min(Swift.max(1, end), hi)
+            return PageRange(start: Swift.min(lo, up), end: Swift.max(lo, up))
+        }
+    }
+
     var difficulty: Difficulty = .understand
     var amount: Amount = .standard
     var customPrompt: String = ""
+    /// Page scoping for PDFs; `nil` = whole document.
+    var pageRange: PageRange?
 
     static let `default` = StudioGenerationParams()
 }

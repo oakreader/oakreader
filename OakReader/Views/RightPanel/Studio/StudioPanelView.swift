@@ -36,7 +36,12 @@ struct StudioPanelView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task(id: viewModel.itemId) { await model.reload() }
         .sheet(item: $sheetKind) { kind in
-            StudioGenerateSheet(kind: kind) { params in
+            StudioGenerateSheet(
+                kind: kind,
+                isPaginated: viewModel.contentType == .pdf,
+                pageCount: viewModel.pageCount,
+                currentPage: viewModel.viewer.currentPageIndex + 1
+            ) { params in
                 model.generate(kind: kind, params: params)
             }
         }

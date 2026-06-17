@@ -63,7 +63,7 @@ final class StudioViewModel {
         case .quiz:
             // Quiz uses a paginated source so cards can cite their page and a
             // large document is chunked by page range rather than truncated.
-            let source = Self.studioSource(from: parent)
+            let source = Self.studioSource(from: parent, pageRange: params.pageRange)
             guard !source.isEmpty else {
                 errorMessage = "This document has no extractable text to generate from."
                 generatingKind = nil
@@ -173,18 +173,25 @@ final class StudioViewModel {
     /// per-page text (so cards cite pages and large docs chunk by page range);
     /// other types fall back to a single unpaginated block.
     @MainActor
-    static func studioSource(from vm: DocumentViewModel) -> StudioSource {
+    static func studioSource(
+        from vm: DocumentViewModel,
+        pageRange: StudioGenerationParams.PageRange? = nil
+    ) -> StudioSource {
         switch vm.contentType {
         case .pdf:
             guard let doc = vm.pdfDocument else { return StudioSource(pages: []) }
             // Overall safety cap so a pathologically large PDF can't blow up the
             // pipeline; chunking keeps each generation call small regardless.
             let cap = 120_000
+            let range = pageRange?.clamped(to: doc.pageCount)
             var pages: [StudioSourcePage] = []
             var total = 0
             for (index, text) in TextExtractionService().extractTextByPage(from: doc) {
+                let pageNumber = index + 1
+                // Scope to the chosen page span (when set); whole document otherwise.
+                if let range, pageNumber < range.start || pageNumber > range.end { continue }
                 if total >= cap { break }
-                pages.append(StudioSourcePage(number: index + 1, text: text))
+                pages.append(StudioSourcePage(number: pageNumber, text: text))
                 total += text.count
             }
             return StudioSource(pages: pages)
