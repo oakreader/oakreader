@@ -32,8 +32,6 @@ struct NoteComposerBox: View {
     @State private var charCount = 0
     @State private var height: CGFloat = 44
 
-    static let flomoGreen = Color(red: 0.31, green: 0.78, blue: 0.47)
-
     var body: some View {
         VStack(spacing: 8) {
             if let quote, !quote.isEmpty {
@@ -60,7 +58,7 @@ struct NoteComposerBox: View {
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .strokeBorder(
-                    mode == .edit ? Self.flomoGreen : Color.primary.opacity(0.10),
+                    mode == .edit ? Color.accentColor : OakStyle.Colors.border,
                     lineWidth: mode == .edit ? 1.5 : 1
                 )
         )
@@ -157,7 +155,7 @@ struct NoteComposerBox: View {
                     .frame(width: 40, height: 28)
                     .background(
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(isEmpty ? Color.secondary.opacity(0.3) : Self.flomoGreen)
+                            .fill(isEmpty ? OakStyle.Colors.buttonBackground : Color.accentColor)
                     )
             }
             .buttonStyle(.plain)

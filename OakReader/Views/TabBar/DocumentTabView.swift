@@ -132,11 +132,12 @@ struct DocumentTabView: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            // Title
-            Text(tab.title)
+            // Title — for web tabs this tracks the live page title across navigation
+            Text(tab.displayTitle)
                 .font(OakStyle.Font.styled(size: OakStyle.Font.body, weight: .regular))
                 .lineLimit(1)
                 .truncationMode(.middle)
+                .help(tab.displayTitle)
 
             Spacer(minLength: 0)
 
@@ -160,7 +161,7 @@ struct DocumentTabView: View {
             .buttonStyle(.plain)
             .onHover { isCloseHovering = $0 }
             .opacity(isActive || isHovering ? 1 : 0)
-            .accessibilityLabel("Close \(tab.title)")
+            .accessibilityLabel("Close \(tab.displayTitle)")
         }
         .padding(.leading, 10 + cr)
         .padding(.trailing, 10 + cr)
@@ -174,7 +175,7 @@ struct DocumentTabView: View {
         .onTapGesture { onSelect() }
         .onHover { isHovering = $0 }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Tab: \(tab.title)")
+        .accessibilityLabel("Tab: \(tab.displayTitle)")
         .accessibilityAddTraits(isActive ? .isSelected : [])
         .accessibilityHint("Double-click to switch to this tab")
     }

@@ -117,7 +117,14 @@ struct ProseBlockView: NSViewRepresentable {
 
     func sizeThatFits(_ proposal: ProposedViewSize, nsView tv: MarkdownTextView, context: Context) -> CGSize? {
         guard let container = tv.textContainer, let lm = tv.layoutManager else { return nil }
-        let width = proposal.width ?? 320
+        // Guard BOTH nil and non-finite proposals. SwiftUI probes a view's maximum
+        // width by proposing `.infinity`; if we laid the text out at infinity it would
+        // collapse to a single unwrapped line, and that natural single-line width would
+        // leak back as the view's intrinsic width — ballooning the bubble past a narrow
+        // chat panel where it gets clipped instead of wrapping. Clamp to a bounded
+        // default so the real (finite) layout proposal is what governs wrapping.
+        let proposed = proposal.width ?? 320
+        let width = proposed.isFinite ? proposed : 320
         // Defensive: keep tracking off so the width we set below actually governs
         // wrapping (see makeNSView).
         container.widthTracksTextView = false

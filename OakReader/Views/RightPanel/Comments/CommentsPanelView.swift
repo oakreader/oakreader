@@ -19,8 +19,7 @@ struct CommentsPanelView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            panelHeader("Notes", subtitle: subtitle)
-            Divider()
+            notesHeader
 
             NoteComposerBox(
                 mode: .create,
@@ -59,6 +58,21 @@ struct CommentsPanelView: View {
     private var subtitle: String {
         let n = model.cards.count
         return n == 1 ? "1 note" : "\(n) notes"
+    }
+
+    /// flomo-style title row with the count inline to the right of "Notes"
+    /// (the shared `panelHeader` stacks the subtitle below, which we don't want here).
+    private var notesHeader: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text("Notes")
+                .font(.system(size: 16, weight: .semibold))
+            Text(subtitle)
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
     }
 
     // MARK: - Stream
@@ -129,6 +143,9 @@ private struct CommentCardView: View {
                 NoteComposerBox(
                     mode: .edit,
                     initialMarkdown: record.comment ?? "",
+                    // Keep the anchored source visible while editing (read-only),
+                    // so an anchored note doesn't look like a freestanding memo.
+                    quote: anchored ? record.text : nil,
                     onSubmit: { md in
                         model.updateComment(id: record.id, text: md)
                         isEditing = false

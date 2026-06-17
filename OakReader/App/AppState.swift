@@ -36,6 +36,27 @@ final class DocumentTab: Identifiable {
         return nil
     }
 
+    /// The title shown in the tab bar. For live web tabs this tracks the page's
+    /// `<title>` (and falls back to the current host) so it stays current across
+    /// in-place navigation; other tab kinds use their stored `title`. Reading the
+    /// `@Observable` web state here means the tab bar re-renders automatically as
+    /// the page loads — no manual syncing back into `title`.
+    var displayTitle: String {
+        switch content {
+        case .web, .newTab:
+            let state = viewModel.state
+            if let pageTitle = state.pageTitle, !pageTitle.isEmpty {
+                return pageTitle
+            }
+            if let host = (state.currentURL ?? viewModel.liveURL)?.host {
+                return host
+            }
+            return title
+        default:
+            return title
+        }
+    }
+
     var isDirty: Bool {
         guard let document else { return false }
         return document.hasUnautosavedChanges || document.isDocumentEdited

@@ -10,6 +10,16 @@ final class OakWebView: WKWebView {
     // Cursor is controlled via CSS (`cursor: default` on html) so that
     // WebKit can still show pointer on links without fighting native overrides.
 
+    // Trackpad pinch. WKWebView's native `magnification` is a bitmap scale of the
+    // already-rendered page (no reflow → content overflows → horizontal scrollbar).
+    // We disable that (`allowsMagnification = false`) and route the gesture to
+    // `pageZoom` instead, which is browser-style full-page zoom: it enlarges text
+    // and reflows responsive content to the window width.
+    override func magnify(with event: NSEvent) {
+        let factor = 1.0 + event.magnification
+        coordinator?.viewModel.viewer.setZoom(pageZoom * factor)
+    }
+
     override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
         super.willOpenMenu(menu, with: event)
 
@@ -305,6 +315,30 @@ struct HTMLViewerRepresentable: NSViewRepresentable {
         config.userContentController.add(context.coordinator, name: "highlightContextMenu")
         config.userContentController.add(context.coordinator, name: "highlightFocus")
 
+        // HTML snapshots (SingleFile captures) often bake in fixed pixel widths, so
+        // even pageZoom would overflow horizontally. Inject fluid CSS so the page
+        // wraps to the window width — zoom then only enlarges/reflows text
+        // (browser-style) instead of producing a sideways scrollbar. Not for live
+        // pages, which are already responsive.
+        if viewModel.liveURL == nil {
+            let fluidCSS = WKUserScript(
+                source: """
+                (function() {
+                    var style = document.createElement('style');
+                    style.textContent = [
+                        'html, body { max-width: 100% !important; overflow-x: hidden !important; }',
+                        'img, video, iframe { max-width: 100% !important; height: auto !important; }',
+                        'table, pre, blockquote { max-width: 100% !important; }'
+                    ].join('\\n');
+                    (document.head || document.documentElement).appendChild(style);
+                })();
+                """,
+                injectionTime: .atDocumentEnd,
+                forMainFrameOnly: true
+            )
+            config.userContentController.addUserScript(fluidCSS)
+        }
+
         // Password autofill — live web pages only. Detects login forms, captures
         // credentials on submit, and exposes OakPasswords.fill() for the coordinator
         // to populate saved credentials on load. Not injected for local snapshots.
@@ -336,7 +370,10 @@ struct HTMLViewerRepresentable: NSViewRepresentable {
         webView.customUserAgent = BrowserSession.userAgent
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator
-        webView.allowsMagnification = true
+        // Disable native bitmap magnification — pinch is handled via pageZoom in
+        // OakWebView.magnify(with:) so zoom reflows like a browser instead of
+        // blowing up the rendered pixels and creating a horizontal scrollbar.
+        webView.allowsMagnification = false
         #if DEBUG
         // Enables Safari Web Inspector (Develop ▸ <host>) → use the Timeline tab to
         // profile scrolling / main-thread work on live pages.

@@ -135,6 +135,24 @@ final class MarkdownTextView: NSTextView {
     /// Dwell before the preview appears — long enough to ignore a cursor passing through.
     private let hoverDelay: TimeInterval = 0.35
 
+    /// Pin the text container's wrap width to the committed frame on every layout pass.
+    ///
+    /// `widthTracksTextView` is off (so AppKit doesn't re-derive the container width from a
+    /// transiently-wide frame), which means the container width is otherwise only set as a
+    /// side effect of `ProseBlockView.sizeThatFits`. SwiftUI probes `sizeThatFits` with
+    /// several candidate widths during layout negotiation, and a probe *wider* than the final
+    /// frame can fire last — leaving the container wider than the view. Long lines then wrap
+    /// past the frame and get clipped at the panel edge. `layout()` runs after SwiftUI commits
+    /// the real frame, so syncing here guarantees wrapping matches what's actually drawn.
+    override func layout() {
+        super.layout()
+        guard let container = textContainer else { return }
+        let target = bounds.width
+        if target > 0, abs(container.size.width - target) > 0.5 {
+            container.size = NSSize(width: target, height: container.size.height)
+        }
+    }
+
     override func resignFirstResponder() -> Bool {
         let resigned = super.resignFirstResponder()
         if resigned {

@@ -43,7 +43,11 @@ struct LLMContextProvider {
             } ?? []
             activeCollection = ChatContextSnapshot.ActiveCollection(
                 name: collection.name,
-                itemCount: collection.itemCount,
+                // Smart/system collections (Reading List, Duplicates, Bin, rule-based)
+                // have no rows in `collection_items`, so the static `collection.itemCount`
+                // is 0. Resolve the real membership count instead.
+                itemCount: appState?.libraryStore.smartCollectionItemCount(for: collection)
+                    ?? collection.itemCount,
                 items: items,
                 scopeId: isScopable ? collection.id.uuidString : nil
             )

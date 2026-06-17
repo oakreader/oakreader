@@ -114,11 +114,12 @@ async function build(markdown, editable) {
   crepe = new Crepe({
     root,
     defaultValue: markdown || "",
-    // A focused note surface: keep inline formatting, lists, links, the slash
-    // menu and the selection toolbar; drop the heavier blocks (code editor,
-    // tables, block images, LaTeX, AI, the document top bar) a short note never
-    // needs. Inline images still work via the commonmark preset + the toolbar's
-    // insertImage bridge.
+    // A focused note surface: keep inline formatting, lists, links and the slash
+    // menu; drop the heavier blocks (code editor, tables, block images, LaTeX,
+    // AI, the document top bar) a short note never needs. Also drop the floating
+    // selection toolbar — formatting lives in the native bottom bar (Slack-style),
+    // so the popover would just duplicate it. Inline images still work via the
+    // commonmark preset + the bottom bar's insertImage bridge.
     features: {
       [CrepeFeature.AI]: false,
       [CrepeFeature.Latex]: false,
@@ -126,6 +127,7 @@ async function build(markdown, editable) {
       [CrepeFeature.ImageBlock]: false,
       [CrepeFeature.CodeMirror]: false,
       [CrepeFeature.TopBar]: false,
+      [CrepeFeature.Toolbar]: false,
     },
     featureConfigs: {
       [CrepeFeature.Placeholder]: { text: "Jot a thought…", mode: "doc" },

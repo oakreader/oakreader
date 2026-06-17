@@ -22,5 +22,9 @@ let package = Package(
                 .product(name: "CMarkGFM", package: "swift-cmark-gfm"),
             ]
         ),
+        .testTarget(
+            name: "OakMarkdownUITests",
+            dependencies: ["OakMarkdownUI"]
+        ),
     ]
 )
