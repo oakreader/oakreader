@@ -185,6 +185,18 @@ final class MarkdownTextView: NSTextView {
         return ceil(lm.usedRect(for: measuringContainer).height)
     }
 
+    /// The *minimum* width the text can occupy — the widest unbreakable run (longest word;
+    /// for CJK, a single character). Reported as the view's size for ambiguous proposals
+    /// (SwiftUI's `nil` ideal / `.infinity` max probes) so this view behaves like a flexible
+    /// `Text`: it never demands a fixed default width that could exceed a narrow panel, and
+    /// the surrounding `.frame(maxWidth: .infinity)` is what makes it fill the column.
+    func minimumContentWidth() -> CGFloat {
+        guard let lm = measuringContainer.layoutManager else { return 0 }
+        measuringContainer.size = CGSize(width: CGFloat(1), height: .greatestFiniteMagnitude)
+        lm.ensureLayout(for: measuringContainer)
+        return ceil(lm.usedRect(for: measuringContainer).width)
+    }
+
     // MARK: - Link hover preview
 
     override func updateTrackingAreas() {

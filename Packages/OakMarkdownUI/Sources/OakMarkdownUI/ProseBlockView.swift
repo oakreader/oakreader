@@ -117,17 +117,21 @@ struct ProseBlockView: NSViewRepresentable {
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, nsView tv: MarkdownTextView, context: Context) -> CGSize? {
-        // Guard BOTH nil and non-finite proposals. SwiftUI probes a view's maximum
-        // width by proposing `.infinity`; measuring at infinity would collapse the text to
-        // a single unwrapped line and report that natural width back, ballooning the bubble
-        // past a narrow chat panel. Clamp to a bounded default so the real (finite) layout
-        // proposal is what governs wrapping.
-        let proposed = proposal.width ?? 320
-        let width = proposed.isFinite ? proposed : 320
-        // Measure height through the text view's *separate* measuring container, never the
-        // display container — so this measurement can't leak a wrap width into what's
-        // rendered (the display container's width is pinned to the frame by
-        // `widthTracksTextView`). This is what keeps a settled answer from clipping.
-        return CGSize(width: width, height: tv.measuredHeight(forWidth: width))
+        // When SwiftUI offers a concrete finite width (the real layout), FILL it: that width
+        // came from the container, so the view can never be wider than its panel. Height is
+        // measured through the text view's *separate* measuring container — never the display
+        // container — so the measurement can't leak a wrap width into what's rendered (the
+        // display container's width is pinned to the frame by `widthTracksTextView`). That is
+        // what keeps a settled answer from clipping.
+        if let proposed = proposal.width, proposed.isFinite {
+            return CGSize(width: proposed, height: tv.measuredHeight(forWidth: proposed))
+        }
+        // Ambiguous proposal (`nil` ideal / `.infinity` max): report the MINIMUM width the
+        // text needs, not a fixed default. A fixed default (e.g. 320) larger than the panel's
+        // content area is exactly what pushed the bubble outside the panel. Reporting the
+        // minimum lets the enclosing `.frame(maxWidth: .infinity)` size the column to the
+        // panel; the concrete-width branch above then fills it.
+        let minWidth = tv.minimumContentWidth()
+        return CGSize(width: minWidth, height: tv.measuredHeight(forWidth: minWidth))
     }
 }
