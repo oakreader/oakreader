@@ -69,7 +69,9 @@ struct StudioPanelView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         streamingHeader("Generating flashcards…", count: deck.cards.count)
                         if !deck.cards.isEmpty {
-                            InlineDeckView(deck: deck)
+                            InlineDeckView(deck: deck, onJumpToSource: { quote, page in
+                                model.jumpToSource(anchorText: quote, page1Based: page)
+                            })
                         }
                     }
                 }
@@ -170,12 +172,18 @@ struct StudioPanelView: View {
             switch artifact.kind {
             case .quiz:
                 if let deck = artifact.quizDeck {
-                    InlineDeckView(deck: deck, showHeader: false)
+                    InlineDeckView(deck: deck, onDeleteCard: { index in
+                        model.deleteQuizCard(artifact, at: index)
+                    }, onJumpToSource: { quote, page in
+                        model.jumpToSource(anchorText: quote, page1Based: page)
+                    }, showHeader: false)
                         .overlay(alignment: .topTrailing) { expandButton(artifact) }
                 } else {
                     unavailableBody
                 }
             case .mindmap:
+                // Read-only preview: pan/zoom to explore, click a leaf to jump to
+                // source. Editing happens in the roomy full-screen editor.
                 StudioWebView(outline: artifact.body, onNodeClick: { model.jumpToSource(anchorText: $0) })
                     .frame(height: 320)
                     .clipShape(RoundedRectangle(cornerRadius: 12))

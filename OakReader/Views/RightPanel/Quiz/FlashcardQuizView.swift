@@ -20,9 +20,15 @@ struct FlashcardQuizView: View {
     var surface: Bool = false
     var cornerRadius: CGFloat = 18
     var surfacePadding: CGFloat = 22
+    /// A monotonic counter the host bumps to flip the card from the keyboard
+    /// (Space / Return in the full-screen deck). Ignored at its initial value.
+    var flipSignal: Int = 0
     /// Opens a tapped citation (`oak://cite/…`) at its source. When set, citation
     /// links navigate; either way, tapping one never flips the card.
     var onOpenCitation: ((String, CitationAnchor) -> Void)? = nil
+    /// Jumps to the passage a card was generated from — `(verbatim quote, 1-based
+    /// page?)`. Drives the quiet "Source · p. N" footnote on the answer side.
+    var onJumpToSource: ((String, Int?) -> Void)? = nil
 
     /// 0 = front, 180 = back. The single source of truth for the flip; the
     /// visible side and every depth cue are derived from its live value.
@@ -39,9 +45,12 @@ struct FlashcardQuizView: View {
                lift: surface ? 0.04 : 0.02,
                shadowBase: surface ? (radius: large ? 24 : 12, y: large ? 8 : 4) : nil) { showBack in
             ZStack {
-                side(tag: "QUESTION", text: content.front, hint: "Tap to reveal answer")
+                side(tag: "QUESTION", text: content.front,
+                     hint: large ? "Press space or tap to reveal answer" : "Tap to reveal answer")
                     .opacity(showBack ? 0 : 1)
-                side(tag: "ANSWER", text: content.back, hint: "Tap to see question")
+                side(tag: "ANSWER", text: content.back,
+                     hint: large ? "Press space or tap to flip back" : "Tap to see question",
+                     showSource: true)
                     .opacity(showBack ? 1 : 0)
                     // The whole card is mirrored at 180°; counter-rotate the back
                     // side so its text reads the right way round.
@@ -51,6 +60,7 @@ struct FlashcardQuizView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture(perform: requestFlip)
+        .onChange(of: flipSignal) { _, _ in flip() }
     }
 
     /// Handles a link tapped inside the card. Marks the flip suppressed first so
@@ -65,14 +75,19 @@ struct FlashcardQuizView: View {
     private func requestFlip() {
         DispatchQueue.main.async {
             guard Date() >= suppressFlipUntil else { return }   // a citation won this click
-            // Sturdy, near-overshoot-free — a card settling, not a spring toy.
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) {
-                angle = angle < 90 ? 180 : 0
-            }
+            flip()
         }
     }
 
-    private func side(tag: String, text: String, hint: String) -> some View {
+    /// Flip to the other face. Sturdy, near-overshoot-free — a card settling, not
+    /// a spring toy.
+    private func flip() {
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) {
+            angle = angle < 90 ? 180 : 0
+        }
+    }
+
+    private func side(tag: String, text: String, hint: String, showSource: Bool = false) -> some View {
         VStack(spacing: large ? 22 : 14) {
             Spacer(minLength: 0)
 
@@ -83,6 +98,9 @@ struct FlashcardQuizView: View {
                     .foregroundStyle(.tertiary)
                 CardMarkdown(text: text, fontSize: large ? 23 : 16, onOpenURL: handleLink)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                if showSource, let label = sourceLabel {
+                    sourceFootnote(label)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -96,6 +114,32 @@ struct FlashcardQuizView: View {
             .foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// The quiet "Source · p. N" label, when the card carries a citation we can
+    /// actually act on (a page to jump to or a quote to find).
+    private var sourceLabel: String? {
+        guard onJumpToSource != nil else { return nil }
+        if let page = content.sourcePage { return "Source · p. \(page)" }
+        if (content.sourceQuote?.isEmpty == false) { return "Source" }
+        return nil
+    }
+
+    private func sourceFootnote(_ label: String) -> some View {
+        Button {
+            onJumpToSource?(content.sourceQuote ?? "", content.sourcePage)
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "text.viewfinder")
+                Text(label)
+            }
+            .font(.system(size: large ? 12 : 10, weight: .medium))
+            .foregroundStyle(.tertiary)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("Jump to the source passage")
+        .padding(.top, large ? 4 : 2)
     }
 }
 

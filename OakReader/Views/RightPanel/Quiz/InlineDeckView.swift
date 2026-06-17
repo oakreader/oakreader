@@ -9,8 +9,14 @@ import SwiftUI
 struct InlineDeckView: View {
     let deck: QuizDeck
     var onSaveCard: ((QuizContent) -> Bool)?
+    /// Deletes the card at the given index from the deck (after confirmation).
+    /// When set, a trash affordance appears in the footer.
+    var onDeleteCard: ((Int) -> Void)? = nil
     /// Opens a tapped citation at its source (forwarded to each card body).
     var onOpenCitation: ((String, CitationAnchor) -> Void)? = nil
+    /// Jumps to the passage a flashcard was generated from — `(quote, 1-based
+    /// page?)`. Powers the per-card "Source · p. N" footnote.
+    var onJumpToSource: ((String, Int?) -> Void)? = nil
     /// Full-screen "slide" presentation: the card fills the height, type is
     /// larger, and the view's own expand button is hidden.
     var embeddedInSheet: Bool = false
@@ -27,6 +33,12 @@ struct InlineDeckView: View {
     @State private var savedIndices: Set<Int> = []
     @State private var savePop = false
     @State private var saveAllFailed = false
+    /// Drives the "Delete this card?" confirmation dialog.
+    @State private var confirmDeleteCard = false
+    /// Holds keyboard focus in slide mode so ← / → page through the deck.
+    @FocusState private var keyboardFocused: Bool
+    /// Bumped on Space/Return to flip the current flashcard from the keyboard.
+    @State private var flipSignal = 0
 
     private var isSlide: Bool { embeddedInSheet }
     private var cardRadius: CGFloat { isSlide ? 22 : 18 }
@@ -45,7 +57,7 @@ struct InlineDeckView: View {
     }
 
     private var showFooter: Bool {
-        deck.cards.count > 1 || onSaveCard != nil
+        deck.cards.count > 1 || onSaveCard != nil || onDeleteCard != nil
     }
 
     var body: some View {
@@ -56,7 +68,21 @@ struct InlineDeckView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: isSlide ? .infinity : nil, alignment: .top)
         .sheet(isPresented: $isFullScreen) {
-            FullScreenDeckView(deck: deck, onSaveCard: onSaveCard, onOpenCitation: onOpenCitation)
+            FullScreenDeckView(deck: deck, onSaveCard: onSaveCard, onDeleteCard: onDeleteCard, onOpenCitation: onOpenCitation, onJumpToSource: onJumpToSource)
+        }
+        // Arrow-key paging in the full-screen / slide presentation. Scoped to
+        // slide mode so it never swallows arrow keys from an inline panel deck.
+        .focusable(isSlide)
+        .focusEffectDisabled()
+        .focused($keyboardFocused)
+        .onKeyPress(.leftArrow) { prev(); return .handled }
+        .onKeyPress(.rightArrow) { next(); return .handled }
+        .onKeyPress(.space) { flipSignal += 1; return .handled }
+        .onKeyPress(.return) { flipSignal += 1; return .handled }
+        .onAppear { if isSlide { keyboardFocused = true } }
+        .confirmationDialog("Delete this card?", isPresented: $confirmDeleteCard, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) { onDeleteCard?(clampedIndex) }
+            Button("Cancel", role: .cancel) {}
         }
     }
 
@@ -155,7 +181,9 @@ struct InlineDeckView: View {
                               surface: true,
                               cornerRadius: cardRadius,
                               surfacePadding: isSlide ? 40 : 22,
-                              onOpenCitation: onOpenCitation)
+                              flipSignal: isSlide ? flipSignal : 0,
+                              onOpenCitation: onOpenCitation,
+                              onJumpToSource: onJumpToSource)
         } else {
             cardFace(card)
         }
@@ -233,9 +261,29 @@ struct InlineDeckView: View {
                     if deck.cards.count > 1 { saveAllButton }
                 }
             }
+
+            if onDeleteCard != nil {
+                HStack {
+                    deleteCardButton
+                    Spacer()
+                }
+            }
         }
         .padding(.horizontal, 2)
         .padding(.top, 2)
+    }
+
+    private var deleteCardButton: some View {
+        Button { confirmDeleteCard = true } label: {
+            Image(systemName: "trash")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 28, height: 28)
+                .background(Circle().fill(Color.primary.opacity(0.06)))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .help("Delete this card")
     }
 
     private func navButton(_ icon: String, enabled: Bool, action: @escaping () -> Void) -> some View {
@@ -313,7 +361,9 @@ struct InlineDeckView: View {
 private struct FullScreenDeckView: View {
     let deck: QuizDeck
     var onSaveCard: ((QuizContent) -> Bool)?
+    var onDeleteCard: ((Int) -> Void)? = nil
     var onOpenCitation: ((String, CitationAnchor) -> Void)? = nil
+    var onJumpToSource: ((String, Int?) -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
 
@@ -332,7 +382,7 @@ private struct FullScreenDeckView: View {
 
             Divider().opacity(0.5)
 
-            InlineDeckView(deck: deck, onSaveCard: onSaveCard, onOpenCitation: onOpenCitation, embeddedInSheet: true)
+            InlineDeckView(deck: deck, onSaveCard: onSaveCard, onDeleteCard: onDeleteCard, onOpenCitation: onOpenCitation, onJumpToSource: onJumpToSource, embeddedInSheet: true)
                 .frame(maxWidth: 1040, maxHeight: .infinity)
                 .padding(.horizontal, 40)
                 .padding(.vertical, 28)

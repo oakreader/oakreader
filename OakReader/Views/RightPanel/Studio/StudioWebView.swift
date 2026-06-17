@@ -11,6 +11,24 @@ final class MindmapController: ObservableObject {
     func fit() { eval("window.oakMindmap&&window.oakMindmap.fit()") }
     func setLayout(_ dir: String) { eval("window.oakMindmap&&window.oakMindmap.setLayout('\(dir)')") }
     func exportImage(_ format: String) { eval("window.oakMindmap&&window.oakMindmap.exportImage('\(format)')") }
+    func addChild() { eval("window.oakMindmap&&window.oakMindmap.addChildToSelected()") }
+    func openNote() { eval("window.oakMindmap&&window.oakMindmap.openNote()") }
+
+    /// Let the user pick an image file and attach it to the selected node. The JS
+    /// side downscales/recompresses before storing it in the map body.
+    func pickAndAddImage() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.png, .jpeg, .gif, .bmp, .tiff, .webP, .heic]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.begin { [weak self] response in
+            guard response == .OK, let url = panel.url,
+                  let data = try? Data(contentsOf: url) else { return }
+            let mime = StudioWebView.mimeType(for: url)
+            let dataURL = "data:\(mime);base64,\(data.base64EncodedString())"
+            self?.eval("window.oakMindmap&&window.oakMindmap.addImageToSelected(\(StudioWebView.jsString(dataURL)))")
+        }
+    }
 
     private func eval(_ js: String) { webView?.evaluateJavaScript(js) }
 }
@@ -22,12 +40,15 @@ final class MindmapController: ObservableObject {
 /// - `editable` off: read-only; `outline` changes are pushed live via
 ///   `oakMindmap.update(...)` so a streaming generation fills in card-by-card.
 /// - `editable` on: Mind Elixir's interactive editor + native toolbar; edits post
-///   the new outline back through `onOutlineChanged`.
+///   the new JSON body back through `onBodyChanged`.
 struct StudioWebView: NSViewRepresentable {
+    /// The artifact body: a streamed bullet outline, or a Mind Elixir JSON object
+    /// once the map has been hand-edited. The JS side auto-detects which.
     let outline: String
     var editable: Bool = false
     var controller: MindmapController? = nil
-    var onOutlineChanged: ((String) -> Void)? = nil
+    /// Invoked when an edit changes the map; the payload is the new body (JSON).
+    var onBodyChanged: ((String) -> Void)? = nil
     /// Read-only: invoked with a node's source anchor (a verbatim document quote)
     /// when the node is clicked, so the host can jump to it in the document.
     var onNodeClick: ((String) -> Void)? = nil
@@ -48,9 +69,10 @@ struct StudioWebView: NSViewRepresentable {
         let coord = context.coordinator
         coord.webView = webView
         coord.editable = editable
+        coord.lastEditable = editable
         coord.pendingOutline = outline
         coord.lastOutline = outline
-        coord.onOutlineChanged = onOutlineChanged
+        coord.onBodyChanged = onBodyChanged
         coord.onNodeClick = onNodeClick
         webView.navigationDelegate = coord
         controller?.webView = webView
@@ -60,16 +82,27 @@ struct StudioWebView: NSViewRepresentable {
 
     func updateNSView(_ webView: WKWebView, context: Context) {
         let coord = context.coordinator
-        coord.onOutlineChanged = onOutlineChanged
+        coord.onBodyChanged = onBodyChanged
         coord.onNodeClick = onNodeClick
+        coord.editable = editable
         controller?.webView = webView
         guard coord.didFinish else {
             coord.pendingOutline = outline
             return
         }
-        if !editable, coord.lastOutline != outline {
+        // Flip read-only ↔ editable in place (inline "edit" toggle), preserving
+        // the current map. Done before any content push.
+        if coord.lastEditable != editable {
+            coord.lastEditable = editable
             coord.lastOutline = outline
-            webView.evaluateJavaScript("window.oakMindmap&&window.oakMindmap.update(\(Self.jsString(outline)));")
+            webView.evaluateJavaScript("window.oakMindmap&&window.oakMindmap.setEditable(\(editable ? "true" : "false"));")
+        } else if !editable, coord.lastOutline != outline {
+            // Live-stream new outline content into the read-only map. Never feed a
+            // JSON body to update() — that path parses outlines only.
+            coord.lastOutline = outline
+            if !outline.trimmingCharacters(in: .whitespaces).hasPrefix("{") {
+                webView.evaluateJavaScript("window.oakMindmap&&window.oakMindmap.update(\(Self.jsString(outline)));")
+            }
         }
         // Re-skin if the app's light/dark appearance flipped while open.
         let dark = Self.isDark(webView)
@@ -92,9 +125,10 @@ struct StudioWebView: NSViewRepresentable {
 
     final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
         weak var webView: WKWebView?
-        var onOutlineChanged: ((String) -> Void)?
+        var onBodyChanged: ((String) -> Void)?
         var onNodeClick: ((String) -> Void)?
         var editable = false
+        var lastEditable = false
         var pendingOutline = ""
         var lastOutline: String?
         var lastDark: Bool?
@@ -121,8 +155,10 @@ struct StudioWebView: NSViewRepresentable {
                 onNodeClick?(anchor)
                 return
             }
-            if let outline = body["outline"] as? String {
-                onOutlineChanged?(outline)
+            // An edit round-tripped back: the new body is JSON (`data`); the
+            // legacy outline key is still accepted for safety.
+            if let updated = (body["data"] as? String) ?? (body["outline"] as? String) {
+                onBodyChanged?(updated)
             }
         }
     }
@@ -149,6 +185,20 @@ struct StudioWebView: NSViewRepresentable {
     /// Encode a Swift string as a JS string literal (quoted, escaped).
     static func jsString(_ s: String) -> String {
         (try? JSONEncoder().encode(s)).flatMap { String(data: $0, encoding: .utf8) } ?? "\"\""
+    }
+
+    /// A best-effort MIME type for a picked image file, for the `data:` URL.
+    static func mimeType(for url: URL) -> String {
+        switch url.pathExtension.lowercased() {
+        case "png": return "image/png"
+        case "jpg", "jpeg": return "image/jpeg"
+        case "gif": return "image/gif"
+        case "bmp": return "image/bmp"
+        case "tif", "tiff": return "image/tiff"
+        case "webp": return "image/webp"
+        case "heic": return "image/heic"
+        default: return "application/octet-stream"
+        }
     }
 
     private static func bundleFile(_ name: String) -> String {
@@ -225,6 +275,42 @@ struct StudioWebView: NSViewRepresentable {
           }
           .map-container me-tpc.oak-anchored:hover::after{ transform:scale(1.25); opacity:1; }
 
+          /* Noted node: a small comment dot in the corner (class added by JS). */
+          .map-container me-tpc.oak-noted{ position:relative; }
+          .map-container me-tpc.oak-noted::before{
+            content:""; position:absolute; top:-3px; right:-3px;
+            width:7px; height:7px; border-radius:50%;
+            background:#E0A45C; box-shadow:0 0 0 2px var(--oak-canvas);
+          }
+
+          /* Node images sit above the label; keep them tidy. */
+          .map-container me-tpc img{
+            display:block; max-width:240px; border-radius:6px; margin:2px auto;
+          }
+
+          /* KaTeX inside a node should inherit the node's ink + size. */
+          .map-container me-tpc .katex{ font-size:1em; color:inherit; }
+
+          /* Comment popover — a small floating editor anchored near a node. */
+          #oak-note{
+            position:fixed; z-index:9999; width:248px;
+            background:#FFFFFF; border:1px solid rgba(0,0,0,0.12); border-radius:10px;
+            box-shadow:0 6px 24px rgba(0,0,0,0.16),0 2px 6px rgba(0,0,0,0.10);
+            padding:8px;
+          }
+          #oak-note textarea{
+            width:100%; min-height:84px; box-sizing:border-box; resize:vertical;
+            border:none; outline:none; background:transparent; color:#26282C;
+            font-family:inherit; font-size:12px; line-height:1.4;
+          }
+          #oak-note .oak-note-close{
+            position:absolute; top:4px; right:6px; border:none; background:transparent;
+            color:#9AA0A8; font-size:12px; cursor:pointer; padding:2px 4px; line-height:1;
+          }
+          #oak-note .oak-note-close:hover{ color:#26282C; }
+          body.oak-dark #oak-note{ background:#2A2A2D; border-color:rgba(255,255,255,0.14); }
+          body.oak-dark #oak-note textarea{ color:#ECECEE; }
+
           /* Dark: native sets <body class="oak-dark">; re-points ME node vars. */
           body.oak-dark{ --oak-canvas:#1C1C1E; --oak-anchor:#E0A45C; }
           body.oak-dark .map-container{
@@ -249,8 +335,12 @@ struct StudioWebView: NSViewRepresentable {
 /// opens here as an interactive, editable Mind Elixir canvas with a toolbar.
 struct StudioFullScreenView: View {
     let artifact: StudioArtifact
-    let onOutlineChanged: (String) -> Void
+    let onBodyChanged: (String) -> Void
     let onClose: () -> Void
+    /// Jumps to the passage a flashcard cites — `(quote, 1-based page?)`.
+    var onJumpToSource: ((String, Int?) -> Void)? = nil
+    /// Deletes the flashcard at the given index from the quiz deck.
+    var onDeleteCard: ((Int) -> Void)? = nil
 
     @StateObject private var controller = MindmapController()
     @State private var layoutSide = false
@@ -294,6 +384,10 @@ struct StudioFullScreenView: View {
 
     private var toolbar: some View {
         HStack(spacing: 6) {
+            toolButton("plus", "Add child node") { controller.addChild() }
+            toolButton("text.bubble", "Add a comment to the selected node") { controller.openNote() }
+            toolButton("photo", "Add an image to the selected node") { controller.pickAndAddImage() }
+            Divider().frame(height: 16)
             toolButton("arrow.up.left.and.down.right.magnifyingglass", "Fit to view") {
                 controller.fit()
             }
@@ -331,11 +425,11 @@ struct StudioFullScreenView: View {
                 outline: artifact.body,
                 editable: true,
                 controller: controller,
-                onOutlineChanged: onOutlineChanged
+                onBodyChanged: onBodyChanged
             )
         case .quiz:
             if let deck = artifact.quizDeck {
-                InlineDeckView(deck: deck, embeddedInSheet: true)
+                InlineDeckView(deck: deck, onDeleteCard: onDeleteCard, onJumpToSource: onJumpToSource, embeddedInSheet: true)
                     .frame(maxWidth: 1040, maxHeight: .infinity)
                     .padding(.horizontal, 40)
                     .padding(.vertical, 28)

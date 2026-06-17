@@ -41,6 +41,43 @@ enum QuizContent: Codable, Hashable {
     struct FlashcardContent: Codable, Hashable {
         let front: String          // Markdown
         let back: String           // Markdown
+        /// 1-based source page the answer is grounded in (PDF only). `nil` when
+        /// unknown or the source isn't paginated (HTML / markdown / media).
+        let sourcePage: Int?
+        /// A short verbatim excerpt the answer comes from — used to locate and
+        /// highlight the passage in the document. `nil` when not provided.
+        let sourceQuote: String?
+
+        enum CodingKeys: String, CodingKey {
+            case front, back
+            case sourcePage = "source_page"
+            case sourceQuote = "source_quote"
+        }
+
+        init(front: String, back: String, sourcePage: Int? = nil, sourceQuote: String? = nil) {
+            self.front = front
+            self.back = back
+            self.sourcePage = sourcePage
+            self.sourceQuote = sourceQuote
+        }
+
+        /// Tolerant decode: a model may emit `source_page` as a number *or* a
+        /// string ("p. 12"), or omit it — none of which should drop the card.
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            front = try c.decode(String.self, forKey: .front)
+            back = try c.decode(String.self, forKey: .back)
+            let quote = try? c.decodeIfPresent(String.self, forKey: .sourceQuote)
+            sourceQuote = (quote?.isEmpty == true) ? nil : quote
+            if let p = try? c.decodeIfPresent(Int.self, forKey: .sourcePage) {
+                sourcePage = p
+            } else if let s = try? c.decodeIfPresent(String.self, forKey: .sourcePage),
+                      let p = Int(s.filter(\.isNumber)), p > 0 {
+                sourcePage = p
+            } else {
+                sourcePage = nil
+            }
+        }
     }
 
     struct OcclusionContent: Codable, Hashable {

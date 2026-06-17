@@ -7,7 +7,7 @@
   "scripts": {
     "build:defuddle": "rollup -c rollup.defuddle.config.js",
     "build:cite-anchor": "rollup -c rollup.cite-anchor.config.js",
-    "build:mindmap": "rollup -c rollup.mindmap.config.js && cp node_modules/mind-elixir/dist/MindElixir.css ../../OakReader/Resources/Preview.bundle/js/oak-mindmap.css",
+    "build:mindmap": "rollup -c rollup.mindmap.config.js && node scripts/build-mindmap-css.mjs",
     "build:milkdown": "rollup -c rollup.milkdown.config.js && node scripts/build-milkdown-css.mjs",
     "build:all": "pnpm run build:defuddle && pnpm run build:cite-anchor && pnpm run build:mindmap && pnpm run build:milkdown"
   },
@@ -17,6 +17,7 @@
     "@milkdown/kit": "^7.21.2",
     "defuddle": "^0.18.1",
     "dom-anchor-text-quote": "^4.0.2",
+    "katex": "^0.16.11",
     "mind-elixir": "^5.12.2"
   },
   "devDependencies": {

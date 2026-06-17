@@ -116,6 +116,10 @@ struct StudioArtifact: Identifiable, Hashable {
     let itemId: String
     let kind: StudioArtifactKind
     var title: String
+    /// The artifact payload, format depending on `kind`:
+    /// - `.quiz`: a JSON deck (`QuizCardCodec`).
+    /// - `.mindmap`: the streamed bullet outline, or a Mind Elixir JSON object
+    ///   once the map has been hand-edited (so images / comments / math survive).
     var body: String
     var params: StudioGenerationParams
     /// Relative path under the studio assets directory (audio only).
