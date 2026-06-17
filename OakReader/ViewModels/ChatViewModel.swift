@@ -88,7 +88,7 @@ class ChatViewModel {
     var researchActivity: String?
 
     /// Transient "memory updated / saved" notice shown in the chat (nil when idle).
-    /// Set by the `remember` tool and by background reflection; auto-clears.
+    /// Set by the `manage_memory` tool when it writes; auto-clears.
     var memoryNotice: String?
     private var memoryNoticeToken: Int = 0
 
@@ -122,12 +122,6 @@ class ChatViewModel {
     private var titleGenerated: Bool = false
     /// Tool context for AI agent tool use (path sandbox).
     private var toolContext: ToolExecutionContext?
-
-    /// Background memory consolidation (USER.md profile + per-document brief).
-    /// We only reflect once enough new material has accumulated, and never while
-    /// a reflection is already running — see reflectIfDue().
-    private var lastReflectedTurnCount = 0
-    private var reflectionInFlight = false
 
     init(parent: DocumentViewModel, documentStoragePath: URL? = nil) {
         self.parent = parent
@@ -336,11 +330,12 @@ class ChatViewModel {
         // 3b. Oak CLI (library search, read items, list collections/tags, manage library)
         tools.append(OakCLITool())
 
-        // 3c. Memory — explicit, user-directed lane only (view/add/update/remove).
-        //     Passive capture happens automatically in the background (see
-        //     reflectIfDue() / MemoryReflectionService); the model is told to use
-        //     this tool ONLY when the user explicitly asks.
-        tools.append(MemoryTool(itemId: itemId))
+        // 3c. Memory — ChatGPT `bio`-style: the model saves durable facts about the
+        //     user inline (proactively when they share something lasting, and on
+        //     explicit request), into one global profile. Gated by the memory toggle.
+        if Preferences.shared.memoryEnabled {
+            tools.append(MemoryTool())
+        }
 
         // 4. Filesystem tools (user preference gated). Available for a document's
         //    storage dir or the library agent's CoW workspace folder.
@@ -384,16 +379,12 @@ class ChatViewModel {
                 // same validated way it cites retrieved passages. Built here, not in
                 // the synchronous prelude, because the chunk fetch is async.
                 let pageChunks = await self?.currentPageChunks(snapshot: snapshot) ?? []
-                var systemPrompt = LLMContextProvider.buildSystemPrompt(
+                let systemPrompt = LLMContextProvider.buildSystemPrompt(
                     skill: currentSkill,
                     context: snapshot,
                     documentCharBudget: docCharBudget,
                     currentPageChunks: pageChunks
                 )
-                if let item = self?.itemId,
-                   let brief = LLMContextProvider.loadItemBrief(itemId: item) {
-                    systemPrompt += "\n\n" + brief
-                }
 
                 let stream = await engine.send(
                     userContent: userContent,
@@ -574,21 +565,8 @@ class ChatViewModel {
                 isStreaming = false
                 researchActivity = nil
             }
-            self?.reflectIfDue()
             self?.titleIfNeeded()
         }
-    }
-
-    // MARK: - Background Memory Reflection
-
-    /// After a chat round settles, consolidate memory in the background if enough
-    /// new material has accumulated. Off the hot path, fail-soft — never blocks or
-    /// surfaces errors into the conversation.
-    private func reflectIfDue() {
-        guard Preferences.shared.memoryReflectionEnabled else { return }
-        let settled = turns.filter { !$0.isStreaming && $0.role != .system }
-        guard settled.count - lastReflectedTurnCount >= Preferences.shared.memoryReflectionFrequency else { return }
-        runReflection(on: settled)
     }
 
     // MARK: - Auto Chat Title
@@ -619,57 +597,6 @@ class ChatViewModel {
             try? self.sessionService?.updateSession(id: sid, title: title, messageCount: count)
             if let idx = self.sessionList.firstIndex(where: { $0.id == sid }) {
                 self.sessionList[idx].title = title
-            }
-        }
-    }
-
-    /// When leaving a session (new/load), flush any unreflected material so the
-    /// profile and brief capture the conversation we're walking away from.
-    private func flushReflectionBeforeSwitch() {
-        guard Preferences.shared.memoryReflectionEnabled else { return }
-        let settled = turns.filter { !$0.isStreaming && $0.role != .system }
-        guard settled.count > lastReflectedTurnCount, settled.count >= 2 else { return }
-        runReflection(on: settled)
-    }
-
-    /// Config for the background reflection: the configured memory model (empty =
-    /// inherit research/chat model), never extended thinking.
-    private var memoryReflectionConfig: ProviderConfig {
-        let model = Preferences.shared.memoryReflectionModel
-        let base = researchConfig
-        return ProviderConfig(
-            providerId: base.providerId,
-            model: model.isEmpty ? base.model : model,
-            thinkingBudget: nil,
-            thinkingEffort: nil
-        )
-    }
-
-    private func runReflection(on settled: [Turn]) {
-        guard !reflectionInFlight else { return }
-        reflectionInFlight = true
-        lastReflectedTurnCount = settled.count
-
-        let prefs = Preferences.shared
-        let cfg = memoryReflectionConfig
-        let profilePrompt = prefs.memoryProfilePrompt.isEmpty
-            ? MemoryReflectionService.defaultProfileSystem : prefs.memoryProfilePrompt
-        let briefPrompt = prefs.memoryBriefPrompt.isEmpty
-            ? MemoryReflectionService.defaultBriefSystem : prefs.memoryBriefPrompt
-        let item = itemId
-
-        Task.detached(priority: .background) { [weak self] in
-            let service = MemoryReflectionService(
-                config: cfg,
-                profilePrompt: profilePrompt,
-                briefPrompt: briefPrompt
-            )
-            var changes = await service.consolidateProfile(recentTurns: settled)
-            if let item { changes += await service.updateItemBrief(itemId: item, recentTurns: settled) }
-            let updated = changes
-            await MainActor.run {
-                self?.reflectionInFlight = false
-                if updated > 0 { self?.flashMemoryNotice("Memory updated") }
             }
         }
     }
@@ -945,7 +872,6 @@ class ChatViewModel {
 
     func newSession() {
         cancelActiveStreamForSwitch()
-        flushReflectionBeforeSwitch()
         turns = []
         sessionId = UUID()
         sessionRecordCreated = false
@@ -956,18 +882,15 @@ class ChatViewModel {
         inputText = ""
         errorMessage = nil
         showHistory = false
-        lastReflectedTurnCount = 0
     }
 
     func loadSession(_ id: UUID) {
         cancelActiveStreamForSwitch()
-        flushReflectionBeforeSwitch()
         sessionId = id
         sessionRecordCreated = true  // already exists in DB
         titleGenerated = true  // existing session already has a title; don't overwrite
         turns = []
         showHistory = false
-        lastReflectedTurnCount = 0
         Task { @MainActor in
             do {
                 turns = Self.normalizedSkillMetadata(try await engine.loadSession(id))

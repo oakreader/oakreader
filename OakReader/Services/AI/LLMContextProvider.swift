@@ -344,7 +344,10 @@ struct LLMContextProvider {
             // exactly like retrieved passages; otherwise fall back to raw page text
             // (cited via ?text=). Bounded by the model-window budget either way.
             if !currentPageChunks.isEmpty {
-                var lines = ["  <current-page index=\"\(doc.currentPageIndex + 1)\" note=\"each [c&lt;id&gt;] is a citable passage — cite it as oak://cite/CITEKEY?c=&lt;id&gt;&amp;text=&lt;verbatim claim sentence&gt;\">"]
+                let currentPageHeader = "  <current-page index=\"\(doc.currentPageIndex + 1)\" "
+                    + "note=\"each [c&lt;id&gt;] is a citable passage — cite it as "
+                    + "oak://cite/CITEKEY?c=&lt;id&gt;&amp;text=&lt;verbatim claim sentence&gt;\">"
+                var lines = [currentPageHeader]
                 var remaining = documentCharBudget
                 for ch in currentPageChunks where remaining > 0 {
                     let snippet = String(ch.text.prefix(remaining))
@@ -366,10 +369,11 @@ struct LLMContextProvider {
             // Tool usage hint
             parts.append("""
                 You have tools to read document pages (read_document), search within the \
-                document (search_document), and find conceptually related items via vector \
-                search (search_content). Use the read tool to read note files by their \
-                path listed above. Use the oak tool to search the library \
-                (oak search <query>), read any item's content \
+                document (search_document), and search the full text of the library by \
+                keyword (search_content — BM25 keyword ranking, NOT semantic: if a query \
+                returns too little, vary the terms and search again). Use the read tool \
+                to read note files by their path listed above. Use the oak tool to search \
+                the library (oak search <query>), read any item's content \
                 (oak items read <citeKey> --pages 1-5), list collections \
                 (oak collections list), list tags (oak tags list), and manage items.
                 """)
@@ -397,8 +401,9 @@ struct LLMContextProvider {
                 read any item's content (oak items read <citeKey> --pages 1-5), \
                 list collections (oak collections list), list tags (oak tags list), \
                 browse items (oak items list), and manage the library. \
-                Use search_content for conceptual/thematic queries and \
-                search_academic to find papers on the web.
+                Use search_content to find passages by keyword (BM25 keyword \
+                ranking, NOT semantic — vary the terms and search again if results \
+                are thin) and search_academic to find papers on the web.
 
                 Cite every claim. When you cite a passage returned by search_content \
                 or research, it carries a "Cite this passage as: ?c=<id>" handle — \
@@ -478,6 +483,12 @@ struct LLMContextProvider {
                 visible [label] can be your own wording; only the anchor value must \
                 be the quote. If you are not certain of the exact wording, omit \
                 ?text= and cite the page alone — never invent a phrase.
+
+                Most reliable anchor: when a passage came from search_content or \
+                research it carries a "Cite this passage as: ?c=<id>" handle. Cite \
+                by that id — oak://cite/{citeKey}?c=<id>&text=<verbatim claim \
+                sentence> — and the app resolves it to the exact page and verifies \
+                the quote, which is safer than writing the page number yourself.
                 """)
 
             // Format + example per citation style. A live web page is `.link` with
@@ -497,17 +508,9 @@ struct LLMContextProvider {
                     This PDF's cite-key is "\(eck)". Citation format:
                     [p. N](oak://cite/\(eck)?page=N)
                     [p. N](oak://cite/\(eck)?page=N&text=verbatim+quote)
-
-                    Add &text= with the verbatim clause or sentence that states the \
-                    claim (not a catchy fragment), copied from that page (spaces \
-                    encoded as +) so the reader jumps to the load-bearing passage. \
-                    The quote must appear word-for-word on the page; if you can't \
-                    quote it exactly, give the page alone.
-
-                    If the <current-page> above is shown as [c<id>] passages, cite \
-                    those by oak://cite/\(eck)?c=<id>&text=<claim sentence> rather \
-                    than writing the page number yourself — the app resolves the id \
-                    to the exact page and verifies the quote.
+                    (spaces in the anchor encoded as +). If the <current-page> above \
+                    is shown as [c<id>] passages, prefer oak://cite/\(eck)?c=<id>&text=… \
+                    over writing the page number yourself.
 
                     Example — the [label] is paraphrased, the &text= anchor is an exact quote:
                     \"The transformer replaces recurrence with self-attention \
@@ -522,15 +525,9 @@ struct LLMContextProvider {
                     [§ Heading](oak://cite/\(eck)?heading=HeadingText)
                     [your own label](oak://cite/\(eck)?text=verbatim+claim+sentence)
 
-                    For ?text= copy the clause or sentence that STATES THE CLAIM \
-                    you're citing — not a catchy fragment — VERBATIM from the \
-                    rendered text (not the raw markdown source), exact words in \
-                    order, no paraphrasing. Matching is case-insensitive, so only \
-                    casing may differ; the words themselves must match the page. The \
-                    [label] is your own wording; the anchor is the quote.
-
-                    Prefer ?text= for referencing specific passages; use \
-                    ?heading= only when pointing to a whole section.
+                    Copy ?text= from the RENDERED text (not the raw markdown source); \
+                    matching is case-insensitive, so only casing may differ. Prefer \
+                    ?text= for specific passages; use ?heading= only for a whole section.
 
                     Example — the label names the idea, the anchor is the claim sentence:
                     \"Batch jobs are processed asynchronously \
@@ -567,18 +564,6 @@ struct LLMContextProvider {
                 provided path.
                 Only cite content you have actually read or found via tools.
                 """)
-
-            // Chunk-id citations for retrieved passages — the most reliable anchor.
-            parts.append("""
-                PREFERRED — When you cite a passage returned by search_content or \
-                research, it carries a "Cite this passage as: ?c=<id>" handle. Cite \
-                using that id and copy the single sentence that states the claim:
-                [your own label](oak://cite/{citeKey}?c=<id>&text=<verbatim claim sentence>)
-                The app resolves the id to the exact page and verifies the quote, so \
-                this is more reliable than writing a page number yourself. The \
-                [label] is your own wording; the ?text= value must be copied \
-                word-for-word from that passage.
-                """)
         } else if context.document != nil {
             parts.append("""
                 This document has no citation key. You may reference content \
@@ -586,29 +571,31 @@ struct LLMContextProvider {
                 """)
         }
 
-        // User profile + memory instructions. Two lanes, split by initiator:
-        // passive facts the agent merely notices are consolidated automatically in
-        // the background; the `manage_memory` tool is ONLY for explicit user
-        // requests. The instructions are always emitted (even with empty memory) so
-        // the agent knows to honor "add … to my memory" on a fresh profile.
-        var memoryParts: [String] = []
-        let userProfileBlock = Self.loadUserProfile()
-        if !userProfileBlock.isEmpty { memoryParts.append(userProfileBlock) }
-        memoryParts.append("""
-            <memory-instructions>
-            The <user-profile> above (when present) is who the user is — use it to \
-            tailor depth, examples, and tone. It is maintained automatically in the \
-            background; do NOT proactively save things you merely noticed, and do not \
-            announce background updates.
-            Use the `manage_memory` tool ONLY when the user EXPLICITLY asks you to \
-            view, add, change, or remove a memory — e.g. "remember that …", "add … to \
-            my memory", "what do you remember about me?", "update …", "forget …". \
-            For add/update/remove, briefly confirm in plain language what you saved, \
-            updated, or removed. Default scope is the user's global memory; use scope \
-            "item" for a note about the document currently open.
-            </memory-instructions>
-            """)
-        parts.append(memoryParts.joined(separator: "\n\n"))
+        // User memory (ChatGPT `bio`-style): one global profile of durable facts
+        // about the user, injected into every conversation. The `manage_memory`
+        // tool writes to it inline — proactively when the user shares something
+        // lasting, and on explicit request. Gated by the memory toggle; when off,
+        // neither the profile nor the instructions (nor the tool) are present.
+        if Preferences.shared.memoryEnabled {
+            var memoryParts: [String] = []
+            let userProfileBlock = Self.loadUserProfile()
+            if !userProfileBlock.isEmpty { memoryParts.append(userProfileBlock) }
+            memoryParts.append("""
+                <memory-instructions>
+                The <user-profile> above (when present) is who the user is — use it to \
+                tailor depth, examples, and tone.
+                You can remember durable facts about the user across conversations with \
+                the `manage_memory` tool. Save a fact when the user shares something \
+                lasting and useful about themselves (background, goals, what they're \
+                studying, durable preferences for how they want answers), and whenever \
+                they explicitly ask you to ("remember that …", "forget …"). Don't save \
+                transient or document-specific details. When the user explicitly asked, \
+                briefly confirm what you changed; when you save on your own initiative, \
+                do it silently.
+                </memory-instructions>
+                """)
+            parts.append(memoryParts.joined(separator: "\n\n"))
+        }
 
         // Skill prompt (after context so the skill can reference it)
         if let skill {
@@ -618,27 +605,13 @@ struct LLMContextProvider {
         return parts.joined(separator: "\n\n")
     }
 
-    // MARK: - User Profile & Per-Document Brief
+    // MARK: - User Profile
 
     /// Load the user profile (discrete facts). Returns empty string if none.
     private static func loadUserProfile() -> String {
-        let rendered = MemoryStore.rendered(.user)
+        let rendered = MemoryStore.rendered()
         guard !rendered.isEmpty else { return "" }
         return "<user-profile>\n\(rendered)\n</user-profile>"
-    }
-
-    /// Load the per-document continuity brief for an item, wrapped for the prompt.
-    /// Injected ONLY when that item is the open document, so memory about one
-    /// document never pollutes a conversation about another. Returns nil if none.
-    static func loadItemBrief(itemId: String) -> String? {
-        let rendered = MemoryStore.rendered(.item(itemId))
-        guard !rendered.isEmpty else { return nil }
-        return """
-            <previous-sessions note="Notes from your earlier chats about THIS document. \
-            Use them to pick up where you left off; they may be stale or incomplete.">
-            \(rendered)
-            </previous-sessions>
-            """
     }
 
     /// Escape special XML characters in attribute values and text content.

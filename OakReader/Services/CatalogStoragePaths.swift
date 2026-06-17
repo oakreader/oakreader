@@ -32,11 +32,6 @@ extension CatalogDatabase {
         dataDirectory.appendingPathComponent("agent", isDirectory: true)
     }
 
-    /// ~/OakReader/agent/USER.md
-    static var agentUserFileURL: URL {
-        agentDirectory.appendingPathComponent("USER.md")
-    }
-
     /// ~/OakReader/agent/VOICE.md
     static var agentVoiceFileURL: URL {
         agentDirectory.appendingPathComponent("VOICE.md")
@@ -55,22 +50,6 @@ extension CatalogDatabase {
     /// ~/OakReader/chats/
     static var chatsDirectory: URL {
         dataDirectory.appendingPathComponent("chats", isDirectory: true)
-    }
-
-    /// ~/OakReader/chats/briefs/ — per-document conversation briefs (auto-summarized
-    /// continuity notes, one markdown file per item). Injected only when that item is open.
-    static var chatBriefsDirectory: URL {
-        chatsDirectory.appendingPathComponent("briefs", isDirectory: true)
-    }
-
-    /// ~/OakReader/chats/briefs/{itemId}.md — legacy prose brief (migration source).
-    static func chatBriefURL(itemId: String) -> URL {
-        chatBriefsDirectory.appendingPathComponent("\(itemId).md")
-    }
-
-    /// ~/OakReader/chats/briefs/{itemId}.jsonl — item memory as discrete facts.
-    static func chatBriefFactsURL(itemId: String) -> URL {
-        chatBriefsDirectory.appendingPathComponent("\(itemId).jsonl")
     }
 
     /// ~/OakReader/chats/attachments/
@@ -99,16 +78,14 @@ extension CatalogDatabase {
         try FileManager.default.createDirectory(at: logsDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: chatsDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: chatAttachmentsDirectory, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: chatBriefsDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: agentDirectory, withIntermediateDirectories: true)
         bootstrapAgentFiles()
     }
 
-    /// Copy USER.md and VOICE.md templates into ~/OakReader/agent/ on first launch.
+    /// Copy the VOICE.md template into ~/OakReader/agent/ on first launch.
     private static func bootstrapAgentFiles() {
         let fm = FileManager.default
         let templates: [(resource: String, destination: URL)] = [
-            ("USER", agentUserFileURL),
             ("VOICE", agentVoiceFileURL)
         ]
         for template in templates {

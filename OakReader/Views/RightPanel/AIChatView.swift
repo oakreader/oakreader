@@ -30,7 +30,6 @@ struct AIChatView: View {
 
     @Environment(\.isTabActive) private var isTabActive
     @State private var playingTurnId: UUID?
-    @State private var showItemMemory = false
     @State private var showUserMemory = false
 
     /// Body text size of the surrounding messages, so the composer and its token
@@ -48,10 +47,7 @@ struct AIChatView: View {
             // Content: either history drawer or chat
             Group {
                 if chatVM.showHistory {
-                    ChatHistoryDrawer(
-                        chatVM: chatVM,
-                        onOpenMemory: chatVM.itemId != nil ? { showItemMemory = true } : nil
-                    )
+                    ChatHistoryDrawer(chatVM: chatVM)
                     .transition(.move(edge: .leading))
                 } else {
                     chatContent
@@ -79,13 +75,8 @@ struct AIChatView: View {
         .onChange(of: isTabActive) { _, active in
             if !active { inputFocusRef.dismissCompletion() }
         }
-        .sheet(isPresented: $showItemMemory) {
-            if let item = chatVM.itemId {
-                MemoryManagerView(scope: .item(item), title: "Document Memory")
-            }
-        }
         .sheet(isPresented: $showUserMemory) {
-            MemoryManagerView(scope: .user, title: "User Memory")
+            MemoryManagerView()
         }
     }
 
@@ -134,8 +125,8 @@ struct AIChatView: View {
                 }
             }
 
-            // Transient "memory updated / saved" notice — surfaces background
-            // reflection + explicit `remember` saves, tappable to inspect.
+            // Transient "memory updated / saved" notice — surfaces the agent's
+            // explicit `remember` saves, tappable to inspect.
             if let notice = chatVM.memoryNotice {
                 canvasConstrained { memoryNoticeBar(notice) }
             }
@@ -148,7 +139,7 @@ struct AIChatView: View {
     /// Dia-style pill announcing a memory write; tap to open the manager.
     private func memoryNoticeBar(_ text: String) -> some View {
         Button {
-            if chatVM.itemId != nil { showItemMemory = true } else { showUserMemory = true }
+            showUserMemory = true
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: "sparkles")

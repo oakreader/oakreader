@@ -4,20 +4,9 @@ struct ChatHistoryDrawer: View {
     let chatVM: ChatViewModel
     /// Called after a session is loaded (e.g. so a sidebar host can open the chat panel).
     var onSelect: ((UUID) -> Void)?
-    /// When non-nil, a "Document Memory" entry is shown atop the list; tapping it runs this.
-    var onOpenMemory: (() -> Void)?
-
-    @State private var memoryHovered = false
 
     var body: some View {
         VStack(spacing: 0) {
-            if let onOpenMemory {
-                memoryRow(onOpenMemory)
-                Rectangle()
-                    .fill(OakStyle.Colors.diaHairline)
-                    .frame(height: 1)
-                    .padding(.horizontal, OakStyle.Spacing.xs)
-            }
             if chatVM.sessionList.isEmpty {
                 emptyState
             } else {
@@ -27,47 +16,6 @@ struct ChatHistoryDrawer: View {
         .onAppear {
             chatVM.loadSessionList()
         }
-    }
-
-    // MARK: - Document Memory entry
-
-    private func memoryRow(_ action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 20)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Document Memory")
-                        .font(OakStyle.Font.styledBody)
-                        .foregroundStyle(.primary)
-                    Text("What the agent remembers about this document")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(1)
-                }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 7)
-            .background(
-                RoundedRectangle(cornerRadius: OakStyle.Radius.small)
-                    .fill(memoryHovered ? OakStyle.Colors.hoverBackground : Color.clear)
-            )
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .padding(.horizontal, OakStyle.Spacing.xs)
-        .padding(.top, OakStyle.Spacing.xs)
-        .padding(.bottom, OakStyle.Spacing.xs)
-        .onHover { memoryHovered = $0 }
     }
 
     // MARK: - Empty State

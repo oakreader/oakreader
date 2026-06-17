@@ -1,15 +1,12 @@
 import SwiftUI
 
-/// Lets the user inspect and edit what the agent remembers — either the global
-/// user profile (`.user`) or one document's continuity notes (`.item`). Backs onto
-/// `MemoryStore`, so edits here and background reflection operate on the same facts.
+/// Lets the user inspect and edit what the agent remembers about them — one global
+/// profile of durable facts (ChatGPT "saved memories" style). Backs onto
+/// `MemoryStore`, so edits here and the agent's own writes operate on the same set.
 ///
 /// Styled to the app's Dia vocabulary: airy padding, hairline separators, muted
 /// secondary text, soft hover, no heavy List chrome.
 struct MemoryManagerView: View {
-    let scope: MemoryScope
-    var title: String = "Memory"
-
     @Environment(\.dismiss) private var dismiss
     @State private var facts: [MemoryFact] = []
     @State private var newText: String = ""
@@ -42,11 +39,9 @@ struct MemoryManagerView: View {
     private var header: some View {
         HStack(alignment: .top, spacing: OakStyle.Spacing.sm) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(title)
+                Text("Saved Memories")
                     .font(.system(size: 15, weight: .semibold))
-                Text(scope == .user
-                     ? "Durable facts about you — always available to the agent."
-                     : "Notes about this document — used only when it's open.")
+                Text("Durable facts about you — available to the agent in every conversation.")
                     .font(.system(size: 11))
                     .foregroundStyle(OakStyle.Colors.textSecondary)
             }
@@ -54,7 +49,7 @@ struct MemoryManagerView: View {
             HStack(spacing: OakStyle.Spacing.xs) {
                 iconButton("clock.arrow.circlepath", active: showHistory, help: "Change history") {
                     showHistory.toggle()
-                    if showHistory { log = MemoryStore.recentLog(scope: scope) }
+                    if showHistory { log = MemoryStore.recentLog() }
                 }
                 Button("Done") { dismiss() }
                     .buttonStyle(.borderless)
@@ -88,24 +83,10 @@ struct MemoryManagerView: View {
     private func factRow(_ fact: Binding<MemoryFact>) -> some View {
         let hovered = hoveredId == fact.wrappedValue.id
         return HStack(alignment: .top, spacing: OakStyle.Spacing.sm) {
-            Button {
-                let p = !fact.wrappedValue.pinned
-                fact.wrappedValue.pinned = p
-                MemoryStore.setPinned(p, id: fact.wrappedValue.id, scope: scope)
-            } label: {
-                Image(systemName: fact.wrappedValue.pinned ? "pin.fill" : "pin")
-                    .font(.system(size: 11))
-                    .foregroundStyle(fact.wrappedValue.pinned ? Color.accentColor : OakStyle.Colors.textTertiary)
-                    .frame(width: 16)
-            }
-            .buttonStyle(.plain)
-            .help(fact.wrappedValue.pinned ? "Pinned — protected from auto-edits" : "Pin to protect from auto-edits")
-            .padding(.top, 1)
-
             TextField("Fact", text: fact.text, axis: .vertical)
                 .textFieldStyle(.plain)
                 .font(.system(size: 13))
-                .onSubmit { MemoryStore.update(id: fact.wrappedValue.id, text: fact.wrappedValue.text, scope: scope) }
+                .onSubmit { MemoryStore.update(id: fact.wrappedValue.id, text: fact.wrappedValue.text) }
 
             Text(sourceLabel(fact.wrappedValue.source))
                 .font(.system(size: 10))
@@ -113,7 +94,7 @@ struct MemoryManagerView: View {
                 .padding(.top, 1)
 
             Button {
-                MemoryStore.delete(id: fact.wrappedValue.id, scope: scope)
+                MemoryStore.delete(id: fact.wrappedValue.id)
                 reload()
             } label: {
                 Image(systemName: "xmark")
@@ -182,9 +163,7 @@ struct MemoryManagerView: View {
             Text("Nothing remembered yet")
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(OakStyle.Colors.textSecondary)
-            Text(scope == .user
-                 ? "Facts appear as you chat, or add one below."
-                 : "Notes appear as you discuss this document, or add one below.")
+            Text("Facts appear as you chat, or add one below.")
                 .font(.system(size: 11))
                 .foregroundStyle(OakStyle.Colors.textTertiary)
                 .multilineTextAlignment(.center)
@@ -211,14 +190,14 @@ struct MemoryManagerView: View {
     // MARK: Actions
 
     private func reload() {
-        facts = MemoryStore.load(scope)
-        if showHistory { log = MemoryStore.recentLog(scope: scope) }
+        facts = MemoryStore.load()
+        if showHistory { log = MemoryStore.recentLog() }
     }
 
     private func addFact() {
         let text = newText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
-        MemoryStore.add(text, source: .user, scope: scope)
+        MemoryStore.add(text, source: .user)
         newText = ""
         reload()
         addFocused = true
@@ -243,7 +222,6 @@ struct MemoryManagerView: View {
         switch source {
         case .user: return "you"
         case .remember: return "saved"
-        case .reflection: return "auto"
         }
     }
 
