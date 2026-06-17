@@ -197,6 +197,7 @@ private struct CommentCardView: View {
                 if anchored {
                     Button("Jump to source") { model.jump(record) }
                 }
+                Button("Copy") { copyToPasteboard() }
                 Button("Edit") { isEditing = true }
                 Button("Delete", role: .destructive) { model.delete(record) }
             } label: {
@@ -210,6 +211,16 @@ private struct CommentCardView: View {
             .menuIndicator(.hidden)
             .fixedSize()
         }
+    }
+
+    /// Copy the note's text to the clipboard. Uses the readable body (tags and
+    /// image markup stripped); falls back to the raw markdown if that's empty.
+    private func copyToPasteboard() {
+        let text = body0.isEmpty ? rawBody : body0
+        guard !text.isEmpty else { return }
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
     }
 
     // MARK: Display
