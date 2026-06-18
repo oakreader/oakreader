@@ -21,9 +21,6 @@ private struct ProviderDetailView: View {
     let store: ConfiguredProviderStore
 
     @State private var apiKey: String = ""
-    @State private var elevenLabsAPIKey: String = ""
-    @State private var elevenLabsVoiceId: String = ""
-    @State private var elevenLabsTTSModelId: String = ""
     @State private var testResult: String?
     @State private var isTesting: Bool = false
     @State private var oauthState = OAuthFlowState()
@@ -40,10 +37,7 @@ private struct ProviderDetailView: View {
     }
 
     private var isConfigured: Bool {
-        if providerId == "__elevenlabs__" {
-            return store.isElevenLabsConfigured
-        }
-        return store.configuredLLMProviderIds.contains(providerId)
+        store.configuredLLMProviderIds.contains(providerId)
     }
 
     private var isOAuthProvider: Bool {
@@ -55,18 +49,13 @@ private struct ProviderDetailView: View {
     }
 
     private var displayTitle: String {
-        if providerId == "__elevenlabs__" {
-            return "ElevenLabs"
-        }
-        return provider?.displayName ?? "Provider"
+        provider?.displayName ?? "Provider"
     }
 
     var body: some View {
         if let provider {
             Form {
-                if providerId == "__elevenlabs__" {
-                    elevenLabsContent
-                } else if isConfigured {
+                if isConfigured {
                     configuredProviderContent(provider)
                 } else {
                     unconfiguredProviderContent(provider)
@@ -76,12 +65,6 @@ private struct ProviderDetailView: View {
             .navigationTitle(displayTitle)
             .onAppear { loadState() }
             .onChange(of: providerId) { _, _ in loadState() }
-        } else if providerId == "__elevenlabs__" {
-            Form { elevenLabsContent }
-                .formStyle(.grouped)
-                .navigationTitle(displayTitle)
-                .onAppear { loadState() }
-                .onChange(of: providerId) { _, _ in loadState() }
         } else {
             ContentUnavailableView("Unknown Provider", systemImage: "questionmark.circle")
         }
@@ -165,9 +148,10 @@ private struct ProviderDetailView: View {
     /// Shared URL field + discover button for local OpenAI-compatible providers.
     @ViewBuilder
     private func localServerControls(_ provider: ProviderInfo, buttonTitle: String) -> some View {
-        TextField("Server URL", text: $serverURL)
+        TextField("Server URL", text: $serverURL, prompt: Text("Server URL"))
             .textFieldStyle(.roundedBorder)
             .autocorrectionDisabled()
+            .labelsHidden()
 
         Text("OpenAI-compatible API base, e.g. http://localhost:11434/v1")
             .font(.caption)
@@ -221,8 +205,9 @@ private struct ProviderDetailView: View {
 
     @ViewBuilder
     private func apiKeyAuthSection(provider: ProviderInfo, envVar: String?) -> some View {
-        SecureField("API Key", text: $apiKey)
+        SecureField("API Key", text: $apiKey, prompt: Text("API Key"))
             .textFieldStyle(.roundedBorder)
+            .labelsHidden()
 
         if let envVar {
             Text("Or set the \(envVar) environment variable.")
@@ -349,18 +334,17 @@ private struct ProviderDetailView: View {
             }
         } else if !isOAuthProvider {
             Section("API Key") {
-                HStack {
-                    SecureField("API Key", text: $apiKey)
-                        .textFieldStyle(.roundedBorder)
-                    Button("Update") {
-                        if !apiKey.isEmpty {
-                            KeychainService.setAPIKey(apiKey, forProviderId: provider.id)
-                            testResult = "Key updated"
-                        }
+                SecureField("API Key", text: $apiKey, prompt: Text("Enter a new key to replace the saved one"))
+                    .textFieldStyle(.roundedBorder)
+                    .labelsHidden()
+
+                Button("Update") {
+                    if !apiKey.isEmpty {
+                        KeychainService.setAPIKey(apiKey, forProviderId: provider.id)
+                        testResult = "Key updated"
                     }
-                    .disabled(apiKey.isEmpty)
-                    .controlSize(.small)
                 }
+                .disabled(apiKey.isEmpty)
             }
         }
 
@@ -446,66 +430,6 @@ private struct ProviderDetailView: View {
         }
     }
 
-    // MARK: - ElevenLabs
-
-    @ViewBuilder
-    private var elevenLabsContent: some View {
-        Section {
-            HStack(spacing: 8) {
-                Text("ElevenLabs")
-                    .font(.title2.weight(.semibold))
-                Spacer()
-                if store.isElevenLabsConfigured {
-                    Label("Connected", systemImage: "checkmark.circle.fill")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.green)
-                }
-            }
-        }
-
-        Section("API Key") {
-            SecureField("ElevenLabs API Key", text: $elevenLabsAPIKey)
-                .textFieldStyle(.roundedBorder)
-
-            Text("Get your API key from elevenlabs.io")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            Button(store.isElevenLabsConfigured ? "Update" : "Save") {
-                Preferences.shared.elevenLabsAPIKey = elevenLabsAPIKey
-                store.refresh()
-            }
-            .disabled(elevenLabsAPIKey.isEmpty)
-        }
-
-        if store.isElevenLabsConfigured {
-            Section("Voice Settings") {
-                TextField("Voice ID", text: $elevenLabsVoiceId)
-                    .textFieldStyle(.roundedBorder)
-
-                Picker("TTS Model", selection: $elevenLabsTTSModelId) {
-                    Text("Turbo v2.5 (fastest)").tag("eleven_turbo_v2_5")
-                    Text("Flash v2.5 (fast)").tag("eleven_flash_v2_5")
-                    Text("Multilingual v2 (quality)").tag("eleven_multilingual_v2")
-                }
-
-                Button("Save Voice Settings") {
-                    let prefs = Preferences.shared
-                    prefs.elevenLabsVoiceId = elevenLabsVoiceId
-                    prefs.elevenLabsTTSModelId = elevenLabsTTSModelId
-                }
-            }
-
-            Section {
-                Button("Remove ElevenLabs", role: .destructive) {
-                    Preferences.shared.elevenLabsAPIKey = ""
-                    store.refresh()
-                    elevenLabsAPIKey = ""
-                }
-            }
-        }
-    }
-
     // MARK: - Helpers
 
     private func loadState() {
@@ -519,12 +443,6 @@ private struct ProviderDetailView: View {
             serverURL = LocalProviderStore.shared.apiBase(for: providerId)
         }
         baseURLOverride = ProviderEndpointStore.shared.displayedBase(for: providerId)
-        if providerId == "__elevenlabs__" {
-            let prefs = Preferences.shared
-            elevenLabsAPIKey = prefs.elevenLabsAPIKey
-            elevenLabsVoiceId = prefs.elevenLabsVoiceId
-            elevenLabsTTSModelId = prefs.elevenLabsTTSModelId
-        }
     }
 
     private func formatTokens(_ count: Int) -> String {
