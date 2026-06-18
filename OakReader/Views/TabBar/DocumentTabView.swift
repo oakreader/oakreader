@@ -121,9 +121,14 @@ struct DocumentTabView: View {
     let tab: DocumentTab
     let isActive: Bool
     let isFirst: Bool
+    /// Chrome-style divider on the leading edge. The strip decides this: a seam's
+    /// line shows only when neither adjacent tab is active or hovered (a highlighted
+    /// tab carries its own shape and absorbs the dividers on both of its sides).
+    let showLeadingSeparator: Bool
     let width: CGFloat
     let onSelect: () -> Void
     let onClose: () -> Void
+    let onHoverChanged: (Bool) -> Void
 
     @State private var isHovering = false
     @State private var isCloseHovering = false
@@ -168,12 +173,21 @@ struct DocumentTabView: View {
         .frame(width: width, height: OakStyle.Size.tabHeight)
         .foregroundStyle(isActive ? Color(nsColor: .labelColor) : Color(nsColor: .secondaryLabelColor))
         .background(tabShape)
+        .overlay(alignment: .leading) {
+            // Sits in the seam: tabs overlap by `cr - 3`, so this frame's leading
+            // edge lands at the shared boundary between this tab and the previous.
+            Rectangle()
+                .fill(Color(nsColor: .separatorColor))
+                .frame(width: 1, height: 16)
+                .opacity(showLeadingSeparator ? 1 : 0)
+                .animation(.easeOut(duration: 0.12), value: showLeadingSeparator)
+        }
         .padding(.leading, isFirst ? 0 : -cr + 3)
         .padding(.trailing, -cr + 3)
         .zIndex(isActive ? 2 : isHovering ? 1 : 0)
         .contentShape(Rectangle())
         .onTapGesture { onSelect() }
-        .onHover { isHovering = $0 }
+        .onHover { isHovering = $0; onHoverChanged($0) }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Tab: \(tab.displayTitle)")
         .accessibilityAddTraits(isActive ? .isSelected : [])

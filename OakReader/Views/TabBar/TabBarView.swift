@@ -9,8 +9,6 @@ struct TabBarView: View {
 
     @State private var isFullScreen = false
     @State private var isPinnedHovering = false
-    @State private var isAgentHovering = false
-    @State private var isAgentCloseHovering = false
     @State private var pluginRefresh = false
 
     private var store: LibraryStore { appState.libraryStore }
@@ -59,48 +57,6 @@ struct TabBarView: View {
             .onHover { isPinnedHovering = $0 }
             .help("Library: \(pinnedTabTitle)")
             .padding(.trailing, 4)
-
-            // Agent workspace pill (closeable; shown once opened).
-            // Matches the Library pinned tab's metrics; close button overlays the
-            // trailing edge so the pill width stays consistent with its sibling.
-            if appState.isAgentTabOpen {
-                HStack(spacing: 6) {
-                    OakAppIcon(size: OakStyle.Font.icon)
-                    Text("Agent")
-                        .font(OakStyle.Font.styled(size: OakStyle.Font.body, weight: .regular))
-                        .lineLimit(1)
-                }
-                .padding(.leading, 16)
-                .padding(.trailing, 20)
-                .frame(height: OakStyle.Size.tabHeight)
-                .frame(width: OakStyle.Size.tabMax, alignment: .leading)
-                .foregroundStyle(appState.isAgentActive ? Color(nsColor: .labelColor) : Color(nsColor: .secondaryLabelColor))
-                .background(agentPillShape)
-                .overlay(alignment: .trailing) {
-                    Button {
-                        appState.closeAgentWorkspace()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(isAgentCloseHovering ? Color(nsColor: .labelColor) : .secondary)
-                            .frame(width: OakStyle.Size.closeButton, height: OakStyle.Size.closeButton)
-                            .background(
-                                RoundedRectangle(cornerRadius: OakStyle.Radius.small)
-                                    .fill(isAgentCloseHovering ? Color.primary.opacity(0.1) : Color.clear)
-                            )
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .onHover { isAgentCloseHovering = $0 }
-                    .opacity(appState.isAgentActive || isAgentHovering ? 1 : 0)
-                    .padding(.trailing, 4)
-                    .accessibilityLabel("Close Agent")
-                }
-                .contentShape(Rectangle())
-                .onTapGesture { appState.openAgentWorkspace() }
-                .onHover { isAgentHovering = $0 }
-                .help("AI Agent workspace")
-            }
 
             // Document tabs share the strip width equally (Chrome-style): each tab
             // divides the available space, capped at `tabMax` and floored at `tabMin`,
@@ -218,19 +174,6 @@ struct TabBarView: View {
         }
         // Inactive + not hovering: transparent (gray tab bar shows through)
     }
-
-    @ViewBuilder
-    private var agentPillShape: some View {
-        if appState.isAgentActive {
-            RoundedRectangle(cornerRadius: OakStyle.Radius.standard)
-                .fill(OakStyle.Colors.activeTabBackground)
-                .padding(.vertical, 6)
-        } else if isAgentHovering {
-            RoundedRectangle(cornerRadius: OakStyle.Radius.standard)
-                .fill(Color.primary.opacity(0.08))
-                .padding(.vertical, 6)
-        }
-    }
 }
 
 // MARK: - Document Tab Strip
@@ -243,11 +186,24 @@ struct TabBarView: View {
 private struct DocumentTabStrip: View {
     let appState: AppState
 
+    @State private var hoveredTabID: DocumentTab.ID?
+
     private let cr: CGFloat = 10           // concave radius (matches DocumentTabView)
     private let plusWidth: CGFloat = 40    // "+" button + its horizontal padding
 
     private var tabCount: Int {
         appState.openTabs.count
+    }
+
+    /// A seam's divider shows only when neither the tab at `index` nor its left
+    /// neighbour is highlighted (active or hovered) — Chrome's behaviour.
+    private func showSeparator(at index: Int) -> Bool {
+        guard index > 0 else { return false }
+        let tabs = appState.openTabs
+        func highlighted(_ id: DocumentTab.ID) -> Bool {
+            id == appState.activeTabID || id == hoveredTabID
+        }
+        return !highlighted(tabs[index].id) && !highlighted(tabs[index - 1].id)
     }
 
     var body: some View {
@@ -280,9 +236,17 @@ private struct DocumentTabStrip: View {
                     tab: tab,
                     isActive: tab.id == appState.activeTabID,
                     isFirst: index == 0,
+                    showLeadingSeparator: showSeparator(at: index),
                     width: width,
                     onSelect: { appState.switchToTab(tab.id) },
-                    onClose: { appState.closeTab(tab.id) }
+                    onClose: { appState.closeTab(tab.id) },
+                    onHoverChanged: { hovering in
+                        if hovering {
+                            hoveredTabID = tab.id
+                        } else if hoveredTabID == tab.id {
+                            hoveredTabID = nil
+                        }
+                    }
                 )
             }
 
