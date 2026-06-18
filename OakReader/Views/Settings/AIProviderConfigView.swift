@@ -28,6 +28,7 @@ private struct ProviderDetailView: View {
     @State private var isTesting: Bool = false
     @State private var oauthState = OAuthFlowState()
     @State private var manualURL: String = ""
+    @State private var baseURLOverride: String = ""
 
     // Local providers (Ollama, LM Studio)
     @State private var serverURL: String = ""
@@ -90,14 +91,6 @@ private struct ProviderDetailView: View {
 
     @ViewBuilder
     private func unconfiguredProviderContent(_ provider: ProviderInfo) -> some View {
-        Section {
-            HStack(spacing: 8) {
-                Text(provider.displayName)
-                    .font(.title2.weight(.semibold))
-                Spacer()
-            }
-        }
-
         if provider.isLocal {
             Section("Server") {
                 localServerControls(provider, buttonTitle: "Connect")
@@ -122,6 +115,47 @@ private struct ProviderDetailView: View {
                         store.refresh()
                     }
                 }
+            }
+
+            if !isOAuthProvider {
+                endpointSection(provider)
+            }
+        }
+    }
+
+    // MARK: - Endpoint Override (proxy / relay)
+
+    /// Optional custom base URL for a cloud provider, so it can be pointed at a proxy or relay
+    /// (e.g. a 中转站) while keeping the same API key, models, and request format.
+    @ViewBuilder
+    private func endpointSection(_ provider: ProviderInfo) -> some View {
+        Section("Endpoint") {
+            TextField("Base URL", text: $baseURLOverride, prompt: Text(provider.baseURL.absoluteString))
+                .textFieldStyle(.roundedBorder)
+                .autocorrectionDisabled()
+                .textContentType(.URL)
+                .labelsHidden()
+
+            Text("Point at a proxy or relay. End with `#` to send the URL exactly as typed.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            HStack {
+                Button("Save Endpoint") {
+                    ProviderEndpointStore.shared.setOverride(baseURLOverride, for: provider.id)
+                    baseURLOverride = ProviderEndpointStore.shared.displayedBase(for: provider.id)
+                    testResult = ProviderEndpointStore.shared.hasOverride(provider.id)
+                        ? "Endpoint saved" : "Using default endpoint"
+                }
+                .disabled(baseURLOverride == ProviderEndpointStore.shared.displayedBase(for: provider.id))
+
+                Button("Reset to Default") {
+                    ProviderEndpointStore.shared.clearOverride(for: provider.id)
+                    baseURLOverride = ProviderEndpointStore.shared.defaultBase(for: provider.id)
+                    testResult = "Using default endpoint"
+                }
+                .controlSize(.small)
+                .disabled(!ProviderEndpointStore.shared.hasOverride(provider.id))
             }
         }
     }
@@ -302,12 +336,9 @@ private struct ProviderDetailView: View {
     @ViewBuilder
     private func configuredProviderContent(_ provider: ProviderInfo) -> some View {
         Section {
-            HStack(spacing: 8) {
-                Text(provider.displayName)
-                    .font(.title2.weight(.semibold))
-                Spacer()
+            LabeledContent("Status") {
                 Label("Connected", systemImage: "checkmark.circle.fill")
-                    .font(.caption.weight(.medium))
+                    .font(.callout.weight(.medium))
                     .foregroundStyle(.green)
             }
         }
@@ -331,6 +362,10 @@ private struct ProviderDetailView: View {
                     .controlSize(.small)
                 }
             }
+        }
+
+        if !provider.isLocal && !isOAuthProvider {
+            endpointSection(provider)
         }
 
         Section("Models") {
@@ -483,6 +518,7 @@ private struct ProviderDetailView: View {
         if let provider, provider.isLocal {
             serverURL = LocalProviderStore.shared.apiBase(for: providerId)
         }
+        baseURLOverride = ProviderEndpointStore.shared.displayedBase(for: providerId)
         if providerId == "__elevenlabs__" {
             let prefs = Preferences.shared
             elevenLabsAPIKey = prefs.elevenLabsAPIKey

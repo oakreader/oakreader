@@ -28,6 +28,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         // Restore local OpenAI-compatible providers (Ollama, LM Studio) into the registry
         // before any AI feature reads the provider list.
         LocalProviderStore.shared.applyAll()
+        // Re-apply per-provider base-URL overrides (proxy / relay endpoints) for cloud providers.
+        ProviderEndpointStore.shared.applyAll()
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {

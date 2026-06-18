@@ -145,4 +145,55 @@ public enum LocalProviderURL {
         if s.hasSuffix("/") { s.removeLast() }
         return URL(string: s + "/" + path) ?? base
     }
+
+    // MARK: - Cloud Endpoint Override
+
+    /// Build the full request endpoint from a user-typed base URL for a cloud provider
+    /// (e.g. a proxy / relay / 中转站). The path suffix differs per API format, so the
+    /// user supplies only the host/base and we append the format-specific path.
+    ///
+    /// Suffix-marker convention (matches Cherry Studio's, which relay vendors already
+    /// document to their users):
+    ///   - ending `#`  → use the URL **exactly** as typed (marker stripped); append nothing.
+    ///   - otherwise   → treat as the API base and append this format's endpoint path,
+    ///                    de-duplicating any `/v1` (or `/v1beta`) the user already typed.
+    ///
+    /// Returns `nil` for empty/invalid input so callers fall back to the default.
+    public static func endpointURL(base rawInput: String, format: APIFormat) -> URL? {
+        let trimmed = rawInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        // `#` = send exactly as typed.
+        if trimmed.hasSuffix("#") {
+            return URL(string: String(trimmed.dropLast()).trimmingCharacters(in: .whitespaces))
+        }
+
+        var base = trimmed
+        while base.hasSuffix("/") { base.removeLast() }
+
+        // (versionPrefix, tail) for each format. Default path == "\(versionPrefix)/\(tail)".
+        let versionPrefix: String
+        let tail: String
+        switch format {
+        case .anthropicMessages:  versionPrefix = "v1";     tail = "messages"
+        case .openaiCompletions:  versionPrefix = "v1";     tail = "chat/completions"
+        case .openaiResponses:    versionPrefix = "v1";     tail = "responses"
+        case .googleGenerativeAI: versionPrefix = "v1beta"; tail = "models"
+        }
+        let fullSuffix = "\(versionPrefix)/\(tail)"
+
+        let assembled: String
+        if base.hasSuffix("/\(fullSuffix)") || base.hasSuffix(fullSuffix) {
+            // User already typed the whole path.
+            assembled = base
+        } else if base.hasSuffix("/\(versionPrefix)") {
+            // User typed `.../v1` — append only the tail.
+            assembled = "\(base)/\(tail)"
+        } else {
+            assembled = "\(base)/\(fullSuffix)"
+        }
+
+        // Google's endpoint conventionally carries a trailing slash (model is appended later).
+        return URL(string: format == .googleGenerativeAI ? "\(assembled)/" : assembled)
+    }
 }
