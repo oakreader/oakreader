@@ -158,6 +158,17 @@ export default defineBackground(() => {
       // Markdown extraction is best-effort
     }
 
+    // 0b. Read the live-page preview image (og:image) from the rendered DOM, so the app uses the
+    //     browser's thumbnail directly instead of a server-side re-fetch the site may block
+    //     (X, Instagram, Dribbble, 知乎, 小红书, 微博…). Best-effort.
+    let thumbnailURL: string | null = null;
+    try {
+      const meta = await chrome.tabs.sendMessage(tabId, { action: "extractMeta" });
+      if (meta?.thumbnailURL) thumbnailURL = meta.thumbnailURL;
+    } catch {
+      // Thumbnail extraction is best-effort
+    }
+
     // 1. Inject SingleFile scripts into the page
     try {
       await injectSingleFileScripts(tabId);
@@ -196,6 +207,7 @@ export default defineBackground(() => {
       title: payload.title,
       html,
       markdown,
+      thumbnailURL,
     };
 
     const response = await fetch(CLIP_URL, {

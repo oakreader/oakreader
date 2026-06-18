@@ -16,6 +16,9 @@ final class LibraryCoverSweeper {
     private let coverService: LibraryCoverService
     private var attempted = Set<UUID>()
     private var running = false
+    /// The latest sweep request that arrived while a sweep was already in flight. The running
+    /// sweep drains this when its current pass finishes, so it never gets dropped.
+    private var pending: (items: [LibraryItem], store: LibraryStore)?
 
     private let maxConcurrent = 3
     private let bumpEvery = 12 // coalesce UI refreshes: re-read cards once per ~12 new covers
@@ -25,13 +28,25 @@ final class LibraryCoverSweeper {
     }
 
     /// Generate covers for any items in `items` that lack one. Cheap to call repeatedly — already
-    /// attempted items are skipped, and it no-ops if a sweep is already in flight. Cancels
-    /// cooperatively when the calling `.task` is torn down (view disappears).
+    /// attempted items are skipped. If a sweep is already in flight, the latest request is recorded
+    /// and run as soon as the current pass finishes — so the progressive item-count growth during
+    /// library load (43 → … → full set) always ends with a sweep over the *complete* set instead of
+    /// dropping the larger set to a `running` guard. A pass always runs to completion (it is not
+    /// tied to the caller's `.task` cancellation) — the work is bounded and covers persist.
     func sweep(items: [LibraryItem], store: LibraryStore) async {
-        guard !running else { return }
+        guard !running else { pending = (items, store); return }
         running = true
         defer { running = false }
 
+        var next: (items: [LibraryItem], store: LibraryStore)? = (items, store)
+        while let pass = next {
+            pending = nil
+            await runSweepPass(items: pass.items, store: pass.store)
+            next = pending // a request that arrived during the pass coalesces into one more run
+        }
+    }
+
+    private func runSweepPass(items: [LibraryItem], store: LibraryStore) async {
         // Cheap pre-filter (type + has a source), no disk I/O, no main-thread stat storm.
         let candidates = items.filter { Self.couldHaveCover($0) && !attempted.contains($0.id) }
         guard !candidates.isEmpty else { return }
@@ -53,7 +68,11 @@ final class LibraryCoverSweeper {
         var sinceBump = 0
         var index = 0
         while index < targets.count {
-            if Task.isCancelled { break }
+            // No `Task.isCancelled` check: a sweep is triggered by `.task(id: items.count)`, which
+            // SwiftUI cancels the moment the count changes (progressive library load, or navigating
+            // collections). Bailing here would abandon the work right when the *full* item set
+            // finally arrived. The work is bounded (maxConcurrent, utility priority, `attempted`
+            // dedup) and covers are useful regardless of the current view, so always run to completion.
             let batch = targets[index..<min(index + maxConcurrent, targets.count)]
             index += maxConcurrent
 
@@ -83,40 +102,53 @@ final class LibraryCoverSweeper {
 
         let data: Data?
         var isSyntheticFallback = false
-        switch item.contentType {
-        case .pdf:
-            // Real first-page render — the most recognizable preview for a document. Fall back to
-            // a synthetic typographic cover only when the page can't be rendered (encrypted/corrupt).
-            if let render = await coverService.generateCover(for: item.fileURL) {
-                data = render
-            } else {
-                isSyntheticFallback = true
-                data = await coverService.generatePaperCover(
-                    title: item.title,
-                    authors: Self.paperAuthors(item),
-                    kicker: Self.paperKicker(item),
-                    footer: Self.paperFooter(item)
-                )
-            }
-        case .html:
-            data = await coverService.generateHTMLCover(for: item.fileURL, sourceURL: item.sourceURL)
-        case .link:
-            if let sourceURL = item.sourceURL {
-                data = await coverService.generateLinkCover(for: sourceURL)
-            } else {
+        // Video items first — a YouTube/Bilibili source URL is the source of truth regardless of how
+        // the attachment was stored. Many were saved as a printed-page "pdf" whose first-page render
+        // is an ugly cropped web page (or fails → a typographic fallback); the real poster is always
+        // the right cover. `generateLinkCover` short-circuits YouTube to its poster CDN and scrapes
+        // Bilibili's og:image from the live page.
+        let isVideo = item.sourceURL.map(Self.isVideoURL) ?? false
+        if isVideo, let sourceURL = item.sourceURL {
+            data = await coverService.generateLinkCover(for: sourceURL)
+        } else {
+            switch item.contentType {
+            case .pdf:
+                // Real first-page render — the most recognizable preview for a document. Fall back to
+                // a synthetic typographic cover only when the page can't be rendered (encrypted/corrupt).
+                if let render = await coverService.generateCover(for: item.fileURL) {
+                    data = render
+                } else {
+                    isSyntheticFallback = true
+                    data = await coverService.generatePaperCover(
+                        title: item.title,
+                        authors: Self.paperAuthors(item),
+                        kicker: Self.paperKicker(item),
+                        footer: Self.paperFooter(item)
+                    )
+                }
+            case .html:
+                data = await coverService.generateHTMLCover(for: item.fileURL, sourceURL: item.sourceURL)
+            case .link:
+                if let sourceURL = item.sourceURL {
+                    data = await coverService.generateLinkCover(for: sourceURL)
+                } else {
+                    data = nil
+                }
+            default:
                 data = nil
             }
-        default:
-            data = nil
         }
         guard let data else { return false }
 
         let url = attachment.coverURL
         // Positive marker: a PDF cover gets a `.render` sidecar ONLY when it's a real first-page
-        // render. Everything else (legacy synthetic covers from the old import OR sweep paths, and
-        // the synthetic fallback below) lacks it, so `needsCover` re-renders them exactly once.
-        let renderMarkerURL = item.contentType == .pdf ? Self.renderMarkerURL(for: attachment) : nil
-        let wroteRealRender = item.contentType == .pdf && !isSyntheticFallback
+        // render — never for the video-poster override or a synthetic fallback — so `needsCover`
+        // re-renders legacy covers exactly once.
+        let renderMarkerURL = (item.contentType == .pdf && !isVideo) ? Self.renderMarkerURL(for: attachment) : nil
+        let wroteRealRender = item.contentType == .pdf && !isVideo && !isSyntheticFallback
+        // Stamp web/video covers with the og-fetch scheme marker so the one-time upgrade settles.
+        let previewMarkerURL = (isVideo || item.contentType == .html || item.contentType == .link)
+            ? Self.previewMarkerURL(for: attachment) : nil
         return await Task.detached(priority: .utility) {
             guard (try? data.write(to: url, options: .atomic)) != nil else { return false }
             if let renderMarkerURL {
@@ -125,6 +157,7 @@ final class LibraryCoverSweeper {
                 }
                 try? FileManager.default.removeItem(at: Self.legacyPaperMarkerURL(for: attachment))
             }
+            if let previewMarkerURL { try? Data().write(to: previewMarkerURL, options: .atomic) }
             return true
         }.value
     }
@@ -165,17 +198,42 @@ final class LibraryCoverSweeper {
     /// exactly once. Other types just check for a cover file on disk.
     nonisolated private static func needsCover(_ item: LibraryItem) -> Bool {
         guard let attachment = item.primaryAttachment else { return false }
+        let hasCover = FileManager.default.fileExists(atPath: attachment.coverURL.path)
+        // Video items (any stored type): upgrade a legacy page-render/paper cover to the live poster
+        // exactly once, gated on the og-fetch marker rather than the PDF `.render` marker.
+        if let url = item.sourceURL, isVideoURL(url) {
+            return !hasCover || !FileManager.default.fileExists(atPath: previewMarkerURL(for: attachment).path)
+        }
         if item.contentType == .pdf {
-            let hasCover = FileManager.default.fileExists(atPath: attachment.coverURL.path)
             let isRealRender = FileManager.default.fileExists(atPath: renderMarkerURL(for: attachment).path)
             return !hasCover || !isRealRender
         }
-        return !FileManager.default.fileExists(atPath: attachment.coverURL.path)
+        // html / link: regenerate when there's no cover, OR when the existing cover predates the
+        // live og:image-fetch scheme (no marker) — this upgrades every legacy snapshot/favicon
+        // cover to a real preview image (YouTube poster, Bilibili/site og:image) exactly once,
+        // after which the marker keeps it settled.
+        let hasScheme = FileManager.default.fileExists(atPath: previewMarkerURL(for: attachment).path)
+        return !hasCover || !hasScheme
+    }
+
+    /// Whether a URL is a video we should cover with its poster rather than a page render: any
+    /// YouTube watch/short/embed link, or a Bilibili `/video/` page. Used so a video saved as a
+    /// printed-page "pdf" still gets its real thumbnail.
+    nonisolated static func isVideoURL(_ url: URL) -> Bool {
+        if LibraryCoverService.youTubeVideoID(url) != nil { return true }
+        let host = url.host?.lowercased() ?? ""
+        return host.contains("bilibili.com") && url.path.contains("/video/")
     }
 
     /// Sidecar marker proving a PDF's cover is a real first-page render (not a synthetic cover).
     nonisolated static func renderMarkerURL(for attachment: Attachment) -> URL {
         attachment.coverURL.appendingPathExtension("render")
+    }
+
+    /// Sidecar marker proving a web (html/link) cover was generated by the live og:image-fetch
+    /// scheme. Absent on legacy snapshot/favicon covers, so `needsCover` upgrades them exactly once.
+    nonisolated static func previewMarkerURL(for attachment: Attachment) -> URL {
+        attachment.coverURL.appendingPathExtension("ogfetch")
     }
 
     /// Legacy `.paper` marker from the previous synthetic-cover scheme; cleaned up on re-render.

@@ -336,13 +336,17 @@ final class OakServer {
 
         let originalURL = URL(string: payload.url)
 
+        // Download the thumbnail the extension read from the live page (og:image), so the cover
+        // comes from the browser-rendered DOM rather than a server-side re-fetch the site may block.
+        downloadData(from: payload.thumbnailURL) { [weak self] thumbnailData in
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             let item = self.importService.importHTML(
                 from: tempURL,
                 originalPageURL: originalURL,
                 title: payload.title,
-                contentMarkdown: payload.markdown
+                contentMarkdown: payload.markdown,
+                thumbnailData: thumbnailData
             )
             try? FileManager.default.removeItem(at: tempURL)
             if let item {
@@ -357,6 +361,7 @@ final class OakServer {
             } else {
                 completion(.failure(OakReaderError.serverError("Import failed")))
             }
+        }
         }
     }
 

@@ -379,6 +379,11 @@ extension LibraryStore {
         let coverURL = primary.coverURL
         do {
             try imageData.write(to: coverURL, options: .atomic)
+            // Stamp web covers with the og-fetch scheme marker so the sweeper's one-time upgrade
+            // doesn't needlessly re-generate a cover the current build just wrote.
+            if item.contentType == .html || item.contentType == .link {
+                try? Data().write(to: LibraryCoverSweeper.previewMarkerURL(for: primary), options: .atomic)
+            }
             invalidate()
         } catch {
             Log.error(Log.store, "updateCover failed: \(error)")

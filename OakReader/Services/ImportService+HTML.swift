@@ -9,7 +9,8 @@ extension ImportService {
         from sourceURL: URL,
         originalPageURL: URL? = nil,
         title: String? = nil,
-        contentMarkdown: String? = nil
+        contentMarkdown: String? = nil,
+        thumbnailData: Data? = nil
     ) -> LibraryItem? {
         // Duplicate detection
         if let hash = hashPrefix(of: sourceURL),
@@ -109,9 +110,18 @@ extension ImportService {
             originalPageURL: originalPageURL
         )
 
-        // Generate cover thumbnail asynchronously
+        // Generate cover thumbnail asynchronously. Prefer the thumbnail the extension already read
+        // from the live, fully-rendered page — it bypasses the anti-bot / login / JS-render walls
+        // that a server-side re-fetch hits (X, Instagram, Dribbble, 知乎, 小红书, 微博…). Only when
+        // the client sent none (or it's unusable) do we scrape the saved archive / live og:image.
         Task {
-            if let coverData = await coverService.generateHTMLCover(for: destURL, sourceURL: originalPageURL) {
+            let coverData: Data?
+            if let thumbnailData, let sanitized = LibraryCoverService.sanitizedCoverData(thumbnailData) {
+                coverData = sanitized
+            } else {
+                coverData = await coverService.generateHTMLCover(for: destURL, sourceURL: originalPageURL)
+            }
+            if let coverData {
                 await MainActor.run {
                     store.updateCover(item, imageData: coverData)
                 }

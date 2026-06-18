@@ -37,6 +37,9 @@ export interface HTMLSnapshotPayload {
   title: string | null;
   html: string;
   markdown?: string | null;
+  /** og:image read from the live, rendered page — the app uses it as the cover directly,
+   *  bypassing a server-side re-fetch that anti-bot sites (X, Instagram, Dribbble, 知乎…) block. */
+  thumbnailURL?: string | null;
 }
 
 /** Payload for a base64 PDF generated via the debugger (sent by background). */

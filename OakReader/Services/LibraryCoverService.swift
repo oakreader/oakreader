@@ -12,6 +12,13 @@ actor LibraryCoverService {
     private static let browserUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
         + "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
 
+    /// A link-preview crawler UA. X (x.com/twitter.com), Instagram and LinkedIn emit the `og:image`
+    /// meta only to a recognized preview bot — exactly how Slack/WhatsApp/Discord build link cards;
+    /// a real-browser UA gets the JS shell with no meta. Tried as a second pass when the browser UA
+    /// finds no preview image.
+    private static let crawlerUserAgent = "facebookexternalhit/1.1 "
+        + "(+http://www.facebook.com/externalhit_uatext.php)"
+
     func generateCover(for url: URL) async -> Data? {
         guard let pdfDoc = PDFDocument(url: url),
               let firstPage = pdfDoc.page(at: 0) else { return nil }
@@ -123,42 +130,118 @@ actor LibraryCoverService {
     /// Returns nil when neither yields a usable image, so callers pick their own fallback (a saved-
     /// page snapshot for HTML archives, a favicon card for bare links).
     private func remotePreviewImage(for sourceURL: URL) async -> Data? {
-        // 1. YouTube fast-path — derive the poster directly. A video always has one.
-        if let id = Self.youTubeVideoID(sourceURL) {
-            for variant in ["maxresdefault", "hqdefault"] { // maxres is absent on some videos → fall back
-                if let url = URL(string: "https://img.youtube.com/vi/\(id)/\(variant).jpg"),
-                   let data = await downloadCoverImage(url) {
-                    return data
-                }
-            }
-        }
+        // Site-specific resolvers first — these pages render their thumbnail in JS, so there is no
+        // og:image to scrape; each exposes a documented poster CDN / API / oEmbed instead.
+        if let data = await youTubePoster(for: sourceURL) { return data }   // YouTube
+        if let data = await bilibiliCover(for: sourceURL) { return data }   // Bilibili / b23.tv
+        if let data = await oEmbedThumbnail(for: sourceURL) { return data } // Vimeo, TikTok
 
-        // 2. Generic / X / Bilibili / website — scrape og:image (or twitter:image) from the page head.
-        if let html = await fetchHTML(sourceURL),
-           let raw = HTMLMeta.content(html, property: "og:image")
-                  ?? HTMLMeta.content(html, name: "twitter:image"),
-           let imageURL = HTMLMeta.resolveURL(raw, relativeTo: sourceURL),
-           let data = await downloadCoverImage(imageURL) {
-            return data
+        // Generic og:image / twitter:image. Browser UA first — covers the overwhelming majority of
+        // server-rendered CN + US sites (Dribbble, Medium, GitHub, Reddit, Substack, news; 微信公众号
+        // mp.weixin, 知乎, 掘金, 简书, 豆瓣, 小宇宙). Then a link-preview crawler UA — X (x.com /
+        // twitter.com), Instagram and LinkedIn emit the meta only to a recognized bot. The download
+        // carries the page as Referer so hotlink-protected image CDNs still serve the image.
+        for userAgent in [Self.browserUserAgent, Self.crawlerUserAgent] {
+            if let html = await fetchHTML(sourceURL, userAgent: userAgent),
+               let raw = HTMLMeta.content(html, property: "og:image")
+                      ?? HTMLMeta.content(html, name: "twitter:image"),
+               let imageURL = HTMLMeta.resolveURL(raw, relativeTo: sourceURL),
+               let data = await downloadCoverImage(imageURL, referer: sourceURL) {
+                return data
+            }
         }
         return nil
     }
 
-    private func fetchHTML(_ url: URL) async -> String? {
+    /// YouTube poster straight from the thumbnail CDN — no page fetch, no API. `maxresdefault` is
+    /// absent on some videos, so fall back to the always-present `hqdefault`.
+    private func youTubePoster(for sourceURL: URL) async -> Data? {
+        guard let id = Self.youTubeVideoID(sourceURL) else { return nil }
+        for variant in ["maxresdefault", "hqdefault"] {
+            if let url = URL(string: "https://img.youtube.com/vi/\(id)/\(variant).jpg"),
+               let data = await downloadCoverImage(url) {
+                return data
+            }
+        }
+        return nil
+    }
+
+    /// Bilibili cover via the public web API — the watch page renders the thumbnail in JS, so there
+    /// is no og:image to scrape. Resolves a `b23.tv` short link to its `BV…` id first. The hdslb
+    /// CDN hotlink-protects covers, so the download carries a bilibili Referer.
+    private func bilibiliCover(for sourceURL: URL) async -> Data? {
+        guard let host = sourceURL.host?.lowercased(),
+              host.contains("bilibili.com") || host.contains("b23.tv") else { return nil }
+        var resolved = sourceURL
+        if host.contains("b23.tv"), let final = await resolvedURL(for: sourceURL) { resolved = final }
+        guard let r = resolved.path.range(of: "BV[0-9A-Za-z]+", options: .regularExpression) else { return nil }
+        let bv = String(resolved.path[r])
+        guard let apiURL = URL(string: "https://api.bilibili.com/x/web-interface/view?bvid=\(bv)"),
+              let obj = await jsonObject(from: apiURL, referer: URL(string: "https://www.bilibili.com")),
+              let data = obj["data"] as? [String: Any],
+              var pic = data["pic"] as? String, !pic.isEmpty else { return nil }
+        if pic.hasPrefix("http://") { pic = "https://" + pic.dropFirst("http://".count) }
+        guard let picURL = URL(string: pic) else { return nil }
+        return await downloadCoverImage(picURL, referer: URL(string: "https://www.bilibili.com"))
+    }
+
+    /// oEmbed providers that expose a reliable `thumbnail_url` (their pages are JS-rendered, so
+    /// og:image scraping is unreliable). The endpoint takes the page URL as the `url` query param.
+    private static let oEmbedEndpoints: [(match: String, endpoint: String)] = [
+        ("vimeo.com", "https://vimeo.com/api/oembed.json"),
+        ("tiktok.com", "https://www.tiktok.com/oembed"),
+    ]
+
+    private func oEmbedThumbnail(for sourceURL: URL) async -> Data? {
+        guard let host = sourceURL.host?.lowercased(),
+              let provider = Self.oEmbedEndpoints.first(where: { host.contains($0.match) }),
+              var comps = URLComponents(string: provider.endpoint) else { return nil }
+        comps.queryItems = [URLQueryItem(name: "url", value: sourceURL.absoluteString)]
+        guard let apiURL = comps.url,
+              let obj = await jsonObject(from: apiURL, referer: sourceURL),
+              let thumb = obj["thumbnail_url"] as? String,
+              let thumbURL = URL(string: thumb) else { return nil }
+        return await downloadCoverImage(thumbURL, referer: sourceURL)
+    }
+
+    /// Follow redirects to resolve a short link (e.g. `b23.tv`) to its canonical URL.
+    private func resolvedURL(for url: URL) async -> URL? {
+        var req = URLRequest(url: url)
+        req.timeoutInterval = 10
+        req.setValue(Self.browserUserAgent, forHTTPHeaderField: "User-Agent")
+        guard let (_, response) = try? await URLSession.shared.data(for: req) else { return nil }
+        return response.url
+    }
+
+    /// Fetch and parse a JSON object (oEmbed / Bilibili API responses).
+    private func jsonObject(from url: URL, referer: URL? = nil) async -> [String: Any]? {
         var req = URLRequest(url: url)
         req.timeoutInterval = 12
         req.setValue(Self.browserUserAgent, forHTTPHeaderField: "User-Agent")
+        if let referer { req.setValue(referer.absoluteString, forHTTPHeaderField: "Referer") }
+        guard let (data, response) = try? await URLSession.shared.data(for: req),
+              (response as? HTTPURLResponse)?.statusCode == 200,
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        return obj
+    }
+
+    private func fetchHTML(_ url: URL, userAgent: String) async -> String? {
+        var req = URLRequest(url: url)
+        req.timeoutInterval = 12
+        req.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         guard let (data, response) = try? await URLSession.shared.data(for: req) else { return nil }
         if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) { return nil }
         return String(data: data, encoding: .utf8)
     }
 
-    /// Download an image, downscale to `maxDimension`, re-encode as JPEG. The status-code
-    /// guard avoids storing a 404 / error-page body (common for absent YouTube `maxresdefault`).
-    private func downloadCoverImage(_ url: URL) async -> Data? {
+    /// Download an image, downscale to `maxDimension`, re-encode as JPEG. The status-code guard
+    /// avoids storing a 404 / error-page body (common for absent YouTube `maxresdefault`). A
+    /// `referer` is sent for hotlink-protected CDNs (Bilibili hdslb, some image hosts).
+    private func downloadCoverImage(_ url: URL, referer: URL? = nil) async -> Data? {
         var req = URLRequest(url: url)
         req.timeoutInterval = 12
         req.setValue(Self.browserUserAgent, forHTTPHeaderField: "User-Agent")
+        if let referer { req.setValue(referer.absoluteString, forHTTPHeaderField: "Referer") }
         guard let (data, response) = try? await URLSession.shared.data(for: req),
               (response as? HTTPURLResponse)?.statusCode == 200,
               let image = NSImage(data: data), image.size.width > 1, image.size.height > 1 else {
