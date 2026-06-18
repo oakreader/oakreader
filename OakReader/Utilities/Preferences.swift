@@ -132,6 +132,8 @@ final class Preferences {
         static let appearanceMode = "appearanceMode"
         // Web search
         static let webSearchProvider = "webSearchProvider"
+        // Browser search engine (new-tab omnibox + address bar)
+        static let browserSearchEngine = "browserSearchEngine"
     }
 
     private init() {
@@ -553,6 +555,15 @@ final class Preferences {
     var webSearchProviderId: String {
         get { defaults.string(forKey: Keys.webSearchProvider) ?? "auto" }
         set { defaults.set(newValue, forKey: Keys.webSearchProvider) }
+    }
+
+    /// Default search engine for the new-tab omnibox and the web address bar.
+    var browserSearchEngine: BrowserSearchEngine {
+        get {
+            defaults.string(forKey: Keys.browserSearchEngine)
+                .flatMap(BrowserSearchEngine.init(rawValue:)) ?? .google
+        }
+        set { defaults.set(newValue.rawValue, forKey: Keys.browserSearchEngine) }
     }
 
 }

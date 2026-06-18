@@ -660,7 +660,7 @@ final class AppState {
 
     /// Execute a new-tab router decision made from the omnibox in `viewModel`'s tab.
     /// Navigate/search turn that same tab into a live web page (in place, like a
-    /// browser); ask hands the text to a fresh agent chat and drops the new tab.
+    /// browser).
     @MainActor
     func routeNewTab(_ route: BrowserSession.Route, from viewModel: DocumentViewModel) {
         switch route {
@@ -672,12 +672,6 @@ final class AppState {
                 tab.title = url.host ?? url.absoluteString
             }
             updateWindowTitle()
-        case .ask(let text):
-            let newTabID = openTabs.first(where: { $0.viewModel === viewModel })?.id
-            openAgentWorkspace(newSession: true)
-            libraryChatVM.inputText = text
-            libraryChatVM.send()
-            if let id = newTabID { closeTab(id) }
         }
     }
 

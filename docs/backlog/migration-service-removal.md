@@ -22,8 +22,7 @@ back-compat" cleanup. In that pass we removed the clearly-dead back-compat:
 
 - memory subsystem legacy import (`importLegacy`, `USER.md`, per-doc brief) — done;
 - the `AgentPermissionLevel` migration cluster (`legacyRawValue` init,
-  `migrateAgentPermissionLevel`, `agentRequireConfirmation`) — done;
-- `StudioViewModel.importLegacyQuizCards` (legacy chat-native quiz cards) — done.
+  `migrateAgentPermissionLevel`, `agentRequireConfirmation`) — done.
 
 `MigrationService` is the last back-compat item, but it was **held back** because it's
 bigger and not as obviously safe to delete. Hence this note instead of just deleting it.

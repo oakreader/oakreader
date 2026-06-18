@@ -83,11 +83,14 @@ final class CommentsViewModel {
         pendingQuote = nil
     }
 
-    /// Save the composer text into the pending highlight's comment.
-    func commitPending(_ text: String) {
-        guard let id = pendingAnchorId else { return }
-        updateComment(id: id, text: text)
-        cancelPending()
+    /// Save the composer text into the pending highlight's comment. The anchored
+    /// highlight row already exists, so this never needs to import a backing item.
+    @discardableResult
+    func commitPending(_ text: String) -> Bool {
+        guard let id = pendingAnchorId else { return false }
+        let ok = updateComment(id: id, text: text)
+        if ok { cancelPending() }
+        return ok
     }
 
     /// Ask the panel to scroll to + flash an existing card.
@@ -99,12 +102,41 @@ final class CommentsViewModel {
 
     // MARK: - Mutations
 
-    /// Create a freestanding memo (no text selection needed).
+    /// Ensure this document has a backing library item to attach notes to.
+    ///
+    /// Live web pages (browser-mode tabs reached from the omnibox) start with no
+    /// item/attachment — `attachmentId`/`itemId` are nil — so a freestanding memo
+    /// had nowhere to persist and was silently dropped. The first note now
+    /// lazy-imports the live page into the library (the same `importBrowserLink`
+    /// flow the toolbar's "Save" button uses), then adopts the new ids on this
+    /// tab. Returns true once both ids exist.
+    @MainActor
+    private func ensureBackingItem() async -> Bool {
+        if parent?.attachmentId != nil, parent?.itemId != nil { return true }
+        guard let parent,
+              let importService = parent.appState?.importService,
+              let url = parent.state.currentURL ?? parent.liveURL,
+              url.scheme?.lowercased().hasPrefix("http") == true else { return false }
+
+        // Best-effort readable enrichment; importBrowserLink works without it.
+        let readable = await LivePageBridge.shared.extractReadable(maxChars: 1_000_000)
+        guard let item = await importService.importBrowserLink(
+            url, liveTitle: readable?.title, liveMarkdown: readable?.markdown
+        ) else { return false }
+
+        parent.itemStorageKey = item.storageKey
+        parent.attachmentId = item.primaryAttachment?.id.uuidString
+        return parent.attachmentId != nil && parent.itemId != nil
+    }
+
+    /// Create a freestanding memo (no text selection needed). Lazily promotes a
+    /// live web page into a library item first so the memo has somewhere to live.
     @discardableResult
-    func addMemo(_ text: String) -> Bool {
+    func addMemo(_ text: String) async -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty,
-              let store,
+        guard !trimmed.isEmpty else { return false }
+        guard await ensureBackingItem() else { return false }
+        guard let store,
               let attId = parent?.attachmentId,
               let itmId = parent?.itemId else { return false }
 
@@ -140,14 +172,16 @@ final class CommentsViewModel {
 
     /// Edit a card's comment text. Clearing it drops the card from the stream;
     /// for anchored notes the highlight row itself stays (just uncommented).
-    func updateComment(id: String, text: String) {
-        guard let store, var record = store.fetch(id: id) else { return }
+    @discardableResult
+    func updateComment(id: String, text: String) -> Bool {
+        guard let store, var record = store.fetch(id: id) else { return false }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         record.comment = trimmed.isEmpty ? nil : text
         record.updatedAt = Date().iso8601String
         store.upsert(record)
         reload()
         postChanged()
+        return true
     }
 
     /// Delete a card. Anchored cards also drop their on-page highlight.

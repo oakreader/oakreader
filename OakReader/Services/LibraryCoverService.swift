@@ -39,9 +39,14 @@ actor LibraryCoverService {
            let data = await downloadCoverImage(imageURL) {
             return data
         }
-        // 2. No usable preview image — snapshot the saved page itself.
+        // 2. The saved archive declared no usable preview image — SingleFile frequently strips the
+        //    og:image meta or inlines it as a `data:` URI we can't download — so fetch it from the
+        //    *live* source instead. YouTube always has a poster; Bilibili and most sites expose
+        //    og:image on the live page even when the archive doesn't.
+        if let sourceURL, let data = await remotePreviewImage(for: sourceURL) { return data }
+        // 3. Still nothing reachable — snapshot the saved page itself.
         if let snapshot = await renderHTMLSnapshot(htmlURL) { return snapshot }
-        // 3. Last resort — a branded favicon card (real site logo on a tinted card), matching how
+        // 4. Last resort — a branded favicon card (real site logo on a tinted card), matching how
         //    `.link` items degrade, instead of leaving a colorless globe placeholder forever.
         if let sourceURL { return await generateFaviconCover(for: sourceURL) }
         return nil
@@ -106,7 +111,19 @@ actor LibraryCoverService {
     /// to its poster CDN (no HTML fetch, no API). Returns a downscaled JPEG, or nil when no
     /// usable preview image is found (caller then shows an icon+title fallback card).
     func generateLinkCover(for sourceURL: URL) async -> Data? {
-        // 1. YouTube fast-path — derive the poster directly, no page fetch.
+        // A real preview image (YouTube poster or the live page's og:image) when one exists, else a
+        // branded favicon card (real site logo on a tinted card) instead of a generic link glyph.
+        if let data = await remotePreviewImage(for: sourceURL) { return data }
+        return await generateFaviconCover(for: sourceURL)
+    }
+
+    /// Fetch a real preview image for a URL, the way WhatsApp/Telegram build link previews: crawl
+    /// once, read a static image, never embed live. YouTube short-circuits to its poster CDN (no
+    /// page fetch, no API); everything else scrapes og:image / twitter:image from the *live* page.
+    /// Returns nil when neither yields a usable image, so callers pick their own fallback (a saved-
+    /// page snapshot for HTML archives, a favicon card for bare links).
+    private func remotePreviewImage(for sourceURL: URL) async -> Data? {
+        // 1. YouTube fast-path — derive the poster directly. A video always has one.
         if let id = Self.youTubeVideoID(sourceURL) {
             for variant in ["maxresdefault", "hqdefault"] { // maxres is absent on some videos → fall back
                 if let url = URL(string: "https://img.youtube.com/vi/\(id)/\(variant).jpg"),
@@ -116,7 +133,7 @@ actor LibraryCoverService {
             }
         }
 
-        // 2. Generic / X / website — scrape og:image (or twitter:image) from the page head.
+        // 2. Generic / X / Bilibili / website — scrape og:image (or twitter:image) from the page head.
         if let html = await fetchHTML(sourceURL),
            let raw = HTMLMeta.content(html, property: "og:image")
                   ?? HTMLMeta.content(html, name: "twitter:image"),
@@ -124,10 +141,7 @@ actor LibraryCoverService {
            let data = await downloadCoverImage(imageURL) {
             return data
         }
-
-        // 3. No usable preview image — fall back to a branded favicon card (real site logo on a
-        //    tinted card) instead of leaving the grid to render a generic link-glyph placeholder.
-        return await generateFaviconCover(for: sourceURL)
+        return nil
     }
 
     private func fetchHTML(_ url: URL) async -> String? {

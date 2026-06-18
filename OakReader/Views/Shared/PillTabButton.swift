@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - Pill Tab Button
 
 /// The app's shared "expanding pill" tab. A row of these renders the right-hand
-/// title-bar panel tabs (AI Chat / Metadata / Translation / Quiz Cards), the
+/// title-bar panel tabs (AI Chat / Metadata / Translation / Notes), the
 /// library detail tabs, and the library list/card view-mode toggle. The *active*
 /// button expands into a capsule that reveals its text label; inactive ones stay
 /// icon-only.

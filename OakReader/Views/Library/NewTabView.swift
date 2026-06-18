@@ -1,10 +1,9 @@
 import SwiftUI
 
-/// Dia-style new-tab router. A centered unified omnibox that resolves typed text
-/// to one of three destinations — navigate to a URL, run a web search (Google),
-/// or hand the text to the AI agent. As the user types, the candidate routes show
-/// as a suggestion list with the auto-classified intent highlighted; the submit
-/// button is relabeled to the selected action. Matches Dia 1.33's Cmd+T page.
+/// New-tab omnibox. A centered unified field that resolves typed text to one of
+/// two destinations — navigate to a URL, or run a web search with the user's
+/// default search engine. As the user types, the candidate routes show as a
+/// suggestion list; the submit button is relabeled to the selected action.
 struct NewTabView: View {
     let viewModel: DocumentViewModel
 
@@ -14,6 +13,10 @@ struct NewTabView: View {
     @Namespace private var highlight
 
     private let contentWidth: CGFloat = 640
+
+    private var searchEngine: BrowserSearchEngine {
+        Preferences.shared.browserSearchEngine
+    }
 
     private var routes: [BrowserSession.Route] {
         BrowserSession.routes(for: text)
@@ -34,7 +37,7 @@ struct NewTabView: View {
                 .frame(maxWidth: contentWidth)
 
             if text.isEmpty {
-                Text("Search the web, open a link, or ask the AI.")
+                Text("Search the web or open a link.")
                     .font(OakStyle.Font.styled(size: 13))
                     .foregroundStyle(.tertiary)
             }
@@ -61,7 +64,7 @@ struct NewTabView: View {
                 OmniboxField(
                     text: $text,
                     isFocused: $fieldFocused,
-                    placeholder: "Ask anything…",
+                    placeholder: "Search or enter address…",
                     font: OakStyle.Font.nsFont(size: 20),
                     onMoveUp: { moveSelection(-1) },
                     onMoveDown: { moveSelection(1) },
@@ -135,7 +138,7 @@ struct NewTabView: View {
     @ViewBuilder
     private func rowLabel(for route: BrowserSession.Route) -> some View {
         switch route {
-        case .ask, .search:
+        case .search:
             Text(text)
                 .font(OakStyle.Font.styled(size: 14))
                 .foregroundStyle(.primary)
@@ -172,22 +175,20 @@ struct NewTabView: View {
     @ViewBuilder
     private func rowIcon(for route: BrowserSession.Route) -> some View {
         switch route {
-        case .ask:
-            // The ask route is answered by Oak (the agent), so brand it with the
-            // app icon rather than a generic chat-bubble symbol. App-icon squircles
-            // ship with transparent margin, so render it larger than the full-bleed
-            // Google mark to carry equal optical weight.
-            OakAppIcon(size: 19)
         case .search:
-            // The search route hands off to Google, so brand the row with the
-            // Google "G" mark rather than a generic magnifying glass — mirroring
-            // how the .ask row carries Oak's app icon.
-            Image("SearchEngineGoogle")
-                .resizable()
-                .interpolation(.high)
-                .scaledToFit()
-                .frame(width: 15, height: 15)
-                .accessibilityLabel("Google")
+            // The search route hands off to the user's default search engine, so
+            // brand the row with that engine's mark when one ships in the asset
+            // catalog; otherwise fall back to a generic magnifying glass.
+            if let asset = searchEngine.iconAsset {
+                Image(asset)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+                    .frame(width: 15, height: 15)
+                    .accessibilityLabel(searchEngine.displayName)
+            } else {
+                symbolIcon("magnifyingglass")
+            }
         case .navigate:
             symbolIcon("globe")
         }
@@ -201,8 +202,7 @@ struct NewTabView: View {
 
     private func actionLabel(for route: BrowserSession.Route) -> String {
         switch route {
-        case .ask: return "Oak"
-        case .search: return "Google"
+        case .search: return searchEngine.displayName
         case .navigate: return "Go"
         }
     }

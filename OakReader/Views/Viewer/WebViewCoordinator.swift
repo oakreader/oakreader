@@ -115,17 +115,21 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
             // ("93 last month" vs the page's "93% a month") via diff-match-patch — then
             // flashes + scrolls to it. Fallback (bundle absent or no anchor found):
             // mark.js exact phrase, which still covers verbatim quotes.
+            // Returns true when the quote was located (anchor or mark.js), false when
+            // it could not be found — the native side then surfaces a toast so the
+            // jump never fails silently.
             let js = """
             (function() {
                 var query = '\(escapedText)';
                 if (window.oakHighlightCitation &&
                     window.oakHighlightCitation(JSON.stringify({ exact: query }))) {
-                    return;
+                    return true;
                 }
                 var ctx = document.querySelector('.heti') || document.body;
                 var instance = new Mark(ctx);
                 instance.unmark({ className: 'oak-cite-hl' });
                 var scrolled = false;
+                var hitCount = 0;
                 instance.mark(query, {
                     acrossElements: true,
                     caseSensitive: false,
@@ -139,15 +143,26 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
                         }
                     },
                     done: function(count) {
+                        hitCount = count;
                         if (count === 0) return;
                         setTimeout(function() {
                             instance.unmark({ className: 'oak-cite-hl' });
                         }, 3000);
                     }
                 });
+                return hitCount > 0;
             })();
             """
-            webView.evaluateJavaScript(js, completionHandler: nil)
+            webView.evaluateJavaScript(js) { result, _ in
+                guard (result as? Bool) == false else { return }
+                Task { @MainActor in
+                    showHUDToast(
+                        message: "Couldn't find that quote on the page",
+                        systemImage: "text.magnifyingglass",
+                        tint: .secondaryLabelColor
+                    )
+                }
+            }
         }
 
         setupWebSidebarObservers()

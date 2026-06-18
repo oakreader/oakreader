@@ -83,6 +83,59 @@ function flashRange(range) {
   return true;
 }
 
+// Candidate roots to anchor within, narrowest-first. Scoping to the readable
+// article (when one exists) matters for two reasons: (1) on a live page like a
+// GitHub repo, `document.body` also holds nav / sidebar / comment chrome whose
+// text dilutes diff-match-patch's Bitap match and invites false hits; (2) the
+// library sizes its fuzzy search distance to the root's text length, so a tighter
+// root means a tighter, more accurate match. We still fall through to body so a
+// quote outside any recognized container can be found.
+function candidateRoots() {
+  const roots = [];
+  const heti = document.querySelector(".heti"); // OakReader's reader-mode clip
+  if (heti) roots.push(heti);
+  // Common readable-article containers across the live web.
+  const sel =
+    "article, main, [role='main'], .markdown-body, #readme, .post, .entry-content, #content";
+  document.querySelectorAll(sel).forEach((el) => {
+    // Skip tiny decorative <article> tags (cards, asides); keep substantial prose.
+    if (el.textContent && el.textContent.length > 200 && !roots.includes(el)) {
+      roots.push(el);
+    }
+  });
+  roots.push(document.body);
+  return roots;
+}
+
+// Progressively shorter leading spans of the quote, longest first. The model
+// sometimes appends a synthesized tail to a real sentence (e.g. it flattens a
+// results table into prose: a true leading clause followed by stitched-together
+// numbers that appear nowhere contiguously). Anchoring the leading clause still
+// lands the reader on the right passage. Bounded to a few candidates so this
+// stays cheap even on large pages.
+function leadingSubSpans(exact) {
+  const out = [];
+  const push = (s) => {
+    const t = s && s.trim();
+    if (t && t.length >= 20 && !out.includes(t)) out.push(t);
+  };
+  const sentence = exact.match(/^[^.!?]{20,}[.!?]/); // up to first sentence end
+  if (sentence) push(sentence[0]);
+  const clause = exact.match(/^[^,;:—(]{20,}/); // up to first clause break
+  if (clause) push(clause[0]);
+  const words = exact.split(/\s+/).filter(Boolean);
+  if (words.length > 12) push(words.slice(0, 12).join(" "));
+  return out.sort((a, b) => b.length - a.length);
+}
+
+function anchorIn(root, sel) {
+  try {
+    return toRange(root, sel);
+  } catch (e) {
+    return null;
+  }
+}
+
 // payload: JSON-encoded W3C TextQuoteSelector — { exact, prefix?, suffix? }.
 // Returns true when a passage was located and flashed, false otherwise (so the
 // native caller can fall back). prefix/suffix are optional context that disambiguate
@@ -91,14 +144,26 @@ window.oakHighlightCitation = function (payload) {
   try {
     const sel = typeof payload === "string" ? JSON.parse(payload) : payload;
     if (!sel || !sel.exact) return false;
-    const root = document.querySelector(".heti") || document.body;
-    const range = toRange(root, {
-      exact: sel.exact,
-      prefix: sel.prefix,
-      suffix: sel.suffix,
-    });
-    if (!range) return false;
-    return flashRange(range);
+    const roots = candidateRoots();
+
+    // Pass 1 — the full quote, narrowest root first.
+    for (const root of roots) {
+      const range = anchorIn(root, {
+        exact: sel.exact,
+        prefix: sel.prefix,
+        suffix: sel.suffix,
+      });
+      if (range) return flashRange(range);
+    }
+
+    // Pass 2 — longest leading sub-span (handles synthesized/table-flattened tails).
+    for (const sub of leadingSubSpans(sel.exact)) {
+      for (const root of roots) {
+        const range = anchorIn(root, { exact: sub, prefix: sel.prefix });
+        if (range) return flashRange(range);
+      }
+    }
+    return false;
   } catch (e) {
     return false;
   }

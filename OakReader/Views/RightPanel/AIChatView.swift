@@ -209,13 +209,6 @@ struct AIChatView: View {
 
     /// Pill in the canvas header showing the agent's current workspace (the
     /// collection it is scoped to), with a clear affordance back to the whole library.
-    /// Resolve a citeKey to display metadata for the per-answer Sources footer.
-    private func resolveCitedSource(_ citeKey: String) -> ChatSourceMeta? {
-        let state = chatVM.appState ?? chatVM.parent?.appState
-        guard let item = state?.libraryStore.findItem(byCiteKey: citeKey) else { return nil }
-        return ChatSourceMeta(title: item.title, icon: item.contentType.icon, contentType: item.contentType)
-    }
-
     private var workspaceChip: some View {
         HStack(spacing: 6) {
             Image(systemName: workspaceName == nil ? "books.vertical" : "folder")
@@ -346,7 +339,6 @@ struct AIChatView: View {
                             onOpenCitation: { citeKey, anchor in
                                 chatVM.openCitation(citeKey: citeKey, anchor: anchor)
                             },
-                            resolveSource: resolveCitedSource,
                             markdownTheme: presentation == .canvas ? .dia : nil
                         )
                             .equatable()
@@ -614,8 +606,8 @@ struct AIChatView: View {
 
     // MARK: - TTS Text Preprocessing
 
-    /// Strips markup that should not be read aloud: citations, quiz XML,
-    /// code blocks, markdown formatting, and reference blocks.
+    /// Strips markup that should not be read aloud: citations, code blocks,
+    /// markdown formatting, and reference blocks.
     static func preprocessForTTS(_ text: String) -> String {
         var s = text
 
@@ -626,54 +618,47 @@ struct AIChatView: View {
             options: .regularExpression
         )
 
-        // 2. Remove <quiz ...>...</quiz> blocks
-        s = s.replacingOccurrences(
-            of: #"<quiz\s[\s\S]*?</quiz>"#,
-            with: "",
-            options: .regularExpression
-        )
-
-        // 3. Remove fenced code blocks (```...```)
+        // 2. Remove fenced code blocks (```...```)
         s = s.replacingOccurrences(
             of: #"```[\s\S]*?```"#,
             with: "",
             options: .regularExpression
         )
 
-        // 4. Remove inline code (`...`)
+        // 3. Remove inline code (`...`)
         s = s.replacingOccurrences(
             of: #"`[^`]+`"#,
             with: "",
             options: .regularExpression
         )
 
-        // 5. Convert markdown links [text](url) → text (keep the label, drop the URL)
+        // 4. Convert markdown links [text](url) → text (keep the label, drop the URL)
         s = s.replacingOccurrences(
             of: #"\[([^\]]+)\]\([^)]+\)"#,
             with: "$1",
             options: .regularExpression
         )
 
-        // 6. Strip bold/italic markers
+        // 5. Strip bold/italic markers
         s = s.replacingOccurrences(of: "***", with: "")
         s = s.replacingOccurrences(of: "**", with: "")
         s = s.replacingOccurrences(of: "__", with: "")
 
-        // 7. Strip heading markers (e.g. "### ")
+        // 6. Strip heading markers (e.g. "### ")
         s = s.replacingOccurrences(
             of: #"(?m)^#{1,6}\s+"#,
             with: "",
             options: .regularExpression
         )
 
-        // 8. Strip horizontal rules
+        // 7. Strip horizontal rules
         s = s.replacingOccurrences(
             of: #"(?m)^[-*_]{3,}\s*$"#,
             with: "",
             options: .regularExpression
         )
 
-        // 9. Collapse multiple blank lines
+        // 8. Collapse multiple blank lines
         s = s.replacingOccurrences(
             of: #"\n{3,}"#,
             with: "\n\n",

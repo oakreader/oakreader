@@ -529,6 +529,19 @@ struct LLMContextProvider {
                     matching is case-insensitive, so only casing may differ. Prefer \
                     ?text= for specific passages; use ?heading= only for a whole section.
 
+                    CRITICAL for this page type — the highlighter locates ?text= by \
+                    matching it as a CONTIGUOUS run of characters in the page. The \
+                    anchor must therefore be one unbroken span that literally exists \
+                    on the page. NEVER synthesize a sentence by flattening a table, \
+                    list, or chart into prose, and never stitch together numbers or \
+                    words that are not physically adjacent — such a "quote" appears \
+                    nowhere contiguously and will not highlight. When the claim comes \
+                    from a table, figure, or other non-prose layout, do NOT fabricate \
+                    a sentence: cite the surrounding section with \
+                    ?heading=<exact heading> instead (your [label] still carries the \
+                    synthesized numbers). Use ?text= only when an actual contiguous \
+                    sentence or clause on the page states the claim.
+
                     Example — the label names the idea, the anchor is the claim sentence:
                     \"Batch jobs are processed asynchronously \
                     ([§ Batch Endpoints](oak://cite/\(eck)?heading=Batch%20Endpoints)), \

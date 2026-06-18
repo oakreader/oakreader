@@ -76,7 +76,7 @@ struct ContentView: View {
                 // Right panel — draggable divider (full height under tab bar)
                 if viewModel.state.rightPanelMode != nil {
                     panelDivider { delta in
-                        rightPanelWidth = min(max(rightPanelWidth - delta, 400), maxRightPanel)
+                        rightPanelWidth = min(max(rightPanelWidth - delta, 200), maxRightPanel)
                     }
 
                     RightPanelContentView(viewModel: viewModel)

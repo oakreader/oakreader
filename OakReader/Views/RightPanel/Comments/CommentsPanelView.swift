@@ -27,9 +27,9 @@ struct CommentsPanelView: View {
                 onDetachQuote: { model.cancelPending() },
                 onSubmit: { md in
                     if model.pendingAnchorId != nil {
-                        model.commitPending(md)
+                        return model.commitPending(md)
                     } else {
-                        model.addMemo(md)
+                        return await model.addMemo(md)
                     }
                 },
                 focusSignal: focusSignal,
@@ -151,8 +151,9 @@ private struct CommentCardView: View {
                     // so an anchored note doesn't look like a freestanding memo.
                     quote: anchored ? record.text : nil,
                     onSubmit: { md in
-                        model.updateComment(id: record.id, text: md)
-                        isEditing = false
+                        let ok = model.updateComment(id: record.id, text: md)
+                        if ok { isEditing = false }
+                        return ok
                     },
                     onCancel: { isEditing = false },
                     memos: model.referenceableMemos(excluding: record.id)

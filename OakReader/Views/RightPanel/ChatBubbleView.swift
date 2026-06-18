@@ -3,25 +3,12 @@ import AppKit
 import OakAgent
 import OakMarkdownUI
 
-/// Display metadata for a cited source, resolved from a citeKey by the host.
-struct ChatSourceMeta {
-    let title: String
-    let icon: String
-    /// Only PDFs have pages — used to gate the `p.N` badge so a stray page anchor
-    /// on a pageless source (HTML / live web) never renders a misleading page chip.
-    let contentType: ContentType
-}
-
 struct ChatBubbleView: View, Equatable {
     let turn: Turn
     var onPlayAudio: ((Turn) -> Void)?
     var isPlayingAudio: Bool = false
     var onStopAudio: (() -> Void)?
     var onOpenCitation: ((String, CitationAnchor) -> Void)?
-    /// Resolves a citeKey to its display metadata (title + icon) for the per-answer
-    /// Sources footer. Supplied by the host (which owns the library store). Returns
-    /// nil for unknown keys, in which case the citeKey itself is shown.
-    var resolveSource: ((String) -> ChatSourceMeta?)?
     /// Optional markdown theme override (e.g. `.dia` for the agent canvas).
     /// When nil, falls back to the user-configured `.oak` theme.
     var markdownTheme: MarkdownTheme? = nil
@@ -75,16 +62,6 @@ struct ChatBubbleView: View, Equatable {
                     // Message content
                     if shouldShowMessageBubble {
                         messageBubble
-                    }
-
-                    // Per-answer Sources footer — the documents this reply cited,
-                    // each a chip that jumps to the exact passage. Shown only once
-                    // the answer has settled (parsed from its oak://cite links).
-                    if turn.role == .assistant && !isRevealing {
-                        let sources = citedSources
-                        if !sources.isEmpty {
-                            sourcesFooter(sources)
-                        }
                     }
 
                     // Streaming cursor — only while text is streaming, not while a
@@ -201,74 +178,7 @@ struct ChatBubbleView: View, Equatable {
         turn.isStreaming || reveal.isAnimating
     }
 
-    // MARK: - Sources footer
-
-    /// One source referenced by this answer, aggregated from its `oak://cite` links.
-    struct CitedSource: Identifiable {
-        let citeKey: String
-        let title: String
-        let icon: String
-        let isPaged: Bool           // PDFs only — gates the `p.N` badge
-        let pages: [Int]            // 1-based, for display
-        let anchor: CitationAnchor  // representative anchor for the jump
-        var id: String { citeKey }
-    }
-
-    /// The distinct sources this answer cites, in first-mention order.
-    private var citedSources: [CitedSource] {
-        Self.parseCitedSources(from: turn.content, resolve: resolveSource)
-    }
-
-    /// Low-key "Sources" strip under an answer: a wrapped row of jump chips.
-    @ViewBuilder
-    private func sourcesFooter(_ sources: [CitedSource]) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Divider().opacity(0.4)
-            Text("Sources")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.tertiary)
-            FlowLayout(spacing: 6) {
-                ForEach(sources) { source in
-                    sourceChip(source)
-                }
-            }
-        }
-        .padding(.top, 2)
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func sourceChip(_ source: CitedSource) -> some View {
-        Button {
-            onOpenCitation?(source.citeKey, source.anchor)
-        } label: {
-            HStack(spacing: 5) {
-                Image(systemName: source.icon)
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.secondary)
-                Text(source.title)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                if source.isPaged, let page = source.pages.first {
-                    Text("p.\(page)")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
-                }
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(Color.primary.opacity(0.05))
-            )
-            .overlay(
-                Capsule(style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
-            )
-        }
-        .buttonStyle(.plain)
-        .help("Jump to \(source.title)")
-    }
+    // MARK: - Citation hover card
 
     /// Whether a citation hover card shows anything beyond the link's own visible text.
     /// A page/heading/timestamp is always extra location info worth a card; a `?text=`
@@ -292,59 +202,6 @@ struct ChatBubbleView: View, Equatable {
             return stripped.lowercased().split(whereSeparator: \.isWhitespace).joined(separator: " ")
         }
         return norm(a) == norm(b)
-    }
-
-    /// Parse `oak://cite/{citeKey}?page=&text=` links out of answer markdown and
-    /// aggregate them per source: title/icon (via `resolve`), the set of cited
-    /// pages, and a representative anchor (first, preferring one with a page).
-    static func parseCitedSources(
-        from content: String,
-        resolve: ((String) -> ChatSourceMeta?)?
-    ) -> [CitedSource] {
-        guard content.contains("oak://cite/"),
-              let regex = try? NSRegularExpression(
-                pattern: "oak://cite/[A-Za-z0-9_.:\\-]+(?:\\?[^)\\s\\]\"'<>]*)?")
-        else { return [] }
-
-        let ns = content as NSString
-        var order: [String] = []
-        var pages: [String: [Int]] = [:]
-        var anchors: [String: CitationAnchor] = [:]
-
-        for match in regex.matches(in: content, range: NSRange(location: 0, length: ns.length)) {
-            let urlString = ns.substring(with: match.range)
-            guard let url = URL(string: urlString),
-                  let (citeKey, anchor) = CitationAnchor.parse(from: url),
-                  !citeKey.isEmpty else { continue }
-
-            if anchors[citeKey] == nil {
-                order.append(citeKey)
-                anchors[citeKey] = anchor
-                pages[citeKey] = []
-            }
-            // Prefer an anchor that can actually navigate (has a page/heading/text).
-            if anchors[citeKey]?.page == nil, anchor.page != nil {
-                anchors[citeKey] = anchor
-            }
-            if let page = anchor.page {
-                let display = page + 1  // anchor.page is 0-based
-                if !(pages[citeKey]?.contains(display) ?? false) {
-                    pages[citeKey]?.append(display)
-                }
-            }
-        }
-
-        return order.map { key in
-            let meta = resolve?(key)
-            return CitedSource(
-                citeKey: key,
-                title: meta?.title ?? key,
-                icon: meta?.icon ?? "doc",
-                isPaged: meta?.contentType == .pdf,
-                pages: (pages[key] ?? []).sorted(),
-                anchor: anchors[key] ?? CitationAnchor()
-            )
-        }
     }
 
     /// Renders chat markdown via the native `StreamingMarkdownView` (OakMarkdownUI).

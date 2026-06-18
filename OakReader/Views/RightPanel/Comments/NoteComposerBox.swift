@@ -1,6 +1,5 @@
 import SwiftUI
 import AppKit
-import UniformTypeIdentifiers
 
 /// The flomo capture/edit card — a Milkdown WYSIWYG editor plus the flomo toolbar
 /// (#, image, Aa, bullet, numbered, @) and a green send button. The *same*
@@ -15,7 +14,10 @@ struct NoteComposerBox: View {
     /// Pending-anchor quote shown as a chip above the editor (create mode).
     var quote: String? = nil
     var onDetachQuote: (() -> Void)? = nil
-    let onSubmit: (String) -> Void
+    /// Persist the composed note. Returns whether the save succeeded — the
+    /// composer only clears itself on success, so a failed save (e.g. a live page
+    /// that couldn't be imported) keeps the user's text instead of dropping it.
+    let onSubmit: (String) async -> Bool
     var onCancel: (() -> Void)? = nil
     /// Bump to pull keyboard focus into the editor (e.g. a text selection started
     /// an anchored note).
@@ -153,32 +155,21 @@ struct NoteComposerBox: View {
 
     @ViewBuilder
     private var addTile: some View {
-        let tile = RoundedRectangle(cornerRadius: 10, style: .continuous)
-            .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [4]))
-            .foregroundStyle(Color.secondary.opacity(0.4))
-            .frame(width: 72, height: 72)
-            .overlay(
-                Image(systemName: "plus")
-                    .font(.system(size: 18))
-                    .foregroundStyle(.secondary)
-            )
-            .contentShape(Rectangle())
-
         if let onCaptureRegion {
-            Menu {
-                Button { onCaptureRegion() } label: { Label("Capture region…", systemImage: "viewfinder") }
-                Button { pickImage() } label: { Label("Choose file…", systemImage: "photo") }
-            } label: {
-                tile
+            Button(action: onCaptureRegion) {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [4]))
+                    .foregroundStyle(Color.secondary.opacity(0.4))
+                    .frame(width: 72, height: 72)
+                    .overlay(
+                        Image(systemName: "viewfinder")
+                            .font(.system(size: 18))
+                            .foregroundStyle(.secondary)
+                    )
+                    .contentShape(Rectangle())
             }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
-            .help("Add image")
-        } else {
-            Button(action: pickImage) { tile }
-                .buttonStyle(.plain)
-                .help("Add image")
+            .buttonStyle(.plain)
+            .help("Capture a region of the document")
         }
     }
 
@@ -285,27 +276,14 @@ struct NoteComposerBox: View {
         }
     }
 
-    /// Image affordance — a menu (capture a region of the document, like AI chat,
-    /// or choose a file) when capture is wired; otherwise a plain file picker.
+    /// Image affordance — captures a region of the document (a viewer crosshair
+    /// clip, like AI chat). Notes only take document screenshots, never file
+    /// uploads, so this is hidden when capture isn't wired (e.g. inline edit).
     @ViewBuilder
     private var imageButton: some View {
         if let onCaptureRegion {
-            Menu {
-                Button { onCaptureRegion() } label: { Label("Capture region…", systemImage: "viewfinder") }
-                Button { pickImage() } label: { Label("Choose file…", systemImage: "photo") }
-            } label: {
-                Image(systemName: "photo")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 28, height: 28)
-            }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
-            .help("Add image")
-        } else {
-            toolButton("photo") { pickImage() }
-                .help("Insert image")
+            toolButton("viewfinder", onCaptureRegion)
+                .help("Capture a region of the document")
         }
     }
 
@@ -425,22 +403,15 @@ struct NoteComposerBox: View {
             let text = md.trimmingCharacters(in: .whitespacesAndNewlines)
             let body = Self.combine(text: text, images: attachments)
             guard !body.isEmpty else { return }
-            onSubmit(body)
-            if mode == .create {
-                controller.clear()
-                attachments = []
+            Task { @MainActor in
+                let ok = await onSubmit(body)
+                // Only clear on a successful save so a failed one keeps the text.
+                if ok, mode == .create {
+                    controller.clear()
+                    attachments = []
+                }
             }
         }
-    }
-
-    private func pickImage() {
-        let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        panel.allowedContentTypes = [.image]
-        guard panel.runModal() == .OK, let url = panel.url,
-              let saved = NoteImageStore.save(fileAt: url) else { return }
-        attachments.append(saved)
     }
 
     // MARK: Body <-> (prose, images)

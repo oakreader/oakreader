@@ -7646,52 +7646,6 @@
         }
       }
     },
-    "This will permanently delete this collection and all associated quiz cards. This action cannot be undone.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "此操作将永久删除该分类及其所有相关的测验卡片。此操作无法撤销。"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "這將永久刪除此分類及所有相關的測驗卡。此動作無法復原。"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "このコレクションと関連するすべてのクイズカードを完全に削除します。この操作は取り消せません。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "이 모음과 관련된 모든 퀴즈 카드가 영구적으로 삭제됩니다. 이 작업은 취소할 수 없습니다."
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dadurch werden diese Sammlung und alle zugehörigen Lernkarten dauerhaft gelöscht. Diese Aktion kann nicht widerrufen werden."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cela supprimera définitivement cette collection et toutes les cartes-questionnaires associées. Cette action est irréversible."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Esto eliminará permanentemente esta colección y todas las tarjetas de cuestionario asociadas. Esta acción no se puede deshacer."
-          }
-        }
-      }
-    },
     "Thought for %@s": {
       "localizations": {
         "zh-Hans": {

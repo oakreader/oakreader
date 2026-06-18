@@ -4,6 +4,7 @@ struct GeneralSettingsView: View {
     @State private var dataDirectory: String = ""
     @State private var autoSave: Bool = Preferences.shared.autoSave
     @State private var showStatusBar: Bool = Preferences.shared.showStatusBar
+    @State private var searchEngine: BrowserSearchEngine = Preferences.shared.browserSearchEngine
     @AppStorage("appearanceMode") private var appearanceMode: String = "system"
     @AppStorage("globalFontFamily") private var fontFamily: String = "system"
     @AppStorage("globalFontSize") private var fontSize: Double = 14.0
@@ -45,6 +46,21 @@ struct GeneralSettingsView: View {
                     }
                 }
                 .pickerStyle(.segmented)
+            }
+
+            Section {
+                Picker("Search Engine", selection: $searchEngine) {
+                    ForEach(BrowserSearchEngine.allCases) { engine in
+                        Text(engine.displayName).tag(engine)
+                    }
+                }
+                .onChange(of: searchEngine) { _, val in
+                    Preferences.shared.browserSearchEngine = val
+                }
+            } header: {
+                Text("Search Engine")
+            } footer: {
+                Text("Used for searches typed into a new tab or the web address bar.")
             }
 
             Section("Data Directory") {

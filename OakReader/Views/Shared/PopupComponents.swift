@@ -352,10 +352,28 @@ class PopupIconButton: NSView {
 /// one place. Fades in (0.2s), holds (1.5s), fades out (0.3s); mouse-transparent.
 @MainActor
 func showCopiedToast(message: String = "Copied to clipboard") {
+    showHUDToast(message: message)
+}
+
+/// General HUD toast — same glass look/timing as `showCopiedToast`, but the icon,
+/// tint and message are caller-supplied and the panel sizes to fit the text. Used
+/// for non-copy feedback such as a failed citation jump.
+@MainActor
+func showHUDToast(
+    message: String,
+    systemImage: String = "checkmark.circle.fill",
+    tint: NSColor = .systemGreen
+) {
     guard let window = NSApp.keyWindow else { return }
 
+    let font = NSFont.systemFont(ofSize: 12, weight: .medium)
+    let textWidth = (message as NSString).size(withAttributes: [.font: font]).width
+    let width = min(max(160, ceil(textWidth) + 56), 360)
+    let labelWidth = width - 50
+    let height: CGFloat = 36
+
     let toast = NSPanel(
-        contentRect: NSRect(x: 0, y: 0, width: 180, height: 36),
+        contentRect: NSRect(x: 0, y: 0, width: width, height: height),
         styleMask: [.borderless, .nonactivatingPanel],
         backing: .buffered,
         defer: true
@@ -365,31 +383,32 @@ func showCopiedToast(message: String = "Copied to clipboard") {
     toast.level = .floating
     toast.ignoresMouseEvents = true
 
-    let bg = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: 180, height: 36))
+    let bg = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: width, height: height))
     bg.material = .hudWindow
     bg.state = .active
     bg.wantsLayer = true
     bg.layer?.cornerRadius = 8
 
     let icon = NSImageView(frame: NSRect(x: 12, y: 6, width: 24, height: 24))
-    if let img = NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: nil) {
+    if let img = NSImage(systemSymbolName: systemImage, accessibilityDescription: nil) {
         let config = NSImage.SymbolConfiguration(pointSize: 16, weight: .medium)
         icon.image = img.withSymbolConfiguration(config)
-        icon.contentTintColor = .systemGreen
+        icon.contentTintColor = tint
     }
     bg.addSubview(icon)
 
     let label = NSTextField(labelWithString: message)
-    label.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+    label.font = font
     label.textColor = .labelColor
-    label.frame = NSRect(x: 40, y: 8, width: 130, height: 20)
+    label.lineBreakMode = .byTruncatingTail
+    label.frame = NSRect(x: 40, y: 8, width: labelWidth, height: 20)
     bg.addSubview(label)
 
     toast.contentView = bg
 
     let windowFrame = window.frame
-    let toastX = windowFrame.midX - 90
-    let toastY = windowFrame.midY - 18
+    let toastX = windowFrame.midX - width / 2
+    let toastY = windowFrame.midY - height / 2
     toast.setFrameOrigin(NSPoint(x: toastX, y: toastY))
     toast.orderFront(nil)
 

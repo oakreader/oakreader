@@ -14,7 +14,7 @@ icon-only. Modeled on Dia's command bar / iOS active-tab labels.
 
 **Reference implementation:** `OakReader/Views/TabBar/TabBarView.swift` —
 `PillTabButton` (the right-side title-bar buttons: AI Chat / Metadata /
-Translation / Quiz Cards, and the library detail tabs).
+Translation / Notes, and the library detail tabs).
 
 ### The one rule that matters: never insert/remove the label
 

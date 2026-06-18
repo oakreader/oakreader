@@ -27,55 +27,43 @@ enum BrowserSession {
     // MARK: - Address-bar resolution
 
     /// Resolve raw address-bar input into a navigable URL (URL if it looks like one,
-    /// otherwise a Google search). Used by the browser chrome's address bar.
+    /// otherwise a search with the user's default engine). Used by the address bar.
     static func resolveInput(_ raw: String) -> URL? {
         let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return nil }
-        return explicitURL(text) ?? googleSearch(text)
+        return explicitURL(text) ?? searchURL(text)
     }
 
     // MARK: - New-tab router
 
-    /// Where a piece of new-tab omnibox text can route to. Mirrors Dia's Cmd+T
-    /// behavior: a single input that resolves to navigate / web-search / ask-AI.
+    /// Where a piece of new-tab omnibox text can route to: navigate to a URL or
+    /// run a web search. A plain browser omnibox — no AI hand-off.
     enum Route: Equatable, Identifiable {
-        /// Hand the text to the AI agent chat.
-        case ask(String)
-        /// Run a web search (Google) for the text.
+        /// Run a web search for the text with the default search engine.
         case search(URL)
         /// Navigate directly to a URL.
         case navigate(URL)
 
         var id: String {
             switch self {
-            case .ask: return "ask"
             case .search: return "search"
             case .navigate: return "navigate"
             }
         }
     }
 
-    /// Ordered routing options for omnibox text, Dia-style: the auto-classified
-    /// primary intent is first, followed by the alternatives. The view highlights
-    /// the first row by default and lets the user pick another.
-    ///
-    /// - URL-like text → navigate first.
-    /// - A clear question/command → ask first (then search).
-    /// - Anything else → search first (then ask).
+    /// Ordered routing options for omnibox text: URL-like text offers navigate
+    /// first (then search as a fallback); anything else is a search. The view
+    /// highlights the first row by default and lets the user pick another.
     static func routes(for raw: String) -> [Route] {
         let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return [] }
 
-        let search = Route.search(googleSearch(text))
-        let ask = Route.ask(text)
-
+        let search = Route.search(searchURL(text))
         if let url = explicitURL(text) {
-            return [.navigate(url), search, ask]
+            return [.navigate(url), search]
         }
-        if looksLikeQuestion(text) {
-            return [ask, search]
-        }
-        return [search, ask]
+        return [search]
     }
 
     // MARK: - Heuristics
@@ -101,41 +89,8 @@ enum BrowserSession {
         return nil
     }
 
-    /// Google search URL for a query.
-    static func googleSearch(_ query: String) -> URL {
-        let q = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
-        return URL(string: "https://www.google.com/search?q=\(q)")!
+    /// Search URL for a query, using the user's default search engine.
+    static func searchURL(_ query: String) -> URL {
+        Preferences.shared.browserSearchEngine.searchURL(for: query)
     }
-
-    /// Heuristic intent classifier: does the text read like a question/command for
-    /// the AI rather than a search query? Conservative on purpose — ambiguous
-    /// keyword strings fall through to search, and the user can still pick "Chat".
-    static func looksLikeQuestion(_ raw: String) -> Bool {
-        let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return false }
-
-        if text.hasSuffix("?") || text.hasSuffix("？") { return true }
-
-        let lower = text.lowercased()
-        let firstWord = lower.split(whereSeparator: { $0 == " " || $0 == "\u{3000}" }).first.map(String.init) ?? lower
-        if englishCues.contains(firstWord) { return true }
-        for cue in chineseCues where text.hasPrefix(cue) { return true }
-        return false
-    }
-
-    /// English question / imperative openers.
-    private static let englishCues: Set<String> = [
-        "how", "what", "why", "who", "when", "where", "which", "whose", "whom",
-        "can", "could", "should", "would", "is", "are", "am", "do", "does", "did",
-        "will", "may", "might", "explain", "summarize", "summarise", "write",
-        "give", "list", "compare", "tell", "describe", "define", "translate",
-        "draft", "generate", "help",
-    ]
-
-    /// Chinese question / imperative openers.
-    private static let chineseCues: [String] = [
-        "怎么", "怎样", "如何", "为什么", "为何", "什么", "哪", "是否", "能否",
-        "可以", "解释", "总结", "概括", "写", "给", "列出", "比较", "翻译", "帮我",
-        "介绍", "说明",
-    ]
 }

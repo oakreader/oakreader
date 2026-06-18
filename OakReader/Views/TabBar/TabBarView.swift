@@ -235,7 +235,7 @@ struct TabBarView: View {
 
 // MARK: - Document Tab Strip
 
-/// Chrome-style equal-width tab strip. Every document (and quiz) tab shares the
+/// Chrome-style equal-width tab strip. Every document tab shares the
 /// available width equally — `clamp(available / count, tabMin, tabMax)` — so a few
 /// tabs sit at `tabMax` (uniform, with trailing space) and shrink together as more
 /// open. Only when even `tabMin` overflows does the strip fall back to scrolling.
