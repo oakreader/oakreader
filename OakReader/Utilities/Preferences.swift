@@ -103,9 +103,7 @@ final class Preferences {
         // Thinking budget
         static let thinkingBudget = "thinkingBudget"
         static let thinkingEffort = "thinkingEffort"
-        // Global font
-        static let globalFontFamily = "globalFontFamily"
-        static let globalFontSize = "globalFontSize"
+        // Chat font
         static let chatFontSize = "chatFontSize"
         static let chatLineHeightScale = "chatLineHeightScale"
         // Voice AI
@@ -154,8 +152,6 @@ final class Preferences {
             Keys.analyticsEnabled: true,
             Keys.aiProvider: "anthropic",
             Keys.aiModel: "",
-            Keys.globalFontFamily: "system",
-            Keys.globalFontSize: 14.0,
             Keys.chatFontSize: 14.0,
             Keys.chatLineHeightScale: 1.35,
             Keys.agentToolsEnabled: true,
@@ -219,17 +215,7 @@ final class Preferences {
         set { defaults.set(newValue, forKey: Keys.analyticsEnabled) }
     }
 
-    // MARK: - Global Font
-
-    var globalFontFamily: String {
-        get { defaults.string(forKey: Keys.globalFontFamily) ?? "system" }
-        set { defaults.set(newValue, forKey: Keys.globalFontFamily) }
-    }
-
-    var globalFontSize: CGFloat {
-        get { CGFloat(defaults.double(forKey: Keys.globalFontSize)) }
-        set { defaults.set(Double(newValue), forKey: Keys.globalFontSize) }
-    }
+    // MARK: - Chat Font
 
     /// Base font size for the AI chat markdown renderer. Code, headings, and line
     /// height all scale from this (see `MarkdownTheme.oak(fontSize:lineHeightScale:)`).

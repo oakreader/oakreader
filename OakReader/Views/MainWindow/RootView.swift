@@ -7,8 +7,6 @@ import SwiftUI
 /// because NSTextView, WKWebView, scroll positions, and editor state are preserved.
 struct RootView: View {
     let appState: AppState
-    @AppStorage("globalFontFamily") private var globalFontFamily: String = "system"
-    @AppStorage("globalFontSize") private var globalFontSize: Double = 14.0
 
     private var isPresenting: Bool {
         appState.activeTab?.viewModel.state.isPresentationMode == true
