@@ -183,17 +183,6 @@ actor LibraryCoverService {
 
     // MARK: - Synthetic covers (typographic paper cover + favicon card)
 
-    /// Curated, muted hues — picking from a small harmonious set avoids the neon/magenta a raw
-    /// hash-to-hue mapping produces, while still giving each source a stable, distinct color.
-    private static let coverHues: [Double] = [0.58, 0.52, 0.42, 0.09, 0.95, 0.70, 0.13, 0.0]
-
-    /// Deterministic, launch-stable hue for a seed string (djb2 → curated palette).
-    private static func hue(for seed: String) -> Double {
-        var hash: UInt64 = 5381
-        for byte in seed.utf8 { hash = (hash &* 33) ^ UInt64(byte) }
-        return coverHues[Int(hash % UInt64(coverHues.count))]
-    }
-
     /// A clean typographic cover for a paper/PDF — colored top band with a source kicker, a large
     /// wrapped title, authors, and a year footer. Replaces the illegible shrunk-first-page render.
     func generatePaperCover(title: String, authors: String, kicker: String, footer: String) async -> Data? {
@@ -213,7 +202,7 @@ actor LibraryCoverService {
         let label = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
         return await withCheckedContinuation { continuation in
             DispatchQueue.main.async {
-                continuation.resume(returning: Self.renderIconCover(favicon: favicon, label: label, seed: host))
+                continuation.resume(returning: Self.renderIconCover(favicon: favicon, label: label))
             }
         }
     }
@@ -234,13 +223,14 @@ actor LibraryCoverService {
     @MainActor
     private static func renderPaperCover(title: String, authors: String, kicker: String, footer: String) -> Data? {
         let size = NSSize(width: 600, height: 800)
-        // Seed on the title so every paper gets a distinct color (kicker is often a shared "PDF").
-        let hue = hue(for: title)
-        let bg = NSColor(hue: hue, saturation: 0.08, brightness: 0.99, alpha: 1)
-        let bandTop = NSColor(hue: hue, saturation: 0.46, brightness: 0.80, alpha: 1)
-        let bandBottom = NSColor(hue: hue, saturation: 0.58, brightness: 0.62, alpha: 1)
-        let titleColor = NSColor(hue: hue, saturation: 0.42, brightness: 0.20, alpha: 1)
-        let metaColor = NSColor(hue: hue, saturation: 0.30, brightness: 0.42, alpha: 1)
+        // Monochrome by design — a synthetic cover carries no real image, so a per-title hash hue is
+        // just noise in an otherwise minimal grid (matches the colorless favicon/placeholder cards).
+        // Identity comes from the title typography; the only color in the grid is real thumbnails.
+        let bg = NSColor(white: 0.99, alpha: 1)
+        let bandTop = NSColor(white: 0.56, alpha: 1)
+        let bandBottom = NSColor(white: 0.44, alpha: 1)
+        let titleColor = NSColor(white: 0.14, alpha: 1)
+        let metaColor = NSColor(white: 0.44, alpha: 1)
         let margin: CGFloat = 46
 
         let image = NSImage(size: size, flipped: true) { _ in
@@ -302,16 +292,17 @@ actor LibraryCoverService {
     }
 
     @MainActor
-    private static func renderIconCover(favicon: NSImage, label: String, seed: String) -> Data? {
+    private static func renderIconCover(favicon: NSImage, label: String) -> Data? {
         let size = NSSize(width: 600, height: 440)
-        let hue = hue(for: seed)
-        let top = NSColor(hue: hue, saturation: 0.34, brightness: 0.97, alpha: 1)
-        let bottom = NSColor(hue: hue, saturation: 0.46, brightness: 0.86, alpha: 1)
-        let labelColor = NSColor(hue: hue, saturation: 0.55, brightness: 0.34, alpha: 1)
+        // Deliberately colorless — the favicon already carries the site's brand color, so a
+        // per-site tinted background just adds noise (matches the colorless type-glyph placeholder
+        // cards in LibraryCardGridView). A flat near-white card keeps the grid quiet and minimal.
+        let bg = NSColor(white: 0.97, alpha: 1)
+        let labelColor = NSColor(white: 0.45, alpha: 1)
 
         let image = NSImage(size: size, flipped: true) { _ in
-            (NSGradient(starting: top, ending: bottom) ?? NSGradient(colors: [top]))?
-                .draw(in: NSRect(origin: .zero, size: size), angle: -90)
+            bg.setFill()
+            NSRect(origin: .zero, size: size).fill()
 
             let glyph: CGFloat = 150
             favicon.draw(

@@ -3,12 +3,12 @@ import UniformTypeIdentifiers
 
 /// Masonry / waterfall card view for the Library middle pane.
 ///
-/// Layout follows GatherOS's "dumb columns": items are round-robined into N independent
-/// vertical stacks (`column[i % N]`) and each card declares its intrinsic aspect ratio, so the
-/// browser-style waterfall falls out of N columns of aspect-correct cards — no packing solver,
-/// no per-card height measurement. Each column is a `LazyVStack`, so off-screen cards virtualize
-/// (this is why we use round-robin columns rather than the `Layout` protocol, which would measure
-/// every subview eagerly and defeat virtualization).
+/// Layout is a column waterfall: each card is appended to whichever of N independent vertical
+/// stacks is currently shortest (estimated heights), and each card declares its intrinsic aspect
+/// ratio, so the browser-style masonry falls out of N columns of aspect-correct cards — no packing
+/// solver, no per-card height measurement. Each column is a `LazyVStack`, so off-screen cards
+/// virtualize (this is why we use plain columns rather than the `Layout` protocol, which would
+/// measure every subview eagerly and defeat virtualization).
 struct LibraryCardGridView: View {
     let appState: AppState
     @Binding var selection: Set<UUID>
@@ -36,7 +36,7 @@ struct LibraryCardGridView: View {
             let items = store.filteredItems
             let columnCount = responsiveColumnCount(for: geo.size.width)
             let coverRevision = store.coverRevision
-            // Distribute round-robin in a single O(items) pass (not O(columns × items)).
+            // Pack into shortest columns in a single O(items) pass (not O(columns × items)).
             let columns = Self.distribute(items, into: columnCount)
 
             ScrollView(.vertical) {
@@ -87,16 +87,40 @@ struct LibraryCardGridView: View {
         return max(minColumns, min(maxColumns, fit))
     }
 
-    // MARK: - Column distribution (round-robin)
+    // MARK: - Column distribution (shortest-column masonry)
 
-    /// Bucket items into `count` columns in one pass: item i → column i % count.
+    /// Pack items into `count` columns by always appending the next card to whichever column is
+    /// currently *shortest* — the standard waterfall rule (Pinterest/Photos/Finder). Round-robin
+    /// (`i % count`) balances card *count* per column but not card *height*, so with mixed card
+    /// heights (portrait document pages vs. landscape web cards) columns end at very different Y
+    /// positions, leaving the ragged bottom + empty-column gap. Heights are *estimated* from the
+    /// content type rather than the real cover ratio — covers load async and aren't known here, and
+    /// a stable estimate keeps the assignment from reshuffling (popping) as covers arrive. Ties
+    /// resolve to the leftmost column, so a uniform set still fills left-to-right like round-robin.
+    /// Still N independent columns ⇒ each stays a virtualizing `LazyVStack`.
     private static func distribute(_ items: [LibraryItem], into count: Int) -> [[LibraryItem]] {
         guard count > 0 else { return [items] }
         var columns = Array(repeating: [LibraryItem](), count: count)
-        for (index, item) in items.enumerated() {
-            columns[index % count].append(item)
+        var heights = Array(repeating: CGFloat(0), count: count)
+        for item in items {
+            let shortest = heights.indices.min(by: { heights[$0] < heights[$1] }) ?? 0
+            columns[shortest].append(item)
+            heights[shortest] += estimatedCardHeight(item)
         }
         return columns
+    }
+
+    /// Relative card height for packing (a fixed card width cancels, so this is in width-units):
+    /// cover height = 1 / aspectRatio, plus a constant for the two-line title + subtitle block.
+    /// Mirrors `LibraryCardView.fallbackRatio` — portrait for documents, landscape for everything
+    /// else — which is also where real covers land once clamped, so the estimate tracks reality.
+    private static func estimatedCardHeight(_ item: LibraryItem) -> CGFloat {
+        let coverRatio: CGFloat
+        switch item.contentType {
+        case .pdf, .markdown: coverRatio = 0.78
+        default: coverRatio = 1.55
+        }
+        return 1 / coverRatio + 0.28
     }
 
     // MARK: - Selection
@@ -117,7 +141,6 @@ struct LibraryCardGridView: View {
         let targets = selection.contains(item.id) ? selectedItems() : [item]
 
         Button { appState.openLibraryItem(item) } label: { Label("Open", systemImage: "arrow.up.forward.square") }
-        Button { appState.openAgentOnItem(item) } label: { Label("Open in Agent", systemImage: "sparkles") }
         Divider()
         if isBinMode {
             Button { store.restoreItems(targets) } label: { Label("Restore", systemImage: "arrow.uturn.backward") }
@@ -169,10 +192,11 @@ struct LibraryCardGridView: View {
 
 // MARK: - Card
 
-/// A single type-agnostic library card: a top-cropped cover with depth + type badge, a neutral
-/// frosted placeholder when no preview exists, and a two-line title + metadata block. Covers are
-/// cropped to their *top* (the title/figure region a reader recognizes) rather than squished
-/// whole-page, and the aspect ratio is clamped so a tall paper page never becomes a noisy strip.
+/// A single type-agnostic library card: the cover shown *whole* (never cropped) with depth + type
+/// badge, a neutral frosted placeholder when no preview exists, and a two-line title + metadata
+/// block. The card takes the cover's own aspect ratio so a PDF page / 16:9 slide displays in full;
+/// the ratio is clamped only at the extremes so a freak panorama or text-wall page can't make a
+/// card absurdly long.
 private struct LibraryCardView: View {
     let item: LibraryItem
     let isSelected: Bool
@@ -185,11 +209,14 @@ private struct LibraryCardView: View {
 
     private let cornerRadius: CGFloat = 10
 
-    /// Display aspect ratio (w/h). Real covers use their own ratio, clamped to a pleasant band so
-    /// extreme portrait pages crop to their title region instead of rendering as a tall text wall.
+    /// Display aspect ratio (w/h). The card adopts the cover's *own* ratio so the page shows whole;
+    /// the band is wide enough to hold every normal document shape (A4 portrait ≈ 0.71 … 16:9 slide
+    /// ≈ 1.78) and clamps only true outliers (a panorama or a very tall single-column page), which
+    /// then letterbox rather than crop. The old tight [0.72, 1.55] band is exactly what cropped
+    /// 16:9 slide/title covers and A4 pages.
     private var aspectRatio: CGFloat {
         guard let cover, cover.size.height > 0 else { return fallbackRatio }
-        return min(max(cover.size.width / cover.size.height, 0.72), 1.55)
+        return min(max(cover.size.width / cover.size.height, 0.55), 1.95)
     }
 
     /// Cover-less fallback ratio: portrait for documents, landscape for web/link/audio.
@@ -244,17 +271,20 @@ private struct LibraryCardView: View {
         GeometryReader { geo in
             Group {
                 if let cover {
+                    // Fit (not fill) so the whole page/slide is always visible — the card already
+                    // adopts the cover's aspect ratio, so in the common case this fills edge-to-edge
+                    // with no bars; only a true out-of-band cover letterboxes onto the page backdrop.
                     Image(nsImage: cover)
                         .resizable()
-                        .scaledToFill()
-                        .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
+                        .scaledToFit()
+                        .frame(width: geo.size.width, height: geo.size.height)
                 } else {
                     placeholderCover
                 }
             }
             .frame(width: geo.size.width, height: geo.size.height)
+            .background(Color(nsColor: .windowBackgroundColor))
             .clipped()
-            .overlay(alignment: .bottomLeading) { typeBadge }
         }
     }
 
@@ -300,15 +330,6 @@ private struct LibraryCardView: View {
     private var cleanHost: String? {
         guard let host = item.sourceURL?.host else { return nil }
         return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
-    }
-
-    private var typeBadge: some View {
-        Image(systemName: glyph)
-            .font(.system(size: 9, weight: .semibold))
-            .foregroundStyle(.white)
-            .padding(4)
-            .background(.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 5))
-            .padding(6)
     }
 
     // MARK: - Cover loading (read-only, cached)
