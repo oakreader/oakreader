@@ -48,15 +48,15 @@ struct AIChatView: View {
             Group {
                 if chatVM.showHistory {
                     ChatHistoryDrawer(chatVM: chatVM)
-                    .transition(.move(edge: .leading))
+                        .transition(.move(edge: .trailing))
                 } else {
                     chatContent
-                        .transition(.move(edge: .trailing))
+                        .transition(.move(edge: .leading))
                 }
             }
             .clipped()
         }
-        .animation(.easeInOut(duration: 0.2), value: chatVM.showHistory)
+        .animation(.spring(duration: 0.32, bounce: 0.0), value: chatVM.showHistory)
         .onAppear {
             chatVM.refreshAtMentionItems()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {

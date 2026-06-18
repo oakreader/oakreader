@@ -5,6 +5,8 @@ struct ChatHistoryDrawer: View {
     /// Called after a session is loaded (e.g. so a sidebar host can open the chat panel).
     var onSelect: ((UUID) -> Void)?
 
+    @State private var hoveredSessionId: UUID?
+
     var body: some View {
         VStack(spacing: 0) {
             if chatVM.sessionList.isEmpty {
@@ -21,78 +23,78 @@ struct ChatHistoryDrawer: View {
     // MARK: - Empty State
 
     private var emptyState: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 10) {
             Spacer()
             Image(systemName: "bubble.left.and.text.bubble.right")
-                .font(.system(size: 32))
-                .foregroundStyle(.tertiary)
+                .font(.system(size: 30, weight: .light))
+                .foregroundStyle(OakStyle.Colors.textTertiary)
             Text("No conversations yet")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(.secondary)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(OakStyle.Colors.textSecondary)
             Text("Start a new chat to see it here.")
                 .font(.system(size: 12))
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(OakStyle.Colors.textTertiary)
             Spacer()
         }
+        .frame(maxWidth: .infinity)
     }
 
-    // MARK: - Session List
+    // MARK: - Session List (date-grouped, Dia "Recents" style)
 
     private var sessionList: some View {
         ScrollView {
-            LazyVStack(spacing: 2) {
-                ForEach(chatVM.sessionList) { session in
-                    sessionRow(session)
+            LazyVStack(alignment: .leading, spacing: 0, pinnedViews: []) {
+                ForEach(groupedSessions, id: \.title) { group in
+                    Section {
+                        ForEach(group.sessions) { session in
+                            sessionRow(session)
+                        }
+                    } header: {
+                        sectionHeader(group.title)
+                    }
                 }
             }
             .padding(.horizontal, OakStyle.Spacing.xs)
-            .padding(.vertical, OakStyle.Spacing.xs)
+            .padding(.bottom, OakStyle.Spacing.sm)
         }
+    }
+
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(OakStyle.Colors.textTertiary)
+            .padding(.horizontal, 10)
+            .padding(.top, 14)
+            .padding(.bottom, 4)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: - Session Row
 
-    @State private var hoveredSessionId: UUID?
-
     private func sessionRow(_ session: ConversationMeta) -> some View {
-        Button {
+        let isSelected = session.id == chatVM.sessionId
+        let isHovered = hoveredSessionId == session.id
+
+        return Button {
             chatVM.loadSession(session.id)
             onSelect?(session.id)
         } label: {
             HStack(spacing: 8) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(session.title.isEmpty ? "New Chat" : session.title)
-                        .font(OakStyle.Font.styledBody)
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
+                Text(session.title.isEmpty ? "New Chat" : session.title)
+                    .font(.system(size: 13, weight: isSelected ? .medium : .regular))
+                    .foregroundStyle(isSelected ? OakStyle.Colors.textPrimary : OakStyle.Colors.textSecondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
 
-                    HStack(spacing: 6) {
-                        Text(relativeDate(session.lastMessageAt))
-                            .font(.system(size: 11))
-                            .foregroundStyle(.tertiary)
+                Spacer(minLength: 6)
 
-                        if session.messageCount > 0 {
-                            Text("\(session.messageCount)")
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(.secondary)
-                                .padding(.horizontal, 5)
-                                .padding(.vertical, 1)
-                                .background(
-                                    Capsule().fill(Color.primary.opacity(0.06))
-                                )
-                        }
-                    }
-                }
-
-                Spacer()
-
-                if hoveredSessionId == session.id {
+                if isHovered {
                     Menu {
                         sessionMenuItems(session)
                     } label: {
                         Image(systemName: "ellipsis")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(OakStyle.Colors.textSecondary)
                             .frame(width: 20, height: 20)
                             .contentShape(Rectangle())
                     }
@@ -100,25 +102,28 @@ struct ChatHistoryDrawer: View {
                     .menuIndicator(.hidden)
                     .fixedSize()
                     .help("More actions")
+                } else {
+                    Text(relativeDate(session.lastMessageAt))
+                        .font(.system(size: 11))
+                        .foregroundStyle(OakStyle.Colors.textTertiary)
+                        .fixedSize()
                 }
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
+            .padding(.horizontal, 10)
+            .frame(height: 34)
             .background(
-                RoundedRectangle(cornerRadius: OakStyle.Radius.small)
+                RoundedRectangle(cornerRadius: OakStyle.Radius.standard, style: .continuous)
                     .fill(
-                        session.id == chatVM.sessionId
+                        isSelected
                             ? OakStyle.Colors.selectedBackground
-                            : (hoveredSessionId == session.id
-                                ? OakStyle.Colors.hoverBackground
-                                : Color.clear)
+                            : (isHovered ? OakStyle.Colors.hoverBackground : Color.clear)
                     )
             )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .onHover { isHovered in
-            hoveredSessionId = isHovered ? session.id : nil
+        .onHover { hovering in
+            hoveredSessionId = hovering ? session.id : nil
         }
         .contextMenu {
             sessionMenuItems(session)
@@ -152,7 +157,60 @@ struct ChatHistoryDrawer: View {
         }
     }
 
-    // MARK: - Helpers
+    // MARK: - Date Grouping
+
+    private struct SessionGroup {
+        let title: String
+        let sessions: [ConversationMeta]
+    }
+
+    /// Buckets sessions into recency sections (Today / Yesterday / Previous 7 Days /
+    /// Previous 30 Days / month-year), mirroring Dia's "Recents" data source.
+    private var groupedSessions: [SessionGroup] {
+        let calendar = Calendar.current
+        let now = Date()
+        let startOfToday = calendar.startOfDay(for: now)
+
+        // Stable order keyed by bucket rank, so newer buckets sort first.
+        var buckets: [(rank: Int, title: String, sessions: [ConversationMeta])] = []
+
+        func appendSession(_ session: ConversationMeta, rank: Int, title: String) {
+            if let idx = buckets.firstIndex(where: { $0.rank == rank }) {
+                buckets[idx].sessions.append(session)
+            } else {
+                buckets.append((rank, title, [session]))
+            }
+        }
+
+        let monthFormatter = DateFormatter()
+        monthFormatter.dateFormat = "MMMM yyyy"
+
+        // sessionList already arrives newest-first from the store.
+        for session in chatVM.sessionList {
+            let date = session.lastMessageAt
+            let dayStart = calendar.startOfDay(for: date)
+            let daysAgo = calendar.dateComponents([.day], from: dayStart, to: startOfToday).day ?? 0
+
+            if daysAgo <= 0 {
+                appendSession(session, rank: 0, title: "Today")
+            } else if daysAgo == 1 {
+                appendSession(session, rank: 1, title: "Yesterday")
+            } else if daysAgo <= 7 {
+                appendSession(session, rank: 2, title: "Previous 7 Days")
+            } else if daysAgo <= 30 {
+                appendSession(session, rank: 3, title: "Previous 30 Days")
+            } else {
+                // Month-year buckets; rank keeps them after the fixed sections and
+                // ordered most-recent-first.
+                let monthRank = 1000 + (calendar.dateComponents([.day], from: dayStart, to: startOfToday).day ?? 0)
+                appendSession(session, rank: monthRank, title: monthFormatter.string(from: date))
+            }
+        }
+
+        return buckets
+            .sorted { $0.rank < $1.rank }
+            .map { SessionGroup(title: $0.title, sessions: $0.sessions) }
+    }
 
     private func relativeDate(_ date: Date) -> String {
         let formatter = RelativeDateTimeFormatter()
