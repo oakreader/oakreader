@@ -7,6 +7,9 @@ import AppKit
 struct ProseBlockView: NSViewRepresentable {
     let attributed: NSAttributedString
     let selectable: Bool
+    /// When true, text appended since the last render fades in (Dia's glyph reveal)
+    /// instead of appearing instantly. Only the streaming trailing block sets this.
+    var animatesAppendedText: Bool = false
     /// Called when a link is clicked. Return `true` if handled (the click is
     /// consumed); return `false` to let the text view open it normally (system
     /// browser). Lets the host intercept custom schemes (e.g. `oak://`) that the
@@ -83,9 +86,13 @@ struct ProseBlockView: NSViewRepresentable {
         context.coordinator.linkPreview = linkPreview
         tv.linkPreview = linkPreview
         tv.isSelectable = selectable
+        // Set before mutating storage so the first fade applies alpha 0 synchronously
+        // (no full-opacity flash before the first animation frame).
+        tv.fadesAppendedText = animatesAppendedText
         guard let ts = tv.textStorage else { return }
         if ts.length == 0 {
             ts.setAttributedString(attributed)
+            tv.fadeInAppendedText(NSRange(location: 0, length: attributed.length))
             return
         }
         // Incremental: keep the common prefix (chars + attributes), replace only the
@@ -98,6 +105,8 @@ struct ProseBlockView: NSViewRepresentable {
         ts.beginEditing()
         ts.replaceCharacters(in: oldTail, with: newTail)
         ts.endEditing()
+        // Fade in the run that just changed (the streamed tail).
+        tv.fadeInAppendedText(NSRange(location: divergence, length: newTail.length))
     }
 
     /// First index where the two attributed strings differ in character or attributes.

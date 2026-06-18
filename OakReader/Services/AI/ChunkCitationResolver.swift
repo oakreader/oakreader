@@ -78,11 +78,48 @@ enum ChunkCitationResolver {
         var query: [String] = []
         if let chunk = chunks[id] {
             if let page = chunk.pageStart { query.append("page=\(page + 1)") }   // URL page is 1-based
+            // Anchor on VERBATIM source text so the highlight reliably matches (PDF
+            // search / DOM fuzzy-match). Keep the model's quote when it copied the
+            // passage verbatim; otherwise (paraphrase, or no quote) fall back to the
+            // chunk's first sentence — still real source text, never a dead link. This
+            // is what makes HTML citations link back as reliably as PDF.
             if let rawText, quote(rawText, appearsIn: chunk.chunkText) {
                 query.append("text=\(rawText)")
+            } else if let sentence = firstSentence(of: chunk.chunkText) {
+                query.append("text=\(encodeAnchor(sentence))")
             }
         }
         return query.isEmpty ? base : base + "?" + query.joined(separator: "&")
+    }
+
+    /// The chunk's leading sentence (verbatim), capped to a sane anchor length. Used as
+    /// the fallback anchor when the model's quote can't be confirmed in the chunk.
+    private static func firstSentence(of text: String) -> String? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 8 else { return nil }
+        let chars = Array(trimmed)
+        let minLen = 15, maxLen = 200
+        var endIdx = min(chars.count, maxLen)
+        var i = 0
+        while i < min(chars.count, maxLen) {
+            let c = chars[i]
+            if i + 1 >= minLen, c == "." || c == "!" || c == "?" || c == "\n" {
+                endIdx = i + 1
+                break
+            }
+            i += 1
+        }
+        let result = String(chars[0..<endIdx]).trimmingCharacters(in: .whitespacesAndNewlines)
+        return result.count >= 8 ? result : nil
+    }
+
+    /// Percent-encode a plain-text anchor for a `text=` query value. `CitationAnchor`
+    /// decodes both `+`→space and percent escapes; we encode spaces as `%20` and the
+    /// reserved characters that would otherwise break URL/citation parsing.
+    private static func encodeAnchor(_ s: String) -> String {
+        var allowed = CharacterSet.urlQueryAllowed
+        allowed.remove(charactersIn: "&=+%#?/")
+        return s.addingPercentEncoding(withAllowedCharacters: allowed) ?? s
     }
 
     /// Whether a `+`/`%`-encoded `?text=` value actually appears in the chunk text,

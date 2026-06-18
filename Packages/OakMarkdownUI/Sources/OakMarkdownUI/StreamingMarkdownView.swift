@@ -21,12 +21,18 @@ public struct StreamingMarkdownView: View {
     /// suppressed for custom-scheme links regardless.)
     public var linkPreview: ((URL, String) -> AnyView?)?
 
+    /// When true, the streaming trailing block fades newly-appended text in (Dia's
+    /// glyph reveal). The host gates this (e.g. off for Reduce Motion).
+    public var fadesAppendedText: Bool
+
     public init(markdown: String, theme: MarkdownTheme = .oak(), isStreaming: Bool = false,
+                fadesAppendedText: Bool = false,
                 onOpenURL: ((URL) -> Bool)? = nil,
                 linkPreview: ((URL, String) -> AnyView?)? = nil) {
         self.markdown = markdown
         self.theme = theme
         self.isStreaming = isStreaming
+        self.fadesAppendedText = fadesAppendedText
         self.onOpenURL = onOpenURL
         self.linkPreview = linkPreview
     }
@@ -37,6 +43,7 @@ public struct StreamingMarkdownView: View {
             ForEach(blocks) { block in
                 BlockRow(block: block, theme: theme,
                          streaming: isStreaming && !block.isSettled,
+                         fadesAppendedText: fadesAppendedText,
                          onOpenURL: onOpenURL, linkPreview: linkPreview)
                     .equatable()
             }
@@ -51,6 +58,7 @@ private struct BlockRow: View, Equatable {
     let block: MarkdownBlock
     let theme: MarkdownTheme
     let streaming: Bool
+    let fadesAppendedText: Bool
     // Excluded from `==`: the handler is stable per host, and a closure isn't
     // Equatable. Only block text/kind and streaming state drive re-rendering.
     var onOpenURL: ((URL) -> Bool)?
@@ -58,6 +66,7 @@ private struct BlockRow: View, Equatable {
 
     static func == (lhs: BlockRow, rhs: BlockRow) -> Bool {
         lhs.block == rhs.block && lhs.streaming == rhs.streaming
+            && lhs.fadesAppendedText == rhs.fadesAppendedText
     }
 
     @ViewBuilder
@@ -67,6 +76,7 @@ private struct BlockRow: View, Equatable {
             ProseBlockView(
                 attributed: MarkdownAttributedBuilder.attributedString(for: block.text, theme: theme),
                 selectable: !streaming,
+                animatesAppendedText: streaming && fadesAppendedText,
                 onOpenURL: onOpenURL,
                 linkPreview: linkPreview
             )

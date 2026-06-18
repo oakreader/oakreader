@@ -30,7 +30,6 @@ struct ChatBubbleView: View, Equatable {
     @State private var isCopyHovered = false
     @State private var isPlayHovered = false
     @State private var showCopied = false
-    @State private var reveal = StreamRevealController()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @ViewBuilder
@@ -66,7 +65,7 @@ struct ChatBubbleView: View, Equatable {
 
                     // Streaming cursor — only while text is streaming, not while a
                     // tool-only turn is executing (the tool-call shimmer covers that).
-                    if (turn.isStreaming || reveal.isAnimating) && shouldShowMessageBubble {
+                    if turn.isStreaming && shouldShowMessageBubble {
                         StreamingCursor()
                             .padding(.leading, 4)
                     }
@@ -127,29 +126,6 @@ struct ChatBubbleView: View, Equatable {
             .clipped()
             .onHover { isHovered = $0 }
             .animation(.spring(duration: 0.2, bounce: 0.15), value: isHovered)
-            .onChange(of: turn.content) { _, newContent in
-                // Reduce Motion: skip the typewriter reveal, show text as it lands.
-                if turn.isStreaming && turn.role == .assistant && !reduceMotion {
-                    reveal.push(newContent)
-                } else {
-                    reveal.flush(newContent)
-                }
-            }
-            .onChange(of: turn.isStreaming) { _, streaming in
-                if !streaming {
-                    reveal.endStreaming(turn.content)
-                }
-            }
-            .onAppear {
-                if turn.isStreaming && turn.role == .assistant && !reduceMotion {
-                    reveal.push(turn.content)
-                } else {
-                    reveal.flush(turn.content)
-                }
-            }
-            .onDisappear {
-                reveal.stop()
-            }
         }
     }
 
@@ -172,10 +148,10 @@ struct ChatBubbleView: View, Equatable {
         }
     }
 
-    /// True while this turn's text is still being revealed (network streaming
-    /// or the local reveal animation).
+    /// True while this turn's text is still streaming in. (The per-glyph fade-in
+    /// finishes on its own ~0.2s after the last delta; we don't gate UI on it.)
     private var isRevealing: Bool {
-        turn.isStreaming || reveal.isAnimating
+        turn.isStreaming
     }
 
     // MARK: - Citation hover card
@@ -212,7 +188,7 @@ struct ChatBubbleView: View, Equatable {
     /// Text selection is disabled while `streaming` (a settled, selectable block is only
     /// produced once the turn stops growing).
     @ViewBuilder
-    private func chatMarkdown(_ markdown: String, streaming: Bool = false) -> some View {
+    private func chatMarkdown(_ markdown: String, streaming: Bool = false, fadesAppendedText: Bool = false) -> some View {
         // Native renderer (OakMarkdownUI): swift-markdown + Highlightr + SwiftMath,
         // block-stack with settled-block memoization + incremental tail editing —
         // the same native stack Dia uses. This is the app's sole markdown renderer.
@@ -220,6 +196,7 @@ struct ChatBubbleView: View, Equatable {
             markdown: markdown,
             theme: markdownTheme ?? .oak(fontSize: CGFloat(chatFontSize), lineHeightScale: CGFloat(chatLineHeightScale)),
             isStreaming: streaming,
+            fadesAppendedText: fadesAppendedText,
             onOpenURL: { url in
                 // Intercept oak:// citation links; let everything else open in the browser.
                 guard let (citeKey, anchor) = CitationAnchor.parse(from: url) else { return false }
@@ -241,7 +218,8 @@ struct ChatBubbleView: View, Equatable {
     @ViewBuilder
     private var plainMessageBubble: some View {
         if turn.role == .assistant {
-            chatMarkdown(renderedContent, streaming: isRevealing)
+            chatMarkdown(renderedContent, streaming: isRevealing,
+                         fadesAppendedText: turn.isStreaming && !reduceMotion)
                 .environment(\.openURL, citationOpenURLAction)
                 .assistantBubbleStyle()
         } else {
@@ -316,10 +294,12 @@ struct ChatBubbleView: View, Equatable {
             let (_, stripped) = Self.extractReferencedDocuments(from: parsed.content)
             return stripped
         }
-        // No sealing/backslash protection needed: StreamingMarkdownView renders
-        // partial markdown as-is (unclosed markers stay literal) and handles math
-        // via its own block splitter, so we just hand it the raw revealed content.
-        return reveal.displayedContent
+        // Hand the renderer the full content as it streams. The reveal animation is
+        // now a glyph fade-in inside the text view (Dia's model), not a typewriter
+        // prefix — so there's no truncation here. No sealing/backslash protection
+        // needed: StreamingMarkdownView renders partial markdown as-is (unclosed
+        // markers stay literal) and handles math via its own block splitter.
+        return turn.content
     }
 
     private var skillBadges: [String] {
@@ -394,7 +374,7 @@ struct ChatBubbleView: View, Equatable {
     }
 
     private var shouldShowActions: Bool {
-        turn.role == .assistant && !turn.isStreaming && !reveal.isAnimating && !renderedContent.isEmpty
+        turn.role == .assistant && !turn.isStreaming && !renderedContent.isEmpty
     }
 
     private var shouldShowMessageBubble: Bool {
@@ -403,7 +383,7 @@ struct ChatBubbleView: View, Equatable {
             // While tools are executing the turn streams with empty content but
             // carries tool-use records — don't render a blank bubble for it.
             if !renderedContent.isEmpty { return true }
-            return (turn.isStreaming || reveal.isAnimating) && turn.toolUses.isEmpty
+            return turn.isStreaming && turn.toolUses.isEmpty
         }
         return !renderedContent.isEmpty || !skillBadges.isEmpty || !referenceBadges.isEmpty
     }
@@ -824,349 +804,6 @@ struct StreamingCursor: NSViewRepresentable {
                 dot.add(op, forKey: "wobble.opacity")
             }
         }
-    }
-}
-
-// MARK: - Adaptive-CPS Stream Reveal Controller
-//
-// Inspired by Alma's useSmoothStreamContent. Instead of a fixed-rate timer
-// that reveals one line per tick, this controller:
-//   1. Tracks API token arrival rate via EMA (exponential moving average).
-//   2. Renders at a rate ≤ arrival rate so the buffer never empties mid-stream.
-//   3. Buffers an initial batch (~50 chars) before the first render to absorb
-//      early arrival jitter.
-//   4. When streaming ends, enters a "flush" phase that smoothly drains the
-//      remaining buffer at 1.25× the observed arrival rate (max 4 seconds).
-//
-// The result is zero render stalls: the display never catches up to the API
-// and then has to wait, producing the jarring "freeze → burst" pattern.
-
-@Observable
-private final class StreamRevealController {
-    var displayedContent = ""
-    var isAnimating = false
-
-    // MARK: - Constants
-
-    private static let minCPS: Double = 15
-    private static let maxCPS: Double = 300
-    private static let defaultCPS: Double = 50
-    private static let emaAlpha: Double = 0.15
-    private static let largeAppend = 500
-    private static let flushMaxSeconds: Double = 4.0
-    private static let flushSpeedup: Double = 1.25
-    private static let minFlushCPS: Double = 18
-    private static let maxFlushCPS: Double = 90
-    private static let safetyBase: Double = 1.5
-    private static let safetyIncrement: Double = 0.2
-
-    // MARK: - State
-
-    private var targetContent = ""
-    private var displayedCount = 0
-    private var targetCount = 0
-    private var timer: Timer?
-    private var lastFrameTime: TimeInterval = 0
-    private var charAccum: Double = 0
-    private var currentCPS: Double = 0
-
-    // Arrival tracking
-    private var emaCPS: Double = defaultCPS
-    private var lastInputTime: TimeInterval = 0
-    private var lastInputCount: Int = 0
-    private var streamStartTime: TimeInterval = 0
-    private var streamStartCount: Int = 0
-    private var arrivalLog: [(time: TimeInterval, chars: Int)] = []
-    private var maxGapMs: Double = 0
-    private var stallCount: Int = 0
-
-    // Phase
-    private enum Phase { case idle, waiting, rendering, flushing }
-    private var phase: Phase = .idle
-    private var streaming = false
-    private var wasRendering = false
-    private var bufferEmptySince: TimeInterval = 0
-
-    // MARK: - Public API
-
-    /// Feed new target content from streaming deltas.
-    func push(_ content: String) {
-        let prev = targetContent
-        if content == prev { return }
-
-        // Content replaced (not appended) — sync immediately
-        if !content.hasPrefix(prev) {
-            syncImmediate(content)
-            return
-        }
-
-        let appendedLength = content.count - prev.count
-
-        // Very large append — skip animation
-        if appendedLength > Self.largeAppend {
-            syncImmediate(content)
-            return
-        }
-
-        streaming = true
-        targetContent = content
-        targetCount = content.count
-
-        let now = ProcessInfo.processInfo.systemUptime
-
-        // Stall detection
-        if lastInputTime > 0 {
-            let gapMs = (now - lastInputTime) * 1000
-            if gapMs > maxGapMs { maxGapMs = gapMs }
-            if gapMs > 300 { stallCount += 1 }
-        }
-
-        // Arrival log (sliding 3-second window)
-        arrivalLog.append((time: now, chars: appendedLength))
-        let cutoff = now - 3.0
-        while let first = arrivalLog.first, first.time < cutoff {
-            arrivalLog.removeFirst()
-        }
-
-        // Stream start tracking
-        if streamStartTime == 0 {
-            streamStartTime = now
-            streamStartCount = targetCount - appendedLength
-        }
-
-        // EMA arrival CPS
-        let deltaChars = targetCount - lastInputCount
-        let deltaTime = max(0.001, now - lastInputTime)
-        if deltaChars > 0 && lastInputTime > 0 {
-            let instantCPS = Double(deltaChars) / deltaTime
-            let clamped = Self.clamp(instantCPS, Self.minCPS, Self.maxCPS * 2)
-            emaCPS = emaCPS * (1 - Self.emaAlpha) + clamped * Self.emaAlpha
-        }
-
-        lastInputTime = now
-        lastInputCount = targetCount
-        startLoop()
-    }
-
-    /// Streaming ended — flush remaining buffer smoothly.
-    func endStreaming(_ content: String) {
-        streaming = false
-        targetContent = content
-        targetCount = content.count
-
-        if displayedCount < targetCount {
-            // Enter flushing phase to drain the backlog at accelerated rate
-            charAccum = 0
-            startLoop()
-        } else {
-            // Already caught up
-            syncImmediate(content)
-        }
-    }
-
-    /// Show all content immediately (non-streaming message / view appeared).
-    func flush(_ content: String) {
-        syncImmediate(content)
-    }
-
-    func stop() {
-        stopTimer()
-    }
-
-    deinit {
-        timer?.invalidate()
-    }
-
-    // MARK: - Loop
-
-    private func startLoop() {
-        if timer != nil { return }
-        if targetCount > displayedCount {
-            isAnimating = true
-        }
-        lastFrameTime = ProcessInfo.processInfo.systemUptime
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
-            self?.tick()
-        }
-    }
-
-    private func stopTimer() {
-        timer?.invalidate()
-        timer = nil
-        lastFrameTime = 0
-    }
-
-    private func tick() {
-        let now = ProcessInfo.processInfo.systemUptime
-        let dt = Self.clamp(now - lastFrameTime, 0.001, 0.05)
-        lastFrameTime = now
-
-        let backlog = targetCount - displayedCount
-
-        // Stream ended and no backlog — done
-        if !streaming && backlog <= 0 {
-            phase = .idle
-            currentCPS = 0
-            wasRendering = false
-            bufferEmptySince = 0
-            isAnimating = false
-            stopTimer()
-            return
-        }
-
-        // Buffer empty but still streaming — wait
-        if backlog <= 0 {
-            if wasRendering && bufferEmptySince == 0 {
-                bufferEmptySince = now
-            }
-            wasRendering = false
-            phase = .waiting
-            currentCPS = 0
-            return
-        }
-
-        bufferEmptySince = 0
-
-        // --- Flushing phase (streaming ended, catch up smoothly) ---
-        if !streaming {
-            phase = .flushing
-
-            var recentArrivalCPS = Self.defaultCPS
-            if arrivalLog.count >= 2 {
-                let windowTime = now - arrivalLog[0].time
-                let windowChars = arrivalLog.reduce(0) { $0 + $1.chars }
-                if windowTime > 0.05 {
-                    recentArrivalCPS = Double(windowChars) / windowTime
-                }
-            }
-
-            let naturalCPS = max(Self.minFlushCPS, recentArrivalCPS * Self.flushSpeedup)
-            let catchUpCPS = Double(backlog) / Self.flushMaxSeconds
-            let cps = Self.clamp(max(naturalCPS, catchUpCPS), Self.minFlushCPS, Self.maxFlushCPS)
-
-            currentCPS = cps
-            charAccum += cps * dt
-            let chars = min(Int(charAccum), backlog)
-            guard chars >= 1 else { return }
-            charAccum -= Double(chars)
-
-            advanceDisplay(by: chars)
-
-            if displayedCount >= targetCount {
-                phase = .idle
-                currentCPS = 0
-                isAnimating = false
-                stopTimer()
-            }
-            return
-        }
-
-        // --- Initial buffering — absorb early jitter ---
-        let elapsedSinceStart = streamStartTime > 0 ? now - streamStartTime : 0
-        let neverRenderedYet = displayedCount <= streamStartCount
-        let minInitialBuffer = max(50, Int(Self.minCPS * 2 * max(1, maxGapMs * 2 / 1000)))
-
-        if streaming && neverRenderedYet && elapsedSinceStart < 5 && backlog < minInitialBuffer {
-            phase = .waiting
-            currentCPS = 0
-            return
-        }
-
-        // --- Normal rendering — adaptive CPS ---
-        var arrivalCPS: Double
-        if arrivalLog.count >= 2 {
-            let windowTime = now - arrivalLog[0].time
-            let windowChars = arrivalLog.reduce(0) { $0 + $1.chars }
-            arrivalCPS = windowTime > 0.05 ? Double(windowChars) / windowTime : Self.minCPS
-        } else {
-            arrivalCPS = Self.minCPS
-        }
-
-        let streamElapsed = streamStartTime > 0 ? now - streamStartTime : 0
-        let charsReceived = targetCount - streamStartCount
-        let effectiveCPS = streamElapsed > 1 && charsReceived > 10
-            ? Double(charsReceived) / streamElapsed : arrivalCPS
-
-        let maxGapS = max(0.5, maxGapMs / 1000)
-        let safety = Self.safetyBase + Double(stallCount) * Self.safetyIncrement
-        let safeCPS = Double(backlog) / (maxGapS * safety)
-        let arrivalCap = min(arrivalCPS, effectiveCPS)
-        let cps = Self.clamp(min(safeCPS, arrivalCap), Self.minCPS, Self.maxCPS)
-
-        phase = .rendering
-        currentCPS = cps
-        wasRendering = true
-
-        charAccum += cps * dt
-        let chars = min(Int(charAccum), backlog)
-        guard chars >= 1 else { return }
-        charAccum -= Double(chars)
-
-        advanceDisplay(by: chars)
-    }
-
-    // MARK: - Helpers
-
-    /// Commit cadence throttle. `displayedContent` assignment triggers a full
-    /// SwiftUI text re-layout (`TextLayoutManager.computeMetrics`), whose cost
-    /// grows with text length. Committing at 60fps on a long message saturates
-    /// the main thread → visible stutter/"white flash". So the character count
-    /// still advances every 60fps tick (pacing unaffected), but the expensive
-    /// published write backs off as the text grows. The final char always
-    /// commits immediately so nothing is left un-rendered.
-    private var lastCommitTime: TimeInterval = 0
-
-    private static func commitInterval(forLength n: Int) -> TimeInterval {
-        switch n {
-        case ..<2_000: return 1.0 / 60.0   // short: smooth 60fps
-        case ..<6_000: return 1.0 / 30.0   // medium: 30fps
-        default:       return 1.0 / 15.0   // long: 15fps (layout is heavy)
-        }
-    }
-
-    private func advanceDisplay(by chars: Int) {
-        let newCount = min(displayedCount + chars, targetCount)
-        displayedCount = newCount
-
-        // Throttle the expensive commit; always commit the final character.
-        let now = ProcessInfo.processInfo.systemUptime
-        let reachedEnd = newCount >= targetCount
-        guard reachedEnd || now - lastCommitTime >= Self.commitInterval(forLength: targetCount) else {
-            return
-        }
-        lastCommitTime = now
-
-        let target = targetContent
-        let endIdx = target.index(target.startIndex, offsetBy: newCount)
-        displayedContent = String(target[..<endIdx])
-    }
-
-    private func syncImmediate(_ content: String) {
-        stopTimer()
-        targetContent = content
-        targetCount = content.count
-        displayedCount = content.count
-        displayedContent = content
-        phase = .idle
-        streaming = false
-        isAnimating = false
-        emaCPS = Self.defaultCPS
-        currentCPS = 0
-        lastInputTime = 0
-        lastInputCount = content.count
-        streamStartTime = 0
-        streamStartCount = content.count
-        arrivalLog = []
-        stallCount = 0
-        maxGapMs = 0
-        wasRendering = false
-        bufferEmptySince = 0
-        charAccum = 0
-        lastCommitTime = 0
-    }
-
-    private static func clamp(_ value: Double, _ lo: Double, _ hi: Double) -> Double {
-        min(hi, max(lo, value))
     }
 }
 

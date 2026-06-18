@@ -298,31 +298,18 @@ public actor AgentSession {
                     resultParts.append(.toolResult(result))
                 }
                 messages.append(LLMMessage(role: .user, content: resultParts))
+            } else if turn.role == .user {
+                // Carry the user turn's attachments (e.g. captured images) through
+                // history so follow-up questions can still reference them. Without
+                // this, a prior image is rebuilt as text-only and silently dropped.
+                messages.append(LLMMessage(role: .user, content: Self.userContentParts(for: turn)))
             } else {
                 messages.append(LLMMessage(role: role, text: Self.modelText(from: turn.content)))
             }
         }
 
-        // Build user message with attachments
-        var contentParts: [LLMMessage.ContentPart] = []
-
-        for attachment in userTurn.attachments {
-            switch attachment.type {
-            case .textSelection:
-                if let text = attachment.textContent {
-                    contentParts.append(.text("[\(attachment.label)]\n> \(text)\n"))
-                }
-            case .imageCapture:
-                if let imageData = attachment.imageData {
-                    let base64 = imageData.base64EncodedString()
-                    contentParts.append(.imageBase64(data: base64, mediaType: "image/png"))
-                }
-            }
-        }
-
-        contentParts.append(.text(Self.modelText(from: userTurn.content)))
-
-        messages.append(LLMMessage(role: .user, content: contentParts))
+        // Build the current user message with its attachments.
+        messages.append(LLMMessage(role: .user, content: Self.userContentParts(for: userTurn)))
 
         for turn in additionalUserTurns {
             messages.append(LLMMessage(role: .user, text: Self.modelText(from: turn.content)))
@@ -354,5 +341,31 @@ public actor AgentSession {
         let text = remaining.trimmingCharacters(in: .whitespacesAndNewlines)
         if skillIds.isEmpty { return text.isEmpty ? "Go" : text }
         return (text.isEmpty || text == "/") ? (skillIds.first ?? "Go") : text
+    }
+
+    /// Builds the provider content parts for a user turn: its attachments
+    /// (text selections + captured images) followed by the typed text. Shared by
+    /// both the live user turn and replayed history turns so images survive
+    /// across follow-up questions.
+    private static func userContentParts(for turn: Turn) -> [LLMMessage.ContentPart] {
+        var parts: [LLMMessage.ContentPart] = []
+
+        for attachment in turn.attachments {
+            switch attachment.type {
+            case .textSelection:
+                if let text = attachment.textContent {
+                    parts.append(.text("[\(attachment.label)]\n> \(text)\n"))
+                }
+            case .imageCapture:
+                if let imageData = attachment.imageData {
+                    parts.append(.imageBase64(data: imageData.base64EncodedString(), mediaType: "image/png"))
+                }
+            }
+        }
+
+        // Always include the typed text; modelText guarantees a non-empty string
+        // so the provider never receives an empty user message.
+        parts.append(.text(modelText(from: turn.content)))
+        return parts
     }
 }

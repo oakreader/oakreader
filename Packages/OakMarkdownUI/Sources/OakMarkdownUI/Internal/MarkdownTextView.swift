@@ -145,6 +145,7 @@ final class MarkdownTextView: NSTextView {
 
     deinit {
         hoverTimer?.invalidate()
+        fadeTimer?.invalidate()
         hoverPopover?.close()
     }
 
@@ -195,6 +196,102 @@ final class MarkdownTextView: NSTextView {
         measuringContainer.size = CGSize(width: CGFloat(1), height: .greatestFiniteMagnitude)
         lm.ensureLayout(for: measuringContainer)
         return ceil(lm.usedRect(for: measuringContainer).width)
+    }
+
+    // MARK: - Streaming fade-in
+
+    /// When true, character ranges handed to `fadeInAppendedText(_:)` animate their
+    /// opacity 0→1 instead of appearing instantly. This is Dia's reveal model: the
+    /// full text is laid out immediately (stable layout, no per-char reflow) and only
+    /// the *newly arrived* glyphs fade in. Set false to finish any in-flight fade at
+    /// full opacity (stream ended / reduce-motion).
+    var fadesAppendedText = false {
+        didSet { if !fadesAppendedText { finishAllFades() } }
+    }
+
+    /// How long a newly-appended run takes to fade from transparent to opaque.
+    /// Matches Dia's `TextFadeAnimator.fadeInDuration` feel (~0.2s).
+    private static let fadeDuration: TimeInterval = 0.22
+
+    private var activeFades: [(range: NSRange, start: TimeInterval)] = []
+    private var fadeTimer: Timer?
+
+    /// Fade in a freshly-appended character range. Applies alpha 0 synchronously so the
+    /// run never flashes at full opacity before the first animation frame.
+    func fadeInAppendedText(_ range: NSRange) {
+        guard fadesAppendedText, range.length > 0, let lm = layoutManager else { return }
+        // The streamed tail can be rewritten (markdown reflow moves the divergence
+        // point back). Restore any overlapping in-flight fade to full opacity BEFORE
+        // dropping it — otherwise a run only partially covered by the new range stays
+        // stuck dim forever ("some text too light").
+        for fade in activeFades where NSIntersectionRange(fade.range, range).length > 0 {
+            clearFadeAlpha(fade.range, lm: lm)
+        }
+        activeFades.removeAll { NSIntersectionRange($0.range, range).length > 0 }
+        activeFades.append((range, ProcessInfo.processInfo.systemUptime))
+        applyFadeAlpha(0, to: range, lm: lm)
+        if fadeTimer == nil {
+            let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
+                self?.tickFades()
+            }
+            // .common so the fade keeps animating during scroll/event tracking
+            // instead of freezing mid-fade (which also reads as stuck-dim text).
+            RunLoop.main.add(timer, forMode: .common)
+            fadeTimer = timer
+        }
+    }
+
+    private func tickFades() {
+        guard let lm = layoutManager else { stopFadeTimer(); return }
+        let now = ProcessInfo.processInfo.systemUptime
+        var stillActive: [(range: NSRange, start: TimeInterval)] = []
+        for fade in activeFades {
+            let p = min(1.0, (now - fade.start) / Self.fadeDuration)
+            if p >= 1.0 {
+                clearFadeAlpha(fade.range, lm: lm)   // restore real color
+            } else {
+                applyFadeAlpha(p * p * (3 - 2 * p), to: fade.range, lm: lm)  // smoothstep
+                stillActive.append(fade)
+            }
+        }
+        activeFades = stillActive
+        if activeFades.isEmpty { stopFadeTimer() }
+    }
+
+    /// Overlay a temporary foreground color at `alpha`, preserving each run's real color
+    /// (links, code spans). Temporary attributes don't trigger relayout, so this is cheap.
+    private func applyFadeAlpha(_ alpha: CGFloat, to range: NSRange, lm: NSLayoutManager) {
+        guard let storage = textStorage else { return }
+        let clamped = NSIntersectionRange(range, NSRange(location: 0, length: storage.length))
+        guard clamped.length > 0 else { return }
+        storage.enumerateAttribute(.foregroundColor, in: clamped, options: []) { value, sub, _ in
+            let base = (value as? NSColor) ?? self.textColor ?? .labelColor
+            lm.addTemporaryAttribute(.foregroundColor, value: base.withAlphaComponent(alpha),
+                                     forCharacterRange: sub)
+        }
+    }
+
+    private func clearFadeAlpha(_ range: NSRange, lm: NSLayoutManager) {
+        guard let storage = textStorage else { return }
+        let clamped = NSIntersectionRange(range, NSRange(location: 0, length: storage.length))
+        guard clamped.length > 0 else { return }
+        lm.removeTemporaryAttribute(.foregroundColor, forCharacterRange: clamped)
+    }
+
+    private func finishAllFades() {
+        // Belt-and-suspenders: clear the fade overlay across the WHOLE text, not just
+        // tracked ranges, so no run can ever be left dim once the stream settles.
+        if let lm = layoutManager, let storage = textStorage, storage.length > 0 {
+            lm.removeTemporaryAttribute(.foregroundColor,
+                                        forCharacterRange: NSRange(location: 0, length: storage.length))
+        }
+        activeFades.removeAll()
+        stopFadeTimer()
+    }
+
+    private func stopFadeTimer() {
+        fadeTimer?.invalidate()
+        fadeTimer = nil
     }
 
     // MARK: - Link hover preview

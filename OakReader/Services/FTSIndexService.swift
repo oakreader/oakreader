@@ -209,6 +209,18 @@ final class FTSIndexService: @unchecked Sendable {
         }
     }
 
+    /// All chunks of a non-paginated item (HTML / markdown / web), for injecting its
+    /// body as citable `?c=` passages. Capped to keep the prompt bounded. Empty when
+    /// the item isn't indexed.
+    func allChunks(itemId: String, limit: Int = 80) async -> [FTSChunk] {
+        do {
+            return try ftsDB.fetchAllChunks(forItemId: itemId, limit: limit)
+        } catch {
+            Log.error(Log.fts, "Failed to fetch all chunks: \(error)")
+            return []
+        }
+    }
+
     /// Fetch full chunks by their stable ids, keyed by id. Used to resolve and
     /// validate `?c=<chunkId>` citations against ground-truth chunk text.
     func chunks(byIds ids: [Int64]) async -> [Int64: FTSChunk] {

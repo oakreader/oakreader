@@ -170,6 +170,18 @@ final class FTSDatabase: @unchecked Sendable {
         }
     }
 
+    /// All chunks of an item, ordered by rowid, capped at `limit`. Used to inject a
+    /// non-paginated document (HTML / markdown / web) as citable `?c=` passages — the
+    /// whole body is one "page", so there is no page filter. Caller truncates by the
+    /// model-window char budget.
+    func fetchAllChunks(forItemId itemId: String, limit: Int) throws -> [FTSChunk] {
+        try dbQueue.read { db in
+            try FTSChunk.fetchAll(db, sql: """
+                SELECT * FROM chunks WHERE item_id = ? ORDER BY id LIMIT ?
+                """, arguments: [itemId, limit])
+        }
+    }
+
     /// All item IDs we've attempted to index (processed set), including empty ones.
     /// Used to skip both already-indexed and known-empty items on the background pass.
     func processedItemIds() throws -> Set<String> {

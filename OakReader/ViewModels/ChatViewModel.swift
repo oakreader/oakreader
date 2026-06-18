@@ -404,6 +404,28 @@ class ChatViewModel {
 
                 var assistantTurnId: UUID?
 
+                // Coalesce streaming text deltas so the observed `turns` array
+                // mutates a few times per second instead of once per token.
+                // Per-token mutation forces SwiftUI to re-render the streaming
+                // bubble on every token — the main source of chat jank at high
+                // token rates. The glyph fade-in in the text view animates each
+                // committed chunk smoothly, and `.finished` always overwrites with
+                // the engine's authoritative full content, so buffering changes only
+                // render cadence, never correctness.
+                var pendingText = ""
+                var lastCommitNanos = DispatchTime.now().uptimeNanoseconds
+                let commitIntervalNanos: UInt64 = 33_000_000  // ~30 commits/sec
+                func commitPendingText() {
+                    guard !pendingText.isEmpty else { return }
+                    if let id = assistantTurnId,
+                       let idx = turns.lastIndex(where: { $0.id == id })
+                    {
+                        turns[idx].content += pendingText
+                    }
+                    pendingText = ""
+                    lastCommitNanos = DispatchTime.now().uptimeNanoseconds
+                }
+
                 for try await event in stream {
                     // The user switched/cleared/loaded a different session mid-stream.
                     // Stop before writing the old response into the new chat (and
@@ -411,12 +433,15 @@ class ChatViewModel {
                     if sessionId != currentSessionId { break }
                     switch event {
                     case .delta(let delta):
-                        if let id = assistantTurnId,
-                           let idx = turns.lastIndex(where: { $0.id == id })
-                        {
-                            turns[idx].content += delta
+                        if assistantTurnId != nil {
+                            pendingText += delta
+                            let now = DispatchTime.now().uptimeNanoseconds
+                            if pendingText.utf8.count >= 256 || now &- lastCommitNanos >= commitIntervalNanos {
+                                commitPendingText()
+                            }
                         } else {
-                            // First delta — create assistant turn placeholder
+                            // First delta — create assistant turn placeholder and
+                            // show it immediately so the response feels responsive.
                             let newTurn = Turn(
                                 role: .assistant,
                                 content: delta,
@@ -424,6 +449,7 @@ class ChatViewModel {
                             )
                             assistantTurnId = newTurn.id
                             turns.append(newTurn)
+                            lastCommitNanos = DispatchTime.now().uptimeNanoseconds
                         }
 
                     case .thinkingDelta(let text):
@@ -508,6 +534,9 @@ class ChatViewModel {
                         }
 
                     case .finished(let turn):
+                        // The resolved content below is authoritative and replaces
+                        // whatever was streamed, so drop any uncommitted tail.
+                        pendingText = ""
                         // Resolve any chunk-id citations (`?c=<id>`) the model emitted
                         // into durable, validated `?page=&text=` anchors before the
                         // message settles into history. No-op when there are none.
@@ -543,6 +572,9 @@ class ChatViewModel {
                         }
 
                     case .error(let error):
+                        // No `.finished` will arrive to reconcile — flush the tail
+                        // so the partial answer stays visible alongside the error.
+                        commitPendingText()
                         errorMessage = error.localizedDescription
                         if let id = assistantTurnId,
                            let idx = turns.lastIndex(where: { $0.id == id })
@@ -703,14 +735,25 @@ class ChatViewModel {
         return await ChunkCitationResolver.resolve(in: content, using: fts)
     }
 
-    /// The open document's current-page passages as citable `?c=` chunks (PDF only,
-    /// when indexed). Empty otherwise — the prompt then falls back to raw page text.
+    /// The open document's citable `?c=` passages, when indexed. For PDFs this is the
+    /// current page's chunks; for non-paginated docs (HTML / markdown / saved web clips)
+    /// it's the whole body's chunks. Empty otherwise — the prompt then falls back to raw
+    /// page text. Giving HTML the same chunk-id path as PDF is what lets web citations
+    /// resolve to a verbatim, reliably-anchorable quote instead of a model paraphrase.
     private func currentPageChunks(snapshot: ChatContextSnapshot) async -> [LLMContextProvider.CurrentPageChunk] {
-        guard let doc = snapshot.document, doc.contentType == .pdf,
+        guard let doc = snapshot.document,
               let itemId,
               let fts = (appState ?? parent?.appState)?.ftsIndexService
         else { return [] }
-        let chunks = await fts.currentPageChunks(itemId: itemId, page: doc.currentPageIndex)
+        let chunks: [FTSChunk]
+        switch doc.contentType {
+        case .pdf:
+            chunks = await fts.currentPageChunks(itemId: itemId, page: doc.currentPageIndex)
+        case .html, .markdown, .link:
+            chunks = await fts.allChunks(itemId: itemId)
+        default:
+            return []
+        }
         return chunks.compactMap { c in
             c.id.map { LLMContextProvider.CurrentPageChunk(id: $0, page: c.pageStart, text: c.chunkText) }
         }
