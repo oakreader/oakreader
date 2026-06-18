@@ -427,6 +427,30 @@ extension CatalogDatabase {
             try db.create(index: "idx_studio_artifacts_item_id", on: "studio_artifacts", columns: ["item_id"])
         }
 
+        // MARK: v16 — Word lookup history
+        //
+        // A simple per-document log of words the user looked up in the Translation
+        // panel, also surfaced globally. Not spaced repetition — just a reviewable
+        // history. `item_id` is nullable with ON DELETE SET NULL so the history
+        // outlives the document; `dedupe_key` keeps it one row per (document, word).
+
+        migrator.registerMigration("v16-word-lookups") { db in
+            try db.create(table: "word_lookups") { t in
+                t.column("id", .text).primaryKey()
+                t.column("user_id", .text).notNull()
+                t.column("item_id", .text).references("items", onDelete: .setNull)
+                t.column("item_title", .text).notNull().defaults(to: "")
+                t.column("word", .text).notNull()
+                t.column("sentence", .text).notNull().defaults(to: "")
+                t.column("explanation", .text).notNull().defaults(to: "")
+                t.column("dedupe_key", .text).notNull()
+                t.column("created_at", .text).notNull()
+            }
+            try db.create(index: "idx_word_lookups_item_id", on: "word_lookups", columns: ["item_id"])
+            try db.create(index: "idx_word_lookups_created", on: "word_lookups", columns: ["created_at"])
+            try db.create(index: "idx_word_lookups_dedupe", on: "word_lookups", columns: ["dedupe_key"])
+        }
+
         return migrator
     }
 

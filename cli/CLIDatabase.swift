@@ -83,6 +83,21 @@ struct CLIPropertyOption: Codable, FetchableRecord {
     }
 }
 
+struct CLIWordLookup: Codable, FetchableRecord {
+    var id: String
+    var word: String
+    var sentence: String
+    var explanation: String
+    var itemTitle: String
+    var createdAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, word, sentence, explanation
+        case itemTitle = "item_title"
+        case createdAt = "created_at"
+    }
+}
+
 // MARK: - System Collection IDs
 
 enum CLISystemCollectionID {
@@ -479,6 +494,32 @@ final class CLIDatabase {
                 INSERT INTO item_property_values (id, item_id, property_id, option_id)
                 VALUES (?, ?, ?, ?)
             """, arguments: [id, itemId, propertyId, statusOptionId])
+        }
+    }
+
+    // MARK: - Word Lookups
+
+    /// Fetch saved word lookups, newest first. `since` is an ISO8601 string
+    /// (lexically comparable to the stored UTC timestamps). Returns an empty list
+    /// when the table doesn't exist yet (DB predates the feature).
+    func fetchWordLookups(since: String? = nil, limit: Int? = nil) throws -> [CLIWordLookup] {
+        try dbQueue.read { db in
+            let hasTable = try Bool.fetchOne(db, sql:
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='word_lookups'") ?? false
+            guard hasTable else { return [] }
+
+            var sql = "SELECT id, word, sentence, explanation, item_title, created_at FROM word_lookups"
+            var args: [DatabaseValueConvertible] = []
+            if let since {
+                sql += " WHERE created_at >= ?"
+                args.append(since)
+            }
+            sql += " ORDER BY created_at DESC"
+            if let limit {
+                sql += " LIMIT ?"
+                args.append(limit)
+            }
+            return try CLIWordLookup.fetchAll(db, sql: sql, arguments: StatementArguments(args))
         }
     }
 

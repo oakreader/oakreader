@@ -95,11 +95,11 @@ enum LibrarySidebarMode: String, CaseIterable, Identifiable {
 }
 
 enum RightPanelMode: String, CaseIterable, Identifiable {
+    // Tab order in the document view (Metadata last).
     case aiChat
     case comments
-    case metadata
     case translation
-    case quiz = "flashcards"
+    case metadata
 
     var id: String { rawValue }
 
@@ -109,7 +109,6 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
         case .aiChat: return "bubble.left.and.bubble.right"
         case .comments: return "text.bubble"
         case .translation: return "translate"
-        case .quiz: return "rectangle.on.rectangle.angled"
         }
     }
 
@@ -119,7 +118,6 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
         case .aiChat: return "AI Chat"
         case .comments: return "Notes"
         case .translation: return "Translation"
-        case .quiz: return "Quiz"
         }
     }
 }

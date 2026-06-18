@@ -279,33 +279,5 @@ struct AnnotationRecord: Codable, FetchableRecord, MutablePersistableRecord, Has
     }
 }
 
-// MARK: - Studio Artifact
-
-/// A generated AI Studio artifact (quiz, mind map, deck, audio) scoped to an item.
-/// See `StudioArtifact` for the domain model and `StudioArtifactStore` for CRUD.
-struct StudioArtifactRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable {
-    static let databaseTableName = "studio_artifacts"
-
-    var id: String
-    var userId: String
-    var itemId: String
-    var kind: String
-    var title: String
-    var body: String
-    var paramsJson: String
-    var assetPath: String?
-    var createdAt: String
-    var updatedAt: String
-
-    enum CodingKeys: String, CodingKey, ColumnExpression {
-        case id, kind, title, body
-        case userId = "user_id"
-        case itemId = "item_id"
-        case paramsJson = "params_json"
-        case assetPath = "asset_path"
-        case createdAt = "created_at"
-        case updatedAt = "updated_at"
-    }
-}
 
 

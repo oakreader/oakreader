@@ -96,15 +96,6 @@ class DocumentViewModel {
         return vm
     }
 
-    private var _studio: StudioViewModel?
-    /// Per-item AI Studio: generated artifacts (quiz, concept map, deck, audio).
-    var studio: StudioViewModel {
-        if let vm = _studio { return vm }
-        let vm = StudioViewModel(parent: self)
-        _studio = vm
-        return vm
-    }
-
     private var _comments: CommentsViewModel?
     /// Per-document comment stream (flomo-style): freestanding memos + the
     /// selection-anchored notes, in one reverse-chronological list.
@@ -114,10 +105,6 @@ class DocumentViewModel {
         _comments = vm
         return vm
     }
-
-    /// When set, a wide Studio artifact (concept map / deck) is shown full-screen
-    /// over the document. Cleared to dismiss.
-    var studioFullScreenArtifact: StudioArtifact?
 
     /// The item-level storage key, set externally by AppState when creating the tab.
     var itemStorageKey: String?

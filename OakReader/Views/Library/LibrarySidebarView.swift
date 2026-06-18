@@ -539,12 +539,12 @@ private struct CollectionRowView: View {
                 isPresented: $showingDeleteConfirmation,
                 titleVisibility: .visible
             ) {
-                Button("Delete Collection and Quiz Cards", role: .destructive) {
+                Button("Delete Collection", role: .destructive) {
                     store.deleteCollection(collection)
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text("This will permanently delete this collection and all associated quiz cards. This action cannot be undone.")
+                Text("This will permanently delete this collection. This action cannot be undone.")
             }
 
             // Subcollections (recursive)

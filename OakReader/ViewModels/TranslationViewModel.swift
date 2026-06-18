@@ -17,6 +17,10 @@ class TranslationViewModel {
     var isExplainingWord: Bool = false
     var explanationWord: String = ""
 
+    /// This document's saved word-lookup history (newest first), shown as a
+    /// flashcard-style list under the source card.
+    var lookups: [WordLookup] = []
+
     private var streamTask: Task<Void, Never>?
     private var debounceTask: Task<Void, Never>?
     private var wordExplanationTask: Task<Void, Never>?
@@ -272,6 +276,7 @@ class TranslationViewModel {
         explanationWord = trimmed
         wordExplanation = ""
         isExplainingWord = true
+        let contextSentence = sentence.trimmingCharacters(in: .whitespacesAndNewlines)
 
         let prefs = Preferences.shared
         let pid = prefs.translationAIProviderId
@@ -287,6 +292,7 @@ class TranslationViewModel {
         let messages = [LLMMessage(role: .user, text: userPrompt)]
 
         wordExplanationTask = Task { @MainActor in
+            var hadError = false
             do {
                 let svc = try await router.provider(for: config)
                 let stream = svc.sendMessage(
@@ -304,14 +310,21 @@ class TranslationViewModel {
                         break
                     case .error(let msg):
                         wordExplanation += "\n\n⚠️ \(msg)"
+                        hadError = true
                     }
                 }
             } catch {
                 if !(error is CancellationError) {
                     wordExplanation += "\n\n⚠️ \(error.localizedDescription)"
+                    hadError = true
                 }
             }
             isExplainingWord = false
+
+            // Save to this document's lookup history (simple, no scheduling).
+            if !Task.isCancelled, !hadError, !trimmed.isEmpty, !wordExplanation.isEmpty {
+                saveLookup(word: trimmed, sentence: contextSentence, explanation: wordExplanation)
+            }
         }
     }
 
@@ -319,6 +332,42 @@ class TranslationViewModel {
         wordExplanationTask?.cancel()
         wordExplanationTask = nil
         isExplainingWord = false
+    }
+
+    // MARK: - Lookup history (per document)
+
+    private var lookupStore: WordLookupStore? {
+        guard let db = parent?.database else { return nil }
+        return WordLookupStore(database: db)
+    }
+
+    /// Load this document's saved lookups. Call when the panel appears.
+    func loadLookups() {
+        guard let store = lookupStore, let itemId = parent?.itemId else { lookups = []; return }
+        lookups = store.fetch(itemId: itemId)
+    }
+
+    private func saveLookup(word: String, sentence: String, explanation: String) {
+        guard let store = lookupStore else { return }
+        let title = parent?.libraryItem?.title ?? parent?.fileName ?? ""
+        let lookup = WordLookup(
+            id: UUID().uuidString, itemId: parent?.itemId, itemTitle: title,
+            word: word, sentence: sentence, explanation: explanation, createdAt: Date()
+        )
+        store.save(lookup)
+        // Reflect immediately: drop any prior entry for the same word, prepend.
+        lookups.removeAll { $0.word.lowercased() == word.lowercased() }
+        lookups.insert(lookup, at: 0)
+    }
+
+    func deleteLookup(_ lookup: WordLookup) {
+        lookupStore?.delete(id: lookup.id)
+        lookups.removeAll { $0.id == lookup.id }
+    }
+
+    func clearLookups() {
+        lookupStore?.clear(itemId: parent?.itemId)
+        lookups = []
     }
 
     /// True when the selection is a single word (no internal whitespace).

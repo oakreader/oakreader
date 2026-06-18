@@ -26,14 +26,41 @@ struct TranslationPanelView: View {
                     languageSelector
                     sourceCard
                     resultCard
+                    lookupsSection
                 }
                 .padding(.horizontal, OakStyle.Spacing.sm)
                 .padding(.bottom, OakStyle.Spacing.md)
             }
             .scrollContentBackground(.hidden)
         }
+        .task { translationVM.loadLookups() }
         .onChange(of: voiceVM?.isSpeaking) { _, speaking in
             if speaking == false { playingSection = nil }
+        }
+    }
+
+    // MARK: - Lookup history (this document)
+
+    @ViewBuilder
+    private var lookupsSection: some View {
+        if !translationVM.lookups.isEmpty {
+            VStack(alignment: .leading, spacing: OakStyle.Spacing.xs) {
+                HStack {
+                    Text("LOOKUPS (\(translationVM.lookups.count))")
+                        .font(.system(size: 10, weight: .semibold))
+                        .tracking(0.5)
+                        .foregroundStyle(.tertiary)
+                    Spacer()
+                    Button("Clear") { translationVM.clearLookups() }
+                        .font(.system(size: 10))
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.tertiary)
+                }
+                ForEach(translationVM.lookups) { lookup in
+                    LookupCardRow(lookup: lookup, onDelete: { translationVM.deleteLookup(lookup) })
+                }
+            }
+            .padding(.top, OakStyle.Spacing.xs)
         }
     }
 

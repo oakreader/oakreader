@@ -95,20 +95,6 @@ struct ContentView: View {
             )
         }
         .background(Color(nsColor: .controlBackgroundColor))
-        .overlay {
-            if let artifact = viewModel.studioFullScreenArtifact {
-                StudioFullScreenView(
-                    artifact: artifact,
-                    onClose: { viewModel.studioFullScreenArtifact = nil },
-                    onJumpToSource: { quote, page in
-                        viewModel.studio.jumpToSource(anchorText: quote, page1Based: page)
-                    },
-                    onDeleteCard: { index in
-                        viewModel.studio.deleteQuizCard(artifact, at: index)
-                    }
-                )
-            }
-        }
         .alert("Error", isPresented: Binding(
             get: { viewModel.state.showError },
             set: { viewModel.state.showError = $0 }

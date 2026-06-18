@@ -55,6 +55,7 @@ struct Oak: ParsableCommand {
             Status.self,
             Open.self,
             Skills.self,
+            Words.self,
         ],
         defaultSubcommand: nil
     )
@@ -76,6 +77,82 @@ struct Oak: ParsableCommand {
             print("")
             print("Run 'oak --help' for available commands.")
         }
+    }
+}
+
+// MARK: - Words (lookup history)
+
+struct Words: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "words",
+        abstract: "List words you looked up while reading (newest first)."
+    )
+
+    @OptionGroup var globals: GlobalOptions
+
+    @Flag(name: .long, help: "Only words looked up today.")
+    var today = false
+
+    @Option(name: .long, help: "Only words looked up on or after this date (YYYY-MM-DD).")
+    var since: String?
+
+    @Option(name: .long, help: "Maximum number of results (default 100).")
+    var limit: Int?
+
+    func run() throws {
+        let database = try CLIDatabase(path: globals.db)
+        let sinceISO = try Words.resolveSince(today: today, since: since)
+        let lookups = try database.fetchWordLookups(since: sinceISO, limit: limit ?? 100)
+
+        if globals.json {
+            let output = CLIOutput(json: true, quiet: globals.quiet)
+            output.results(operation: "words.list", items: lookups, meta: ["count": lookups.count])
+            return
+        }
+
+        guard !lookups.isEmpty else {
+            print(today ? "No words looked up today." : "No word lookups found.")
+            return
+        }
+        for l in lookups {
+            let sentence = l.sentence.replacingOccurrences(of: "\n", with: " ")
+            let snippet = sentence.count > 64 ? String(sentence.prefix(64)) + "…" : sentence
+            let doc = l.itemTitle.isEmpty ? "" : "  (\(l.itemTitle))"
+            print("\(l.word)  —  \(snippet)\(doc)  ·  \(Words.shortDate(l.createdAt))")
+        }
+        if !globals.quiet {
+            print("\n\(lookups.count) word\(lookups.count == 1 ? "" : "s").")
+        }
+    }
+
+    /// Resolve `--today` / `--since` to an ISO8601 UTC lower bound matching the
+    /// stored timestamps' format, or nil for no lower bound.
+    static func resolveSince(today: Bool, since: String?) throws -> String? {
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if today {
+            return iso.string(from: Calendar.current.startOfDay(for: Date()))
+        }
+        if let since {
+            let day = DateFormatter()
+            day.calendar = Calendar(identifier: .gregorian)
+            day.dateFormat = "yyyy-MM-dd"
+            guard let date = day.date(from: since) else {
+                throw ValidationError("Invalid --since date '\(since)'. Use YYYY-MM-DD.")
+            }
+            return iso.string(from: Calendar.current.startOfDay(for: date))
+        }
+        return nil
+    }
+
+    /// Render a stored ISO8601 timestamp as a short local "MMM d, HH:mm".
+    static func shortDate(_ iso: String) -> String {
+        let parser = ISO8601DateFormatter()
+        parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        guard let date = parser.date(from: iso) else { return iso }
+        let out = DateFormatter()
+        out.dateFormat = "MMM d, HH:mm"
+        return out.string(from: date)
     }
 }
 
