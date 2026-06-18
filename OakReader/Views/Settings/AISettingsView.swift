@@ -45,7 +45,7 @@ struct AISettingsView: View {
                 thinkingSection
             }
             .formStyle(.grouped)
-            .navigationTitle("AI")
+            .navigationTitle("LLM")
             .navigationDestination(for: String.self) { providerId in
                 AIProviderConfigView(providerId: providerId, store: store)
             }

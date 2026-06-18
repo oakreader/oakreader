@@ -1,6 +1,5 @@
 import SwiftUI
 import OakAgent
-import OakVoice
 
 // MARK: - Provider Config View (Right Panel)
 
@@ -113,11 +112,13 @@ private struct ProviderDetailView: View {
     @ViewBuilder
     private func endpointSection(_ provider: ProviderInfo) -> some View {
         Section("Endpoint") {
-            TextField("Base URL", text: $baseURLOverride, prompt: Text(provider.baseURL.absoluteString))
-                .textFieldStyle(.roundedBorder)
-                .autocorrectionDisabled()
-                .textContentType(.URL)
-                .labelsHidden()
+            titledField("Base URL") {
+                TextField("Base URL", text: $baseURLOverride, prompt: Text(provider.baseURL.absoluteString))
+                    .textFieldStyle(.roundedBorder)
+                    .autocorrectionDisabled()
+                    .textContentType(.URL)
+                    .labelsHidden()
+            }
 
             Text("Point at a proxy or relay. End with `#` to send the URL exactly as typed.")
                 .font(.caption)
@@ -148,10 +149,12 @@ private struct ProviderDetailView: View {
     /// Shared URL field + discover button for local OpenAI-compatible providers.
     @ViewBuilder
     private func localServerControls(_ provider: ProviderInfo, buttonTitle: String) -> some View {
-        TextField("Server URL", text: $serverURL, prompt: Text("Server URL"))
-            .textFieldStyle(.roundedBorder)
-            .autocorrectionDisabled()
-            .labelsHidden()
+        titledField("Server URL") {
+            TextField("Server URL", text: $serverURL, prompt: Text("Server URL"))
+                .textFieldStyle(.roundedBorder)
+                .autocorrectionDisabled()
+                .labelsHidden()
+        }
 
         Text("OpenAI-compatible API base, e.g. http://localhost:11434/v1")
             .font(.caption)
@@ -205,9 +208,11 @@ private struct ProviderDetailView: View {
 
     @ViewBuilder
     private func apiKeyAuthSection(provider: ProviderInfo, envVar: String?) -> some View {
-        SecureField("API Key", text: $apiKey, prompt: Text("API Key"))
-            .textFieldStyle(.roundedBorder)
-            .labelsHidden()
+        titledField("API Key") {
+            SecureField("API Key", text: $apiKey, prompt: Text("API Key"))
+                .textFieldStyle(.roundedBorder)
+                .labelsHidden()
+        }
 
         if let envVar {
             Text("Or set the \(envVar) environment variable.")
@@ -219,6 +224,7 @@ private struct ProviderDetailView: View {
             Button("Test & Save") {
                 testAndSaveAPIKey(provider)
             }
+            .buttonStyle(.borderedProminent)
             .disabled(apiKey.isEmpty || isTesting)
 
             if isTesting {
@@ -449,6 +455,17 @@ private struct ProviderDetailView: View {
         if count >= 1_000_000 { return "\(count / 1_000_000)M" }
         if count >= 1_000 { return "\(count / 1_000)K" }
         return "\(count)"
+    }
+
+    /// A titled input row: a persistent label on its own line with the field beneath it,
+    /// matching the label-above-control layout used elsewhere in Settings.
+    @ViewBuilder
+    private func titledField(_ title: String, @ViewBuilder content: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.subheadline.weight(.medium))
+            content()
+        }
     }
 
     // MARK: - Connection Testing

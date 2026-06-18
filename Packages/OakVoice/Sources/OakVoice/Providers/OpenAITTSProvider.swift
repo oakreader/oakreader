@@ -9,14 +9,20 @@ public struct OpenAITTSProvider: TTSService {
     private let apiKey: String
     private let model: String
     private let defaultVoice: String
-    private let baseURL = URL(string: "https://api.openai.com/v1/audio/speech")!
+    private let baseURL: URL
 
     public nonisolated let sampleRate: Double = 24000
 
-    public init(apiKey: String, model: String = "gpt-4o-mini-tts", voice: String = "alloy") {
+    public init(
+        apiKey: String,
+        model: String = "gpt-4o-mini-tts",
+        voice: String = "alloy",
+        endpoint: URL = URL(string: "https://api.openai.com/v1/audio/speech")!
+    ) {
         self.apiKey = apiKey
         self.model = model
         self.defaultVoice = voice
+        self.baseURL = endpoint
     }
 
     public func synthesize(

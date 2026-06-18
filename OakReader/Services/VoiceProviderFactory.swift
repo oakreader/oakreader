@@ -1,3 +1,4 @@
+import Foundation
 import OakAgent
 import OakVoice
 
@@ -52,10 +53,11 @@ enum VoiceProviderFactory {
             ))
             return (provider, "elevenlabs:\(prefs.elevenLabsVoiceId):\(prefs.elevenLabsTTSModelId)")
         case .openAI:
-            return (OpenAITTSProvider(apiKey: key, voice: prefs.openAITTSVoice),
+            return (OpenAITTSProvider(apiKey: key, voice: prefs.openAITTSVoice,
+                                      endpoint: openAIEndpoint(path: "/audio/speech")),
                     "openai:\(prefs.openAITTSVoice)")
         case .gemini:
-            return (GeminiTTSProvider(apiKey: key, voice: prefs.geminiTTSVoice),
+            return (GeminiTTSProvider(apiKey: key, voice: prefs.geminiTTSVoice, baseURL: geminiBase()),
                     "gemini:\(prefs.geminiTTSVoice)")
         case .fishAudio:
             return (FishAudioTTSProvider(apiKey: key, referenceId: prefs.fishAudioReferenceId),
@@ -81,9 +83,45 @@ enum VoiceProviderFactory {
         guard let key = apiKey(for: type) else { return nil }
         switch type {
         case .elevenLabs: return ElevenLabsSTTProvider(apiKey: key)
-        case .openAI: return OpenAISTTProvider(apiKey: key)
-        case .gemini: return GeminiSTTProvider(apiKey: key)
+        case .openAI: return OpenAISTTProvider(apiKey: key, endpoint: openAIEndpoint(path: "/audio/transcriptions"))
+        case .gemini: return GeminiSTTProvider(apiKey: key, baseURL: geminiBase())
         case .fishAudio: return FishAudioSTTProvider(apiKey: key)
         }
+    }
+
+    // MARK: - Base URL overrides (proxy / relay)
+
+    /// OpenAI voice endpoint built from the resolved base. Falls back to the chat
+    /// provider's Endpoint override since OpenAI voice shares its API key.
+    private static func openAIEndpoint(path: String) -> URL {
+        let base = resolvedBase(voiceId: "openai", chatId: "openai",
+                                default: "https://api.openai.com/v1")
+        return URL(string: base + path) ?? URL(string: "https://api.openai.com/v1" + path)!
+    }
+
+    /// Gemini API base host (explicit voice override or default — no chat fallback,
+    /// since the Gemini chat endpoint uses a different URL shape).
+    private static func geminiBase() -> String {
+        resolvedBase(voiceId: "gemini", chatId: nil,
+                     default: "https://generativelanguage.googleapis.com/v1beta")
+    }
+
+    private static func resolvedBase(voiceId: String, chatId: String?, default def: String) -> String {
+        let prefs = Preferences.shared
+        let explicit = prefs.voiceBaseURL(forProvider: voiceId).trimmingCharacters(in: .whitespacesAndNewlines)
+        if !explicit.isEmpty { return normalizeBase(explicit) }
+        if let chatId {
+            let chat = ProviderEndpointStore.shared.override(for: chatId)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if !chat.isEmpty { return normalizeBase(chat) }
+        }
+        return def
+    }
+
+    private static func normalizeBase(_ s: String) -> String {
+        var v = s
+        if v.hasSuffix("#") { v.removeLast() }   // chat "use exactly as typed" marker
+        while v.hasSuffix("/") { v.removeLast() }
+        return v
     }
 }

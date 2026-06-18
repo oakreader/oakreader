@@ -67,6 +67,8 @@ struct SkillManagementView: View {
                             )
                         }
                     }
+
+                    openFolderFooter
                 }
             }
             .frame(maxWidth: 920)
@@ -76,15 +78,6 @@ struct SkillManagementView: View {
         }
         .background(Color(nsColor: .windowBackgroundColor))
         .onAppear { reload() }
-        .toolbar {
-            ToolbarItem(placement: .automatic) {
-                Button {
-                    openSkillsFolder()
-                } label: {
-                    Label("Open Folder", systemImage: "folder")
-                }
-            }
-        }
     }
 
     private var header: some View {
@@ -160,6 +153,21 @@ struct SkillManagementView: View {
             .buttonStyle(.plain)
             .fixedSize()
         }
+    }
+
+    /// Bottom-of-page action to reveal the installed-skills folder in Finder.
+    private var openFolderFooter: some View {
+        HStack {
+            Spacer()
+            Button {
+                openSkillsFolder()
+            } label: {
+                Label("Open Folder", systemImage: "folder")
+            }
+            .controlSize(.regular)
+            Spacer()
+        }
+        .padding(.top, 6)
     }
 
     private var emptyState: some View {

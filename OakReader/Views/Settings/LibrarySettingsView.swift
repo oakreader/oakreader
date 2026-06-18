@@ -86,6 +86,7 @@ struct LibrarySettingsView: View {
                 } label: {
                     Text("Rebuild Index")
                 }
+                .buttonStyle(.borderedProminent)
                 .disabled(isRebuilding)
 
                 Text("Clears the full-text search index and re-indexes all documents.")

@@ -8,10 +8,16 @@ import Foundation
 public struct GeminiSTTProvider: STTService {
     private let apiKey: String
     private let model: String
+    private let baseURL: String
 
-    public init(apiKey: String, model: String = "gemini-2.5-flash") {
+    public init(
+        apiKey: String,
+        model: String = "gemini-2.5-flash",
+        baseURL: String = "https://generativelanguage.googleapis.com/v1beta"
+    ) {
         self.apiKey = apiKey
         self.model = model
+        self.baseURL = baseURL
     }
 
     public func transcribe(audio: AVAudioPCMBuffer) async throws -> TranscriptionResult {
@@ -19,7 +25,7 @@ public struct GeminiSTTProvider: STTService {
             throw VoiceAgentError.sttFailed("Failed to encode audio for Gemini transcription")
         }
 
-        let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent")!
+        let url = URL(string: "\(baseURL)/models/\(model):generateContent")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")

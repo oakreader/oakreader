@@ -25,11 +25,23 @@ struct AgentSettingsView: View {
         Form {
             // MARK: Agent Tools
             Section {
-                Toggle("Enable Agent Tools", isOn: $agentToolsEnabled)
-                Toggle("Read File", isOn: $agentReadFileEnabled)
-                    .disabled(!agentToolsEnabled)
-                Toggle("Write File", isOn: $agentWriteFileEnabled)
-                    .disabled(!agentToolsEnabled)
+                toggleRow(
+                    "Enable Agent Tools",
+                    "Let the assistant use tools while chatting",
+                    isOn: $agentToolsEnabled
+                )
+                toggleRow(
+                    "Read File",
+                    "Open files you reference in chat",
+                    isOn: $agentReadFileEnabled,
+                    disabled: !agentToolsEnabled
+                )
+                toggleRow(
+                    "Write File",
+                    "Create and edit files on your Mac",
+                    isOn: $agentWriteFileEnabled,
+                    disabled: !agentToolsEnabled
+                )
                 Picker("Confirmation", selection: $agentPermissionLevel) {
                     ForEach(AgentPermissionLevel.allCases) { level in
                         Text(level.label).tag(level)
@@ -47,7 +59,11 @@ struct AgentSettingsView: View {
             // The agent saves durable facts about you into one profile and reuses
             // them in every conversation — like ChatGPT's saved memories.
             Section {
-                Toggle("Remember details about me", isOn: $memoryEnabled)
+                toggleRow(
+                    "Remember details about me",
+                    "Save durable facts and reuse them across chats",
+                    isOn: $memoryEnabled
+                )
 
                 LabeledContent("Saved memories") {
                     HStack(spacing: 8) {
@@ -70,6 +86,24 @@ struct AgentSettingsView: View {
         .sheet(isPresented: $showUserMemory, onDismiss: { userFactCount = MemoryStore.load().count }) {
             MemoryManagerView()
         }
+    }
+
+    /// A toggle row with a title and a one-line description beneath it.
+    private func toggleRow(
+        _ title: String,
+        _ subtitle: String,
+        isOn: Binding<Bool>,
+        disabled: Bool = false
+    ) -> some View {
+        Toggle(isOn: isOn) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .disabled(disabled)
     }
 
     private func save() {

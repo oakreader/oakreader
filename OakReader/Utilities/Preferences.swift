@@ -525,6 +525,17 @@ final class Preferences {
         set { defaults.set(newValue, forKey: Keys.fishAudioReferenceId) }
     }
 
+    /// Per-provider base-URL override for cloud voice (TTS/STT), so OpenAI/Gemini
+    /// voice can be pointed at a proxy or relay. Empty uses the provider's default.
+    /// Keyed by `VoiceProviderType.rawValue` (e.g. "openai", "gemini").
+    func voiceBaseURL(forProvider id: String) -> String {
+        defaults.string(forKey: "voiceBaseURL.\(id)") ?? ""
+    }
+
+    func setVoiceBaseURL(_ value: String, forProvider id: String) {
+        defaults.set(value, forKey: "voiceBaseURL.\(id)")
+    }
+
     var voiceReferenceAudioURL: URL? {
         let path = voiceReferenceAudioPath
         if !path.isEmpty {

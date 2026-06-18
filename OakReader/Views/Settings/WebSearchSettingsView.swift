@@ -64,7 +64,7 @@ struct WebSearchSettingsView: View {
     }
 
     private func providerKeyRow(_ provider: any WebSearchProvider) -> some View {
-        DisclosureGroup(provider.displayName) {
+        DisclosureGroup {
             VStack(alignment: .leading, spacing: 8) {
                 SecureField(provider.placeholder, text: binding(for: provider.id))
                     .textFieldStyle(.roundedBorder)
@@ -79,6 +79,7 @@ struct WebSearchSettingsView: View {
                     Button("Save") {
                         saveKey(for: provider)
                     }
+                    .buttonStyle(.borderedProminent)
                     .disabled((apiKeys[provider.id] ?? "").isEmpty)
 
                     if KeychainService.apiKey(forProviderId: provider.id) != nil {
@@ -101,6 +102,24 @@ struct WebSearchSettingsView: View {
                 }
             }
             .padding(.vertical, 4)
+        } label: {
+            HStack(spacing: 10) {
+                WebProviderIconTile(
+                    name: provider.displayName,
+                    color: Self.providerColor(provider.id)
+                )
+                Text(provider.displayName)
+            }
+        }
+    }
+
+    private static func providerColor(_ id: String) -> Color {
+        switch id {
+        case "web-search-brave": return .orange
+        case "web-search-tavily": return .blue
+        case "web-search-exa": return .purple
+        case "web-search-serper": return .green
+        default: return .gray
         }
     }
 
@@ -135,5 +154,25 @@ struct WebSearchSettingsView: View {
 
     private func saveSelection() {
         Preferences.shared.webSearchProviderId = selectedProviderId
+    }
+}
+
+// MARK: - Provider Icon Tile
+
+/// A small colored monogram tile for brandless web-search providers, giving the
+/// API-key rows a leading icon like the AI Providers list.
+private struct WebProviderIconTile: View {
+    let name: String
+    let color: Color
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 6, style: .continuous)
+            .fill(color.gradient)
+            .frame(width: 22, height: 22)
+            .overlay(
+                Text(String(name.prefix(1)))
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white)
+            )
     }
 }

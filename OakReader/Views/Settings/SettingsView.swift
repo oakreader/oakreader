@@ -23,7 +23,7 @@ struct SettingsView: View {
             switch self {
             case .general: return "General"
             case .library: return "Library"
-            case .ai: return "AI"
+            case .ai: return "LLM"
             case .agent: return "Agent"
             case .audio: return "Audio"
             case .extensions: return "Extensions"
@@ -37,10 +37,10 @@ struct SettingsView: View {
             switch self {
             case .general: return "gearshape"
             case .library: return "books.vertical"
-            case .ai: return "sparkles.2"
+            case .ai: return "cpu"
             case .agent: return "wrench.and.screwdriver"
             case .audio: return "speaker.wave.2"
-            case .extensions: return "square.grid.2x2"
+            case .extensions: return "puzzlepiece.extension"
             case .skills: return "hammer"
             case .webSearch: return "magnifyingglass.circle"
             case .extensionTranslation: return AppExtension.translation.systemImage
@@ -70,43 +70,43 @@ struct SettingsView: View {
         }
     }
 
-    /// Fixed tabs that always appear.
-    private static let fixedTabs: [Tab] = [.general, .library, .ai, .agent, .audio, .skills, .extensions, .webSearch]
-
     @State private var selectedTab: Tab = .general
-    @State private var visibleTabs: [Tab] = Self.buildVisibleTabs()
+    @State private var pluginTabs: [Tab] = Self.enabledPluginTabs()
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
-    private static func buildVisibleTabs() -> [Tab] {
-        var tabs = fixedTabs
-        let pluginTabs = AppExtension.allCases
+    /// Extension panes that are currently enabled (shown under the Extensions group).
+    private static func enabledPluginTabs() -> [Tab] {
+        AppExtension.allCases
             .filter { Preferences.shared.isExtensionEnabled($0) }
             .map { Tab.tab(for: $0) }
-        if let idx = tabs.firstIndex(of: .extensions) {
-            tabs.insert(contentsOf: pluginTabs, at: idx + 1)
-        }
-        return tabs
     }
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            List(visibleTabs, selection: $selectedTab) { tab in
-                Label {
-                    Text(tab.label)
-                } icon: {
-                    if let asset = tab.iconAsset {
-                        Image(asset)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 16, height: 16)
-                    } else {
-                        Image(systemName: tab.icon)
-                    }
+            List(selection: $selectedTab) {
+                Section {
+                    tabRow(.general)
+                    tabRow(.library)
                 }
-                .tag(tab)
+
+                Section("Models") {
+                    tabRow(.ai)
+                    tabRow(.audio)
+                }
+
+                Section("Agent") {
+                    tabRow(.agent)
+                    tabRow(.skills)
+                    tabRow(.webSearch)
+                }
+
+                Section("Extensions") {
+                    tabRow(.extensions)
+                    ForEach(pluginTabs) { tabRow($0) }
+                }
             }
             .listStyle(.sidebar)
-            .navigationSplitViewColumnWidth(min: 160, ideal: 180, max: 200)
+            .navigationSplitViewColumnWidth(min: 175, ideal: 195, max: 215)
         } detail: {
             settingsContent
                 .id(selectedTab)
@@ -121,12 +121,12 @@ struct SettingsView: View {
         }
         .frame(minWidth: 900, minHeight: 620)
         .onReceive(NotificationCenter.default.publisher(for: Preferences.appExtensionToggleNotification)) { _ in
-            let updated = Self.buildVisibleTabs()
-            if visibleTabs != updated {
+            let updated = Self.enabledPluginTabs()
+            if pluginTabs != updated {
                 if let ext = selectedTab.appExtension, !Preferences.shared.isExtensionEnabled(ext) {
                     selectedTab = .extensions
                 }
-                visibleTabs = updated
+                pluginTabs = updated
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .settingsNavigateToTab)) { notification in
@@ -135,6 +135,23 @@ struct SettingsView: View {
                 selectedTab = tab
             }
         }
+    }
+
+    @ViewBuilder
+    private func tabRow(_ tab: Tab) -> some View {
+        Label {
+            Text(tab.label)
+        } icon: {
+            if let asset = tab.iconAsset {
+                Image(asset)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 16, height: 16)
+            } else {
+                Image(systemName: tab.icon)
+            }
+        }
+        .tag(tab)
     }
 
     @ViewBuilder

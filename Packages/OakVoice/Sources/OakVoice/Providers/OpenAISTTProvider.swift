@@ -6,12 +6,18 @@ public struct OpenAISTTProvider: STTService {
     private let apiKey: String
     private let model: String
     private let language: String?
-    private let baseURL = URL(string: "https://api.openai.com/v1/audio/transcriptions")!
+    private let baseURL: URL
 
-    public init(apiKey: String, model: String = "gpt-4o-transcribe", language: String? = nil) {
+    public init(
+        apiKey: String,
+        model: String = "gpt-4o-transcribe",
+        language: String? = nil,
+        endpoint: URL = URL(string: "https://api.openai.com/v1/audio/transcriptions")!
+    ) {
         self.apiKey = apiKey
         self.model = model
         self.language = language
+        self.baseURL = endpoint
     }
 
     public func transcribe(audio: AVAudioPCMBuffer) async throws -> TranscriptionResult {

@@ -63,6 +63,10 @@ struct AudioSettingsView: View {
     @State private var originalOpenAIAPIKey: String = ""
     @State private var originalGeminiAPIKey: String = ""
 
+    // Base URL overrides (proxy / relay) for OpenAI & Gemini voice
+    @State private var openAIBaseURL: String = ""
+    @State private var geminiBaseURL: String = ""
+
     private let openAIVoices = ["alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse"]
     private let geminiVoices = ["Kore", "Puck", "Zephyr", "Charon", "Fenrir", "Aoede", "Leda", "Orus"]
 
@@ -104,6 +108,10 @@ struct AudioSettingsView: View {
         _geminiAPIKey = State(initialValue: geminiKey)
         _originalOpenAIAPIKey = State(initialValue: openAIKey)
         _originalGeminiAPIKey = State(initialValue: geminiKey)
+
+        // Base URL overrides
+        _openAIBaseURL = State(initialValue: prefs.voiceBaseURL(forProvider: "openai"))
+        _geminiBaseURL = State(initialValue: prefs.voiceBaseURL(forProvider: "gemini"))
     }
 
     private static func providerForModel(_ modelId: String) -> String? {
@@ -345,18 +353,34 @@ struct AudioSettingsView: View {
         case .openAI:
             SecureField("OpenAI API Key", text: $openAIAPIKey, prompt: Text("API Key"))
                 .textFieldStyle(.roundedBorder)
-            Text("Shared with the OpenAI chat provider.")
+            TextField("Base URL", text: $openAIBaseURL, prompt: Text(openAIBasePlaceholder))
+                .textFieldStyle(.roundedBorder)
+                .autocorrectionDisabled()
+                .textContentType(.URL)
+            Text("Shared with the OpenAI chat provider. Leave Base URL empty to follow the chat endpoint, or set a proxy/relay here.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         case .gemini:
             SecureField("Google Gemini API Key", text: $geminiAPIKey, prompt: Text("API Key"))
                 .textFieldStyle(.roundedBorder)
-            Text("Shared with the Google chat provider.")
+            TextField("Base URL", text: $geminiBaseURL, prompt: Text("https://generativelanguage.googleapis.com/v1beta"))
+                .textFieldStyle(.roundedBorder)
+                .autocorrectionDisabled()
+                .textContentType(.URL)
+            Text("Shared with the Google chat provider. Point Base URL at a proxy or relay; empty uses the default.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         case .fishAudio:
             fishAudioFields
         }
+    }
+
+    /// Placeholder for the OpenAI voice Base URL: the chat Endpoint override if set,
+    /// otherwise the OpenAI default — so it's clear what an empty field resolves to.
+    private var openAIBasePlaceholder: String {
+        let chat = ProviderEndpointStore.shared.override(for: "openai")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return chat.isEmpty ? "https://api.openai.com/v1" : chat
     }
 
     @ViewBuilder
@@ -642,6 +666,10 @@ struct AudioSettingsView: View {
         if trimmedGemini != originalGeminiAPIKey, !trimmedGemini.isEmpty {
             KeychainService.setAPIKey(trimmedGemini, forProviderId: "google")
         }
+
+        // Base URL overrides (proxy / relay)
+        prefs.setVoiceBaseURL(openAIBaseURL.trimmingCharacters(in: .whitespacesAndNewlines), forProvider: "openai")
+        prefs.setVoiceBaseURL(geminiBaseURL.trimmingCharacters(in: .whitespacesAndNewlines), forProvider: "gemini")
 
         store.refresh()
     }

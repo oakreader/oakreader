@@ -7,10 +7,6 @@ final class ConfiguredProviderStore {
 
     private(set) var configuredLLMProviderIds: Set<String> = []
 
-    var isElevenLabsConfigured: Bool {
-        !Preferences.shared.elevenLabsAPIKey.isEmpty
-    }
-
     /// All providers that have valid credentials configured.
     var configuredLLMProviders: [ProviderInfo] {
         ProviderRegistry.shared.allProviders.filter { configuredLLMProviderIds.contains($0.id) }

@@ -9,13 +9,20 @@ public struct GeminiTTSProvider: TTSService {
     private let apiKey: String
     private let model: String
     private let defaultVoice: String
+    private let baseURL: String
 
     public nonisolated let sampleRate: Double = 24000
 
-    public init(apiKey: String, model: String = "gemini-2.5-flash-preview-tts", voice: String = "Kore") {
+    public init(
+        apiKey: String,
+        model: String = "gemini-2.5-flash-preview-tts",
+        voice: String = "Kore",
+        baseURL: String = "https://generativelanguage.googleapis.com/v1beta"
+    ) {
         self.apiKey = apiKey
         self.model = model
         self.defaultVoice = voice
+        self.baseURL = baseURL
     }
 
     public func synthesize(
@@ -24,7 +31,7 @@ public struct GeminiTTSProvider: TTSService {
         referenceAudioURL: URL?,
         referenceText: String?
     ) async throws -> AVAudioPCMBuffer {
-        let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent")!
+        let url = URL(string: "\(baseURL)/models/\(model):generateContent")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
