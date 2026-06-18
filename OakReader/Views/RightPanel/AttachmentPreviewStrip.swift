@@ -84,23 +84,40 @@ private struct AttachmentPill: View {
     @ViewBuilder
     private var preview: some View {
         if let image {
+            // Size the popover to the image's own aspect ratio so it hugs the
+            // picture instead of floating it in a fixed square with empty space.
+            let size = previewSize(for: image)
             Image(nsImage: image)
                 .resizable()
-                .scaledToFit()
-                .frame(maxWidth: 360, maxHeight: 360)
+                .frame(width: size.width, height: size.height)
                 .padding(8)
         } else if attachment.type == .textSelection, let text = attachment.textContent, !text.isEmpty {
             ScrollView {
                 Text(text)
                     .font(.system(size: 12))
                     .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    // Fixed width + vertical fixedSize makes the text WRAP and grow
+                    // downward, instead of laying out as one ideal-width line that the
+                    // popover then clamps and truncates.
+                    .frame(width: 320, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(12)
             }
-            .frame(maxWidth: 340, maxHeight: 240)
-            .padding(10)
+            .frame(maxHeight: 260)
         } else {
             Text(title).font(.system(size: 12)).padding(10)
         }
+    }
+
+    /// The preview's display size: the image's real aspect ratio scaled to fit a
+    /// bounding box (so a wide screenshot becomes a wide, short popover — never a
+    /// tall box with empty space).
+    private func previewSize(for image: NSImage) -> CGSize {
+        let maxW: CGFloat = 460, maxH: CGFloat = 360
+        let s = image.size
+        guard s.width > 0, s.height > 0 else { return CGSize(width: 240, height: 180) }
+        let scale = min(maxW / s.width, maxH / s.height)
+        return CGSize(width: (s.width * scale).rounded(), height: (s.height * scale).rounded())
     }
 
     /// One concise label: the page when known, else the attachment's own label
