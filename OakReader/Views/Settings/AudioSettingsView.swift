@@ -1,6 +1,7 @@
 import AVFoundation
 import CoreAudio
 import SwiftUI
+import OakAgent
 import OakVoice
 
 struct AudioSettingsView: View {
@@ -32,12 +33,86 @@ struct AudioSettingsView: View {
     /// Duration in seconds for mic recording
     private let micRecordDuration = 5
 
+    // MARK: - Voice / AI state
+
+    @State private var store = ConfiguredProviderStore.shared
+
+    // Chat default (read-only display for Voice Chat LLM)
+    @State private var chatProviderId: String = ""
+    @State private var chatModel: String = ""
+
+    // Voice Chat LLM
+    @State private var voiceLLMUseChatDefault: Bool = true
+    @State private var voiceLLMProviderId: String = ""
+    @State private var voiceLLMModel: String = ""
+
+    // Voice providers
+    @State private var ttsProvider: String = ""
+    @State private var sttProvider: String = ""
+    @State private var elevenLabsVoiceId: String = ""
+    @State private var elevenLabsTTSModelId: String = ""
+    @State private var openAITTSVoice: String = ""
+    @State private var geminiTTSVoice: String = ""
+    @State private var fishAudioReferenceId: String = ""
+
+    // Inline API keys
+    @State private var elevenLabsAPIKey: String = ""
+    @State private var fishAudioAPIKey: String = ""
+    @State private var openAIAPIKey: String = ""
+    @State private var geminiAPIKey: String = ""
+    @State private var originalOpenAIAPIKey: String = ""
+    @State private var originalGeminiAPIKey: String = ""
+
+    private let openAIVoices = ["alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse"]
+    private let geminiVoices = ["Kore", "Puck", "Zephyr", "Charon", "Fenrir", "Aoede", "Leda", "Orus"]
+
     private var deviceManager: AudioDeviceManager { AudioDeviceManager.shared }
 
     init() {
         let prefs = Preferences.shared
         _inputDeviceUID = State(initialValue: prefs.voiceInputDeviceUID)
         _outputDeviceUID = State(initialValue: prefs.voiceOutputDeviceUID)
+
+        // Chat default
+        let pid = prefs.aiProviderId
+        let defaultModel = ProviderRegistry.shared.provider(for: pid)?.defaultModelId ?? ""
+        _chatProviderId = State(initialValue: pid)
+        _chatModel = State(initialValue: prefs.aiModel.isEmpty ? defaultModel : prefs.aiModel)
+
+        // Voice Chat LLM
+        let vlm = prefs.voiceLLMModel
+        _voiceLLMUseChatDefault = State(initialValue: vlm.isEmpty)
+        _voiceLLMModel = State(initialValue: vlm.isEmpty ? defaultModel : vlm)
+        let vlmProvider = Self.providerForModel(vlm.isEmpty ? (prefs.aiModel.isEmpty ? defaultModel : prefs.aiModel) : vlm) ?? pid
+        _voiceLLMProviderId = State(initialValue: vlmProvider)
+
+        // Voice providers
+        _ttsProvider = State(initialValue: prefs.voiceTTSProvider)
+        _sttProvider = State(initialValue: prefs.voiceSTTProvider)
+        _elevenLabsVoiceId = State(initialValue: prefs.elevenLabsVoiceId)
+        _elevenLabsTTSModelId = State(initialValue: prefs.elevenLabsTTSModelId)
+        _openAITTSVoice = State(initialValue: prefs.openAITTSVoice)
+        _geminiTTSVoice = State(initialValue: prefs.geminiTTSVoice)
+        _fishAudioReferenceId = State(initialValue: prefs.fishAudioReferenceId)
+
+        // Inline API keys
+        _elevenLabsAPIKey = State(initialValue: prefs.elevenLabsAPIKey)
+        _fishAudioAPIKey = State(initialValue: prefs.fishAudioAPIKey)
+        let openAIKey = KeychainService.apiKey(forProviderId: "openai") ?? ""
+        let geminiKey = KeychainService.apiKey(forProviderId: "google") ?? ""
+        _openAIAPIKey = State(initialValue: openAIKey)
+        _geminiAPIKey = State(initialValue: geminiKey)
+        _originalOpenAIAPIKey = State(initialValue: openAIKey)
+        _originalGeminiAPIKey = State(initialValue: geminiKey)
+    }
+
+    private static func providerForModel(_ modelId: String) -> String? {
+        for provider in ConfiguredProviderStore.shared.configuredLLMProviders {
+            if provider.models.contains(where: { $0.id == modelId }) {
+                return provider.id
+            }
+        }
+        return nil
     }
 
     var body: some View {
@@ -171,6 +246,10 @@ struct AudioSettingsView: View {
                     }
                 }
             }
+
+            voiceChatSection
+            transcribeSection
+            ttsSection
         }
         .formStyle(.grouped)
         .onAppear { loadVolumes() }
@@ -181,6 +260,143 @@ struct AudioSettingsView: View {
             stopSpeakerTest()
             save()
         }
+    }
+
+    // MARK: - Voice Chat LLM
+
+    @ViewBuilder
+    private var voiceChatSection: some View {
+        Section("Voice Chat LLM") {
+            Toggle("Use Chat default", isOn: $voiceLLMUseChatDefault)
+
+            if voiceLLMUseChatDefault {
+                chatDefaultLabel
+            } else {
+                llmPickers(providerId: $voiceLLMProviderId, model: $voiceLLMModel)
+            }
+        }
+    }
+
+    // MARK: - Transcribe
+
+    @ViewBuilder
+    private var transcribeSection: some View {
+        Section("Transcribe") {
+            Picker("Provider", selection: $sttProvider) {
+                ForEach(VoiceProviderType.allCases, id: \.rawValue) { type in
+                    Text(type.displayName).tag(type.rawValue)
+                }
+            }
+            credentialFields(for: VoiceProviderType(rawValue: sttProvider) ?? .elevenLabs)
+        }
+    }
+
+    // MARK: - Text-to-Speech
+
+    @ViewBuilder
+    private var ttsSection: some View {
+        Section("Text-to-Speech") {
+            Picker("Provider", selection: $ttsProvider) {
+                ForEach(VoiceProviderType.allCases, id: \.rawValue) { type in
+                    Text(type.displayName).tag(type.rawValue)
+                }
+            }
+
+            switch VoiceProviderType(rawValue: ttsProvider) ?? .elevenLabs {
+            case .elevenLabs:
+                credentialFields(for: .elevenLabs)
+                if !elevenLabsAPIKey.isEmpty {
+                    TextField("Voice ID", text: $elevenLabsVoiceId)
+                        .textFieldStyle(.roundedBorder)
+                    Picker("TTS Model", selection: $elevenLabsTTSModelId) {
+                        Text("Turbo v2.5 (fastest)").tag("eleven_turbo_v2_5")
+                        Text("Flash v2.5 (fast)").tag("eleven_flash_v2_5")
+                        Text("Multilingual v2 (quality)").tag("eleven_multilingual_v2")
+                    }
+                }
+            case .openAI:
+                Picker("Voice", selection: $openAITTSVoice) {
+                    ForEach(openAIVoices, id: \.self) { Text($0.capitalized).tag($0) }
+                }
+                credentialFields(for: .openAI)
+            case .gemini:
+                Picker("Voice", selection: $geminiTTSVoice) {
+                    ForEach(geminiVoices, id: \.self) { Text($0).tag($0) }
+                }
+                credentialFields(for: .gemini)
+            case .fishAudio:
+                fishAudioFields
+            }
+        }
+    }
+
+    // MARK: - Credential helpers
+
+    /// Inline API-key entry for the selected voice provider.
+    @ViewBuilder
+    private func credentialFields(for type: VoiceProviderType) -> some View {
+        switch type {
+        case .elevenLabs:
+            SecureField("ElevenLabs API Key", text: $elevenLabsAPIKey, prompt: Text("API Key"))
+                .textFieldStyle(.roundedBorder)
+            Text("Get your API key from elevenlabs.io")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        case .openAI:
+            SecureField("OpenAI API Key", text: $openAIAPIKey, prompt: Text("API Key"))
+                .textFieldStyle(.roundedBorder)
+            Text("Shared with the OpenAI chat provider.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        case .gemini:
+            SecureField("Google Gemini API Key", text: $geminiAPIKey, prompt: Text("API Key"))
+                .textFieldStyle(.roundedBorder)
+            Text("Shared with the Google chat provider.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        case .fishAudio:
+            fishAudioFields
+        }
+    }
+
+    @ViewBuilder
+    private var fishAudioFields: some View {
+        SecureField("Fish Audio API Key", text: $fishAudioAPIKey)
+            .textFieldStyle(.roundedBorder)
+        TextField("Voice Reference ID (optional)", text: $fishAudioReferenceId)
+            .textFieldStyle(.roundedBorder)
+    }
+
+    @ViewBuilder
+    private func llmPickers(providerId: Binding<String>, model: Binding<String>) -> some View {
+        if store.configuredLLMProviders.isEmpty {
+            Text("Add a provider in AI settings to select a model.")
+                .foregroundStyle(.secondary)
+        } else {
+            Picker("Provider", selection: providerId) {
+                ForEach(store.configuredLLMProviders) { p in
+                    Text(p.displayName).tag(p.id)
+                }
+            }
+            .onChange(of: providerId.wrappedValue) { _, newValue in
+                model.wrappedValue = ProviderRegistry.shared.provider(for: newValue)?.defaultModelId ?? ""
+            }
+
+            if let provider = ProviderRegistry.shared.provider(for: providerId.wrappedValue) {
+                Picker("Model", selection: model) {
+                    ForEach(provider.models) { m in
+                        Text(m.name).tag(m.id)
+                    }
+                }
+            }
+        }
+    }
+
+    private var chatDefaultLabel: some View {
+        let providerName = ProviderRegistry.shared.provider(for: chatProviderId)?.displayName ?? chatProviderId
+        let modelName = ProviderRegistry.shared.provider(for: chatProviderId)?.models.first(where: { $0.id == chatModel })?.name ?? chatModel
+        return LabeledContent("Using", value: "\(providerName) / \(modelName)")
+            .foregroundStyle(.secondary)
     }
 
     // MARK: - Computed Labels
@@ -399,6 +615,35 @@ struct AudioSettingsView: View {
         let prefs = Preferences.shared
         prefs.voiceInputDeviceUID = inputDeviceUID
         prefs.voiceOutputDeviceUID = outputDeviceUID
+
+        // Voice Chat LLM
+        prefs.voiceLLMModel = voiceLLMUseChatDefault ? "" : voiceLLMModel
+
+        // Voice providers
+        prefs.voiceTTSProvider = ttsProvider
+        prefs.voiceSTTProvider = sttProvider
+        prefs.elevenLabsVoiceId = elevenLabsVoiceId
+        prefs.elevenLabsTTSModelId = elevenLabsTTSModelId
+        prefs.openAITTSVoice = openAITTSVoice
+        prefs.geminiTTSVoice = geminiTTSVoice
+        prefs.fishAudioReferenceId = fishAudioReferenceId.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Inline API keys
+        prefs.elevenLabsAPIKey = elevenLabsAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        prefs.fishAudioAPIKey = fishAudioAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // OpenAI / Gemini keys share the chat provider's Keychain entry. Only write when
+        // changed and non-empty so clearing the field never wipes the chat provider's key.
+        let trimmedOpenAI = openAIAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedOpenAI != originalOpenAIAPIKey, !trimmedOpenAI.isEmpty {
+            KeychainService.setAPIKey(trimmedOpenAI, forProviderId: "openai")
+        }
+        let trimmedGemini = geminiAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedGemini != originalGeminiAPIKey, !trimmedGemini.isEmpty {
+            KeychainService.setAPIKey(trimmedGemini, forProviderId: "google")
+        }
+
+        store.refresh()
     }
 }
 

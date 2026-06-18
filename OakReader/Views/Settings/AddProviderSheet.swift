@@ -11,10 +11,6 @@ struct AddProviderSheet: View {
         store.unconfiguredLLMProviders
     }
 
-    private var showElevenLabs: Bool {
-        !store.isElevenLabsConfigured
-    }
-
     var body: some View {
         VStack(spacing: 0) {
             // Header
@@ -44,20 +40,6 @@ struct AddProviderSheet: View {
                             }
                             .buttonStyle(.plain)
                         }
-                    }
-                }
-
-                if showElevenLabs {
-                    Section("Voice & Audio") {
-                        Button {
-                            onSelect(AISettingsView.elevenLabsId)
-                        } label: {
-                            providerRow(
-                                iconAsset: "provider-elevenlabs",
-                                title: "ElevenLabs"
-                            )
-                        }
-                        .buttonStyle(.plain)
                     }
                 }
             }
