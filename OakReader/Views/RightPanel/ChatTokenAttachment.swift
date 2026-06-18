@@ -92,9 +92,7 @@ private final class ChatTokenCell: NSTextAttachmentCell {
             width: Self.iconSize,
             height: Self.iconSize
         )
-        let iconName = item.icon.hasSuffix(".fill") ? item.icon : "\(item.icon).fill"
-        let resolvedName = NSImage(systemSymbolName: iconName, accessibilityDescription: nil) != nil ? iconName : item.icon
-        if let image = NSImage(systemSymbolName: resolvedName, accessibilityDescription: item.label) {
+        if let image = SymbolStyle.filled(item.icon, accessibilityDescription: item.label) {
             let config = NSImage.SymbolConfiguration(pointSize: Self.iconSize, weight: .regular)
             let configured = image.withSymbolConfiguration(config) ?? image
             let tinted = NSImage(size: iconRect.size, flipped: false) { drawRect in

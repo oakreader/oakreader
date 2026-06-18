@@ -308,7 +308,7 @@ private final class ChatCompletionRowView: NSView {
         iconShell.translatesAutoresizingMaskIntoConstraints = false
 
         let icon = NSImageView(frame: .zero)
-        if let img = NSImage(systemSymbolName: item.icon, accessibilityDescription: item.label) {
+        if let img = SymbolStyle.filled(item.icon, accessibilityDescription: item.label) {
             icon.image = img.withSymbolConfiguration(.init(pointSize: 14, weight: .regular))
             icon.contentTintColor = item.completionTint
         }
