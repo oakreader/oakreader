@@ -159,7 +159,6 @@ final class CommentsViewModel {
             styleJson: nil,
             source: "oakreader",
             sourceKey: nil,
-            isExternal: false,
             createdAt: now,
             updatedAt: now,
             deletedAt: nil

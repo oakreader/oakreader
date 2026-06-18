@@ -7,8 +7,8 @@ extension CatalogDatabase {
     /// Database schema migrator.
     ///
     /// The schema is defined as a sequence of grouped migrations, each owning one
-    /// cohesive area of the model. Never edit a migration once it has shipped — add a
-    /// new `vN-…` step instead.
+    /// cohesive area of the model. Once this app has shipped, never edit a migration
+    /// in place — add a new `vN-…` step instead.
     static var migrator: DatabaseMigrator {
         var migrator = DatabaseMigrator()
 
@@ -123,9 +123,9 @@ extension CatalogDatabase {
             try db.create(index: "idx_item_property_values_property", on: "item_property_values", columns: ["property_id"])
         }
 
-        // MARK: v4 — Conversations & Notes
+        // MARK: v4 — Conversations
 
-        migrator.registerMigration("v4-conversations-notes") { db in
+        migrator.registerMigration("v4-conversations") { db in
             try db.create(table: "conversations") { t in
                 t.column("id", .text).primaryKey()
                 t.column("user_id", .text).notNull()
@@ -135,17 +135,6 @@ extension CatalogDatabase {
                 t.column("created_at", .text).notNull()
                 t.column("updated_at", .text).notNull()
             }
-
-            try db.create(table: "notes") { t in
-                t.column("id", .text).primaryKey()
-                t.column("user_id", .text).notNull()
-                t.column("item_id", .text).notNull().references("items", onDelete: .cascade)
-                t.column("title", .text).notNull().defaults(to: "")
-                t.column("is_pinned", .integer).notNull().defaults(to: false)
-                t.column("created_at", .text).notNull()
-                t.column("updated_at", .text).notNull()
-            }
-            try db.create(index: "idx_notes_item_id", on: "notes", columns: ["item_id"])
         }
 
         // MARK: v5 — Citations
@@ -198,7 +187,6 @@ extension CatalogDatabase {
                 t.column("style_json", .text)
                 t.column("source", .text).notNull().defaults(to: "oakreader")
                 t.column("source_key", .text)
-                t.column("is_external", .integer).notNull().defaults(to: false)
                 t.column("created_at", .text).notNull()
                 t.column("updated_at", .text).notNull()
                 t.column("deleted_at", .text)
@@ -210,231 +198,14 @@ extension CatalogDatabase {
             """)
         }
 
-        // MARK: v7 — Item Relations
-
-        migrator.registerMigration("v7-item-relations") { db in
-            try db.create(table: "item_relations") { t in
-                t.column("id", .text).primaryKey()
-                t.column("source_item_id", .text).notNull().references("items", onDelete: .cascade)
-                t.column("target_item_id", .text).notNull().references("items", onDelete: .cascade)
-                t.column("relation_type", .text).notNull()
-                t.column("created_at", .text).notNull()
-            }
-            try db.execute(sql: """
-                CREATE UNIQUE INDEX idx_item_relations_unique
-                ON item_relations(source_item_id, target_item_id, relation_type)
-            """)
-            try db.create(index: "idx_item_relations_target", on: "item_relations", columns: ["target_item_id"])
-        }
-
-        // MARK: v8 — Quiz Cards & Review Log
-
-        migrator.registerMigration("v8-quiz-cards") { db in
-            try db.create(table: "quiz_cards") { t in
-                t.column("id", .text).primaryKey()
-                t.column("item_id", .text).notNull().references("items", onDelete: .cascade)
-                t.column("conversation_id", .text)
-                t.column("group_id", .text)
-                t.column("type", .text).notNull()
-                t.column("content_json", .text).notNull()
-                // FSRS scheduling fields
-                t.column("state", .text).notNull().defaults(to: "new")
-                t.column("due_at", .text).notNull()
-                t.column("stability", .double).notNull().defaults(to: 0)
-                t.column("difficulty", .double).notNull().defaults(to: 0)
-                t.column("elapsed_days", .integer).notNull().defaults(to: 0)
-                t.column("scheduled_days", .integer).notNull().defaults(to: 0)
-                t.column("reps", .integer).notNull().defaults(to: 0)
-                t.column("lapses", .integer).notNull().defaults(to: 0)
-                t.column("last_review_at", .text)
-                t.column("is_suspended", .integer).notNull().defaults(to: false)
-                t.column("annotation_id", .text)
-                t.column("source_text", .text)
-                t.column("page_context", .text)
-                t.column("is_pending", .integer).notNull().defaults(to: 0)
-                t.column("collection_id", .text).references("collections", onDelete: .cascade)
-                t.column("created_at", .text).notNull()
-                t.column("updated_at", .text).notNull()
-            }
-            try db.create(index: "idx_quiz_cards_state_due", on: "quiz_cards", columns: ["state", "due_at"])
-            try db.create(index: "idx_quiz_cards_item_id", on: "quiz_cards", columns: ["item_id"])
-            try db.create(index: "idx_quiz_cards_group_id", on: "quiz_cards", columns: ["group_id"])
-            try db.create(index: "idx_quiz_cards_annotation", on: "quiz_cards", columns: ["annotation_id"])
-            try db.create(index: "idx_quiz_cards_pending", on: "quiz_cards", columns: ["is_pending", "item_id"])
-            try db.create(index: "idx_quiz_cards_collection", on: "quiz_cards", columns: ["collection_id"])
-
-            try db.create(table: "quiz_review_log") { t in
-                t.column("id", .text).primaryKey()
-                t.column("card_id", .text).notNull().references("quiz_cards", onDelete: .cascade)
-                t.column("rating", .integer).notNull()
-                t.column("state", .text).notNull()
-                t.column("scheduled_days", .integer).notNull()
-                t.column("elapsed_days", .integer).notNull()
-                t.column("reviewed_at", .text).notNull()
-            }
-            try db.create(index: "idx_quiz_review_log_card_id", on: "quiz_review_log", columns: ["card_id"])
-        }
-
-        // MARK: v9 — Full-Text Search (created last, after synchronized base tables exist)
-
-        migrator.registerMigration("v9-full-text-search") { db in
-            try db.create(virtualTable: "items_fts", using: FTS5()) { t in
-                t.synchronize(withTable: "items")
-                t.tokenizer = .unicode61()
-                t.column("title")
-                t.column("author")
-            }
-
-            try db.create(virtualTable: "citations_fts", using: FTS5()) { t in
-                t.synchronize(withTable: "citations")
-                t.tokenizer = .unicode61()
-                t.column("abstract")
-                t.column("container_title")
-            }
-        }
-
-        // MARK: v10 — Split `embed` content type into `video` + `link`
-
-        migrator.registerMigration("v10-split-embed-content-type") { db in
-            let now = Date().iso8601String
-
-            // Reclassify legacy `embed` attachments: YouTube → `video`, everything else → `link`.
-            try db.execute(sql: """
-                UPDATE attachments SET content_type = 'video', updated_at = ?
-                WHERE content_type = 'embed'
-                  AND (source_url LIKE '%youtube.com%' OR source_url LIKE '%youtu.be%')
-            """, arguments: [now])
-            try db.execute(sql: """
-                UPDATE attachments SET content_type = 'link', updated_at = ?
-                WHERE content_type = 'embed'
-            """, arguments: [now])
-
-            // Repoint the former "Embeds" system collection at videos only.
-            let videoRule = #"{"match":"all","conditions":[{"field":"content_type","op":"eq","value":"video"}]}"#
-            try db.execute(sql: """
-                UPDATE collections SET name = 'Videos', icon = 'play.rectangle', filter_rules = ?, updated_at = ?
-                WHERE id = ?
-            """, arguments: [videoRule, now, SystemCollectionID.embeds.uuidString])
-
-            // "Web" now covers saved HTML snapshots *and* link bookmarks.
-            let webRule = #"{"match":"any","conditions":[{"field":"content_type","op":"eq","value":"html"},{"field":"content_type","op":"eq","value":"link"}]}"#
-            try db.execute(sql: """
-                UPDATE collections SET filter_rules = ?, updated_at = ?
-                WHERE id = ?
-            """, arguments: [webRule, now, SystemCollectionID.html.uuidString])
-        }
-
-        // MARK: v11 — Remove the `video` content type (folded into `link`)
-
-        migrator.registerMigration("v11-remove-video-content-type") { db in
-            let now = Date().iso8601String
-
-            // YouTube playback was removed; former `video` embeds are now plain
-            // link bookmarks rendered as cards. Reclassify them.
-            try db.execute(sql: """
-                UPDATE attachments SET content_type = 'link', updated_at = ?
-                WHERE content_type = 'video'
-            """, arguments: [now])
-
-            // Drop the now-redundant "Videos" system collection (smart collection,
-            // no collection_items rows to clean up).
-            try db.execute(
-                sql: "DELETE FROM collections WHERE id = ?",
-                arguments: [SystemCollectionID.embeds.uuidString]
-            )
-        }
-
-        // MARK: v12 — Remove the Notes feature
-
-        migrator.registerMigration("v12-remove-notes") { db in
-            try db.execute(sql: "DROP INDEX IF EXISTS idx_notes_item_id")
-            try db.execute(sql: "DROP TABLE  IF EXISTS notes")
-        }
-
-        // MARK: v13 — Anki export: collapse quiz_cards to a slim staging table
-        //
-        // The self-built FSRS scheduler/review UI is removed; cards are now generated
-        // in chat and exported to Anki. Only one kind of card remains (chat-generated),
-        // so the table sheds all FSRS columns, the dead annotation/origin columns, and
-        // the review log. `item_id`/`conversation_id` survive as provenance only.
-
-        migrator.registerMigration("v13-anki-export") { db in
-            // Rebuild the table (SQLite can't drop FK columns in place).
-            try db.execute(sql: """
-                CREATE TABLE quiz_cards_new (
-                    id              TEXT PRIMARY KEY,
-                    conversation_id TEXT REFERENCES conversations(id) ON DELETE SET NULL,
-                    item_id         TEXT REFERENCES items(id) ON DELETE SET NULL,
-                    type            TEXT NOT NULL,
-                    content_json    TEXT NOT NULL,
-                    source_text     TEXT,
-                    exported_at     TEXT,
-                    created_at      TEXT NOT NULL,
-                    updated_at      TEXT NOT NULL
-                )
-            """)
-            // Carry over the surviving columns. Legacy "annotation" rows keep their
-            // content and item_id; only the dead annotation link is dropped.
-            try db.execute(sql: """
-                INSERT INTO quiz_cards_new
-                    (id, conversation_id, item_id, type, content_json, source_text, exported_at, created_at, updated_at)
-                SELECT id, conversation_id, item_id, type, content_json, source_text, NULL, created_at, updated_at
-                FROM quiz_cards
-            """)
-            try db.execute(sql: "DROP TABLE quiz_cards")
-            try db.execute(sql: "ALTER TABLE quiz_cards_new RENAME TO quiz_cards")
-
-            try db.create(index: "idx_quiz_cards_item_id", on: "quiz_cards", columns: ["item_id"])
-            try db.create(index: "idx_quiz_cards_conversation", on: "quiz_cards", columns: ["conversation_id"])
-            try db.create(index: "idx_quiz_cards_exported", on: "quiz_cards", columns: ["exported_at"])
-
-            try db.execute(sql: "DROP TABLE IF EXISTS quiz_review_log")
-        }
-
-        // MARK: v14 — Remove the "Quiz Cards" system collection
-        //
-        // The quiz feature is gone, so its seeded sidebar collection should disappear
-        // too. `CatalogDatabase` no longer seeds it for new libraries; this clears the
-        // already-persisted row from existing ones (cf. v11 dropping "Videos"). The id
-        // is hardcoded because the `SystemCollectionID.quizCards` constant was removed.
-
-        migrator.registerMigration("v14-remove-quiz-cards-collection") { db in
-            try db.execute(
-                sql: "DELETE FROM collections WHERE id = ?",
-                arguments: ["00000000-0000-0000-0000-00000000000D"]
-            )
-        }
-
-        // MARK: v15 — AI Studio artifacts
-        //
-        // Item-scoped generated artifacts (quiz, concept map, deck, audio). Replaces
-        // the chat-native quiz model: cards are no longer buried in chat turns but
-        // are first-class rows here, with a renderable `body` and generation params.
-
-        migrator.registerMigration("v15-studio-artifacts") { db in
-            try db.create(table: "studio_artifacts") { t in
-                t.column("id", .text).primaryKey()
-                t.column("user_id", .text).notNull()
-                t.column("item_id", .text).notNull().references("items", onDelete: .cascade)
-                t.column("kind", .text).notNull()
-                t.column("title", .text).notNull().defaults(to: "")
-                t.column("body", .text).notNull().defaults(to: "")
-                t.column("params_json", .text).notNull().defaults(to: "{}")
-                t.column("asset_path", .text)
-                t.column("created_at", .text).notNull()
-                t.column("updated_at", .text).notNull()
-            }
-            try db.create(index: "idx_studio_artifacts_item_id", on: "studio_artifacts", columns: ["item_id"])
-        }
-
-        // MARK: v16 — Word lookup history
+        // MARK: v7 — Word lookup history
         //
         // A simple per-document log of words the user looked up in the Translation
         // panel, also surfaced globally. Not spaced repetition — just a reviewable
         // history. `item_id` is nullable with ON DELETE SET NULL so the history
         // outlives the document; `dedupe_key` keeps it one row per (document, word).
 
-        migrator.registerMigration("v16-word-lookups") { db in
+        migrator.registerMigration("v7-word-lookups") { db in
             try db.create(table: "word_lookups") { t in
                 t.column("id", .text).primaryKey()
                 t.column("user_id", .text).notNull()

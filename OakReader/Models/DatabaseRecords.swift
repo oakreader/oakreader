@@ -255,7 +255,6 @@ struct AnnotationRecord: Codable, FetchableRecord, MutablePersistableRecord, Has
     var styleJson: String?
     var source: String
     var sourceKey: String?
-    var isExternal: Bool
     var createdAt: String
     var updatedAt: String
     var deletedAt: String?
@@ -272,7 +271,6 @@ struct AnnotationRecord: Codable, FetchableRecord, MutablePersistableRecord, Has
         case positionJson = "position_json"
         case styleJson = "style_json"
         case sourceKey = "source_key"
-        case isExternal = "is_external"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
         case deletedAt = "deleted_at"

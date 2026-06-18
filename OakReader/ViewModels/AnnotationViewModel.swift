@@ -425,7 +425,6 @@ class AnnotationViewModel {
             styleJson: style.toJSON(),
             source: "oakreader",
             sourceKey: nil,
-            isExternal: false,
             createdAt: now,
             updatedAt: now,
             deletedAt: nil
@@ -504,7 +503,6 @@ class AnnotationViewModel {
             styleJson: styleJson,
             source: existingRecord?.source ?? "oakreader",
             sourceKey: existingRecord?.sourceKey,
-            isExternal: existingRecord?.isExternal ?? false,
             createdAt: existingRecord?.createdAt ?? now,
             updatedAt: now,
             deletedAt: nil

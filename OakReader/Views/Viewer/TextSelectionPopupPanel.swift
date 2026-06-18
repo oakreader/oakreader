@@ -164,7 +164,7 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
         mainStack.addArrangedSubview(colorBtn)
 
         let noteBtn = PopupIconButton(
-            systemImage: "text.bubble",
+            systemImage: "note.text",
             accessibilityLabel: "Add Note"
         ) { [weak self] in
             self?.addNote()

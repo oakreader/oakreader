@@ -105,7 +105,7 @@ struct CommentsPanelView: View {
 
     private var emptyHint: some View {
         VStack(spacing: 10) {
-            Image(systemName: "text.bubble")
+            Image(systemName: "note.text")
                 .font(.system(size: 32))
                 .foregroundStyle(.tertiary)
             Text("No Notes")
@@ -265,7 +265,7 @@ private struct CommentCardView: View {
             ForEach(refs) { ref in
                 Button { model.focusCard(id: ref.id) } label: {
                     HStack(spacing: 6) {
-                        Image(systemName: "text.bubble")
+                        Image(systemName: "note.text")
                             .font(.system(size: 10))
                             .foregroundStyle(.tertiary)
                         Text(ref.preview.isEmpty ? "Untitled" : ref.preview)

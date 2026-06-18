@@ -107,7 +107,7 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
         switch self {
         case .metadata: return "list.bullet.rectangle.portrait"
         case .aiChat: return "bubble.left.and.bubble.right"
-        case .comments: return "text.bubble"
+        case .comments: return "note.text"
         case .translation: return "translate"
         }
     }

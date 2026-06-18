@@ -744,7 +744,6 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
             styleJson: nil,
             source: "oakreader",
             sourceKey: nil,
-            isExternal: false,
             createdAt: now,
             updatedAt: now,
             deletedAt: nil
@@ -814,7 +813,7 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
         // Stash the highlight id + its screen anchor for the note editor.
         let screenPoint = webView.window?.convertPoint(toScreen: webView.convert(viewPoint, to: nil)) ?? .zero
         noteItem.representedObject = WebNoteMenuContext(highlightId: highlightId, screenPoint: screenPoint)
-        noteItem.image = NSImage(systemSymbolName: "text.bubble", accessibilityDescription: nil)
+        noteItem.image = NSImage(systemSymbolName: "note.text", accessibilityDescription: nil)
         menu.addItem(noteItem)
 
         menu.addItem(.separator())
