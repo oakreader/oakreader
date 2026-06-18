@@ -421,22 +421,13 @@ private struct CollectionRowView: View {
                 Group {
                     if isDropActive {
                         RoundedRectangle(cornerRadius: 8)
-                            .fill(.ultraThinMaterial)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color.accentColor.opacity(0.06))
-                            )
+                            .fill(Color.accentColor.opacity(0.14))
                     } else if isSelected {
                         RoundedRectangle(cornerRadius: 6)
                             .fill(Color.primary.opacity(0.08))
                     }
                 }
                 .padding(.horizontal, 12)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .strokeBorder(isDropActive ? Color.accentColor.opacity(0.35) : Color.clear, lineWidth: 1)
-                    .padding(.horizontal, 12)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
