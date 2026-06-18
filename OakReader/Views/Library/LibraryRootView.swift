@@ -18,12 +18,8 @@ struct LibraryRootView: View {
                 Divider()
             }
 
-            // Right side: full-page agent workspace, or the classic catalog browser.
-            if appState.librarySurface == .agent {
-                AgentWorkspaceView(appState: appState)
-            } else {
-                browsePanes
-            }
+            // Right side: the classic catalog browser.
+            browsePanes
         }
         .background(libraryChromeBackground)
         .onHover { inside in if inside { NSCursor.arrow.set() } }

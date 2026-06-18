@@ -117,14 +117,6 @@ final class DocumentTab: Identifiable {
 
 // MARK: - Library Surface
 
-/// Which full-window surface the library shows when no document tab is active.
-enum LibrarySurface {
-    /// The classic 3-pane catalog browser (sidebar · table · detail panel).
-    case browse
-    /// The full-page Dia-style AI agent workspace.
-    case agent
-}
-
 // MARK: - App State
 
 @Observable
@@ -149,28 +141,7 @@ final class AppState {
     var backupRestoreURL: URL?
     var isLibrarySidebarVisible: Bool = true
     var libraryDetailTab: LibraryDetailTab?
-    /// Which surface the library window shows (catalog browser vs. AI agent workspace).
-    var librarySurface: LibrarySurface = .browse
-    /// Whether the Agent tab exists in the title bar (shown until closed).
-    var isAgentTabOpen: Bool = false
-    /// When set, the agent workspace is bound to this item (overrides collection scope).
-    var agentBoundItemStorageKey: String?
-    /// The resolved on-disk workspace folder for the active agent binding.
-    var agentWorkspaceDirectory: URL?
     var importNotification: String?
-
-    // MARK: - Library Chat
-
-    private var _libraryChatVM: ChatViewModel?
-    var libraryChatVM: ChatViewModel {
-        if let vm = _libraryChatVM { return vm }
-        let vm = ChatViewModel()
-        vm.appState = self
-        vm.itemId = "library"
-        vm.sessionService = ConversationService(database: libraryStore.database)
-        _libraryChatVM = vm
-        return vm
-    }
 
     private var autosaveTimer: Timer?
 
@@ -180,12 +151,7 @@ final class AppState {
 
     /// The library catalog browser is the active surface.
     var isLibraryBrowseActive: Bool {
-        activeTabID == nil && librarySurface == .browse
-    }
-
-    /// The full-page AI agent workspace is the active surface.
-    var isAgentActive: Bool {
-        activeTabID == nil && librarySurface == .agent
+        activeTabID == nil
     }
 
     var activeTab: DocumentTab? {
@@ -641,7 +607,6 @@ final class AppState {
     /// Show the classic catalog browser surface.
     func showLibraryBrowse() {
         activeTabID = nil
-        librarySurface = .browse
         updateWindowTitle()
     }
 
@@ -672,69 +637,6 @@ final class AppState {
                 tab.title = url.host ?? url.absoluteString
             }
             updateWindowTitle()
-        }
-    }
-
-    /// Show the full-page AI agent workspace. Optionally start a fresh chat session.
-    func openAgentWorkspace(newSession: Bool = false) {
-        activeTabID = nil
-        librarySurface = .agent
-        isAgentTabOpen = true
-        if newSession {
-            libraryChatVM.newSession()
-        }
-        refreshAgentWorkspace()
-        updateWindowTitle()
-    }
-
-    /// Open the agent workspace bound to a specific library item, mounting its file.
-    func openAgentOnItem(_ item: LibraryItem) {
-        agentBoundItemStorageKey = item.storageKey
-        activeTabID = nil
-        librarySurface = .agent
-        isAgentTabOpen = true
-        refreshAgentWorkspace()
-        updateWindowTitle()
-    }
-
-    /// Close the Agent tab: hide its pill and, if it's the active surface, fall
-    /// back to the catalog browser. The chat session itself is kept in history.
-    func closeAgentWorkspace() {
-        isAgentTabOpen = false
-        agentBoundItemStorageKey = nil
-        if librarySurface == .agent {
-            librarySurface = .browse
-        }
-        updateWindowTitle()
-    }
-
-    /// Resolve the current binding (bound item → selected collection → general),
-    /// provision its `<dataDir>/workspace/` folder, mount sources (CoW) off the main
-    /// thread, and point the library agent's file tools at it.
-    func refreshAgentWorkspace() {
-        let binding: AgentWorkspace.Binding
-        var sources: [URL] = []
-        if let key = agentBoundItemStorageKey,
-           let item = libraryStore.items.first(where: { $0.storageKey == key }) {
-            binding = .item(storageKey: key)
-            sources = [item.fileURL]
-        } else if let collection = libraryStore.selectedCollection,
-                  collection.id != SystemCollectionID.allItems,
-                  !collection.isSmart {
-            binding = .collection(id: collection.id)
-            sources = libraryStore.items
-                .filter { item in item.collections.contains { $0.id == collection.id } }
-                .map(\.fileURL)
-        } else {
-            binding = .general
-        }
-
-        let dir = AgentWorkspace.ensureDirectory(for: binding)
-        agentWorkspaceDirectory = dir
-        libraryChatVM.workspaceDirectory = dir
-        if !sources.isEmpty {
-            let mounts = sources
-            Task.detached { AgentWorkspace.mountSources(mounts, into: dir) }
         }
     }
 

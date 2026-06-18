@@ -10,9 +10,6 @@ struct ChatContextSnapshot: Sendable {
     let activeCollection: ActiveCollection?
     let openTabTitles: [String]
     let activeTabTitle: String?
-    /// Filesystem path of the active agent workspace folder (nil unless the
-    /// full-page agent workspace is active). Source documents are CoW-mounted here.
-    let agentWorkspacePath: String?
 
     struct ActiveCollection: Sendable {
         let name: String

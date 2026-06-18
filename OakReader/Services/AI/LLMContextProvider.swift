@@ -54,10 +54,6 @@ struct LLMContextProvider {
         } else {
             activeCollection = nil
         }
-        let workspacePath = (appState?.isAgentActive == true)
-            ? appState?.agentWorkspaceDirectory?.path
-            : nil
-
         let openTabTitles = appState?.openTabs.map(\.title) ?? []
         let activeTabTitle = appState?.activeTab?.title
 
@@ -73,7 +69,6 @@ struct LLMContextProvider {
             activeCollection: activeCollection,
             openTabTitles: openTabTitles,
             activeTabTitle: activeTabTitle,
-            agentWorkspacePath: workspacePath,
             document: docContext
         )
     }
@@ -415,19 +410,6 @@ struct LLMContextProvider {
                 """)
         }
 
-        // Agent workspace — the chat's working directory, with mounted documents.
-        if let wsPath = context.agentWorkspacePath {
-            parts.append("""
-                <workspace path="\(xmlEscape(wsPath))" />
-                You are working inside an agent workspace folder — your current \
-                working directory. The documents for this workspace are mounted \
-                here as editable copies (relative paths resolve to this folder). \
-                Read and edit them in place with the read/write/ls tools, and save \
-                any new content you produce (notes, drafts, summaries) as files in \
-                this folder.
-                """)
-        }
-
         // GROUNDED mode — scoped to a real collection. Retrieval (search_content /
         // research) is already PHYSICALLY restricted to this collection's members,
         // so the model cannot accidentally pull from the rest of the library.
@@ -524,6 +506,12 @@ struct LLMContextProvider {
                     This document's cite-key is "\(eck)". Citation format:
                     [§ Heading](oak://cite/\(eck)?heading=HeadingText)
                     [your own label](oak://cite/\(eck)?text=verbatim+claim+sentence)
+
+                    Most reliable: if the <current-page> above is shown as [c<id>] \
+                    passages, cite by that id — oak://cite/\(eck)?c=<id>&text=<verbatim \
+                    sentence copied exactly from that passage>. The app then anchors on \
+                    the passage's own verbatim text, so the highlight lands even if your \
+                    wording differs — far more reliable than writing ?text= from memory.
 
                     Copy ?text= from the RENDERED text (not the raw markdown source); \
                     matching is case-insensitive, so only casing may differ. Prefer \

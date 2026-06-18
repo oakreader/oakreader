@@ -375,18 +375,6 @@ struct LibraryTableView: View {
             }
         }
 
-        Button {
-            appState.libraryChatVM.pendingLibraryRef = item
-        } label: {
-            Label("Add to Chat", systemImage: "bubble.left.and.text.bubble.right")
-        }
-
-        Button {
-            appState.openAgentOnItem(item)
-        } label: {
-            Label("Open in Agent Workspace", systemImage: "sparkles")
-        }
-
         if item.contentType == .audio {
             Button {
                 transcribeAudioItem(item)
