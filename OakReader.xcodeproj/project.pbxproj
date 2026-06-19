@@ -90,7 +90,6 @@
 		5552620EEB30835823F9CA6E /* WebSearchTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6D0591497C695399587D6CA /* WebSearchTool.swift */; };
 		55575EB6016D9FA1F38818E5 /* ConversationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1428432F0FC92A5486EAF1E /* ConversationService.swift */; };
 		557C5F1F5CA816F6CEA107CB /* BackupService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E12BE615801270BB860D7415 /* BackupService.swift */; };
-		55985062B2B910DFAC73008E /* RecordingSummaryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3347292FAB8B284480E4486 /* RecordingSummaryService.swift */; };
 		5744CB147F6473B1472883E7 /* WebFetchTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50CD4408767BA75C7CB27191 /* WebFetchTool.swift */; };
 		58DFACB7DB1AF310CEA7A4CD /* ZoteroMigrationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E682F4A12F66C8D3B12A14F /* ZoteroMigrationService.swift */; };
 		5967878A95FEAB1001C9CD7B /* AccessibilityCheckerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA017F31D0A69846D78444B1 /* AccessibilityCheckerView.swift */; };
@@ -183,7 +182,6 @@
 		AB8A54EEC470E21B7DDC6015 /* AnnotationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 936AA0D7A9E66908D29318BA /* AnnotationStore.swift */; };
 		AD65FC5A720D4B145AA9459F /* SnapshotHitTestNSView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11BE1416DF735A904FF85758 /* SnapshotHitTestNSView.swift */; };
 		AF69C97966EB24620D0D683B /* ChatInputTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79CDDA518E696E683F924E68 /* ChatInputTextView.swift */; };
-		B03AE29883273DB1062F2448 /* RecordingSummaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E7C2340A84717F734A9AFFD /* RecordingSummaryView.swift */; };
 		B0F40B872CFA21EB17E14CBF /* Color+Hex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D17F1174B3EE5697AC4D967 /* Color+Hex.swift */; };
 		B13E3E2BAD89594EEB6DAB21 /* OakReaderDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9430D8AD0D92F2EA45E73BDA /* OakReaderDocument.swift */; };
 		B1FE1232C2E15AF345399697 /* ImportService+PDF.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F1E73B68CE5C3BAB49180CE /* ImportService+PDF.swift */; };
@@ -393,7 +391,6 @@
 		5ADEB81E2037E219F10BD1AD /* TagNode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagNode.swift; sourceTree = "<group>"; };
 		5D0EF95DEAF62D528E84E45A /* HTMLMetaParse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTMLMetaParse.swift; sourceTree = "<group>"; };
 		5E4636A8AA3BC27A6648E285 /* WebSearchProviderRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSearchProviderRegistry.swift; sourceTree = "<group>"; };
-		5E7C2340A84717F734A9AFFD /* RecordingSummaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingSummaryView.swift; sourceTree = "<group>"; };
 		5F08A21C55E4718377512E18 /* PopupComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopupComponents.swift; sourceTree = "<group>"; };
 		5FE613E96213AA2CB75C0600 /* CGContext+PDFDrawing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CGContext+PDFDrawing.swift"; sourceTree = "<group>"; };
 		60B1BE6A503FBBAE5E5F6D33 /* ZoteroFieldMapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoteroFieldMapping.swift; sourceTree = "<group>"; };
@@ -477,7 +474,6 @@
 		B13F3C4D671B00C4C56C6096 /* Preview.bundle */ = {isa = PBXFileReference; lastKnownFileType = wrapper.cfbundle; path = Preview.bundle; sourceTree = "<group>"; };
 		B1428432F0FC92A5486EAF1E /* ConversationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationService.swift; sourceTree = "<group>"; };
 		B26DDB8ABAE032A0D1F7C5F5 /* PDFViewerRepresentable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFViewerRepresentable.swift; sourceTree = "<group>"; };
-		B3347292FAB8B284480E4486 /* RecordingSummaryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingSummaryService.swift; sourceTree = "<group>"; };
 		B6D0591497C695399587D6CA /* WebSearchTool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSearchTool.swift; sourceTree = "<group>"; };
 		B759AEF7B571932C2B41C37C /* CatalogDatabase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogDatabase.swift; sourceTree = "<group>"; };
 		B8AE0CDFA398D5A223EA1547 /* BrowserSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserSession.swift; sourceTree = "<group>"; };
@@ -591,7 +587,6 @@
 				6D46DC9842C708EE4F886379 /* PDFViewCoordinator.swift */,
 				B26DDB8ABAE032A0D1F7C5F5 /* PDFViewerRepresentable.swift */,
 				1379764617DB73FF9F2599D8 /* PresentationOverlayView.swift */,
-				5E7C2340A84717F734A9AFFD /* RecordingSummaryView.swift */,
 				11BE1416DF735A904FF85758 /* SnapshotHitTestNSView.swift */,
 				6176ECEF16286177BB48421B /* SnapshotOverlayView.swift */,
 				983CA3B831B97DF57EDBE332 /* TextSelectionPopupPanel.swift */,
@@ -790,7 +785,6 @@
 				2DCA2ACEB7E84961D0442526 /* PDFOCRService.swift */,
 				FEC033770C091AC5B1EA41B0 /* PDFRenderingService.swift */,
 				7030A159436B3C2A9C0B7A47 /* ProviderEndpointStore.swift */,
-				B3347292FAB8B284480E4486 /* RecordingSummaryService.swift */,
 				9741E79B8A2B0C06ED59E2BE /* RecordingTranscriptionService.swift */,
 				8F738341643EF3BE5A70CB44 /* ReferenceService.swift */,
 				10CC73228029B5BE684EDB61 /* SharingService.swift */,
@@ -1450,8 +1444,6 @@
 				C939D8C826D2C44D278BE20C /* ProgressOverlay.swift in Sources */,
 				5F9A3641CBB16475FEC80FF7 /* ProviderEndpointStore.swift in Sources */,
 				F9675FDB4D713B981E015EA1 /* ProviderIconView.swift in Sources */,
-				55985062B2B910DFAC73008E /* RecordingSummaryService.swift in Sources */,
-				B03AE29883273DB1062F2448 /* RecordingSummaryView.swift in Sources */,
 				28D3A097DDD467370B2F8C01 /* RecordingTranscriptionService.swift in Sources */,
 				53561F934267B72C8D1035F7 /* RedactionRegion.swift in Sources */,
 				60C2E9229F9BAD55574472A9 /* ReferenceMetadataView.swift in Sources */,
