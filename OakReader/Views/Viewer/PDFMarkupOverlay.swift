@@ -138,7 +138,11 @@ final class OverlayPDFPage: PDFPage {
             .withSymbolConfiguration(config) else { return nil }
         let canvas = NSImage(size: NSSize(width: px, height: px))
         canvas.lockFocus()
-        noteMarkerColor.set()
+        // The glyph (a small, fine-lined `note.text` at 11–18pt on a near-white
+        // page) needs more contrast than the lighter identity slate gives —
+        // tint it with the darker `noteAccentIcon` (~5.5:1) to match the panel
+        // source pin. The flash *fill* (drawFlash) stays on the lighter accent.
+        OakStyle.Colors.noteAccentIconNS.set()
         let s = base.size
         base.draw(in: NSRect(x: (px - s.width) / 2, y: (px - s.height) / 2, width: s.width, height: s.height))
         NSRect(origin: .zero, size: canvas.size).fill(using: .sourceAtop)  // tint the symbol slate
