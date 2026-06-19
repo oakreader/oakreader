@@ -74,11 +74,11 @@ export function Hero() {
         </p>
 
         <h1 className="flex flex-col items-center text-black leading-[1.1] tracking-[-0.02em] text-[3.2rem] min-[600px]:text-[4.8rem] min-[800px]:text-[6rem] min-[1000px]:text-[6.8rem]">
-          <span className="font-sans font-light whitespace-nowrap">
-            Read <span className="font-exposure font-medium">everything.</span>
+          <span className="font-exposure font-light whitespace-nowrap">
+            Read <span className="font-medium">everything.</span>
           </span>
-          <span className="font-sans font-light whitespace-nowrap">
-            Understand <span className="font-exposure font-medium">anything.</span>
+          <span className="font-exposure font-light whitespace-nowrap">
+            Understand <span className="font-medium">anything.</span>
           </span>
         </h1>
 
