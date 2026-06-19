@@ -239,7 +239,7 @@ struct TranslationPanelView: View {
             }
 
             if !trimmed.isEmpty {
-                toolbarButton(systemImage: "doc.on.doc", tooltip: copyTooltip) {
+                toolbarButton(systemImage: "square.on.square", tooltip: copyTooltip) {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(text, forType: .string)
                 }
@@ -319,7 +319,7 @@ struct TranslationPanelView: View {
     private func toolbarButton(systemImage: String, tooltip: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(size: 13, weight: .regular))
                 .foregroundStyle(.secondary)
                 .frame(width: 26, height: 26)
                 .contentShape(Rectangle())
