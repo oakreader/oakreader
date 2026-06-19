@@ -13,6 +13,7 @@ struct MemoryManagerView: View {
     @State private var showHistory = false
     @State private var log: [MemoryLogEntry] = []
     @State private var hoveredId: String?
+    @State private var pendingDelete: MemoryFact?
     @FocusState private var addFocused: Bool
 
     var body: some View {
@@ -26,6 +27,23 @@ struct MemoryManagerView: View {
         .frame(width: 480, height: 540)
         .background(Color(nsColor: .textBackgroundColor))
         .onAppear(perform: reload)
+        .confirmationDialog(
+            "Delete this memory?",
+            isPresented: Binding(
+                get: { pendingDelete != nil },
+                set: { if !$0 { pendingDelete = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: pendingDelete
+        ) { fact in
+            Button("Delete", role: .destructive) {
+                MemoryStore.delete(id: fact.id)
+                reload()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text("The agent will no longer remember this. This can't be undone.")
+        }
     }
 
     private var hairline: some View {
@@ -94,8 +112,7 @@ struct MemoryManagerView: View {
                 .padding(.top, 1)
 
             Button {
-                MemoryStore.delete(id: fact.wrappedValue.id)
-                reload()
+                pendingDelete = fact.wrappedValue
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 10, weight: .medium))

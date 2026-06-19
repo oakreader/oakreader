@@ -30,6 +30,7 @@ private struct ProviderDetailView: View {
     @State private var serverURL: String = ""
     @State private var isDiscovering: Bool = false
     @State private var discoverResult: String?
+    @State private var showResetConfirm = false
 
     private var provider: ProviderInfo? {
         ProviderRegistry.shared.provider(for: providerId)
@@ -422,6 +423,15 @@ private struct ProviderDetailView: View {
 
         Section {
             Button("Reset Provider", role: .destructive) {
+                showResetConfirm = true
+            }
+        }
+        .confirmationDialog(
+            provider.isLocal ? "Remove this provider?" : "Reset this provider?",
+            isPresented: $showResetConfirm,
+            titleVisibility: .visible
+        ) {
+            Button(provider.isLocal ? "Remove" : "Reset", role: .destructive) {
                 if provider.isLocal {
                     LocalProviderStore.shared.remove(id: provider.id)
                 } else {
@@ -433,6 +443,11 @@ private struct ProviderDetailView: View {
                 testResult = nil
                 discoverResult = nil
             }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(provider.isLocal
+                 ? "This removes the local provider configuration."
+                 : "Your saved API key and any sign-in for this provider will be permanently deleted. You'll need to re-enter them to use it again.")
         }
     }
 

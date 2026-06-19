@@ -6,6 +6,7 @@ struct ChatHistoryDrawer: View {
     var onSelect: ((UUID) -> Void)?
 
     @State private var hoveredSessionId: UUID?
+    @State private var pendingDelete: ConversationMeta?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -17,6 +18,22 @@ struct ChatHistoryDrawer: View {
         }
         .onAppear {
             chatVM.loadSessionList()
+        }
+        .confirmationDialog(
+            "Delete this conversation?",
+            isPresented: Binding(
+                get: { pendingDelete != nil },
+                set: { if !$0 { pendingDelete = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: pendingDelete
+        ) { session in
+            Button("Delete", role: .destructive) {
+                chatVM.deleteSessionFromList(session.id)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { session in
+            Text("“\(session.title.isEmpty ? "New Chat" : session.title)” will be permanently deleted.")
         }
     }
 
@@ -163,7 +180,7 @@ struct ChatHistoryDrawer: View {
         Divider()
 
         Button(role: .destructive) {
-            chatVM.deleteSessionFromList(session.id)
+            pendingDelete = session
         } label: {
             Label("Delete Conversation", systemImage: "trash")
         }
