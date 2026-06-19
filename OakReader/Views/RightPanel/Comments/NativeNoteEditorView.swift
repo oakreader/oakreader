@@ -535,7 +535,12 @@ final class NoteEditorTextView: NSTextView {
         // Route to the completion panel first when it's open.
         if completionPanel != nil, handleCompletionKey(event) { return }
 
-        if event.keyCode == 36, event.modifierFlags.contains(.command) { onSubmit?(); return }
+        // Enter saves (quick capture, like the chat composer); Shift/⌘+Enter = newline.
+        if event.keyCode == 36 {
+            let mods = event.modifierFlags
+            if mods.contains(.command) || mods.contains(.shift) { insertNewline(nil) } else { onSubmit?() }
+            return
+        }
 
         // Trigger detection: `/` at a line start (block menu), `@`/`#` at a word
         // boundary. Insert the char first (super), then surface the panel.

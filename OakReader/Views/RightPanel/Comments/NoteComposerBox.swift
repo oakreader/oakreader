@@ -234,7 +234,7 @@ struct NoteComposerBox: View {
             }
             .buttonStyle(.plain)
             .disabled(!canSend)
-            .help(mode == .edit ? "Save (⌘↩)" : "Save note (⌘↩)")
+            .help(mode == .edit ? "Save (↩)" : "Save note (↩)")
         }
     }
 
