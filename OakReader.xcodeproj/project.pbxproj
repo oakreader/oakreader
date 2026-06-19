@@ -39,7 +39,6 @@
 		247565697261607937720B65 /* WebSearchSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 550762CBAFE2986E9180ED34 /* WebSearchSettingsView.swift */; };
 		249505FEB7F2FB8F5ABF87ED /* BackupProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08000CB32FE5FB153C8D346F /* BackupProgressView.swift */; };
 		27926C8DE8B6E9E53CF5553D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35C3D7C67DA37CE045FCE96F /* ContentView.swift */; };
-		27E648D5548C7D502D8DFA32 /* MilkdownComposerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 602DF20D4679A5E02D71408B /* MilkdownComposerView.swift */; };
 		28D3A097DDD467370B2F8C01 /* RecordingTranscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9741E79B8A2B0C06ED59E2BE /* RecordingTranscriptionService.swift */; };
 		292A1C4192568BEACFE65E88 /* DatabaseRecords.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2E4089D54ED9BD0D3F84946 /* DatabaseRecords.swift */; };
 		2BEB2B630AF8E575DE9FE809 /* LibraryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6E956A0342EDE33F8AC2ACB /* LibraryStore.swift */; };
@@ -52,6 +51,7 @@
 		312E8065353AA35E010D96CC /* FannedAttachmentStack.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9C644594425945C7B78ACFD /* FannedAttachmentStack.swift */; };
 		31D75CEE8AEEFE3C3681CB21 /* SkillCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE1B1725466F2575C959C69A /* SkillCommands.swift */; };
 		3361EE0F6F4FD80D6EFA1D5C /* SnapshotOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6176ECEF16286177BB48421B /* SnapshotOverlayView.swift */; };
+		33EC1322007BDE199F951D73 /* NativeNoteEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BCE0A5839AD49EFBF67BA94 /* NativeNoteEditorView.swift */; };
 		3471F39243CDDFFC6E1476C2 /* CSLTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10A6B5888A5CF5E18A2C1559 /* CSLTypes.swift */; };
 		3569116CCF91ED3A66102DB4 /* UninstallService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47A63D583D4151C734A38F58 /* UninstallService.swift */; };
 		359563B756BEBFD7B6BC6733 /* PDFDocument+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0419B899299907DCFA91F960 /* PDFDocument+Extensions.swift */; };
@@ -355,6 +355,7 @@
 		37594A1723FA448772E9FAA7 /* FileCoordination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileCoordination.swift; sourceTree = "<group>"; };
 		397EB83BF75F4E405467D317 /* ChunkCitationResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChunkCitationResolver.swift; sourceTree = "<group>"; };
 		3A68874A493BE4FAA33E42A1 /* LibraryEnums.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryEnums.swift; sourceTree = "<group>"; };
+		3BCE0A5839AD49EFBF67BA94 /* NativeNoteEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeNoteEditorView.swift; sourceTree = "<group>"; };
 		3D38BCCDC836C6A8870744D6 /* DOIExtractorService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DOIExtractorService.swift; sourceTree = "<group>"; };
 		3EDAE070FD925FD55D45822B /* TabBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabBarView.swift; sourceTree = "<group>"; };
 		3F805A52D7F110665173B75C /* WebSearchProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSearchProvider.swift; sourceTree = "<group>"; };
@@ -395,7 +396,6 @@
 		5E7C2340A84717F734A9AFFD /* RecordingSummaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingSummaryView.swift; sourceTree = "<group>"; };
 		5F08A21C55E4718377512E18 /* PopupComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopupComponents.swift; sourceTree = "<group>"; };
 		5FE613E96213AA2CB75C0600 /* CGContext+PDFDrawing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CGContext+PDFDrawing.swift"; sourceTree = "<group>"; };
-		602DF20D4679A5E02D71408B /* MilkdownComposerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MilkdownComposerView.swift; sourceTree = "<group>"; };
 		60B1BE6A503FBBAE5E5F6D33 /* ZoteroFieldMapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoteroFieldMapping.swift; sourceTree = "<group>"; };
 		6176ECEF16286177BB48421B /* SnapshotOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapshotOverlayView.swift; sourceTree = "<group>"; };
 		62560256F2EDCA5C146F6644 /* BrowserTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserTools.swift; sourceTree = "<group>"; };
@@ -635,7 +635,7 @@
 			children = (
 				978C633C84BE0CB15F291AF6 /* CommentsPanelView.swift */,
 				846387925BF723676FB401E7 /* ImageLightbox.swift */,
-				602DF20D4679A5E02D71408B /* MilkdownComposerView.swift */,
+				3BCE0A5839AD49EFBF67BA94 /* NativeNoteEditorView.swift */,
 				AB28674401171F133AF0003D /* NoteComposerBox.swift */,
 				BCE09C2AAC01ED235CB5E49D /* NoteDetailSheet.swift */,
 				62D7A3CC47463993633A9DEC /* NotesSupport.swift */,
@@ -1415,8 +1415,8 @@
 				4B87D6B57BB298674715C6BB /* MemoryStore.swift in Sources */,
 				8AC0ABB880FAADB6AB7286F3 /* MemoryTools.swift in Sources */,
 				50C9D716C1D0FFD111BC429F /* MigrationService.swift in Sources */,
-				27E648D5548C7D502D8DFA32 /* MilkdownComposerView.swift in Sources */,
 				35AC4A178210B13C19012AD1 /* NSImage+Extensions.swift in Sources */,
+				33EC1322007BDE199F951D73 /* NativeNoteEditorView.swift in Sources */,
 				4E9B217F367B0ABF7EAA70F6 /* NewTabView.swift in Sources */,
 				803BDBB63574B75950ED1DA2 /* NoteComposerBox.swift in Sources */,
 				8EBE599938FF028F296BDAC1 /* NoteDetailSheet.swift in Sources */,
@@ -1630,7 +1630,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.6.0;
+				MARKETING_VERSION = 0.7.4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.oakreader.OakReader.dev;
 				PRODUCT_NAME = OakReader;
 				SDKROOT = macosx;
@@ -1721,7 +1721,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.6.0;
+				MARKETING_VERSION = 0.7.4;
 				OTHER_CODE_SIGN_FLAGS = "--timestamp";
 				PRODUCT_BUNDLE_IDENTIFIER = com.oakreader.OakReader;
 				PRODUCT_NAME = OakReader;

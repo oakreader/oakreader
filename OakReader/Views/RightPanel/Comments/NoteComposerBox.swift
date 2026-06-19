@@ -33,11 +33,8 @@ struct NoteComposerBox: View {
     /// Existing `#tags` in this doc, offered by the `#` picker so the user reuses a
     /// tag instead of retyping it (recognition over recall → prevents tag sprawl).
     var tags: [String] = []
-    /// When set (create composer only), reuse the document's already-booted editor
-    /// across Notes-tab visits instead of reloading — kills the boot+fade "flick".
-    var reuseHolder: ComposerWebHolder? = nil
 
-    @State private var controller = MilkdownComposerController()
+    @State private var controller = NoteEditorController()
     @State private var isEmpty = true
     @State private var charCount = 0
     /// Formatting commands active at the caret (reported live by the editor), so
@@ -53,19 +50,13 @@ struct NoteComposerBox: View {
     /// the prose (kept out of the editor so they never crowd out the writing line).
     @State private var attachments: [String] = []
     @State private var didSeedAttachments = false
-    @State private var showMention = false
-    @State private var mentionQuery = ""
-    @State private var mentionAnchor: CGPoint = .zero
-    @FocusState private var mentionFieldFocused: Bool
-    @State private var showTag = false
-    @State private var tagQuery = ""
-    @State private var tagAnchor: CGPoint = .zero
-    @FocusState private var tagFieldFocused: Bool
-    @Environment(\.colorScheme) private var colorScheme
-
-    /// The shared dropdown palette — the same source the chat `@`/`/` panel renders
-    /// from — so the note `@`/`#` pickers stay pixel-identical to it.
-    private var mentionPalette: CompletionPalette { CompletionPalette(isDark: colorScheme == .dark) }
+    /// Slack-style: the inline-format row (B/I/U/S, link, lists, quote, code) is
+    /// collapsed by default and toggled by the `Aa` button on the action row, so
+    /// the always-visible bar stays a clean capture surface (#, @, image, send).
+    @State private var showFormatBar = false
+    @State private var showLink = false
+    @State private var linkURL = ""
+    @FocusState private var linkFieldFocused: Bool
 
     /// Send is allowed when there's prose *or* at least one attached image.
     private var canSend: Bool { !isEmpty || !attachments.isEmpty }
@@ -76,46 +67,30 @@ struct NoteComposerBox: View {
                 quoteChip(quote)
             }
 
-            ZStack(alignment: .topLeading) {
-                MilkdownComposerView(
-                    initialMarkdown: Self.splitBody(initialMarkdown).text,
-                    controller: controller,
-                    isEmpty: $isEmpty,
-                    charCount: $charCount,
-                    height: $height,
-                    activeFormats: $activeFormats,
-                    reuseHolder: reuseHolder,
-                    onSubmit: send,
-                    onMention: { point in
-                        if let point { mentionAnchor = point }
-                        showMention = true
-                    },
-                    onTag: { point in
-                        if let point { tagAnchor = point }
-                        showTag = true
-                    }
-                )
-
-                // Invisible caret anchor so the `@` picker pops up next to the
-                // cursor (coords reported from the editor), flomo-style.
-                Color.clear
-                    .frame(width: 1, height: 1)
-                    .offset(x: mentionAnchor.x, y: mentionAnchor.y)
-                    .popover(isPresented: $showMention, arrowEdge: .bottom) { mentionPicker }
-
-                // Same caret-anchored popover for the `#` tag picker.
-                Color.clear
-                    .frame(width: 1, height: 1)
-                    .offset(x: tagAnchor.x, y: tagAnchor.y)
-                    .popover(isPresented: $showTag, arrowEdge: .bottom) { tagPicker }
+            // Slack-style: the format bar sits at the TOP of the box (the `Aa`
+            // toggle is on the bottom action row).
+            if showFormatBar {
+                formatBar
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
+
+            // `@` references and `#` tags are driven inline by the editor itself
+            // (same `ChatCompletionPanel` the chat composer uses), so there are no
+            // SwiftUI popovers to host here anymore.
+            NativeNoteEditorView(
+                initialMarkdown: Self.splitBody(initialMarkdown).text,
+                controller: controller,
+                isEmpty: $isEmpty,
+                charCount: $charCount,
+                height: $height,
+                activeFormats: $activeFormats,
+                onSubmit: send,
+                references: memos,
+                tags: tags
+            )
             .frame(height: max(height, Self.minEditorHeight), alignment: .topLeading)
-            // No height animation: animating the frame made it TRAIL the web
-            // content for ~100ms after each newline, and in that window the
-            // content was taller than the frame — so ProseMirror scrolled to keep
-            // the caret in view, yanking the first line up and back (the visible
-            // "晃一下" wobble). Growing the frame in lockstep with the content
-            // keeps the first line pinned.
+            // Grow the frame in lockstep with content (no height animation) so the
+            // first line stays pinned as the editor auto-grows.
 
             if !attachments.isEmpty {
                 attachmentTray
@@ -214,44 +189,22 @@ struct NoteComposerBox: View {
 
     // MARK: Toolbar
 
+    /// The always-visible action row (Slack-style): formatting toggle + the note's
+    /// own capture actions (#, @, image), then count/cancel/send.
     private var toolbar: some View {
         HStack(spacing: 2) {
+            toolButton("textformat", active: showFormatBar) {
+                withAnimation(.easeOut(duration: 0.12)) { showFormatBar.toggle() }
+            }
+            .help("Formatting")
+
             toolButton("number") { controller.cmd("tag") }
                 .help("Tag")
+
+            toolButton("at") { controller.requestMention() }
+                .help("Reference a note")
+
             imageButton
-
-            toolDivider
-
-            // Inline-format toggles laid out flat in the bar (no `Aa` popover) —
-            // each is a single tap and lights up when active at the caret, matching
-            // flomo's flat capture toolbar.
-            toolButton("bold", active: activeFormats.contains("bold")) { controller.cmd("bold") }
-                .help("Bold")
-            toolButton("italic", active: activeFormats.contains("italic")) { controller.cmd("italic") }
-                .help("Italic")
-            toolButton("textformat.size", active: activeFormats.contains("heading")) { controller.cmd("heading") }
-                .help("Heading")
-            toolButton("chevron.left.forwardslash.chevron.right", active: activeFormats.contains("code")) { controller.cmd("code") }
-                .help("Inline code")
-
-            toolDivider
-
-            toolButton("list.bullet", active: activeFormats.contains("bulletList")) { controller.cmd("bulletList") }
-                .help("Bulleted list")
-            toolButton("list.number", active: activeFormats.contains("orderedList")) { controller.cmd("orderedList") }
-                .help("Numbered list")
-
-            toolDivider
-
-            Button { controller.requestMention() } label: {
-                Image(systemName: "at")
-                    .font(.system(size: 14))
-                    .foregroundStyle(showMention ? Color.accentColor : .secondary)
-                    .frame(width: 28, height: 28)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(ToolButtonStyle())
-            .help("Reference a note")
 
             Spacer()
 
@@ -285,6 +238,83 @@ struct NoteComposerBox: View {
         }
     }
 
+    /// The collapsible inline-format row (toggled by the action row's `Aa`),
+    /// matching Slack's: B/I/U/S · link · bullet/ordered · quote · inline/block code.
+    /// Each lights up when active at the caret so the toggle-off affordance is clear.
+    private var formatBar: some View {
+        HStack(spacing: 2) {
+            toolButton("bold", active: activeFormats.contains("bold")) { controller.cmd("bold") }
+                .help("Bold")
+            toolButton("italic", active: activeFormats.contains("italic")) { controller.cmd("italic") }
+                .help("Italic")
+            toolButton("underline", active: activeFormats.contains("underline")) { controller.cmd("underline") }
+                .help("Underline")
+            toolButton("strikethrough", active: activeFormats.contains("strikethrough")) { controller.cmd("strikethrough") }
+                .help("Strikethrough")
+
+            toolDivider
+
+            Button { showLink = true } label: {
+                Image(systemName: "link")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(ToolButtonStyle())
+            .help("Link")
+            .popover(isPresented: $showLink, arrowEdge: .bottom) { linkPopover }
+
+            toolDivider
+
+            toolButton("list.bullet", active: activeFormats.contains("bulletList")) { controller.cmd("bulletList") }
+                .help("Bulleted list")
+            toolButton("list.number", active: activeFormats.contains("orderedList")) { controller.cmd("orderedList") }
+                .help("Numbered list")
+            toolButton("text.quote", active: activeFormats.contains("quote")) { controller.cmd("quote") }
+                .help("Quote")
+
+            toolDivider
+
+            toolButton("chevron.left.forwardslash.chevron.right", active: activeFormats.contains("code")) { controller.cmd("code") }
+                .help("Inline code")
+            toolButton("curlybraces", active: activeFormats.contains("codeBlock")) { controller.cmd("codeBlock") }
+                .help("Code block")
+
+            Spacer()
+        }
+    }
+
+    /// Small URL entry for the link button — applies a link to the current
+    /// selection (or inserts the URL as the link text when nothing is selected).
+    private var linkPopover: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "link").font(.system(size: 12)).foregroundStyle(.secondary)
+            TextField("https://…", text: $linkURL)
+                .textFieldStyle(.plain)
+                .font(.system(size: 13))
+                .focused($linkFieldFocused)
+                .onSubmit { applyLink() }
+            Button("Add") { applyLink() }
+                .buttonStyle(.plain)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Color.accentColor)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .frame(width: 280)
+        .onAppear { linkFieldFocused = true }
+    }
+
+    private func applyLink() {
+        let url = linkURL.trimmingCharacters(in: .whitespaces)
+        showLink = false
+        linkURL = ""
+        guard !url.isEmpty else { return }
+        controller.insertLink(url: url)
+        controller.focus()
+    }
+
     /// Image affordance — captures a region of the document (a viewer crosshair
     /// clip, like AI chat). Notes only take document screenshots, never file
     /// uploads, so this is hidden when capture isn't wired (e.g. inline edit).
@@ -296,157 +326,15 @@ struct NoteComposerBox: View {
         }
     }
 
-    // MARK: @ memo-reference picker (flomo note-to-note link)
-
-    private var filteredMemos: [NoteRef] {
-        let q = mentionQuery.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !q.isEmpty else { return memos }
-        return memos.filter { $0.preview.lowercased().contains(q) }
-    }
-
-    private var mentionPicker: some View {
-        let palette = mentionPalette
-        return VStack(spacing: 0) {
-            // The picker can't observe keystrokes typed into the WKWebView editor
-            // (the native chat input filters inline because it owns its NSTextView),
-            // so it carries its own search field to filter the note list.
-            HStack(spacing: 6) {
-                Image(systemName: "at")
-                    .font(.system(size: 12))
-                    .foregroundStyle(palette.secondaryColor)
-                TextField("Search notes…", text: $mentionQuery)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 13))
-                    .foregroundStyle(palette.titleColor)
-                    .focused($mentionFieldFocused)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-
-            Rectangle().fill(palette.borderColor).frame(height: 1)
-
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    ForEach(filteredMemos) { ref in
-                        MentionRow(ref: ref, palette: palette) { insertReference(ref) }
-                    }
-                    if filteredMemos.isEmpty {
-                        Text(memos.isEmpty ? "No other notes yet" : "No matches")
-                            .font(.system(size: 13))
-                            .foregroundStyle(palette.secondaryColor)
-                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                            .padding(.horizontal, 12)
-                    }
-                }
-                // 6/5pt content inset matches the chat panel's card padding, so the
-                // selection pill insets the same 6pt from the card edge.
-                .padding(.horizontal, 6)
-                .padding(.vertical, 5)
-            }
-            .frame(maxHeight: 280)
-        }
-        .frame(width: 300)
-        .background(palette.panelBackgroundColor)
-        .onAppear { mentionFieldFocused = true }
-    }
-
-    private func insertReference(_ ref: NoteRef) {
-        controller.insertReference(label: Self.referenceLabel(ref.preview), href: NoteLink.href(ref.id))
-        showMention = false
-        mentionQuery = ""
-        controller.focus()
-    }
-
-    // MARK: # tag picker (reuse existing tags → no sprawl)
-
-    private var filteredTags: [String] {
-        let q = tagQuery.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !q.isEmpty else { return tags }
-        return tags.filter { $0.lowercased().contains(q) }
-    }
-
-    /// A "create this tag" candidate from the query — shown only when it isn't
-    /// already an existing tag. Spaces are stripped (tags are single tokens).
-    private var newTagCandidate: String? {
-        let c = tagQuery.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: " ", with: "")
-        guard !c.isEmpty,
-              !tags.contains(where: { $0.caseInsensitiveCompare(c) == .orderedSame }) else { return nil }
-        return c
-    }
-
-    private var tagPicker: some View {
-        let palette = mentionPalette
-        return VStack(spacing: 0) {
-            HStack(spacing: 6) {
-                Image(systemName: "number")
-                    .font(.system(size: 12))
-                    .foregroundStyle(palette.secondaryColor)
-                TextField("Filter or create a tag…", text: $tagQuery)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 13))
-                    .foregroundStyle(palette.titleColor)
-                    .focused($tagFieldFocused)
-                    .onSubmit {
-                        if let c = newTagCandidate { insertTag(c) }
-                        else if let first = filteredTags.first { insertTag(first) }
-                    }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-
-            Rectangle().fill(palette.borderColor).frame(height: 1)
-
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    if let c = newTagCandidate {
-                        TagPickerRow(label: "Create #\(c)", icon: "plus", palette: palette) { insertTag(c) }
-                    }
-                    ForEach(filteredTags, id: \.self) { tag in
-                        // The leading `#` glyph already marks these as tags — don't
-                        // repeat it in the label (was rendering "# #tag").
-                        TagPickerRow(label: tag, icon: "number", palette: palette) { insertTag(tag) }
-                    }
-                    if filteredTags.isEmpty && newTagCandidate == nil {
-                        Text(tags.isEmpty ? "No tags yet — type to create one" : "No matches")
-                            .font(.system(size: 13))
-                            .foregroundStyle(palette.secondaryColor)
-                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                            .padding(.horizontal, 12)
-                    }
-                }
-                .padding(.horizontal, 6)
-                .padding(.vertical, 5)
-            }
-            .frame(maxHeight: 280)
-        }
-        .frame(width: 300)
-        .background(palette.panelBackgroundColor)
-        .onAppear { tagFieldFocused = true }
-    }
-
-    private func insertTag(_ tag: String) {
-        controller.insertTag(tag)
-        showTag = false
-        tagQuery = ""
-        controller.focus()
-    }
-
-    /// A compact, markdown-safe label for an inserted note reference.
-    static func referenceLabel(_ preview: String) -> String {
-        let oneLine = preview
-            .replacingOccurrences(of: "\n", with: " ")
-            .replacingOccurrences(of: "[", with: "")
-            .replacingOccurrences(of: "]", with: "")
-            .trimmingCharacters(in: .whitespaces)
-        if oneLine.isEmpty { return "MEMO" }
-        return oneLine.count > 24 ? String(oneLine.prefix(24)) + "…" : oneLine
-    }
 
     private func toolButton(_ system: String, active: Bool = false, _ action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: system)
+                // Icon color stays constant whether or not the format is active —
+                // the *background* (grey fill + hairline border) signals the toggle,
+                // not a color change.
                 .font(.system(size: 14))
-                .foregroundStyle(active ? Color.accentColor : .secondary)
+                .foregroundStyle(.secondary)
                 .frame(width: 28, height: 28)
                 .contentShape(Rectangle())
         }
@@ -612,92 +500,23 @@ private struct ToolButtonStyle: ButtonStyle {
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
                         .fill(fill)
                 )
+                .overlay(
+                    // Hairline light-grey border marks the active (toggled) state —
+                    // a neutral affordance, no accent color.
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(active ? 0.15 : 0), lineWidth: 1)
+                )
                 .animation(.easeOut(duration: 0.12), value: hovering)
                 .animation(.easeOut(duration: 0.12), value: active)
                 .onHover { hovering = $0 }
         }
 
         private var fill: Color {
-            if active { return Color.accentColor.opacity(hovering ? 0.22 : 0.15) }
+            if active { return Color.primary.opacity(hovering ? 0.12 : 0.08) }
             if configuration.isPressed { return Color.primary.opacity(0.12) }
             return Color.primary.opacity(hovering ? 0.06 : 0)
         }
     }
 }
 
-/// A row in the `@` note picker, styled to match the chat composer's completion
-/// panel (`ChatCompletionPanel`): 26pt tall, a leading glyph shown directly, the
-/// note preview as the title and the timestamp right-aligned, with an accent-blue
-/// selection pill and white text on hover.
-private struct MentionRow: View {
-    let ref: NoteRef
-    let palette: CompletionPalette
-    let onSelect: () -> Void
-    @State private var hovering = false
-
-    private typealias M = CompletionPalette.Metrics
-
-    var body: some View {
-        HStack(spacing: M.iconToTitle) {
-            Image(systemName: "note.text")
-                .font(.system(size: M.iconPointSize, weight: .medium))
-                .foregroundStyle(hovering ? palette.onSelectionTextColor : palette.secondaryColor)
-                .frame(width: M.iconFrame)
-            Text(ref.preview.isEmpty ? "Untitled" : ref.preview)
-                .font(.system(size: M.titleSize))
-                .foregroundStyle(hovering ? palette.onSelectionTextColor : palette.titleColor)
-                .lineLimit(1)
-                .truncationMode(.tail)
-            Spacer(minLength: 10)
-            Text(ref.time)
-                .font(.system(size: M.secondarySize))
-                .foregroundStyle(hovering ? palette.onSelectionSecondaryColor : palette.secondaryColor)
-                .lineLimit(1)
-        }
-        .padding(.horizontal, M.horizontalInset)
-        .frame(height: M.rowHeight)
-        .background(
-            RoundedRectangle(cornerRadius: M.selectionRadius, style: .continuous)
-                .fill(hovering ? palette.selectionFillColor : Color.clear)
-        )
-        .contentShape(Rectangle())
-        .onHover { hovering = $0 }
-        .onTapGesture(perform: onSelect)
-    }
-}
-
-/// A row in the `#` tag picker — same 26pt / selection-pill styling as `MentionRow`.
-private struct TagPickerRow: View {
-    let label: String
-    let icon: String
-    let palette: CompletionPalette
-    let onSelect: () -> Void
-    @State private var hovering = false
-
-    private typealias M = CompletionPalette.Metrics
-
-    var body: some View {
-        HStack(spacing: M.iconToTitle) {
-            Image(systemName: icon)
-                .font(.system(size: M.iconPointSize, weight: .medium))
-                .foregroundStyle(hovering ? palette.onSelectionTextColor : palette.secondaryColor)
-                .frame(width: M.iconFrame)
-            Text(label)
-                .font(.system(size: M.titleSize))
-                .foregroundStyle(hovering ? palette.onSelectionTextColor : palette.titleColor)
-                .lineLimit(1)
-                .truncationMode(.tail)
-            Spacer(minLength: 10)
-        }
-        .padding(.horizontal, M.horizontalInset)
-        .frame(height: M.rowHeight)
-        .background(
-            RoundedRectangle(cornerRadius: M.selectionRadius, style: .continuous)
-                .fill(hovering ? palette.selectionFillColor : Color.clear)
-        )
-        .contentShape(Rectangle())
-        .onHover { hovering = $0 }
-        .onTapGesture(perform: onSelect)
-    }
-}
 

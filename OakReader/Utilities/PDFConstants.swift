@@ -255,7 +255,11 @@ struct PDFDefaults {
     static let watermarkFontSize: CGFloat = 72
     static let batesNumberFormat = "%06d"
     static let searchHighlightColor = NSColor.systemYellow.withAlphaComponent(0.4)
-    static let annotationDefaultColor = NSColor.systemRed
+    // Yellow is the conventional highlight default (Preview, Acrobat, Zotero) and
+    // is the first swatch in every color picker — keep the default in sync with it
+    // rather than diverging to red.
+    static let annotationDefaultColor =
+        OakStyle.AnnotationColors.highlightColors.first?.nsColor ?? NSColor.systemYellow
     static let annotationDefaultLineWidth: CGFloat = 1.5
     static let defaultFontName = "Helvetica"
     static let defaultFontSize: CGFloat = 12.0

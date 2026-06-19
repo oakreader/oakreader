@@ -54,8 +54,7 @@ struct CommentsPanelView: View {
                 captureURL: model.pendingCaptureURL,
                 onCaptureConsumed: { model.pendingCaptureURL = nil },
                 memos: model.referenceableMemos(excluding: nil),
-                tags: model.allTags,
-                reuseHolder: model.composerWebHolder
+                tags: model.allTags
             )
             .padding(.horizontal, 12)
             .padding(.vertical, 12)
@@ -272,7 +271,6 @@ private struct CommentCardView: View {
     @State private var showDetail = false
 
     private var anchored: Bool { model.isAnchored(record) }
-    private var accent: Color { Self.color(from: record.color) }
     private var rawBody: String { record.comment ?? "" }
     private var tags: [String] { NoteTags.extract(rawBody) }
     // Pull images out of the body so they render as native, tappable thumbnails
@@ -370,10 +368,22 @@ private struct CommentCardView: View {
         }
     }
 
-    /// Copy the note's text to the clipboard. Uses the readable body (tags and
-    /// image markup stripped); falls back to the raw markdown if that's empty.
+    /// Copy the note to the clipboard. For an anchored note the quoted source is
+    /// part of its meaning, so copy it too — the quote as a markdown blockquote,
+    /// then the note body (the Zotero/Readwise export convention, and it stays
+    /// readable as plain text). Uses the readable body (tags and image markup
+    /// stripped); falls back to the raw markdown if that's empty.
     private func copyToPasteboard() {
-        let text = body0.isEmpty ? rawBody : body0
+        let note = body0.isEmpty ? rawBody : body0
+        var parts: [String] = []
+        if anchored,
+           let quote = record.text?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !quote.isEmpty {
+            parts.append(quote.split(separator: "\n", omittingEmptySubsequences: false)
+                .map { "> \($0)" }.joined(separator: "\n"))
+        }
+        if !note.isEmpty { parts.append(note) }
+        let text = parts.joined(separator: "\n\n")
         guard !text.isEmpty else { return }
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
@@ -514,7 +524,7 @@ private struct CommentCardView: View {
         } label: {
             HStack(spacing: 7) {
                 ZStack {
-                    Circle().fill(accent.opacity(0.9)).frame(width: 18, height: 18)
+                    Circle().fill(OakStyle.Colors.noteAccent.opacity(0.9)).frame(width: 18, height: 18)
                     Image(systemName: "arrow.up.left")
                         .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(.white)

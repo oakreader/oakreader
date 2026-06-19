@@ -55,6 +55,13 @@ enum OakStyle {
         static let border = Color.primary.opacity(0.10)
         static let borderSubtle = Color.primary.opacity(0.05)
 
+        // Note identity — ONE color for everything that represents a note: the
+        // on-page marker badge, the panel's source pin, and the click-to-reveal
+        // flash. A muted slate, deliberately distinct from the yellow *highlight*
+        // tint so "noted" never reads as "highlighted".
+        static let noteAccent = Color(hex: "7C8896")
+        static let noteAccentNS = NSColor(srgbRed: 0x7C / 255.0, green: 0x88 / 255.0, blue: 0x96 / 255.0, alpha: 1)
+
         // Text
         static let textPrimary = Color.primary.opacity(1.0)
         static let textSecondary = Color.primary.opacity(0.60)

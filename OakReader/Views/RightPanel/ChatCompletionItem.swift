@@ -7,6 +7,10 @@ struct ChatCompletionItem: Identifiable, Equatable {
     enum Kind {
         case installedSkill(Skill)
         case libraryReference(LibraryRefPayload)
+        /// A generic item that carries its own section title — used by the note
+        /// composer to reuse this panel for `/` block commands, `#` tags and `@`
+        /// note references (the action is encoded in `id`, handled by the caller).
+        case command(section: String)
     }
 
     struct LibraryRefPayload: Equatable {
@@ -95,7 +99,17 @@ struct ChatCompletionItem: Identifiable, Equatable {
             return "Skills"
         case .libraryReference:
             return "Library"
+        case .command(let section):
+            return section
         }
+    }
+
+    /// Build a generic note-composer item (block command / tag / reference). The
+    /// action is encoded in `id` (`block:` / `tag:` / `ref:` prefix).
+    static func note(id: String, icon: String, label: String, description: String = "",
+                     section: String, trigger: String) -> ChatCompletionItem {
+        ChatCompletionItem(id: id, icon: icon, label: label, description: description,
+                           kind: .command(section: section), trigger: trigger)
     }
 
     /// Matches a filter query against label and description (case-insensitive).

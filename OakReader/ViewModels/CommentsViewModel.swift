@@ -84,11 +84,6 @@ final class CommentsViewModel {
     /// the composer consumes it.
     var pendingCaptureURL: String?
 
-    /// Retains the create composer's already-booted Milkdown `WKWebView` so
-    /// re-entering the Notes tab reuses it instead of reloading (which caused the
-    /// boot+fade "flick"). View-layer plumbing, not observable note state.
-    @ObservationIgnored let composerWebHolder = ComposerWebHolder()
-
     /// Route a finished area capture into the active note composer.
     func deliverCapturedImage(_ url: String) {
         pendingCaptureURL = url

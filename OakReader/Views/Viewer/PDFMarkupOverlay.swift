@@ -41,8 +41,8 @@ struct PDFTextMarkup: Identifiable {
     /// past the end of the last line. `nil` when this isn't a note.
     var noteMarkerRect: CGRect? {
         guard isNote, let last = quads.last else { return nil }
-        let side = max(9, min(16, last.height * 0.9))
-        return CGRect(x: last.maxX + 2, y: last.maxY - side, width: side, height: side)
+        let side = max(11, min(18, last.height))
+        return CGRect(x: last.maxX + 3, y: last.maxY - side, width: side, height: side)
     }
 }
 
@@ -99,10 +99,10 @@ final class OverlayPDFPage: PDFPage {
         // marker (for jump-back / click-to-edit). Only a *plain* highlight (no
         // comment) draws the colored fill/stroke decoration.
         if let markerRect = markup.noteMarkerRect {
-            // Neutral grey badge (not the highlight hue): the marker is a UI
-            // affordance — "a note lives here" — not a colored highlight. Mirrors
-            // the app's secondary-text token (≈ `Color.primary.opacity(0.6)`).
-            drawNoteMarker(markerRect, color: Self.noteMarkerColor, in: context)
+            // A recognizable note *icon* (not a colored dot): the marker is a UI
+            // affordance — "a note lives here, click to open" — so its shape, not
+            // its color, carries the meaning. Tinted the calm note-identity slate.
+            drawNoteMarker(markerRect, in: context)
         } else {
             drawDecoration(markup, in: context)
         }
@@ -112,33 +112,52 @@ final class OverlayPDFPage: PDFPage {
     /// as a highlight, but at a caller-controlled, fading alpha).
     private func drawFlash(_ markup: PDFTextMarkup, alpha: CGFloat, in context: CGContext) {
         context.setBlendMode(.multiply)
-        context.setFillColor(markup.color.withAlphaComponent(alpha).cgColor)
+        // Flash in the note-identity slate (not the highlight tint) so the reveal
+        // matches the marker + panel pin.
+        context.setFillColor(Self.noteMarkerColor.withAlphaComponent(alpha).cgColor)
         for quad in markup.quads {
             context.fill(quad)
         }
     }
 
-    /// Neutral grey for the note marker badge. Drawn on the (light) page, so a
-    /// fixed ~60%-black grey reads the same regardless of app appearance —
-    /// matching `OakStyle.Colors.textSecondary` (`Color.primary.opacity(0.6)`).
-    static let noteMarkerColor = NSColor(calibratedWhite: 0.4, alpha: 1)
+    /// Color for the note marker badge — the shared note-identity slate (see
+    /// `OakStyle.Colors.noteAccent`). Same color as the panel source pin and the
+    /// click flash, so a note reads as one color everywhere; distinct from the
+    /// yellow highlight tint.
+    static let noteMarkerColor = OakStyle.Colors.noteAccentNS
 
-    /// Draws a small "comment bubble" marker indicating a note is attached.
-    private func drawNoteMarker(_ rect: CGRect, color: NSColor, in context: CGContext) {
+    /// Cached, pre-tinted `note.text` glyph. The overlay redraws on every scroll/
+    /// zoom tick, so rasterize the SF Symbol once at high resolution and reuse it.
+    private static var noteGlyphCache: CGImage?
+
+    private static func noteGlyph() -> CGImage? {
+        if let cached = noteGlyphCache { return cached }
+        let px: CGFloat = 128
+        let config = NSImage.SymbolConfiguration(pointSize: px * 0.86, weight: .semibold)
+        guard let base = NSImage(systemSymbolName: "note.text", accessibilityDescription: "Note")?
+            .withSymbolConfiguration(config) else { return nil }
+        let canvas = NSImage(size: NSSize(width: px, height: px))
+        canvas.lockFocus()
+        noteMarkerColor.set()
+        let s = base.size
+        base.draw(in: NSRect(x: (px - s.width) / 2, y: (px - s.height) / 2, width: s.width, height: s.height))
+        NSRect(origin: .zero, size: canvas.size).fill(using: .sourceAtop)  // tint the symbol slate
+        canvas.unlockFocus()
+        noteGlyphCache = canvas.cgImage(forProposedRect: nil, context: nil, hints: nil)
+        return noteGlyphCache
+    }
+
+    /// Draws the note marker — a slate `note.text` icon at the anchor.
+    private func drawNoteMarker(_ rect: CGRect, in context: CGContext) {
+        guard let glyph = Self.noteGlyph() else { return }
+        context.saveGState()
         context.setBlendMode(.normal)
-        let body = NSBezierPath(roundedRect: rect, xRadius: rect.width * 0.25, yRadius: rect.width * 0.25)
-        context.addPath(body.cgPath)
-        context.setFillColor(color.withAlphaComponent(1).cgColor)
-        context.fillPath()
-
-        // Two dots to read as a speech bubble.
-        let dot = max(1, rect.width * 0.12)
-        context.setFillColor(NSColor.white.withAlphaComponent(0.9).cgColor)
-        for fraction in [0.34, 0.62] {
-            let cx = rect.minX + rect.width * fraction
-            let cy = rect.midY
-            context.fillEllipse(in: CGRect(x: cx - dot / 2, y: cy - dot / 2, width: dot, height: dot))
-        }
+        context.interpolationQuality = .high
+        // CGImage rows are top-first; flip within the rect for PDF's y-up space.
+        context.translateBy(x: rect.minX, y: rect.maxY)
+        context.scaleBy(x: 1, y: -1)
+        context.draw(glyph, in: CGRect(x: 0, y: 0, width: rect.width, height: rect.height))
+        context.restoreGState()
     }
 
     private func drawDecoration(_ markup: PDFTextMarkup, in context: CGContext) {

@@ -7,13 +7,9 @@
   "scripts": {
     "build:defuddle": "rollup -c rollup.defuddle.config.js",
     "build:cite-anchor": "rollup -c rollup.cite-anchor.config.js",
-    "build:milkdown": "rollup -c rollup.milkdown.config.js && node scripts/build-milkdown-css.mjs",
-    "build:all": "pnpm run build:defuddle && pnpm run build:cite-anchor && pnpm run build:milkdown"
+    "build:all": "pnpm run build:defuddle && pnpm run build:cite-anchor"
   },
   "dependencies": {
-    "@milkdown/core": "^7.21.2",
-    "@milkdown/crepe": "^7.21.2",
-    "@milkdown/kit": "^7.21.2",
     "@xyflow/react": "^12.8.6",
     "defuddle": "^0.18.1",
     "dom-anchor-text-quote": "^4.0.2",
