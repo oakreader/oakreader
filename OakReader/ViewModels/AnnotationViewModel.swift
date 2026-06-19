@@ -258,6 +258,10 @@ class AnnotationViewModel {
         parent?.state.selectedAnnotation = nil
         parent?.markDocumentEdited()
         refreshAnnotationModels()
+        // The note lives on the same annotation row (the `comment` column), so the
+        // soft-delete above already removed it — tell the Notes panel to drop the
+        // now-stale card live, matching the overlay-delete path.
+        NotificationCenter.default.post(name: .commentsDidChange, object: parent)
     }
 
     func updateAnnotation(_ annotation: PDFAnnotation, properties: AnnotationModel) {

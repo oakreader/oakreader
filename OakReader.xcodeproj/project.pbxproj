@@ -21,6 +21,7 @@
 		09611B6D3684448759E0A86B /* OakReaderApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF62422793C7EE0AA7518AFA /* OakReaderApp.swift */; };
 		0C0D2A973031AAE11BCB2AF9 /* LivePageBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10AB44716AEA6538F1A2E07 /* LivePageBridge.swift */; };
 		0E17C11829C1155A97BB3186 /* CLICommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0934E40C45D625649E6E481 /* CLICommands.swift */; };
+		0E5AD27AC93B037A12175862 /* CompletionPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 365A3E746422A07BDC4D2D20 /* CompletionPalette.swift */; };
 		0EF4D73ECF530A47D812350B /* CommentsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89AA5BB8CC107781AE914D5F /* CommentsViewModel.swift */; };
 		0F13A6E0A89F4F20EAFA4069 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = F7AB5ED40472FCDDFAE174DE /* GRDB */; };
 		103070479B17846DE2CA8739 /* ResearchTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE3C5AFB721EE407EADCAE17 /* ResearchTool.swift */; };
@@ -144,6 +145,7 @@
 		8DC2B9E6FC102BB649732E02 /* SystemSettingsLauncher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7565F0D9DAFCB05C1541E163 /* SystemSettingsLauncher.swift */; };
 		8DF345E8B9C7A4A26745D3C2 /* DocumentToolbarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77B8325AE459CB24E2335895 /* DocumentToolbarView.swift */; };
 		8E48000C86108C02A86F07C5 /* PDFViewCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D46DC9842C708EE4F886379 /* PDFViewCoordinator.swift */; };
+		8EBE599938FF028F296BDAC1 /* NoteDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCE09C2AAC01ED235CB5E49D /* NoteDetailSheet.swift */; };
 		8FEC7772368A77E5AE2091B4 /* NotesSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62D7A3CC47463993633A9DEC /* NotesSupport.swift */; };
 		904CE886864FA94FC8C4AB6C /* NoteImageStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 262CF97B8692FC8111488347 /* NoteImageStore.swift */; };
 		914F7BE3B7A9B1A36BF76B12 /* AppIcon-Dev.icon in Resources */ = {isa = PBXBuildFile; fileRef = EA91E07EE10DFB021A1A92A7 /* AppIcon-Dev.icon */; };
@@ -349,6 +351,7 @@
 		34F729218144530B02528906 /* AccessibilityTag.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityTag.swift; sourceTree = "<group>"; };
 		35900F9BA497A3B47688C5D3 /* grant_voice.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = grant_voice.wav; sourceTree = "<group>"; };
 		35C3D7C67DA37CE045FCE96F /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		365A3E746422A07BDC4D2D20 /* CompletionPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionPalette.swift; sourceTree = "<group>"; };
 		37594A1723FA448772E9FAA7 /* FileCoordination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileCoordination.swift; sourceTree = "<group>"; };
 		397EB83BF75F4E405467D317 /* ChunkCitationResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChunkCitationResolver.swift; sourceTree = "<group>"; };
 		3A68874A493BE4FAA33E42A1 /* LibraryEnums.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryEnums.swift; sourceTree = "<group>"; };
@@ -480,6 +483,7 @@
 		B8AE0CDFA398D5A223EA1547 /* BrowserSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserSession.swift; sourceTree = "<group>"; };
 		B8EDE9B51AC3DBC63B9AD860 /* MemoryManagerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryManagerView.swift; sourceTree = "<group>"; };
 		B9C644594425945C7B78ACFD /* FannedAttachmentStack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FannedAttachmentStack.swift; sourceTree = "<group>"; };
+		BCE09C2AAC01ED235CB5E49D /* NoteDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteDetailSheet.swift; sourceTree = "<group>"; };
 		BDA88342DD6ED3A2875AE5CA /* CollectionPanelHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionPanelHelpers.swift; sourceTree = "<group>"; };
 		BEF098B7FA82F2D106A0F186 /* CommandPaletteController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandPaletteController.swift; sourceTree = "<group>"; };
 		C0721B6B26F9E1364BF56FE6 /* WordLookupStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WordLookupStore.swift; sourceTree = "<group>"; };
@@ -633,6 +637,7 @@
 				846387925BF723676FB401E7 /* ImageLightbox.swift */,
 				602DF20D4679A5E02D71408B /* MilkdownComposerView.swift */,
 				AB28674401171F133AF0003D /* NoteComposerBox.swift */,
+				BCE09C2AAC01ED235CB5E49D /* NoteDetailSheet.swift */,
 				62D7A3CC47463993633A9DEC /* NotesSupport.swift */,
 			);
 			path = Comments;
@@ -959,6 +964,7 @@
 				79CDDA518E696E683F924E68 /* ChatInputTextView.swift */,
 				57AD1A032BEBDA96C018D84A /* ChatTokenAttachment.swift */,
 				62D62DFCF466824B7B1C5431 /* CitationHoverCard.swift */,
+				365A3E746422A07BDC4D2D20 /* CompletionPalette.swift */,
 				B9C644594425945C7B78ACFD /* FannedAttachmentStack.swift */,
 				480A67A2AF6B7A4B34639C05 /* ItemPanelView.swift */,
 				D84531E29A6D116B01BD569C /* RightPanelView.swift */,
@@ -1330,6 +1336,7 @@
 				EC5FBBDBA99538D343AEF315 /* CommandRegistry.swift in Sources */,
 				C417FD98ACAD3CA24923F8B6 /* CommentsPanelView.swift in Sources */,
 				0EF4D73ECF530A47D812350B /* CommentsViewModel.swift in Sources */,
+				0E5AD27AC93B037A12175862 /* CompletionPalette.swift in Sources */,
 				61C920D4F3BB632A494AD843 /* ConfiguredProviderStore.swift in Sources */,
 				C0BB4EFB91FC8970E8BB9B7D /* ContentChunker.swift in Sources */,
 				27926C8DE8B6E9E53CF5553D /* ContentView.swift in Sources */,
@@ -1412,6 +1419,7 @@
 				35AC4A178210B13C19012AD1 /* NSImage+Extensions.swift in Sources */,
 				4E9B217F367B0ABF7EAA70F6 /* NewTabView.swift in Sources */,
 				803BDBB63574B75950ED1DA2 /* NoteComposerBox.swift in Sources */,
+				8EBE599938FF028F296BDAC1 /* NoteDetailSheet.swift in Sources */,
 				904CE886864FA94FC8C4AB6C /* NoteImageStore.swift in Sources */,
 				8FEC7772368A77E5AE2091B4 /* NotesSupport.swift in Sources */,
 				CBE3B2BF6507D35AC3F06CFD /* OakAppIcon.swift in Sources */,
@@ -1576,12 +1584,14 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.4;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.9;
 			};
@@ -1680,6 +1690,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.4;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -1687,6 +1698,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.9;
 			};

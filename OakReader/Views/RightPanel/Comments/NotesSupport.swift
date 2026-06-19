@@ -1,5 +1,30 @@
 import SwiftUI
 
+/// Shared note-color parsing. The stored color is either hex (`#rrggbb`, used by
+/// PDF/memo highlights) or a CSS `rgba(r,g,b,a)` string (web highlights).
+enum NoteColor {
+    static func parse(_ raw: String) -> Color {
+        let s = raw.trimmingCharacters(in: .whitespaces)
+        if s.hasPrefix("#") {
+            let hex = String(s.dropFirst())
+            if let v = Int(hex, radix: 16), hex.count == 6 {
+                return Color(
+                    .sRGB,
+                    red: Double((v >> 16) & 0xFF) / 255,
+                    green: Double((v >> 8) & 0xFF) / 255,
+                    blue: Double(v & 0xFF) / 255
+                )
+            }
+        }
+        let nums = s.components(separatedBy: CharacterSet(charactersIn: "0123456789").inverted)
+            .compactMap { Int($0) }
+        if nums.count >= 3 {
+            return Color(.sRGB, red: Double(nums[0]) / 255, green: Double(nums[1]) / 255, blue: Double(nums[2]) / 255)
+        }
+        return .yellow
+    }
+}
+
 /// flomo-style `#tag` handling — extract hierarchical hashtags (`#welcome/guide`,
 /// `#tags/sub-tags`, CJK supported) for chip display and strip them from the body
 /// so the rendered markdown doesn't show raw `#…` runs.
@@ -117,14 +142,19 @@ struct NoteTagChip: View {
     }
 
     private var chip: some View {
+        // Neutral grey, on the app's button-fill tokens (NOT accent blue) — the
+        // active/filtered state just reads a notch darker, staying monochrome.
+        // Rounded-RECT corners (like the chat token chip / input), not a full-radius
+        // pill.
         Text("#\(tag)")
             .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(isActive ? Color.white : Color.accentColor)
-            .padding(.horizontal, 7)
+            .foregroundStyle(isActive ? OakStyle.Colors.textPrimary : OakStyle.Colors.textSecondary)
+            .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(
-                Capsule().fill(isActive ? Color.accentColor : Color.accentColor.opacity(0.10))
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .fill(isActive ? Color.primary.opacity(0.14) : OakStyle.Colors.buttonBackground)
             )
-            .contentShape(Capsule())
+            .contentShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
     }
 }

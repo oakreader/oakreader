@@ -20,6 +20,14 @@ final class MilkdownComposerController {
     /// Open the `@` memo picker from the toolbar button (reports the caret coords).
     func requestMention() { eval("window.oakMilkdown&&window.oakMilkdown.requestMention()") }
 
+    /// Open the `#` tag picker from the toolbar button (reports the caret coords).
+    func requestTag() { eval("window.oakMilkdown&&window.oakMilkdown.requestTag()") }
+
+    /// Insert a `#tag` at the caret, consuming a typed `#` trigger.
+    func insertTag(_ tag: String) {
+        eval("window.oakMilkdown&&window.oakMilkdown.insertTag(\(MilkdownComposerView.jsString(tag)))")
+    }
+
     func getMarkdown(_ completion: @escaping (String) -> Void) {
         guard let webView else { completion(""); return }
         webView.evaluateJavaScript("window.oakMilkdown?window.oakMilkdown.getMarkdown():''") { result, _ in
@@ -74,6 +82,9 @@ struct MilkdownComposerView: NSViewRepresentable {
     /// anchored at the given caret point in the editor's coordinate space (nil if
     /// coords were unavailable).
     var onMention: (CGPoint?) -> Void = { _ in }
+    /// The user typed `#` (or hit the button) — open the tag picker at the given
+    /// caret point (nil if coords were unavailable).
+    var onTag: (CGPoint?) -> Void = { _ in }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -163,6 +174,12 @@ struct MilkdownComposerView: NSViewRepresentable {
                     parent.onMention(CGPoint(x: left.doubleValue, y: bottom.doubleValue))
                 } else {
                     parent.onMention(nil)
+                }
+            case "tag":
+                if let left = body["left"] as? NSNumber, let bottom = body["bottom"] as? NSNumber {
+                    parent.onTag(CGPoint(x: left.doubleValue, y: bottom.doubleValue))
+                } else {
+                    parent.onTag(nil)
                 }
             default:
                 break

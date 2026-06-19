@@ -24,6 +24,10 @@ final class CommentsViewModel {
     /// (last note bearing it deleted) or when a new memo is added.
     var activeTagFilter: String?
 
+    /// Free-text filter over the stream (matches note body + its tags, case-
+    /// insensitive). Combines with `activeTagFilter`.
+    var searchQuery: String = ""
+
     /// Distinct `#tags` across all cards in this doc, most-used first (ties → name).
     /// Drives the filter bar; only worth showing when there are ≥2 distinct tags.
     var allTags: [String] {
@@ -36,10 +40,28 @@ final class CommentsViewModel {
         }
     }
 
-    /// Cards after applying `activeTagFilter` (all cards when no filter is set).
+    /// Cards after applying the tag filter and the free-text search (either/both,
+    /// or neither). Text matches the note's clean body plus its tag names.
     var filteredCards: [AnnotationRecord] {
-        guard let tag = activeTagFilter else { return cards }
-        return cards.filter { NoteTags.extract($0.comment ?? "").contains(tag) }
+        var result = cards
+        if let tag = activeTagFilter {
+            result = result.filter { NoteTags.extract($0.comment ?? "").contains(tag) }
+        }
+        let q = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if !q.isEmpty {
+            result = result.filter { card in
+                let raw = card.comment ?? ""
+                let body = NoteTags.preview(NoteComposerBox.splitBody(raw).text)
+                let tags = NoteTags.extract(raw).joined(separator: " ")
+                return "\(body) \(tags)".lowercased().contains(q)
+            }
+        }
+        return result
+    }
+
+    /// Whether any filter (tag or text) is narrowing the stream.
+    var isFiltering: Bool {
+        activeTagFilter != nil || !searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     /// Toggle the stream's tag filter (tap the active tag again to clear it).
@@ -178,9 +200,10 @@ final class CommentsViewModel {
               let attId = parent?.attachmentId,
               let itmId = parent?.itemId else { return false }
 
-        // A just-jotted note may not carry the filtered tag — clear the filter so
+        // A just-jotted note may not match the active filter/search — clear both so
         // it isn't hidden the moment it's created.
         activeTagFilter = nil
+        searchQuery = ""
 
         let now = Date().iso8601String
         let record = AnnotationRecord(
@@ -267,6 +290,19 @@ final class CommentsViewModel {
             guard record.id != id, (record.comment ?? "").contains(href) else { return nil }
             return noteRef(record)
         }
+    }
+
+    /// The full records (not just previews) of the notes that reference the given
+    /// card — backing the flomo-style "Note Detail" popup, which renders each
+    /// referencing note in full rather than as a one-line backlink.
+    func backlinkRecords(to id: String) -> [AnnotationRecord] {
+        let href = NoteLink.href(id)
+        return cards.filter { $0.id != id && ($0.comment ?? "").contains(href) }
+    }
+
+    /// Look up a single card record by id (for the detail popup's left column).
+    func card(id: String) -> AnnotationRecord? {
+        cards.first { $0.id == id }
     }
 
     /// Scroll the document to a card's source and surface it.

@@ -269,6 +269,7 @@ private struct CommentCardView: View {
     @State private var isHovering = false
     @State private var isEditing = false
     @State private var showDeleteConfirm = false
+    @State private var showDetail = false
 
     private var anchored: Bool { model.isAnchored(record) }
     private var accent: Color { Self.color(from: record.color) }
@@ -310,6 +311,9 @@ private struct CommentCardView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This can't be undone.")
+        }
+        .sheet(isPresented: $showDetail) {
+            NoteDetailSheet(record: record, model: model) { showDetail = false }
         }
     }
 
@@ -410,16 +414,22 @@ private struct CommentCardView: View {
         .onTapGesture { if anchored { model.jump(record) } }
     }
 
-    /// flomo "关联" — the notes that reference this one. Each row jumps to the
-    /// referencing memo.
+    /// flomo "关联" — the notes that reference this one. Tapping the section opens
+    /// the flomo-style Note Detail popup (this note + every note quoting it).
     private func backlinksSection(_ refs: [NoteRef]) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Label(refs.count == 1 ? "1 reference" : "\(refs.count) references",
-                  systemImage: "arrow.turn.up.left")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.secondary)
-            ForEach(refs) { ref in
-                Button { model.focusCard(id: ref.id) } label: {
+        Button { showDetail = true } label: {
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 4) {
+                    Label(refs.count == 1 ? "1 reference" : "\(refs.count) references",
+                          systemImage: "arrow.turn.up.left")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                }
+                ForEach(refs) { ref in
                     HStack(spacing: 6) {
                         Image(systemName: "note.text")
                             .font(.system(size: 10))
@@ -431,15 +441,15 @@ private struct CommentCardView: View {
                             .truncationMode(.tail)
                         Spacer(minLength: 0)
                     }
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
-                .help("Jump to the note that references this one")
             }
+            .padding(8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.primary.opacity(0.04)))
+            .contentShape(Rectangle())
         }
-        .padding(8)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.primary.opacity(0.04)))
+        .buttonStyle(.plain)
+        .help("Open note detail")
     }
 
     /// Handle a link tap in the card body. An `oak-note://<id>` reference jumps to
@@ -525,27 +535,6 @@ private struct CommentCardView: View {
 
     // MARK: Helpers
 
-    /// Parse the stored color, which is hex (`#rrggbb`, PDF/memo) or a CSS
-    /// `rgba(r,g,b,a)` string (web highlights).
-    static func color(from raw: String) -> Color {
-        let s = raw.trimmingCharacters(in: .whitespaces)
-        if s.hasPrefix("#") {
-            let hex = String(s.dropFirst())
-            if let v = Int(hex, radix: 16), hex.count == 6 {
-                return Color(
-                    .sRGB,
-                    red: Double((v >> 16) & 0xFF) / 255,
-                    green: Double((v >> 8) & 0xFF) / 255,
-                    blue: Double(v & 0xFF) / 255
-                )
-            }
-        }
-        let nums = s.components(separatedBy: CharacterSet(charactersIn: "0123456789").inverted)
-            .compactMap { Int($0) }
-        if nums.count >= 3 {
-            return Color(.sRGB, red: Double(nums[0]) / 255, green: Double(nums[1]) / 255, blue: Double(nums[2]) / 255)
-        }
-        return .yellow
-    }
+    static func color(from raw: String) -> Color { NoteColor.parse(raw) }
 
 }

@@ -234,6 +234,39 @@ function postMentionAnchor() {
   });
 }
 
+// Tell native to open the tag picker, anchored at the caret (mirrors the `@`
+// mention flow). Used by the `#` toolbar button and the typed-`#` trigger, so a
+// tag is reused from the existing set instead of retyped (kills tag sprawl).
+function postTagAnchor() {
+  withEditor((ctx) => {
+    const view = ctx.get(editorViewCtx);
+    const payload = { type: "tag" };
+    try {
+      const c = view.coordsAtPos(view.state.selection.from);
+      payload.left = c.left;
+      payload.top = c.top;
+      payload.bottom = c.bottom;
+    } catch (e) {
+      /* no coords — native falls back to a default anchor */
+    }
+    post(payload);
+  });
+}
+
+// True when the caret is at a token boundary (start of block, or after
+// whitespace) — so a typed `#` mid-word ("C#", "F#") doesn't open the picker.
+function atTokenBoundary() {
+  let boundary = true;
+  withEditor((ctx) => {
+    const sel = ctx.get(editorViewCtx).state.selection;
+    if (sel.empty && sel.$from.parentOffset > 0) {
+      const ch = sel.$from.parent.textBetween(sel.$from.parentOffset - 1, sel.$from.parentOffset);
+      if (ch && !/\s/.test(ch)) boundary = false;
+    }
+  });
+  return boundary;
+}
+
 function run(commandKey, payload) {
   withEditor(callCommand(commandKey, payload));
   focusEditor();
@@ -255,7 +288,10 @@ const COMMANDS = {
   heading: () => run(wrapInHeadingCommand.key, 2),
   bulletList: () => run(wrapInBulletListCommand.key),
   orderedList: () => run(wrapInOrderedListCommand.key),
-  tag: () => insertText("#"),
+  tag: () => {
+    focusEditor();
+    postTagAnchor();
+  },
   mention: () => insertText("@"),
 };
 
@@ -266,12 +302,16 @@ async function build(markdown, editable) {
   crepe = new Crepe({
     root,
     defaultValue: markdown || "",
-    // A focused note surface: keep inline formatting, lists, links and the slash
-    // menu; drop the heavier blocks (code editor, tables, block images, LaTeX,
-    // AI, the document top bar) a short note never needs. Also drop the floating
-    // selection toolbar — formatting lives in the native bottom bar (Slack-style),
-    // so the popover would just duplicate it. Inline images still work via the
-    // commonmark preset + the bottom bar's insertImage bridge.
+    // A focused note surface: keep inline formatting, lists and links; drop the
+    // heavier blocks (code editor, tables, block images, LaTeX, AI, the document
+    // top bar) a short note never needs. Also drop the floating selection toolbar —
+    // formatting lives in the native bottom bar (Slack-style), so the popover would
+    // just duplicate it. Inline images still work via the commonmark preset + the
+    // bottom bar's insertImage bridge.
+    //
+    // BlockEdit is OFF: its `/` slash menu (and left block handle) popped an empty,
+    // clipped panel inside this short auto-grow webview — ugly and pointless for a
+    // capture box. Formatting/lists/tag/mention all live on the native toolbar.
     //
     // LinkTooltip is OFF: its copy/edit/delete popover is absolutely positioned
     // inside the webview, but this composer is a short auto-grow surface, so the
@@ -287,6 +327,7 @@ async function build(markdown, editable) {
       [CrepeFeature.TopBar]: false,
       [CrepeFeature.Toolbar]: false,
       [CrepeFeature.LinkTooltip]: false,
+      [CrepeFeature.BlockEdit]: false,
     },
     featureConfigs: {
       [CrepeFeature.Placeholder]: { text: "Jot a thought…", mode: "doc" },
@@ -318,6 +359,12 @@ async function build(markdown, editable) {
       // we measure its coords (so the dropdown anchors next to the cursor).
       if (e.key === "@") {
         setTimeout(postMentionAnchor, 0);
+      }
+      // Typing `#` at a token boundary opens the tag picker (reuse an existing
+      // tag → no sprawl). Mid-word `#` ("C#") is left alone. The `#` is consumed
+      // by insertTag when a tag is picked.
+      if (e.key === "#" && atTokenBoundary()) {
+        setTimeout(postTagAnchor, 0);
       }
     },
     true
@@ -404,6 +451,35 @@ window.oakMilkdown = {
   requestMention() {
     focusEditor();
     postMentionAnchor();
+  },
+
+  // Open the tag picker from the toolbar button (focus + report caret).
+  requestTag() {
+    focusEditor();
+    postTagAnchor();
+  },
+
+  // Insert a `#tag ` at the caret, consuming a just-typed `#` immediately before
+  // the caret if present. Plain text (no space after `#`) so the tagHighlight
+  // plugin colours it and NoteTags.extract picks it up; round-trips as markdown.
+  insertTag(tag) {
+    const clean = (tag || "").trim().replace(/^#+/, "");
+    if (!clean) return;
+    withEditor((ctx) => {
+      const view = ctx.get(editorViewCtx);
+      const { state } = view;
+      const sel = state.selection;
+      let from = sel.from;
+      const to = sel.to;
+      if (sel.empty && sel.$from.parentOffset > 0) {
+        const ch = sel.$from.parent.textBetween(sel.$from.parentOffset - 1, sel.$from.parentOffset);
+        if (ch === "#") from = sel.from - 1;
+      }
+      const node = state.schema.text(`#${clean} `);
+      const tr = state.tr.replaceWith(from, to, node);
+      view.dispatch(tr.scrollIntoView());
+      view.focus();
+    });
   },
 
   // Insert a memo reference (a link + trailing space) at the caret, consuming a
