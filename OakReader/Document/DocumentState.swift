@@ -31,6 +31,10 @@ class DocumentState {
 
     // Live web browser navigation state (driven by KVO on WKWebView)
     var currentURL: URL?
+    /// MIME type of the current main-frame response, captured during navigation
+    /// (`application/pdf` for PDFs). Lets "Save to Reading List" download the
+    /// actual PDF instead of bookmarking it, without an extra network probe.
+    var currentMIMEType: String?
     var pageTitle: String?
     var canGoBack: Bool = false
     var canGoForward: Bool = false

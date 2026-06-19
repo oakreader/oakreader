@@ -390,6 +390,24 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
         decisionHandler(.allow)
     }
 
+    /// Capture the main-frame response's MIME type so "Save to Reading List" can
+    /// tell a PDF (e.g. arXiv `/pdf/<id>`, which has no `.pdf` suffix) from an HTML
+    /// page and download the binary instead of bookmarking it. WebKit already has
+    /// this from the loaded response — we just record it here.
+    func webView(
+        _ webView: WKWebView,
+        decidePolicyFor navigationResponse: WKNavigationResponse,
+        decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void
+    ) {
+        if navigationResponse.isForMainFrame {
+            let mime = navigationResponse.response.mimeType
+            DispatchQueue.main.async { [weak self] in
+                self?.viewModel.state.currentMIMEType = mime
+            }
+        }
+        decisionHandler(.allow)
+    }
+
     // MARK: - WKUIDelegate
 
     /// `target="_blank"` / `window.open` links return no web view from us, so WebKit

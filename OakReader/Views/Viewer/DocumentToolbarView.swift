@@ -157,12 +157,24 @@ private struct LiveWebToolbarContent: View {
               url.scheme?.lowercased().hasPrefix("http") == true else { return }
 
         saveState = .saving
-        let readable = await LivePageBridge.shared.extractReadable(maxChars: 1_000_000)
-        let item = await importService.importBrowserLink(
-            url,
-            liveTitle: readable?.title,
-            liveMarkdown: readable?.markdown
-        )
+
+        // A PDF loaded in the live browser (e.g. arXiv `/pdf/<id>`) should be
+        // downloaded as a real PDF, not bookmarked. `importURL` re-confirms via
+        // a HEAD and downloads the binary; for HTML we keep the live bookmark
+        // path, which preserves SPA-rendered title/markdown.
+        let isPDF = state.currentMIMEType?.lowercased() == "application/pdf"
+            || url.pathExtension.lowercased() == "pdf"
+        let item: LibraryItem?
+        if isPDF {
+            item = try? await importService.importURL(url)
+        } else {
+            let readable = await LivePageBridge.shared.extractReadable(maxChars: 1_000_000)
+            item = await importService.importBrowserLink(
+                url,
+                liveTitle: readable?.title,
+                liveMarkdown: readable?.markdown
+            )
+        }
         guard item != nil else {
             saveState = .failed
             viewModel.appState?.importNotification = "Couldn’t save to Reading List"
