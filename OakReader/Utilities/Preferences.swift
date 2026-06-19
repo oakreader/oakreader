@@ -103,9 +103,6 @@ final class Preferences {
         // Thinking budget
         static let thinkingBudget = "thinkingBudget"
         static let thinkingEffort = "thinkingEffort"
-        // Chat font
-        static let chatFontSize = "chatFontSize"
-        static let chatLineHeightScale = "chatLineHeightScale"
         // Voice AI
         static let voiceTTSVoice = "voiceTTSVoice"
         static let voiceReferenceAudioPath = "voiceReferenceAudioPath"
@@ -152,8 +149,6 @@ final class Preferences {
             Keys.analyticsEnabled: true,
             Keys.aiProvider: "anthropic",
             Keys.aiModel: "",
-            Keys.chatFontSize: 14.0,
-            Keys.chatLineHeightScale: 1.35,
             Keys.agentToolsEnabled: true,
             Keys.agentReadFileEnabled: true,
             Keys.agentWriteFileEnabled: true,
@@ -213,22 +208,6 @@ final class Preferences {
     var analyticsEnabled: Bool {
         get { defaults.bool(forKey: Keys.analyticsEnabled) }
         set { defaults.set(newValue, forKey: Keys.analyticsEnabled) }
-    }
-
-    // MARK: - Chat Font
-
-    /// Base font size for the AI chat markdown renderer. Code, headings, and line
-    /// height all scale from this (see `MarkdownTheme.oak(fontSize:lineHeightScale:)`).
-    var chatFontSize: CGFloat {
-        get { CGFloat(defaults.double(forKey: Keys.chatFontSize)) }
-        set { defaults.set(Double(newValue), forKey: Keys.chatFontSize) }
-    }
-
-    /// Line-spacing multiplier for the AI chat markdown renderer (line height =
-    /// chatFontSize × this). Scales with the font so spacing stays proportional.
-    var chatLineHeightScale: CGFloat {
-        get { CGFloat(defaults.double(forKey: Keys.chatLineHeightScale)) }
-        set { defaults.set(Double(newValue), forKey: Keys.chatLineHeightScale) }
     }
 
     // MARK: - Appearance

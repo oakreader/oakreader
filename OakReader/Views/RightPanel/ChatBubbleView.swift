@@ -23,9 +23,6 @@ struct ChatBubbleView: View, Equatable {
         lhs.turn == rhs.turn && lhs.isPlayingAudio == rhs.isPlayingAudio
     }
 
-    @AppStorage("chatFontSize") private var chatFontSize: Double = 14
-    @AppStorage("chatLineHeightScale") private var chatLineHeightScale: Double = 1.35
-
     @State private var isHovered = false
     @State private var isCopyHovered = false
     @State private var isPlayHovered = false
@@ -194,7 +191,7 @@ struct ChatBubbleView: View, Equatable {
         // the same native stack Dia uses. This is the app's sole markdown renderer.
         StreamingMarkdownView(
             markdown: markdown,
-            theme: markdownTheme ?? .oak(fontSize: CGFloat(chatFontSize), lineHeightScale: CGFloat(chatLineHeightScale)),
+            theme: markdownTheme ?? .oak(),
             isStreaming: streaming,
             fadesAppendedText: fadesAppendedText,
             onOpenURL: { url in
@@ -265,7 +262,7 @@ struct ChatBubbleView: View, Equatable {
 
     /// User-message body rendered with a native SwiftUI `Text` (markdown-aware).
     private var userMessageText: some View {
-        let size = markdownTheme?.bodyFont.pointSize ?? CGFloat(chatFontSize)
+        let size = markdownTheme?.bodyFont.pointSize ?? MarkdownTheme.oak().bodyFont.pointSize
         return Text(userAttributedContent)
             .font(.system(size: size))
             .textSelection(.enabled)

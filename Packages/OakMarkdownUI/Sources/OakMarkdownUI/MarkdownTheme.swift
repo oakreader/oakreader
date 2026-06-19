@@ -65,7 +65,7 @@ public struct MarkdownTheme {
 
     /// OakReader default — system fonts scaled from `fontSize`. Code, heading, and
     /// line-height metrics are all derived from it so the whole block scales together.
-    public static func oak(fontSize: CGFloat = 14, lineHeightScale: CGFloat = 1.35) -> MarkdownTheme {
+    public static func oak(fontSize: CGFloat = 14, lineHeightScale: CGFloat = 1.4) -> MarkdownTheme {
         let headingScales: [CGFloat] = [1.6, 1.33, 1.13, 1.0, 0.93, 0.87]
         return MarkdownTheme(
             bodyFont: .systemFont(ofSize: fontSize, weight: .regular),

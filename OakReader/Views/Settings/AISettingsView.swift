@@ -8,10 +8,6 @@ struct AISettingsView: View {
     @State private var navigationPath = NavigationPath()
     @State private var showAddProviderSheet = false
 
-    // Chat appearance (live-bound so the transcript updates as you drag).
-    @AppStorage("chatFontSize") private var chatFontSize: Double = 14
-    @AppStorage("chatLineHeightScale") private var chatLineHeightScale: Double = 1.35
-
     // Chat LLM
     @State private var chatProviderId: String
     @State private var chatModel: String
@@ -41,7 +37,6 @@ struct AISettingsView: View {
             Form {
                 providersSection
                 chatSection
-                appearanceSection
                 thinkingSection
             }
             .formStyle(.grouped)
@@ -136,30 +131,6 @@ struct AISettingsView: View {
                     LabeledContent("Reasoning", value: info.reasoning ? "Yes" : "No")
                 }
             }
-        }
-    }
-
-    // MARK: - Appearance Section
-
-    private var appearanceSection: some View {
-        Section("Appearance") {
-            VStack(alignment: .leading, spacing: 4) {
-                LabeledContent("Font Size") {
-                    Text("\(Int(chatFontSize)) pt").foregroundStyle(.secondary)
-                }
-                Slider(value: $chatFontSize, in: 11...20, step: 1)
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
-                LabeledContent("Line Spacing") {
-                    Text(String(format: "%.2f×", chatLineHeightScale)).foregroundStyle(.secondary)
-                }
-                Slider(value: $chatLineHeightScale, in: 1.1...1.8, step: 0.05)
-            }
-
-            Text("Controls the AI chat message text. Code, headings, and line height all scale from the font size.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
     }
 

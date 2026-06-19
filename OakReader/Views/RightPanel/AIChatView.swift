@@ -26,8 +26,6 @@ struct AIChatView: View {
     /// Width of the centered content column in `.canvas` mode.
     private let canvasContentWidth: CGFloat = 760
 
-    @AppStorage("chatFontSize") private var chatFontSize: Double = 14
-
     @Environment(\.isTabActive) private var isTabActive
     @State private var playingTurnId: UUID?
     @State private var showUserMemory = false
@@ -36,7 +34,7 @@ struct AIChatView: View {
     /// chips match the rendered body ("正文") size: the dia theme's 15pt on the
     /// canvas, the user-configurable size in the right panel.
     private var bodyFontSize: CGFloat {
-        presentation == .canvas ? MarkdownTheme.dia.bodyFont.pointSize : CGFloat(chatFontSize)
+        presentation == .canvas ? MarkdownTheme.dia.bodyFont.pointSize : MarkdownTheme.oak().bodyFont.pointSize
     }
 
     var body: some View {
@@ -103,7 +101,14 @@ struct AIChatView: View {
     private var chatContent: some View {
         VStack(spacing: 0) {
             if chatVM.turns.isEmpty {
-                canvasConstrained { emptyState }
+                // Canvas is a full-page surface that earns a welcome screen; the
+                // right panel doesn't — its composer placeholder already says the
+                // same thing, so leave the space clean above the input bar.
+                if presentation == .canvas {
+                    canvasConstrained { emptyState }
+                } else {
+                    Spacer()
+                }
             } else {
                 // messageList spans the full pane so its custom scrollbar sits at
                 // the pane's right edge; the message column is centered internally.
