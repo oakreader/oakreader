@@ -61,6 +61,12 @@ enum OakStyle {
         // tint so "noted" never reads as "highlighted".
         static let noteAccent = Color(hex: "7C8896")
         static let noteAccentNS = NSColor(srgbRed: 0x7C / 255.0, green: 0x88 / 255.0, blue: 0x96 / 255.0, alpha: 1)
+        /// A darker shade of `noteAccent` for the source-pin glyph: the mid-tone
+        /// slate only clears WCAG 1.4.11's 3:1 floor by a hair (~3.1:1 on its own
+        /// tinted badge), and a 9pt thin chevron needs more headroom to read
+        /// comfortably. #5E6A78 lifts it to ~4.7:1 on the badge / ~5.5:1 on white.
+        static let noteAccentIcon = Color(hex: "5E6A78")
+        static let noteAccentIconNS = NSColor(srgbRed: 0x5E / 255.0, green: 0x6A / 255.0, blue: 0x78 / 255.0, alpha: 1)
 
         // Text
         static let textPrimary = Color.primary.opacity(1.0)

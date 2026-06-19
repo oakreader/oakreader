@@ -527,7 +527,7 @@ private struct CommentCardView: View {
                     Circle().fill(OakStyle.Colors.noteAccent.opacity(0.14)).frame(width: 18, height: 18)
                     Image(systemName: "arrow.up.left")
                         .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(OakStyle.Colors.noteAccent)
+                        .foregroundStyle(OakStyle.Colors.noteAccentIcon)
                 }
                 Text(quoted)
                     .font(.system(size: 12))
