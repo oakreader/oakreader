@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import ImageIO
 import PDFKit
 import Vision
 
@@ -30,6 +31,21 @@ enum PDFOCRService {
             chunks += ContentChunker.chunkPlainText(text, type: "page", pageStart: i, pageEnd: i)
         }
         return chunks
+    }
+
+    /// OCR a standalone image (e.g. a Translation region snapshot) into plain
+    /// text, joining recognized lines top-to-bottom. Returns "" on failure or
+    /// when no text is found. Heavy — call off the main thread.
+    static func recognizeText(
+        inPNG pngData: Data,
+        languages: [String] = ["en-US", "zh-Hans"]
+    ) -> String {
+        guard let source = CGImageSourceCreateWithData(pngData as CFData, nil),
+              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+            Log.error(Log.fts, "OCR: cannot decode region snapshot image")
+            return ""
+        }
+        return recognize(image, languages: languages)
     }
 
     /// Render a PDF page to a white-backed RGB bitmap at `scale`× for OCR. 2× gives

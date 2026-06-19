@@ -418,6 +418,7 @@ class DocumentViewModel {
         if mode != .snapshot {
             state.snapshotForChat = false
             state.snapshotForNote = false
+            state.snapshotForTranslation = false
         }
         state.editorMode = mode
     }
@@ -458,5 +459,41 @@ class DocumentViewModel {
         }
         state.rightPanelMode = .comments
         setEditorMode(.viewer)
+    }
+
+    /// Begin a region capture whose result is OCR'd and dropped into the
+    /// Translation panel's source field. Mirror of `beginAreaCaptureForChat`,
+    /// routed to the Translation panel.
+    func beginAreaCaptureForTranslation() {
+        Log.debug(Log.ui, "[capture-cursor] beginAreaCaptureForTranslation — contentType: \(contentType)")
+        state.snapshotForTranslation = true
+        state.rightPanelMode = .translation
+        state.editorMode = .snapshot
+    }
+
+    /// OCR a finished capture (Apple Vision, on-device) and drop the recognized
+    /// text into the Translation source field, which auto-translates. The Vision
+    /// pass is off the main thread; the source update happens back on main.
+    func deliverAreaCaptureToTranslation(_ pngData: Data, pageIndex: Int) {
+        state.rightPanelMode = .translation
+        setEditorMode(.viewer)
+
+        // Prioritize the chosen source language for recognition; fall back to a
+        // common EN+简体中文 pair when the source is auto/unspecified.
+        let languages: [String]
+        if let code = translation.sourceLang.visionLanguageCode {
+            languages = code == "en-US" ? ["en-US", "zh-Hans"] : [code, "en-US"]
+        } else {
+            languages = ["en-US", "zh-Hans"]
+        }
+
+        Task.detached(priority: .userInitiated) { [weak self] in
+            let text = PDFOCRService.recognizeText(inPNG: pngData, languages: languages)
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            await MainActor.run {
+                guard let self, !trimmed.isEmpty else { return }
+                self.translation.setSourceText(trimmed)
+            }
+        }
     }
 }

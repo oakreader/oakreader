@@ -122,11 +122,15 @@ struct SnapshotOverlayView: View {
 
         // Dia-style chat capture: render the region and drop it straight into
         // the composer, skipping the annotation popup.
-        if viewModel.state.snapshotForChat || viewModel.state.snapshotForNote {
+        if viewModel.state.snapshotForChat || viewModel.state.snapshotForNote
+            || viewModel.state.snapshotForTranslation {
             let forNote = viewModel.state.snapshotForNote
+            let forTranslation = viewModel.state.snapshotForTranslation
             showSelection = false
             if let pngData = Self.renderAreaAsPNG(page: page, region: pdfRect) {
-                if forNote {
+                if forTranslation {
+                    viewModel.deliverAreaCaptureToTranslation(pngData, pageIndex: pageIndex)
+                } else if forNote {
                     viewModel.deliverAreaCaptureToNote(pngData, pageIndex: pageIndex)
                 } else {
                     viewModel.deliverAreaCaptureToChat(pngData, pageIndex: pageIndex)

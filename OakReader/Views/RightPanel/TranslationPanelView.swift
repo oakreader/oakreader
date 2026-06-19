@@ -71,6 +71,13 @@ struct TranslationPanelView: View {
             Text("Translation")
                 .font(OakStyle.ChatFont.headerTitle)
             Spacer()
+            Button(action: { translationVM.parent?.beginAreaCaptureForTranslation() }) {
+                Image(systemName: "text.viewfinder")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Capture a region and translate the text it contains (OCR)")
         }
         .padding(.horizontal, OakStyle.Spacing.sm)
         .padding(.vertical, OakStyle.Spacing.sm)
@@ -185,7 +192,7 @@ struct TranslationPanelView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         } else if translationVM.translatedText.isEmpty && translationVM.isTranslating {
             HStack(spacing: 6) {
-                ProgressView().controlSize(.small)
+                StreamingCursor()
                 Text("Translating…")
                     .font(OakStyle.Font.styled(size: 13))
                     .foregroundStyle(.secondary)
@@ -268,8 +275,7 @@ struct TranslationPanelView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 6) {
                 if translationVM.isExplainingWord {
-                    ProgressView()
-                        .controlSize(.mini)
+                    StreamingCursor()
                 }
                 Text(translationVM.explanationWord)
                     .font(OakStyle.Font.styled(size: 12, weight: .semibold))
@@ -281,21 +287,22 @@ struct TranslationPanelView: View {
                     translationVM.explanationWord = ""
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 9, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.tertiary)
-                        .frame(width: 20, height: 20)
+                        .frame(width: 28, height: 28)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .help("Dismiss")
             }
             .padding(.horizontal, OakStyle.Spacing.sm)
-            .padding(.top, OakStyle.Spacing.xs)
+            .padding(.vertical, OakStyle.Spacing.sm)
 
             if translationVM.wordExplanation.isEmpty && translationVM.isExplainingWord {
-                ProgressView()
-                    .controlSize(.small)
-                    .frame(maxWidth: .infinity, minHeight: 40)
+                // Header already shows the bouncing-dots indicator; just hold a
+                // little height so the card doesn't collapse before text streams in.
+                Color.clear
+                    .frame(maxWidth: .infinity, minHeight: 20)
                     .padding(.bottom, OakStyle.Spacing.xs)
             } else {
                 StreamingMarkdownView(

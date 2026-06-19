@@ -36,11 +36,21 @@ class TranslationViewModel {
 
     // MARK: - Public API
 
-    /// Called from text selection popup — sets source text and auto-triggers translation.
+    /// Called from text selection popup and the screenshot/OCR path — sets source
+    /// text and auto-triggers translation. Any open word-explanation card is for
+    /// the previous input, so dismiss it before the new text comes in.
     func setSourceText(_ text: String) {
         skipNextDebounce = true
+        clearWordExplanation()
         sourceText = Self.normalizeExtractedText(text)
         translate()
+    }
+
+    /// Dismiss the inline word-explanation card and stop any in-flight stream.
+    func clearWordExplanation() {
+        stopWordExplanation()
+        wordExplanation = ""
+        explanationWord = ""
     }
 
     /// PDF text extraction carries hard line breaks (and hyphenated word

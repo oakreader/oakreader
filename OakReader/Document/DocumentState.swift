@@ -19,6 +19,10 @@ class DocumentState {
     /// Twin of `snapshotForChat` for the Notes composer: the next completed area
     /// capture is inserted as an image into the active note instead of the popup.
     var snapshotForNote: Bool = false
+    /// Twin of `snapshotForChat` for the Translation panel: the next completed
+    /// area capture is run through OCR and its text dropped into the source field
+    /// (which auto-translates) instead of showing the popup.
+    var snapshotForTranslation: Bool = false
     var sidebarMode: SidebarMode = .thumbnails
 
     var isSidebarVisible: Bool = true

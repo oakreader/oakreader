@@ -139,7 +139,9 @@ struct MediaSnapshotOverlayView: View {
 
             DispatchQueue.main.async {
                 self.showSelection = false
-                if viewModel.state.snapshotForNote {
+                if viewModel.state.snapshotForTranslation {
+                    viewModel.deliverAreaCaptureToTranslation(pngData, pageIndex: 0)
+                } else if viewModel.state.snapshotForNote {
                     viewModel.deliverAreaCaptureToNote(pngData, pageIndex: 0)
                 } else if viewModel.state.snapshotForChat {
                     viewModel.deliverAreaCaptureToChat(pngData, pageIndex: 0)
