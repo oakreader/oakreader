@@ -78,7 +78,7 @@ struct HTMLOverlayView: View {
         let webViewPoint1 = hitTestView.convert(nsPoint1, to: webView)
         let webViewPoint2 = hitTestView.convert(nsPoint2, to: webView)
 
-        // Build the capture rect in WKWebView coordinates (Y-up AppKit)
+        // Build the capture rect in WKWebView coordinates (flipped, Y-down)
         let captureRect = CGRect(
             x: min(webViewPoint1.x, webViewPoint2.x),
             y: min(webViewPoint1.y, webViewPoint2.y),
@@ -91,14 +91,25 @@ struct HTMLOverlayView: View {
             return
         }
 
-        // WKSnapshotConfiguration uses flipped coords (Y-down from top of webView)
-        let webViewHeight = webView.bounds.height
-        let snapshotRect = CGRect(
-            x: captureRect.origin.x,
-            y: webViewHeight - captureRect.origin.y - captureRect.height,
-            width: captureRect.width,
-            height: captureRect.height
-        )
+        // `WKSnapshotConfiguration.rect` is in the web view's OWN coordinate
+        // system, and `convert(_:to: webView)` above already accounted for that
+        // view's flippedness — so `captureRect` is already the rect to snapshot.
+        // This app's WKWebView is flipped (origin top-left, Y-down — see
+        // WebViewCoordinator.screenPoints), so no further flip is needed. A second
+        // manual Y-flip here mirrored the rect across the viewport centre, which is
+        // why selecting one table captured a *different* one lower/higher on the
+        // page. Only flip for the (rare) non-flipped web view.
+        let snapshotRect: CGRect
+        if webView.isFlipped {
+            snapshotRect = captureRect
+        } else {
+            snapshotRect = CGRect(
+                x: captureRect.origin.x,
+                y: webView.bounds.height - captureRect.origin.y - captureRect.height,
+                width: captureRect.width,
+                height: captureRect.height
+            )
+        }
 
         // Get screen position for popup (bottom-center of selection in screen coords)
         let bottomCenterNS = NSPoint(
