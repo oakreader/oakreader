@@ -715,7 +715,7 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
         }
     }
 
-    // MARK: - Scroll Zoom (Cmd + Scroll Wheel)
+    // MARK: - Scroll Zoom (Cmd/Shift + Scroll Wheel)
 
     private func setupScrollMonitor(for pdfView: PDFView) {
         removeScrollMonitor()
@@ -723,17 +723,22 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
         scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
             guard let self,
                   let pdfView = self.pdfView,
-                  event.modifierFlags.contains(.command) else { return event }
+                  event.modifierFlags.contains(.command) || event.modifierFlags.contains(.shift)
+            else { return event }
 
             // Only handle events within the PDF view
             let locationInView = pdfView.convert(event.locationInWindow, from: nil)
             guard pdfView.bounds.contains(locationInView) else { return event }
 
-            let delta = event.scrollingDeltaY
-            guard abs(delta) > 0.01 else { return nil }
+            // Trackpads report pixel-precise `scrollingDeltaY`; a traditional mouse
+            // wheel leaves that at 0 and uses the line-based `deltaY` instead.
+            let precise = event.hasPreciseScrollingDeltas
+            let delta = event.scrollingDeltaY != 0 ? event.scrollingDeltaY : event.deltaY
+            guard abs(delta) > 0.001 else { return nil }
 
-            // Use a smooth zoom factor proportional to scroll delta
-            let zoomFactor: CGFloat = 1.0 + (delta * 0.01)
+            // Per-pixel step for trackpads; a larger per-detent step for mouse wheels.
+            let step: CGFloat = precise ? 0.01 : 0.12
+            let zoomFactor: CGFloat = 1.0 + (delta * step)
             let newZoom = pdfView.scaleFactor * zoomFactor
             self.viewModel.viewer.setZoom(newZoom)
 

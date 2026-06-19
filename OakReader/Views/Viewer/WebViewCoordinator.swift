@@ -341,17 +341,22 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
         scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
             guard let self,
                   let webView = self.webView,
-                  event.modifierFlags.contains(.command) else { return event }
+                  event.modifierFlags.contains(.command) || event.modifierFlags.contains(.shift)
+            else { return event }
 
             // Only handle events within the web view
             let locationInView = webView.convert(event.locationInWindow, from: nil)
             guard webView.bounds.contains(locationInView) else { return event }
 
-            let delta = event.scrollingDeltaY
-            guard abs(delta) > 0.01 else { return nil }
+            // Trackpads report pixel-precise `scrollingDeltaY`; a traditional mouse
+            // wheel leaves that at 0 and uses the line-based `deltaY` instead.
+            let precise = event.hasPreciseScrollingDeltas
+            let delta = event.scrollingDeltaY != 0 ? event.scrollingDeltaY : event.deltaY
+            guard abs(delta) > 0.001 else { return nil }
 
-            // Smooth zoom factor proportional to scroll delta
-            let zoomFactor: CGFloat = 1.0 + (delta * 0.01)
+            // Per-pixel step for trackpads; a larger per-detent step for mouse wheels.
+            let step: CGFloat = precise ? 0.01 : 0.12
+            let zoomFactor: CGFloat = 1.0 + (delta * step)
             let newZoom = webView.pageZoom * zoomFactor
             self.viewModel.viewer.setZoom(newZoom)
 
