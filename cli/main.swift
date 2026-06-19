@@ -99,6 +99,9 @@ struct Words: ParsableCommand {
     @Option(name: .long, help: "Maximum number of results (default 100).")
     var limit: Int?
 
+    @Flag(name: .long, help: "Output as CSV (Word, Sentence, Explanation, Document, Created At).")
+    var csv = false
+
     func run() throws {
         let database = try CLIDatabase(path: globals.db)
         let sinceISO = try Words.resolveSince(today: today, since: since)
@@ -107,6 +110,11 @@ struct Words: ParsableCommand {
         if globals.json {
             let output = CLIOutput(json: true, quiet: globals.quiet)
             output.results(operation: "words.list", items: lookups, meta: ["count": lookups.count])
+            return
+        }
+
+        if csv {
+            print(Words.csvString(lookups))
             return
         }
 
@@ -143,6 +151,20 @@ struct Words: ParsableCommand {
             return iso.string(from: Calendar.current.startOfDay(for: date))
         }
         return nil
+    }
+
+    /// Render lookups as CSV with a header row. Created-at stays in the stored
+    /// ISO8601 form so it round-trips with `--json`.
+    static func csvString(_ lookups: [CLIWordLookup]) -> String {
+        func escape(_ field: String) -> String {
+            "\"" + field.replacingOccurrences(of: "\"", with: "\"\"") + "\""
+        }
+        var rows = ["Word,Sentence,Explanation,Document,Created At"]
+        for l in lookups {
+            rows.append([l.word, l.sentence, l.explanation, l.itemTitle, l.createdAt]
+                .map(escape).joined(separator: ","))
+        }
+        return rows.joined(separator: "\n")
     }
 
     /// Render a stored ISO8601 timestamp as a short local "MMM d, HH:mm".

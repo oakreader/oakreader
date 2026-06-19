@@ -174,7 +174,7 @@ struct SettingsView: View {
         case .webSearch:
             WebSearchSettingsView()
         case .extensionTranslation:
-            TranslationSettingsView()
+            TranslationSettingsView(store: store)
         }
     }
 }
