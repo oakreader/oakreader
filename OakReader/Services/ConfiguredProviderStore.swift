@@ -28,6 +28,16 @@ final class ConfiguredProviderStore {
         ProviderRegistry.shared.allProviders.filter { !configuredLLMProviderIds.contains($0.id) }
     }
 
+    /// The provider chat should actually use: the user's stored preference when it has
+    /// credentials, otherwise the first provider that does. This stops a never-touched
+    /// default (e.g. the hardcoded "anthropic") from selecting a vendor the user never
+    /// configured. Falls back to `preferred` unchanged when nothing is configured yet,
+    /// so the caller still surfaces a useful "missing key" path.
+    func resolvedProviderId(preferred: String) -> String {
+        if configuredLLMProviderIds.contains(preferred) { return preferred }
+        return configuredLLMProviders.first?.id ?? preferred
+    }
+
     private init() {
         refresh()
     }

@@ -704,8 +704,15 @@ struct AIChatView: View {
 
     @State private var settingsModel: String = {
         let prefs = Preferences.shared
-        if !prefs.aiModel.isEmpty { return prefs.aiModel }
-        let pid = prefs.aiProviderId
+        let store = ConfiguredProviderStore.shared
+        // Honor the stored model only when it's actually available (configured provider,
+        // not toggled off); otherwise fall back to the resolved provider's default so the
+        // picker never shows a model from a vendor the user hasn't set up.
+        if !prefs.aiModel.isEmpty,
+           store.availableLLMModels.contains(where: { $0.model.id == prefs.aiModel }) {
+            return prefs.aiModel
+        }
+        let pid = store.resolvedProviderId(preferred: prefs.aiProviderId)
         return ProviderRegistry.shared.provider(for: pid)?.defaultModelId ?? ""
     }()
     @State private var settingsEffort: String = Preferences.shared.thinkingEffort

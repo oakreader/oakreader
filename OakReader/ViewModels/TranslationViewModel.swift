@@ -103,10 +103,13 @@ class TranslationViewModel {
         isTranslating = true
 
         let prefs = Preferences.shared
-        let pid = prefs.translationAIProviderId
+        let storedPid = prefs.translationAIProviderId
+        let pid = ConfiguredProviderStore.shared.resolvedProviderId(preferred: storedPid)
         let model: String = {
             let m = prefs.translationAIModel
-            return m.isEmpty ? (ProviderRegistry.shared.provider(for: pid)?.defaultModelId ?? "") : m
+            let valid = pid == storedPid && !m.isEmpty
+                && ProviderRegistry.shared.provider(for: pid)?.models.contains { $0.id == m } == true
+            return valid ? m : (ProviderRegistry.shared.provider(for: pid)?.defaultModelId ?? "")
         }()
 
         let (systemPrompt, userPrompt) = buildPrompts(text: text)
@@ -289,10 +292,13 @@ class TranslationViewModel {
         let contextSentence = sentence.trimmingCharacters(in: .whitespacesAndNewlines)
 
         let prefs = Preferences.shared
-        let pid = prefs.translationAIProviderId
+        let storedPid = prefs.translationAIProviderId
+        let pid = ConfiguredProviderStore.shared.resolvedProviderId(preferred: storedPid)
         let model: String = {
             let m = prefs.translationAIModel
-            return m.isEmpty ? (ProviderRegistry.shared.provider(for: pid)?.defaultModelId ?? "") : m
+            let valid = pid == storedPid && !m.isEmpty
+                && ProviderRegistry.shared.provider(for: pid)?.models.contains { $0.id == m } == true
+            return valid ? m : (ProviderRegistry.shared.provider(for: pid)?.defaultModelId ?? "")
         }()
 
         let systemPrompt = buildExplanationSystemPrompt()

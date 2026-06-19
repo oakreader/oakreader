@@ -170,10 +170,18 @@ class ChatViewModel {
 
     var config: ProviderConfig {
         let prefs = Preferences.shared
-        let pid = prefs.aiProviderId
-        let defaultModel = ProviderRegistry.shared.provider(for: pid)?.defaultModelId ?? ""
-        let modelId = prefs.aiModel.isEmpty ? defaultModel : prefs.aiModel
-        let modelInfo = ProviderRegistry.shared.provider(for: pid)?.models.first { $0.id == modelId }
+        let storedPid = prefs.aiProviderId
+        let pid = ConfiguredProviderStore.shared.resolvedProviderId(preferred: storedPid)
+        let provider = ProviderRegistry.shared.provider(for: pid)
+        let defaultModel = provider?.defaultModelId ?? ""
+        // Keep the stored model only when it belongs to the provider we resolved to;
+        // otherwise (e.g. we fell back from an unconfigured default) use the provider's
+        // own default rather than a model from a different vendor.
+        let storedModelValid = pid == storedPid
+            && !prefs.aiModel.isEmpty
+            && provider?.models.contains { $0.id == prefs.aiModel } == true
+        let modelId = storedModelValid ? prefs.aiModel : defaultModel
+        let modelInfo = provider?.models.first { $0.id == modelId }
         let isReasoning = modelInfo?.reasoning == true
         let effort = prefs.thinkingEffort
         let thinkingEnabled = isReasoning && effort != "off"
