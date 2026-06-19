@@ -16,8 +16,11 @@ struct ToolbarPill<Content: View>: View {
         content
             .padding(.horizontal, 2)
             .background(
+                // Same neutral capsule fill as the prominent `OakToolButton`
+                // (History close, panel pills) so every chrome pill shares one
+                // token and reads as the same component.
                 Capsule(style: .continuous)
-                    .fill(OakStyle.Colors.hoverBackground)
+                    .fill(OakStyle.Colors.buttonBackground)
             )
     }
 }

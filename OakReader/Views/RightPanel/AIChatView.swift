@@ -44,19 +44,23 @@ struct AIChatView: View {
             // Header
             header
 
-            // Content: either history drawer or chat
+            // Content: either history drawer or chat.
+            // Cross-fade rather than slide: a horizontal `.move` pushes content
+            // (including the AppKit NSTextView input bar) past the panel's edge,
+            // where it escapes `.clipped()` and paints over the document. A fade
+            // keeps every subview in place, so nothing can bleed out of the panel.
             Group {
                 if chatVM.showHistory {
                     ChatHistoryDrawer(chatVM: chatVM)
-                        .transition(.move(edge: .trailing))
+                        .transition(.opacity)
                 } else {
                     chatContent
-                        .transition(.move(edge: .leading))
+                        .transition(.opacity)
                 }
             }
             .clipped()
         }
-        .animation(.spring(duration: 0.32, bounce: 0.0), value: chatVM.showHistory)
+        .animation(.easeInOut(duration: 0.2), value: chatVM.showHistory)
         .onAppear {
             chatVM.refreshAtMentionItems()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -179,7 +183,7 @@ struct AIChatView: View {
         HStack(spacing: 8) {
             OakToolButton(
                 systemImage: chatVM.showHistory ? "xmark" : "list.bullet",
-                isSelected: chatVM.showHistory,
+                prominent: true,
                 tooltip: chatVM.showHistory ? "Close History" : "Chat History"
             ) {
                 if chatVM.showHistory {
@@ -199,12 +203,17 @@ struct AIChatView: View {
 
             Spacer()
 
-            OakToolButton(systemImage: "plus.bubble", tooltip: "New Chat") {
+            OakToolButton(systemImage: "plus.bubble", prominent: true, tooltip: "New Chat") {
                 chatVM.newSession()
             }
         }
         .padding(.horizontal, OakStyle.Spacing.sm)
-        .padding(.vertical, OakStyle.Spacing.sm)
+        // Match the live-web address-bar toolbar's vertical padding (6) so this
+        // header's icons sit on the SAME line as the back/forward/reload row in
+        // the content column — both columns start at the same Y below the tab
+        // bar, so equal padding lines up the icon centers. Spacing.sm (10) here
+        // pushed these icons 4px lower than the toolbar.
+        .padding(.vertical, 6)
     }
 
     /// Pill in the canvas header showing the agent's current workspace (the
@@ -262,7 +271,7 @@ struct AIChatView: View {
         if presentation == .canvas {
             OakAppIcon(size: 44)
         } else {
-            Image(systemName: "bubble.left.and.text.bubble.right")
+            Image(systemName: "bubble.left.and.bubble.right")
                 .font(.system(size: 40))
                 .foregroundStyle(.tertiary)
         }
@@ -574,16 +583,14 @@ struct AIChatView: View {
             .padding(.bottom, 10)
         }
         .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Color(nsColor: .textBackgroundColor))
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(OakStyle.Colors.diaSurface)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(presentation == .canvas ? OakStyle.Colors.diaHairline : Color.primary.opacity(0.20),
-                        lineWidth: 1)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.primary.opacity(0.10), lineWidth: 1)
         )
-        .shadow(color: presentation == .canvas ? Color.black.opacity(0.06) : .clear,
-                radius: 8, y: 2)
+        .shadow(color: Color.black.opacity(0.08), radius: 10, y: 3)
         .padding(.horizontal, presentation == .canvas ? 0 : OakStyle.Spacing.sm)
         .padding(.bottom, presentation == .canvas ? OakStyle.Spacing.md : OakStyle.Spacing.xs)
         .padding(.top, OakStyle.Spacing.xs)

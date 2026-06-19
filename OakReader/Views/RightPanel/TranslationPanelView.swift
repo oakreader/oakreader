@@ -367,15 +367,17 @@ struct TranslationPanelView: View {
 // MARK: - Card Surface
 
 private extension View {
-    /// Rounded card surface. `filled` cards (the result) get a stronger fill to
-    /// distinguish output from input; unfilled cards (the source) get a hairline.
+    /// Rounded card surface. Both source and result sit on the same solid white
+    /// surface as the AI chat input (`diaSurface` — ≈#FEFFFF light / #2D2D2D dark),
+    /// with a clear hairline border so the cards read as crisp panels rather than
+    /// grey washes picked up from the window background.
     func cardSurface(filled: Bool) -> some View {
         background(
             RoundedRectangle(cornerRadius: 14)
-                .fill(Color.primary.opacity(filled ? 0.05 : 0.02))
+                .fill(OakStyle.Colors.diaSurface)
                 .overlay(
                     RoundedRectangle(cornerRadius: 14)
-                        .strokeBorder(Color.primary.opacity(filled ? 0 : 0.07), lineWidth: 1)
+                        .strokeBorder(Color.primary.opacity(0.10), lineWidth: 1)
                 )
         )
     }

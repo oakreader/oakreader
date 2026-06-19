@@ -361,11 +361,11 @@ private final class Renderer {
         let m = NSMutableAttributedString(attributedString: renderBlocks(node))
         let full = NSRange(location: 0, length: m.length)
         m.addAttribute(.foregroundColor, value: theme.secondaryTextColor, range: full)
-        m.addAttribute(.paragraphStyle, value: bodyParagraphStyle(headIndent: 16), range: full)
-        // Tag the range so `HuggingLayoutManager` paints a rounded fill + left bar
-        // behind it (the actual drawing can't be expressed as text attributes).
+        m.addAttribute(.paragraphStyle, value: bodyParagraphStyle(headIndent: 12), range: full)
+        // Tag the range so `HuggingLayoutManager` paints a soft rounded fill behind
+        // it (the drawing can't be expressed as text attributes). No left bar — the
+        // fill alone reads as a quote; the bar on top of it was redundant chrome.
         m.addAttribute(.blockquoteFill, value: theme.blockquoteBackground, range: full)
-        m.addAttribute(.blockquoteBar, value: theme.blockquoteBar, range: full)
         return m
     }
 }

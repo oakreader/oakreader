@@ -237,7 +237,7 @@ private struct LibraryCardView: View {
                 .overlay {
                     RoundedRectangle(cornerRadius: cornerRadius)
                         .strokeBorder(
-                            isSelected ? Color.accentColor : Color.primary.opacity(0.06),
+                            isSelected ? OakStyle.Colors.border : Color.primary.opacity(0.06),
                             lineWidth: isSelected ? 2.5 : 1
                         )
                 }

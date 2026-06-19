@@ -4,6 +4,10 @@ import AppKit
 struct OakToolButton: View {
     let systemImage: String
     var isSelected: Bool = false
+    /// Renders like the title-bar panel pills (`PillTabButton`): a neutral
+    /// capsule fill that's always visible, never the blue accent tint. Used for
+    /// the History close button so it matches the Metadata tab's look.
+    var prominent: Bool = false
     var tooltip: String = ""
     var action: () -> Void
 
@@ -17,11 +21,14 @@ struct OakToolButton: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .foregroundStyle(isSelected ? Color.accentColor : Color(nsColor: .labelColor))
-        .background(
-            RoundedRectangle(cornerRadius: OakStyle.Radius.standard)
-                .fill(backgroundColor)
-        )
+        .foregroundStyle(foreground)
+        .background {
+            if prominent {
+                Capsule().fill(backgroundColor)
+            } else {
+                RoundedRectangle(cornerRadius: OakStyle.Radius.standard).fill(backgroundColor)
+            }
+        }
         .onHover { isHovering = $0 }
         .accessibilityLabel(tooltip)
         .background(
@@ -29,7 +36,17 @@ struct OakToolButton: View {
         )
     }
 
+    private var foreground: Color {
+        // Prominent buttons stay neutral (no accent tint) like the panel pills.
+        if !prominent && isSelected { return Color.accentColor }
+        return Color(nsColor: .labelColor)
+    }
+
     private var backgroundColor: Color {
+        if prominent {
+            // Neutral capsule fill that appears only on hover (no persistent bg).
+            return isHovering ? Color.primary.opacity(0.10) : .clear
+        }
         if isSelected {
             return OakStyle.Colors.activeBackground
         } else if isHovering {

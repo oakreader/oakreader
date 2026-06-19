@@ -9,6 +9,7 @@ struct TabBarView: View {
 
     @State private var isFullScreen = false
     @State private var isPinnedHovering = false
+    @State private var isSidebarToggleHovering = false
     @State private var pluginRefresh = false
 
     private var store: LibraryStore { appState.libraryStore }
@@ -26,10 +27,17 @@ struct TabBarView: View {
                 Image(systemName: "sidebar.leading")
                     .font(.system(size: 16, weight: .regular))
                     .frame(width: 28, height: 28)
-                    .contentShape(Rectangle())
+                    .background(
+                        Capsule()
+                            .fill(Color.primary.opacity(sidebarToggleFillOpacity))
+                    )
+                    .contentShape(Capsule())
             }
             .buttonStyle(.plain)
-            .foregroundStyle(sidebarToggleActive ? Color.accentColor : Color(nsColor: .labelColor))
+            .foregroundStyle(sidebarToggleActive ? Color(nsColor: .labelColor) : Color(nsColor: .secondaryLabelColor))
+            .onHover { isSidebarToggleHovering = $0 }
+            .animation(.easeInOut(duration: 0.12), value: isSidebarToggleHovering)
+            .animation(.easeInOut(duration: 0.12), value: sidebarToggleActive)
             .help("Toggle Sidebar")
             .accessibilityLabel("Toggle Sidebar")
             .padding(.trailing, 4)
@@ -117,6 +125,13 @@ struct TabBarView: View {
             return viewModel.state.isSidebarVisible
         }
         return appState.isLibrarySidebarVisible
+    }
+
+    // Mirror PillTabButton's quiet fill ramp: 0 / 0.07 hover / 0.12 active.
+    private var sidebarToggleFillOpacity: Double {
+        if sidebarToggleActive { return 0.12 }
+        if isSidebarToggleHovering { return 0.07 }
+        return 0
     }
 
     // MARK: - Panel Mode Tabs

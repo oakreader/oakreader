@@ -124,22 +124,24 @@ private struct LiveWebToolbarContent: View {
         }
     }
 
-    private var savePill: some View {
-        ToolbarPill { saveButton }
-    }
-
+    // A single `prominent` OakToolButton — its own neutral capsule, no outer
+    // `ToolbarPill` wrapper. Wrapping it used to stack two backgrounds (the pill
+    // capsule + the button's own hover/selected fill), which read as a "box in a
+    // box". This is now the same single-capsule component as the History close
+    // button, so the chrome reads consistently.
     @ViewBuilder
-    private var saveButton: some View {
+    private var savePill: some View {
         switch saveState {
         case .saving:
             ProgressView()
                 .controlSize(.small)
                 .frame(width: 28, height: 28)
+                .background(Capsule(style: .continuous).fill(OakStyle.Colors.buttonBackground))
         default:
             OakToolButton(
                 systemImage: saveState == .saved ? "bookmark.fill"
                     : (saveState == .failed ? "exclamationmark.triangle" : "bookmark"),
-                isSelected: saveState == .saved,
+                prominent: true,
                 tooltip: saveState == .saved ? "Saved to Reading List"
                     : (saveState == .failed ? "Save failed — click to retry" : "Save to Reading List")
             ) {
