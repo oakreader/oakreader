@@ -111,7 +111,7 @@ struct RecordingSummaryView: View {
                 Button {
                     copySummary(summary)
                 } label: {
-                    Label("Copy", systemImage: "doc.on.doc")
+                    Label("Copy", systemImage: "square.on.square")
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.mini)

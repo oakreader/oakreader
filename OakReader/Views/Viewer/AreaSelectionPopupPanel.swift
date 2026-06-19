@@ -128,7 +128,7 @@ class AreaSelectionPopupPanel: NSPanel, AppResignDismissable {
 
         // Group 3: Clipboard (copy image)
         let copyBtn = PopupIconButton(
-            systemImage: "doc.on.doc",
+            systemImage: "square.on.square",
             accessibilityLabel: "Copy Image"
         ) { [weak self] in
             self?.copyImage()

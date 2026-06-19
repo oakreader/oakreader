@@ -195,7 +195,7 @@ final class AnnotationEditPopupPanel: NSPanel, AppResignDismissable {
 
         // Row 3 — utility: copy text + delete
         let copyBtn = PopupIconButton(
-            systemImage: "doc.on.doc",
+            systemImage: "square.on.square",
             accessibilityLabel: "Copy Highlighted Text"
         ) { [weak self] in self?.copyText() }
         mainStack.addArrangedSubview(copyBtn)

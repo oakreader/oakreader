@@ -174,7 +174,7 @@ struct ChatHistoryDrawer: View {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(path, forType: .string)
         } label: {
-            Label("Copy File Path", systemImage: "doc.on.doc")
+            Label("Copy File Path", systemImage: "square.on.square")
         }
 
         Divider()

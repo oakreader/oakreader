@@ -229,7 +229,7 @@ class HTMLSelectionPopupPanel: NSPanel, AppResignDismissable {
 
         // Group 3: Clipboard (copy)
         let copyBtn = PopupIconButton(
-            systemImage: "doc.on.doc",
+            systemImage: "square.on.square",
             accessibilityLabel: "Copy"
         ) { [weak self] in
             self?.copyText()
@@ -497,7 +497,7 @@ class WebAreaPopupPanel: NSPanel, AppResignDismissable {
 
         // Copy Image
         let copyBtn = PopupActionButton(
-            systemImage: "doc.on.doc",
+            systemImage: "square.on.square",
             title: "Copy Image"
         ) { [weak self] in
             self?.copyImage()

@@ -207,7 +207,7 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
 
         // Group 3: Clipboard (copy)
         let copyBtn = PopupIconButton(
-            systemImage: "doc.on.doc",
+            systemImage: "square.on.square",
             accessibilityLabel: "Copy"
         ) { [weak self] in
             self?.copySelection()

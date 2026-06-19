@@ -237,7 +237,7 @@ struct ReferenceMetadataView: View {
                     }
                 } label: {
                     HStack(spacing: 4) {
-                        Image(systemName: "doc.on.doc")
+                        Image(systemName: "square.on.square")
                             .font(.system(size: 12))
                         Text("Copy Citation")
                             .font(.system(size: 13))

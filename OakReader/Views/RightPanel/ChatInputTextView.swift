@@ -291,7 +291,7 @@ final class ChatNSTextView: NSTextView {
             case "Cut":
                 item.image = NSImage(systemSymbolName: "scissors", accessibilityDescription: nil)
             case "Copy":
-                item.image = NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: nil)
+                item.image = NSImage(systemSymbolName: "square.on.square", accessibilityDescription: nil)
             case "Paste":
                 item.image = NSImage(systemSymbolName: "clipboard", accessibilityDescription: nil)
             case "Select All":

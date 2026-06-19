@@ -300,7 +300,7 @@ enum MainMenuBuilder {
         let copyItem = NSMenuItem(
             title: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c"
         )
-        copyItem.image = icon("doc.on.doc")
+        copyItem.image = icon("square.on.square")
         editMenu.addItem(copyItem)
 
         let pasteItem = NSMenuItem(
