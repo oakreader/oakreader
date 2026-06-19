@@ -98,17 +98,33 @@ enum NoteTime {
     }
 }
 
-/// A flomo `#tag` chip — lavender fill, blue text.
+/// A flomo `#tag` chip — lavender fill, blue text. When `action` is set it's a
+/// button that filters the note stream by this tag; `isActive` paints it solid
+/// to show it's the current filter.
 struct NoteTagChip: View {
     let tag: String
+    var isActive: Bool = false
+    var action: (() -> Void)? = nil
+
     var body: some View {
+        if let action {
+            Button(action: action) { chip }
+                .buttonStyle(.plain)
+                .help(isActive ? "Show all notes" : "Show only notes tagged #\(tag)")
+        } else {
+            chip
+        }
+    }
+
+    private var chip: some View {
         Text("#\(tag)")
             .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(Color.accentColor)
+            .foregroundStyle(isActive ? Color.white : Color.accentColor)
             .padding(.horizontal, 7)
             .padding(.vertical, 2)
             .background(
-                Capsule().fill(Color.accentColor.opacity(0.10))
+                Capsule().fill(isActive ? Color.accentColor : Color.accentColor.opacity(0.10))
             )
+            .contentShape(Capsule())
     }
 }

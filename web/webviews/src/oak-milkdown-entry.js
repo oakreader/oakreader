@@ -30,9 +30,23 @@ import {
   wrapInOrderedListCommand,
   wrapInHeadingCommand,
   insertImageCommand,
+  linkSchema,
 } from "@milkdown/kit/preset/commonmark";
 
+// Make the link mark non-inclusive. ProseMirror marks are inclusive by default,
+// so typing at the end of an autolinked URL keeps extending the link — type a URL
+// then a space and a word, and the space + word stay underlined as part of the
+// link. Non-inclusive ends the mark at the URL boundary, so anything you type
+// after it is plain text (matching what a space visibly implies).
+const nonInclusiveLink = linkSchema.extendSchema((prev) => (ctx) => ({
+  ...prev(ctx),
+  inclusive: false,
+}));
+
 let crepe = null;
+// Observes the editor's content box so the native frame follows the real height
+// the moment the browser commits layout — see attachHeightObserver.
+let heightObserver = null;
 
 // Highlight `#tags` inline (flomo-style accent text) as you type — a ProseMirror
 // *decoration* only, so the serialized markdown stays plain `#welcome/guide` and
@@ -71,6 +85,67 @@ const tagHighlight = $prose(
     })
 );
 
+// --- Active-format reporting -------------------------------------------------
+// The native flomo toolbar fires *toggle* commands (bold, inline code, heading,
+// lists). Without telling native which of those are currently ON at the caret,
+// the user has no way to know that the same button will toggle the style back
+// OFF — they'd press "code", land inside an inline-code span, and feel stuck.
+// So on every selection/doc change we report which formats are active; native
+// highlights the matching toolbar buttons (accent), making the toggle obvious.
+
+function markActive(state, type) {
+  if (!type) return false;
+  const { from, to, empty, $from } = state.selection;
+  if (empty) return !!type.isInSet(state.storedMarks || $from.marks());
+  return state.doc.rangeHasMark(from, to, type);
+}
+
+// True when any ancestor of the caret is of `nodeType` (used for block-level
+// styles: heading, bullet / ordered list).
+function ancestorActive(state, nodeType) {
+  if (!nodeType) return false;
+  const { $from } = state.selection;
+  for (let d = $from.depth; d >= 0; d--) {
+    if ($from.node(d).type === nodeType) return true;
+  }
+  return false;
+}
+
+function reportFormat(state) {
+  const m = state.schema.marks;
+  const n = state.schema.nodes;
+  post({
+    type: "format",
+    bold: markActive(state, m.strong),
+    italic: markActive(state, m.emphasis),
+    code: markActive(state, m.inlineCode || m.code),
+    heading: ancestorActive(state, n.heading),
+    bulletList: ancestorActive(state, n.bullet_list || n.bulletList),
+    orderedList: ancestorActive(state, n.ordered_list || n.orderedList),
+  });
+}
+
+// Re-report the active formats whenever the selection or document changes, so
+// the native toolbar's highlight tracks the caret in real time.
+const formatReporter = $prose(
+  () =>
+    new Plugin({
+      key: new PluginKey("oak-format-reporter"),
+      view() {
+        return {
+          update(view, prev) {
+            if (
+              view.state.selection.eq(prev.selection) &&
+              view.state.doc.eq(prev.doc)
+            )
+              return;
+            reportFormat(view.state);
+          },
+        };
+      },
+    })
+);
+
 function post(payload) {
   try {
     window.webkit.messageHandlers.oakMilkdown.postMessage(payload);
@@ -105,6 +180,21 @@ function reportHeight() {
   // of `.milkdown` tracks the real content height up and down.
   const el = document.querySelector(".milkdown") || document.querySelector(".ProseMirror");
   if (el) post({ type: "height", value: Math.ceil(el.getBoundingClientRect().height) });
+}
+
+// Drive auto-grow off the editor's actual layout, not the doc-edit signal. A
+// ResizeObserver fires exactly when the browser commits a new content height —
+// race-free (no stale pre-layout read) and for *every* cause: typing, wrapping,
+// list/heading changes, a pasted image, a late font load. Measuring only on
+// markdownUpdated missed the non-edit reflows and could double-bump; this owns
+// height end-to-end so the native frame catches up once, smoothly.
+function attachHeightObserver() {
+  if (typeof ResizeObserver === "undefined") return;
+  const el = document.querySelector(".milkdown") || document.querySelector(".ProseMirror");
+  if (!el) return;
+  if (heightObserver) heightObserver.disconnect();
+  heightObserver = new ResizeObserver(() => reportHeight());
+  heightObserver.observe(el);
 }
 
 function withEditor(fn) {
@@ -182,6 +272,12 @@ async function build(markdown, editable) {
     // selection toolbar — formatting lives in the native bottom bar (Slack-style),
     // so the popover would just duplicate it. Inline images still work via the
     // commonmark preset + the bottom bar's insertImage bridge.
+    //
+    // LinkTooltip is OFF: its copy/edit/delete popover is absolutely positioned
+    // inside the webview, but this composer is a short auto-grow surface, so the
+    // popover can't escape the painted bounds and clipped to an ugly sliver under
+    // the link. Links still autolink (paste/type a URL) and round-trip as markdown
+    // — a capture box doesn't need an in-place link editor.
     features: {
       [CrepeFeature.AI]: false,
       [CrepeFeature.Latex]: false,
@@ -190,6 +286,7 @@ async function build(markdown, editable) {
       [CrepeFeature.CodeMirror]: false,
       [CrepeFeature.TopBar]: false,
       [CrepeFeature.Toolbar]: false,
+      [CrepeFeature.LinkTooltip]: false,
     },
     featureConfigs: {
       [CrepeFeature.Placeholder]: { text: "Jot a thought…", mode: "doc" },
@@ -201,6 +298,8 @@ async function build(markdown, editable) {
   });
 
   crepe.editor.use(tagHighlight);
+  crepe.editor.use(formatReporter);
+  crepe.editor.use(nonInclusiveLink);
   await crepe.create();
   if (!editable) crepe.setReadonly(true);
 
@@ -230,6 +329,8 @@ async function build(markdown, editable) {
     /* ignore */
   }
   reportState(crepe.getMarkdown());
+  withEditor((ctx) => reportFormat(ctx.get(editorViewCtx).state));
+  attachHeightObserver();
 
   // Reveal once layout has settled — avoids the blank→content flash/resize the
   // Notes tab showed on first appearance.
@@ -244,6 +345,10 @@ async function build(markdown, editable) {
 
 window.oakMilkdown = {
   async init(markdown, editable) {
+    if (heightObserver) {
+      heightObserver.disconnect();
+      heightObserver = null;
+    }
     if (crepe) {
       try {
         await crepe.destroy();
@@ -271,6 +376,18 @@ window.oakMilkdown = {
   // Reset to an empty editor (after a note is sent).
   clear() {
     return this.init("", true);
+  },
+
+  // Re-report the live content + height WITHOUT rebuilding the editor. Used when a
+  // cached WKWebView is rebound to a freshly-created native composer (re-entering
+  // the Notes tab): the editor is already booted, so we only resync the native
+  // @State (empty / char count / height) instead of reloading — which is what
+  // caused the visible boot+fade "flick" on every tab switch.
+  resync() {
+    if (!crepe) return false;
+    reportState(this.getMarkdown());
+    withEditor((ctx) => reportFormat(ctx.get(editorViewCtx).state));
+    return true;
   },
 
   focus() {

@@ -2,10 +2,12 @@ import SwiftUI
 import AppKit
 import OakMarkdownUI
 
-/// The right-panel **Notes** surface — a flomo-style, capture-first stream.
-/// A persistent Milkdown capture card at the top jots freestanding memos (with a
-/// WYSIWYG editor + the flomo toolbar: tag, image, bold/italic, lists, mention);
-/// below it, a reverse-chrono list of memo cards. Each card shows its timestamp,
+/// The right-panel **Notes** surface — a chat-to-self, capture-first stream.
+/// The memo list fills the panel (oldest first, newest at the bottom) and a
+/// persistent Milkdown capture card is pinned at the **bottom**, mirroring the AI
+/// chat panel: you jot at the bottom and the stream grows downward, like Telegram
+/// Saved Messages / 微信文件传输助手. The composer carries the flomo toolbar (tag,
+/// image, bold/italic, lists, mention). Each card shows its timestamp,
 /// `#tag` chips, rendered markdown body, and — for selection-anchored notes — a
 /// source row that jumps back to the highlight on tap. Editing a card reuses the
 /// exact same composer (`NoteComposerBox`).
@@ -20,6 +22,10 @@ struct CommentsPanelView: View {
     var body: some View {
         VStack(spacing: 0) {
             notesHeader
+
+            tagFilterBar
+
+            stream
 
             NoteComposerBox(
                 mode: .create,
@@ -36,12 +42,11 @@ struct CommentsPanelView: View {
                 onCaptureRegion: { viewModel.beginAreaCaptureForNote() },
                 captureURL: model.pendingCaptureURL,
                 onCaptureConsumed: { model.pendingCaptureURL = nil },
-                memos: model.referenceableMemos(excluding: nil)
+                memos: model.referenceableMemos(excluding: nil),
+                reuseHolder: model.composerWebHolder
             )
             .padding(.horizontal, 12)
-            .padding(.top, 12)
-
-            stream
+            .padding(.vertical, 12)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .windowBackgroundColor))
@@ -76,6 +81,27 @@ struct CommentsPanelView: View {
         .padding(.vertical, 8)
     }
 
+    /// Horizontal row of the doc's tags; tap one to filter the stream, tap again
+    /// to clear. Only shown when there are ≥2 distinct tags (filtering a single
+    /// tag has nothing to narrow against).
+    @ViewBuilder
+    private var tagFilterBar: some View {
+        let tags = model.allTags
+        if tags.count >= 2 {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(tags, id: \.self) { tag in
+                        NoteTagChip(tag: tag, isActive: model.activeTagFilter == tag) {
+                            withAnimation(.easeOut(duration: 0.15)) { model.toggleTagFilter(tag) }
+                        }
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 8)
+            }
+        }
+    }
+
     // MARK: - Stream
 
     @ViewBuilder
@@ -83,13 +109,27 @@ struct CommentsPanelView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 12) {
-                    ForEach(model.cards, id: \.id) { record in
+                    ForEach(model.filteredCards, id: \.id) { record in
                         CommentCardView(record: record, model: model, isFlashing: flashId == record.id)
                             .id(record.id)
                     }
-                    if model.cards.isEmpty { emptyHint }
+                    if model.cards.isEmpty {
+                        emptyHint
+                    } else if model.filteredCards.isEmpty {
+                        filteredEmptyHint
+                    }
+                    // Invisible anchor at the very bottom — newest note lives here,
+                    // so we land on it when the panel opens and after each capture.
+                    Color.clear.frame(height: 1).id("bottom")
                 }
                 .padding(12)
+            }
+            // Open at the live edge (newest note), chat-style.
+            .defaultScrollAnchor(.bottom)
+            .frame(maxHeight: .infinity)
+            // A fresh capture lands at the bottom — follow it down.
+            .onChange(of: model.cards.count) { _, _ in
+                withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo("bottom") }
             }
             .onChange(of: model.focusedCardId) { _, id in
                 guard let id else { return }
@@ -111,7 +151,7 @@ struct CommentsPanelView: View {
             Text("No Notes")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.secondary)
-            Text("Jot a thought above, or select text in the document to add a note.")
+            Text("Jot a thought below, or select text in the document to add a note.")
                 .font(.system(size: 12))
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
@@ -119,6 +159,24 @@ struct CommentsPanelView: View {
         .frame(maxWidth: .infinity)
         .padding(.top, 60)
         .padding(.horizontal, 24)
+    }
+
+    /// Shown when a tag filter is active but matches nothing (rare — the filter
+    /// auto-clears when its tag disappears, but the stream can momentarily be empty).
+    private var filteredEmptyHint: some View {
+        VStack(spacing: 8) {
+            Text(model.activeTagFilter.map { "No notes tagged #\($0)" } ?? "No notes")
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+            Button("Show all notes") {
+                withAnimation(.easeOut(duration: 0.15)) { model.activeTagFilter = nil }
+            }
+            .buttonStyle(.plain)
+            .font(.system(size: 12))
+            .foregroundStyle(Color.accentColor)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 40)
     }
 }
 
@@ -176,8 +234,11 @@ private struct CommentCardView: View {
                 .fill(Color(nsColor: .textBackgroundColor))
         )
         .overlay(
+            // The "jump-to" flash uses a neutral grey ring, not the note's highlight
+            // colour — a yellow memo flashed an alarming yellow border. Grey reads as
+            // a calm focus pulse regardless of the note's colour.
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(isFlashing ? accent : Color.primary.opacity(0.06),
+                .strokeBorder(isFlashing ? Color.secondary.opacity(0.55) : Color.primary.opacity(0.15),
                               lineWidth: isFlashing ? 2 : 1)
         )
         .shadow(color: .black.opacity(isHovering ? 0.07 : 0.04), radius: isHovering ? 8 : 5, y: 1)
@@ -230,7 +291,11 @@ private struct CommentCardView: View {
         VStack(alignment: .leading, spacing: 8) {
             if !tags.isEmpty {
                 FlowLayout(spacing: 6) {
-                    ForEach(tags, id: \.self) { NoteTagChip(tag: $0) }
+                    ForEach(tags, id: \.self) { tag in
+                        NoteTagChip(tag: tag, isActive: model.activeTagFilter == tag) {
+                            withAnimation(.easeOut(duration: 0.15)) { model.toggleTagFilter(tag) }
+                        }
+                    }
                 }
             }
 
@@ -287,12 +352,21 @@ private struct CommentCardView: View {
     }
 
     /// Handle a link tap in the card body. An `oak-note://<id>` reference jumps to
-    /// the linked memo (returning true to consume the click); other links fall
-    /// through to the default handler (open externally).
+    /// the linked memo. When the note belongs to a live web tab, a web link
+    /// navigates that tab's page in place — e.g. a YouTube `?t=209` link jumps to
+    /// that timestamp in the video you're watching, instead of bouncing out to an
+    /// external browser. Anything else falls through to the default handler.
     private func openURL(_ url: URL) -> Bool {
-        guard let id = NoteLink.id(from: url) else { return false }
-        model.focusCard(id: id)
-        return true
+        if let id = NoteLink.id(from: url) {
+            model.focusCard(id: id)
+            return true
+        }
+        if let doc = model.parent, doc.liveURL != nil || doc.state.currentURL != nil,
+           let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" {
+            NotificationCenter.default.post(name: .webViewLoadURL, object: doc, userInfo: ["url": url])
+            return true
+        }
+        return false
     }
 
     /// A native, tappable image thumbnail in a card — click opens it full screen.

@@ -1,8 +1,8 @@
 import Foundation
 
 /// Drives the right-panel **Comments** stream for a single document — a
-/// flomo-style, capture-first list. It surfaces every comment-bearing annotation
-/// row for the doc in one reverse-chronological stream:
+/// chat-to-self, capture-first list. It surfaces every comment-bearing annotation
+/// row for the doc in one chronological stream (oldest first, newest at bottom):
 ///   • freestanding **memos** (`positionKind == "memo"`, no anchor),
 ///   • selection-anchored notes (`pdf-overlay` / `web`, with a quoted source).
 ///
@@ -12,9 +12,40 @@ import Foundation
 final class CommentsViewModel {
     weak var parent: DocumentViewModel?
 
-    /// All comment cards for the current doc, newest first.
+    /// All comment cards for the current doc, oldest first (newest at the bottom).
+    /// Chat-to-self model: you jot at the bottom and the stream grows downward,
+    /// like Telegram Saved Messages / 微信文件传输助手.
     var cards: [AnnotationRecord] = []
     var isLoaded = false
+
+    /// When set, the stream shows only cards carrying this `#tag`. Document-scoped:
+    /// for a long, note-dense doc (a book / long paper) the per-doc note list IS a
+    /// corpus worth filtering. Cleared automatically when the tag no longer exists
+    /// (last note bearing it deleted) or when a new memo is added.
+    var activeTagFilter: String?
+
+    /// Distinct `#tags` across all cards in this doc, most-used first (ties → name).
+    /// Drives the filter bar; only worth showing when there are ≥2 distinct tags.
+    var allTags: [String] {
+        var counts: [String: Int] = [:]
+        for card in cards {
+            for tag in NoteTags.extract(card.comment ?? "") { counts[tag, default: 0] += 1 }
+        }
+        return counts.keys.sorted { a, b in
+            counts[a]! != counts[b]! ? counts[a]! > counts[b]! : a < b
+        }
+    }
+
+    /// Cards after applying `activeTagFilter` (all cards when no filter is set).
+    var filteredCards: [AnnotationRecord] {
+        guard let tag = activeTagFilter else { return cards }
+        return cards.filter { NoteTags.extract($0.comment ?? "").contains(tag) }
+    }
+
+    /// Toggle the stream's tag filter (tap the active tag again to clear it).
+    func toggleTagFilter(_ tag: String) {
+        activeTagFilter = (activeTagFilter == tag) ? nil : tag
+    }
 
     /// When set, the composer is writing the note for this just-created highlight
     /// (vs. a freestanding memo). `pendingQuote` is the highlighted source text,
@@ -30,6 +61,11 @@ final class CommentsViewModel {
     /// URL for the active composer to insert as a markdown image. Cleared once
     /// the composer consumes it.
     var pendingCaptureURL: String?
+
+    /// Retains the create composer's already-booted Milkdown `WKWebView` so
+    /// re-entering the Notes tab reuses it instead of reloading (which caused the
+    /// boot+fade "flick"). View-layer plumbing, not observable note state.
+    @ObservationIgnored let composerWebHolder = ComposerWebHolder()
 
     /// Route a finished area capture into the active note composer.
     func deliverCapturedImage(_ url: String) {
@@ -63,8 +99,10 @@ final class CommentsViewModel {
                 $0.deletedAt == nil
                     && ($0.comment?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
             }
-            .sorted { $0.createdAt > $1.createdAt }
+            .sorted { $0.createdAt < $1.createdAt }
         isLoaded = true
+        // Drop a filter whose tag no longer exists (its last note was deleted/edited).
+        if let tag = activeTagFilter, !allTags.contains(tag) { activeTagFilter = nil }
     }
 
     // MARK: - Anchored capture (selection → panel)
@@ -139,6 +177,10 @@ final class CommentsViewModel {
         guard let store,
               let attId = parent?.attachmentId,
               let itmId = parent?.itemId else { return false }
+
+        // A just-jotted note may not carry the filtered tag — clear the filter so
+        // it isn't hidden the moment it's created.
+        activeTagFilter = nil
 
         let now = Date().iso8601String
         let record = AnnotationRecord(

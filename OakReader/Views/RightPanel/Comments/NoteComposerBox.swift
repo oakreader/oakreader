@@ -30,20 +30,35 @@ struct NoteComposerBox: View {
     var onCaptureConsumed: (() -> Void)? = nil
     /// Other memos in this doc the `@` button can reference (flomo note-to-note link).
     var memos: [NoteRef] = []
+    /// When set (create composer only), reuse the document's already-booted editor
+    /// across Notes-tab visits instead of reloading — kills the boot+fade "flick".
+    var reuseHolder: ComposerWebHolder? = nil
 
     @State private var controller = MilkdownComposerController()
     @State private var isEmpty = true
     @State private var charCount = 0
-    @State private var height: CGFloat = 44
+    /// Formatting commands active at the caret (reported live by the editor), so
+    /// the toolbar can highlight the matching buttons — the affordance that tells
+    /// the user the same button toggles the style back off.
+    @State private var activeFormats: Set<String> = []
+    @State private var height: CGFloat = Self.minEditorHeight
+    /// Default writing area floor — a touch roomier than the AI chat input
+    /// (`ChatInputTextView.minContentHeight` = 40) so the composer invites a real
+    /// jot, without towering over it. The editor still grows past this with content.
+    private static let minEditorHeight: CGFloat = 60
     /// Images attached to this note, shown as a flomo-style thumbnail tray below
     /// the prose (kept out of the editor so they never crowd out the writing line).
     @State private var attachments: [String] = []
     @State private var didSeedAttachments = false
-    @State private var showFormat = false
     @State private var showMention = false
     @State private var mentionQuery = ""
     @State private var mentionAnchor: CGPoint = .zero
     @FocusState private var mentionFieldFocused: Bool
+    @Environment(\.colorScheme) private var colorScheme
+
+    /// Colours mirrored from `ChatCompletionPanel`'s `CompletionPalette` so the
+    /// note `@` picker reads as the *same* component as the chat `@`/`/` panel.
+    private var mentionPalette: MentionPalette { MentionPalette(isDark: colorScheme == .dark) }
 
     /// Send is allowed when there's prose *or* at least one attached image.
     private var canSend: Bool { !isEmpty || !attachments.isEmpty }
@@ -61,6 +76,8 @@ struct NoteComposerBox: View {
                     isEmpty: $isEmpty,
                     charCount: $charCount,
                     height: $height,
+                    activeFormats: $activeFormats,
+                    reuseHolder: reuseHolder,
                     onSubmit: send,
                     onMention: { point in
                         if let point { mentionAnchor = point }
@@ -75,7 +92,13 @@ struct NoteComposerBox: View {
                     .offset(x: mentionAnchor.x, y: mentionAnchor.y)
                     .popover(isPresented: $showMention, arrowEdge: .bottom) { mentionPicker }
             }
-            .frame(height: height)
+            .frame(height: max(height, Self.minEditorHeight), alignment: .topLeading)
+            // No height animation: animating the frame made it TRAIL the web
+            // content for ~100ms after each newline, and in that window the
+            // content was taller than the frame — so ProseMirror scrolled to keep
+            // the caret in view, yanking the first line up and back (the visible
+            // "晃一下" wobble). Growing the frame in lockstep with the content
+            // keeps the first line pinned.
 
             if !attachments.isEmpty {
                 attachmentTray
@@ -91,7 +114,7 @@ struct NoteComposerBox: View {
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .strokeBorder(
-                    mode == .edit ? Color.accentColor : OakStyle.Colors.border,
+                    mode == .edit ? Color.accentColor : Color.primary.opacity(0.15),
                     lineWidth: mode == .edit ? 1.5 : 1
                 )
         )
@@ -210,28 +233,23 @@ struct NoteComposerBox: View {
 
             toolDivider
 
-            Button { showFormat.toggle() } label: {
-                Image(systemName: "textformat")
-                    .font(.system(size: 14))
-                    .foregroundStyle(showFormat ? Color.accentColor : .secondary)
-                    .frame(width: 28, height: 28)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .help("Text format")
-            .popover(isPresented: $showFormat, arrowEdge: .top) {
-                HStack(spacing: 2) {
-                    formatButton("bold", "Bold") { controller.cmd("bold") }
-                    formatButton("italic", "Italic") { controller.cmd("italic") }
-                    formatButton("textformat.size", "Heading") { controller.cmd("heading") }
-                    formatButton("chevron.left.forwardslash.chevron.right", "Inline code") { controller.cmd("code") }
-                }
-                .padding(6)
-            }
+            // Inline-format toggles laid out flat in the bar (no `Aa` popover) —
+            // each is a single tap and lights up when active at the caret, matching
+            // flomo's flat capture toolbar.
+            toolButton("bold", active: activeFormats.contains("bold")) { controller.cmd("bold") }
+                .help("Bold")
+            toolButton("italic", active: activeFormats.contains("italic")) { controller.cmd("italic") }
+                .help("Italic")
+            toolButton("textformat.size", active: activeFormats.contains("heading")) { controller.cmd("heading") }
+                .help("Heading")
+            toolButton("chevron.left.forwardslash.chevron.right", active: activeFormats.contains("code")) { controller.cmd("code") }
+                .help("Inline code")
 
-            toolButton("list.bullet") { controller.cmd("bulletList") }
+            toolDivider
+
+            toolButton("list.bullet", active: activeFormats.contains("bulletList")) { controller.cmd("bulletList") }
                 .help("Bulleted list")
-            toolButton("list.number") { controller.cmd("orderedList") }
+            toolButton("list.number", active: activeFormats.contains("orderedList")) { controller.cmd("orderedList") }
                 .help("Numbered list")
 
             toolDivider
@@ -243,7 +261,7 @@ struct NoteComposerBox: View {
                     .frame(width: 28, height: 28)
                     .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ToolButtonStyle())
             .help("Reference a note")
 
             Spacer()
@@ -260,15 +278,17 @@ struct NoteComposerBox: View {
                     .padding(.horizontal, 4)
             }
 
+            // Matches the AI chat send button: a filled circle (primary when there's
+            // something to send, grey when not) with a bold up-arrow glyph.
             Button(action: send) {
-                Image(systemName: "paperplane.fill")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.white)
-                    .frame(width: 40, height: 28)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(canSend ? Color.accentColor : OakStyle.Colors.buttonBackground)
-                    )
+                ZStack {
+                    Circle()
+                        .fill(canSend ? Color.primary : Color.gray.opacity(0.3))
+                        .frame(width: 28, height: 28)
+                    Image(systemName: "arrow.up")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(Color(nsColor: .windowBackgroundColor))
+                }
             }
             .buttonStyle(.plain)
             .disabled(!canSend)
@@ -296,54 +316,48 @@ struct NoteComposerBox: View {
     }
 
     private var mentionPicker: some View {
-        VStack(spacing: 0) {
+        let palette = mentionPalette
+        return VStack(spacing: 0) {
+            // The picker can't observe keystrokes typed into the WKWebView editor
+            // (the native chat input filters inline because it owns its NSTextView),
+            // so it carries its own search field to filter the note list.
             HStack(spacing: 6) {
                 Image(systemName: "at")
                     .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                TextField("Search memos…", text: $mentionQuery)
+                    .foregroundStyle(palette.secondary)
+                TextField("Search notes…", text: $mentionQuery)
                     .textFieldStyle(.plain)
                     .font(.system(size: 13))
+                    .foregroundStyle(palette.title)
                     .focused($mentionFieldFocused)
             }
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 12)
             .padding(.vertical, 8)
 
-            Divider()
+            Rectangle().fill(palette.border).frame(height: 1)
 
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(filteredMemos) { ref in
-                        Button { insertReference(ref) } label: {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(ref.time)
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(.tertiary)
-                                Text(ref.preview.isEmpty ? "Untitled" : ref.preview)
-                                    .font(.system(size: 13))
-                                    .foregroundStyle(.primary)
-                                    .lineLimit(2)
-                                    .multilineTextAlignment(.leading)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 7)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(MentionRowStyle())
+                        MentionRow(ref: ref, palette: palette) { insertReference(ref) }
                     }
                     if filteredMemos.isEmpty {
                         Text(memos.isEmpty ? "No other notes yet" : "No matches")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.tertiary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(12)
+                            .font(.system(size: 13))
+                            .foregroundStyle(palette.secondary)
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                            .padding(.horizontal, 12)
                     }
                 }
+                // 6/5pt content inset matches the chat panel's card padding, so the
+                // selection pill insets the same 6pt from the card edge.
+                .padding(.horizontal, 6)
+                .padding(.vertical, 5)
             }
             .frame(maxHeight: 280)
         }
-        .frame(width: 320)
+        .frame(width: 300)
+        .background(palette.panel)
         .onAppear { mentionFieldFocused = true }
     }
 
@@ -365,28 +379,15 @@ struct NoteComposerBox: View {
         return oneLine.count > 24 ? String(oneLine.prefix(24)) + "…" : oneLine
     }
 
-    private func toolButton(_ system: String, _ action: @escaping () -> Void) -> some View {
+    private func toolButton(_ system: String, active: Bool = false, _ action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: system)
                 .font(.system(size: 14))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(active ? Color.accentColor : .secondary)
                 .frame(width: 28, height: 28)
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-    }
-
-    /// An icon button inside the `Aa` formatting popover.
-    private func formatButton(_ system: String, _ help: String, _ action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: system)
-                .font(.system(size: 14))
-                .foregroundStyle(.primary)
-                .frame(width: 32, height: 28)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .help(help)
+        .buttonStyle(ToolButtonStyle(active: active))
     }
 
     private var toolDivider: some View {
@@ -449,17 +450,94 @@ struct NoteComposerBox: View {
     }
 }
 
-/// A row in the `@` memo picker that highlights on hover / press.
-private struct MentionRowStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View { Row(configuration: configuration) }
+/// A plain icon button that lights up with a light-grey rounded background on
+/// hover (and a slightly darker one while pressed), used for the note toolbar's
+/// `#`/image/`Aa`/list/`@` icons so they read as tappable affordances.
+private struct ToolButtonStyle: ButtonStyle {
+    /// The button's style is currently ON at the caret — show a persistent
+    /// accent-tinted background so the user sees it's toggled (and can untoggle).
+    var active = false
 
-    private struct Row: View {
-        let configuration: Configuration
+    func makeBody(configuration: Configuration) -> some View {
+        StyleBody(configuration: configuration, active: active)
+    }
+
+    fileprivate struct StyleBody: View {
+        let configuration: ButtonStyleConfiguration
+        let active: Bool
         @State private var hovering = false
+
         var body: some View {
             configuration.label
-                .background((hovering || configuration.isPressed) ? Color.accentColor.opacity(0.12) : Color.clear)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(fill)
+                )
+                .animation(.easeOut(duration: 0.12), value: hovering)
+                .animation(.easeOut(duration: 0.12), value: active)
                 .onHover { hovering = $0 }
         }
+
+        private var fill: Color {
+            if active { return Color.accentColor.opacity(hovering ? 0.22 : 0.15) }
+            if configuration.isPressed { return Color.primary.opacity(0.12) }
+            return Color.primary.opacity(hovering ? 0.06 : 0)
+        }
     }
+}
+
+/// A row in the `@` note picker, styled to match the chat composer's completion
+/// panel (`ChatCompletionPanel`): 26pt tall, a leading glyph shown directly, the
+/// note preview as the title and the timestamp right-aligned, with an accent-blue
+/// selection pill and white text on hover.
+private struct MentionRow: View {
+    let ref: NoteRef
+    let palette: MentionPalette
+    let onSelect: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Image(systemName: "note.text")
+                .font(.system(size: 12.5, weight: .medium))
+                .foregroundStyle(hovering ? Color.white : palette.secondary)
+                .frame(width: 15)
+            Text(ref.preview.isEmpty ? "Untitled" : ref.preview)
+                .font(.system(size: 13))
+                .foregroundStyle(hovering ? Color.white : palette.title)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            Spacer(minLength: 10)
+            Text(ref.time)
+                .font(.system(size: 11))
+                .foregroundStyle(hovering ? Color.white.opacity(0.82) : palette.secondary)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 6)
+        .frame(height: 26)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(hovering ? palette.selection : Color.clear)
+        )
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 }
+        .onTapGesture(perform: onSelect)
+    }
+}
+
+/// SwiftUI mirror of `ChatCompletionPanel.CompletionPalette` — the same Dia 1.36
+/// values, so the note `@` picker and the chat `@`/`/` panel read as one component.
+private struct MentionPalette {
+    let isDark: Bool
+
+    var panel: Color {
+        isDark ? Color(.sRGB, red: 0x16 / 255, green: 0x16 / 255, blue: 0x17 / 255, opacity: 1) : .white
+    }
+    var border: Color { isDark ? Color.white.opacity(0.06) : Color.black.opacity(0.04) }
+    var selection: Color {
+        isDark ? Color(.sRGB, red: 0x2B / 255, green: 0x57 / 255, blue: 0xB7 / 255, opacity: 1)
+               : Color(.sRGB, red: 0x6A / 255, green: 0x9F / 255, blue: 0xF9 / 255, opacity: 1)
+    }
+    var title: Color { isDark ? Color(white: 0.91) : Color(white: 0.10) }
+    var secondary: Color { isDark ? Color(white: 0.56) : Color(white: 0.58) }
 }
