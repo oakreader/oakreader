@@ -66,6 +66,9 @@ tmp/
 # Cloudflare Wrangler
 .wrangler/
 
+# Dia reference app (local analysis copy)
+/Dia/
+
 # Keys and secrets
 *.pem
 *.p12
