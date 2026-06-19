@@ -259,11 +259,12 @@ struct MilkdownComposerView: NSViewRepresentable {
           .milkdown{background:transparent;box-shadow:none;border:none;}
           /* Right padding gives the end-of-line caret room — at 2px the insertion
              caret sat flush against (and clipped into) the last typed character. */
-          /* 13px matches the saved card body (StreamingMarkdownView .oak(fontSize: 13)
-             in CommentsPanelView), so typing is a true WYSIWYG of the card — no
-             size jump on send. */
-          .milkdown .ProseMirror{padding:2px 10px 0 2px;font-size:13px;line-height:1.5;}
-          .milkdown .ProseMirror p{margin:0 0 4px;}
+          /* Metrics mirror the saved card body (StreamingMarkdownView .oak() in
+             CommentsPanelView): 14px body, 1.4 line-height, 10px ¶ gap. Keeping all
+             three in sync makes typing a true WYSIWYG of the card — no size or
+             line-rhythm jump on send. */
+          .milkdown .ProseMirror{padding:2px 10px 0 2px;font-size:14px;line-height:1.4;}
+          .milkdown .ProseMirror p{margin:0 0 10px;}
           /* Inline #tag highlight (flomo-style) — accent text, no box, so it reads
              as a tag while staying natural to edit. Matches the card's tag chip. */
           .milkdown .ProseMirror .oak-tag{color:\(accentHex);font-weight:500;}

@@ -31,10 +31,10 @@ struct AIChatView: View {
     @State private var showUserMemory = false
 
     /// Body text size of the surrounding messages, so the composer and its token
-    /// chips match the rendered body ("正文") size: the dia theme's 15pt on the
-    /// canvas, the user-configurable size in the right panel.
+    /// chips match the rendered body ("正文") size — the shared 14pt prose token
+    /// (`oak()`'s default), used by chat and notes alike.
     private var bodyFontSize: CGFloat {
-        presentation == .canvas ? MarkdownTheme.dia.bodyFont.pointSize : MarkdownTheme.oak().bodyFont.pointSize
+        MarkdownTheme.oak().bodyFont.pointSize
     }
 
     var body: some View {

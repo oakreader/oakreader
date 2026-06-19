@@ -115,7 +115,7 @@ private struct NoteReadCard: View {
             }
 
             if !body0.isEmpty {
-                StreamingMarkdownView(markdown: body0, theme: .oak(fontSize: 13), onOpenURL: openURL)
+                StreamingMarkdownView(markdown: body0, theme: .oak(), onOpenURL: openURL)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
