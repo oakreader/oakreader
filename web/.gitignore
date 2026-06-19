@@ -3,3 +3,10 @@ node_modules/
 .wxt/
 SingleFile-MV3/
 extension/public/lib/
+
+# www (Next.js)
+www/.next/
+www/out/
+www/next-env.d.ts
+*.tsbuildinfo
+.vercel/
