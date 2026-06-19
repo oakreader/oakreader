@@ -524,10 +524,10 @@ private struct CommentCardView: View {
         } label: {
             HStack(spacing: 7) {
                 ZStack {
-                    Circle().fill(OakStyle.Colors.noteAccent.opacity(0.9)).frame(width: 18, height: 18)
+                    Circle().fill(OakStyle.Colors.noteAccent.opacity(0.14)).frame(width: 18, height: 18)
                     Image(systemName: "arrow.up.left")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(.white)
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(OakStyle.Colors.noteAccent)
                 }
                 Text(quoted)
                     .font(.system(size: 12))
