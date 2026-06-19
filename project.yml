@@ -57,6 +57,10 @@ settings:
     SWIFT_VERSION: "5.9"
     MACOSX_DEPLOYMENT_TARGET: "15.4"
     ENABLE_STRICT_OBJC_MSGSEND: YES
+    # Auto-harvest UI string literals into the String Catalog at build time so
+    # new strings can't ship as untranslated English silently.
+    SWIFT_EMIT_LOC_STRINGS: YES
+    LOCALIZATION_PREFERS_STRING_CATALOGS: YES
 
 targets:
   OakReader:

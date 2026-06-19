@@ -48,6 +48,18 @@ struct GeneralSettingsView: View {
             }
 
             Section {
+                LabeledContent("Language") {
+                    Button("Change in System Settings…") {
+                        SystemSettingsLauncher.language.open()
+                    }
+                }
+            } header: {
+                Text("Language")
+            } footer: {
+                Text("OakReader follows your system language. To use a different language just for OakReader, set a preferred language for it in System Settings.")
+            }
+
+            Section {
                 Picker("Search Engine", selection: $searchEngine) {
                     ForEach(BrowserSearchEngine.allCases) { engine in
                         Text(engine.displayName).tag(engine)
