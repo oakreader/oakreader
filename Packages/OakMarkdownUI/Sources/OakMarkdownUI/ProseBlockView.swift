@@ -97,6 +97,7 @@ struct ProseBlockView: NSViewRepresentable {
         }
         // Incremental: keep the common prefix (chars + attributes), replace only the
         // diverging suffix → TextKit re-lays-out just that glyph range (Dia's append-in-place).
+        let oldLength = ts.length
         let divergence = Self.firstDivergence(ts, attributed)
         if divergence == ts.length, divergence == attributed.length { return }
         let oldTail = NSRange(location: divergence, length: ts.length - divergence)
@@ -105,8 +106,18 @@ struct ProseBlockView: NSViewRepresentable {
         ts.beginEditing()
         ts.replaceCharacters(in: oldTail, with: newTail)
         ts.endEditing()
-        // Fade in the run that just changed (the streamed tail).
-        tv.fadeInAppendedText(NSRange(location: divergence, length: newTail.length))
+        // Fade in ONLY the genuinely-new trailing glyphs — [oldLength, end). The text is
+        // append-only, so anything before `oldLength` was already on screen; `divergence`
+        // can sit far earlier than that when late inline markdown finishes parsing (a
+        // link/citation, bold, or a list marker restyles text that was already visible).
+        // Re-fading that restyled-but-seen run from transparent on every delta is what made
+        // the streamed answer flicker and pop paragraph-by-paragraph. Snap any in-flight
+        // fade over the rewritten region to full opacity (so it isn't left stuck dim), then
+        // fade just the appended tail.
+        tv.finalizeFades(before: oldLength)
+        if attributed.length > oldLength {
+            tv.fadeInAppendedText(NSRange(location: oldLength, length: attributed.length - oldLength))
+        }
     }
 
     /// First index where the two attributed strings differ in character or attributes.

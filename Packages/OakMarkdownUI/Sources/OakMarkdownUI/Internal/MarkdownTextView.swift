@@ -241,6 +241,25 @@ final class MarkdownTextView: NSTextView {
         }
     }
 
+    /// Snap any in-flight fade that begins before `location` to full opacity and drop it.
+    /// Called when the streamed tail was rewritten (markdown reflow restyled already-visible
+    /// text): the stored fade ranges for that region are now stale, and letting `tickFades`
+    /// keep applying alpha to them re-dims text the reader has already seen — the flicker.
+    /// Restoring them to their real color and removing them leaves only the fresh tail fading.
+    func finalizeFades(before location: Int) {
+        guard let lm = layoutManager else { return }
+        var remaining: [(range: NSRange, start: TimeInterval)] = []
+        for fade in activeFades {
+            if fade.range.location < location {
+                clearFadeAlpha(fade.range, lm: lm)   // restore real color, full opacity
+            } else {
+                remaining.append(fade)
+            }
+        }
+        activeFades = remaining
+        if activeFades.isEmpty { stopFadeTimer() }
+    }
+
     private func tickFades() {
         guard let lm = layoutManager else { stopFadeTimer(); return }
         let now = ProcessInfo.processInfo.systemUptime
