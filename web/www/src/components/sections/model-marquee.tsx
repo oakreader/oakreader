@@ -1,19 +1,21 @@
 "use client";
 
-import {
-  Claude,
-  Cohere,
-  DeepSeek,
-  Gemini,
-  Grok,
-  LmStudio,
-  Meta,
-  Mistral,
-  Ollama,
-  OpenAI,
-  Perplexity,
-  Qwen,
-} from "@lobehub/icons";
+// Deep imports (not the "@lobehub/icons" barrel): the barrel re-exports
+// ./features → providerConfig → @lobehub/ui + antd, which breaks the static
+// prerender in `next build` (works in dev, fails at build). Importing each icon
+// by path pulls only that SVG component and keeps the bundle tiny.
+import Claude from "@lobehub/icons/es/Claude";
+import Cohere from "@lobehub/icons/es/Cohere";
+import DeepSeek from "@lobehub/icons/es/DeepSeek";
+import Gemini from "@lobehub/icons/es/Gemini";
+import Grok from "@lobehub/icons/es/Grok";
+import LmStudio from "@lobehub/icons/es/LmStudio";
+import Meta from "@lobehub/icons/es/Meta";
+import Mistral from "@lobehub/icons/es/Mistral";
+import Ollama from "@lobehub/icons/es/Ollama";
+import OpenAI from "@lobehub/icons/es/OpenAI";
+import Perplexity from "@lobehub/icons/es/Perplexity";
+import Qwen from "@lobehub/icons/es/Qwen";
 import { useReveal } from "@/hooks/use-reveal";
 
 type IconComponent = React.ComponentType<{ size?: number }>;
