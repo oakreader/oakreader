@@ -50,7 +50,10 @@ struct ItemPanelView: View {
             ReferenceMetadataView(
                 item: item,
                 store: store,
-                referenceService: refService
+                referenceService: refService,
+                onTitleChange: { newTitle in
+                    viewModel.appState?.updateTitle(for: viewModel, to: newTitle)
+                }
             )
         } else {
             notInLibraryState

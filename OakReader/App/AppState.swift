@@ -273,8 +273,13 @@ final class AppState {
         tab.viewModel.itemStorageKey = storageKey
         tab.viewModel.attachmentId = item?.primaryAttachment?.id.uuidString
 
-        // Use original filename (not "document.pdf" from managed storage)
-        tab.title = item?.fileName ?? url.lastPathComponent
+        // Prefer the item's metadata title; fall back to the original filename
+        // (not "document.pdf" from managed storage).
+        if let item {
+            tab.title = item.title.isEmpty ? item.fileName : item.title
+        } else {
+            tab.title = url.lastPathComponent
+        }
         NSDocumentController.shared.addDocument(doc)
         openTabs.append(tab)
         activeTabID = tab.id
@@ -418,8 +423,8 @@ final class AppState {
         tab.viewModel.itemStorageKey = item.storageKey
         tab.viewModel.attachmentId = item.primaryAttachment?.id.uuidString
 
-        // Use original filename from library item
-        tab.title = item.fileName
+        // Prefer the item's metadata title; fall back to the original filename.
+        tab.title = item.title.isEmpty ? item.fileName : item.title
         NSDocumentController.shared.addDocument(doc)
         openTabs.append(tab)
         activeTabID = tab.id
@@ -665,6 +670,17 @@ final class AppState {
 
     func updateWindowTitle() {
         window?.title = ""
+    }
+
+    /// Live-update an open tab's title after its reference metadata is edited.
+    /// Matches the tab by its document view model so the tab bar (and window
+    /// title) reflect the new metadata title without reopening the document.
+    func updateTitle(for viewModel: DocumentViewModel, to title: String) {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              let tab = openTabs.first(where: { $0.viewModel === viewModel }) else { return }
+        tab.title = trimmed
+        updateWindowTitle()
     }
 
     // MARK: - Undo Manager
