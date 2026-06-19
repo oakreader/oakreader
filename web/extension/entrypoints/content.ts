@@ -88,6 +88,20 @@ function toPageCapture(result: TranslatorResult): PageCapture {
   }
 }
 
+/** Fetch a cover image via the background SW (cross-origin host permissions) → base64. */
+async function fetchThumbnailBase64(url: string): Promise<string | null> {
+  try {
+    const result = (await chrome.runtime.sendMessage({
+      method: "fetchThumbnail",
+      url,
+      referrer: location.href,
+    })) as { base64?: string; error?: string } | undefined;
+    return result?.base64 ?? null;
+  } catch {
+    return null; // Best effort — app falls back to downloading thumbnailURL itself
+  }
+}
+
 // ─── Content Script Entry ───────────────────────────────────────────────────────
 
 export default defineContentScript({
@@ -110,7 +124,7 @@ export default defineContentScript({
           : getTranslator(location.href).extract(document, location.href);
 
         extraction
-          .then((result) => {
+          .then(async (result) => {
             const payload = toPageCapture(result);
 
             // Extract article markdown for AI chat context
@@ -120,6 +134,13 @@ export default defineContentScript({
               if (markdown) payload.markdown = markdown;
             } catch {
               // Best effort — save still works without markdown
+            }
+
+            // For link/embed clips, fetch the og:image bytes now — in-page we carry cookies
+            // and a real referer, so anti-bot/hotlink hosts (X, 小红书, bilibili) that block a
+            // later server-side re-fetch still serve the cover. App falls back to the URL.
+            if (payload.type === "embed" && payload.thumbnailURL) {
+              payload.thumbnailData = await fetchThumbnailBase64(payload.thumbnailURL);
             }
 
             sendResponse(payload);

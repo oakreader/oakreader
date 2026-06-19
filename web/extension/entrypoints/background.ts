@@ -76,6 +76,17 @@ export default defineBackground(() => {
       return true;
     }
 
+    // Fetch an og:image (or any cover) through the SW, which has cross-origin host
+    // permissions, and return it as base64 so the app stores it directly as a cover.
+    if (message.method === "fetchThumbnail") {
+      handleFetchThumbnail(message)
+        .then(sendResponse)
+        .catch((error) =>
+          sendResponse({ error: error instanceof Error ? error.message : String(error) })
+        );
+      return true;
+    }
+
     // Progress events from content script → popup receives directly via onMessage
     if (message.method === "singlefile.progress") {
       return false;
@@ -102,6 +113,31 @@ export default defineBackground(() => {
       headers,
       array: Array.from(new Uint8Array(arrayBuffer)),
     };
+  }
+
+  // ─── Thumbnail (og:image) Fetch → base64 ──────────────────────────────────────
+
+  async function handleFetchThumbnail(
+    message: { url: string; referrer?: string }
+  ): Promise<{ base64?: string; contentType?: string; error?: string }> {
+    // Referer = the page being clipped, so hotlink-protected CDNs (bilibili, weibo) serve it.
+    const response = await fetch(message.url, { referrer: message.referrer });
+    if (!response.ok) return { error: `HTTP ${response.status}` };
+
+    const contentType = response.headers.get("content-type") ?? "";
+    if (!contentType.startsWith("image/")) return { error: `not an image: ${contentType}` };
+
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    if (bytes.byteLength === 0) return { error: "empty image" };
+    if (bytes.byteLength > 5_000_000) return { error: "image too large" };
+
+    // Chunked btoa — String.fromCharCode.apply on the whole array overflows the call stack.
+    let binary = "";
+    const CHUNK = 0x8000;
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+    }
+    return { base64: btoa(binary), contentType };
   }
 
   // ─── SingleFile Script Injection ──────────────────────────────────────────────

@@ -443,8 +443,7 @@ final class OakServer {
             embedType: resolvedEmbedType
         )
 
-        // Download thumbnail if available
-        downloadData(from: payload.thumbnailURL) { thumbnailData in
+        let finish: (Data?) -> Void = { thumbnailData in
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
                 let item = self.importService.importEmbed(.init(
@@ -466,6 +465,16 @@ final class OakServer {
                     completion(.failure(OakReaderError.serverError("Embed import failed")))
                 }
             }
+        }
+
+        // Prefer the og:image bytes the extension already fetched in-page (cookies + referer,
+        // so anti-bot/hotlink hosts like X, 小红书, bilibili don't block it). Fall back to a
+        // server-side download of the URL; importEmbed then scrapes/sweeps as a last resort.
+        if let base64 = payload.thumbnailData,
+           let inlineData = Data(base64Encoded: base64), !inlineData.isEmpty {
+            finish(inlineData)
+        } else {
+            downloadData(from: payload.thumbnailURL) { finish($0) }
         }
     }
 
@@ -718,6 +727,7 @@ struct ClipPayload: Codable {
     let markdown: String?       // html & pdf — Defuddle/Turndown extracted text
     let duration: Int?
     let thumbnailURL: String?
+    let thumbnailData: String?  // base64 og:image bytes the extension fetched in-page
     let description: String?
     let cookies: String?        // pdf only — forwarded cookies for authenticated downloads
     let pdfData: String?         // pdf only — base64-encoded PDF from Page.printToPDF

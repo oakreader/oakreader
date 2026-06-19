@@ -16,6 +16,9 @@ export interface PageCapture {
   title: string | null;
   author?: string | null;
   thumbnailURL?: string | null;
+  /** Base64 og:image bytes fetched in-page (cookies + referer beat anti-bot hosts like
+   *  X, Instagram, 小红书). The app stores this cover directly instead of re-fetching the URL. */
+  thumbnailData?: string | null;
   description?: string | null;
   embedType?: "link";
   biblio?: BiblioMetadata;
