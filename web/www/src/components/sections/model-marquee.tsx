@@ -22,24 +22,25 @@ import type { Dictionary } from "@/i18n/get-dictionary";
 type IconComponent = React.ComponentType<{ size?: number }>;
 type Provider = { name: string; Icon: IconComponent };
 
-// Real brand marks via @lobehub/icons — the plain monochrome logo (default
-// export renders in currentColor), not the brand-color fills. Nominative use:
+// Real brand marks via @lobehub/icons — each logo in its own brand color
+// (.Color). OpenAI / Grok / Ollama / LM Studio ship mono-only marks (black by
+// design, no color variant), so those use the default logo. Nominative use:
 // shown to convey which models OakReader works with, no endorsement implied.
 // Llama uses Meta's mark (it's a Meta model).
 const row1: Provider[] = [
-  { name: "Claude", Icon: Claude },
+  { name: "Claude", Icon: Claude.Color },
   { name: "GPT", Icon: OpenAI },
-  { name: "Gemini", Icon: Gemini },
-  { name: "Llama", Icon: Meta },
-  { name: "Mistral", Icon: Mistral },
-  { name: "DeepSeek", Icon: DeepSeek },
+  { name: "Gemini", Icon: Gemini.Color },
+  { name: "Llama", Icon: Meta.Color },
+  { name: "Mistral", Icon: Mistral.Color },
+  { name: "DeepSeek", Icon: DeepSeek.Color },
 ];
 
 const row2: Provider[] = [
   { name: "Grok", Icon: Grok },
-  { name: "Qwen", Icon: Qwen },
-  { name: "Cohere", Icon: Cohere },
-  { name: "Perplexity", Icon: Perplexity },
+  { name: "Qwen", Icon: Qwen.Color },
+  { name: "Cohere", Icon: Cohere.Color },
+  { name: "Perplexity", Icon: Perplexity.Color },
   { name: "Ollama (local)", Icon: Ollama },
   { name: "LM Studio (local)", Icon: LmStudio },
 ];
