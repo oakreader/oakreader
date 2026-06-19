@@ -73,15 +73,17 @@ private final class ChatTokenCell: NSTextAttachmentCell {
     // MARK: - Drawing
 
     override func draw(withFrame cellFrame: NSRect, in controlView: NSView?) {
-        let rawAccent = NSColor.controlAccentColor
-        let softAccent = rawAccent
-            .blended(withFraction: 0.5, of: .tertiaryLabelColor) ?? rawAccent
+        // A library reference is passive context → a neutral grey chip. A skill is a
+        // command → the soft accent. (The sent-message badges mirror this split.)
+        let isReference: Bool = { if case .libraryReference = item.kind { return true }; return false }()
+        let tint: NSColor = isReference
+            ? .secondaryLabelColor
+            : (NSColor.controlAccentColor.blended(withFraction: 0.5, of: .tertiaryLabelColor) ?? .controlAccentColor)
 
-        // Borderless fill — a soft accent wash reads as a chip without the
-        // boxed-in look of a stroke.
+        // Borderless fill — a soft wash reads as a chip without the boxed-in look of a stroke.
         let bgRect = cellFrame.insetBy(dx: 0.5, dy: 0.5)
         let path = NSBezierPath(roundedRect: bgRect, xRadius: Self.cornerRadius, yRadius: Self.cornerRadius)
-        softAccent.withAlphaComponent(0.13).setFill()
+        tint.withAlphaComponent(isReference ? 0.10 : 0.13).setFill()
         path.fill()
 
         // Icon — tint to match label color
@@ -97,7 +99,7 @@ private final class ChatTokenCell: NSTextAttachmentCell {
             let configured = image.withSymbolConfiguration(config) ?? image
             let tinted = NSImage(size: iconRect.size, flipped: false) { drawRect in
                 configured.draw(in: drawRect, from: .zero, operation: .sourceOver, fraction: 1.0)
-                softAccent.set()
+                tint.set()
                 drawRect.fill(using: .sourceAtop)
                 return true
             }
@@ -109,7 +111,7 @@ private final class ChatTokenCell: NSTextAttachmentCell {
         let textX = iconRect.maxX + Self.iconTextGap
         let attrs: [NSAttributedString.Key: Any] = [
             .font: labelFont,
-            .foregroundColor: softAccent
+            .foregroundColor: tint
         ]
         let textSize = (displayLabel as NSString).size(withAttributes: attrs)
         let textY = cellFrame.minY + (cellFrame.height - textSize.height) / 2

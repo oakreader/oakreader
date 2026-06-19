@@ -1,12 +1,71 @@
 import AppKit
 
-/// A floating, sectioned completion panel for `/` commands.
+/// Resolved colour set for the completion panel, picked once at build time from the
+/// app's effective appearance. Every value below was reverse-engineered pixel-by-pixel
+/// from Dia 1.36's `@`/skill suggestion panel (`Attachments.AttachmentSuggestionsViewController`
+/// inside an `ARCUI.PopoverBackgroundView`) — see the spec table in the panel header.
+private struct CompletionPalette {
+    let isDark: Bool
+
+    /// Card fill. Dia: pure white in light, a deep near-black `#141415` in dark
+    /// (the popover reads *darker* than the surrounding command-bar chrome).
+    var panelBackground: NSColor {
+        isDark ? NSColor(srgbRed: 0x16 / 255, green: 0x16 / 255, blue: 0x17 / 255, alpha: 1)
+               : .white
+    }
+
+    /// Hairline card border — barely-there in light, a soft top-edge highlight in dark.
+    var border: NSColor {
+        isDark ? NSColor.white.withAlphaComponent(0.06)
+               : NSColor.black.withAlphaComponent(0.04)
+    }
+
+    /// Selected-row fill. Measured pixel mode: `#6A9FF9` (light) / `#2B57B7` (dark).
+    var selectionFill: NSColor {
+        isDark ? NSColor(srgbRed: 0x2B / 255, green: 0x57 / 255, blue: 0xB7 / 255, alpha: 1)
+               : NSColor(srgbRed: 0x6A / 255, green: 0x9F / 255, blue: 0xF9 / 255, alpha: 1)
+    }
+
+    /// Title text. `#1A1A1A` / `#E6E7E7` — i.e. ~labelColor.
+    var title: NSColor {
+        isDark ? NSColor(white: 0.91, alpha: 1) : NSColor(white: 0.10, alpha: 1)
+    }
+
+    /// Secondary / right-aligned source text and inline counts.
+    var secondary: NSColor {
+        isDark ? NSColor(white: 0.56, alpha: 1) : NSColor(white: 0.58, alpha: 1)
+    }
+
+    /// Section-header grey. Measured `#BEBEBE` in light; dimmer in dark.
+    var header: NSColor {
+        isDark ? NSColor(white: 0.50, alpha: 1) : NSColor(white: 0.72, alpha: 1)
+    }
+
+    /// Faint icon-tile fill for the few rows that read better with a chip
+    /// (currently unused — Dia shows glyphs directly with no tile).
+    var onSelectionText: NSColor { .white }
+    var onSelectionSecondary: NSColor { NSColor.white.withAlphaComponent(0.82) }
+}
+
+/// A floating, sectioned completion panel for `/` commands and `@` references.
 /// The panel intentionally mirrors the chat composer width so the trigger UI
 /// feels connected to the input instead of appearing as a detached menu.
+///
+/// Visuals are a faithful reproduction of Dia 1.36's command-bar suggestion panel,
+/// measured from a live screenshot (NOT guessed from asset tokens):
+///   • Card: white `#FFFFFF` / dark `#141415`, 14pt continuous corners, hairline
+///     border, soft drop shadow.
+///   • Row: 28pt tall, 16pt glyph shown directly (NO grey tile), 12pt left pad,
+///     8pt icon→title gap, 13.5pt title.
+///   • Selection: accent-blue pill (`#6A9FF9` / `#2B57B7`) with WHITE text/icon,
+///     8pt corners, 6pt horizontal inset from the card edge.
+///   • Header: UPPERCASE 11pt semibold grey (`#BEBEBE`) tracked ~0.5, left-aligned
+///     to the icon column.
 final class ChatCompletionPanel: NSPanel, AppResignDismissable {
 
     var resignObserver: NSObjectProtocol?
 
+    private let palette: CompletionPalette
     private var allItems: [ChatCompletionItem]
     private var filtered: [ChatCompletionItem]
     private var selectedIndex = 0
@@ -21,25 +80,33 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
     /// NSViews on every keystroke during incremental filtering.
     private var cachedRows: [String: ChatCompletionRowView] = [:]
     private var cachedHeaders: [String: ChatCompletionSectionHeaderView] = [:]
-    private lazy var emptyView = ChatCompletionEmptyView()
+    private lazy var emptyView = ChatCompletionEmptyView(palette: palette)
 
-    private let anchorPoint: NSPoint
+    /// The composer's frame in screen coordinates. The panel mirrors its width and
+    /// floats just above it (falling back to below when there's no room above).
+    private let anchorRect: NSRect
+    /// The visible frame of the screen the composer lives on (from `window.screen`),
+    /// so clamping never targets the wrong display on a multi-monitor setup.
+    private let screenVisibleFrame: NSRect
     private let panelWidth: CGFloat
-    private let windowFrame: NSRect
 
-    fileprivate static let rowHeight: CGFloat = 28
+    // Row metrics, measured from Dia (favicon pitch = 24pt; we add a touch of air
+    // for OakReader's slightly larger 13.5pt title → 28pt).
+    fileprivate static let rowHeight: CGFloat = 26
     fileprivate static let headerHeight: CGFloat = 22
-    fileprivate static let emptyHeight: CGFloat = 46
+    fileprivate static let emptyHeight: CGFloat = 44
     // ~9 rows tall, then scroll. Keeps the popup compact instead of ballooning to
     // fill the pane when a trigger (e.g. `@`) surfaces dozens of items.
-    private static let maxPanelHeight: CGFloat = 300
-    private static let minPanelWidth: CGFloat = 300
-    // Cap matches the canvas agent's composer column (AIChatView.canvasContentWidth)
-    // so the popup mirrors the input width there; the narrow right panel never
-    // reaches this cap.
-    private static let maxPanelWidth: CGFloat = 760
-    private static let horizontalInset: CGFloat = 14
-    private static let verticalInset: CGFloat = 10
+    private static let maxPanelHeight: CGFloat = 320
+    private static let minPanelWidth: CGFloat = 260
+    // Mirrors the chat composer width but capped tight — the popup should read as a
+    // compact suggestion menu (Dia's is ~260pt), never a pane-wide sheet.
+    private static let maxPanelWidth: CGFloat = 320
+    // Card content inset. The selection pill fills the full stack width, so this
+    // doubles as the selection's 6pt horizontal inset from the card edge (measured).
+    private static let horizontalInset: CGFloat = 6
+    private static let verticalInset: CGFloat = 5
+    private static let cornerRadius: CGFloat = 14
 
     var selectedItem: ChatCompletionItem? {
         guard selectedIndex >= 0, selectedIndex < filtered.count else { return nil }
@@ -52,17 +119,18 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
 
     init(
         items: [ChatCompletionItem],
-        at screenPoint: NSPoint,
-        width requestedWidth: CGFloat,
-        windowFrame: NSRect,
+        anchorRect: NSRect,
+        screenVisibleFrame: NSRect,
         onSelect: @escaping (ChatCompletionItem) -> Void
     ) {
         self.allItems = items
         self.filtered = items
-        self.anchorPoint = screenPoint
-        self.panelWidth = min(max(requestedWidth, Self.minPanelWidth), Self.maxPanelWidth)
-        self.windowFrame = windowFrame
+        self.anchorRect = anchorRect
+        self.screenVisibleFrame = screenVisibleFrame
+        self.panelWidth = min(max(anchorRect.width, Self.minPanelWidth), Self.maxPanelWidth)
         self.onSelect = onSelect
+        let isDark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        self.palette = CompletionPalette(isDark: isDark)
 
         super.init(
             contentRect: NSRect(x: 0, y: 0, width: panelWidth, height: 10),
@@ -74,7 +142,9 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
         isOpaque = false
         backgroundColor = .clear
         level = .floating
-        hasShadow = false
+        // A soft, rounded drop shadow (matched to the corner radius below) lifts the
+        // popup off the composer the way Dia's suggestion panel does.
+        hasShadow = true
         collectionBehavior = [.transient, .ignoresCycle]
 
         stackView.orientation = .vertical
@@ -94,13 +164,21 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
         documentView.addSubview(stackView)
         scrollView.documentView = documentView
 
+        // Dia's suggestion panel (`ARCUI.PopoverBackgroundView`) reads as a clean NEUTRAL
+        // card — white in light, a deep near-black `#161617` in dark. We render it as a
+        // SOLID opaque surface (not a `.behindWindow` vibrant material): the panel floats
+        // over the chat pane's own rounded cards, and a translucent frost let those show
+        // through — the "a background behind the background" artifact. Opaque kills that
+        // and also keeps the card from reading grey.
         let container = NSView()
         container.wantsLayer = true
-        container.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
-        container.layer?.cornerRadius = 12
+        container.layer?.backgroundColor = palette.panelBackground.cgColor
+        container.layer?.cornerRadius = Self.cornerRadius
         container.layer?.borderWidth = 0.5
-        container.layer?.borderColor = NSColor.labelColor.withAlphaComponent(0.12).cgColor
+        container.layer?.borderColor = palette.border.cgColor
+        container.layer?.cornerCurve = .continuous
         container.layer?.masksToBounds = true
+
         container.addSubview(scrollView)
         contentView = container
 
@@ -129,6 +207,11 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
 
         observeAppResign()
         orderFront(nil)
+        // Re-assert the frame AFTER ordering. `orderFront` relocates a window onto the
+        // active screen on first display (the real cause of the "flying off" on a
+        // secondary monitor); setting the frame again here pins it where we want. This
+        // single line is what actually holds the position — do not remove it.
+        sizeAndPosition()
         alphaValue = 0
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.10
@@ -138,6 +221,14 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
 
     deinit {
         removeAppResignObserver()
+    }
+
+    /// Neutralise AppKit's automatic window constraining. The default keeps a window's
+    /// title bar below the menu bar and on its screen, which — for a positioned,
+    /// borderless popup on a secondary display with a negative-origin coordinate space —
+    /// quietly relocates the panel ("flies off"). We position it ourselves.
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
+        frameRect
     }
 
     // MARK: - Filtering
@@ -204,7 +295,7 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
 
         for section in sectionedItems {
             let header = cachedHeaders[section.title] ?? {
-                let h = ChatCompletionSectionHeaderView(title: section.title)
+                let h = ChatCompletionSectionHeaderView(title: section.title, palette: palette)
                 cachedHeaders[section.title] = h
                 return h
             }()
@@ -215,6 +306,7 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
                 let row = cachedRows[item.id] ?? {
                     let r = ChatCompletionRowView(
                         item: item,
+                        palette: palette,
                         onHover: { [weak self] in
                             guard let self, let index = self.filtered.firstIndex(of: item) else { return }
                             self.selectedIndex = index
@@ -268,88 +360,125 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
     }
 
     private func sizeAndPosition() {
-        // Constrain to the parent window frame so the panel never extends
-        // beyond the application window edge.
-        let constraintRect = windowFrame
+        // Clamp against the composer window's frame (∩ its screen) — so the popup stays
+        // inside the chat pane and never spills past its right edge or onto another display.
+        let visible = screenVisibleFrame
         let margin: CGFloat = 8
+        let gap: CGFloat = 8
 
-        // Cap height to available space above the anchor within the window
-        let maxAvailableHeight = max(constraintRect.maxY - anchorPoint.y - margin * 2, 0)
-        let height = max(min(contentHeight(), Self.maxPanelHeight, max(maxAvailableHeight, Self.emptyHeight + Self.verticalInset * 2)), 0)
+        // Width never exceeds the composer's own span (the chat pane) — so the popup
+        // can't spill past the pane's right edge into the document — nor the screen.
+        let width = min(panelWidth, min(anchorRect.width, visible.width - margin * 2))
 
-        let maxX = constraintRect.maxX - panelWidth - margin
-        let x = min(max(anchorPoint.x, constraintRect.minX + margin), maxX)
-        let maxY = constraintRect.maxY - height - margin
-        let y = min(max(anchorPoint.y, constraintRect.minY + margin), maxY)
-        setFrame(NSRect(x: x, y: y, width: panelWidth, height: height), display: true)
+        // Horizontal: mirror the composer's left edge, kept inside the pane and screen.
+        let rightBound = min(visible.maxX - margin, anchorRect.maxX)
+        let x = min(max(anchorRect.minX, visible.minX + margin), rightBound - width)
+
+        // Vertical: prefer floating above the composer; fall back to below when the
+        // space above is too tight (e.g. composer dragged near the top of the screen).
+        let desired = min(contentHeight(), Self.maxPanelHeight)
+        let spaceAbove = visible.maxY - anchorRect.maxY - gap - margin
+        let spaceBelow = anchorRect.minY - visible.minY - gap - margin
+
+        let height: CGFloat
+        let y: CGFloat
+        if desired <= spaceAbove || spaceAbove >= spaceBelow {
+            height = max(min(desired, spaceAbove), Self.emptyHeight + Self.verticalInset * 2)
+            y = anchorRect.maxY + gap                 // panel bottom sits above the composer top
+        } else {
+            height = max(min(desired, spaceBelow), Self.emptyHeight + Self.verticalInset * 2)
+            y = anchorRect.minY - gap - height        // panel top sits below the composer bottom
+        }
+        setFrame(NSRect(x: x, y: y, width: width, height: height), display: true)
     }
 }
 
 // MARK: - Row View
 
 private final class ChatCompletionRowView: NSView {
+    private let palette: CompletionPalette
+    private let item: ChatCompletionItem
+    private let titleLabel: NSTextField
+    private let descLabel: NSTextField
+    private let iconView: NSImageView
     private let onHover: () -> Void
     private let onClick: () -> Void
     private var trackingArea: NSTrackingArea?
+    private var isHighlighted = false
 
-    init(item: ChatCompletionItem, onHover: @escaping () -> Void, onClick: @escaping () -> Void) {
+    // Measured from Dia: 16pt glyph shown directly (no tile), 12pt from the card edge.
+    // The card content already insets 6pt, so the icon adds the remaining 6pt here.
+    private static let iconSize: CGFloat = 15
+    private static let iconLeading: CGFloat = 6
+    private static let iconToTitle: CGFloat = 7
+    private static let selectionRadius: CGFloat = 8
+
+    init(
+        item: ChatCompletionItem,
+        palette: CompletionPalette,
+        onHover: @escaping () -> Void,
+        onClick: @escaping () -> Void
+    ) {
+        self.palette = palette
+        self.item = item
+        self.titleLabel = NSTextField(labelWithString: item.displayLabel)
+        self.descLabel = NSTextField(labelWithString: item.description)
+        self.iconView = NSImageView(frame: .zero)
         self.onHover = onHover
         self.onClick = onClick
         super.init(frame: .zero)
         wantsLayer = true
-        layer?.cornerRadius = 6
+        layer?.cornerRadius = Self.selectionRadius
+        layer?.cornerCurve = .continuous
         translatesAutoresizingMaskIntoConstraints = false
         heightAnchor.constraint(equalToConstant: ChatCompletionPanel.rowHeight).isActive = true
         toolTip = item.description
 
-        let iconShell = NSView()
-        iconShell.wantsLayer = true
-        iconShell.layer?.backgroundColor = NSColor.clear.cgColor
-        iconShell.translatesAutoresizingMaskIntoConstraints = false
-
-        let icon = NSImageView(frame: .zero)
+        // Glyph shown directly — no grey tile (matches Dia's favicons/SF symbols).
         if let img = SymbolStyle.filled(item.icon, accessibilityDescription: item.label) {
-            icon.image = img.withSymbolConfiguration(.init(pointSize: 14, weight: .regular))
-            icon.contentTintColor = item.completionTint
+            iconView.image = img.withSymbolConfiguration(.init(pointSize: 13.5, weight: .medium))
+            iconView.contentTintColor = item.completionTint
         }
-        icon.translatesAutoresizingMaskIntoConstraints = false
+        iconView.translatesAutoresizingMaskIntoConstraints = false
 
-        let label = NSTextField(labelWithString: item.displayLabel)
-        label.font = .systemFont(ofSize: 14, weight: .regular)
-        label.textColor = .labelColor
-        label.lineBreakMode = .byTruncatingTail
-        label.translatesAutoresizingMaskIntoConstraints = false
-        label.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
+        titleLabel.font = .systemFont(ofSize: 13, weight: .regular)
+        titleLabel.textColor = palette.title
+        titleLabel.lineBreakMode = .byTruncatingTail
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        // LOW compression resistance: a long @-mention title must TRUNCATE, never widen
+        // the row. With high resistance the label refuses to shrink and AutoLayout grows
+        // the panel's fitting width instead (the popup window then adopts it) — which is
+        // why long document titles ballooned the panel past its width clamp.
+        titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        titleLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
-        let desc = NSTextField(labelWithString: item.description)
-        desc.font = .systemFont(ofSize: 12)
-        desc.textColor = .secondaryLabelColor
-        desc.lineBreakMode = .byTruncatingTail
-        desc.translatesAutoresizingMaskIntoConstraints = false
-        desc.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        descLabel.font = .systemFont(ofSize: 11)
+        descLabel.textColor = palette.secondary
+        descLabel.alignment = .right
+        descLabel.lineBreakMode = .byTruncatingTail
+        descLabel.translatesAutoresizingMaskIntoConstraints = false
+        descLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        descLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
-        addSubview(iconShell)
-        iconShell.addSubview(icon)
-        addSubview(label)
-        addSubview(desc)
+        addSubview(iconView)
+        addSubview(titleLabel)
+        addSubview(descLabel)
 
         NSLayoutConstraint.activate([
-            iconShell.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 6),
-            iconShell.centerYAnchor.constraint(equalTo: centerYAnchor),
-            iconShell.widthAnchor.constraint(equalToConstant: 20),
-            iconShell.heightAnchor.constraint(equalToConstant: 20),
+            iconView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Self.iconLeading),
+            iconView.centerYAnchor.constraint(equalTo: centerYAnchor),
+            iconView.widthAnchor.constraint(equalToConstant: Self.iconSize),
+            iconView.heightAnchor.constraint(equalToConstant: Self.iconSize),
 
-            icon.centerXAnchor.constraint(equalTo: iconShell.centerXAnchor),
-            icon.centerYAnchor.constraint(equalTo: iconShell.centerYAnchor),
-            icon.widthAnchor.constraint(equalToConstant: 16),
-            icon.heightAnchor.constraint(equalToConstant: 16),
+            titleLabel.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: Self.iconToTitle),
+            titleLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
 
-            label.leadingAnchor.constraint(equalTo: iconShell.trailingAnchor, constant: 6),
-            label.centerYAnchor.constraint(equalTo: centerYAnchor),
-
-            desc.leadingAnchor.constraint(equalTo: label.trailingAnchor, constant: 8),
-            desc.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -8),
-            desc.centerYAnchor.constraint(equalTo: centerYAnchor),
+            // Bound the title's trailing edge so a long @-mention label (which often has
+            // no right-aligned description to pin against) truncates instead of spilling
+            // past the row/panel edge.
+            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: descLabel.leadingAnchor, constant: -10),
+            descLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
+            descLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
     }
 
@@ -357,9 +486,13 @@ private final class ChatCompletionRowView: NSView {
     required init?(coder: NSCoder) { fatalError() }
 
     func setHighlighted(_ on: Bool) {
-        layer?.backgroundColor = on
-            ? NSColor.labelColor.withAlphaComponent(0.065).cgColor
-            : NSColor.clear.cgColor
+        isHighlighted = on
+        // Accent-blue pill with WHITE text/icon when selected (Dia parity); fully
+        // transparent otherwise so the card fill shows through.
+        layer?.backgroundColor = on ? palette.selectionFill.cgColor : NSColor.clear.cgColor
+        titleLabel.textColor = on ? palette.onSelectionText : palette.title
+        descLabel.textColor = on ? palette.onSelectionSecondary : palette.secondary
+        iconView.contentTintColor = on ? palette.onSelectionText : item.completionTint
     }
 
     override func updateTrackingAreas() {
@@ -385,21 +518,29 @@ private final class ChatCompletionRowView: NSView {
 // MARK: - Header / Empty Views
 
 private final class ChatCompletionSectionHeaderView: NSView {
-    init(title: String) {
+    init(title: String, palette: CompletionPalette) {
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
         heightAnchor.constraint(equalToConstant: ChatCompletionPanel.headerHeight).isActive = true
 
-        let label = NSTextField(labelWithString: title)
-        label.font = .systemFont(ofSize: 11, weight: .medium)
-        label.textColor = .tertiaryLabelColor
+        // UPPERCASE, 11pt semibold, tracked ~0.5, grey — left-aligned to the icon column
+        // (12pt from the card edge: 6pt card inset + 6pt to match the row's icon leading).
+        let label = NSTextField(labelWithString: title.uppercased())
+        label.attributedStringValue = NSAttributedString(
+            string: title.uppercased(),
+            attributes: [
+                .font: NSFont.systemFont(ofSize: 11, weight: .semibold),
+                .foregroundColor: palette.header,
+                .kern: 0.5,
+            ]
+        )
         label.translatesAutoresizingMaskIntoConstraints = false
         addSubview(label)
 
         NSLayoutConstraint.activate([
-            label.leadingAnchor.constraint(equalTo: leadingAnchor),
+            label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 6),
             label.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor),
-            label.centerYAnchor.constraint(equalTo: centerYAnchor),
+            label.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -4),
         ])
     }
 
@@ -408,19 +549,19 @@ private final class ChatCompletionSectionHeaderView: NSView {
 }
 
 private final class ChatCompletionEmptyView: NSView {
-    init() {
+    init(palette: CompletionPalette) {
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
         heightAnchor.constraint(equalToConstant: ChatCompletionPanel.emptyHeight).isActive = true
 
         let label = NSTextField(labelWithString: "No matches")
-        label.font = .systemFont(ofSize: 14, weight: .medium)
-        label.textColor = .secondaryLabelColor
+        label.font = .systemFont(ofSize: 13, weight: .regular)
+        label.textColor = palette.secondary
         label.translatesAutoresizingMaskIntoConstraints = false
         addSubview(label)
 
         NSLayoutConstraint.activate([
-            label.leadingAnchor.constraint(equalTo: leadingAnchor),
+            label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
             label.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor),
             label.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
@@ -435,13 +576,8 @@ private final class CompletionDocumentView: NSView {
 }
 
 private extension ChatCompletionItem {
-    var completionTint: NSColor {
-        switch kind {
-        case .installedSkill:
-            return NSColor.controlAccentColor
-                .blended(withFraction: 0.5, of: .tertiaryLabelColor) ?? .controlAccentColor
-        case .libraryReference:
-            return .systemOrange
-        }
-    }
+    /// Neutral monochrome glyph for every row (skills and library refs alike). Tinting
+    /// each symbol its own accent/orange read as noisy; Dia keeps the icon column calm
+    /// and grey, letting the selection pill be the only colour. White when selected.
+    var completionTint: NSColor { .secondaryLabelColor }
 }

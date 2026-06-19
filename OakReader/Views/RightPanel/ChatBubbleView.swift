@@ -414,15 +414,23 @@ struct ChatBubbleView: View, Equatable {
     }
 
     private func referenceBadge(_ title: String, icon: String) -> some View {
+        // A neutral light-grey chip (not the old hard-orange, and not the accent used
+        // for skill commands): a reference is passive context, so it reads as a quiet
+        // chip in the app's grey palette — muted secondary text on a faint fill.
         HStack(spacing: 3) {
             Image(systemName: icon)
                 .font(OakStyle.ChatFont.badge)
-                .opacity(0.8)
             Text(title)
                 .font(OakStyle.ChatFont.badge)
                 .lineLimit(1)
         }
-        .foregroundStyle(Color.orange)
+        .foregroundStyle(OakStyle.Colors.textSecondary)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(
+            RoundedRectangle(cornerRadius: 4)
+                .fill(Color.primary.opacity(0.06))
+        )
         .fixedSize()
     }
 

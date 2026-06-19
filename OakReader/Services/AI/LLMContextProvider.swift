@@ -410,6 +410,21 @@ struct LLMContextProvider {
                 """)
         }
 
+        // Referenced documents (the user's `@`-mentions). These arrive as a
+        // <referenced-documents> block in the user message carrying only metadata —
+        // the body is NOT inlined. The model must fetch it itself rather than ask the
+        // user to summarize or open it.
+        parts.append("""
+            When the user message contains a <referenced-documents> block, the user has \
+            attached those library documents as context. Only their metadata is given — \
+            NOT their text. Before answering anything about a referenced document, READ \
+            it yourself: call `oak items read "<title-or-cite-key>" [--pages N-M]` (use \
+            the <doc> element's `read-with` attribute, or its title / cite-key), and \
+            `search <query>` to locate a passage. Never reply that you "haven't read it" \
+            or ask the user to summarize/open it — you have the tools, so use them, then \
+            answer and cite with oak://cite/...
+            """)
+
         // GROUNDED mode — scoped to a real collection. Retrieval (search_content /
         // research) is already PHYSICALLY restricted to this collection's members,
         // so the model cannot accidentally pull from the rest of the library.

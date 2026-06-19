@@ -403,13 +403,12 @@ final class ChatNSTextView: NSTextView {
         triggerChar = trigger
         triggerLocation = selectedRange().location - 1  // before the trigger char we just inserted
 
-        guard let anchor = popupAnchor() else { return }
+        guard let composerRect = composerScreenRect() else { return }
 
         completionPanel = ChatCompletionPanel(
             items: items,
-            at: anchor.point,
-            width: anchor.width,
-            windowFrame: anchor.windowFrame
+            anchorRect: composerRect,
+            screenVisibleFrame: composerScreenVisibleFrame()
         ) { [weak self] item in
             self?.insertToken(item)
         }
@@ -613,24 +612,33 @@ final class ChatNSTextView: NSTextView {
         onTokensChanged?(activeTokens())
     }
 
-    /// Computes the screen point, width, and window frame for the completion popup.
-    /// It is anchored to the input region so the popup aligns with the composer.
-    private func popupAnchor() -> (point: NSPoint, width: CGFloat, windowFrame: NSRect)? {
+    /// The composer's frame in *screen* coordinates, used to anchor the completion
+    /// popup so it mirrors the input width and floats just above it — the way Dia's
+    /// command bar surfaces its suggestions.
+    ///
+    /// We convert the whole rect with `convertToScreen(_:)` (not a single point via
+    /// `convertPoint(toScreen:)`, which mislocated the panel inside the SwiftUI-hosted
+    /// scroll view) and let the panel clamp itself to the screen's visible frame.
+    private func composerScreenRect() -> NSRect? {
         guard let window else { return nil }
+        // The input's own rect in screen coordinates. `convert(_:to:nil)` → `convertToScreen`
+        // is accurate here (the earlier "flying" was AppKit's `constrainFrameRect`, not a
+        // bad conversion). Anchoring to the input rect keeps the popup exactly as wide as
+        // the input and left-aligned to it, so it never overflows the chat pane.
         let sourceView: NSView = enclosingScrollView ?? self
-        let inputRect = sourceView.convert(sourceView.bounds, to: nil)
-        let composerHorizontalPadding: CGFloat = 14
-        let composerTopPadding: CGFloat = 12
-        let popupGap: CGFloat = 8
-        let anchor = NSPoint(
-            x: inputRect.minX - composerHorizontalPadding,
-            y: inputRect.maxY + composerTopPadding + popupGap
-        )
-        return (
-            window.convertPoint(toScreen: anchor),
-            inputRect.width + composerHorizontalPadding * 2,
-            window.frame
-        )
+        let onScreen = window.convertToScreen(sourceView.convert(sourceView.bounds, to: nil))
+        // Zero-height anchor line spanning the input width, sitting just above its top edge.
+        return NSRect(x: onScreen.minX, y: onScreen.maxY + 8, width: onScreen.width, height: 0)
+    }
+
+    /// The rect the popup must stay inside: the composer window's frame intersected with
+    /// its screen's visible frame. Clamping to the *window* (not the whole screen) is what
+    /// keeps the popup from spilling past the chat pane's right edge.
+    private func composerScreenVisibleFrame() -> NSRect {
+        let screenVisible = (window?.screen ?? NSScreen.main)?.visibleFrame ?? (NSScreen.main?.frame ?? .zero)
+        guard let windowFrame = window?.frame else { return screenVisible }
+        let clamped = NSIntersectionRect(windowFrame, screenVisible)
+        return clamped.isEmpty ? screenVisible : clamped
     }
 
     // MARK: - Override text changes to track token deletions

@@ -114,10 +114,12 @@ private struct AttachmentCard: View {
                 .buttonStyle(.plain)
                 .help("Click to view full size")
                 .popover(isPresented: $showPreview, arrowEdge: .leading) {
+                    // Hug the image's aspect ratio so the popover isn't a fixed
+                    // square with empty space around a wide/tall capture.
+                    let size = previewSize(for: image)
                     Image(nsImage: image)
                         .resizable()
-                        .scaledToFit()
-                        .frame(maxWidth: 640, maxHeight: 640)
+                        .frame(width: size.width, height: size.height)
                         .padding(8)
                 }
         } else {
@@ -141,6 +143,16 @@ private struct AttachmentCard: View {
                 .padding(.horizontal, 7)
                 .padding(.vertical, 5)
         }
+    }
+
+    /// Full-size preview dimensions: the image's real aspect ratio scaled into a
+    /// bounding box, so the popover hugs the picture (no empty square).
+    private func previewSize(for image: NSImage) -> CGSize {
+        let maxW: CGFloat = 720, maxH: CGFloat = 560
+        let s = image.size
+        guard s.width > 0, s.height > 0 else { return CGSize(width: 320, height: 240) }
+        let scale = min(maxW / s.width, maxH / s.height)
+        return CGSize(width: (s.width * scale).rounded(), height: (s.height * scale).rounded())
     }
 
     /// Text-selection (or an image whose data didn't load): icon + label + quote.
