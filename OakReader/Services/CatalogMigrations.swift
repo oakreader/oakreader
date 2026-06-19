@@ -9,6 +9,16 @@ extension CatalogDatabase {
     /// The schema is defined as a sequence of grouped migrations, each owning one
     /// cohesive area of the model. Once this app has shipped, never edit a migration
     /// in place — add a new `vN-…` step instead.
+    /// Current schema version, derived from the number of registered migrations.
+    ///
+    /// This is the single source of truth for the schema version — backup
+    /// manifests and the restore compatibility check both read it, so they can
+    /// never drift from the actual migrations. Bumps automatically whenever a
+    /// new `vN-…` migration is appended.
+    static var currentSchemaVersion: Int {
+        migrator.migrations.count
+    }
+
     static var migrator: DatabaseMigrator {
         var migrator = DatabaseMigrator()
 
