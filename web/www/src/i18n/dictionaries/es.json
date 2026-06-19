@@ -1,0 +1,61 @@
+{
+  "meta": {
+    "title": "Oak | La biblioteca de contexto para ti y tu agente",
+    "description": "Oak reúne todo lo que lees en un solo lugar y le añade un agente de investigación con IA que lo recorre todo para buscar y responder — con citas que puedes abrir."
+  },
+  "nav": {
+    "download": "Descargar",
+    "language": "Idioma"
+  },
+  "hero": {
+    "badge": "Acceso anticipado · macOS",
+    "tagline": "Un agente de investigación para todo lo que lees.",
+    "headline1": "Léelo todo.",
+    "headline2": "Compréndelo todo.",
+    "subhead": "Reúne todo lo que lees en un solo lugar y deja que una IA lo recorra para buscar y responder, con citas que puedes abrir.",
+    "bringYour": "Trae tus",
+    "pills": ["PDF", "Artículos", "Páginas web", "Libros"],
+    "cta": "Descargar gratis",
+    "ctaNote": "Disponible en macOS · Sin tarjeta de crédito",
+    "shotAlt": "Oak responde una pregunta en contexto, con fórmulas y Markdown renderizados"
+  },
+  "bento": {
+    "eyebrow": "Biblioteca de contexto",
+    "title": "Tus fuentes, tus notas y tus respuestas en un solo lugar.",
+    "cards": {
+      "ask": {
+        "eyebrow": "Preguntar",
+        "title": "Leer entre líneas",
+        "desc": "Abre cualquier documento y pregúntale a Oak qué significa — con respuestas en contexto, notas con formato, código y fórmulas renderizadas.",
+        "alt": "Oak responde una pregunta en contexto, con fórmulas y Markdown renderizados"
+      },
+      "browse": {
+        "eyebrow": "Navegar",
+        "title": "La web, sin salir de la app",
+        "desc": "Busca, abre un enlace o pregúntale a la IA en una pestaña nueva. Lee páginas en vivo con tus sesiones activas y guarda lo que importa.",
+        "alt": "La búsqueda de nueva pestaña del navegador integrado de Oak, dirigida a la web o a la IA"
+      },
+      "library": {
+        "eyebrow": "Biblioteca",
+        "title": "Todo lo que guardas, con búsqueda",
+        "desc": "Cada PDF, artículo y captura web en colecciones y etiquetas — búsqueda de texto completo que incluso entiende el chino, el japonés y el coreano.",
+        "alt": "La biblioteca de Oak con colecciones, etiquetas y búsqueda de texto completo"
+      },
+      "oakai": {
+        "eyebrow": "OakAI",
+        "title": "Un compañero que lo ha leído todo",
+        "desc": "Conversa con un asistente que conoce toda tu biblioteca y responde con citas que puedes abrir y verificar.",
+        "alt": "El asistente OakAI de Oak responde a partir de toda la biblioteca"
+      }
+    }
+  },
+  "models": {
+    "eyebrow": "Independiente del modelo",
+    "title": "Usa cualquier modelo. Cambia cuando quieras.",
+    "subhead": "El mejor cerebro para cada pregunta — desde los laboratorios punteros hasta un modelo local en tu Mac. Tú eliges, siempre."
+  },
+  "footer": {
+    "copyright": "Copyright",
+    "builtBy": "Diseñado y desarrollado por"
+  }
+}

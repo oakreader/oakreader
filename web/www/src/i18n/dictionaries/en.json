@@ -1,0 +1,61 @@
+{
+  "meta": {
+    "title": "Oak | The Context Library for you and your agent",
+    "description": "Oak keeps everything you read in one place, then puts an AI research agent on top that searches and answers across all of it — with citations you can open."
+  },
+  "nav": {
+    "download": "Download",
+    "language": "Language"
+  },
+  "hero": {
+    "badge": "Early Access · macOS",
+    "tagline": "A research agent for everything you read.",
+    "headline1": "Read everything.",
+    "headline2": "Understand anything.",
+    "subhead": "Keep everything you read in one place — then let an AI search and answer across all of it, with citations you can open.",
+    "bringYour": "Bring your",
+    "pills": ["PDFs", "Papers", "Web pages", "Books"],
+    "cta": "Download for Free",
+    "ctaNote": "Available on macOS · No credit card required",
+    "shotAlt": "Oak answering a question in context with rendered math and markdown"
+  },
+  "bento": {
+    "eyebrow": "Context Library",
+    "title": "Your sources, notes, and answers in one place.",
+    "cards": {
+      "ask": {
+        "eyebrow": "Ask",
+        "title": "Read between the lines",
+        "desc": "Open any document and ask Oak what it means — answered in context with formatted notes, code, and rendered math.",
+        "alt": "Oak answering a question in context with rendered math and markdown"
+      },
+      "browse": {
+        "eyebrow": "Browse",
+        "title": "The web, without leaving",
+        "desc": "Search, open a link, or just ask the AI in a new tab. Read live pages with your logins intact, then capture what matters.",
+        "alt": "Oak's in-app browser new-tab search routing to the web or the AI"
+      },
+      "library": {
+        "eyebrow": "Library",
+        "title": "Everything you keep, searchable",
+        "desc": "Every PDF, article, and web snapshot in collections and tags — full-text search that even understands 中日韩.",
+        "alt": "Oak's library with collections, tags, and full-text search"
+      },
+      "oakai": {
+        "eyebrow": "OakAI",
+        "title": "A partner that read it all",
+        "desc": "Chat with an assistant that knows your whole library and answers with citations you can open and check.",
+        "alt": "Oak's OakAI assistant answering from across the library"
+      }
+    }
+  },
+  "models": {
+    "eyebrow": "Model-agnostic",
+    "title": "Use any model. Switch anytime.",
+    "subhead": "The best brain for each question — from the frontier labs to a local model running on your Mac. Your choice, every time."
+  },
+  "footer": {
+    "copyright": "Copyright",
+    "builtBy": "Designed and Built by"
+  }
+}

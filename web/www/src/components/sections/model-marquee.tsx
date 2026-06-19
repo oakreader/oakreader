@@ -17,6 +17,7 @@ import OpenAI from "@lobehub/icons/es/OpenAI";
 import Perplexity from "@lobehub/icons/es/Perplexity";
 import Qwen from "@lobehub/icons/es/Qwen";
 import { useReveal } from "@/hooks/use-reveal";
+import type { Dictionary } from "@/i18n/get-dictionary";
 
 type IconComponent = React.ComponentType<{ size?: number }>;
 type Provider = { name: string; Icon: IconComponent };
@@ -87,7 +88,7 @@ function MarqueeRow({
   );
 }
 
-export function ModelMarquee() {
+export function ModelMarquee({ dict }: { dict: Dictionary["models"] }) {
   const headingRef = useReveal<HTMLDivElement>();
 
   return (
@@ -101,14 +102,13 @@ export function ModelMarquee() {
         className="text-center px-[2rem] mb-[4rem] md:mb-[6rem] max-w-[120rem] mx-auto"
       >
         <p className="font-mono uppercase tracking-[0.1em] text-[1.2rem] text-black/35 mb-[1.6rem]">
-          Model-agnostic
+          {dict.eyebrow}
         </p>
         <h2 className="font-exposure font-bold text-[3.2rem] md:text-[4rem] lg:text-[4.8rem] leading-[1.15] tracking-[-0.01em] text-balance">
-          Use any model. Switch anytime.
+          {dict.title}
         </h2>
         <p className="font-sans mt-[2.4rem] text-[1.7rem] md:text-[1.9rem] leading-[1.6] text-black/50 max-w-[46ch] mx-auto text-pretty">
-          The best brain for each question &mdash; from the frontier labs to a
-          local model running on your Mac. Your choice, every time.
+          {dict.subhead}
         </p>
       </div>
 

@@ -1,0 +1,61 @@
+{
+  "meta": {
+    "title": "Oak | Die Kontext-Bibliothek für dich und deinen Agenten",
+    "description": "Oak bewahrt alles Gelesene an einem Ort und setzt einen KI-Recherche-Agenten darauf, der das gesamte Material durchsucht und beantwortet – mit Belegen, die du öffnen kannst."
+  },
+  "nav": {
+    "download": "Herunterladen",
+    "language": "Sprache"
+  },
+  "hero": {
+    "badge": "Early Access · macOS",
+    "tagline": "Ein Recherche-Agent für alles, was du liest.",
+    "headline1": "Alles lesen.",
+    "headline2": "Alles begreifen.",
+    "subhead": "Sammle alles Gelesene an einem Ort – und lass eine KI darin suchen und antworten, mit Belegen, die du öffnen kannst.",
+    "bringYour": "Bring deine",
+    "pills": ["PDFs", "Aufsätze", "Webseiten", "Bücher"],
+    "cta": "Kostenlos herunterladen",
+    "ctaNote": "Für macOS · Keine Kreditkarte nötig",
+    "shotAlt": "Oak beantwortet eine Frage im Kontext, mit gesetzten Formeln und Markdown"
+  },
+  "bento": {
+    "eyebrow": "Kontext-Bibliothek",
+    "title": "Deine Quellen, Notizen und Antworten an einem Ort.",
+    "cards": {
+      "ask": {
+        "eyebrow": "Fragen",
+        "title": "Zwischen den Zeilen lesen",
+        "desc": "Öffne ein beliebiges Dokument und frag Oak, was es bedeutet – beantwortet im Kontext, mit formatierten Notizen, Code und gesetzten Formeln.",
+        "alt": "Oak beantwortet eine Frage im Kontext, mit gesetzten Formeln und Markdown"
+      },
+      "browse": {
+        "eyebrow": "Surfen",
+        "title": "Das Web, ohne die App zu verlassen",
+        "desc": "Suche, öffne einen Link oder frag einfach die KI in einem neuen Tab. Lies Live-Seiten mit deinen Logins und sichere, was zählt.",
+        "alt": "Die Neuer-Tab-Suche von Oaks integriertem Browser leitet ins Web oder zur KI"
+      },
+      "library": {
+        "eyebrow": "Bibliothek",
+        "title": "Alles, was du sammelst – durchsuchbar",
+        "desc": "Jedes PDF, jeder Artikel und jeder Web-Snapshot in Sammlungen und Tags – Volltextsuche, die sogar CJK (Chinesisch, Japanisch, Koreanisch) versteht.",
+        "alt": "Oaks Bibliothek mit Sammlungen, Tags und Volltextsuche"
+      },
+      "oakai": {
+        "eyebrow": "OakAI",
+        "title": "Ein Partner, der alles gelesen hat",
+        "desc": "Chatte mit einem Assistenten, der deine ganze Bibliothek kennt und mit Belegen antwortet, die du öffnen und prüfen kannst.",
+        "alt": "Oaks OakAI-Assistent antwortet aus der gesamten Bibliothek"
+      }
+    }
+  },
+  "models": {
+    "eyebrow": "Modellunabhängig",
+    "title": "Jedes Modell nutzen. Jederzeit wechseln.",
+    "subhead": "Das beste Gehirn für jede Frage – von den Spitzenlaboren bis zu einem lokalen Modell auf deinem Mac. Deine Wahl, jedes Mal."
+  },
+  "footer": {
+    "copyright": "Copyright",
+    "builtBy": "Gestaltet und entwickelt von"
+  }
+}

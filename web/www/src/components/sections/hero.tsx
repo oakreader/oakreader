@@ -4,6 +4,9 @@ import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { DOWNLOAD_URL } from "@/lib/links";
 import { WindowFrame } from "@/components/window-frame";
+import type { Dictionary } from "@/i18n/get-dictionary";
+
+type HeroDict = Dictionary["hero"];
 
 // Single static accent — the page stays calm. (Was a two-theme color cycle.)
 const HERO_COLOR = "#79C9FF";
@@ -20,7 +23,7 @@ const HERO_GRADIENT = `radial-gradient(
   rgba(0,0,0,0) 100%
 )`;
 
-function EarlyAccessBadge() {
+function EarlyAccessBadge({ text }: { text: string }) {
   return (
     <div className="inline-flex items-center gap-[0.8rem] bg-white/70 backdrop-blur border border-[#ededed] rounded-full px-[1.6rem] h-[3.4rem] shadow-[0_1px_3px_rgba(0,0,0,0.04)] mb-[2.4rem]">
       <span className="relative flex h-[0.7rem] w-[0.7rem]">
@@ -28,13 +31,13 @@ function EarlyAccessBadge() {
         <span className="relative rounded-full h-[0.7rem] w-[0.7rem] bg-emerald-500" />
       </span>
       <span className="text-[1.3rem] text-black/55 font-medium tracking-[0.01em]">
-        Early Access &middot; macOS
+        {text}
       </span>
     </div>
   );
 }
 
-export function Hero() {
+export function Hero({ dict }: { dict: HeroDict }) {
   return (
     <section
       className="relative overflow-clip bg-[#f8f8f8] isolate pb-[8rem] md:pb-[12rem]"
@@ -67,32 +70,31 @@ export function Hero() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
       >
-        <EarlyAccessBadge />
+        <EarlyAccessBadge text={dict.badge} />
 
         <p className="font-sans italic text-[1.4rem] min-[800px]:text-[1.6rem] text-black/40 tracking-[0.01em] mb-[1.6rem]">
-          A research agent for everything you read.
+          {dict.tagline}
         </p>
 
         <h1 className="flex flex-col items-center text-black leading-[1.1] tracking-[-0.02em] text-[3.2rem] min-[600px]:text-[4.8rem] min-[800px]:text-[6rem] min-[1000px]:text-[6.8rem]">
           <span className="font-exposure font-semibold whitespace-nowrap">
-            Read everything.
+            {dict.headline1}
           </span>
           <span className="font-exposure font-semibold whitespace-nowrap">
-            Understand anything.
+            {dict.headline2}
           </span>
         </h1>
 
         <p className="font-sans font-medium tracking-[-0.01em] text-[1.6rem] min-[600px]:text-[1.8rem] min-[800px]:text-[2.2rem] text-black/55 max-w-[30rem] min-[800px]:max-w-[48rem] leading-[150%] text-pretty mt-[3.2rem] md:mt-[4rem]">
-          Keep everything you read in one place &mdash; then let an AI search
-          and answer across all of it, with citations you can open.
+          {dict.subhead}
         </p>
 
         {/* What you can bring — Heptabase-style source pills */}
         <div className="flex flex-wrap items-center justify-center gap-[0.8rem] mt-[2.4rem]">
           <span className="text-[1.3rem] text-black/35 font-medium mr-[0.4rem]">
-            Bring your
+            {dict.bringYour}
           </span>
-          {["PDFs", "Papers", "Web pages", "Books"].map((s) => (
+          {dict.pills.map((s) => (
             <span
               key={s}
               className="inline-flex items-center bg-white/70 backdrop-blur border border-[#ededed] rounded-full px-[1.4rem] h-[3.2rem] text-[1.3rem] font-medium text-black/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
@@ -117,12 +119,12 @@ export function Hero() {
                   boxShadow: `inset 0 1px 0 0 color-mix(in srgb, ${HERO_COLOR} 55%, transparent)`,
                 }}
               >
-                Download for Free
+                {dict.cta}
               </span>
             </span>
           </Button>
           <p className="font-sans text-[1.3rem] min-[800px]:text-[1.4rem] text-black/35 tracking-[0.02em]">
-            Available on macOS &middot; No credit card required
+            {dict.ctaNote}
           </p>
         </div>
 
@@ -130,7 +132,7 @@ export function Hero() {
         <div className="w-full max-w-[100rem] mt-[6rem] md:mt-[9rem]">
           <WindowFrame
             src="/shots/ai-agent.png"
-            alt="Oak answering a question in context with rendered math and markdown"
+            alt={dict.shotAlt}
             priority
           />
         </div>

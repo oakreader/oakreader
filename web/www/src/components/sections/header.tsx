@@ -5,10 +5,20 @@ import { motion, AnimatePresence } from "motion/react";
 import Image from "next/image";
 import Link from "next/link";
 import { DOWNLOAD_URL } from "@/lib/links";
+import { LocaleSwitcher } from "@/components/locale-switcher";
+import { localeHome, type Locale } from "@/i18n/config";
+import type { Dictionary } from "@/i18n/get-dictionary";
 
 const navLinks: { label: string; href: string }[] = [];
 
-export function Header() {
+export function Header({
+  dict,
+  locale,
+}: {
+  dict: Dictionary["nav"];
+  locale: Locale;
+}) {
+  const home = localeHome(locale);
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -30,18 +40,19 @@ export function Header() {
           }`}
         >
           <Link
-            href="/"
+            href={home}
             className="flex items-center gap-[0.6rem] h-[4rem] px-[0.8rem]"
             aria-label="OakReader"
           >
             <OakLogo />
           </Link>
-          <div className="flex items-center gap-[0.8rem]">
+          <div className="flex items-center gap-[0.4rem]">
+            <LocaleSwitcher current={locale} label={dict.language} />
             <a
               href={DOWNLOAD_URL}
               className="inline-flex items-center justify-center h-[3.6rem] px-[1.4rem] rounded-[1rem] bg-black text-white text-[1.3rem] font-medium tracking-[-0.01em] cursor-pointer whitespace-nowrap"
             >
-              Download
+              {dict.download}
             </a>
             {navLinks.length > 0 && (
               <button
@@ -105,7 +116,7 @@ export function Header() {
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
         >
           <Link
-            href="/"
+            href={home}
             className="flex items-center gap-[0.6rem] h-[4rem] px-[0.8rem] text-black transition-opacity duration-200 hover:opacity-70"
             aria-label="OakReader"
           >
@@ -124,11 +135,12 @@ export function Header() {
               </li>
             ))}
           </ul>
+          <LocaleSwitcher current={locale} label={dict.language} />
           <a
             href={DOWNLOAD_URL}
-            className="inline-flex items-center justify-center ml-[0.4rem] h-[3.8rem] px-[1.6rem] rounded-[1.2rem] bg-black text-white text-[1.4rem] font-medium tracking-[-0.01em] transition-all duration-200 hover:bg-black/85 cursor-pointer whitespace-nowrap"
+            className="inline-flex items-center justify-center h-[3.8rem] px-[1.6rem] rounded-[1.2rem] bg-black text-white text-[1.4rem] font-medium tracking-[-0.01em] transition-all duration-200 hover:bg-black/85 cursor-pointer whitespace-nowrap"
           >
-            Download
+            {dict.download}
           </a>
         </motion.div>
       </nav>

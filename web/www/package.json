@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
+    "@formatjs/intl-localematcher": "^0.8.10",
     "@gsap/react": "^2.1.2",
     "@lobehub/icons": "^5.10.0",
     "class-variance-authority": "^0.7.1",
@@ -17,6 +18,7 @@
     "gsap": "^3.15.0",
     "lucide-react": "^1.14.0",
     "motion": "^12.38.0",
+    "negotiator": "^1.0.0",
     "next": "16.2.6",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -26,6 +28,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/negotiator": "^0.6.4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
