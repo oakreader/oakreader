@@ -163,13 +163,15 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
         }
         mainStack.addArrangedSubview(colorBtn)
 
-        let noteBtn = PopupIconButton(
-            systemImage: "note.text",
-            accessibilityLabel: "Add Note"
-        ) { [weak self] in
-            self?.addNote()
+        if Preferences.shared.isExtensionEnabled(.notes) {
+            let noteBtn = PopupIconButton(
+                systemImage: "note.text",
+                accessibilityLabel: "Add Note"
+            ) { [weak self] in
+                self?.addNote()
+            }
+            mainStack.addArrangedSubview(noteBtn)
         }
-        mainStack.addArrangedSubview(noteBtn)
 
         // Separator 1
         mainStack.addArrangedSubview(makeVerticalSeparator())

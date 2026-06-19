@@ -124,18 +124,21 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
 
 enum AppExtension: String, CaseIterable, Identifiable {
     case translation
+    case notes
 
     var id: String { rawValue }
 
     var label: String {
         switch self {
         case .translation: return "Translation"
+        case .notes: return "Notes"
         }
     }
 
     var description: String {
         switch self {
         case .translation: return "Translate selected text using AI-powered translation."
+        case .notes: return "Capture highlights and notes in a side panel."
         }
     }
 
@@ -143,6 +146,7 @@ enum AppExtension: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .translation: return "translate"
+        case .notes: return "note.text"
         }
     }
 
@@ -154,6 +158,7 @@ enum AppExtension: String, CaseIterable, Identifiable {
     var rightPanelModes: [RightPanelMode] {
         switch self {
         case .translation: return [.translation]
+        case .notes: return [.comments]
         }
     }
 

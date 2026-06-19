@@ -63,9 +63,13 @@ struct SettingsView: View {
         /// Tabs exposed in the command palette for deep-linking.
         static let paletteTabs: [Tab] = [.general, .library, .ai, .agent, .audio, .extensions, .webSearch]
 
-        static func tab(for ext: AppExtension) -> Tab {
+        /// The dedicated settings pane for an extension, if it has one. Extensions
+        /// without their own settings (e.g. Notes) return nil — they appear as a
+        /// toggle in the Extensions list but add no sidebar sub-pane.
+        static func tab(for ext: AppExtension) -> Tab? {
             switch ext {
             case .translation: return .extensionTranslation
+            case .notes: return nil
             }
         }
     }
@@ -78,7 +82,7 @@ struct SettingsView: View {
     private static func enabledPluginTabs() -> [Tab] {
         AppExtension.allCases
             .filter { Preferences.shared.isExtensionEnabled($0) }
-            .map { Tab.tab(for: $0) }
+            .compactMap { Tab.tab(for: $0) }
     }
 
     var body: some View {

@@ -17,7 +17,9 @@ struct RightPanelContentView: View {
                         voiceVM: viewModel.voice
                     )
                 case .comments:
-                    CommentsPanelView(viewModel: viewModel)
+                    if Preferences.shared.isExtensionEnabled(.notes) {
+                        CommentsPanelView(viewModel: viewModel)
+                    }
                 case .translation:
                     if Preferences.shared.isExtensionEnabled(.translation) {
                         TranslationPanelView(translationVM: viewModel.translation, voiceVM: viewModel.voice)
