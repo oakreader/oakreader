@@ -450,41 +450,23 @@ final class ZoteroMigrationService {
                 continue
             }
 
-            // Detect video sites (YouTube, Bilibili) by URL before looking at attachments
-            let isVideo = cslItem.URL.map { Self.isVideoURL($0) } ?? false
+            // Video & social sites are live destinations, not snapshots. Import them as
+            // `.link` items that open as a live web tab, ignoring any stale Zotero snapshot.
+            let isLiveWeb = cslItem.URL.map { Self.isLiveWebDestination($0) } ?? false
 
             // Find attachment — prefer PDF over HTML when multiple exist
             let allAttachments = (attachmentsByParent[zItem.itemID] ?? [])
                 .sorted { a, _ in a.contentType == "application/pdf" ? true : false }
             let primaryAtt = allAttachments.first
-            var contentType: ContentType = isVideo ? .link : oakItemType(for: primaryAtt?.contentType)
-            var attFileName = isVideo ? "metadata.json" : (contentType == .pdf ? "document.pdf" : "index.html")
+            var contentType: ContentType = isLiveWeb ? .link : oakItemType(for: primaryAtt?.contentType)
+            var attFileName = isLiveWeb ? "metadata.json" : (contentType == .pdf ? "document.pdf" : "index.html")
             var attFileSize: Int64 = 0
             var attPageCount = 0
             var fileCopied = false
 
-            if isVideo {
-                // Write metadata.json for YouTube items
-                let publishedAt: String? = cslItem.issued.flatMap { date in
-                    guard let y = date.year else { return date.raw }
-                    let m = date.month ?? 1
-                    let d = date.day ?? 1
-                    return String(format: "%04d-%02d-%02dT00:00:00Z", y, m, d)
-                }
-                let metadata = MediaMetadata(
-                    title: cslItem.title ?? title,
-                    author: authorDisplay,
-                    sourceURL: URL(string: cslItem.URL!)!,
-                    duration: nil,
-                    thumbnailURL: nil,
-                    publishedAt: publishedAt,
-                    description: cslItem.abstract,
-                    embedType: "youtube"
-                )
-                if let encoded = try? JSONEncoder().encode(metadata) {
-                    try? encoded.write(to: attDir.appendingPathComponent("metadata.json"), options: .atomic)
-                }
-            } else if let att = primaryAtt {
+            // Live-web items skip snapshot copying — the bookmark branch below turns them
+            // into a `.link`. Only non-live items copy a PDF/HTML attachment.
+            if !isLiveWeb, let att = primaryAtt {
                 let sourceURL = resolveAttachmentPath(att, dataDirectory: dataDirectory)
                 if let srcURL = sourceURL, FileManager.default.fileExists(atPath: srcURL.path) {
                     attFileName = srcURL.lastPathComponent
@@ -522,8 +504,9 @@ final class ZoteroMigrationService {
                 }
             }
 
-            // If no file was copied and item has a URL, treat as a linked web bookmark
-            if !fileCopied && !isVideo, let urlString = cslItem.URL, let url = URL(string: urlString) {
+            // If no file was copied and item has a URL, treat as a linked web bookmark.
+            // This also covers every live-web (video/social) item, which never copies a file.
+            if !fileCopied, let urlString = cslItem.URL, let url = URL(string: urlString) {
                 contentType = .link
                 attFileName = "metadata.json"
                 let metadata = MediaMetadata(
@@ -765,11 +748,69 @@ final class ZoteroMigrationService {
         }
     }
 
-    /// Check if a URL string points to a video site (YouTube, Bilibili).
-    private static func isVideoURL(_ urlString: String) -> Bool {
+    /// Hosts whose value is the live page, not a saved snapshot — video platforms and
+    /// social media. On Zotero import these become `.link` items that open as a live web
+    /// tab, instead of a stale static snapshot or a dead "Open in Browser" card.
+    /// Matched on the registrable host (exact or subdomain), so `m.youtube.com` counts.
+    /// Keep in sync with `LIVE_WEB_HOSTS` in web/extension/src/lib/translators/url-utils.ts
+    private static let liveWebHosts: Set<String> = [
+        // Video
+        "youtube.com", "youtu.be", "vimeo.com", "dailymotion.com", "dai.ly",
+        "tiktok.com", "douyin.com", "kuaishou.com", "kwai.com",
+        "bilibili.com", "b23.tv", "youku.com", "iqiyi.com", "v.qq.com", "ixigua.com",
+        "rumble.com", "odysee.com", "bitchute.com", "nicovideo.jp", "coub.com",
+        "streamable.com", "tv.naver.com", "rutube.ru", "abema.tv", "tving.com", "triller.com",
+        // Live streaming
+        "twitch.tv", "kick.com", "chzzk.naver.com", "sooplive.co.kr", "afreecatv.com",
+        "douyu.com", "huya.com", "nimo.tv", "trovo.live", "dlive.tv", "bigo.tv",
+        "showroom-live.com", "younow.com",
+        // Social
+        "x.com", "twitter.com", "t.co", "facebook.com", "fb.com", "fb.watch",
+        "instagram.com", "threads.net", "threads.com", "reddit.com", "redd.it",
+        "linkedin.com", "lnkd.in", "pinterest.com", "pin.it", "tumblr.com",
+        "snapchat.com", "bsky.app", "mastodon.social", "truthsocial.com", "gettr.com",
+        "gab.com", "vk.com", "ok.ru", "weibo.com", "weibo.cn", "xiaohongshu.com",
+        "xhslink.com", "zhihu.com", "douban.com", "tieba.baidu.com", "line.me",
+        "band.us", "mixi.jp", "quora.com", "qr.ae",
+        // Messaging
+        "t.me", "telegram.org", "telegram.me", "wa.me", "whatsapp.com",
+        "discord.com", "discord.gg",
+        // Music / audio / podcast
+        "spotify.com", "music.apple.com", "podcasts.apple.com", "music.amazon.com",
+        "soundcloud.com", "bandcamp.com", "deezer.com", "tidal.com", "pandora.com",
+        "iheart.com", "mixcloud.com", "audiomack.com", "anchor.fm", "music.163.com",
+        "y.qq.com", "kugou.com", "kuwo.cn", "ximalaya.com", "xiaoyuzhoufm.com",
+        "lizhi.fm", "castbox.fm", "overcast.fm", "pocketcasts.com", "podbean.com",
+        "spreaker.com", "melon.com", "genie.co.kr", "bugs.co.kr", "joox.com",
+        // Regional: India
+        "sharechat.com", "mojapp.in", "chingari.io", "roposo.com",
+        "hotstar.com", "jiocinema.com", "zee5.com", "sonyliv.com",
+        "gaana.com", "jiosaavn.com", "wynk.in", "hungama.com",
+        // Regional: Japan
+        "pixiv.net", "tver.jp", "17.live", "pococha.com",
+        // Regional: South Korea
+        "weverse.io", "wavve.com", "watcha.com", "music-flo.com",
+        // Regional: Russia
+        "dzen.ru", "music.yandex.ru", "likee.video", "yappy.media",
+        // Regional: Southeast Asia
+        "vidio.com", "viu.com", "wetv.vip", "snackvideo.com",
+        // Regional: Middle East / North Africa
+        "shahid.net", "anghami.com",
+        // Regional: Türkiye
+        "blutv.com", "exxen.com", "puhutv.com",
+        // Regional: Iran
+        "aparat.com", "filimo.com",
+        // Regional: Vietnam
+        "zingmp3.vn", "zalo.me",
+        // Regional: Africa
+        "boomplay.com",
+        // Regional: Latin America
+        "globoplay.globo.com", "vix.com",
+    ]
+
+    private static func isLiveWebDestination(_ urlString: String) -> Bool {
         guard let host = URL(string: urlString)?.host?.lowercased() else { return false }
-        return host.contains("youtube.com") || host.contains("youtu.be")
-            || host.contains("bilibili.com") || host.contains("b23.tv")
+        return liveWebHosts.contains { host == $0 || host.hasSuffix("." + $0) }
     }
 
     /// Copy all sibling files from a Zotero storage directory to the OakReader attachment directory.

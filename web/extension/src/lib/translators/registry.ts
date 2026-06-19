@@ -1,8 +1,10 @@
 import type { ContentKind, Translator } from "./types";
 import { scholarlyTranslator } from "./scholarly";
 import { genericWebpageTranslator } from "./webpage";
+import { liveWebTranslator } from "./live-web";
 
 const translators: Translator[] = [
+  liveWebTranslator,
   scholarlyTranslator,
   genericWebpageTranslator,
 ].sort((a, b) => b.priority - a.priority);
@@ -29,8 +31,11 @@ export function contentKindToPageType(kind: ContentKind): "html" | "embed" {
   switch (kind) {
     case "webpage":
     case "scholarly":
-    case "link":
       return "html";
+    case "link":
+      // Live-web / bookmark items have no meaningful snapshot — they go straight to the
+      // embed/link path, which hides the "Archive" snapshot picker in the popup.
+      return "embed";
   }
 }
 
