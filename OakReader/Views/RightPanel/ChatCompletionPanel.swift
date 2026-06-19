@@ -1,51 +1,8 @@
 import AppKit
 
-/// Resolved colour set for the completion panel, picked once at build time from the
-/// app's effective appearance. Every value below was reverse-engineered pixel-by-pixel
-/// from Dia 1.36's `@`/skill suggestion panel (`Attachments.AttachmentSuggestionsViewController`
-/// inside an `ARCUI.PopoverBackgroundView`) — see the spec table in the panel header.
-private struct CompletionPalette {
-    let isDark: Bool
-
-    /// Card fill. Dia: pure white in light, a deep near-black `#141415` in dark
-    /// (the popover reads *darker* than the surrounding command-bar chrome).
-    var panelBackground: NSColor {
-        isDark ? NSColor(srgbRed: 0x16 / 255, green: 0x16 / 255, blue: 0x17 / 255, alpha: 1)
-               : .white
-    }
-
-    /// Hairline card border — barely-there in light, a soft top-edge highlight in dark.
-    var border: NSColor {
-        isDark ? NSColor.white.withAlphaComponent(0.06)
-               : NSColor.black.withAlphaComponent(0.04)
-    }
-
-    /// Selected-row fill. Measured pixel mode: `#6A9FF9` (light) / `#2B57B7` (dark).
-    var selectionFill: NSColor {
-        isDark ? NSColor(srgbRed: 0x2B / 255, green: 0x57 / 255, blue: 0xB7 / 255, alpha: 1)
-               : NSColor(srgbRed: 0x6A / 255, green: 0x9F / 255, blue: 0xF9 / 255, alpha: 1)
-    }
-
-    /// Title text. `#1A1A1A` / `#E6E7E7` — i.e. ~labelColor.
-    var title: NSColor {
-        isDark ? NSColor(white: 0.91, alpha: 1) : NSColor(white: 0.10, alpha: 1)
-    }
-
-    /// Secondary / right-aligned source text and inline counts.
-    var secondary: NSColor {
-        isDark ? NSColor(white: 0.56, alpha: 1) : NSColor(white: 0.58, alpha: 1)
-    }
-
-    /// Section-header grey. Measured `#BEBEBE` in light; dimmer in dark.
-    var header: NSColor {
-        isDark ? NSColor(white: 0.50, alpha: 1) : NSColor(white: 0.72, alpha: 1)
-    }
-
-    /// Faint icon-tile fill for the few rows that read better with a chip
-    /// (currently unused — Dia shows glyphs directly with no tile).
-    var onSelectionText: NSColor { .white }
-    var onSelectionSecondary: NSColor { NSColor.white.withAlphaComponent(0.82) }
-}
+// The dropdown's colours + metrics now live in the shared `CompletionPalette`
+// (`CompletionPalette.swift`) so this AppKit panel and the SwiftUI note `@`/`#`
+// pickers render pixel-identically from one source.
 
 /// A floating, sectioned completion panel for `/` commands and `@` references.
 /// The panel intentionally mirrors the chat composer width so the trigger UI
@@ -90,10 +47,10 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
     private let screenVisibleFrame: NSRect
     private let panelWidth: CGFloat
 
-    // Row metrics, measured from Dia (favicon pitch = 24pt; we add a touch of air
-    // for OakReader's slightly larger 13.5pt title → 28pt).
-    fileprivate static let rowHeight: CGFloat = 26
-    fileprivate static let headerHeight: CGFloat = 22
+    // Row metrics come from the shared `CompletionPalette.Metrics` so this panel and
+    // the SwiftUI note pickers measure to the same pixels.
+    fileprivate static let rowHeight = CompletionPalette.Metrics.rowHeight
+    fileprivate static let headerHeight = CompletionPalette.Metrics.headerHeight
     fileprivate static let emptyHeight: CGFloat = 44
     // ~9 rows tall, then scroll. Keeps the popup compact instead of ballooning to
     // fill the pane when a trigger (e.g. `@`) surfaces dozens of items.
@@ -104,9 +61,9 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
     private static let maxPanelWidth: CGFloat = 320
     // Card content inset. The selection pill fills the full stack width, so this
     // doubles as the selection's 6pt horizontal inset from the card edge (measured).
-    private static let horizontalInset: CGFloat = 6
-    private static let verticalInset: CGFloat = 5
-    private static let cornerRadius: CGFloat = 14
+    private static let horizontalInset = CompletionPalette.Metrics.horizontalInset
+    private static let verticalInset = CompletionPalette.Metrics.verticalInset
+    private static let cornerRadius = CompletionPalette.Metrics.cornerRadius
 
     var selectedItem: ChatCompletionItem? {
         guard selectedIndex >= 0, selectedIndex < filtered.count else { return nil }
@@ -406,12 +363,13 @@ private final class ChatCompletionRowView: NSView {
     private var trackingArea: NSTrackingArea?
     private var isHighlighted = false
 
-    // Measured from Dia: 16pt glyph shown directly (no tile), 12pt from the card edge.
-    // The card content already insets 6pt, so the icon adds the remaining 6pt here.
-    private static let iconSize: CGFloat = 15
-    private static let iconLeading: CGFloat = 6
-    private static let iconToTitle: CGFloat = 7
-    private static let selectionRadius: CGFloat = 8
+    // Glyph shown directly (no tile), 12pt from the card edge. The card content
+    // already insets 6pt, so the icon adds the remaining 6pt here. Sourced from the
+    // shared `CompletionPalette.Metrics` so the note pickers match.
+    private static let iconSize = CompletionPalette.Metrics.iconFrame
+    private static let iconLeading = CompletionPalette.Metrics.iconLeading
+    private static let iconToTitle = CompletionPalette.Metrics.iconToTitle
+    private static let selectionRadius = CompletionPalette.Metrics.selectionRadius
 
     init(
         item: ChatCompletionItem,
@@ -436,12 +394,12 @@ private final class ChatCompletionRowView: NSView {
 
         // Glyph shown directly — no grey tile (matches Dia's favicons/SF symbols).
         if let img = SymbolStyle.filled(item.icon, accessibilityDescription: item.label) {
-            iconView.image = img.withSymbolConfiguration(.init(pointSize: 13.5, weight: .medium))
+            iconView.image = img.withSymbolConfiguration(.init(pointSize: CompletionPalette.Metrics.iconPointSize, weight: .medium))
             iconView.contentTintColor = item.completionTint
         }
         iconView.translatesAutoresizingMaskIntoConstraints = false
 
-        titleLabel.font = .systemFont(ofSize: 13, weight: .regular)
+        titleLabel.font = .systemFont(ofSize: CompletionPalette.Metrics.titleSize, weight: .regular)
         titleLabel.textColor = palette.title
         titleLabel.lineBreakMode = .byTruncatingTail
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -449,15 +407,20 @@ private final class ChatCompletionRowView: NSView {
         // the row. With high resistance the label refuses to shrink and AutoLayout grows
         // the panel's fitting width instead (the popup window then adopts it) — which is
         // why long document titles ballooned the panel past its width clamp.
-        titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        // BUT it must still outrank the description (just below), or a long skill
+        // description (e.g. Grill/Socratic) squeezes the title to zero width and the
+        // skill NAME disappears. So: title 251 > description 249 — both stay "low" so
+        // neither widens the window, but the title wins the tug-of-war and the
+        // description truncates first.
+        titleLabel.setContentCompressionResistancePriority(.init(251), for: .horizontal)
         titleLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
-        descLabel.font = .systemFont(ofSize: 11)
+        descLabel.font = .systemFont(ofSize: CompletionPalette.Metrics.secondarySize)
         descLabel.textColor = palette.secondary
         descLabel.alignment = .right
         descLabel.lineBreakMode = .byTruncatingTail
         descLabel.translatesAutoresizingMaskIntoConstraints = false
-        descLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        descLabel.setContentCompressionResistancePriority(.init(249), for: .horizontal)
         descLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
         addSubview(iconView)

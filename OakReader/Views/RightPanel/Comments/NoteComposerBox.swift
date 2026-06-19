@@ -30,6 +30,9 @@ struct NoteComposerBox: View {
     var onCaptureConsumed: (() -> Void)? = nil
     /// Other memos in this doc the `@` button can reference (flomo note-to-note link).
     var memos: [NoteRef] = []
+    /// Existing `#tags` in this doc, offered by the `#` picker so the user reuses a
+    /// tag instead of retyping it (recognition over recall → prevents tag sprawl).
+    var tags: [String] = []
     /// When set (create composer only), reuse the document's already-booted editor
     /// across Notes-tab visits instead of reloading — kills the boot+fade "flick".
     var reuseHolder: ComposerWebHolder? = nil
@@ -54,11 +57,15 @@ struct NoteComposerBox: View {
     @State private var mentionQuery = ""
     @State private var mentionAnchor: CGPoint = .zero
     @FocusState private var mentionFieldFocused: Bool
+    @State private var showTag = false
+    @State private var tagQuery = ""
+    @State private var tagAnchor: CGPoint = .zero
+    @FocusState private var tagFieldFocused: Bool
     @Environment(\.colorScheme) private var colorScheme
 
-    /// Colours mirrored from `ChatCompletionPanel`'s `CompletionPalette` so the
-    /// note `@` picker reads as the *same* component as the chat `@`/`/` panel.
-    private var mentionPalette: MentionPalette { MentionPalette(isDark: colorScheme == .dark) }
+    /// The shared dropdown palette — the same source the chat `@`/`/` panel renders
+    /// from — so the note `@`/`#` pickers stay pixel-identical to it.
+    private var mentionPalette: CompletionPalette { CompletionPalette(isDark: colorScheme == .dark) }
 
     /// Send is allowed when there's prose *or* at least one attached image.
     private var canSend: Bool { !isEmpty || !attachments.isEmpty }
@@ -82,6 +89,10 @@ struct NoteComposerBox: View {
                     onMention: { point in
                         if let point { mentionAnchor = point }
                         showMention = true
+                    },
+                    onTag: { point in
+                        if let point { tagAnchor = point }
+                        showTag = true
                     }
                 )
 
@@ -91,6 +102,12 @@ struct NoteComposerBox: View {
                     .frame(width: 1, height: 1)
                     .offset(x: mentionAnchor.x, y: mentionAnchor.y)
                     .popover(isPresented: $showMention, arrowEdge: .bottom) { mentionPicker }
+
+                // Same caret-anchored popover for the `#` tag picker.
+                Color.clear
+                    .frame(width: 1, height: 1)
+                    .offset(x: tagAnchor.x, y: tagAnchor.y)
+                    .popover(isPresented: $showTag, arrowEdge: .bottom) { tagPicker }
             }
             .frame(height: max(height, Self.minEditorHeight), alignment: .topLeading)
             // No height animation: animating the frame made it TRAIL the web
@@ -138,41 +155,13 @@ struct NoteComposerBox: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 ForEach(attachments, id: \.self) { url in
-                    thumbnail(url)
+                    NoteAttachmentThumbnail(url: url) {
+                        attachments.removeAll { $0 == url }
+                    }
                 }
                 addTile
             }
             .padding(.vertical, 2)
-        }
-    }
-
-    private func thumbnail(_ url: String) -> some View {
-        ZStack(alignment: .topTrailing) {
-            Group {
-                if let img = Self.loadImage(url) {
-                    Image(nsImage: img)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } else {
-                    Image(systemName: "photo")
-                        .foregroundStyle(.tertiary)
-                }
-            }
-            .frame(width: 72, height: 72)
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-
-            Button {
-                attachments.removeAll { $0 == url }
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 8, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 16, height: 16)
-                    .background(Circle().fill(Color.black.opacity(0.55)))
-            }
-            .buttonStyle(.plain)
-            .padding(3)
-            .help("Remove image")
         }
     }
 
@@ -324,17 +313,17 @@ struct NoteComposerBox: View {
             HStack(spacing: 6) {
                 Image(systemName: "at")
                     .font(.system(size: 12))
-                    .foregroundStyle(palette.secondary)
+                    .foregroundStyle(palette.secondaryColor)
                 TextField("Search notes…", text: $mentionQuery)
                     .textFieldStyle(.plain)
                     .font(.system(size: 13))
-                    .foregroundStyle(palette.title)
+                    .foregroundStyle(palette.titleColor)
                     .focused($mentionFieldFocused)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
 
-            Rectangle().fill(palette.border).frame(height: 1)
+            Rectangle().fill(palette.borderColor).frame(height: 1)
 
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
@@ -344,7 +333,7 @@ struct NoteComposerBox: View {
                     if filteredMemos.isEmpty {
                         Text(memos.isEmpty ? "No other notes yet" : "No matches")
                             .font(.system(size: 13))
-                            .foregroundStyle(palette.secondary)
+                            .foregroundStyle(palette.secondaryColor)
                             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                             .padding(.horizontal, 12)
                     }
@@ -357,7 +346,7 @@ struct NoteComposerBox: View {
             .frame(maxHeight: 280)
         }
         .frame(width: 300)
-        .background(palette.panel)
+        .background(palette.panelBackgroundColor)
         .onAppear { mentionFieldFocused = true }
     }
 
@@ -365,6 +354,80 @@ struct NoteComposerBox: View {
         controller.insertReference(label: Self.referenceLabel(ref.preview), href: NoteLink.href(ref.id))
         showMention = false
         mentionQuery = ""
+        controller.focus()
+    }
+
+    // MARK: # tag picker (reuse existing tags → no sprawl)
+
+    private var filteredTags: [String] {
+        let q = tagQuery.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !q.isEmpty else { return tags }
+        return tags.filter { $0.lowercased().contains(q) }
+    }
+
+    /// A "create this tag" candidate from the query — shown only when it isn't
+    /// already an existing tag. Spaces are stripped (tags are single tokens).
+    private var newTagCandidate: String? {
+        let c = tagQuery.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: " ", with: "")
+        guard !c.isEmpty,
+              !tags.contains(where: { $0.caseInsensitiveCompare(c) == .orderedSame }) else { return nil }
+        return c
+    }
+
+    private var tagPicker: some View {
+        let palette = mentionPalette
+        return VStack(spacing: 0) {
+            HStack(spacing: 6) {
+                Image(systemName: "number")
+                    .font(.system(size: 12))
+                    .foregroundStyle(palette.secondaryColor)
+                TextField("Filter or create a tag…", text: $tagQuery)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13))
+                    .foregroundStyle(palette.titleColor)
+                    .focused($tagFieldFocused)
+                    .onSubmit {
+                        if let c = newTagCandidate { insertTag(c) }
+                        else if let first = filteredTags.first { insertTag(first) }
+                    }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+
+            Rectangle().fill(palette.borderColor).frame(height: 1)
+
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    if let c = newTagCandidate {
+                        TagPickerRow(label: "Create #\(c)", icon: "plus", palette: palette) { insertTag(c) }
+                    }
+                    ForEach(filteredTags, id: \.self) { tag in
+                        // The leading `#` glyph already marks these as tags — don't
+                        // repeat it in the label (was rendering "# #tag").
+                        TagPickerRow(label: tag, icon: "number", palette: palette) { insertTag(tag) }
+                    }
+                    if filteredTags.isEmpty && newTagCandidate == nil {
+                        Text(tags.isEmpty ? "No tags yet — type to create one" : "No matches")
+                            .font(.system(size: 13))
+                            .foregroundStyle(palette.secondaryColor)
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                            .padding(.horizontal, 12)
+                    }
+                }
+                .padding(.horizontal, 6)
+                .padding(.vertical, 5)
+            }
+            .frame(maxHeight: 280)
+        }
+        .frame(width: 300)
+        .background(palette.panelBackgroundColor)
+        .onAppear { tagFieldFocused = true }
+    }
+
+    private func insertTag(_ tag: String) {
+        controller.insertTag(tag)
+        showTag = false
+        tagQuery = ""
         controller.focus()
     }
 
@@ -443,10 +506,86 @@ struct NoteComposerBox: View {
         default: return imgs
         }
     }
+}
 
-    private static func loadImage(_ urlString: String) -> NSImage? {
-        guard let url = URL(string: urlString) else { return nil }
-        return NSImage(contentsOf: url)
+/// A 72pt note-tray thumbnail that, like the AI chat input's `AttachmentPill`,
+/// reveals an enlarged preview on hover (a short dwell so a cursor passing over
+/// doesn't flash it) — so the tray stays compact without hiding the picture.
+private struct NoteAttachmentThumbnail: View {
+    let url: String
+    let onRemove: () -> Void
+
+    @State private var hovering = false
+    @State private var showPreview = false
+
+    private var image: NSImage? {
+        guard let u = URL(string: url) else { return nil }
+        return NSImage(contentsOf: u)
+    }
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Group {
+                if let img = image {
+                    Image(nsImage: img)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } else {
+                    Image(systemName: "photo")
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .frame(width: 72, height: 72)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+            Button(action: onRemove) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 16, height: 16)
+                    .background(Circle().fill(Color.black.opacity(0.55)))
+            }
+            .buttonStyle(.plain)
+            .padding(3)
+            .help("Remove image")
+        }
+        .onHover { h in
+            hovering = h
+            if h {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    if hovering { showPreview = true }
+                }
+            } else {
+                showPreview = false
+            }
+        }
+        .popover(isPresented: $showPreview, arrowEdge: .top) { preview }
+    }
+
+    @ViewBuilder
+    private var preview: some View {
+        if let img = image {
+            // Hug the picture's own aspect ratio (a wide screenshot → a wide, short
+            // popover) instead of floating it in a fixed square with empty space.
+            let size = previewSize(for: img)
+            Image(nsImage: img)
+                .resizable()
+                .frame(width: size.width, height: size.height)
+                .padding(8)
+        } else {
+            Image(systemName: "photo")
+                .font(.system(size: 28))
+                .foregroundStyle(.tertiary)
+                .padding(24)
+        }
+    }
+
+    private func previewSize(for image: NSImage) -> CGSize {
+        let maxW: CGFloat = 460, maxH: CGFloat = 360
+        let s = image.size
+        guard s.width > 0, s.height > 0 else { return CGSize(width: 240, height: 180) }
+        let scale = min(maxW / s.width, maxH / s.height)
+        return CGSize(width: (s.width * scale).rounded(), height: (s.height * scale).rounded())
     }
 }
 
@@ -492,32 +631,34 @@ private struct ToolButtonStyle: ButtonStyle {
 /// selection pill and white text on hover.
 private struct MentionRow: View {
     let ref: NoteRef
-    let palette: MentionPalette
+    let palette: CompletionPalette
     let onSelect: () -> Void
     @State private var hovering = false
 
+    private typealias M = CompletionPalette.Metrics
+
     var body: some View {
-        HStack(spacing: 7) {
+        HStack(spacing: M.iconToTitle) {
             Image(systemName: "note.text")
-                .font(.system(size: 12.5, weight: .medium))
-                .foregroundStyle(hovering ? Color.white : palette.secondary)
-                .frame(width: 15)
+                .font(.system(size: M.iconPointSize, weight: .medium))
+                .foregroundStyle(hovering ? palette.onSelectionTextColor : palette.secondaryColor)
+                .frame(width: M.iconFrame)
             Text(ref.preview.isEmpty ? "Untitled" : ref.preview)
-                .font(.system(size: 13))
-                .foregroundStyle(hovering ? Color.white : palette.title)
+                .font(.system(size: M.titleSize))
+                .foregroundStyle(hovering ? palette.onSelectionTextColor : palette.titleColor)
                 .lineLimit(1)
                 .truncationMode(.tail)
             Spacer(minLength: 10)
             Text(ref.time)
-                .font(.system(size: 11))
-                .foregroundStyle(hovering ? Color.white.opacity(0.82) : palette.secondary)
+                .font(.system(size: M.secondarySize))
+                .foregroundStyle(hovering ? palette.onSelectionSecondaryColor : palette.secondaryColor)
                 .lineLimit(1)
         }
-        .padding(.horizontal, 6)
-        .frame(height: 26)
+        .padding(.horizontal, M.horizontalInset)
+        .frame(height: M.rowHeight)
         .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(hovering ? palette.selection : Color.clear)
+            RoundedRectangle(cornerRadius: M.selectionRadius, style: .continuous)
+                .fill(hovering ? palette.selectionFillColor : Color.clear)
         )
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
@@ -525,19 +666,38 @@ private struct MentionRow: View {
     }
 }
 
-/// SwiftUI mirror of `ChatCompletionPanel.CompletionPalette` — the same Dia 1.36
-/// values, so the note `@` picker and the chat `@`/`/` panel read as one component.
-private struct MentionPalette {
-    let isDark: Bool
+/// A row in the `#` tag picker — same 26pt / selection-pill styling as `MentionRow`.
+private struct TagPickerRow: View {
+    let label: String
+    let icon: String
+    let palette: CompletionPalette
+    let onSelect: () -> Void
+    @State private var hovering = false
 
-    var panel: Color {
-        isDark ? Color(.sRGB, red: 0x16 / 255, green: 0x16 / 255, blue: 0x17 / 255, opacity: 1) : .white
+    private typealias M = CompletionPalette.Metrics
+
+    var body: some View {
+        HStack(spacing: M.iconToTitle) {
+            Image(systemName: icon)
+                .font(.system(size: M.iconPointSize, weight: .medium))
+                .foregroundStyle(hovering ? palette.onSelectionTextColor : palette.secondaryColor)
+                .frame(width: M.iconFrame)
+            Text(label)
+                .font(.system(size: M.titleSize))
+                .foregroundStyle(hovering ? palette.onSelectionTextColor : palette.titleColor)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            Spacer(minLength: 10)
+        }
+        .padding(.horizontal, M.horizontalInset)
+        .frame(height: M.rowHeight)
+        .background(
+            RoundedRectangle(cornerRadius: M.selectionRadius, style: .continuous)
+                .fill(hovering ? palette.selectionFillColor : Color.clear)
+        )
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 }
+        .onTapGesture(perform: onSelect)
     }
-    var border: Color { isDark ? Color.white.opacity(0.06) : Color.black.opacity(0.04) }
-    var selection: Color {
-        isDark ? Color(.sRGB, red: 0x2B / 255, green: 0x57 / 255, blue: 0xB7 / 255, opacity: 1)
-               : Color(.sRGB, red: 0x6A / 255, green: 0x9F / 255, blue: 0xF9 / 255, opacity: 1)
-    }
-    var title: Color { isDark ? Color(white: 0.91) : Color(white: 0.10) }
-    var secondary: Color { isDark ? Color(white: 0.56) : Color(white: 0.58) }
 }
+

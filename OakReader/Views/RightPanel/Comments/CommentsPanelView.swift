@@ -16,6 +16,8 @@ struct CommentsPanelView: View {
 
     @State private var flashId: String?
     @State private var focusSignal = 0
+    @State private var showSearch = false
+    @FocusState private var searchFocused: Bool
 
     private var model: CommentsViewModel { viewModel.comments }
 
@@ -23,9 +25,18 @@ struct CommentsPanelView: View {
         VStack(spacing: 0) {
             notesHeader
 
+            searchField
+
             tagFilterBar
 
-            stream
+            // While filtering, show a dedicated TOP-anchored results list right
+            // under the controls. Reusing the bottom-anchored chat stream pinned a
+            // handful of matches to the bottom with a big empty gap above them.
+            if model.isFiltering {
+                resultsList
+            } else {
+                stream
+            }
 
             NoteComposerBox(
                 mode: .create,
@@ -43,6 +54,7 @@ struct CommentsPanelView: View {
                 captureURL: model.pendingCaptureURL,
                 onCaptureConsumed: { model.pendingCaptureURL = nil },
                 memos: model.referenceableMemos(excluding: nil),
+                tags: model.allTags,
                 reuseHolder: model.composerWebHolder
             )
             .padding(.horizontal, 12)
@@ -76,9 +88,61 @@ struct CommentsPanelView: View {
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
             Spacer()
+            Button {
+                withAnimation(.easeOut(duration: 0.15)) {
+                    showSearch.toggle()
+                    if !showSearch { model.searchQuery = "" }
+                }
+                if showSearch { searchFocused = true }
+            } label: {
+                Image(systemName: showSearch ? "xmark" : "magnifyingglass")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(showSearch ? Color.accentColor : .secondary)
+                    .frame(width: 24, height: 24)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(showSearch ? "Close search" : "Search notes")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+    }
+
+    /// Inline search field, revealed by the header's magnifying-glass button.
+    /// Filters the stream by text; combines with the tag filter bar below.
+    @ViewBuilder
+    private var searchField: some View {
+        if showSearch {
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                TextField("Search notes…", text: Binding(
+                    get: { model.searchQuery },
+                    set: { model.searchQuery = $0 }
+                ))
+                .textFieldStyle(.plain)
+                .font(.system(size: 13))
+                .focused($searchFocused)
+                if !model.searchQuery.isEmpty {
+                    Button { model.searchQuery = "" } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(OakStyle.Colors.buttonBackground)
+            )
+            .padding(.horizontal, 12)
+            .padding(.bottom, 8)
+            .transition(.opacity.combined(with: .move(edge: .top)))
+        }
     }
 
     /// Horizontal row of the doc's tags; tap one to filter the stream, tap again
@@ -102,6 +166,22 @@ struct CommentsPanelView: View {
         }
     }
 
+    /// Top-anchored results list for active search / tag filter — matches grow
+    /// downward from just below the search input (not the chat stream's bottom edge).
+    private var resultsList: some View {
+        ScrollView {
+            LazyVStack(spacing: 12) {
+                ForEach(model.filteredCards, id: \.id) { record in
+                    CommentCardView(record: record, model: model, isFlashing: flashId == record.id)
+                        .id(record.id)
+                }
+                if model.filteredCards.isEmpty { filteredEmptyHint }
+            }
+            .padding(12)
+        }
+        .frame(maxHeight: .infinity)
+    }
+
     // MARK: - Stream
 
     @ViewBuilder
@@ -109,15 +189,11 @@ struct CommentsPanelView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 12) {
-                    ForEach(model.filteredCards, id: \.id) { record in
+                    ForEach(model.cards, id: \.id) { record in
                         CommentCardView(record: record, model: model, isFlashing: flashId == record.id)
                             .id(record.id)
                     }
-                    if model.cards.isEmpty {
-                        emptyHint
-                    } else if model.filteredCards.isEmpty {
-                        filteredEmptyHint
-                    }
+                    if model.cards.isEmpty { emptyHint }
                     // Invisible anchor at the very bottom — newest note lives here,
                     // so we land on it when the panel opens and after each capture.
                     Color.clear.frame(height: 1).id("bottom")
@@ -165,11 +241,14 @@ struct CommentsPanelView: View {
     /// auto-clears when its tag disappears, but the stream can momentarily be empty).
     private var filteredEmptyHint: some View {
         VStack(spacing: 8) {
-            Text(model.activeTagFilter.map { "No notes tagged #\($0)" } ?? "No notes")
+            Text(model.activeTagFilter.map { "No notes tagged #\($0)" } ?? "No matching notes")
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
             Button("Show all notes") {
-                withAnimation(.easeOut(duration: 0.15)) { model.activeTagFilter = nil }
+                withAnimation(.easeOut(duration: 0.15)) {
+                    model.activeTagFilter = nil
+                    model.searchQuery = ""
+                }
             }
             .buttonStyle(.plain)
             .font(.system(size: 12))
@@ -189,6 +268,7 @@ private struct CommentCardView: View {
 
     @State private var isHovering = false
     @State private var isEditing = false
+    @State private var showDeleteConfirm = false
 
     private var anchored: Bool { model.isAnchored(record) }
     private var accent: Color { Self.color(from: record.color) }
@@ -214,11 +294,22 @@ private struct CommentCardView: View {
                         return ok
                     },
                     onCancel: { isEditing = false },
-                    memos: model.referenceableMemos(excluding: record.id)
+                    memos: model.referenceableMemos(excluding: record.id),
+                    tags: model.allTags
                 )
             } else {
                 card
             }
+        }
+        .confirmationDialog(
+            "Delete this note?",
+            isPresented: $showDeleteConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) { model.delete(record) }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This can't be undone.")
         }
     }
 
@@ -261,7 +352,7 @@ private struct CommentCardView: View {
                 }
                 Button("Copy") { copyToPasteboard() }
                 Button("Edit") { isEditing = true }
-                Button("Delete", role: .destructive) { model.delete(record) }
+                Button("Delete", role: .destructive) { showDeleteConfirm = true }
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 13, weight: .semibold))
@@ -304,7 +395,7 @@ private struct CommentCardView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            ForEach(images, id: \.self) { cardImage($0) }
+            cardImages
 
             if anchored, let quoted = record.text, !quoted.isEmpty {
                 sourceRow(quoted)
@@ -369,14 +460,27 @@ private struct CommentCardView: View {
         return false
     }
 
-    /// A native, tappable image thumbnail in a card — click opens it full screen.
+    /// Card images, flomo-style: uniform square thumbnails (九宫格) that wrap, so
+    /// they read as compact cards instead of spanning a full-width line. A click
+    /// opens the full-screen lightbox so the crop never hides anything.
     @ViewBuilder
-    private func cardImage(_ urlString: String) -> some View {
+    private var cardImages: some View {
+        if !images.isEmpty {
+            FlowLayout(spacing: 6) {
+                ForEach(images, id: \.self) { cardImageTile($0) }
+            }
+        }
+    }
+
+    /// A uniform square thumbnail (cropped to fill) for the image grid —
+    /// click opens the full image so the crop never hides anything.
+    @ViewBuilder
+    private func cardImageTile(_ urlString: String) -> some View {
         if let url = URL(string: urlString), let img = NSImage(contentsOf: url) {
             Image(nsImage: img)
                 .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(maxWidth: .infinity, maxHeight: 220, alignment: .leading)
+                .aspectRatio(contentMode: .fill)
+                .frame(width: Self.tileSize, height: Self.tileSize)
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -387,6 +491,10 @@ private struct CommentCardView: View {
                 .help("Click to view full screen")
         }
     }
+
+    /// Grid tile edge — small enough that 3–4 sit across the right panel per row,
+    /// like flomo's 九宫格.
+    private static let tileSize: CGFloat = 80
 
     /// flomo "source" affordance — a circular badge (tinted with the highlight
     /// color) + the quoted passage; taps jump back to it in the document.
