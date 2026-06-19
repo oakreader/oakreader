@@ -87,11 +87,41 @@ final class OverlayPDFPage: PDFPage {
     }
 
     private func draw(_ markup: PDFTextMarkup, in context: CGContext) {
-        drawDecoration(markup, in: context)
+        // Transient flash: clicking a note card pulses the note's source range so
+        // you can see *where* it came from, then it fades — no persistent paint.
+        if let controller = document?.delegate as? PDFMarkupOverlayController,
+           let alpha = controller.flashAlpha(forId: markup.id) {
+            drawFlash(markup, alpha: alpha, in: context)
+        }
+
+        // A note anchors to a selection but must NOT paint over the source text —
+        // the quote lives in the note card; the page only gets the small clickable
+        // marker (for jump-back / click-to-edit). Only a *plain* highlight (no
+        // comment) draws the colored fill/stroke decoration.
         if let markerRect = markup.noteMarkerRect {
-            drawNoteMarker(markerRect, color: markup.color, in: context)
+            // Neutral grey badge (not the highlight hue): the marker is a UI
+            // affordance — "a note lives here" — not a colored highlight. Mirrors
+            // the app's secondary-text token (≈ `Color.primary.opacity(0.6)`).
+            drawNoteMarker(markerRect, color: Self.noteMarkerColor, in: context)
+        } else {
+            drawDecoration(markup, in: context)
         }
     }
+
+    /// Draw the transient reveal fill for a flashing markup (same multiply blend
+    /// as a highlight, but at a caller-controlled, fading alpha).
+    private func drawFlash(_ markup: PDFTextMarkup, alpha: CGFloat, in context: CGContext) {
+        context.setBlendMode(.multiply)
+        context.setFillColor(markup.color.withAlphaComponent(alpha).cgColor)
+        for quad in markup.quads {
+            context.fill(quad)
+        }
+    }
+
+    /// Neutral grey for the note marker badge. Drawn on the (light) page, so a
+    /// fixed ~60%-black grey reads the same regardless of app appearance —
+    /// matching `OakStyle.Colors.textSecondary` (`Color.primary.opacity(0.6)`).
+    static let noteMarkerColor = NSColor(calibratedWhite: 0.4, alpha: 1)
 
     /// Draws a small "comment bubble" marker indicating a note is attached.
     private func drawNoteMarker(_ rect: CGRect, color: NSColor, in context: CGContext) {
@@ -160,6 +190,46 @@ final class OverlayPDFPage: PDFPage {
 final class PDFMarkupOverlayController: NSObject, PDFDocumentDelegate, PDFMarkupOverlaySource {
     private var byPage: [Int: [PDFTextMarkup]] = [:]
     weak var pdfView: PDFView?
+
+    // MARK: Transient flash (click-to-reveal a note's source)
+
+    private var flashId: String?
+    private var flashStart: Date?
+    private var flashTimer: Timer?
+    /// Hold at full strength briefly (so it's visible after a scroll/page jump
+    /// settles), then fade out.
+    private let flashHold: TimeInterval = 0.35
+    private let flashFade: TimeInterval = 0.85
+    private let flashPeak: CGFloat = 0.5
+
+    /// The fill alpha to use for `id` right now, or nil if it isn't flashing.
+    /// Read by `OverlayPDFPage` while a flash fades.
+    func flashAlpha(forId id: String) -> CGFloat? {
+        guard id == flashId, let start = flashStart else { return nil }
+        let elapsed = Date().timeIntervalSince(start)
+        if elapsed <= flashHold { return flashPeak }
+        let t = min(1, (elapsed - flashHold) / flashFade)
+        return flashPeak * (1 - CGFloat(t))
+    }
+
+    /// Briefly pulse a markup's source range, then fade it out — the reveal a
+    /// note card triggers when clicked, since notes leave no persistent paint.
+    func flash(id: String) {
+        flashTimer?.invalidate()
+        flashId = id
+        flashStart = Date()
+        redraw()
+        flashTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] timer in
+            guard let self, let start = self.flashStart else { timer.invalidate(); return }
+            if Date().timeIntervalSince(start) >= self.flashHold + self.flashFade {
+                self.flashId = nil
+                self.flashStart = nil
+                timer.invalidate()
+                self.flashTimer = nil
+            }
+            self.redraw()
+        }
+    }
 
     // MARK: PDFDocumentDelegate
 

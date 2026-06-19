@@ -315,6 +315,9 @@ final class CommentsViewModel {
         case "pdf-overlay":
             if let (pageIndex, _) = parent?.markupOverlay.markup(withId: record.id) {
                 parent?.viewer.goToPage(pageIndex)
+                // Notes leave no persistent highlight, so flash the source range
+                // to reveal where the note came from.
+                parent?.markupOverlay.flash(id: record.id)
             }
         default:
             break  // memo: no anchor to jump to
