@@ -3,12 +3,16 @@ import GRDB
 
 /// Generates and manages cite keys for library items.
 ///
+/// Follows the Better BibTeX default schema `auth.lower + shorttitle(3,3) + year`:
+/// in BBT, `shorttitle(3,3)` selects 3 words and capitalizes 3 of them, so the title
+/// words are CamelCase while the author is lowercase.
+///
 /// **Formula**: `{auth}{TitleWords}{year}`
 /// - `auth`: first author family name, lowercased, transliterated, particles stripped
-/// - `TitleWords`: first 3 significant words (stop words filtered), CamelCase
+/// - `TitleWords`: first 3 significant words (stop words filtered), each capitalized
 /// - `year`: 4-digit year
 ///
-/// Examples: `vaswaniAttentionAll2017`, `goodfellowDeepLearning2016`
+/// Examples: `vaswaniAttentionAllYou2017`, `goodfellowDeepLearning2016`
 struct CiteKeyService {
     let database: CatalogDatabase
 
@@ -48,33 +52,17 @@ struct CiteKeyService {
         let authorPart = Self.extractAuthorKey(csl: csl)
         let titlePart = Self.extractTitleWords(csl: csl)
         let yearPart = csl.issued?.year.map { "\($0)" } ?? ""
-
-        // No-author fallback: lowercase the first title word so it reads like `attentionAll2017`
-        if authorPart.isEmpty, !titlePart.isEmpty {
-            return Self.lowercaseFirstWord(titlePart) + yearPart
-        }
-
-        let base = authorPart + titlePart + yearPart
-        return base.isEmpty ? "" : base
+        // BBT default: lowercase author + CamelCase title words + year, simply concatenated.
+        // A missing author just drops out (the key then starts with the capitalized title).
+        return authorPart + titlePart + yearPart
     }
 
     /// Fallback for when no CSLItem is available (plain strings).
     func generateBase(author: String, title: String?, year: Int?) -> String {
         let authorPart = Self.processAuthorName(author)
-        let titlePart: String
-        if let title, !title.isEmpty {
-            titlePart = Self.extractTitleWordsFromString(title)
-        } else {
-            titlePart = ""
-        }
+        let titlePart = (title?.isEmpty == false) ? Self.extractTitleWordsFromString(title!) : ""
         let yearPart = year.map { "\($0)" } ?? ""
-
-        if authorPart.isEmpty, !titlePart.isEmpty {
-            return Self.lowercaseFirstWord(titlePart) + yearPart
-        }
-
-        let base = authorPart + titlePart + yearPart
-        return base.isEmpty ? "" : base
+        return authorPart + titlePart + yearPart
     }
 
     // MARK: - Assign
@@ -90,43 +78,62 @@ struct CiteKeyService {
                 .filter(CitationRecord.CodingKeys.itemId == itemId)
                 .fetchOne(db)
 
-            let base: String
-            if let cslJson = citation?.cslJson,
-               let data = cslJson.data(using: .utf8),
-               let csl = try? JSONDecoder().decode(CSLItem.self, from: data)
-            {
-                base = generateBase(csl: csl)
-            } else {
-                base = generateBase(
-                    author: item.author,
-                    title: item.title,
-                    year: citation?.year
-                )
-            }
-
+            let base = computeBase(item: item, citation: citation)
             guard !base.isEmpty else { return }
 
-            // Find unique key within the write transaction
-            var candidate = base
-            var suffix = 0
-            while true {
-                let count = try Int.fetchOne(
-                    db,
-                    sql: "SELECT COUNT(*) FROM items WHERE cite_key = ? AND id != ?",
-                    arguments: [candidate, itemId]
-                ) ?? 0
-                if count == 0 { break }
-                let letter = String(UnicodeScalar(UInt8(97 + suffix)))
-                candidate = base + letter
-                suffix += 1
-                if suffix >= 26 { break }
-            }
-
+            let candidate = try uniqueCandidate(base: base, itemId: itemId, db: db)
             try db.execute(
                 sql: "UPDATE items SET cite_key = ?, updated_at = ? WHERE id = ?",
                 arguments: [candidate, Date().iso8601String, itemId]
             )
         }
+    }
+
+    /// Compute a fresh, unique cite key from the item's CURRENT metadata, WITHOUT writing.
+    /// Used by the metadata panel's Regenerate action so the user can confirm before committing.
+    /// Returns `nil` if there isn't enough metadata to form a key.
+    func proposedKey(forItemId itemId: String) throws -> String? {
+        try database.dbQueue.read { db in
+            guard let item = try ItemRecord.fetchOne(db, key: itemId) else { return nil }
+            let citation = try CitationRecord
+                .filter(CitationRecord.CodingKeys.itemId == itemId)
+                .fetchOne(db)
+            let base = computeBase(item: item, citation: citation)
+            guard !base.isEmpty else { return nil }
+            return try uniqueCandidate(base: base, itemId: itemId, db: db)
+        }
+    }
+
+    /// Build the base key (no uniqueness suffix) from an item and its citation row.
+    /// Prefers the full CSL metadata; falls back to the item's plain author/title fields.
+    private func computeBase(item: ItemRecord, citation: CitationRecord?) -> String {
+        if let cslJson = citation?.cslJson,
+           let data = cslJson.data(using: .utf8),
+           let csl = try? JSONDecoder().decode(CSLItem.self, from: data)
+        {
+            return generateBase(csl: csl)
+        }
+        return generateBase(author: item.author, title: item.title, year: citation?.year)
+    }
+
+    /// Find a unique key derived from `base`, appending `a`/`b`/`c`… on collision.
+    /// Excludes `itemId` so re-deriving an item's own existing key is not treated as a clash.
+    private func uniqueCandidate(base: String, itemId: String, db: Database) throws -> String {
+        var candidate = base
+        var suffix = 0
+        while true {
+            let count = try Int.fetchOne(
+                db,
+                sql: "SELECT COUNT(*) FROM items WHERE cite_key = ? AND id != ?",
+                arguments: [candidate, itemId]
+            ) ?? 0
+            if count == 0 { break }
+            let letter = String(UnicodeScalar(UInt8(97 + suffix)))
+            candidate = base + letter
+            suffix += 1
+            if suffix >= 26 { break }
+        }
+        return candidate
     }
 
     // MARK: - Lookup
@@ -224,18 +231,12 @@ struct CiteKeyService {
             .filter { !stopWords.contains($0.lowercased()) }
             .prefix(3)
 
-        // CamelCase each word: first letter uppercased, rest lowercased
+        // Better BibTeX `shorttitle(3,3)`: capitalize each selected word (CamelCase) and
+        // concatenate without separators, e.g. "Attention All You" -> "AttentionAllYou".
         return significant.map { word in
             guard let first = word.first else { return "" }
             return first.uppercased() + word.dropFirst().lowercased()
         }.joined()
-    }
-
-    /// Lowercase only the first character of a string.
-    /// Used for no-author fallback: `AttentionAll` → `attentionAll`.
-    static func lowercaseFirstWord(_ str: String) -> String {
-        guard let first = str.first else { return str }
-        return first.lowercased() + str.dropFirst()
     }
 
     /// Apple-native transliteration: any script → Latin → strip diacritics.

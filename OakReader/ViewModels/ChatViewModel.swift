@@ -123,6 +123,9 @@ class ChatViewModel {
     /// Tool context for AI agent tool use (path sandbox).
     private var toolContext: ToolExecutionContext?
 
+    /// Observer for cite-key rewrites, so an open chat reloads stale `oak://cite/` links.
+    private var citeKeyRewriteObserver: NSObjectProtocol?
+
     init(parent: DocumentViewModel, documentStoragePath: URL? = nil) {
         self.parent = parent
         self.engine = AgentSession(chatsDirectory: CatalogDatabase.chatsDirectory)
@@ -133,11 +136,34 @@ class ChatViewModel {
                 allowedPaths: [path]
             )
         }
+        observeCiteKeyRewrites()
     }
 
     init() {
         self.parent = nil
         self.engine = AgentSession(chatsDirectory: CatalogDatabase.chatsDirectory)
+        observeCiteKeyRewrites()
+    }
+
+    deinit {
+        if let citeKeyRewriteObserver {
+            NotificationCenter.default.removeObserver(citeKeyRewriteObserver)
+        }
+    }
+
+    /// When a cite key is regenerated, its `oak://cite/` links are rewritten on disk. If this
+    /// chat is showing an affected session and isn't mid-stream, reload it so the displayed
+    /// links match disk (the persisted data is already correct either way).
+    private func observeCiteKeyRewrites() {
+        citeKeyRewriteObserver = NotificationCenter.default.addObserver(
+            forName: .oakCiteKeysRewritten, object: nil, queue: .main
+        ) { [weak self] note in
+            let sessions = note.userInfo?["sessions"] as? [UUID] ?? []
+            Task { @MainActor in
+                guard let self, !self.isStreaming, sessions.contains(self.sessionId) else { return }
+                self.loadSession(self.sessionId)
+            }
+        }
     }
 
     // MARK: - Configuration
@@ -183,8 +209,10 @@ class ChatViewModel {
         )
     }
 
-    /// Items shown in the `@`-mention panel: recent library documents the user can
-    /// attach as context (the keyboard path to what drag-and-drop already does).
+    /// Items shown in the `@`-mention panel: documents in the CURRENT collection that
+    /// the user can attach as context (the keyboard path to what drag-and-drop already
+    /// does). Scoped to the selected collection — not the whole library — so `@` mirrors
+    /// what the user is actually working in (the same set grounded chat retrieves over).
     /// Cached in a stored property because the DB fetch is too costly to run on
     /// every SwiftUI update — `refreshAtMentionItems()` repopulates it on appear
     /// and when a new session starts.
@@ -196,8 +224,9 @@ class ChatViewModel {
             atMentionItems = []
             return
         }
-        let items = (try? store.fetchAllItems()) ?? []
-        let recent = items.sorted { $0.dateAdded > $1.dateAdded }.prefix(60)
+        // `filteredItems` already respects the selected collection / smart filter, so this
+        // surfaces only the current collection's documents instead of the entire library.
+        let recent = store.filteredItems.sorted { $0.dateAdded > $1.dateAdded }.prefix(60)
         atMentionItems = recent.map { ChatCompletionItem.libraryReference(from: $0, trigger: "@") }
     }
 
@@ -249,6 +278,31 @@ class ChatViewModel {
         // Create or update session record in DB
         persistSessionMetadata(firstUserMessage: sendText)
 
+        // Defer the heavy context-snapshot + tool build off the synchronous send()
+        // path. `isStreaming = true` (and the cleared input) only paint once send()
+        // returns to the runloop, so doing the snapshot here would freeze the UI for
+        // its whole duration — and on a wide-context model the snapshot can extract a
+        // large amount of document text. Yielding first lets the "sent" state paint,
+        // then we build context and start streaming on the next tick.
+        Task { @MainActor [weak self] in
+            await Task.yield()
+            self?.startStream(
+                effectiveSkill: effectiveSkill,
+                userContent: userContent,
+                attachments: attachments
+            )
+        }
+    }
+
+    /// Builds the context snapshot + tool set and kicks off the streaming task.
+    /// Split out of `send()` so the synchronous input handling can return to the
+    /// runloop (painting the cleared input + streaming indicator) before this work.
+    @MainActor
+    private func startStream(
+        effectiveSkill: Skill?,
+        userContent: String,
+        attachments: [TurnAttachment]
+    ) {
         // Build enriched context snapshot. The document-text budget scales with the
         // active model's context window (replaces the old fixed 4 000-char cap), so a
         // whole short document loads in full on a large window.
@@ -1043,15 +1097,39 @@ class ChatViewModel {
     private static func buildReferencedDocumentsXML(
         libraryRefs: [ChatCompletionItem.LibraryRefPayload]
     ) -> String {
-        var lines = ["<referenced-documents>"]
+        // The user attached these library documents as context, but their full text
+        // is NOT inlined here (it can be large). Tell the model exactly how to pull a
+        // doc's content on demand: read it with the oak tool by its title or cite-key.
+        // Without this instruction the model only sees the metadata and (rightly)
+        // responds that it lacks the document body.
+        //
+        // NOTE: the opening tag MUST stay bare `<referenced-documents>` — the chat
+        // bubble (ChatBubbleView.extractReferencedDocuments) and the TTS preprocessor
+        // strip the block by matching that literal tag, so attributes on it would leak
+        // the raw XML into the rendered message. Keep guidance in a child element.
+        var lines = [
+            "<referenced-documents>",
+            "  <instructions>The user attached these library documents as context. "
+            + "Their full text is NOT included below — only metadata. To read a "
+            + "document's content, call the oak tool: `items read \"&lt;title-or-cite-key&gt;\" "
+            + "[--pages N-M]`. To find a passage inside one, use `search &lt;query&gt;`. "
+            + "Read the referenced document(s) with the tool before answering questions "
+            + "about them — do not ask the user to summarize or open them for you.</instructions>"
+        ]
         for ref in libraryRefs {
-            let ck = ref.citeKey ?? ref.storageKey
-            lines.append(
-                "  <doc cite-key=\"\(xmlEsc(ck))\" title=\"\(xmlEsc(ref.title))\" "
+            // Prefer a real cite-key (resolvable by `oak items read`); fall back to the
+            // title, which the resolver also matches exactly. Never emit the storageKey
+            // as cite-key — it is a storage path, not a resolvable identifier.
+            let readKey = ref.citeKey ?? ref.title
+            var attrs =
+                "title=\"\(xmlEsc(ref.title))\" "
                 + "author=\"\(xmlEsc(ref.author))\" pages=\"\(ref.pageCount)\" "
                 + "format=\"\(xmlEsc(ref.contentType))\" "
-                + "link=\"oak://cite/\(xmlEsc(ck))\" />"
-            )
+                + "read-with=\"items read &quot;\(xmlEsc(readKey))&quot;\""
+            if let ck = ref.citeKey, !ck.isEmpty {
+                attrs = "cite-key=\"\(xmlEsc(ck))\" " + attrs + " link=\"oak://cite/\(xmlEsc(ck))\""
+            }
+            lines.append("  <doc \(attrs) />")
         }
         lines.append("</referenced-documents>")
         return lines.joined(separator: "\n")

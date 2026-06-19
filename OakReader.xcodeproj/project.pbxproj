@@ -224,6 +224,7 @@
 		CC7D576D3A9990F1737D140D /* DuckDuckGoSearchProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7637FBE267CE1092647B935E /* DuckDuckGoSearchProvider.swift */; };
 		CD68F5844D15888537F54363 /* Marketplace.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10E57E661596E49EB03F2F2 /* Marketplace.swift */; };
 		CF1FE06115DEFE39C67CE511 /* Preview.bundle in Resources */ = {isa = PBXBuildFile; fileRef = B13F3C4D671B00C4C56C6096 /* Preview.bundle */; };
+		CFC79967BC4F0A9623DD68FB /* CiteLinkRewriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1980E6AB390BD5E181358F93 /* CiteLinkRewriter.swift */; };
 		D203D0879C1D6334AA846B0D /* ReferenceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F738341643EF3BE5A70CB44 /* ReferenceService.swift */; };
 		D3FDC0F775EC2D91FF876566 /* ChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67058640A7746AEB945545CA /* ChatViewModel.swift */; };
 		D5CFF5D2B99EDFC92C7EC923 /* SecurityViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB456F0D360470509AF91C56 /* SecurityViewModel.swift */; };
@@ -310,6 +311,7 @@
 		16F14AE6A44E2896D55B85E2 /* CommandPaletteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandPaletteView.swift; sourceTree = "<group>"; };
 		17EFE48B927C4FA692D2A3FB /* AgentSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSettingsView.swift; sourceTree = "<group>"; };
 		19548A405FBCC2C0C9A2E5EF /* AnnotationEditPopupPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationEditPopupPanel.swift; sourceTree = "<group>"; };
+		1980E6AB390BD5E181358F93 /* CiteLinkRewriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CiteLinkRewriter.swift; sourceTree = "<group>"; };
 		1BA0F12DFA84CBFFE95CD534 /* HTMLViewerRepresentable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTMLViewerRepresentable.swift; sourceTree = "<group>"; };
 		1E17653B4A5B70DEDC4E21C1 /* AppExtensionSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppExtensionSettingsView.swift; sourceTree = "<group>"; };
 		1E682F4A12F66C8D3B12A14F /* ZoteroMigrationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoteroMigrationService.swift; sourceTree = "<group>"; };
@@ -750,6 +752,7 @@
 				DF16A725DAC68F199227892D /* CatalogStoragePaths.swift */,
 				321349C45AEC61F2E40F34B9 /* CitationFormatter.swift */,
 				21CDA00C280D985B61794989 /* CiteKeyService.swift */,
+				1980E6AB390BD5E181358F93 /* CiteLinkRewriter.swift */,
 				A42FC1665D3C0FC1A2667BB7 /* CJKBigramTokenizer.swift */,
 				AB52F4E998F30885954293C4 /* ConfiguredProviderStore.swift */,
 				101914D5471BD54C347EA63C /* ContentChunker.swift */,
@@ -1316,6 +1319,7 @@
 				A11D9E56DCAEA0A563A18512 /* CitationFormatter.swift in Sources */,
 				6DD0D154F916374FE0A7DCAC /* CitationHoverCard.swift in Sources */,
 				F404B1B9EE85677B6CBA6D4C /* CiteKeyService.swift in Sources */,
+				CFC79967BC4F0A9623DD68FB /* CiteLinkRewriter.swift in Sources */,
 				986C134F1FD341E0D275E0DB /* CollectionEditorSheet.swift in Sources */,
 				F0E1B4B9AD317961D657FA94 /* CollectionPanelHelpers.swift in Sources */,
 				B0F40B872CFA21EB17E14CBF /* Color+Hex.swift in Sources */,

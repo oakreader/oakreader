@@ -7,6 +7,9 @@ struct ReferenceMetadataView: View {
     let item: LibraryItem
     let store: LibraryStore
     let referenceService: ReferenceService
+    /// Called with the new title whenever metadata is saved, so an open tab can
+    /// live-update its title. Nil when shown outside a document tab (e.g. library).
+    var onTitleChange: ((String) -> Void)?
 
     @State private var cslType: CSLItemType = .document
     @State private var fieldValues: [String: String] = [:]
@@ -15,6 +18,11 @@ struct ReferenceMetadataView: View {
     @State private var accessedString: String = ""
     @State private var citeKeyText: String = ""
     @State private var citeKeyError: String?
+    @State private var citeKeyInfo: String?
+    @State private var pendingRegenKey: String?
+    @State private var regenAffectedCount: Int = 0
+    @State private var showRegenConfirm = false
+    @State private var isRegenerating = false
     @State private var extraText: String = ""
     @State private var contextualDateStrings: [String: String] = [:]
 
@@ -24,7 +32,6 @@ struct ReferenceMetadataView: View {
     @FocusState private var focusedField: Field?
 
     private enum Field: Hashable {
-        case citeKey
         case field(String)
         case date, accessed
         case contextualDate(String)
@@ -40,6 +47,16 @@ struct ReferenceMetadataView: View {
             editableContent
                 .onAppear { loadFromMetadata() }
                 .onChange(of: item.id) { _, _ in loadFromMetadata() }
+                .alert("Regenerate cite key?", isPresented: $showRegenConfirm, presenting: pendingRegenKey) { newKey in
+                    Button("Regenerate") { commitRegenerate(to: newKey) }
+                    Button("Cancel", role: .cancel) {}
+                } message: { newKey in
+                    if regenAffectedCount > 0 {
+                        Text("“\(citeKeyText)” → “\(newKey)”.\n\(regenAffectedCount) citation\(regenAffectedCount == 1 ? "" : "s") in your chat history will be updated to the new key.")
+                    } else {
+                        Text("“\(citeKeyText)” → “\(newKey)”.")
+                    }
+                }
         } else {
             extractingState
                 .onAppear { autoExtract() }
@@ -72,6 +89,7 @@ struct ReferenceMetadataView: View {
                         try referenceService.saveMetadata(cslItem, forItemId: item.id.uuidString)
                         await MainActor.run {
                             store.invalidate()
+                            if let title = cslItem.title, !title.isEmpty { onTitleChange?(title) }
                             isExtracting = false
                         }
                         return
@@ -108,23 +126,40 @@ struct ReferenceMetadataView: View {
                 .onChange(of: cslType) { _, _ in saveDebounced() }
             }
 
-            // Cite Key
+            // Cite Key — derived from metadata (Better BibTeX schema), not hand-editable.
+            // The only way to change it is Regenerate, which also fixes up existing
+            // citations in chat history so links never break silently.
             gridRow("Cite Key") {
                 VStack(alignment: .leading, spacing: 2) {
-                    underlinedField {
-                        TextField("", text: $citeKeyText)
-                            .textFieldStyle(.plain)
+                    HStack(spacing: 8) {
+                        Text(citeKeyText.isEmpty ? "—" : citeKeyText)
                             .font(.system(size: 14, design: .monospaced))
-                            .focused($focusedField, equals: .citeKey)
-                            .onSubmit { saveCiteKey() }
-                            .onChange(of: focusedField) { old, new in
-                                if old == .citeKey && new != .citeKey { saveCiteKey() }
+                            .foregroundStyle(citeKeyText.isEmpty ? .secondary : .primary)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Button(action: prepareRegenerate) {
+                            if isRegenerating {
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .scaleEffect(0.6)
+                            } else {
+                                Image(systemName: "arrow.clockwise")
+                                    .font(.system(size: 12, weight: .medium))
                             }
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+                        .disabled(isRegenerating)
+                        .help("Regenerate from the current title, author & year")
                     }
                     if let error = citeKeyError {
                         Text(error)
                             .font(.system(size: 11))
                             .foregroundStyle(.red)
+                    } else if let info = citeKeyInfo {
+                        Text(info)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
                     }
                 }
             }
@@ -457,6 +492,7 @@ struct ReferenceMetadataView: View {
         guard let meta = item.referenceMetadata else { return }
         citeKeyText = item.citeKey ?? ""
         citeKeyError = nil
+        citeKeyInfo = nil
         let csl = meta.cslItem
 
         // Set type
@@ -494,40 +530,46 @@ struct ReferenceMetadataView: View {
     }
 
     private func buildCSLItem() -> CSLItem {
-        var csl = CSLItem(type: cslType.rawValue)
+        // Start from the existing record so fields not surfaced for the current
+        // type (e.g. DOI/volume on a `document`) and sub-year date precision are
+        // preserved instead of being wiped on every save.
+        var csl = item.referenceMetadata?.cslItem ?? CSLItem(type: cslType.rawValue)
+        csl.type = cslType.rawValue
 
-        // Set all field values
-        for (key, value) in fieldValues {
-            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-            csl.setField(key, value: trimmed.isEmpty ? nil : trimmed)
-        }
+        let spec = CSLTypeFieldRegistry.spec(for: cslType)
 
-        // Date
-        if let year = Int(dateString) {
-            csl.issued = CSLDate(year: year)
-        }
-        if let year = Int(accessedString) {
-            csl.accessed = CSLDate(year: year)
+        // Overwrite only the fields shown for this type (empty → cleared).
+        for fieldSpec in spec.fields {
+            let trimmed = (fieldValues[fieldSpec.key] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            csl.setField(fieldSpec.key, value: trimmed.isEmpty ? nil : trimmed)
         }
 
-        // Contextual dates
-        if let str = contextualDateStrings["eventDate"], let year = Int(str) {
-            csl.eventDate = CSLDate(year: year)
-        }
-        if let str = contextualDateStrings["submitted"], let year = Int(str) {
-            csl.submitted = CSLDate(year: year)
-        }
-        if let str = contextualDateStrings["originalDate"], let year = Int(str) {
-            csl.originalDate = CSLDate(year: year)
-        }
+        // Dates — preserve month/day when the displayed year is unchanged.
+        csl.issued = mergeYear(dateString, into: csl.issued)
+        csl.accessed = mergeYear(accessedString, into: csl.accessed)
+        csl.eventDate = mergeYear(contextualDateStrings["eventDate"], into: csl.eventDate)
+        csl.submitted = mergeYear(contextualDateStrings["submitted"], into: csl.submitted)
+        csl.originalDate = mergeYear(contextualDateStrings["originalDate"], into: csl.originalDate)
 
-        // Set all creator arrays
-        for (role, names) in creatorValues {
-            let filtered = names.filter { !($0.family ?? "").isEmpty || !($0.given ?? "").isEmpty }
-            csl.setCreators(role: role, names: filtered.isEmpty ? nil : filtered)
+        // Overwrite only the creator roles shown for this type.
+        for creatorSpec in spec.creators {
+            let names = (creatorValues[creatorSpec.role] ?? [])
+                .filter { !($0.family ?? "").isEmpty || !($0.given ?? "").isEmpty }
+            csl.setCreators(role: creatorSpec.role, names: names.isEmpty ? nil : names)
         }
 
         return csl
+    }
+
+    /// Apply an edited year string to a date while keeping the existing
+    /// month/day when the year hasn't changed. Empty clears the date; a
+    /// non-numeric value leaves the existing date untouched.
+    private func mergeYear(_ str: String?, into existing: CSLDate?) -> CSLDate? {
+        let trimmed = (str ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return nil }
+        guard let year = Int(trimmed) else { return existing }
+        if existing?.year == year { return existing }
+        return CSLDate(year: year)
     }
 
     private func saveDebounced() {
@@ -535,6 +577,9 @@ struct ReferenceMetadataView: View {
         do {
             try referenceService.saveMetadata(csl, forItemId: item.id.uuidString)
             store.invalidate()
+            if let title = csl.title, !title.isEmpty {
+                onTitleChange?(title)
+            }
         } catch {
             Log.error(Log.store, "Failed to save reference metadata: \(error)")
         }
@@ -555,16 +600,84 @@ struct ReferenceMetadataView: View {
         }
     }
 
-    private func saveCiteKey() {
-        let key = citeKeyText.trimmingCharacters(in: .whitespaces)
-        guard !key.isEmpty else { return }
-        let service = CiteKeyService(database: store.database)
-        do {
-            try service.saveCiteKey(key, forItemId: item.id.uuidString)
-            citeKeyError = nil
-            store.invalidate()
-        } catch {
-            citeKeyError = error.localizedDescription
+    /// Compute the cite key the item *would* get from its current metadata. If it differs
+    /// from the stored key, count how many chat citations reference the old key and ask the
+    /// user to confirm before committing. The DB read and the chat-history scan run off the
+    /// main thread so the panel never hitches on a large library.
+    private func prepareRegenerate() {
+        guard !isRegenerating else { return }
+        citeKeyError = nil
+        citeKeyInfo = nil
+        isRegenerating = true
+        let database = store.database
+        let itemId = item.id.uuidString
+        let current = citeKeyText.trimmingCharacters(in: .whitespaces)
+        Task.detached {
+            let service = CiteKeyService(database: database)
+            let proposed = (try? service.proposedKey(forItemId: itemId)) ?? nil
+            let isChange = proposed != nil && !proposed!.isEmpty && proposed != current
+            let count = (isChange && !current.isEmpty) ? CiteLinkRewriter.countReferences(toKey: current) : 0
+            await MainActor.run {
+                isRegenerating = false
+                guard let proposed, !proposed.isEmpty else {
+                    citeKeyInfo = "Not enough metadata to generate a cite key."
+                    return
+                }
+                guard proposed != current else {
+                    citeKeyInfo = "Already up to date."
+                    return
+                }
+                pendingRegenKey = proposed
+                regenAffectedCount = count
+                showRegenConfirm = true
+            }
+        }
+    }
+
+    /// Write the new key and rewrite matching `oak://cite/` links in chat history, off the
+    /// main thread. Surfaces any write failures, and notifies open chat views to reload.
+    private func commitRegenerate(to newKey: String) {
+        guard !isRegenerating else { return }
+        let oldKey = citeKeyText.trimmingCharacters(in: .whitespaces)
+        let database = store.database
+        let itemId = item.id.uuidString
+        isRegenerating = true
+        Task.detached {
+            var saveError: String?
+            var result = CiteLinkRewriter.RewriteResult.empty
+            do {
+                try CiteKeyService(database: database).saveCiteKey(newKey, forItemId: itemId)
+                if !oldKey.isEmpty {
+                    result = CiteLinkRewriter.rewrite(from: oldKey, to: newKey)
+                }
+            } catch {
+                saveError = error.localizedDescription
+            }
+            await MainActor.run {
+                isRegenerating = false
+                if let saveError {
+                    citeKeyError = saveError
+                    return
+                }
+                citeKeyText = newKey
+                citeKeyError = nil
+                var parts: [String] = []
+                if result.linksRewritten > 0 {
+                    parts.append("Updated \(result.linksRewritten) citation\(result.linksRewritten == 1 ? "" : "s") in chat history.")
+                }
+                if result.failedFiles > 0 {
+                    parts.append("\(result.failedFiles) chat file\(result.failedFiles == 1 ? "" : "s") could not be updated.")
+                }
+                citeKeyInfo = parts.isEmpty ? nil : parts.joined(separator: " ")
+                store.invalidate()
+                if !result.affectedSessions.isEmpty {
+                    NotificationCenter.default.post(
+                        name: .oakCiteKeysRewritten,
+                        object: nil,
+                        userInfo: ["sessions": result.affectedSessions]
+                    )
+                }
+            }
         }
     }
 
@@ -578,6 +691,7 @@ struct ReferenceMetadataView: View {
                 try referenceService.saveMetadata(cslItem, forItemId: item.id.uuidString)
                 await MainActor.run {
                     store.invalidate()
+                    if let title = cslItem.title, !title.isEmpty { onTitleChange?(title) }
                     isLookingUp = false
                 }
             } catch {
