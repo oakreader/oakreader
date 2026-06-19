@@ -40,12 +40,18 @@ struct WebSearchSettingsView: View {
     @ViewBuilder
     private var activeProviderStatus: some View {
         let active = registry.activeProvider()
-        if !active.requiresAPIKey {
-            Label("Using \(active.displayName) (free, no key required)", systemImage: "checkmark.circle")
-                .foregroundStyle(.secondary, .green)
-        } else {
-            Label("Using \(active.displayName)", systemImage: "checkmark.circle.fill")
-                .foregroundStyle(.secondary, .green)
+        HStack(spacing: 10) {
+            ProviderIconView(assetName: "provider-\(active.id)", fallbackSymbol: "magnifyingglass", size: 22)
+            if !active.requiresAPIKey {
+                Text("Using \(active.displayName) (free, no key required)")
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("Using \(active.displayName)")
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(.green)
         }
     }
 
@@ -104,23 +110,11 @@ struct WebSearchSettingsView: View {
             .padding(.vertical, 4)
         } label: {
             HStack(spacing: 10) {
-                WebProviderIconTile(
-                    name: provider.displayName,
-                    color: Self.providerColor(provider.id)
-                )
+                ProviderIconView(assetName: "provider-\(provider.id)", fallbackSymbol: "magnifyingglass", size: 22)
                 Text(provider.displayName)
             }
         }
-    }
-
-    private static func providerColor(_ id: String) -> Color {
-        switch id {
-        case "web-search-brave": return .orange
-        case "web-search-tavily": return .blue
-        case "web-search-exa": return .purple
-        case "web-search-serper": return .green
-        default: return .gray
-        }
+        .disclosureGroupStyle(TrailingChevronDisclosureStyle())
     }
 
     // MARK: - Key Management
@@ -157,22 +151,33 @@ struct WebSearchSettingsView: View {
     }
 }
 
-// MARK: - Provider Icon Tile
+// MARK: - Trailing Chevron Disclosure Style
 
-/// A small colored monogram tile for brandless web-search providers, giving the
-/// API-key rows a leading icon like the AI Providers list.
-private struct WebProviderIconTile: View {
-    let name: String
-    let color: Color
+/// A `DisclosureGroupStyle` that places the expand/collapse chevron on the trailing
+/// edge (right) instead of SwiftUI's default leading position.
+private struct TrailingChevronDisclosureStyle: DisclosureGroupStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                withAnimation(.snappy(duration: 0.2)) {
+                    configuration.isExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    configuration.label
+                    Spacer(minLength: 8)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                        .rotationEffect(.degrees(configuration.isExpanded ? 90 : 0))
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
 
-    var body: some View {
-        RoundedRectangle(cornerRadius: 6, style: .continuous)
-            .fill(color.gradient)
-            .frame(width: 22, height: 22)
-            .overlay(
-                Text(String(name.prefix(1)))
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.white)
-            )
+            if configuration.isExpanded {
+                configuration.content
+            }
+        }
     }
 }
