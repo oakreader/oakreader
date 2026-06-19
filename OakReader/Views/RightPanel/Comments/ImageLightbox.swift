@@ -54,10 +54,15 @@ private struct ImageLightboxView: View {
                 .contentShape(Rectangle())
                 .onTapGesture(perform: onClose)
 
+            // Own full-size frame (default center alignment) so the fitted image
+            // sits in the middle of the screen — without it the ZStack's
+            // `.topTrailing` alignment (there for the close button) pins a
+            // wide/short image to the top edge.
             Image(nsImage: image)
                 .resizable()
                 .scaledToFit()
                 .padding(48)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .onTapGesture(perform: onClose)
 
             Button(action: onClose) {

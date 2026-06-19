@@ -12,6 +12,11 @@ struct OakToolButton: View {
     var action: () -> Void
 
     @State private var isHovering = false
+    // Inactive (kept-alive, opacity-0) tabs keep their AppKit tracking areas
+    // live, so without this gate a background tab's tooltip fires when you hover
+    // the *active* tab's overlapping content — e.g. the save button leaking
+    // "Save to Reading List" over the Notes panel's close button.
+    @Environment(\.isTabActive) private var isTabActive
 
     var body: some View {
         Button(action: action) {
@@ -32,7 +37,9 @@ struct OakToolButton: View {
         .onHover { isHovering = $0 }
         .accessibilityLabel(tooltip)
         .background(
-            TooltipTrigger(tooltip: tooltip)
+            // Only the active tab arms the tooltip's tracking area; background
+            // tabs would otherwise show their tooltip over the visible tab.
+            TooltipTrigger(tooltip: isTabActive ? tooltip : "")
         )
     }
 
