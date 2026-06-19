@@ -512,6 +512,12 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
     private func handleNavigationError(_ error: Error) {
         guard isLiveMode else { return }
         viewModel.state.webLoadProgress = 0
+
+        // A reload or in-place navigation cancels the in-flight load, which surfaces
+        // as NSURLErrorCancelled (-999). Browsers ignore it; so do we.
+        let nsError = error as NSError
+        guard nsError.domain != NSURLErrorDomain || nsError.code != NSURLErrorCancelled else { return }
+
         viewModel.state.presentError("Failed to load page: \(error.localizedDescription)")
     }
 
