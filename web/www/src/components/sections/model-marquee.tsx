@@ -1,27 +1,44 @@
 "use client";
 
+import {
+  Claude,
+  Cohere,
+  DeepSeek,
+  Gemini,
+  Grok,
+  LmStudio,
+  Meta,
+  Mistral,
+  Ollama,
+  OpenAI,
+  Perplexity,
+  Qwen,
+} from "@lobehub/icons";
 import { useReveal } from "@/hooks/use-reveal";
 
-type Provider = { name: string; color: string };
+type IconComponent = React.ComponentType<{ size?: number }>;
+type Provider = { name: string; Icon: IconComponent };
 
-// Brand-ish accent per provider — gives each model a visual identity
-// without depending on (trademarked) logo assets.
+// Real brand marks via @lobehub/icons — the plain monochrome logo (default
+// export renders in currentColor), not the brand-color fills. Nominative use:
+// shown to convey which models OakReader works with, no endorsement implied.
+// Llama uses Meta's mark (it's a Meta model).
 const row1: Provider[] = [
-  { name: "Claude", color: "#D97757" },
-  { name: "GPT", color: "#10A37F" },
-  { name: "Gemini", color: "#4285F4" },
-  { name: "Llama", color: "#0866FF" },
-  { name: "Mistral", color: "#FA520F" },
-  { name: "DeepSeek", color: "#4D6BFE" },
+  { name: "Claude", Icon: Claude },
+  { name: "GPT", Icon: OpenAI },
+  { name: "Gemini", Icon: Gemini },
+  { name: "Llama", Icon: Meta },
+  { name: "Mistral", Icon: Mistral },
+  { name: "DeepSeek", Icon: DeepSeek },
 ];
 
 const row2: Provider[] = [
-  { name: "Grok", color: "#111111" },
-  { name: "Qwen", color: "#615CED" },
-  { name: "Cohere", color: "#39594D" },
-  { name: "Perplexity", color: "#20808D" },
-  { name: "Ollama (local)", color: "#111111" },
-  { name: "LM Studio (local)", color: "#4338CA" },
+  { name: "Grok", Icon: Grok },
+  { name: "Qwen", Icon: Qwen },
+  { name: "Cohere", Icon: Cohere },
+  { name: "Perplexity", Icon: Perplexity },
+  { name: "Ollama (local)", Icon: Ollama },
+  { name: "LM Studio (local)", Icon: LmStudio },
 ];
 
 const edgeFade = {
@@ -31,13 +48,10 @@ const edgeFade = {
     "linear-gradient(90deg, transparent, black 10%, black 90%, transparent)",
 } as const;
 
-function Chip({ name, color }: Provider) {
+function Chip({ name, Icon }: Provider) {
   return (
     <div className="shrink-0 inline-flex items-center gap-[1rem] bg-white border border-[#ededed] rounded-full px-[2rem] h-[5rem] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.03)]">
-      <span
-        className="w-[1rem] h-[1rem] rounded-full shrink-0"
-        style={{ backgroundColor: color }}
-      />
+      <Icon size={22} />
       <span className="font-sans font-medium text-[1.6rem] md:text-[1.7rem] text-black/70 whitespace-nowrap">
         {name}
       </span>

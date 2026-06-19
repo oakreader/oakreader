@@ -69,19 +69,22 @@ export function Hero() {
       >
         <EarlyAccessBadge />
 
+        <p className="font-sans italic text-[1.4rem] min-[800px]:text-[1.6rem] text-black/40 tracking-[0.01em] mb-[1.6rem]">
+          A research agent for everything you read.
+        </p>
+
         <h1 className="flex flex-col items-center text-black leading-[1.1] tracking-[-0.02em] text-[3.2rem] min-[600px]:text-[4.8rem] min-[800px]:text-[6rem] min-[1000px]:text-[6.8rem]">
-          <span className="whitespace-nowrap">
-            <span className="font-sans font-light">The </span>
-            <span className="font-exposure font-medium">Context Library</span>
+          <span className="font-sans font-light whitespace-nowrap">
+            Read <span className="font-exposure font-medium">everything.</span>
           </span>
           <span className="font-sans font-light whitespace-nowrap">
-            for you and your agent.
+            Understand <span className="font-exposure font-medium">anything.</span>
           </span>
         </h1>
 
         <p className="font-sans font-medium tracking-[-0.01em] text-[1.6rem] min-[600px]:text-[1.8rem] min-[800px]:text-[2.2rem] text-black/55 max-w-[30rem] min-[800px]:max-w-[48rem] leading-[150%] text-pretty mt-[3.2rem] md:mt-[4rem]">
-          Keep everything you read in one place &mdash; then let an AI research
-          agent search and answer across all of it, with citations you can open.
+          Keep everything you read in one place &mdash; then let an AI search
+          and answer across all of it, with citations you can open.
         </p>
 
         {/* What you can bring — Heptabase-style source pills */}
@@ -107,11 +110,6 @@ export function Hero() {
             render={<a href={DOWNLOAD_URL} />}
           >
             <span className="relative inline-flex items-center justify-center">
-              <span
-                aria-hidden="true"
-                className="absolute -inset-x-[3.2rem] -inset-y-[1.6rem] rounded-full blur-[32px] opacity-40 pointer-events-none"
-                style={{ backgroundColor: HERO_COLOR }}
-              />
               <span
                 className="relative flex items-center justify-center rounded-[1.4rem] text-white font-sans font-medium text-[1.8rem] min-[800px]:text-[2rem] h-[5.6rem] w-[28rem] hover:opacity-85 transition-opacity"
                 style={{
