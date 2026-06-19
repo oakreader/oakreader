@@ -12,7 +12,7 @@
     "tagline": "Un agent de recherche pour tout ce que vous lisez.",
     "headline1": "Tout lire.",
     "headline2": "Tout comprendre.",
-    "subhead": "Rassemblez tout ce que vous lisez au même endroit, puis laissez une IA tout parcourir pour chercher et répondre, avec des citations que vous pouvez ouvrir.",
+    "subhead": "Rassemblez tout ce que vous lisez au même endroit, puis laissez une IA tout parcourir pour chercher et répondre, avec des citations que vous pouvez ouvrir d'un clic.",
     "bringYour": "Apportez vos",
     "pills": ["PDF", "Articles", "Pages web", "Livres"],
     "cta": "Télécharger gratuitement",
@@ -52,7 +52,7 @@
   "models": {
     "eyebrow": "Indépendant du modèle",
     "title": "Tous les modèles. Changez quand vous voulez.",
-    "subhead": "Le meilleur cerveau pour chaque question — des laboratoires de pointe à un modèle local sur votre Mac. Votre choix, à chaque fois."
+    "subhead": "Le meilleur modèle pour chaque question — des laboratoires de pointe à celui qui tourne en local sur votre Mac. Votre choix, à chaque fois."
   },
   "footer": {
     "copyright": "Copyright",

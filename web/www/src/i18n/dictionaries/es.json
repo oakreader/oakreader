@@ -12,7 +12,7 @@
     "tagline": "Un agente de investigación para todo lo que lees.",
     "headline1": "Léelo todo.",
     "headline2": "Compréndelo todo.",
-    "subhead": "Reúne todo lo que lees en un solo lugar y deja que una IA lo recorra para buscar y responder, con citas que puedes abrir.",
+    "subhead": "Reúne todo lo que lees en un solo lugar y deja que una IA lo recorra para buscar y responder, con citas que puedes abrir al instante.",
     "bringYour": "Trae tus",
     "pills": ["PDF", "Artículos", "Páginas web", "Libros"],
     "cta": "Descargar gratis",
@@ -52,7 +52,7 @@
   "models": {
     "eyebrow": "Independiente del modelo",
     "title": "Usa cualquier modelo. Cambia cuando quieras.",
-    "subhead": "El mejor cerebro para cada pregunta — desde los laboratorios punteros hasta un modelo local en tu Mac. Tú eliges, siempre."
+    "subhead": "El mejor modelo para cada pregunta — desde los laboratorios punteros hasta el que se ejecuta localmente en tu Mac. Tú eliges, siempre."
   },
   "footer": {
     "copyright": "Copyright",

@@ -12,7 +12,7 @@
     "tagline": "Ein Recherche-Agent für alles, was du liest.",
     "headline1": "Alles lesen.",
     "headline2": "Alles begreifen.",
-    "subhead": "Sammle alles Gelesene an einem Ort – und lass eine KI darin suchen und antworten, mit Belegen, die du öffnen kannst.",
+    "subhead": "Sammle alles Gelesene an einem Ort – und lass eine KI darin suchen und antworten, samt Belegen, die du nachprüfen kannst.",
     "bringYour": "Bring deine",
     "pills": ["PDFs", "Aufsätze", "Webseiten", "Bücher"],
     "cta": "Kostenlos herunterladen",
@@ -52,7 +52,7 @@
   "models": {
     "eyebrow": "Modellunabhängig",
     "title": "Jedes Modell nutzen. Jederzeit wechseln.",
-    "subhead": "Das beste Gehirn für jede Frage – von den Spitzenlaboren bis zu einem lokalen Modell auf deinem Mac. Deine Wahl, jedes Mal."
+    "subhead": "Für jede Frage das beste Modell – von den Spitzenlaboren bis zu einem, das lokal auf deinem Mac läuft. Deine Wahl, jedes Mal."
   },
   "footer": {
     "copyright": "Copyright",
