@@ -400,8 +400,11 @@ final class Preferences {
 
     /// Thinking effort level for reasoning models ("off", "low", "medium", "high", "max").
     /// "off" disables thinking entirely. Other values map to API effort levels.
+    /// Defaults to "low": interactive chat should answer fast (Dia-like). High effort
+    /// spends seconds reasoning before the first visible token — reserve it for hard
+    /// questions via the model menu, don't pay it on every message.
     var thinkingEffort: String {
-        get { defaults.string(forKey: Keys.thinkingEffort) ?? "high" }
+        get { defaults.string(forKey: Keys.thinkingEffort) ?? "low" }
         set { defaults.set(newValue, forKey: Keys.thinkingEffort) }
     }
 
