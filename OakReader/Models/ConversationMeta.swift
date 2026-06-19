@@ -9,6 +9,9 @@ struct ConversationMeta: Identifiable, Hashable {
     var createdAt: Date
     var lastMessageAt: Date
     var messageCount: Int
+    /// Short teaser of the conversation (first user message), for the history list's
+    /// second line. Populated lazily by `ConversationService` from the JSONL file.
+    var snippet: String
 
     init(
         id: UUID = UUID(),
@@ -16,7 +19,8 @@ struct ConversationMeta: Identifiable, Hashable {
         itemId: UUID? = nil,
         createdAt: Date = Date(),
         lastMessageAt: Date = Date(),
-        messageCount: Int = 0
+        messageCount: Int = 0,
+        snippet: String = ""
     ) {
         self.id = id
         self.title = title
@@ -24,14 +28,16 @@ struct ConversationMeta: Identifiable, Hashable {
         self.createdAt = createdAt
         self.lastMessageAt = lastMessageAt
         self.messageCount = messageCount
+        self.snippet = snippet
     }
 
-    init(record: ConversationRecord) {
+    init(record: ConversationRecord, snippet: String = "") {
         self.id = UUID(uuidString: record.id) ?? UUID()
         self.title = record.title
         self.itemId = record.itemId.flatMap { UUID(uuidString: $0) }
         self.createdAt = Date(iso8601String: record.createdAt) ?? Date()
         self.lastMessageAt = Date(iso8601String: record.updatedAt) ?? Date()
         self.messageCount = record.messageCount
+        self.snippet = snippet
     }
 }

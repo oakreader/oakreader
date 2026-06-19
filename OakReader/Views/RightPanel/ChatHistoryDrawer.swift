@@ -46,7 +46,7 @@ struct ChatHistoryDrawer: View {
             LazyVStack(alignment: .leading, spacing: 0, pinnedViews: []) {
                 ForEach(groupedSessions, id: \.title) { group in
                     Section {
-                        ForEach(group.sessions) { session in
+                        ForEach(group.sessions, id: \.id) { session in
                             sessionRow(session)
                         }
                     } header: {
@@ -74,17 +74,31 @@ struct ChatHistoryDrawer: View {
     private func sessionRow(_ session: ConversationMeta) -> some View {
         let isSelected = session.id == chatVM.sessionId
         let isHovered = hoveredSessionId == session.id
+        // A two-line cell mirrors Dia's ChatCellView (title + subtitle teaser).
+        // Fall back to the relative time when there's no message to preview.
+        let subtitle = session.snippet.isEmpty ? relativeDate(session.lastMessageAt) : session.snippet
 
         return Button {
             chatVM.loadSession(session.id)
             onSelect?(session.id)
         } label: {
-            HStack(spacing: 8) {
-                Text(session.title.isEmpty ? "New Chat" : session.title)
-                    .font(.system(size: 13, weight: isSelected ? .medium : .regular))
-                    .foregroundStyle(isSelected ? OakStyle.Colors.textPrimary : OakStyle.Colors.textSecondary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+            HStack(alignment: .top, spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(session.title.isEmpty ? "New Chat" : session.title)
+                        // Regular by default so the list stays light/quiet; only the
+                        // currently-open conversation gets medium, so weight itself
+                        // marks "this is the one you're viewing".
+                        .font(.system(size: 13, weight: isSelected ? .medium : .regular))
+                        .foregroundStyle(OakStyle.Colors.textPrimary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+
+                    Text(subtitle)
+                        .font(.system(size: 11))
+                        .foregroundStyle(OakStyle.Colors.textSecondary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
 
                 Spacer(minLength: 6)
 
@@ -102,15 +116,13 @@ struct ChatHistoryDrawer: View {
                     .menuIndicator(.hidden)
                     .fixedSize()
                     .help("More actions")
-                } else {
-                    Text(relativeDate(session.lastMessageAt))
-                        .font(.system(size: 11))
-                        .foregroundStyle(OakStyle.Colors.textTertiary)
-                        .fixedSize()
                 }
             }
             .padding(.horizontal, 10)
-            .frame(height: 34)
+            // No per-row hairline: modern macOS sidebars (Notes, Reminders) separate
+            // rows with whitespace + the rounded selection/hover highlight instead of
+            // a divider. A touch more vertical room replaces the line's structuring job.
+            .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: OakStyle.Radius.standard, style: .continuous)
                     .fill(
