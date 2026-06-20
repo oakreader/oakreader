@@ -185,22 +185,12 @@ class HTMLSelectionPopupPanel: NSPanel, AppResignDismissable {
         }
         mainStack.addArrangedSubview(colorBtn)
 
-        if Preferences.shared.isExtensionEnabled(.notes) {
-            let noteBtn = PopupIconButton(
-                systemImage: "note.text",
-                accessibilityLabel: "Add Note"
-            ) { [weak self] in
-                self?.addNote()
-            }
-            mainStack.addArrangedSubview(noteBtn)
-        }
-
         // Separator 1
         mainStack.addArrangedSubview(makeVerticalSeparator())
 
-        // Group 2: Actions (chat + translate + speak)
+        // Group 2: Send selection elsewhere (chat + translate + note)
         let chatBtn = PopupIconButton(
-            systemImage: "text.quote",
+            systemImage: "bubble.left.and.bubble.right",
             accessibilityLabel: "Add to Chat"
         ) { [weak self] in
             self?.addToChat()
@@ -217,6 +207,20 @@ class HTMLSelectionPopupPanel: NSPanel, AppResignDismissable {
             mainStack.addArrangedSubview(translateBtn)
         }
 
+        if Preferences.shared.isExtensionEnabled(.notes) {
+            let noteBtn = PopupIconButton(
+                systemImage: "note.text",
+                accessibilityLabel: "Add Note"
+            ) { [weak self] in
+                self?.addNote()
+            }
+            mainStack.addArrangedSubview(noteBtn)
+        }
+
+        // Separator 2
+        mainStack.addArrangedSubview(makeVerticalSeparator())
+
+        // Group 3: Utility (speak + copy)
         let speakBtn = PopupIconButton(
             systemImage: "speaker.wave.2",
             accessibilityLabel: "Play Sound"
@@ -226,10 +230,6 @@ class HTMLSelectionPopupPanel: NSPanel, AppResignDismissable {
         self.speakButton = speakBtn
         mainStack.addArrangedSubview(speakBtn)
 
-        // Separator 2
-        mainStack.addArrangedSubview(makeVerticalSeparator())
-
-        // Group 3: Clipboard (copy)
         let copyBtn = PopupIconButton(
             systemImage: "square.on.square",
             accessibilityLabel: "Copy"

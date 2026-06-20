@@ -124,11 +124,11 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
     // MARK: - Content View (horizontal toolbar)
 
     private func buildContentView() -> NSView {
-        // Three logical groups separated by dividers, following Marshall's
-        // ecology of annotation: persistent marginalia (highlight/underline/
-        // color) | ephemeral AI actions (chat/translate/speak) | utility (copy).
+        // Three logical groups separated by dividers: persistent marginalia
+        // (highlight/underline/color) | actions that send the selection
+        // elsewhere (chat/translate/note) | utility (speak/copy).
         // Spacing is wider around the dividers than within groups so the
-        // lifecycle distinction is visible at a glance — Gestalt proximity.
+        // grouping is visible at a glance — Gestalt proximity.
         let mainStack = NSStackView()
         mainStack.orientation = .horizontal
         mainStack.spacing = 4
@@ -163,22 +163,12 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
         }
         mainStack.addArrangedSubview(colorBtn)
 
-        if Preferences.shared.isExtensionEnabled(.notes) {
-            let noteBtn = PopupIconButton(
-                systemImage: "note.text",
-                accessibilityLabel: "Add Note"
-            ) { [weak self] in
-                self?.addNote()
-            }
-            mainStack.addArrangedSubview(noteBtn)
-        }
-
         // Separator 1
         mainStack.addArrangedSubview(makeVerticalSeparator())
 
-        // Group 2: Actions (chat + translate + speak)
+        // Group 2: Send selection elsewhere (chat + translate + note)
         let chatBtn = PopupIconButton(
-            systemImage: "text.quote",
+            systemImage: "bubble.left.and.bubble.right",
             accessibilityLabel: "Add to Chat"
         ) { [weak self] in
             self?.addToChat()
@@ -195,6 +185,20 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
             mainStack.addArrangedSubview(translateBtn)
         }
 
+        if Preferences.shared.isExtensionEnabled(.notes) {
+            let noteBtn = PopupIconButton(
+                systemImage: "note.text",
+                accessibilityLabel: "Add Note"
+            ) { [weak self] in
+                self?.addNote()
+            }
+            mainStack.addArrangedSubview(noteBtn)
+        }
+
+        // Separator 2
+        mainStack.addArrangedSubview(makeVerticalSeparator())
+
+        // Group 3: Utility (speak + copy)
         let speakBtn = PopupIconButton(
             systemImage: "speaker.wave.2",
             accessibilityLabel: "Play Sound"
@@ -204,10 +208,6 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
         self.speakButton = speakBtn
         mainStack.addArrangedSubview(speakBtn)
 
-        // Separator 2
-        mainStack.addArrangedSubview(makeVerticalSeparator())
-
-        // Group 3: Clipboard (copy)
         let copyBtn = PopupIconButton(
             systemImage: "square.on.square",
             accessibilityLabel: "Copy"
