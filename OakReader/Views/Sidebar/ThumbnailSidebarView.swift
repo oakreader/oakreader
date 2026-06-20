@@ -58,6 +58,14 @@ private struct ThumbnailItemView: View {
     @AppStorage("appearanceMode") private var appearanceMode: String = "system"
     @Environment(\.colorScheme) private var colorScheme
 
+    /// The rasterized page, rendered ONCE off the main thread and cached here.
+    /// Rendering must never happen in `body`: a full `CGContextDrawPDFPage` raster
+    /// inside the body getter re-fired on every window SwiftUI transaction (e.g. a
+    /// composer keystroke/animation re-running `NSHostingView.layout()`), re-rastering
+    /// every visible page on the main thread → a sustained beachball. Caching makes
+    /// body re-evaluation free.
+    @State private var thumbnail: NSImage?
+
     private let borderWidth: CGFloat = 3
     private let cardPadding: CGFloat = 4
 
@@ -71,9 +79,9 @@ private struct ThumbnailItemView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Thumbnail image — fills available width, aspect ratio preserved
-            if let page = pdfDocument?.page(at: pageIndex) {
-                let thumbnail = page.thumbnail(maxDimension: 240)
+            // Thumbnail image — fills available width, aspect ratio preserved.
+            // Reads the cached raster; rendering is done in `.task` below, not here.
+            if let thumbnail {
                 let imageView = Image(nsImage: thumbnail)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
@@ -93,6 +101,13 @@ private struct ThumbnailItemView: View {
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 3)
+        }
+        // Render the thumbnail once per page, off the main thread, then cache it.
+        // `.task(id:)` re-runs only if the page identity actually changes.
+        .task(id: pageIndex) {
+            if thumbnail != nil { return }
+            guard let image = await ThumbnailRenderer.render(pdfDocument, page: pageIndex) else { return }
+            thumbnail = image
         }
         .padding([.horizontal, .top], cardPadding)
         .background(Color(nsColor: .textBackgroundColor))
@@ -115,6 +130,28 @@ private struct ThumbnailItemView: View {
             Divider()
             Button(role: .destructive) { } label: {
                 Label("Delete Page", systemImage: "trash")
+            }
+        }
+    }
+}
+
+/// Renders PDF page thumbnails off the main thread, one at a time.
+///
+/// PDF rasterization (`CGContextDrawPDFPage`) is expensive; doing it in a SwiftUI
+/// `body` getter re-rastered every visible page on every window transaction and
+/// beachballed the main thread (confirmed by a `sample`: `ThumbnailItemView.body`
+/// → `PDFPage.thumbnail` → `CGContextDrawPDFPageWithOptions`). This moves the work
+/// to a single serial background queue — PDFKit pages aren't safe to render
+/// concurrently — so the main thread only ever assigns the finished image.
+private enum ThumbnailRenderer {
+    private static let queue = DispatchQueue(label: "com.oakreader.pdf-thumbnail", qos: .userInitiated)
+
+    static func render(_ document: PDFDocument?, page index: Int) async -> NSImage? {
+        guard let document else { return nil }
+        return await withCheckedContinuation { (continuation: CheckedContinuation<NSImage?, Never>) in
+            queue.async {
+                let image = document.page(at: index)?.thumbnail(maxDimension: 240)
+                continuation.resume(returning: image)
             }
         }
     }
