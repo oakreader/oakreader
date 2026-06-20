@@ -117,23 +117,45 @@ struct MarkdownEngineNoteEditor: View {
 // MARK: - NSTextView introspection
 
 /// Captures the engine's underlying editable `NSTextView` so the toolbar can act
-/// on the caret/selection. Placed as a `.background` of the editor, it walks up to
-/// the shared SwiftUI container and finds the first scroll-view-hosted, editable
-/// text view in that subtree (the composer hosts exactly one).
+/// on the caret/selection. Placed as a `.background` of the editor, it climbs its
+/// ancestors one level at a time and, at each level, searches that subtree for the
+/// composer's editable text view. Climbing from the probe (which sits right next to
+/// the editor) finds the composer's own text view well before reaching the window
+/// root — so it never grabs the PDF/chat/search text views elsewhere in the window.
 private struct TextViewProbe: NSViewRepresentable {
     let onFound: (NSTextView) -> Void
 
     func makeNSView(context: Context) -> NSView { NSView(frame: .zero) }
 
     func updateNSView(_ nsView: NSView, context: Context) {
+        attempt(from: nsView, tries: 8)
+    }
+
+    /// Retry a few times: on the first SwiftUI update the engine's text view may not
+    /// be in the hierarchy yet.
+    private func attempt(from probe: NSView, tries: Int) {
         DispatchQueue.main.async {
-            guard let root = nsView.superview?.superview ?? nsView.superview else { return }
-            if let tv = Self.firstEditableTextView(in: root) { onFound(tv) }
+            if let tv = Self.climbForTextView(from: probe) {
+                onFound(tv)
+            } else if tries > 0 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    attempt(from: probe, tries: tries - 1)
+                }
+            }
         }
     }
 
+    private static func climbForTextView(from probe: NSView) -> NSTextView? {
+        var ancestor: NSView? = probe
+        while let a = ancestor {
+            if let tv = firstEditableTextView(in: a) { return tv }
+            ancestor = a.superview
+        }
+        return nil
+    }
+
     private static func firstEditableTextView(in view: NSView) -> NSTextView? {
-        if let tv = view as? NSTextView, tv.isEditable, tv.enclosingScrollView != nil { return tv }
+        if let tv = view as? NSTextView, tv.isEditable { return tv }
         for sub in view.subviews {
             if let found = firstEditableTextView(in: sub) { return found }
         }
