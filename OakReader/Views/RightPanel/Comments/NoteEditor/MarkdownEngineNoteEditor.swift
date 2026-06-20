@@ -27,6 +27,10 @@ final class MarkdownNoteController {
     var tags: [String] = []
     /// A `#` tag typed/created that isn't in `tags` yet (so the host can persist it).
     var onCreateTag: ((String) -> Void)?
+    /// Reports the editor's *pure text* content height (excludes the engine's
+    /// scroll overscroll) so the host can size the composer to hug its content
+    /// instead of stretching to the engine `NSScrollView`'s flexible frame.
+    var onHeight: ((CGFloat) -> Void)?
 
     private var completionPanel: ChatCompletionPanel?
     private var triggerChar: String?
@@ -34,6 +38,9 @@ final class MarkdownNoteController {
     private var keyMonitor: Any?
     private var textObserver: NSObjectProtocol?
     private var selObserver: NSObjectProtocol?
+    private var frameObserver: NSObjectProtocol?
+    /// De-dupes height reports (TextKit echoes frame changes during typing).
+    private var lastReportedHeight: CGFloat = -1
     /// Guards programmatic edits (token insertion) from re-triggering detection.
     private var isProgrammatic = false
 
@@ -47,19 +54,27 @@ final class MarkdownNoteController {
         textView = tv
         textObserver = NotificationCenter.default.addObserver(
             forName: NSText.didChangeNotification, object: tv, queue: .main
-        ) { [weak self] _ in MainActor.assumeIsolated { self?.onTextChanged() } }
+        ) { [weak self] _ in MainActor.assumeIsolated { self?.reportHeight(); self?.onTextChanged() } }
         selObserver = NotificationCenter.default.addObserver(
             forName: NSTextView.didChangeSelectionNotification, object: tv, queue: .main
         ) { [weak self] _ in MainActor.assumeIsolated { self?.onSelectionChanged() } }
+        // The engine's text view is vertically resizable, so its frame changes
+        // whenever content height changes (typing) or width changes (re-wrap) —
+        // re-measure on either so the composer keeps hugging its content.
+        frameObserver = NotificationCenter.default.addObserver(
+            forName: NSView.frameDidChangeNotification, object: tv, queue: .main
+        ) { [weak self] _ in MainActor.assumeIsolated { self?.reportHeight() } }
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             MainActor.assumeIsolated { self?.handleKey(event) ?? event }
         }
+        reportHeight()
     }
 
     private func teardown() {
         if let k = keyMonitor { NSEvent.removeMonitor(k); keyMonitor = nil }
         if let o = textObserver { NotificationCenter.default.removeObserver(o); textObserver = nil }
         if let o = selObserver { NotificationCenter.default.removeObserver(o); selObserver = nil }
+        if let o = frameObserver { NotificationCenter.default.removeObserver(o); frameObserver = nil }
         dismissPanel()
     }
 
@@ -67,6 +82,21 @@ final class MarkdownNoteController {
         if let k = keyMonitor { NSEvent.removeMonitor(k) }
         if let o = textObserver { NotificationCenter.default.removeObserver(o) }
         if let o = selObserver { NotificationCenter.default.removeObserver(o) }
+        if let o = frameObserver { NotificationCenter.default.removeObserver(o) }
+    }
+
+    // MARK: Content height
+
+    /// Measure the laid-out text height (TextKit 2 usage bounds, *not* the text
+    /// view frame — that includes the engine's scroll overscroll, min 40pt) and
+    /// report it when it changes. The host clamps it to the composer's range.
+    private func reportHeight() {
+        guard let tv = textView, let tlm = tv.textLayoutManager else { return }
+        tlm.ensureLayout(for: tlm.documentRange)
+        let h = tlm.usageBoundsForTextContainer.height + tv.textContainerInset.height * 2
+        guard h > 0, abs(h - lastReportedHeight) > 0.5 else { return }
+        lastReportedHeight = h
+        onHeight?(h)
     }
 
     // MARK: Toolbar actions

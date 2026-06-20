@@ -44,11 +44,19 @@ struct NoteComposerBox: View {
     /// Vestigial: the engine doesn't report caret formats, so toolbar buttons no
     /// longer show a toggled-on state. Kept empty to avoid churning the format bar.
     @State private var activeFormats: Set<String> = []
+    /// Live writing-area height, driven by the engine editor's reported content
+    /// height (`controller.onHeight`) and clamped to `[minEditorHeight, maxEditorHeight]`.
+    /// The engine editor is an `NSScrollView` with no intrinsic content size, so
+    /// without this it would stretch to its `maxHeight` frame in the panel `VStack`
+    /// rather than hug the text — the cause of the over-tall empty composer.
     @State private var height: CGFloat = Self.minEditorHeight
     /// Default writing area floor — a touch roomier than the AI chat input
     /// (`ChatInputTextView.minContentHeight` = 40) so the composer invites a real
     /// jot, without towering over it. The editor still grows past this with content.
     private static let minEditorHeight: CGFloat = 40
+    /// Ceiling before the editor starts scrolling internally, so a long note never
+    /// pushes the toolbar/cards off-screen.
+    private static let maxEditorHeight: CGFloat = 220
     /// Images attached to this note, shown as a flomo-style thumbnail tray below
     /// the prose (kept out of the editor so they never crowd out the writing line).
     @State private var attachments: [String] = []
@@ -87,7 +95,7 @@ struct NoteComposerBox: View {
                 references: memos,
                 tags: tags
             )
-            .frame(minHeight: Self.minEditorHeight, maxHeight: 220)
+            .frame(height: height)
             .onChange(of: markdown) { _, md in
                 let trimmed = md.trimmingCharacters(in: .whitespacesAndNewlines)
                 if isEmpty != trimmed.isEmpty { isEmpty = trimmed.isEmpty }
@@ -114,6 +122,12 @@ struct NoteComposerBox: View {
         )
         .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
         .onAppear {
+            controller.onHeight = { h in
+                let clamped = min(max(h, Self.minEditorHeight), Self.maxEditorHeight)
+                if abs(clamped - height) > 0.5 {
+                    withAnimation(.easeOut(duration: 0.12)) { height = clamped }
+                }
+            }
             if !didSeedMarkdown {
                 didSeedMarkdown = true
                 markdown = Self.splitBody(initialMarkdown).text

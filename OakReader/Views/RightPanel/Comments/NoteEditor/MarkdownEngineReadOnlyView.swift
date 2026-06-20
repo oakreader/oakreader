@@ -127,21 +127,20 @@ private struct ContentHeightProbe: NSViewRepresentable {
 
         private func measure() {
             guard let tv = textView else { return }
-            // The engine sizes its content container (scroll view's documentView) to the
-            // real content height (overscroll zeroed for read-only), so it's the most
-            // reliable measure; fall back to the TextKit-2 used height.
-            if let doc = tv.enclosingScrollView?.documentView, doc.frame.height > 1 {
-                onHeight?(ceil(doc.frame.height))
-                return
-            }
+            // Measure the *content* height only — NOT the scroll view's documentView,
+            // which inflates to the viewport (my own frame) and feeds back into an
+            // ever-growing empty box. TextKit-2 `usageBoundsForTextContainer` is
+            // width-driven (no height feedback) so the card hugs its text.
             let inset = tv.textContainerInset.height * 2
+            var h: CGFloat = 0
             if let tlm = tv.textLayoutManager {
                 tlm.ensureLayout(for: tlm.documentRange)
-                onHeight?(ceil(tlm.usageBoundsForTextContainer.height + inset))
+                h = tlm.usageBoundsForTextContainer.height + inset
             } else if let lm = tv.layoutManager, let tc = tv.textContainer {
                 lm.ensureLayout(for: tc)
-                onHeight?(ceil(lm.usedRect(for: tc).height + inset))
+                h = lm.usedRect(for: tc).height + inset
             }
+            if h > 1 { onHeight?(ceil(h)) }
         }
 
         deinit {
