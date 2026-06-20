@@ -70,8 +70,10 @@ struct NoteComposerBox: View {
             // Slack-style: the format bar sits at the TOP of the box (the `Aa`
             // toggle is on the bottom action row).
             if showFormatBar {
+                // Fade in while the card grows to make room — no edge-slide (which
+                // read as "flying in from the toolbar"). Calm, per motion.md.
                 formatBar
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .transition(.opacity)
             }
 
             // `@` references and `#` tags are driven inline by the editor itself
@@ -194,6 +196,9 @@ struct NoteComposerBox: View {
     private var toolbar: some View {
         HStack(spacing: 2) {
             toolButton("textformat", active: showFormatBar) {
+                // Bounded easeOut, never a spring: a spring's long settling tail keeps
+                // re-rendering the view graph, which on a non-base locale snowballs into
+                // the SF-Symbol accessibility CPU-peg (see [[sfsymbol-a11y-locale-hang]]).
                 withAnimation(.easeOut(duration: 0.12)) { showFormatBar.toggle() }
             }
             .help("Formatting")
@@ -260,6 +265,7 @@ struct NoteComposerBox: View {
                     .foregroundStyle(.secondary)
                     .frame(width: 28, height: 28)
                     .contentShape(Rectangle())
+                    .accessibilityHidden(true)
             }
             .buttonStyle(ToolButtonStyle())
             .help("Link")
@@ -271,7 +277,10 @@ struct NoteComposerBox: View {
                 .help("Bulleted list")
             toolButton("list.number", active: activeFormats.contains("orderedList")) { controller.cmd("orderedList") }
                 .help("Numbered list")
-            toolButton("text.quote", active: activeFormats.contains("quote")) { controller.cmd("quote") }
+            // `increase.quotelevel` (left rule + indented lines) is the blockquote
+            // glyph — distinct from `text.quote`, which this app already uses for a
+            // quoted *source reference* (the anchored-note chip / add-to-chat).
+            toolButton("increase.quotelevel", active: activeFormats.contains("quote")) { controller.cmd("quote") }
                 .help("Quote")
 
             toolDivider
@@ -289,7 +298,7 @@ struct NoteComposerBox: View {
     /// selection (or inserts the URL as the link text when nothing is selected).
     private var linkPopover: some View {
         HStack(spacing: 6) {
-            Image(systemName: "link").font(.system(size: 12)).foregroundStyle(.secondary)
+            Image(systemName: "link").font(.system(size: 12)).foregroundStyle(.secondary).accessibilityHidden(true)
             TextField("https://…", text: $linkURL)
                 .textFieldStyle(.plain)
                 .font(.system(size: 13))
@@ -337,6 +346,10 @@ struct NoteComposerBox: View {
                 .foregroundStyle(.secondary)
                 .frame(width: 28, height: 28)
                 .contentShape(Rectangle())
+                // The `.help(...)` tooltip is the real label, so hide the icon from a11y:
+                // resolving an SF Symbol's localized description on a non-base locale is
+                // the CPU-peg documented in [[sfsymbol-a11y-locale-hang]].
+                .accessibilityHidden(true)
         }
         .buttonStyle(ToolButtonStyle(active: active))
     }

@@ -34,6 +34,9 @@ enum NoteEditorStyle {
     // a light grey fill (a chip-like token, kept consistent editor ↔ review).
     static var tagForeground: NSColor { .secondaryLabelColor }
     static var tagBackground: NSColor { NSColor.secondaryLabelColor.withAlphaComponent(0.12) }
+    /// The Slack-style left rule beside a blockquote paragraph (upright text, no
+    /// fill, no italics — the rule + head-indent carry the "quote" read).
+    static var quoteBar: NSColor { NSColor.tertiaryLabelColor }
 
     static func headingFont(_ block: NoteBlock) -> NSFont {
         switch block {
@@ -337,8 +340,8 @@ enum NoteMarkdownCodec {
 
 // MARK: - Controller
 
-/// Imperative handle the toolbar drives (same surface as before, so `NoteComposerBox`
-/// is unchanged apart from the new commands).
+/// Imperative handle the composer's toolbar drives — every formatting button and
+/// the `@`/`#` pickers route through here to the live `NoteEditorTextView`.
 @MainActor
 final class NoteEditorController {
     weak var textView: NoteEditorTextView?
@@ -452,9 +455,32 @@ struct NativeNoteEditorView: NSViewRepresentable {
 /// in-editor `#tag` reads as a chip (matching the card's `NoteTagChip`) instead
 /// of the flat, tight rectangle `NSAttributedString.backgroundColor` would give.
 final class NoteTagLayoutManager: NSLayoutManager {
+    /// Paragraph-level decoration (the blockquote rule) belongs in the *background*
+    /// pass — it runs before glyphs, is the API designed for backgrounds, and reads
+    /// completed layout so it never forces a re-layout the way the glyph pass would.
+    override func drawBackground(forGlyphRange glyphsToShow: NSRange, at origin: NSPoint) {
+        super.drawBackground(forGlyphRange: glyphsToShow, at: origin)
+        guard let ts = textStorage, let container = textContainers.first else { return }
+        let charRange = characterRange(forGlyphRange: glyphsToShow, actualGlyphRange: nil)
+        // Blockquote: a Slack-style left rule. The paragraph's 14pt head-indent
+        // (NoteEditorStyle.paragraphStyle) leaves the gutter the bar sits in.
+        ts.enumerateAttribute(.oakBlock, in: charRange, options: []) { value, range, _ in
+            guard let raw = value as? Int, raw == NoteBlock.quote.rawValue else { return }
+            let gr = glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+            let rect = boundingRect(forGlyphRange: gr, in: container)   // includes empty lines
+            guard !rect.isEmpty else { return }
+            let bar = NSRect(x: rect.minX + origin.x + 2, y: rect.minY + origin.y + 2,
+                             width: 3, height: rect.height - 4)
+            NoteEditorStyle.quoteBar.setFill()
+            NSBezierPath(roundedRect: bar, xRadius: 1.5, yRadius: 1.5).fill()
+        }
+    }
+
     override func drawGlyphs(forGlyphRange glyphsToShow: NSRange, at origin: NSPoint) {
         if let ts = textStorage, let container = textContainers.first {
             let charRange = characterRange(forGlyphRange: glyphsToShow, actualGlyphRange: nil)
+
+            // Rounded #tag chips.
             ts.enumerateAttribute(.oakTag, in: charRange, options: []) { value, range, _ in
                 guard value != nil else { return }
                 let gr = glyphRange(forCharacterRange: range, actualCharacterRange: nil)
@@ -651,7 +677,9 @@ final class NoteEditorTextView: NSTextView {
         .note(id: "block:heading", icon: "textformat.size", label: "Heading", section: "Format", trigger: "/"),
         .note(id: "block:bullet", icon: "list.bullet", label: "Bulleted list", section: "Format", trigger: "/"),
         .note(id: "block:ordered", icon: "list.number", label: "Numbered list", section: "Format", trigger: "/"),
-        .note(id: "block:quote", icon: "text.quote", label: "Quote", section: "Format", trigger: "/"),
+        // `increase.quotelevel`, matching the toolbar — `text.quote` is reserved here
+        // for a quoted *source reference*, not a blockquote.
+        .note(id: "block:quote", icon: "increase.quotelevel", label: "Quote", section: "Format", trigger: "/"),
         .note(id: "block:code", icon: "curlybraces", label: "Code block", section: "Format", trigger: "/"),
     ]
 
@@ -877,7 +905,26 @@ final class NoteEditorTextView: NSTextView {
             ts.removeAttribute(.backgroundColor, range: range)
             ts.addAttribute(.foregroundColor, value: NSColor.labelColor, range: range)
         }
+        // Continue the block when typing onward (esp. toggled on an empty line).
+        typingAttributes = blockTypingAttributes(target)
         didChangeText()
+    }
+
+    /// Typing attributes matching a block so text typed after a toggle inherits it.
+    private func blockTypingAttributes(_ block: NoteBlock) -> [NSAttributedString.Key: Any] {
+        var attrs: [NSAttributedString.Key: Any] = [
+            .paragraphStyle: NoteEditorStyle.paragraphStyle(block),
+            .oakBlock: block.rawValue,
+            .foregroundColor: NSColor.labelColor,
+            .font: NoteEditorStyle.baseFont,
+        ]
+        switch block {
+        case .h1, .h2, .h3: attrs[.font] = NoteEditorStyle.headingFont(block)
+        case .code: attrs[.font] = NoteEditorStyle.monoFont; attrs[.backgroundColor] = NoteEditorStyle.codeBackground
+        case .quote: attrs[.foregroundColor] = NSColor.secondaryLabelColor
+        case .paragraph, .bullet, .ordered: break
+        }
+        return attrs
     }
 
     /// Length of the `oakListMarker` run at the start of a paragraph, if any.

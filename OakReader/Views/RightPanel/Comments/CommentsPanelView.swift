@@ -361,6 +361,13 @@ private struct CommentCardView: View {
                     .foregroundStyle(.secondary)
                     .frame(width: 22, height: 18)
                     .contentShape(Rectangle())
+                    // Pin the a11y label so SwiftUI never resolves the `ellipsis`
+                    // symbol's *localized* accessibility description. This Menu is an
+                    // AppKitPopUpAdaptor rendered once per card; on a non-base locale
+                    // (en-GB) that resolution walks CFBundle tables and, re-applied to
+                    // every card's menu on each transaction flush the composer drives,
+                    // pegs the main thread. See [[sfsymbol-a11y-locale-hang]].
+                    .accessibilityLabel(Text("More"))
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
