@@ -98,6 +98,29 @@ struct CLIWordLookup: Codable, FetchableRecord {
     }
 }
 
+/// A note (a comment-bearing `annotations` row): a freestanding memo
+/// (`positionKind == "memo"`) or a selection-anchored note (`pdf-overlay` / `web`,
+/// whose `text` is the quoted source). Mirrors the Notes panel's stream.
+struct CLINote: Codable, FetchableRecord {
+    var id: String
+    var itemId: String
+    var itemTitle: String
+    var positionKind: String
+    /// Quoted source passage for an anchored note (nil for a memo).
+    var text: String?
+    /// The note body as Markdown.
+    var comment: String
+    var createdAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, text, comment
+        case itemId = "item_id"
+        case itemTitle = "item_title"
+        case positionKind = "position_kind"
+        case createdAt = "created_at"
+    }
+}
+
 // MARK: - System Collection IDs
 
 enum CLISystemCollectionID {
@@ -520,6 +543,41 @@ final class CLIDatabase {
                 args.append(limit)
             }
             return try CLIWordLookup.fetchAll(db, sql: sql, arguments: StatementArguments(args))
+        }
+    }
+
+    // MARK: - Notes
+
+    /// Fetch comment-bearing annotation rows (the Notes panel's stream), newest
+    /// first. `itemId` scopes to one document; omit for the whole library. Skips
+    /// soft-deleted notes and notes on trashed items.
+    func fetchNotes(itemId: String? = nil, since: String? = nil, limit: Int? = nil) throws -> [CLINote] {
+        try dbQueue.read { db in
+            var sql = """
+                SELECT a.id, a.item_id, i.title AS item_title, a.position_kind,
+                       a.text, a.comment, a.created_at
+                FROM annotations a
+                JOIN items i ON i.id = a.item_id
+                WHERE a.deleted_at IS NULL
+                  AND i.deleted_at IS NULL
+                  AND a.comment IS NOT NULL
+                  AND TRIM(a.comment) <> ''
+                """
+            var args: [DatabaseValueConvertible] = []
+            if let itemId {
+                sql += " AND a.item_id = ?"
+                args.append(itemId)
+            }
+            if let since {
+                sql += " AND a.created_at >= ?"
+                args.append(since)
+            }
+            sql += " ORDER BY a.created_at DESC"
+            if let limit {
+                sql += " LIMIT ?"
+                args.append(limit)
+            }
+            return try CLINote.fetchAll(db, sql: sql, arguments: StatementArguments(args))
         }
     }
 

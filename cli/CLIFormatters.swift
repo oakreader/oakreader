@@ -221,6 +221,54 @@ enum CLIFormatters {
         return df.string(from: date)
     }
 
+    // MARK: - Notes
+
+    /// A note's `created_at` as the panel's `yyyy-MM-dd HH:mm` (local), matching
+    /// `NoteTime.absolute` so the CLI and the app agree on timestamps.
+    static func noteTimestamp(_ iso8601: String) -> String {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let plain = ISO8601DateFormatter()
+        guard let date = f.date(from: iso8601) ?? plain.date(from: iso8601) else { return "" }
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd HH:mm"
+        return df.string(from: date)
+    }
+
+    /// Combined Markdown for a set of notes. MUST match the in-app
+    /// `NoteExporter.combinedMarkdown` format so `oak notes --markdown` and the
+    /// Notes panel's "Export as Single Markdown" produce identical files.
+    /// Notes are emitted oldest-first (chronological), so callers pass newest-first
+    /// rows straight from `fetchNotes` and this reverses them.
+    static func notesMarkdown(_ notes: [CLINote], title: String) -> String {
+        var out = "# \(title) — Notes\n\n"
+        out += "*\(notes.count) note\(notes.count == 1 ? "" : "s")*\n"
+        for note in notes.reversed() {
+            out += "\n---\n\n"
+            out += noteSection(note)
+        }
+        return out + "\n"
+    }
+
+    /// One note as a `## timestamp` section: optional quoted source (anchored note)
+    /// as a blockquote, then the body verbatim. Mirrors `NoteExporter.noteSection`.
+    static func noteSection(_ note: CLINote) -> String {
+        var s = ""
+        let ts = noteTimestamp(note.createdAt)
+        s += ts.isEmpty ? "## Note\n\n" : "## \(ts)\n\n"
+
+        if note.positionKind != "memo",
+           let quote = note.text?.trimmingCharacters(in: .whitespacesAndNewlines), !quote.isEmpty {
+            s += quote.split(separator: "\n", omittingEmptySubsequences: false)
+                .map { "> \($0)" }.joined(separator: "\n")
+            s += "\n\n"
+        }
+
+        let body = note.comment.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !body.isEmpty { s += body + "\n" }
+        return s
+    }
+
     static func formatFileSize(_ bytes: Int64) -> String {
         if bytes < 1024 { return "\(bytes) B" }
         let kb = Double(bytes) / 1024.0

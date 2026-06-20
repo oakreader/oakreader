@@ -132,6 +132,31 @@ struct CommentsPanelView: View {
         }
     }
 
+    /// Copy an `oak notes` CLI command that prints this document's notes as
+    /// Markdown — paste it into a terminal, or hand it to an AI agent as the
+    /// "how to read my notes on this" instruction. Scoped by the exact item ID
+    /// (not the title): titles aren't unique — duplicate imports share one — so
+    /// the ID is the only identifier guaranteed to resolve to *this* document.
+    /// Falls back to the title only when there's no item ID yet.
+    private func copyFetchCommand() {
+        let identifier = viewModel.itemId ?? (viewModel.libraryItem?.title ?? docTitle)
+        let command = "oak notes --item \(shellQuote(identifier)) --markdown"
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(command, forType: .string)
+    }
+
+    /// Wrap a value in double quotes for a shell command line, escaping the few
+    /// characters that would otherwise break out of the quotes.
+    private func shellQuote(_ s: String) -> String {
+        let escaped = s
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+            .replacingOccurrences(of: "$", with: "\\$")
+            .replacingOccurrences(of: "`", with: "\\`")
+        return "\"\(escaped)\""
+    }
+
     private func presentError(_ error: Error) {
         let alert = NSAlert()
         alert.messageText = "Couldn't export notes"
@@ -182,6 +207,10 @@ struct CommentsPanelView: View {
             }
             Button { exportSingleMarkdown() } label: {
                 Label("Export as Single Markdown…", systemImage: "doc.text")
+            }
+            Divider()
+            Button { copyFetchCommand() } label: {
+                Label("Copy Command to Fetch Notes", systemImage: "terminal")
             }
             Divider()
             Button(role: .destructive) { showDeleteAllConfirm = true } label: {

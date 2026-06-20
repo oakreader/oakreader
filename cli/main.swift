@@ -56,6 +56,7 @@ struct Oak: ParsableCommand {
             Open.self,
             Skills.self,
             Words.self,
+            Notes.self,
         ],
         defaultSubcommand: nil
     )
@@ -175,6 +176,82 @@ struct Words: ParsableCommand {
         let out = DateFormatter()
         out.dateFormat = "MMM d, HH:mm"
         return out.string(from: date)
+    }
+}
+
+// MARK: - Notes
+
+struct Notes: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "notes",
+        abstract: "List or export the notes you wrote while reading.",
+        discussion: """
+        Notes live in OakReader's library database, not on disk. This is how you \
+        get them out — as a readable list, structured JSON, or one combined \
+        Markdown document you can pipe anywhere:
+
+            oak notes                                    # every note, newest first
+            oak notes --item "Measuring Agents"          # just one document's notes
+            oak notes --markdown | pbcopy                # copy all notes as Markdown
+            oak notes --item paper2512 --markdown        # (resolves title / cite key / id)
+        """
+    )
+
+    @OptionGroup var globals: GlobalOptions
+
+    @Option(name: .long, help: "Only notes for this item (title, cite key, or ID).")
+    var item: String?
+
+    @Option(name: .long, help: "Only notes created on or after this date (YYYY-MM-DD).")
+    var since: String?
+
+    @Option(name: .long, help: "Maximum number of notes (newest first).")
+    var limit: Int?
+
+    @Flag(name: .long, help: "Output one combined Markdown document (pipeable to pbcopy).")
+    var markdown = false
+
+    func run() throws {
+        let database = try CLIDatabase(path: globals.db)
+
+        // Resolve the optional item filter, and the title used for the Markdown heading.
+        var itemId: String?
+        var title = "Library"
+        if let item {
+            let resolved = try CLIResolver(db: database).resolveItem(item)
+            itemId = resolved.id
+            title = resolved.title
+        }
+
+        let sinceISO = try Words.resolveSince(today: false, since: since)
+        let notes = try database.fetchNotes(itemId: itemId, since: sinceISO, limit: limit)
+
+        if markdown {
+            // Markdown wins over --json: it's the copy-to-clipboard / paste-into-vault path.
+            print(CLIFormatters.notesMarkdown(notes, title: title))
+            return
+        }
+
+        if globals.json {
+            let output = CLIOutput(json: true, quiet: globals.quiet)
+            output.results(operation: "notes.list", items: notes, meta: ["count": notes.count])
+            return
+        }
+
+        guard !notes.isEmpty else {
+            print(item == nil ? "No notes yet." : "No notes for '\(title)'.")
+            return
+        }
+        for note in notes {
+            let preview = CLIFormatters.truncate(
+                note.comment.replacingOccurrences(of: "\n", with: " "), to: 72
+            )
+            let doc = item == nil && !note.itemTitle.isEmpty ? "  (\(note.itemTitle))" : ""
+            print("\(CLIFormatters.noteTimestamp(note.createdAt))  —  \(preview)\(doc)")
+        }
+        if !globals.quiet {
+            print("\n\(notes.count) note\(notes.count == 1 ? "" : "s").")
+        }
     }
 }
 
