@@ -167,6 +167,7 @@
 		9AF259DE199FD7C80B076A8A /* OakServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90CA00E989DE8B804DE54C7 /* OakServer.swift */; };
 		9AF81FE50E6A21CEB721A3C4 /* NoteTagLayoutManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17CE832AFEC21B928508B6D5 /* NoteTagLayoutManager.swift */; };
 		9B9542A26B0276BDB55E969C /* LibraryEnums.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A68874A493BE4FAA33E42A1 /* LibraryEnums.swift */; };
+		9BD3C875BA0D91D5206BABF4 /* MarkdownEngineNoteEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44258EB3416427A3D7BC3A8A /* MarkdownEngineNoteEditor.swift */; };
 		9C0D39643C6F6C9114686235 /* HTMLSelectionPopupPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5BDDDE8E91B2FE0DB268BFD /* HTMLSelectionPopupPanel.swift */; };
 		9D697BAB4B53A551DCA29B58 /* FTSIndexService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E248BC431D2893A73E08394F /* FTSIndexService.swift */; };
 		9DB442DACFAA33B1DEBFE15C /* DuplicateService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BA4B71E0B1792E76D69CD78 /* DuplicateService.swift */; };
@@ -375,6 +376,7 @@
 		419CEA188E86F7409CECF14B /* LibraryQuerying.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryQuerying.swift; sourceTree = "<group>"; };
 		42F45F7A5E5FBBA78F6F352C /* AIProviderConfigView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIProviderConfigView.swift; sourceTree = "<group>"; };
 		4414DE4AC8A70F338F26BCB8 /* WebTOCSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebTOCSidebarView.swift; sourceTree = "<group>"; };
+		44258EB3416427A3D7BC3A8A /* MarkdownEngineNoteEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownEngineNoteEditor.swift; sourceTree = "<group>"; };
 		444CCC199D01E402686514A7 /* Log.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Log.swift; sourceTree = "<group>"; };
 		45CA5369BCA5767E15F0D5F3 /* VOICE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = VOICE.md; sourceTree = "<group>"; };
 		468D80F75322A949B8272648 /* PDFDocumentController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFDocumentController.swift; sourceTree = "<group>"; };
@@ -750,6 +752,7 @@
 		5478A60CB7F9A9A8555319F7 /* NoteEditor */ = {
 			isa = PBXGroup;
 			children = (
+				44258EB3416427A3D7BC3A8A /* MarkdownEngineNoteEditor.swift */,
 				76757A9FEAE3BA266939DCEF /* NativeNoteEditorView.swift */,
 				3C1F1EA1FDD437CC7333A7D8 /* NoteEditorModel.swift */,
 				6948A7DABE793B09EF66F145 /* NoteEditorStyle.swift */,
@@ -1447,6 +1450,7 @@
 				3ADD57E9A53EC42FBA217E40 /* LookupCardRow.swift in Sources */,
 				5E8B8AB39E7BA7E9F8529E2F /* MainMenuBuilder.swift in Sources */,
 				CBCD4E03D39EECC58E1311D6 /* MarkdownDocument.swift in Sources */,
+				9BD3C875BA0D91D5206BABF4 /* MarkdownEngineNoteEditor.swift in Sources */,
 				D65A66AF24BA727D16226BD7 /* MarkdownOutlineSidebarView.swift in Sources */,
 				553214B429F34C605FD0C24E /* MarkdownPreviewView.swift in Sources */,
 				B346916E0BE2FE17E1F7FC5C /* MediaDocument.swift in Sources */,
