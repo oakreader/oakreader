@@ -84,6 +84,12 @@ final class CommentsViewModel {
     /// the composer consumes it.
     var pendingCaptureURL: String?
 
+    /// Which composer initiated the in-flight region capture, so the finished image
+    /// lands in the right one: `nil` = the bottom create composer; a card id = that
+    /// card's inline edit composer. (Both composers are on screen at once, so the
+    /// shared `pendingCaptureURL` must be routed.)
+    var captureTargetId: String?
+
     /// Route a finished area capture into the active note composer.
     func deliverCapturedImage(_ url: String) {
         pendingCaptureURL = url

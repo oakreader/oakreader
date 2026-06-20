@@ -77,11 +77,20 @@ final class MarkdownNoteController {
     /// no selection, insert the markers and place the caret between them.
     func wrapSelection(_ marker: String) { wrapSelection(open: marker, close: marker) }
 
-    /// Wrap the selection in distinct opening/closing markers (e.g. `<u>…</u>`).
+    /// Wrap the selection in distinct opening/closing markers (e.g. `**…**`). With
+    /// no selection, wrap the *word under the caret* so clicking Bold on a word just
+    /// bolds it — instead of dropping bare `****` markers the user must type into.
     func wrapSelection(open: String, close: String) {
         guard let tv = textView else { return }
-        let sel = tv.selectedRange()
         let ns = tv.string as NSString
+        var sel = tv.selectedRange()
+        if sel.length == 0 {
+            let word = tv.selectionRange(forProposedRange: sel, granularity: .selectByWord)
+            if word.length > 0,
+               !ns.substring(with: word).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                sel = word
+            }
+        }
         let inner = sel.length > 0 ? ns.substring(with: sel) : ""
         let caret = sel.location + (open as NSString).length + (inner as NSString).length
         replace(sel, with: open + inner + close, caret: caret)

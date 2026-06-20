@@ -261,8 +261,9 @@ struct NoteComposerBox: View {
                 .help("Bold")
             toolButton("italic") { controller.wrapSelection("*") }
                 .help("Italic")
-            toolButton("underline") { controller.wrapSelection(open: "<u>", close: "</u>") }
-                .help("Underline")
+            // No Underline: Markdown has no underline syntax (only raw <u></u> HTML),
+            // and underlined text reads as a link. Bold/Italic/Strikethrough all map
+            // to real Markdown.
             toolButton("strikethrough") { controller.wrapSelection("~~") }
                 .help("Strikethrough")
 

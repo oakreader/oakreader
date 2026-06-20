@@ -50,8 +50,8 @@ struct CommentsPanelView: View {
                     }
                 },
                 focusSignal: focusSignal,
-                onCaptureRegion: { viewModel.beginAreaCaptureForNote() },
-                captureURL: model.pendingCaptureURL,
+                onCaptureRegion: { model.captureTargetId = nil; viewModel.beginAreaCaptureForNote() },
+                captureURL: model.captureTargetId == nil ? model.pendingCaptureURL : nil,
                 onCaptureConsumed: { model.pendingCaptureURL = nil },
                 memos: model.referenceableMemos(excluding: nil),
                 tags: model.allTags
@@ -293,6 +293,17 @@ private struct CommentCardView: View {
                         return ok
                     },
                     onCancel: { isEditing = false },
+                    // Same region-capture affordance as the create composer, routed
+                    // back to *this* card's editor via `captureTargetId`.
+                    onCaptureRegion: {
+                        model.captureTargetId = record.id
+                        model.parent?.beginAreaCaptureForNote()
+                    },
+                    captureURL: model.captureTargetId == record.id ? model.pendingCaptureURL : nil,
+                    onCaptureConsumed: {
+                        model.pendingCaptureURL = nil
+                        model.captureTargetId = nil
+                    },
                     memos: model.referenceableMemos(excluding: record.id),
                     tags: model.allTags
                 )
