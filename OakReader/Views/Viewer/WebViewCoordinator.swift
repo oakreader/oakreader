@@ -409,8 +409,27 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
             DispatchQueue.main.async { [weak self] in
                 self?.viewModel.state.currentMIMEType = mime
             }
+            // Anything WebKit can't render inline (zip, dmg, octet-stream, a
+            // `Content-Disposition: attachment` response, …) is a download, not a
+            // page — otherwise WebKit renders the raw bytes as on-screen mojibake.
+            // PDFs/HTML/images stay inline because WebKit *can* show them.
+            if !navigationResponse.canShowMIMEType {
+                decisionHandler(.download)
+                return
+            }
         }
         decisionHandler(.allow)
+    }
+
+    /// WebKit promotes a `.download` response into a `WKDownload`; hand it to the
+    /// shared manager, which owns the transfer for its full lifetime (see
+    /// `WebDownloadManager`).
+    func webView(
+        _ webView: WKWebView,
+        navigationResponse: WKNavigationResponse,
+        didBecome download: WKDownload
+    ) {
+        WebDownloadManager.shared.track(download)
     }
 
     // MARK: - WKUIDelegate
@@ -517,6 +536,11 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
         // as NSURLErrorCancelled (-999). Browsers ignore it; so do we.
         let nsError = error as NSError
         guard nsError.domain != NSURLErrorDomain || nsError.code != NSURLErrorCancelled else { return }
+
+        // Returning `.download` from the response policy cancels the page load with
+        // WebKitErrorFrameLoadInterruptedByPolicyChange (domain "WebKitErrorDomain",
+        // code 102). That's a normal hand-off to `WebDownloadManager`, not a failure.
+        guard nsError.domain != "WebKitErrorDomain" || nsError.code != 102 else { return }
 
         viewModel.state.presentError("Failed to load page: \(error.localizedDescription)")
     }

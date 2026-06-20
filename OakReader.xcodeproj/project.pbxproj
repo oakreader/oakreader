@@ -94,6 +94,7 @@
 		58DFACB7DB1AF310CEA7A4CD /* ZoteroMigrationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E682F4A12F66C8D3B12A14F /* ZoteroMigrationService.swift */; };
 		5967878A95FEAB1001C9CD7B /* AccessibilityCheckerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA017F31D0A69846D78444B1 /* AccessibilityCheckerView.swift */; };
 		59AE79D7BB542D60DB5BFDCC /* CLIFormatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2983A71BA4770E4CA31A54D6 /* CLIFormatters.swift */; };
+		5AD84330410F248BA26BF375 /* DownloadToast.swift in Sources */ = {isa = PBXBuildFile; fileRef = B98975D7930CED1DDA2028F5 /* DownloadToast.swift */; };
 		5B1003499D0DCB79CCBEFE65 /* ToolConfirmationBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CE29A2BBD053694A17B419D /* ToolConfirmationBar.swift */; };
 		5E203AE21E16EA6F26B580B6 /* CMarkGFM in Frameworks */ = {isa = PBXBuildFile; productRef = EE983D369D941923AF2F04FF /* CMarkGFM */; };
 		5E8B8AB39E7BA7E9F8529E2F /* MainMenuBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86F8522DF838B0A5C1D31B28 /* MainMenuBuilder.swift */; };
@@ -234,6 +235,7 @@
 		D780F2292F24CD26A497D0A1 /* WebTOCSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4414DE4AC8A70F338F26BCB8 /* WebTOCSidebarView.swift */; };
 		D80127156A0AAC81229B2C4B /* ChatTitleService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53AF73D574C778FB669A7C5D /* ChatTitleService.swift */; };
 		D81ED34E73D2176855056C83 /* PDFConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 018A6B84B7C370D0CCFF1DD9 /* PDFConstants.swift */; };
+		DC992F8B3D1FBA2634E15053 /* WebDownloadManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9470276A84C7C461F2293CE4 /* WebDownloadManager.swift */; };
 		DF048E195043CB2B97CBDE8E /* ExaSearchProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BFE38958DB0558AED5B2981 /* ExaSearchProvider.swift */; };
 		DF26AC14B9E8763040EB8123 /* CatalogDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = B759AEF7B571932C2B41C37C /* CatalogDatabase.swift */; };
 		DF697AA8687A1A82359C7565 /* TranslationLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3232D6BA9590F8C571CF9937 /* TranslationLanguage.swift */; };
@@ -452,6 +454,7 @@
 		936AA0D7A9E66908D29318BA /* AnnotationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationStore.swift; sourceTree = "<group>"; };
 		93C99C7591916F9811A0E20C /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		9430D8AD0D92F2EA45E73BDA /* OakReaderDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OakReaderDocument.swift; sourceTree = "<group>"; };
+		9470276A84C7C461F2293CE4 /* WebDownloadManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebDownloadManager.swift; sourceTree = "<group>"; };
 		96CF3FC69CB31437788FA5EF /* AnnotationPosition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationPosition.swift; sourceTree = "<group>"; };
 		9741E79B8A2B0C06ED59E2BE /* RecordingTranscriptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingTranscriptionService.swift; sourceTree = "<group>"; };
 		978C633C84BE0CB15F291AF6 /* CommentsPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommentsPanelView.swift; sourceTree = "<group>"; };
@@ -480,6 +483,7 @@
 		B759AEF7B571932C2B41C37C /* CatalogDatabase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogDatabase.swift; sourceTree = "<group>"; };
 		B8AE0CDFA398D5A223EA1547 /* BrowserSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserSession.swift; sourceTree = "<group>"; };
 		B8EDE9B51AC3DBC63B9AD860 /* MemoryManagerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryManagerView.swift; sourceTree = "<group>"; };
+		B98975D7930CED1DDA2028F5 /* DownloadToast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadToast.swift; sourceTree = "<group>"; };
 		B9C644594425945C7B78ACFD /* FannedAttachmentStack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FannedAttachmentStack.swift; sourceTree = "<group>"; };
 		BCE09C2AAC01ED235CB5E49D /* NoteDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteDetailSheet.swift; sourceTree = "<group>"; };
 		BDA88342DD6ED3A2875AE5CA /* CollectionPanelHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionPanelHelpers.swift; sourceTree = "<group>"; };
@@ -795,6 +799,7 @@
 				67A7297F5A3894E12796E73F /* TextExtractionService.swift */,
 				47A63D583D4151C734A38F58 /* UninstallService.swift */,
 				0E4D810B1BF5A7040422507C /* VoiceProviderFactory.swift */,
+				9470276A84C7C461F2293CE4 /* WebDownloadManager.swift */,
 				9C267A2F75A10BFF4E105B27 /* WebExtensionController.swift */,
 				C0721B6B26F9E1364BF56FE6 /* WordLookupStore.swift */,
 				60B1BE6A503FBBAE5E5F6D33 /* ZoteroFieldMapping.swift */,
@@ -1068,6 +1073,7 @@
 			isa = PBXGroup;
 			children = (
 				D7F8A56EF5AEA94BAAD55EDB /* ColorPickerButton.swift */,
+				B98975D7930CED1DDA2028F5 /* DownloadToast.swift */,
 				8BA004BD76C17A3C38A67CED /* DropZoneView.swift */,
 				59A9288E9C481CF6A75AB970 /* LookupCardRow.swift */,
 				EA77DDD4C28228A80CDD348A /* OakAppIcon.swift */,
@@ -1347,6 +1353,7 @@
 				8DF345E8B9C7A4A26745D3C2 /* DocumentToolbarView.swift in Sources */,
 				4BE123A4C0B2F1A40496CCFA /* DocumentTools.swift in Sources */,
 				BED3AEF28A699F0D3102C745 /* DocumentViewModel.swift in Sources */,
+				5AD84330410F248BA26BF375 /* DownloadToast.swift in Sources */,
 				926F2E2181E20990E83C4098 /* DropZoneView.swift in Sources */,
 				CC7D576D3A9990F1737D140D /* DuckDuckGoSearchProvider.swift in Sources */,
 				9DB442DACFAA33B1DEBFE15C /* DuplicateService.swift in Sources */,
@@ -1490,6 +1497,7 @@
 				A0F345EB9B3741DCFE741698 /* ViewerViewModel.swift in Sources */,
 				A40F41BFE6740036C056CC9B /* VoiceProviderFactory.swift in Sources */,
 				B4E30811EC8E73E6C02A7352 /* VoiceViewModel.swift in Sources */,
+				DC992F8B3D1FBA2634E15053 /* WebDownloadManager.swift in Sources */,
 				FC44012A01C088C035309B13 /* WebExtensionController.swift in Sources */,
 				5744CB147F6473B1472883E7 /* WebFetchTool.swift in Sources */,
 				921B2CA2159A3DC110701335 /* WebSearchProvider.swift in Sources */,
