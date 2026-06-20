@@ -115,12 +115,8 @@ private struct NoteReadCard: View {
             }
 
             if !body0.isEmpty {
-                MarkdownEngineReadOnlyView(
-                    markdown: body0,
-                    documentId: "note-detail-\(record.id)",
-                    onOpenURL: openURL
-                )
-                .frame(maxWidth: .infinity, alignment: .leading)
+                StreamingMarkdownView(markdown: body0, theme: .oak(), onOpenURL: openURL)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             if !images.isEmpty {

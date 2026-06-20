@@ -4,6 +4,28 @@ import MarkdownEngine
 import MarkdownEngineLatex
 import MarkdownEngineCodeBlocks
 
+// MARK: - Shared engine config
+
+/// The `swift-markdown-engine` configuration used by the note *composer*. (Note
+/// *cards* render with OakMarkdownUI `StreamingMarkdownView(.oak())`, which sizes
+/// to its content intrinsically — the engine is a scroll view and only earns its
+/// keep for live editing.)
+enum NoteMarkdownEngine {
+    /// Math + syntax-highlighting via the package's drop-in bridges.
+    static let services = MarkdownEditorServices(
+        syntaxHighlighter: HighlighterSwiftBridge(),
+        latex: SwiftMathBridge()
+    )
+
+    /// Tighter than the engine defaults: list indent 27.5→12pt, list line-height
+    /// +2→+1, calmer paragraph spacing (0.3→0.18 of the line height).
+    static let configuration = MarkdownEditorConfiguration(
+        services: services,
+        lists: ListStyle(indentPerLevel: 12, extraLineHeight: 1),
+        paragraph: ParagraphStyle(spacingFactor: 0.18)
+    )
+}
+
 // MARK: - Controller
 
 /// Imperative handle the composer's toolbar drives. The editor edits a Markdown
@@ -97,6 +119,40 @@ final class MarkdownNoteController {
         guard h > 0, abs(h - lastReportedHeight) > 0.5 else { return }
         lastReportedHeight = h
         onHeight?(h)
+    }
+
+    /// Imperatively empty the editor (used when the composer clears on save).
+    ///
+    /// Setting the `markdown` *binding* to `""` is a programmatic change that the
+    /// engine doesn't echo as a height/frame notification (`NSText.didChange` is for
+    /// user edits only, and it doesn't fire `frameDidChange` on a programmatic
+    /// shrink), so the box would stay stuck at its tall size. Replacing the text
+    /// directly fires `didChangeText` — which the engine observes to re-sync the
+    /// `markdown` binding back to "" — and lets us re-measure against the now-empty
+    /// content so the composer collapses back to its floor. Mirrors main's native
+    /// editor `clear()`.
+    func clear() {
+        guard let tv = textView else { return }
+        let full = NSRange(location: 0, length: (tv.string as NSString).length)
+        guard full.length > 0 else { reportHeight(); return }
+        isProgrammatic = true
+        if tv.shouldChangeText(in: full, replacementString: "") {
+            tv.textStorage?.replaceCharacters(in: full, with: "")
+            tv.didChangeText()
+            tv.setSelectedRange(NSRange(location: 0, length: 0))
+        }
+        isProgrammatic = false
+        // When the note overflowed 220pt the engine's scroll view was scrolled down;
+        // after collapsing to the floor that leftover offset leaves a stranded
+        // scroller. Snap the clip view back to the top and let it recompute scroller
+        // visibility against the now-tiny content so the bar disappears.
+        if let sv = tv.enclosingScrollView {
+            sv.contentView.scroll(to: .zero)
+            sv.reflectScrolledClipView(sv.contentView)
+        }
+        // Re-measure now that the view actually holds empty content.
+        lastReportedHeight = -1
+        reportHeight()
     }
 
     // MARK: Toolbar actions

@@ -423,14 +423,11 @@ private struct CommentCardView: View {
             }
 
             if !body0.isEmpty {
-                // Render with the same engine as the composer so the card preview
-                // matches the input exactly (lists, quote, code, math, spacing).
-                MarkdownEngineReadOnlyView(
-                    markdown: body0,
-                    documentId: "note-card-\(record.id)",
-                    onOpenURL: openURL
-                )
-                .frame(maxWidth: .infinity, alignment: .leading)
+                // Cards render with OakMarkdownUI, which sizes to its content
+                // intrinsically — no scroll view, no height measurement. (The engine
+                // is a scroll view and only earns its keep in the live composer.)
+                StreamingMarkdownView(markdown: body0, theme: .oak(), onOpenURL: openURL)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             cardImages

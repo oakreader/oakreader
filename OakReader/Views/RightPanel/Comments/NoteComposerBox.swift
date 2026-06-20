@@ -404,6 +404,12 @@ struct NoteComposerBox: View {
             let ok = await onSubmit(body)
             // Only clear on a successful save so a failed one keeps the text.
             if ok, mode == .create {
+                // Clear imperatively through the controller (not via `markdown = ""`):
+                // a binding reset is a programmatic change the engine doesn't echo as a
+                // height notification, so the box would stay stuck tall. `clear()` empties
+                // the text view directly and re-measures the now-empty content, which
+                // drives `onHeight` back down to the floor.
+                controller.clear()
                 markdown = ""
                 attachments = []
             }

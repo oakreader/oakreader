@@ -122,7 +122,6 @@
 		7741B23119F62E52C5DAAA5B /* LibraryTableToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E778748A8896A1883FEAAC7 /* LibraryTableToolbar.swift */; };
 		785110B982E23861D414F9B1 /* AreaSelectionPopupPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBDEAC41F0AF9C06236E365F /* AreaSelectionPopupPanel.swift */; };
 		79003249BE36C95F8A9065B7 /* LibraryCardGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC05D7173FD7935E97EC42B8 /* LibraryCardGridView.swift */; };
-		79BDD605A64F9CDE442B3DCE /* MarkdownEngineReadOnlyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48B546B3872646B1FAC03128 /* MarkdownEngineReadOnlyView.swift */; };
 		7A9F8D5C4783EFBCCDA7F1AB /* WordLookupStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0721B6B26F9E1364BF56FE6 /* WordLookupStore.swift */; };
 		7B0AEAD8EF8C83303DA847EB /* LibraryCoverSweeper.swift in Sources */ = {isa = PBXBuildFile; fileRef = D19D6C94D6FEE4CEB6E03746 /* LibraryCoverSweeper.swift */; };
 		7C801DF85757C5352215FC61 /* MemoryManagerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8EDE9B51AC3DBC63B9AD860 /* MemoryManagerView.swift */; };
@@ -384,7 +383,6 @@
 		47A63D583D4151C734A38F58 /* UninstallService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UninstallService.swift; sourceTree = "<group>"; };
 		480A67A2AF6B7A4B34639C05 /* ItemPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItemPanelView.swift; sourceTree = "<group>"; };
 		4858AF08186653B11C29612C /* DocumentTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentTools.swift; sourceTree = "<group>"; };
-		48B546B3872646B1FAC03128 /* MarkdownEngineReadOnlyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownEngineReadOnlyView.swift; sourceTree = "<group>"; };
 		4A5987B0AB524A0EDED7C3C3 /* SearchTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchTools.swift; sourceTree = "<group>"; };
 		4A6ED63FAF96F7236000130F /* LibrarySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibrarySettingsView.swift; sourceTree = "<group>"; };
 		4A72FAA928BCA03348A4CC8F /* LibraryRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryRootView.swift; sourceTree = "<group>"; };
@@ -755,7 +753,6 @@
 			isa = PBXGroup;
 			children = (
 				44258EB3416427A3D7BC3A8A /* MarkdownEngineNoteEditor.swift */,
-				48B546B3872646B1FAC03128 /* MarkdownEngineReadOnlyView.swift */,
 				76757A9FEAE3BA266939DCEF /* NativeNoteEditorView.swift */,
 				3C1F1EA1FDD437CC7333A7D8 /* NoteEditorModel.swift */,
 				6948A7DABE793B09EF66F145 /* NoteEditorStyle.swift */,
@@ -1454,7 +1451,6 @@
 				5E8B8AB39E7BA7E9F8529E2F /* MainMenuBuilder.swift in Sources */,
 				CBCD4E03D39EECC58E1311D6 /* MarkdownDocument.swift in Sources */,
 				9BD3C875BA0D91D5206BABF4 /* MarkdownEngineNoteEditor.swift in Sources */,
-				79BDD605A64F9CDE442B3DCE /* MarkdownEngineReadOnlyView.swift in Sources */,
 				D65A66AF24BA727D16226BD7 /* MarkdownOutlineSidebarView.swift in Sources */,
 				553214B429F34C605FD0C24E /* MarkdownPreviewView.swift in Sources */,
 				B346916E0BE2FE17E1F7FC5C /* MediaDocument.swift in Sources */,
