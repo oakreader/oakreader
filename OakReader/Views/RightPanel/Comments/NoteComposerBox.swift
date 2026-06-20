@@ -48,7 +48,7 @@ struct NoteComposerBox: View {
     /// Default writing area floor — a touch roomier than the AI chat input
     /// (`ChatInputTextView.minContentHeight` = 40) so the composer invites a real
     /// jot, without towering over it. The editor still grows past this with content.
-    private static let minEditorHeight: CGFloat = 60
+    private static let minEditorHeight: CGFloat = 40
     /// Images attached to this note, shown as a flomo-style thumbnail tray below
     /// the prose (kept out of the editor so they never crowd out the writing line).
     @State private var attachments: [String] = []

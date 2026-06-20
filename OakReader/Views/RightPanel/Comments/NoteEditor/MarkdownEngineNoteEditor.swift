@@ -303,12 +303,11 @@ struct MarkdownEngineNoteEditor: View {
     )
 
     /// Tighter than the engine defaults, which read as over-indented/loose in a
-    /// compact composer: list indent 27.5→18pt (matches the engine's fixed 18pt
-    /// blockquote indent and the rendered note card), list line-height +2→+1, and
-    /// calmer paragraph spacing (0.3→0.18 of the line height).
+    /// compact composer: list indent 27.5→12pt, list line-height +2→+1, and calmer
+    /// paragraph spacing (0.3→0.18 of the line height).
     private static let configuration = MarkdownEditorConfiguration(
         services: services,
-        lists: ListStyle(indentPerLevel: 18, extraLineHeight: 1),
+        lists: ListStyle(indentPerLevel: 12, extraLineHeight: 1),
         paragraph: ParagraphStyle(spacingFactor: 0.18)
     )
 
