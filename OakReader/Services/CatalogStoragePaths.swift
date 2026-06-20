@@ -67,11 +67,6 @@ extension CatalogDatabase {
         chatAttachmentsDirectory.appendingPathComponent(sessionId.uuidString, isDirectory: true)
     }
 
-    /// ~/OakReader/chats/attachments/{sessionId}/{fileName}
-    static func chatAttachmentURL(sessionId: UUID, fileName: String) -> URL {
-        chatAttachmentDirectory(sessionId: sessionId).appendingPathComponent(fileName)
-    }
-
     static func createBaseDirectories() throws {
         try FileManager.default.createDirectory(at: dataDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: storageDirectory, withIntermediateDirectories: true)
@@ -144,11 +139,5 @@ extension CatalogDatabase {
     static func attachmentTranscriptURL(itemStorageKey: String, attachmentStorageKey: String) -> URL {
         attachmentDirectory(itemStorageKey: itemStorageKey, attachmentStorageKey: attachmentStorageKey)
             .appendingPathComponent("transcript.txt")
-    }
-
-    /// Summary JSON URL for an audio recording attachment.
-    static func attachmentSummaryURL(itemStorageKey: String, attachmentStorageKey: String) -> URL {
-        attachmentDirectory(itemStorageKey: itemStorageKey, attachmentStorageKey: attachmentStorageKey)
-            .appendingPathComponent("summary.json")
     }
 }
