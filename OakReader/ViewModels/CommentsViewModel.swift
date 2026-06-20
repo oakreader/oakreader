@@ -280,6 +280,28 @@ final class CommentsViewModel {
         postChanged()
     }
 
+    /// Delete every note in this doc's stream in one go (used by the panel's ⋯
+    /// menu). Honours each card's kind exactly like `delete(_:)` — an anchored
+    /// card also drops its on-page highlight — then reloads + notifies once.
+    @MainActor
+    func deleteAll() {
+        for record in cards {
+            switch record.positionKind {
+            case "pdf-overlay":
+                parent?.annotation.deleteOverlayMarkup(id: record.id)
+            case "web":
+                store?.softDelete(id: record.id)
+                NotificationCenter.default.post(
+                    name: .webDeleteHighlight, object: parent, userInfo: ["id": record.id]
+                )
+            default:  // "memo"
+                store?.softDelete(id: record.id)
+            }
+        }
+        reload()
+        postChanged()
+    }
+
     /// A plain-text `NoteRef` (preview + time) for a card, for pickers / backlinks.
     private func noteRef(_ record: AnnotationRecord) -> NoteRef {
         let raw = record.comment ?? ""

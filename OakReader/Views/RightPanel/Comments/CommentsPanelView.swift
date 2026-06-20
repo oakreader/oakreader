@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import OakMarkdownUI
+import UniformTypeIdentifiers
 
 /// The right-panel **Notes** surface — a chat-to-self, capture-first stream.
 /// The memo list fills the panel (oldest first, newest at the bottom) and a
@@ -17,6 +18,7 @@ struct CommentsPanelView: View {
     @State private var flashId: String?
     @State private var focusSignal = 0
     @State private var showSearch = false
+    @State private var showDeleteAllConfirm = false
     @FocusState private var searchFocused: Bool
 
     private var model: CommentsViewModel { viewModel.comments }
@@ -70,11 +72,72 @@ struct CommentsPanelView: View {
             if new != nil { focusSignal += 1 }
         }
         .onAppear { if model.pendingAnchorId != nil { focusSignal += 1 } }
+        .confirmationDialog(
+            "Delete all \(model.cards.count) notes?",
+            isPresented: $showDeleteAllConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Delete All", role: .destructive) { model.deleteAll() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes every note in this document, including the highlights anchored notes point to. This can't be undone.")
+        }
     }
 
     private var subtitle: String {
         let n = model.cards.count
         return n == 1 ? "1 note" : "\(n) notes"
+    }
+
+    // MARK: - Export
+
+    /// The document name (no extension) used as the export folder/file base.
+    private var docTitle: String {
+        (viewModel.fileName as NSString).deletingPathExtension
+    }
+
+    /// Export one Markdown file per note into a user-chosen folder (images copied
+    /// alongside), then reveal the new folder in Finder.
+    private func exportToFolder() {
+        guard !model.cards.isEmpty else { return }
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.prompt = "Export"
+        panel.message = "Choose where to create the notes folder"
+        guard panel.runModal() == .OK, let dir = panel.url else { return }
+        do {
+            let folder = try NoteExporter.exportToFolder(records: model.cards, title: docTitle, parentDir: dir)
+            NSWorkspace.shared.activateFileViewerSelecting([folder])
+        } catch {
+            presentError(error)
+        }
+    }
+
+    /// Export every note into a single Markdown file, then reveal it in Finder.
+    private func exportSingleMarkdown() {
+        guard !model.cards.isEmpty else { return }
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "\(docTitle) Notes.md"
+        panel.allowedContentTypes = [UTType(filenameExtension: "md") ?? .plainText]
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let md = NoteExporter.combinedMarkdown(records: model.cards, title: docTitle)
+            try md.write(to: url, atomically: true, encoding: .utf8)
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        } catch {
+            presentError(error)
+        }
+    }
+
+    private func presentError(_ error: Error) {
+        let alert = NSAlert()
+        alert.messageText = "Couldn't export notes"
+        alert.informativeText = error.localizedDescription
+        alert.alertStyle = .warning
+        alert.runModal()
     }
 
     /// flomo-style title row with the count inline to the right of "Notes"
@@ -102,9 +165,44 @@ struct CommentsPanelView: View {
             }
             .buttonStyle(.plain)
             .help(showSearch ? "Close search" : "Search notes")
+
+            moreMenu
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+    }
+
+    /// Overflow menu (⋯) next to the search button: bulk export + delete. Notes
+    /// live in SQLite (not on disk), so export is how they reach the filesystem —
+    /// either one file per note in a folder, or all of them in one Markdown file.
+    private var moreMenu: some View {
+        Menu {
+            Button { exportToFolder() } label: {
+                Label("Export Notes to Folder…", systemImage: "folder")
+            }
+            Button { exportSingleMarkdown() } label: {
+                Label("Export as Single Markdown…", systemImage: "doc.text")
+            }
+            Divider()
+            Button(role: .destructive) { showDeleteAllConfirm = true } label: {
+                Label("Delete All Notes", systemImage: "trash")
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 24, height: 24)
+                .contentShape(Rectangle())
+                // Pin the a11y label so SwiftUI never resolves the `ellipsis`
+                // symbol's localized description on a non-base locale (the
+                // CPU-peg in [[sfsymbol-a11y-locale-hang]]).
+                .accessibilityLabel(Text("More"))
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .disabled(model.cards.isEmpty)
+        .help("More")
     }
 
     /// Inline search field, revealed by the header's magnifying-glass button.
