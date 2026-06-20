@@ -129,6 +129,7 @@
 		7E7586A8F4A8D8F88F0C7413 /* HTMLDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91FDAC96786D8B4011B623B5 /* HTMLDocument.swift */; };
 		803BDBB63574B75950ED1DA2 /* NoteComposerBox.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB28674401171F133AF0003D /* NoteComposerBox.swift */; };
 		806B3FDB25EF504E461636A4 /* PDFAnnotation+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BC5B006B91985952010BF6E /* PDFAnnotation+Extensions.swift */; };
+		80859BD31B884DB1EB2CCCE4 /* MarkdownEngineLatex in Frameworks */ = {isa = PBXBuildFile; productRef = E604AC2FE326516ABF46BE91 /* MarkdownEngineLatex */; };
 		80B0CA96D9643F36B4AA9E50 /* ChatHistoryDrawer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 203FB2B8AAC61EDD2FD22B9A /* ChatHistoryDrawer.swift */; };
 		815C460944AA84D568D81D44 /* NoteEditorTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4D7A13777FA8876C6D9C961 /* NoteEditorTextView.swift */; };
 		821FA1782652ED5BCC545A5A /* CommandPaletteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16F14AE6A44E2896D55B85E2 /* CommandPaletteView.swift */; };
@@ -147,6 +148,7 @@
 		8DF345E8B9C7A4A26745D3C2 /* DocumentToolbarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77B8325AE459CB24E2335895 /* DocumentToolbarView.swift */; };
 		8E48000C86108C02A86F07C5 /* PDFViewCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D46DC9842C708EE4F886379 /* PDFViewCoordinator.swift */; };
 		8EBE599938FF028F296BDAC1 /* NoteDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCE09C2AAC01ED235CB5E49D /* NoteDetailSheet.swift */; };
+		8F413E89092923AC9E22AD7D /* MarkdownEngineCodeBlocks in Frameworks */ = {isa = PBXBuildFile; productRef = D9CEF64D789B323DB657A325 /* MarkdownEngineCodeBlocks */; };
 		8FEC7772368A77E5AE2091B4 /* NotesSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62D7A3CC47463993633A9DEC /* NotesSupport.swift */; };
 		8FF26178C885487D750AD03B /* NoteEditorStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6948A7DABE793B09EF66F145 /* NoteEditorStyle.swift */; };
 		904CE886864FA94FC8C4AB6C /* NoteImageStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 262CF97B8692FC8111488347 /* NoteImageStore.swift */; };
@@ -210,6 +212,7 @@
 		BD36C5500052012731AC6FED /* BraveSearchProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31104B8D21C713147806A5AB /* BraveSearchProvider.swift */; };
 		BED3AEF28A699F0D3102C745 /* DocumentViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 258BBD44D9EA81C666F6CA0F /* DocumentViewModel.swift */; };
 		BF331128A5EB291CD2CE3563 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02CC2D250D2F0DC2A519B204 /* SidebarView.swift */; };
+		C0B2CBFE824C5F19A1A071C0 /* MarkdownEngine in Frameworks */ = {isa = PBXBuildFile; productRef = D060BA45903E82B11F0F72E8 /* MarkdownEngine */; };
 		C0BB4EFB91FC8970E8BB9B7D /* ContentChunker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 101914D5471BD54C347EA63C /* ContentChunker.swift */; };
 		C1205D6CBED8E36E3DCFFFE0 /* ZoteroImportProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8769A6CEF743D0FD408B953D /* ZoteroImportProgressView.swift */; };
 		C2252EFF5D2937ABBC360DF1 /* TranslationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83F5836A81B34F501B65BBA1 /* TranslationViewModel.swift */; };
@@ -573,6 +576,9 @@
 				7CD7B12462D12E8B04AABBDA /* Sparkle in Frameworks */,
 				98FA357C48DEAB6E8669CA3F /* OakVoice in Frameworks */,
 				B9BE36D6C7401EE88CE7071D /* PostHog in Frameworks */,
+				C0B2CBFE824C5F19A1A071C0 /* MarkdownEngine in Frameworks */,
+				80859BD31B884DB1EB2CCCE4 /* MarkdownEngineLatex in Frameworks */,
+				8F413E89092923AC9E22AD7D /* MarkdownEngineCodeBlocks in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1166,6 +1172,9 @@
 				F10B728DCD9CF1D3612369BE /* Sparkle */,
 				700CFFFFF234759D7CB6C385 /* OakVoice */,
 				FD8515630C748A9B57C93804 /* PostHog */,
+				D060BA45903E82B11F0F72E8 /* MarkdownEngine */,
+				E604AC2FE326516ABF46BE91 /* MarkdownEngineLatex */,
+				D9CEF64D789B323DB657A325 /* MarkdownEngineCodeBlocks */,
 			);
 			productName = OakReader;
 			productReference = 62D8CC8D7C726C11792024B3 /* OakReader.app */;
@@ -1205,6 +1214,7 @@
 				A0FC1AC836FC06E7C9FCEAFE /* XCRemoteSwiftPackageReference "swift-cmark-gfm" */,
 				DD10350F424FE099033E1375 /* XCRemoteSwiftPackageReference "GRDB.swift" */,
 				225B7FE5AC36B1D8CF482B3A /* XCRemoteSwiftPackageReference "Highlightr" */,
+				6EB8B63FFF5F1AC3ECFC2C43 /* XCRemoteSwiftPackageReference "swift-markdown-engine" */,
 				143D7C079301426A56D90A4A /* XCRemoteSwiftPackageReference "posthog-ios" */,
 				EC431EFA19C3F508366C9671 /* XCRemoteSwiftPackageReference "Sparkle" */,
 				B680BFA2F3935A70C71804BD /* XCRemoteSwiftPackageReference "swift-argument-parser" */,
@@ -1836,6 +1846,14 @@
 				minimumVersion = 2.3.0;
 			};
 		};
+		6EB8B63FFF5F1AC3ECFC2C43 /* XCRemoteSwiftPackageReference "swift-markdown-engine" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/nodes-app/swift-markdown-engine";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.7.0;
+			};
+		};
 		A0FC1AC836FC06E7C9FCEAFE /* XCRemoteSwiftPackageReference "swift-cmark-gfm" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/stackotter/swift-cmark-gfm";
@@ -1897,14 +1915,29 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = OakAgent;
 		};
+		D060BA45903E82B11F0F72E8 /* MarkdownEngine */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 6EB8B63FFF5F1AC3ECFC2C43 /* XCRemoteSwiftPackageReference "swift-markdown-engine" */;
+			productName = MarkdownEngine;
+		};
 		D1622ABDD098451C89D32128 /* OakAgent */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = OakAgent;
+		};
+		D9CEF64D789B323DB657A325 /* MarkdownEngineCodeBlocks */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 6EB8B63FFF5F1AC3ECFC2C43 /* XCRemoteSwiftPackageReference "swift-markdown-engine" */;
+			productName = MarkdownEngineCodeBlocks;
 		};
 		DBFC960D58BB4D238DFC9FF1 /* GRDB */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = DD10350F424FE099033E1375 /* XCRemoteSwiftPackageReference "GRDB.swift" */;
 			productName = GRDB;
+		};
+		E604AC2FE326516ABF46BE91 /* MarkdownEngineLatex */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 6EB8B63FFF5F1AC3ECFC2C43 /* XCRemoteSwiftPackageReference "swift-markdown-engine" */;
+			productName = MarkdownEngineLatex;
 		};
 		EE983D369D941923AF2F04FF /* CMarkGFM */ = {
 			isa = XCSwiftPackageProductDependency;
