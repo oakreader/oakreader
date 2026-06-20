@@ -34,12 +34,15 @@ struct NoteComposerBox: View {
     /// tag instead of retyping it (recognition over recall → prevents tag sprawl).
     var tags: [String] = []
 
-    @State private var controller = NoteEditorController()
+    @State private var controller = MarkdownNoteController()
+    /// The note body as Markdown — `swift-markdown-engine` styles this string live
+    /// and round-trips it, so there is no rich-attribute ⇄ Markdown codec to drift.
+    @State private var markdown = ""
+    @State private var didSeedMarkdown = false
     @State private var isEmpty = true
     @State private var charCount = 0
-    /// Formatting commands active at the caret (reported live by the editor), so
-    /// the toolbar can highlight the matching buttons — the affordance that tells
-    /// the user the same button toggles the style back off.
+    /// Vestigial: the engine doesn't report caret formats, so toolbar buttons no
+    /// longer show a toggled-on state. Kept empty to avoid churning the format bar.
     @State private var activeFormats: Set<String> = []
     @State private var height: CGFloat = Self.minEditorHeight
     /// Default writing area floor — a touch roomier than the AI chat input
@@ -61,12 +64,6 @@ struct NoteComposerBox: View {
     /// Send is allowed when there's prose *or* at least one attached image.
     private var canSend: Bool { !isEmpty || !attachments.isEmpty }
 
-    /// Code is literal text, so rich inline formatting (B/I/U/S, link) is unavailable
-    /// in any code context, and inline-code can't nest inside a code block — Slack's
-    /// rule. Driven by the live `activeFormats` the editor reports at the caret.
-    private var inCodeBlock: Bool { activeFormats.contains("codeBlock") }
-    private var inCodeContext: Bool { inCodeBlock || activeFormats.contains("code") }
-
     var body: some View {
         VStack(spacing: 8) {
             if let quote, !quote.isEmpty {
@@ -82,23 +79,18 @@ struct NoteComposerBox: View {
                     .transition(.opacity)
             }
 
-            // `@` references and `#` tags are driven inline by the editor itself
-            // (same `ChatCompletionPanel` the chat composer uses), so there are no
-            // SwiftUI popovers to host here anymore.
-            NativeNoteEditorView(
-                initialMarkdown: Self.splitBody(initialMarkdown).text,
+            MarkdownEngineNoteEditor(
+                markdown: $markdown,
                 controller: controller,
-                isEmpty: $isEmpty,
-                charCount: $charCount,
-                height: $height,
-                activeFormats: $activeFormats,
-                onSubmit: send,
-                references: memos,
-                tags: tags
+                fontSize: 14,
+                placeholder: mode == .create ? "Write a note…" : ""
             )
-            .frame(height: max(height, Self.minEditorHeight), alignment: .topLeading)
-            // Grow the frame in lockstep with content (no height animation) so the
-            // first line stays pinned as the editor auto-grows.
+            .frame(minHeight: Self.minEditorHeight, maxHeight: 220)
+            .onChange(of: markdown) { _, md in
+                let trimmed = md.trimmingCharacters(in: .whitespacesAndNewlines)
+                if isEmpty != trimmed.isEmpty { isEmpty = trimmed.isEmpty }
+                if charCount != md.count { charCount = md.count }
+            }
 
             if !attachments.isEmpty {
                 attachmentTray
@@ -120,6 +112,12 @@ struct NoteComposerBox: View {
         )
         .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
         .onAppear {
+            if !didSeedMarkdown {
+                didSeedMarkdown = true
+                markdown = Self.splitBody(initialMarkdown).text
+                isEmpty = markdown.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                charCount = markdown.count
+            }
             guard !didSeedAttachments else { return }
             didSeedAttachments = true
             attachments = Self.splitBody(initialMarkdown).images
@@ -209,10 +207,12 @@ struct NoteComposerBox: View {
             }
             .help("Formatting")
 
-            toolButton("number") { controller.cmd("tag") }
+            // TODO(markdown-engine): restore the inline #/@ completion popup
+            // (ChatCompletionPanel) on top of the engine's NSTextView.
+            toolButton("number") { controller.insert("#") }
                 .help("Tag")
 
-            toolButton("at") { controller.requestMention() }
+            toolButton("at") { controller.insert("@") }
                 .help("Reference a note")
 
             imageButton
@@ -255,13 +255,13 @@ struct NoteComposerBox: View {
     private var formatBar: some View {
         HStack(spacing: 2) {
             // B/I/U/S don't apply to literal code — disabled in any code context.
-            toolButton("bold", active: activeFormats.contains("bold"), disabled: inCodeContext) { controller.cmd("bold") }
+            toolButton("bold") { controller.wrapSelection("**") }
                 .help("Bold")
-            toolButton("italic", active: activeFormats.contains("italic"), disabled: inCodeContext) { controller.cmd("italic") }
+            toolButton("italic") { controller.wrapSelection("*") }
                 .help("Italic")
-            toolButton("underline", active: activeFormats.contains("underline"), disabled: inCodeContext) { controller.cmd("underline") }
+            toolButton("underline") { controller.wrapSelection(open: "<u>", close: "</u>") }
                 .help("Underline")
-            toolButton("strikethrough", active: activeFormats.contains("strikethrough"), disabled: inCodeContext) { controller.cmd("strikethrough") }
+            toolButton("strikethrough") { controller.wrapSelection("~~") }
                 .help("Strikethrough")
 
             toolDivider
@@ -270,27 +270,25 @@ struct NoteComposerBox: View {
                 Image(systemName: "link")
                     .font(.system(size: 14))
                     .foregroundStyle(.secondary)
-                    .opacity(inCodeContext ? 0.35 : 1)
                     .frame(width: 28, height: 28)
                     .contentShape(Rectangle())
                     .accessibilityHidden(true)
             }
             .buttonStyle(ToolButtonStyle())
-            .disabled(inCodeContext)   // no links in literal code
             .help("Link")
             .popover(isPresented: $showLink, arrowEdge: .bottom) { linkPopover }
 
             toolDivider
 
-            toolButton("list.bullet", active: activeFormats.contains("bulletList")) { controller.cmd("bulletList") }
+            toolButton("list.bullet") { controller.toggleLinePrefix("- ") }
                 .help("Bulleted list")
-            toolButton("list.number", active: activeFormats.contains("orderedList")) { controller.cmd("orderedList") }
+            toolButton("list.number") { controller.toggleLinePrefix("1. ") }
                 .help("Numbered list")
             // `quote.opening` — a distinct quotation glyph for the blockquote toggle.
             // NOT `text.quote`: this app reserves that for a *source reference* (the
             // anchored-note chip / add-to-chat), so `text.quote` here read as "make a
             // reference" rather than "format this paragraph as a blockquote".
-            toolButton("quote.opening", active: activeFormats.contains("quote")) { controller.cmd("quote") }
+            toolButton("quote.opening") { controller.toggleLinePrefix("> ") }
                 .help("Quote")
 
             toolDivider
@@ -300,9 +298,9 @@ struct NoteComposerBox: View {
             // One consistent code family: inline = bare braces, block = braces-in-a-box.
             // Inline code can't nest inside a code block; the code-block toggle
             // stays enabled so you can always leave the block.
-            toolButton("curlybraces", active: activeFormats.contains("code"), disabled: inCodeBlock) { controller.cmd("code") }
+            toolButton("curlybraces") { controller.wrapSelection("`") }
                 .help("Inline code")
-            toolButton("curlybraces.square", active: activeFormats.contains("codeBlock")) { controller.cmd("codeBlock") }
+            toolButton("curlybraces.square") { controller.insertCodeBlock() }
                 .help("Code block")
 
             Spacer()
@@ -335,7 +333,8 @@ struct NoteComposerBox: View {
         showLink = false
         linkURL = ""
         guard !url.isEmpty else { return }
-        controller.insertLink(url: url)
+        // Wrap the selection as `[sel](url)` (or `[](url)` with no selection).
+        controller.wrapSelection(open: "[", close: "](\(url))")
         controller.focus()
     }
 
@@ -381,17 +380,15 @@ struct NoteComposerBox: View {
     // MARK: Actions
 
     private func send() {
-        controller.getMarkdown { md in
-            let text = md.trimmingCharacters(in: .whitespacesAndNewlines)
-            let body = Self.combine(text: text, images: attachments)
-            guard !body.isEmpty else { return }
-            Task { @MainActor in
-                let ok = await onSubmit(body)
-                // Only clear on a successful save so a failed one keeps the text.
-                if ok, mode == .create {
-                    controller.clear()
-                    attachments = []
-                }
+        let text = markdown.trimmingCharacters(in: .whitespacesAndNewlines)
+        let body = Self.combine(text: text, images: attachments)
+        guard !body.isEmpty else { return }
+        Task { @MainActor in
+            let ok = await onSubmit(body)
+            // Only clear on a successful save so a failed one keeps the text.
+            if ok, mode == .create {
+                markdown = ""
+                attachments = []
             }
         }
     }

@@ -19,16 +19,24 @@ final class MarkdownNoteController {
 
     /// Wrap the current selection in `marker` on both sides (e.g. `**bold**`); with
     /// no selection, insert the markers and place the caret between them.
-    func wrapSelection(_ marker: String) {
+    func wrapSelection(_ marker: String) { wrapSelection(open: marker, close: marker) }
+
+    /// Wrap the selection in distinct opening/closing markers (e.g. `<u>…</u>`).
+    func wrapSelection(open: String, close: String) {
         guard let tv = textView else { return }
         let sel = tv.selectedRange()
         let ns = tv.string as NSString
-        if sel.length > 0 {
-            let inner = ns.substring(with: sel)
-            replace(sel, with: "\(marker)\(inner)\(marker)", caret: sel.location + marker.count + (inner as NSString).length)
-        } else {
-            replace(sel, with: "\(marker)\(marker)", caret: sel.location + marker.count)
-        }
+        let inner = sel.length > 0 ? ns.substring(with: sel) : ""
+        let caret = sel.location + (open as NSString).length + (inner as NSString).length
+        replace(sel, with: open + inner + close, caret: caret)
+    }
+
+    /// Insert a fenced code block, caret placed on the empty middle line.
+    func insertCodeBlock() {
+        guard let tv = textView else { return }
+        let sel = tv.selectedRange()
+        let fence = "```\n\n```"
+        replace(sel, with: fence, caret: sel.location + 4)  // after "```\n"
     }
 
     /// Prefix the caret's line with `prefix` (e.g. `> `, `- `, `1. `, `# `). Toggles
