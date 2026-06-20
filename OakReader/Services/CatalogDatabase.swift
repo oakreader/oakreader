@@ -13,6 +13,13 @@ final class CatalogDatabase {
         let dbPath = Self.dataDirectory.appendingPathComponent("library.sqlite").path
         var config = Configuration()
         config.foreignKeysEnabled = true
+        // WAL lets the UI read while imports write, instead of blocking on the
+        // default rollback journal. busy_timeout absorbs brief lock contention.
+        // (Do not place ~/OakReader in a cloud-synced folder — WAL + sync corrupts SQLite.)
+        config.prepareDatabase { db in
+            try db.execute(sql: "PRAGMA journal_mode = WAL")
+            try db.execute(sql: "PRAGMA busy_timeout = 5000")
+        }
         dbQueue = try DatabaseQueue(path: dbPath, configuration: config)
 
         // Tier 1 — Schema: run DDL migrations
