@@ -123,10 +123,12 @@ extension CatalogDatabase {
             .appendingPathComponent(fileName)
     }
 
-    /// Cover image URL for an attachment: storage/{itemKey}/attachments/{attachmentKey}/cover.webp
+    /// Cover image URL for an attachment: storage/{itemKey}/attachments/{attachmentKey}/cover.jpg
+    /// (Content is JPEG — see `LibraryCoverService.jpegData(quality:)`. Marker files derive
+    /// from this name via `appendingPathExtension`, e.g. `cover.jpg.render`.)
     static func attachmentCoverURL(itemStorageKey: String, attachmentStorageKey: String) -> URL {
         attachmentDirectory(itemStorageKey: itemStorageKey, attachmentStorageKey: attachmentStorageKey)
-            .appendingPathComponent("cover.webp")
+            .appendingPathComponent("cover.jpg")
     }
 
     /// Metadata JSON URL for an embed attachment.
