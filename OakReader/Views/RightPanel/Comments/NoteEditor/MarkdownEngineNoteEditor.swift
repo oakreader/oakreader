@@ -296,25 +296,10 @@ struct MarkdownEngineNoteEditor: View {
     /// A finished region capture's `file://` URL, inserted as a Markdown image.
     var onPasteImage: ((NSPasteboard) -> String?)? = nil
 
-    /// Math + syntax-highlighting services come from the package's drop-in bridges.
-    private static let services = MarkdownEditorServices(
-        syntaxHighlighter: HighlighterSwiftBridge(),
-        latex: SwiftMathBridge()
-    )
-
-    /// Tighter than the engine defaults, which read as over-indented/loose in a
-    /// compact composer: list indent 27.5→12pt, list line-height +2→+1, and calmer
-    /// paragraph spacing (0.3→0.18 of the line height).
-    private static let configuration = MarkdownEditorConfiguration(
-        services: services,
-        lists: ListStyle(indentPerLevel: 12, extraLineHeight: 1),
-        paragraph: ParagraphStyle(spacingFactor: 0.18)
-    )
-
     var body: some View {
         NativeTextViewWrapper(
             text: $markdown,
-            configuration: Self.configuration,
+            configuration: NoteMarkdownEngine.configuration,
             fontName: "SF Pro",
             fontSize: fontSize,
             documentId: "note-composer",

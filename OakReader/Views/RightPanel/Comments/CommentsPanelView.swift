@@ -423,8 +423,14 @@ private struct CommentCardView: View {
             }
 
             if !body0.isEmpty {
-                StreamingMarkdownView(markdown: body0, theme: .oak(), onOpenURL: openURL)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                // Render with the same engine as the composer so the card preview
+                // matches the input exactly (lists, quote, code, math, spacing).
+                MarkdownEngineReadOnlyView(
+                    markdown: body0,
+                    documentId: "note-card-\(record.id)",
+                    onOpenURL: openURL
+                )
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             cardImages
