@@ -94,10 +94,20 @@ struct MarkdownEngineNoteEditor: View {
         latex: SwiftMathBridge()
     )
 
+    /// Tighter than the engine defaults, which read as over-indented/loose in a
+    /// compact composer: list indent 27.5→18pt (matches the engine's fixed 18pt
+    /// blockquote indent and the rendered note card), list line-height +2→+1, and
+    /// calmer paragraph spacing (0.3→0.18 of the line height).
+    private static let configuration = MarkdownEditorConfiguration(
+        services: services,
+        lists: ListStyle(indentPerLevel: 18, extraLineHeight: 1),
+        paragraph: ParagraphStyle(spacingFactor: 0.18)
+    )
+
     var body: some View {
         NativeTextViewWrapper(
             text: $markdown,
-            configuration: MarkdownEditorConfiguration(services: Self.services),
+            configuration: Self.configuration,
             fontName: "SF Pro",
             fontSize: fontSize,
             documentId: "note-composer",
