@@ -128,6 +128,9 @@ struct NoteComposerBox: View {
                     withAnimation(.easeOut(duration: 0.12)) { height = clamped }
                 }
             }
+            // Plain ⏎ in the editor saves the note (the help text already advertises
+            // "Save (↩)"); the controller's key monitor routes it here.
+            controller.onSubmit = { send() }
             if !didSeedMarkdown {
                 didSeedMarkdown = true
                 markdown = Self.splitBody(initialMarkdown).text
@@ -404,14 +407,27 @@ struct NoteComposerBox: View {
             let ok = await onSubmit(body)
             // Only clear on a successful save so a failed one keeps the text.
             if ok, mode == .create {
-                // Clear imperatively through the controller (not via `markdown = ""`):
-                // a binding reset is a programmatic change the engine doesn't echo as a
-                // height notification, so the box would stay stuck tall. `clear()` empties
-                // the text view directly and re-measures the now-empty content, which
-                // drives `onHeight` back down to the floor.
-                controller.clear()
-                markdown = ""
-                attachments = []
+                // Collapse the writing area to its floor *before* clearing the text.
+                // The engine sizes its scroll view's document view to
+                // `max(contentHeight, viewportHeight)` and only re-measures on a
+                // *content* change — never on a viewport-only change. So clearing while
+                // the box is still tall inflates the now-empty document view to the OLD
+                // tall viewport and then never shrinks it when the frame collapses,
+                // stranding a scrollbar over the empty box. Dropping the frame first
+                // (un-animated, so the engine's clip view is the floor height by the
+                // next runloop) makes the clear's re-measure run against the small
+                // viewport, so the document view collapses with it — no lingering scroller.
+                height = Self.minEditorHeight
+                DispatchQueue.main.async {
+                    // Clear imperatively through the controller (not via `markdown = ""`):
+                    // a binding reset is a programmatic change the engine doesn't echo as a
+                    // height notification, so the box would stay stuck tall. `clear()` empties
+                    // the text view directly and re-measures the now-empty content against the
+                    // (now small) viewport, which drives `onHeight` back down to the floor.
+                    controller.clear()
+                    markdown = ""
+                    attachments = []
+                }
             }
         }
     }

@@ -17,16 +17,25 @@ enum NoteMarkdownEngine {
         latex: SwiftMathBridge()
     )
 
-    /// Tighter than the engine defaults: list indent 27.5→12pt, list line-height
+    /// Tighter than the engine defaults: list indent 27.5→6pt, list line-height
     /// +2→+1, calmer paragraph spacing (0.3→0.18 of the line height).
     static let configuration = MarkdownEditorConfiguration(
         services: services,
-        lists: ListStyle(indentPerLevel: 12, extraLineHeight: 1),
+        lists: ListStyle(indentPerLevel: 6, extraLineHeight: 1),
         paragraph: ParagraphStyle(spacingFactor: 0.18)
     )
 }
 
 // MARK: - Controller
+
+/// Hardware key codes the composer's key monitor steers on (`NSEvent.keyCode`).
+private enum Key {
+    static let enter: UInt16 = 36
+    static let tab: UInt16 = 48
+    static let escape: UInt16 = 53
+    static let down: UInt16 = 125
+    static let up: UInt16 = 126
+}
 
 /// Imperative handle the composer's toolbar drives. The editor edits a Markdown
 /// *string* (the engine styles it live), so content lives in a `String` binding;
@@ -49,6 +58,9 @@ final class MarkdownNoteController {
     var tags: [String] = []
     /// A `#` tag typed/created that isn't in `tags` yet (so the host can persist it).
     var onCreateTag: ((String) -> Void)?
+    /// Plain ⏎ saves the note (flomo/chat-composer quick capture); Shift/⌘+⏎ inserts
+    /// a newline. Driven from the local key monitor when the completion panel is closed.
+    var onSubmit: (() -> Void)?
     /// Reports the editor's *pure text* content height (excludes the engine's
     /// scroll overscroll) so the host can size the composer to hug its content
     /// instead of stretching to the engine `NSScrollView`'s flexible frame.
@@ -273,22 +285,36 @@ final class MarkdownNoteController {
         triggerLocation = nil
     }
 
-    /// Intercept navigation keys while the panel is open and the editor has focus;
-    /// return `nil` to swallow, or the event to let the text view handle it (which
-    /// then re-filters via the change observer).
+    /// Steer the editor's keyboard while it has focus: drive the completion popup
+    /// when it's open, otherwise apply the Slack-model submit. Returns `nil` to
+    /// swallow the key, or the event to let the text view handle it.
     private func handleKey(_ event: NSEvent) -> NSEvent? {
-        guard completionPanel != nil, let tv = textView, tv.window?.firstResponder === tv else {
-            return event
-        }
+        guard let tv = textView, tv.window?.firstResponder === tv else { return event }
+        return completionPanel != nil ? steerPanel(event) : handleSubmit(event, in: tv)
+    }
+
+    /// Drive the open `#`/`@` popup with ↑/↓/⏎/⎋ — the text view never sees these.
+    private func steerPanel(_ event: NSEvent) -> NSEvent? {
         switch event.keyCode {
-        case 53: dismissPanel(); return nil                                   // Esc
-        case 36, 48:                                                          // Enter / Tab
+        case Key.escape: dismissPanel()
+        case Key.enter, Key.tab:
             if let item = completionPanel?.selectedItem { performSelect(item) } else { dismissPanel() }
-            return nil
-        case 126: completionPanel?.moveSelection(by: -1); return nil          // Up
-        case 125: completionPanel?.moveSelection(by: 1); return nil           // Down
-        default: return event                                                // type → re-filter
+        case Key.up: completionPanel?.moveSelection(by: -1)
+        case Key.down: completionPanel?.moveSelection(by: 1)
+        default: return event                                  // any other key → re-filter
         }
+        return nil
+    }
+
+    /// Slack model: ⏎ saves the note, Shift+⏎ inserts a newline.
+    private func handleSubmit(_ event: NSEvent, in tv: NSTextView) -> NSEvent? {
+        guard event.keyCode == Key.enter else { return event }
+        if event.modifierFlags.intersection(.deviceIndependentFlagsMask).contains(.shift) {
+            tv.insertNewline(nil)
+        } else {
+            onSubmit?()
+        }
+        return nil
     }
 
     private func updateFilter() {
