@@ -83,7 +83,9 @@ struct NoteComposerBox: View {
                 markdown: $markdown,
                 controller: controller,
                 fontSize: 14,
-                placeholder: mode == .create ? "Write a note…" : ""
+                placeholder: mode == .create ? "Write a note…" : "",
+                references: memos,
+                tags: tags
             )
             .frame(minHeight: Self.minEditorHeight, maxHeight: 220)
             .onChange(of: markdown) { _, md in
@@ -207,8 +209,8 @@ struct NoteComposerBox: View {
             }
             .help("Formatting")
 
-            // TODO(markdown-engine): restore the inline #/@ completion popup
-            // (ChatCompletionPanel) on top of the engine's NSTextView.
+            // Inserting the trigger char opens the inline completion popup (the
+            // controller's change observer detects it), same as typing #/@.
             toolButton("number") { controller.insert("#") }
                 .help("Tag")
 
