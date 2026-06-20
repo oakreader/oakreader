@@ -372,6 +372,7 @@ struct LibraryTableView: View {
                 }
             } label: {
                 Label("Add to Collection", systemImage: "folder.badge.plus")
+                    .accessibilityLabel(Text("Add to Collection"))
             }
         }
 
@@ -402,6 +403,7 @@ struct LibraryTableView: View {
                     )
                 } label: {
                     Label(property.name, systemImage: "tag")
+                        .accessibilityLabel(Text(property.name))
                 }
             }
         }
@@ -416,6 +418,7 @@ struct LibraryTableView: View {
                 }
             } label: {
                 Label("Copy Citation", systemImage: "quote.opening")
+                    .accessibilityLabel(Text("Copy Citation"))
             }
         }
 
@@ -470,6 +473,7 @@ struct LibraryTableView: View {
                 }
             } label: {
                 Label("Add to Collection", systemImage: "folder.badge.plus")
+                    .accessibilityLabel(Text("Add to Collection"))
             }
         }
 
@@ -482,6 +486,7 @@ struct LibraryTableView: View {
                 Button("CSL JSON") { exportCitations(itemsWithRefs, format: .cslJson) }
             } label: {
                 Label("Export Citations", systemImage: "quote.opening")
+                    .accessibilityLabel(Text("Export Citations"))
             }
         }
 
@@ -536,6 +541,7 @@ struct LibraryTableView: View {
                     store.addItem(item, to: collection)
                 } label: {
                     Label(collection.name, systemImage: "folder.fill")
+                        .accessibilityLabel(Text(collection.name))
                 }
             )
         } else {
@@ -545,6 +551,7 @@ struct LibraryTableView: View {
                         store.addItem(item, to: collection)
                     } label: {
                         Label(collection.name, systemImage: "folder.fill")
+                            .accessibilityLabel(Text(collection.name))
                     }
                     Divider()
                     ForEach(children) { child in
@@ -552,6 +559,7 @@ struct LibraryTableView: View {
                     }
                 } label: {
                     Label(collection.name, systemImage: "folder.fill")
+                        .accessibilityLabel(Text(collection.name))
                 }
             )
         }
@@ -565,6 +573,7 @@ struct LibraryTableView: View {
                     for item in items { store.addItem(item, to: collection) }
                 } label: {
                     Label(collection.name, systemImage: "folder.fill")
+                        .accessibilityLabel(Text(collection.name))
                 }
             )
         } else {
@@ -574,6 +583,7 @@ struct LibraryTableView: View {
                         for item in items { store.addItem(item, to: collection) }
                     } label: {
                         Label(collection.name, systemImage: "folder.fill")
+                            .accessibilityLabel(Text(collection.name))
                     }
                     Divider()
                     ForEach(children) { child in
@@ -581,6 +591,7 @@ struct LibraryTableView: View {
                     }
                 } label: {
                     Label(collection.name, systemImage: "folder.fill")
+                        .accessibilityLabel(Text(collection.name))
                 }
             )
         }

@@ -38,7 +38,8 @@ extension ImportService {
         let ext = sourceURL.pathExtension.lowercased()
         if ext == "html" || ext == "htm" {
             return importHTML(from: sourceURL)
-        } else if ext == "md" || ext == "markdown" {
+        } else if ext == "md" || ext == "markdown" || ext == "txt" || ext == "text" {
+            // Plain text renders fine through the markdown pipeline.
             return importMarkdown(from: sourceURL)
         } else if ext == "pdf" {
             return importPDF(from: sourceURL)

@@ -128,6 +128,9 @@ struct ChatHistoryDrawer: View {
                             .foregroundStyle(OakStyle.Colors.textSecondary)
                             .frame(width: 20, height: 20)
                             .contentShape(Rectangle())
+                            // a11y-pinned to skip the SF Symbol localized-description
+                            // resolution that pegs the CPU on en-GB (sfsymbol-a11y-locale-hang).
+                            .accessibilityLabel(Text("More actions"))
                     }
                     .menuStyle(.borderlessButton)
                     .menuIndicator(.hidden)

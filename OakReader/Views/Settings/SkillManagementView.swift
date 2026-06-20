@@ -129,6 +129,7 @@ struct SkillManagementView: View {
                     } label: {
                         if filter == option {
                             Label(option.title, systemImage: "checkmark")
+                                .accessibilityLabel(Text(option.title))
                         } else {
                             Text(option.title)
                         }
@@ -140,6 +141,7 @@ struct SkillManagementView: View {
                     Image(systemName: "chevron.down")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
                 }
                 .font(OakStyle.Font.styledBody)
                 .foregroundStyle(.primary)

@@ -61,6 +61,12 @@ struct NoteComposerBox: View {
     /// Send is allowed when there's prose *or* at least one attached image.
     private var canSend: Bool { !isEmpty || !attachments.isEmpty }
 
+    /// Code is literal text, so rich inline formatting (B/I/U/S, link) is unavailable
+    /// in any code context, and inline-code can't nest inside a code block — Slack's
+    /// rule. Driven by the live `activeFormats` the editor reports at the caret.
+    private var inCodeBlock: Bool { activeFormats.contains("codeBlock") }
+    private var inCodeContext: Bool { inCodeBlock || activeFormats.contains("code") }
+
     var body: some View {
         VStack(spacing: 8) {
             if let quote, !quote.isEmpty {
@@ -248,13 +254,14 @@ struct NoteComposerBox: View {
     /// Each lights up when active at the caret so the toggle-off affordance is clear.
     private var formatBar: some View {
         HStack(spacing: 2) {
-            toolButton("bold", active: activeFormats.contains("bold")) { controller.cmd("bold") }
+            // B/I/U/S don't apply to literal code — disabled in any code context.
+            toolButton("bold", active: activeFormats.contains("bold"), disabled: inCodeContext) { controller.cmd("bold") }
                 .help("Bold")
-            toolButton("italic", active: activeFormats.contains("italic")) { controller.cmd("italic") }
+            toolButton("italic", active: activeFormats.contains("italic"), disabled: inCodeContext) { controller.cmd("italic") }
                 .help("Italic")
-            toolButton("underline", active: activeFormats.contains("underline")) { controller.cmd("underline") }
+            toolButton("underline", active: activeFormats.contains("underline"), disabled: inCodeContext) { controller.cmd("underline") }
                 .help("Underline")
-            toolButton("strikethrough", active: activeFormats.contains("strikethrough")) { controller.cmd("strikethrough") }
+            toolButton("strikethrough", active: activeFormats.contains("strikethrough"), disabled: inCodeContext) { controller.cmd("strikethrough") }
                 .help("Strikethrough")
 
             toolDivider
@@ -263,11 +270,13 @@ struct NoteComposerBox: View {
                 Image(systemName: "link")
                     .font(.system(size: 14))
                     .foregroundStyle(.secondary)
+                    .opacity(inCodeContext ? 0.35 : 1)
                     .frame(width: 28, height: 28)
                     .contentShape(Rectangle())
                     .accessibilityHidden(true)
             }
             .buttonStyle(ToolButtonStyle())
+            .disabled(inCodeContext)   // no links in literal code
             .help("Link")
             .popover(isPresented: $showLink, arrowEdge: .bottom) { linkPopover }
 
@@ -277,17 +286,23 @@ struct NoteComposerBox: View {
                 .help("Bulleted list")
             toolButton("list.number", active: activeFormats.contains("orderedList")) { controller.cmd("orderedList") }
                 .help("Numbered list")
-            // `increase.quotelevel` (left rule + indented lines) is the blockquote
-            // glyph — distinct from `text.quote`, which this app already uses for a
-            // quoted *source reference* (the anchored-note chip / add-to-chat).
-            toolButton("increase.quotelevel", active: activeFormats.contains("quote")) { controller.cmd("quote") }
+            // `quote.opening` — a distinct quotation glyph for the blockquote toggle.
+            // NOT `text.quote`: this app reserves that for a *source reference* (the
+            // anchored-note chip / add-to-chat), so `text.quote` here read as "make a
+            // reference" rather than "format this paragraph as a blockquote".
+            toolButton("quote.opening", active: activeFormats.contains("quote")) { controller.cmd("quote") }
                 .help("Quote")
 
             toolDivider
 
-            toolButton("chevron.left.forwardslash.chevron.right", active: activeFormats.contains("code")) { controller.cmd("code") }
+            // Inline code can't nest inside a code block; the code-block toggle
+            // stays enabled so you can always leave the block.
+            // One consistent code family: inline = bare braces, block = braces-in-a-box.
+            // Inline code can't nest inside a code block; the code-block toggle
+            // stays enabled so you can always leave the block.
+            toolButton("curlybraces", active: activeFormats.contains("code"), disabled: inCodeBlock) { controller.cmd("code") }
                 .help("Inline code")
-            toolButton("curlybraces", active: activeFormats.contains("codeBlock")) { controller.cmd("codeBlock") }
+            toolButton("curlybraces.square", active: activeFormats.contains("codeBlock")) { controller.cmd("codeBlock") }
                 .help("Code block")
 
             Spacer()
@@ -336,14 +351,15 @@ struct NoteComposerBox: View {
     }
 
 
-    private func toolButton(_ system: String, active: Bool = false, _ action: @escaping () -> Void) -> some View {
+    private func toolButton(_ system: String, active: Bool = false, disabled: Bool = false, _ action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: system)
                 // Icon color stays constant whether or not the format is active —
                 // the *background* (grey fill + hairline border) signals the toggle,
-                // not a color change.
+                // not a color change. A disabled button dims so it reads as inert.
                 .font(.system(size: 14))
                 .foregroundStyle(.secondary)
+                .opacity(disabled ? 0.35 : 1)
                 .frame(width: 28, height: 28)
                 .contentShape(Rectangle())
                 // The `.help(...)` tooltip is the real label, so hide the icon from a11y:
@@ -352,6 +368,7 @@ struct NoteComposerBox: View {
                 .accessibilityHidden(true)
         }
         .buttonStyle(ToolButtonStyle(active: active))
+        .disabled(disabled)
     }
 
     private var toolDivider: some View {
@@ -513,19 +530,15 @@ private struct ToolButtonStyle: ButtonStyle {
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
                         .fill(fill)
                 )
-                .overlay(
-                    // Hairline light-grey border marks the active (toggled) state —
-                    // a neutral affordance, no accent color.
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .strokeBorder(Color.primary.opacity(active ? 0.15 : 0), lineWidth: 1)
-                )
                 .animation(.easeOut(duration: 0.12), value: hovering)
                 .animation(.easeOut(duration: 0.12), value: active)
                 .onHover { hovering = $0 }
         }
 
         private var fill: Color {
-            if active { return Color.primary.opacity(hovering ? 0.12 : 0.08) }
+            // Active (toggled) state reads purely as a heavier grey fill — no border —
+            // so the toggle is obvious without a hairline outline.
+            if active { return Color.primary.opacity(hovering ? 0.22 : 0.16) }
             if configuration.isPressed { return Color.primary.opacity(0.12) }
             return Color.primary.opacity(hovering ? 0.06 : 0)
         }

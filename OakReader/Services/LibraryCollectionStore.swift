@@ -252,7 +252,7 @@ extension LibraryStore {
 
     /// Supported file extensions for folder import.
     static let folderImportExtensions: Set<String> = {
-        var exts: Set<String> = ["pdf", "html", "htm", "md", "markdown"]
+        var exts: Set<String> = ["pdf", "html", "htm", "md", "markdown", "txt", "text"]
         exts.formUnion(ImportService.audioExtensions)
         return exts
     }()

@@ -343,7 +343,10 @@ private final class Renderer {
         let start = Int(cmark_node_get_list_start(node))
         let items = children(node)
         let out = NSMutableAttributedString()
-        let indent = CGFloat(listDepth) * 18
+        // `listDepth` is 1 at the top level, so the marker indent must be measured
+        // from depth-1 — otherwise even a top-level list pushes its `1.`/`•` marker
+        // a full step (18pt) off the left edge.
+        let indent = CGFloat(listDepth - 1) * 18
         for (i, item) in items.enumerated() {
             let marker = ordered ? "\(start + i).  " : "•  "
             let line = NSMutableAttributedString(string: marker, attributes: base())

@@ -266,6 +266,7 @@ struct LibrarySidebarPanel: View {
             } label: {
                 if selectedOption == nil {
                     Label("None", systemImage: "checkmark")
+                        .accessibilityLabel(Text("None"))
                 } else {
                     Text("None")
                 }
@@ -285,7 +286,9 @@ struct LibrarySidebarPanel: View {
                         Text(opt.name)
                     } icon: {
                         Image(systemName: selectedOption?.id == opt.id ? "checkmark.circle.fill" : "circle.fill")
+                            .accessibilityHidden(true)
                     }
+                    .accessibilityLabel(Text(opt.name))
                 }
                 .tint(Color(hex: opt.colorHex))
             }
@@ -305,6 +308,7 @@ struct LibrarySidebarPanel: View {
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
             }
         }
         .menuStyle(.borderlessButton)
@@ -334,6 +338,7 @@ struct LibrarySidebarPanel: View {
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(OakStyle.Colors.textSecondary)
                     .frame(width: 20, height: 20)
+                    .accessibilityLabel(Text("Add option"))
                     .background(
                         RoundedRectangle(cornerRadius: OakStyle.Radius.small)
                             .fill(OakStyle.Colors.buttonBackground)
@@ -496,7 +501,9 @@ private struct PropertyOptionAssignmentMenuNodeView: View {
     }
 
     private func optionLabel(title: String, isAssigned: Bool) -> some View {
+        // a11y-pinned: skip the selection symbol's localized-description resolution (en-GB peg)
         Label(title, systemImage: isAssigned ? "checkmark.circle.fill" : "circle.fill")
+            .accessibilityLabel(Text(title))
     }
 
     private func firstChildColorHex(in node: TagNode) -> String? {

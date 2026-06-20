@@ -239,6 +239,7 @@ struct ReferenceMetadataView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "square.on.square")
                             .font(.system(size: 12))
+                            .accessibilityHidden(true)
                         Text("Copy Citation")
                             .font(.system(size: 13))
                     }

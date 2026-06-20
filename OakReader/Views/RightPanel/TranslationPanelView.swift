@@ -408,7 +408,10 @@ private struct LanguagePillButton: View {
                     selection = lang
                 } label: {
                     if lang == selection {
+                        // a11y-pinned: skip the checkmark's localized-description
+                        // resolution (sfsymbol-a11y-locale-hang).
                         Label(lang.nativeName, systemImage: "checkmark")
+                            .accessibilityLabel(Text(lang.nativeName))
                     } else {
                         Text(lang.nativeName)
                     }
@@ -423,6 +426,8 @@ private struct LanguagePillButton: View {
                 Image(systemName: "chevron.down")
                     .font(.system(size: 9, weight: .semibold))
                     .foregroundStyle(.tertiary)
+                    // decorative chevron; hidden to skip its a11y resolution (en-GB peg)
+                    .accessibilityHidden(true)
             }
             .frame(maxWidth: .infinity)
             .padding(.horizontal, OakStyle.Spacing.sm)

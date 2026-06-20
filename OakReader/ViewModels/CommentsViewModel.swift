@@ -140,6 +140,12 @@ final class CommentsViewModel {
 
     /// Save the composer text into the pending highlight's comment. The anchored
     /// highlight row already exists, so this never needs to import a backing item.
+    ///
+    /// `@MainActor` is load-bearing: this is reached from `NoteComposerBox`'s
+    /// nonisolated `async` `onSubmit` closure (it runs on the cooperative pool), and
+    /// `updateComment` → `reload()` mutates the `@Observable cards`. Mutating observed
+    /// state off the main thread deadlocks SwiftUI's observation lock (`_MovableLock`).
+    @MainActor
     @discardableResult
     func commitPending(_ text: String) -> Bool {
         guard let id = pendingAnchorId else { return false }
@@ -186,6 +192,13 @@ final class CommentsViewModel {
 
     /// Create a freestanding memo (no text selection needed). Lazily promotes a
     /// live web page into a library item first so the memo has somewhere to live.
+    ///
+    /// `@MainActor` is load-bearing: this is reached from `NoteComposerBox`'s
+    /// nonisolated `async` `onSubmit` closure, which runs on the cooperative thread
+    /// pool. Without it, `reload()` mutates the `@Observable cards` off the main
+    /// thread, which deadlocks SwiftUI's observation lock (`_MovableLock`) — the app
+    /// freezes on save (no save, no other clicks register).
+    @MainActor
     @discardableResult
     func addMemo(_ text: String) async -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)

@@ -44,7 +44,7 @@ struct CommentsPanelView: View {
                 onDetachQuote: { model.cancelPending() },
                 onSubmit: { md in
                     if model.pendingAnchorId != nil {
-                        return model.commitPending(md)
+                        return await model.commitPending(md)
                     } else {
                         return await model.addMemo(md)
                     }
