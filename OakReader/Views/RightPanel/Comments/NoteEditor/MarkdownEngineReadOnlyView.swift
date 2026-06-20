@@ -25,6 +25,17 @@ enum NoteMarkdownEngine {
         lists: ListStyle(indentPerLevel: 12, extraLineHeight: 1),
         paragraph: ParagraphStyle(spacingFactor: 0.18)
     )
+
+    /// Card variant: same styling, but the view must hug its content (it's sized to
+    /// fit in the stream), so kill the scrollers and the 40pt minimum overscroll —
+    /// otherwise every card shows a scrollbar and clips.
+    static let readOnlyConfiguration = MarkdownEditorConfiguration(
+        services: services,
+        lists: ListStyle(indentPerLevel: 12, extraLineHeight: 1),
+        paragraph: ParagraphStyle(spacingFactor: 0.18),
+        overscroll: OverscrollPolicy(percent: 0, maxPoints: 0, minPoints: 0),
+        scrollers: .hidden
+    )
 }
 
 // MARK: - Read-only card renderer
@@ -47,7 +58,7 @@ struct MarkdownEngineReadOnlyView: View {
     var body: some View {
         NativeTextViewWrapper(
             text: .constant(markdown),
-            configuration: NoteMarkdownEngine.configuration,
+            configuration: NoteMarkdownEngine.readOnlyConfiguration,
             fontName: "SF Pro",
             fontSize: fontSize,
             documentId: documentId,
@@ -98,9 +109,13 @@ private struct ContentHeightProbe: NSViewRepresentable {
                 guard let self else { return }
                 if let tv = Self.climb(from: probe) {
                     self.textView = tv
-                    tv.postsFrameChangedNotifications = true
+                    // Observe the content container's frame: it tracks the real content
+                    // height (overscroll is zeroed for read-only), incl. async growth as
+                    // math/code images finish.
+                    let target: NSView = tv.enclosingScrollView?.documentView ?? tv
+                    target.postsFrameChangedNotifications = true
                     self.observer = NotificationCenter.default.addObserver(
-                        forName: NSView.frameDidChangeNotification, object: tv, queue: .main
+                        forName: NSView.frameDidChangeNotification, object: target, queue: .main
                     ) { [weak self] _ in MainActor.assumeIsolated { self?.measure() } }
                     self.measure()
                 } else if self.tries < 8 {
@@ -112,16 +127,21 @@ private struct ContentHeightProbe: NSViewRepresentable {
 
         private func measure() {
             guard let tv = textView else { return }
+            // The engine sizes its content container (scroll view's documentView) to the
+            // real content height (overscroll zeroed for read-only), so it's the most
+            // reliable measure; fall back to the TextKit-2 used height.
+            if let doc = tv.enclosingScrollView?.documentView, doc.frame.height > 1 {
+                onHeight?(ceil(doc.frame.height))
+                return
+            }
             let inset = tv.textContainerInset.height * 2
-            var content: CGFloat = 0
             if let tlm = tv.textLayoutManager {
                 tlm.ensureLayout(for: tlm.documentRange)
-                content = tlm.usageBoundsForTextContainer.height
+                onHeight?(ceil(tlm.usageBoundsForTextContainer.height + inset))
             } else if let lm = tv.layoutManager, let tc = tv.textContainer {
                 lm.ensureLayout(for: tc)
-                content = lm.usedRect(for: tc).height
+                onHeight?(ceil(lm.usedRect(for: tc).height + inset))
             }
-            onHeight?(ceil(content + inset))
         }
 
         deinit {
