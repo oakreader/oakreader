@@ -526,16 +526,16 @@ struct AIChatView: View {
                 // where every attach type funnels through one borderless "+".
                 Menu {
                     Button(action: { uploadFile() }) {
-                        Label("Upload File", systemImage: "arrow.up.doc")
+                        OakLabel("Upload File", systemImage: "arrow.up.doc")
                     }
                     if chatVM.parent != nil {
                         Button(action: { chatVM.addDocumentPageSnapshot() }) {
-                            Label("Attach Page", systemImage: "doc.viewfinder")
+                            OakLabel("Attach Page", systemImage: "doc.viewfinder")
                         }
                         // Was a standalone camera button — folded in here so the
                         // toolbar stays a single calm "+" like Dia's.
                         Button(action: { chatVM.parent?.beginAreaCaptureForChat() }) {
-                            Label("Capture Region", systemImage: "viewfinder")
+                            OakLabel("Capture Region", systemImage: "viewfinder")
                         }
                     }
                 } label: {
@@ -544,6 +544,7 @@ struct AIChatView: View {
                         .foregroundStyle(.secondary)
                         .frame(width: 28, height: 28)
                         .contentShape(Rectangle())
+                        .accessibilityLabel(Text("Add attachment"))
                 }
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
@@ -764,7 +765,7 @@ struct AIChatView: View {
                     }
                 }
             } label: {
-                Label("Model", systemImage: "cpu")
+                OakLabel("Model", systemImage: "cpu")
             }
 
             // Thinking effort submenu — only for reasoning models
@@ -776,7 +777,7 @@ struct AIChatView: View {
                     Text("High").tag("high")
                     Text("Max").tag("max")
                 } label: {
-                    Label("Thinking", systemImage: "brain")
+                    OakLabel("Thinking", systemImage: "brain")
                 }
             }
 
@@ -785,7 +786,7 @@ struct AIChatView: View {
                     Text(level.label).tag(level)
                 }
             } label: {
-                Label("Permission", systemImage: "wrench")
+                OakLabel("Permission", systemImage: "wrench")
             }
         } label: {
             HStack(spacing: 3) {
@@ -796,6 +797,7 @@ struct AIChatView: View {
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.system(size: 8, weight: .semibold))
                     .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 4)

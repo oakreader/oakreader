@@ -193,6 +193,7 @@
 		B47BBACED773D14CCE38F4A3 /* AIChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5118CA820B8CFC61AF38EA47 /* AIChatView.swift */; };
 		B4E30811EC8E73E6C02A7352 /* VoiceViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DA5745F0584DA9C6E3AD3BA /* VoiceViewModel.swift */; };
 		B68F20AD0F783968157A0A20 /* ImageLightbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 846387925BF723676FB401E7 /* ImageLightbox.swift */; };
+		B6A224D3DC2C4C7E014527DB /* OakLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 114A801A1E42838ADD9BF58A /* OakLabel.swift */; };
 		B7D8F9FBB22A904C5496164E /* TavilySearchProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2C0A783E601F0D37DEFF58E /* TavilySearchProvider.swift */; };
 		B81B9BA647234E09506AC8D5 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = DBFC960D58BB4D238DFC9FF1 /* GRDB */; };
 		B9BE36D6C7401EE88CE7071D /* PostHog in Frameworks */ = {isa = PBXBuildFile; productRef = FD8515630C748A9B57C93804 /* PostHog */; };
@@ -301,6 +302,7 @@
 		10A6B5888A5CF5E18A2C1559 /* CSLTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSLTypes.swift; sourceTree = "<group>"; };
 		10A8A79F203A72B68BB81305 /* SearchSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchSidebarView.swift; sourceTree = "<group>"; };
 		10CC73228029B5BE684EDB61 /* SharingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharingService.swift; sourceTree = "<group>"; };
+		114A801A1E42838ADD9BF58A /* OakLabel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OakLabel.swift; sourceTree = "<group>"; };
 		11ACBAF44051CFB33C15E315 /* CommandPalettePanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandPalettePanel.swift; sourceTree = "<group>"; };
 		11BE1416DF735A904FF85758 /* SnapshotHitTestNSView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapshotHitTestNSView.swift; sourceTree = "<group>"; };
 		131686965C90CDE1C7F81AB7 /* String+PDFSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "String+PDFSearch.swift"; sourceTree = "<group>"; };
@@ -1069,6 +1071,7 @@
 				8BA004BD76C17A3C38A67CED /* DropZoneView.swift */,
 				59A9288E9C481CF6A75AB970 /* LookupCardRow.swift */,
 				EA77DDD4C28228A80CDD348A /* OakAppIcon.swift */,
+				114A801A1E42838ADD9BF58A /* OakLabel.swift */,
 				D18E67DFB5D1EAA11B2B5A07 /* OakToolButton.swift */,
 				775D74C4CCC80BE808BFC226 /* PageRangeSelector.swift */,
 				E85B3D6B6234137FED454A91 /* PillTabButton.swift */,
@@ -1418,6 +1421,7 @@
 				8FEC7772368A77E5AE2091B4 /* NotesSupport.swift in Sources */,
 				CBE3B2BF6507D35AC3F06CFD /* OakAppIcon.swift in Sources */,
 				93988D0D369D24F7EA93C18A /* OakCLITool.swift in Sources */,
+				B6A224D3DC2C4C7E014527DB /* OakLabel.swift in Sources */,
 				09611B6D3684448759E0A86B /* OakReaderApp.swift in Sources */,
 				B13E3E2BAD89594EEB6DAB21 /* OakReaderDocument.swift in Sources */,
 				9AF259DE199FD7C80B076A8A /* OakServer.swift in Sources */,
@@ -1622,7 +1626,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.7.4;
+				MARKETING_VERSION = 0.7.7;
 				PRODUCT_BUNDLE_IDENTIFIER = com.oakreader.OakReader.dev;
 				PRODUCT_NAME = OakReader;
 				SDKROOT = macosx;
@@ -1713,7 +1717,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.7.4;
+				MARKETING_VERSION = 0.7.7;
 				OTHER_CODE_SIGN_FLAGS = "--timestamp";
 				PRODUCT_BUNDLE_IDENTIFIER = com.oakreader.OakReader;
 				PRODUCT_NAME = OakReader;
