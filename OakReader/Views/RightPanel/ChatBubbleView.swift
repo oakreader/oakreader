@@ -391,9 +391,8 @@ struct ChatBubbleView: View, Equatable {
                 || $0.name.caseInsensitiveCompare(skillId) == .orderedSame
         }
         // Mirror the input composer's token chip (ChatTokenAttachment): a soft
-        // accent fill + muted accent text, no border.
-        let softAccent = Color(nsColor: NSColor.controlAccentColor
-            .blended(withFraction: 0.5, of: .tertiaryLabelColor) ?? .controlAccentColor)
+        // accent fill + muted accent text, no border. Shared token so both match exactly.
+        let softAccent = OakStyle.Colors.skillTint
         return HStack(spacing: 3) {
             Image(systemName: skill?.icon ?? "sparkles")
                 .font(OakStyle.ChatFont.modelLabel)

@@ -23,7 +23,9 @@ private final class ChatTokenCell: NSTextAttachmentCell {
 
     private let item: ChatCompletionItem
     private let labelFont: NSFont
-    private static let iconSize: CGFloat = 18
+    // Slightly under the label font so the glyph sits near the text cap-height rather than
+    // looming over it — mirrors the sent-message badge, where icon ≈ text size.
+    private static let iconSize: CGFloat = 15
     private static let hPad: CGFloat = 6
     private static let iconTextGap: CGFloat = 3
     private static let vPad: CGFloat = 2
@@ -76,14 +78,16 @@ private final class ChatTokenCell: NSTextAttachmentCell {
         // A library reference is passive context → a neutral grey chip. A skill is a
         // command → the soft accent. (The sent-message badges mirror this split.)
         let isReference: Bool = { if case .libraryReference = item.kind { return true }; return false }()
+        // Mirror the sent-message badges exactly (ChatBubbleView): a reference is a neutral
+        // grey chip (label@0.60 text on a label@0.06 fill); a skill is the soft accent.
         let tint: NSColor = isReference
-            ? .secondaryLabelColor
-            : (NSColor.controlAccentColor.blended(withFraction: 0.5, of: .tertiaryLabelColor) ?? .controlAccentColor)
+            ? .labelColor.withAlphaComponent(0.60)
+            : OakStyle.Colors.skillTintNS
 
         // Borderless fill — a soft wash reads as a chip without the boxed-in look of a stroke.
         let bgRect = cellFrame.insetBy(dx: 0.5, dy: 0.5)
         let path = NSBezierPath(roundedRect: bgRect, xRadius: Self.cornerRadius, yRadius: Self.cornerRadius)
-        tint.withAlphaComponent(isReference ? 0.10 : 0.13).setFill()
+        (isReference ? NSColor.labelColor.withAlphaComponent(0.06) : tint.withAlphaComponent(0.13)).setFill()
         path.fill()
 
         // Icon — tint to match label color
@@ -94,13 +98,21 @@ private final class ChatTokenCell: NSTextAttachmentCell {
             width: Self.iconSize,
             height: Self.iconSize
         )
-        if let image = SymbolStyle.filled(item.icon, accessibilityDescription: item.label) {
+        // Use the plain (outline) symbol variant so the chip matches the sent-message
+        // skill badge (ChatBubbleView.skillBadge), which renders `Image(systemName:)`.
+        if let image = NSImage(systemSymbolName: item.icon, accessibilityDescription: item.label) {
             let config = NSImage.SymbolConfiguration(pointSize: Self.iconSize, weight: .regular)
             let configured = image.withSymbolConfiguration(config) ?? image
+            // Tint by masking, NOT by compositing over the glyph: fill the rect with the
+            // tint, then keep it only where the glyph has coverage (.destinationIn). The
+            // tint is semi-transparent (the muted accent), so a .sourceAtop fill over the
+            // black template would let ~37% of the black glyph bleed through and darken the
+            // icon — masking replaces the glyph color outright, matching SwiftUI's
+            // `foregroundStyle` in the sent-message badge.
             let tinted = NSImage(size: iconRect.size, flipped: false) { drawRect in
-                configured.draw(in: drawRect, from: .zero, operation: .sourceOver, fraction: 1.0)
                 tint.set()
-                drawRect.fill(using: .sourceAtop)
+                drawRect.fill()
+                configured.draw(in: drawRect, from: .zero, operation: .destinationIn, fraction: 1.0)
                 return true
             }
             tinted.draw(in: iconRect)

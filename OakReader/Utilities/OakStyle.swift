@@ -68,6 +68,21 @@ enum OakStyle {
         static let noteAccentIcon = Color(hex: "5E6A78")
         static let noteAccentIconNS = NSColor(srgbRed: 0x5E / 255.0, green: 0x6A / 255.0, blue: 0x78 / 255.0, alpha: 1)
 
+        // Skill-pill tint — ONE muted-accent source for the `/skill` chip so the chat
+        // input attachment (ChatTokenAttachment) and the sent-message badge
+        // (ChatBubbleView.skillBadge) render identically. The muted look = accent blended
+        // 50% with the translucent tertiary label. `blended(withFraction:of:)` returns nil
+        // when a color can't flatten to calibrated RGB (which happened inconsistently
+        // between the SwiftUI and AppKit draw contexts → one side fell back to the
+        // full-saturation accent). Pre-converting both operands to sRGB makes the blend
+        // deterministic, so the chip and the badge always match.
+        static let skillTintNS: NSColor = NSColor(name: "OakSkillTint") { _ in
+            let accent = NSColor.controlAccentColor.usingColorSpace(.sRGB) ?? .controlAccentColor
+            let grey = NSColor.tertiaryLabelColor.usingColorSpace(.sRGB) ?? .gray
+            return accent.blended(withFraction: 0.5, of: grey) ?? accent
+        }
+        static let skillTint = Color(nsColor: skillTintNS)
+
         // Text
         static let textPrimary = Color.primary.opacity(1.0)
         static let textSecondary = Color.primary.opacity(0.60)
