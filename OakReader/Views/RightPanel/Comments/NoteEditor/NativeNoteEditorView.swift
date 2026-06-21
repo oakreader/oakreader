@@ -57,6 +57,7 @@ struct NativeNoteEditorView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSScrollView {
         let scroll = NSScrollView()
+        scroll.contentView = NoteEditorClipView()
         scroll.drawsBackground = false
         // The editor auto-grows up to `maxHeight` (the SwiftUI frame tracks the
         // reported content height); past that it's a fixed box whose content must
@@ -157,5 +158,21 @@ struct NativeNoteEditorView: NSViewRepresentable {
         func textViewDidChangeSelection(_ notification: Notification) {
             (notification.object as? NoteEditorTextView)?.reportActiveFormats()
         }
+    }
+}
+
+/// `NSTextView` can move its enclosing clip view through more than the public
+/// `scrollRangeToVisible(_:)` path while handling edits and selection changes. Keep
+/// grow-mode honest at the clip-view boundary: while the text view says its visual
+/// content still fits under the auto-grow cap, every proposed scroll is constrained
+/// back to the document top. Once the content exceeds the cap, normal scrolling is
+/// allowed.
+private final class NoteEditorClipView: NSClipView {
+    override func constrainBoundsRect(_ proposedBounds: NSRect) -> NSRect {
+        var bounds = super.constrainBoundsRect(proposedBounds)
+        if let tv = documentView as? NoteEditorTextView, tv.shouldPinClipViewToTop {
+            bounds.origin.y = 0
+        }
+        return bounds
     }
 }

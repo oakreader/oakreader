@@ -20,6 +20,12 @@ final class NoteEditorTextView: NSTextView {
     /// this cap, the editor is in grow-mode and AppKit must not leave a scroll offset.
     var maxAutoGrowHeight: CGFloat = .greatestFiniteMagnitude
 
+    private var cachedMeasuredContentHeight: CGFloat = 0
+
+    var shouldPinClipViewToTop: Bool {
+        cachedMeasuredContentHeight <= maxAutoGrowHeight + 1
+    }
+
     /// Data for the completion panel (kept in sync by the representable).
     var references: [NoteRef] = []
     var tags: [String] = []
@@ -126,7 +132,9 @@ final class NoteEditorTextView: NSTextView {
             let decorations = lm.blockDecorationBoundingRect()
             if !decorations.isNull { maxY = max(maxY, decorations.maxY) }
         }
-        return ceil(maxY + textContainerInset.height * 2)
+        let height = ceil(maxY + textContainerInset.height * 2)
+        cachedMeasuredContentHeight = height
+        return height
     }
 
     /// Re-measure and emit the content height *now*. The initial report from
