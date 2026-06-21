@@ -334,6 +334,27 @@ struct AIChatView: View {
     @State private var scrollState = ChatScrollState()
     @State private var scrollTask: Task<Void, Never>?
 
+    /// A soft "scroll edge" fade — messages dissolve into the panel background at the
+    /// top (under the header) and bottom (above the input bar) rather than being
+    /// clipped by a hard line. Opaque panel-background at the very edge → fully clear
+    /// where the content reads; the Liquid-Glass scroll-edge effect. Non-interactive
+    /// so it never eats clicks on the bubbles beneath it. Mirrors the Notes panel.
+    private func scrollEdgeFade(_ edge: VerticalEdge) -> some View {
+        let isTop = edge == .top
+        let bg = Color(nsColor: .windowBackgroundColor)
+        return LinearGradient(
+            stops: [
+                .init(color: bg, location: 0),
+                .init(color: bg.opacity(0), location: 1)
+            ],
+            startPoint: isTop ? .top : .bottom,
+            endPoint: isTop ? .bottom : .top
+        )
+        .frame(height: 16)
+        .frame(maxWidth: .infinity)
+        .allowsHitTesting(false)
+    }
+
     private var messageList: some View {
         ScrollViewReader { proxy in
             ScrollView {
@@ -426,6 +447,12 @@ struct AIChatView: View {
             .overlay(alignment: .trailing) {
                 ChatScrollbar(state: scrollState)
             }
+            // Soft scroll-edge fade: messages dissolve into the panel background as
+            // they scroll up under the header and down toward the input bar, instead
+            // of cutting off on a hard line — the same Liquid-Glass scroll-edge effect
+            // used by the Notes panel (`CommentsPanelView.scrollEdgeFade`).
+            .overlay(alignment: .top) { scrollEdgeFade(.top) }
+            .overlay(alignment: .bottom) { scrollEdgeFade(.bottom) }
             .onPreferenceChange(ScrollMetricsKey.self) { metrics in
                 // Guard redundant writes: during a pure scroll only `offset`
                 // changes, so only the scrollbar (which reads it) is invalidated.
@@ -517,7 +544,9 @@ struct AIChatView: View {
             )
             .frame(height: inputContentHeight)
             .padding(.horizontal, 14)
-            .padding(.top, 12)
+            // Match the note composer's 8pt top breathing room (NoteComposerBox) so the
+            // two right-panel input boxes feel consistent.
+            .padding(.top, 8)
             .padding(.bottom, 6)
 
             // Bottom row: attachment + send
@@ -586,7 +615,7 @@ struct AIChatView: View {
                 }
             }
             .padding(.horizontal, 14)
-            .padding(.bottom, 10)
+            .padding(.bottom, 8)
         }
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)

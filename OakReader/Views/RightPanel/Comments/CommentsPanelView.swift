@@ -319,9 +319,33 @@ struct CommentsPanelView: View {
             .background(OverlayScrollerConfigurator())
         }
         .frame(maxHeight: .infinity)
+        .overlay(alignment: .top) { scrollEdgeFade(.top) }
+        .overlay(alignment: .bottom) { scrollEdgeFade(.bottom) }
     }
 
     // MARK: - Stream
+
+    /// A soft "scroll edge" fade — cards dissolve into the panel background at the
+    /// top (under the tag/search bar) and bottom (under the composer) instead of
+    /// being clipped by a hard line. The gradient runs from the opaque panel
+    /// background at the very edge to fully clear where the content reads, which
+    /// reads as the Liquid-Glass scroll-edge effect (Apple's own list/scroll chrome).
+    /// Non-interactive so it never eats clicks on the cards beneath it.
+    private func scrollEdgeFade(_ edge: VerticalEdge) -> some View {
+        let isTop = edge == .top
+        let bg = Color(nsColor: .windowBackgroundColor)
+        return LinearGradient(
+            stops: [
+                .init(color: bg, location: 0),
+                .init(color: bg.opacity(0), location: 1)
+            ],
+            startPoint: isTop ? .top : .bottom,
+            endPoint: isTop ? .bottom : .top
+        )
+        .frame(height: 16)
+        .frame(maxWidth: .infinity)
+        .allowsHitTesting(false)
+    }
 
     @ViewBuilder
     private var stream: some View {
@@ -356,6 +380,8 @@ struct CommentsPanelView: View {
             // Open at the live edge (newest note), chat-style.
             .defaultScrollAnchor(.bottom)
             .frame(maxHeight: .infinity)
+            .overlay(alignment: .top) { scrollEdgeFade(.top) }
+            .overlay(alignment: .bottom) { scrollEdgeFade(.bottom) }
             // Land at the bottom on load and after a fresh capture — but WITHOUT an
             // animated scroll. Slack-style: switching to a long thread just shows the
             // newest message at the bottom instantly; it never animates the whole list
@@ -554,7 +580,7 @@ private struct CommentCardView: View {
         if anchored {
             items.append(CardMenuItem(title: "Jump to Source", icon: "arrow.up.left") { model.jump(record) })
         }
-        items.append(CardMenuItem(title: "Copy", icon: "doc.on.doc") { copyToPasteboard() })
+        items.append(CardMenuItem(title: "Copy", icon: "square.on.square") { copyToPasteboard() })
         items.append(CardMenuItem(title: "Edit", icon: "pencil") { isEditing = true })
         items.append(.separator)
         items.append(CardMenuItem(title: "Delete", icon: "trash") { showDeleteConfirm = true })
@@ -592,7 +618,7 @@ private struct CommentCardView: View {
                 // Cards render with OakMarkdownUI, which sizes to its content
                 // intrinsically — no scroll view, no height measurement. (The engine
                 // is a scroll view and only earns its keep in the live composer.)
-                StreamingMarkdownView(markdown: body0, theme: .oak(), onOpenURL: openURL)
+                StreamingMarkdownView(markdown: body0, theme: .oak(fontSize: 15), onOpenURL: openURL)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
