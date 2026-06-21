@@ -758,7 +758,7 @@ private struct CommentCardView: View {
     /// click opens the full image so the crop never hides anything.
     @ViewBuilder
     private func cardImageTile(_ urlString: String) -> some View {
-        if let url = URL(string: urlString), let img = NSImage(contentsOf: url) {
+        if let img = OakNoteImageURL.image(urlString) {
             Image(nsImage: img)
                 .resizable()
                 .aspectRatio(contentMode: .fill)

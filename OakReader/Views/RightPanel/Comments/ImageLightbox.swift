@@ -10,8 +10,7 @@ enum ImageLightbox {
     private static var escMonitor: Any?
 
     static func show(url urlString: String) {
-        guard let url = URL(string: urlString),
-              let image = NSImage(contentsOf: url),
+        guard let image = OakNoteImageURL.image(urlString),
               let screen = NSScreen.main else { return }
         dismiss()
 

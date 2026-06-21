@@ -376,7 +376,7 @@ private struct NoteContent: View {
 
     @ViewBuilder
     private func slideImage(_ urlString: String) -> some View {
-        if let url = URL(string: urlString), let img = NSImage(contentsOf: url) {
+        if let img = OakNoteImageURL.image(urlString) {
             Image(nsImage: img)
                 .resizable()
                 .scaledToFit()

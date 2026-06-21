@@ -30,8 +30,11 @@ enum OakNoteImageURL {
             .appendingPathComponent(parts[1])
     }
 
-    /// Load the image an `oak://image/...` URL points at, or `nil` if it isn't one.
+    /// Load the image a URL string points at. Resolves the relocatable
+    /// `oak://image/...` scheme first; for any other URL (legacy absolute `file://`,
+    /// remote `http(s)://`) it falls back to loading the URL as-is.
     static func image(_ urlString: String) -> NSImage? {
-        resolveToFile(urlString).flatMap { NSImage(contentsOf: $0) }
+        if let file = resolveToFile(urlString) { return NSImage(contentsOf: file) }
+        return URL(string: urlString).flatMap { NSImage(contentsOf: $0) }
     }
 }
