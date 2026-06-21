@@ -8,9 +8,9 @@ import AppKit
 /// forces a re-layout during drawing.
 final class NoteTagLayoutManager: NSLayoutManager {
     private struct BlockSurfaceMetrics {
-        var sideInset: CGFloat
-        var verticalPadding: CGFloat
-        var radius: CGFloat
+        let sideInset: CGFloat
+        let verticalPadding: CGFloat
+        let radius: CGFloat
     }
 
     private func surfaceMetrics(for block: NoteBlock) -> BlockSurfaceMetrics? {
@@ -34,9 +34,7 @@ final class NoteTagLayoutManager: NSLayoutManager {
         )
     }
 
-    /// The visual vertical extent of quote/code surfaces in text-container
-    /// coordinates. Height measurement uses this so the SwiftUI frame tracks what the
-    /// layout manager actually paints, including padding outside glyph used rects.
+    /// Visual quote/code bounds in text-container coordinates, used by height measurement.
     func blockDecorationBoundingRect() -> NSRect {
         var result = NSRect.null
         enumerateDecoratedBlockBoxes { block, box, fullWidth in
@@ -49,11 +47,6 @@ final class NoteTagLayoutManager: NSLayoutManager {
     /// Paragraph-level decoration (quote fill + rule, code-block fill) belongs in
     /// the *background* pass — it runs before glyphs, is the API designed for
     /// backgrounds, and reads completed layout so it never forces a re-layout.
-    ///
-    /// NOTE: a block toggled onto a still-EMPTY line has no glyph run, so it isn't drawn
-    /// here — AppKit doesn't even call this method when the text is empty. That case is
-    /// handled by `NoteEditorTextView.draw(_:)` (always called) calling
-    /// `drawBlockSurface` directly. See that override.
     override func drawBackground(forGlyphRange glyphsToShow: NSRange, at origin: NSPoint) {
         super.drawBackground(forGlyphRange: glyphsToShow, at: origin)
         enumerateDecoratedBlockBoxes { block, box, fullWidth in
@@ -135,41 +128,16 @@ final class NoteTagLayoutManager: NSLayoutManager {
         }
     }
 
-    /// Paint one block's surface (quote fill / code fill+border) for the given unioned
-    /// glyph `box`. Factored out so `NoteEditorTextView.draw(_:)` can reuse the exact
-    /// same geometry to paint a block toggled onto a still-empty line (no glyph run).
+    /// Paint one block surface. Drawing and measuring both go through `blockSurfaceRect`.
     func drawBlockSurface(_ block: NoteBlock, box: NSRect, fullWidth: CGFloat, origin: NSPoint) {
         guard let metrics = surfaceMetrics(for: block),
               let surface = blockSurfaceRect(block, box: box, fullWidth: fullWidth) else { return }
         let fill = surface.offsetBy(dx: origin.x, dy: origin.y)
         switch block {
         case .quote:
-            // Match the saved note card exactly (WYSIWYG): a soft rounded fill,
-            // NO left bar. The card's `HuggingLayoutManager` deliberately draws
-            // fill-only ("the bar on top of it was redundant chrome"), so the
-            // editor preview mirrors its geometry — inset 2pt per side, padded
-            // 4pt vertically, corner radius 5 — and its head-indent (12pt, set in
-            // `NoteEditorStyle.paragraphStyle`).
             NoteEditorStyle.quoteBackground.setFill()
             NSBezierPath(roundedRect: fill, xRadius: metrics.radius, yRadius: metrics.radius).fill()
         case .code:
-            // Mirror the saved card's `CodeBlockView` surface so the editor
-            // preview isn't a cramped grey strip: a filled, hairline-bordered
-            // rounded block with real vertical breathing room (the card pads its
-            // code 8pt vertically). One continuous fill over all the block's lines
-            // (replaces the old per-line `.backgroundColor`, which striped).
-            // Tight inner padding now: the fill hugs the glyphs (used rect), so a small
-            // vPad is enough; the block's outer breathing room comes from its
-            // `paragraphSpacingBefore/After`, which sits outside this grey. Keep vPad
-            // small so a code block at the very top of the editor doesn't push its
-            // rounded top past the container inset and get clipped.
-            //
-            // sideInset 0 so the grey box's left edge sits flush with the body-text
-            // margin (origin.x) — matching the saved card, whose `CodeBlockView`
-            // surface spans the full content width with the code text padded 12pt
-            // inside (the block's `headIndent`/`firstLineHeadIndent`). A nonzero
-            // inset left a visible leading gap before the box that body paragraphs
-            // didn't have.
             NoteEditorStyle.codeBlockBackground.setFill()
             NSBezierPath(roundedRect: fill, xRadius: metrics.radius, yRadius: metrics.radius).fill()
             let border = NSBezierPath(

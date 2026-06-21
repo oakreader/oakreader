@@ -16,15 +16,16 @@ final class NoteEditorTextView: NSTextView {
     var onHeight: ((CGFloat) -> Void)?
     var onCreateTag: ((String) -> Void)?
 
-    /// The SwiftUI host's max editor height. While the measured content is at or below
-    /// this cap, the editor is in grow-mode and AppKit must not leave a scroll offset.
+    /// The host's auto-grow cap. Below this, the enclosing clip view stays pinned.
     var maxAutoGrowHeight: CGFloat = .greatestFiniteMagnitude
 
-    private var cachedMeasuredContentHeight: CGFloat = 0
+    private var visualContentHeight: CGFloat = 0
 
     var shouldPinClipViewToTop: Bool {
-        cachedMeasuredContentHeight <= maxAutoGrowHeight + 1
+        visualContentHeight <= maxAutoGrowHeight + 1
     }
+
+    private var allowsDocumentScrolling: Bool { !shouldPinClipViewToTop }
 
     /// Data for the completion panel (kept in sync by the representable).
     var references: [NoteRef] = []
@@ -76,18 +77,14 @@ final class NoteEditorTextView: NSTextView {
         // invalidation doesn't cover them — a reflow or toggle leaves a stale "ghost"
         // box behind. Force a full repaint so only the current decoration is drawn.
         needsDisplay = true
-        normalizeScrollPosition()
-        // Run one more pass after SwiftUI applies the reported height. The synchronous
-        // `scrollRangeToVisible` override below is the real race fix; this catches
-        // geometry changes from the host after the binding update lands.
-        DispatchQueue.main.async { [weak self] in self?.normalizeScrollPosition() }
+        reconcileScrollPosition()
+        DispatchQueue.main.async { [weak self] in self?.reconcileScrollPosition() }
     }
 
-    /// AppKit calls this synchronously during typing, before SwiftUI has applied the
-    /// new frame height. If the content will still fit under the auto-grow cap, cancel
-    /// that scroll immediately so the clip view cannot retain a stale downward offset.
+    /// AppKit calls this during edits before SwiftUI has applied the new frame height.
+    /// In grow-mode, scrolling is a bug; the host will resize instead.
     override func scrollRangeToVisible(_ range: NSRange) {
-        guard shouldAllowDocumentScrolling else {
+        guard allowsDocumentScrolling else {
             scrollClipViewToTop()
             return
         }
@@ -96,15 +93,12 @@ final class NoteEditorTextView: NSTextView {
 
     override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
-        normalizeScrollPosition()
+        _ = measureVisualContentHeight()
+        reconcileScrollPosition()
     }
 
-    private var shouldAllowDocumentScrolling: Bool {
-        measuredContentHeight() > maxAutoGrowHeight + 1
-    }
-
-    private func normalizeScrollPosition() {
-        if shouldAllowDocumentScrolling {
+    private func reconcileScrollPosition() {
+        if allowsDocumentScrolling {
             super.scrollRangeToVisible(selectedRange())
         } else {
             scrollClipViewToTop()
@@ -120,11 +114,14 @@ final class NoteEditorTextView: NSTextView {
     }
 
     private func reportHeight() {
-        onHeight?(measuredContentHeight())
+        onHeight?(measureVisualContentHeight())
     }
 
-    private func measuredContentHeight() -> CGFloat {
-        guard let lm = layoutManager, let tc = textContainer else { return textContainerInset.height * 2 }
+    private func measureVisualContentHeight() -> CGFloat {
+        guard let lm = layoutManager, let tc = textContainer else {
+            visualContentHeight = textContainerInset.height * 2
+            return visualContentHeight
+        }
         lm.ensureLayout(for: tc)
         let used = lm.usedRect(for: tc)
         var maxY = used.maxY
@@ -133,7 +130,7 @@ final class NoteEditorTextView: NSTextView {
             if !decorations.isNull { maxY = max(maxY, decorations.maxY) }
         }
         let height = ceil(maxY + textContainerInset.height * 2)
-        cachedMeasuredContentHeight = height
+        visualContentHeight = height
         return height
     }
 

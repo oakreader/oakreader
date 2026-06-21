@@ -91,15 +91,8 @@ struct NativeNoteEditorView: NSViewRepresentable {
         tv.isAutomaticDashSubstitutionEnabled = false
         tv.isAutomaticTextReplacementEnabled = false
         tv.allowsUndo = true
-        // width 0 so the text's left edge aligns with the card body (which renders at
-        // the card's 14pt padding with no inset). Height 5: the layout manager draws a
-        // code/quote block's surface ~2pt ABOVE its first glyph (vPad) plus a 1px border
-        // and rounded corner. On the very first line that decoration has only the top
-        // inset for clearance; at inset 4 the rounded top was shaved 1–2pt by the scroll
-        // view's top edge (it read as the toolbar covering the box). 5 leaves the box top
-        // at ~3pt — enough to clear — without the airy gap a larger inset added above
-        // every block. The composer cancels the VStack's gap above the editor (see
-        // NoteComposerBox) so this inset is the *only* space above the first block.
+        // Width 0 aligns text with the rendered note body. The 5pt vertical inset keeps
+        // the first-line block surface compact; the clip view below handles scroll pinning.
         tv.textContainerInset = NSSize(width: 0, height: 5)
         tv.isVerticallyResizable = true
         tv.isHorizontallyResizable = false
@@ -161,12 +154,8 @@ struct NativeNoteEditorView: NSViewRepresentable {
     }
 }
 
-/// `NSTextView` can move its enclosing clip view through more than the public
-/// `scrollRangeToVisible(_:)` path while handling edits and selection changes. Keep
-/// grow-mode honest at the clip-view boundary: while the text view says its visual
-/// content still fits under the auto-grow cap, every proposed scroll is constrained
-/// back to the document top. Once the content exceeds the cap, normal scrolling is
-/// allowed.
+/// Enforces the editor's two modes at the scroll boundary: grow-mode is pinned to the
+/// top; overflow mode scrolls normally.
 private final class NoteEditorClipView: NSClipView {
     override func constrainBoundsRect(_ proposedBounds: NSRect) -> NSRect {
         var bounds = super.constrainBoundsRect(proposedBounds)
