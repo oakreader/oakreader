@@ -48,6 +48,7 @@ export function Header({
           </Link>
           <div className="flex items-center gap-[0.4rem]">
             <LocaleSwitcher current={locale} label={dict.language} />
+            <XLink />
             <a
               href={DOWNLOAD_URL}
               className="inline-flex items-center justify-center h-[3.6rem] px-[1.4rem] rounded-[1rem] bg-black text-white text-footnote font-medium tracking-[-0.01em] cursor-pointer whitespace-nowrap"
@@ -106,7 +107,7 @@ export function Header({
         className="hidden md:flex w-full items-center justify-center z-10 relative"
       >
         <motion.div
-          className={`backdrop-blur-xl border rounded-[1.6rem] flex items-center h-[5.2rem] pl-[0.6rem] pr-[0.6rem] gap-[1.2rem] transition-all duration-500 ease-out ${
+          className={`backdrop-blur-xl border rounded-[1.6rem] flex items-center h-[5.2rem] pl-[1.2rem] pr-[0.8rem] gap-[2rem] transition-all duration-500 ease-out ${
             scrolled
               ? "bg-white/90 border-black/10 shadow-[0_2px_16px_rgba(0,0,0,0.08)]"
               : "bg-white/80 border-black/8 shadow-sm"
@@ -135,7 +136,10 @@ export function Header({
               </li>
             ))}
           </ul>
-          <LocaleSwitcher current={locale} label={dict.language} />
+          <div className="flex items-center gap-[0.4rem]">
+            <LocaleSwitcher current={locale} label={dict.language} />
+            <XLink />
+          </div>
           <a
             href={DOWNLOAD_URL}
             className="inline-flex items-center justify-center h-[3.8rem] px-[1.6rem] rounded-[1.2rem] bg-black text-white text-callout font-medium tracking-[-0.01em] transition-all duration-200 hover:bg-black/85 cursor-pointer whitespace-nowrap"
@@ -145,6 +149,25 @@ export function Header({
         </motion.div>
       </nav>
     </header>
+  );
+}
+
+const ICON_LINK_CLASS =
+  "flex items-center justify-center w-[3.8rem] h-[3.8rem] rounded-[1.2rem] text-label-secondary hover:bg-black/5 transition-colors cursor-pointer";
+
+function XLink() {
+  return (
+    <a
+      href="https://x.com/JiweiYuan"
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="X (Twitter)"
+      className={ICON_LINK_CLASS}
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231 5.45-6.231Zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77Z" />
+      </svg>
+    </a>
   );
 }
 

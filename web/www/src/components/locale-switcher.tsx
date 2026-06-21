@@ -44,7 +44,7 @@ export function LocaleSwitcher({
           <circle cx="12" cy="12" r="9.5" />
           <path d="M2.5 12h19M12 2.5c2.6 2.6 4 6 4 9.5s-1.4 6.9-4 9.5c-2.6-2.6-4-6-4-9.5s1.4-6.9 4-9.5Z" />
         </svg>
-        <span className="hidden lg:inline">{LOCALE_META[current].name}</span>
+        <span>{LOCALE_META[current].name}</span>
       </button>
 
       {open && (
