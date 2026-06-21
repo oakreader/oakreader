@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Oak | Die Kontext-Bibliothek für dich und deinen Agenten",
+    "title": "Oak | Die KI-Wissensbasis für dich und deinen Agenten",
     "description": "Oak bewahrt alles Gelesene an einem Ort und setzt einen KI-Recherche-Agenten darauf, der das gesamte Material durchsucht und beantwortet – mit Belegen, die du öffnen kannst."
   },
   "nav": {
@@ -8,7 +8,7 @@
     "language": "Sprache"
   },
   "hero": {
-    "tagline": "Ein Recherche-Agent für alles, was du liest.",
+    "tagline": "Eine KI-Wissensbasis, die du und dein Agent gemeinsam nutzt.",
     "headline1": "Alles lesen.",
     "headline2": "Alles begreifen.",
     "subhead": "Sammle alles Gelesene an einem Ort – und lass eine KI darin suchen und antworten, samt Belegen, die du nachprüfen kannst.",
@@ -19,7 +19,7 @@
     "shotAlt": "Oaks Bibliothek wechselt zwischen Cover- und Listenansicht"
   },
   "bento": {
-    "eyebrow": "Kontext-Bibliothek",
+    "eyebrow": "KI-Wissensbasis",
     "title": "Deine Quellen, Notizen und Antworten an einem Ort.",
     "cards": {
       "library": {
@@ -37,7 +37,7 @@
       "translate": {
         "eyebrow": "Übersetzen",
         "title": "Original und Sprache, nebeneinander",
-        "desc": "Lies einen ganzen Aufsatz in deiner Sprache direkt neben dem Original – Satz für Satz, ohne Kopieren, ohne Tab-Wechsel.",
+        "desc": "Markiere eine Passage und sieh sie in deiner Sprache direkt neben dem Original – Satz für Satz, ohne Kopieren, ohne Umweg über eine andere Übersetzungs-App.",
         "alt": "Oaks Übersetzungspanel zeigt einen Aufsatz auf Englisch und in deiner Sprache nebeneinander"
       },
       "define": {

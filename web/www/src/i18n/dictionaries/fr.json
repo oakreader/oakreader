@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Oak | La bibliothèque de contexte pour vous et votre agent",
+    "title": "Oak | La base de connaissances IA pour vous et votre agent",
     "description": "Oak rassemble tout ce que vous lisez au même endroit, puis y ajoute un agent de recherche IA qui parcourt l'ensemble pour chercher et répondre — avec des citations que vous pouvez ouvrir."
   },
   "nav": {
@@ -8,7 +8,7 @@
     "language": "Langue"
   },
   "hero": {
-    "tagline": "Un agent de recherche pour tout ce que vous lisez.",
+    "tagline": "Une base de connaissances IA, partagée par vous et votre agent.",
     "headline1": "Tout lire.",
     "headline2": "Tout comprendre.",
     "subhead": "Rassemblez tout ce que vous lisez au même endroit, puis laissez une IA tout parcourir pour chercher et répondre, avec des citations que vous pouvez ouvrir d'un clic.",
@@ -19,7 +19,7 @@
     "shotAlt": "La bibliothèque d'Oak bascule entre l'affichage en couvertures et en liste"
   },
   "bento": {
-    "eyebrow": "Bibliothèque de contexte",
+    "eyebrow": "Base de connaissances IA",
     "title": "Vos sources, vos notes et vos réponses au même endroit.",
     "cards": {
       "library": {
@@ -37,7 +37,7 @@
       "translate": {
         "eyebrow": "Traduire",
         "title": "L'original et votre langue, côte à côte",
-        "desc": "Lisez tout un article dans votre langue juste à côté de l'original — phrase par phrase, sans copier-coller, sans changer d'onglet.",
+        "desc": "Sélectionnez un passage et lisez-le dans votre langue juste à côté de l'original — phrase par phrase, sans copier-coller, sans détour par une autre appli de traduction.",
         "alt": "Le panneau de traduction d'Oak montrant un article en anglais et dans votre langue côte à côte"
       },
       "define": {

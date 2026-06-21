@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Oak | The Context Library for you and your agent",
+    "title": "Oak | The AI knowledge base you and your agent share",
     "description": "Oak keeps everything you read in one place, then puts an AI research agent on top that searches and answers across all of it — with citations you can open."
   },
   "nav": {
@@ -8,7 +8,7 @@
     "language": "Language"
   },
   "hero": {
-    "tagline": "A research agent for everything you read.",
+    "tagline": "An AI knowledge base, shared by you and your agent.",
     "headline1": "Read everything.",
     "headline2": "Understand anything.",
     "subhead": "Keep everything you read in one place — then let an AI search and answer across all of it, with citations you can open.",
@@ -19,7 +19,7 @@
     "shotAlt": "Oak's library switching between cover and list views"
   },
   "bento": {
-    "eyebrow": "Context Library",
+    "eyebrow": "AI knowledge base",
     "title": "Your sources, notes, and answers in one place.",
     "cards": {
       "library": {
@@ -37,7 +37,7 @@
       "translate": {
         "eyebrow": "Translate",
         "title": "Translate inline, never break flow",
-        "desc": "Read any paper in your language right beside the original — sentence by sentence, no copy-paste, no tab-switching.",
+        "desc": "Select any passage to see it in your language right beside the original — sentence by sentence, no copy-paste, no jumping to a separate translation app.",
         "alt": "Oak's translation panel showing a paper in English and your language side by side"
       },
       "define": {

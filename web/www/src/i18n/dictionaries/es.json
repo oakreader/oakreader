@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Oak | La biblioteca de contexto para ti y tu agente",
+    "title": "Oak | La base de conocimiento con IA para ti y tu agente",
     "description": "Oak reúne todo lo que lees en un solo lugar y le añade un agente de investigación con IA que lo recorre todo para buscar y responder — con citas que puedes abrir."
   },
   "nav": {
@@ -8,7 +8,7 @@
     "language": "Idioma"
   },
   "hero": {
-    "tagline": "Un agente de investigación para todo lo que lees.",
+    "tagline": "Una base de conocimiento con IA, compartida por ti y tu agente.",
     "headline1": "Léelo todo.",
     "headline2": "Compréndelo todo.",
     "subhead": "Reúne todo lo que lees en un solo lugar y deja que una IA lo recorra para buscar y responder, con citas que puedes abrir al instante.",
@@ -19,7 +19,7 @@
     "shotAlt": "La biblioteca de Oak alternando entre la vista de portadas y la de lista"
   },
   "bento": {
-    "eyebrow": "Biblioteca de contexto",
+    "eyebrow": "Base de conocimiento con IA",
     "title": "Tus fuentes, tus notas y tus respuestas en un solo lugar.",
     "cards": {
       "library": {
@@ -37,7 +37,7 @@
       "translate": {
         "eyebrow": "Traducir",
         "title": "El original y tu idioma, lado a lado",
-        "desc": "Lee un artículo entero en tu idioma junto al original — frase por frase, sin copiar y pegar, sin cambiar de pestaña.",
+        "desc": "Selecciona cualquier fragmento y léelo en tu idioma junto al original — frase por frase, sin copiar y pegar, sin pasar por otra app de traducción.",
         "alt": "El panel de traducción de Oak mostrando un artículo en inglés y en tu idioma lado a lado"
       },
       "define": {
