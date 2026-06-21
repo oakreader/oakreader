@@ -14,10 +14,12 @@ export function Footer({ dict }: { dict: Dictionary["footer"] }) {
               {dict.builtBy}
               <br />
               <a
-                href="#"
+                href="https://x.com/JiweiYuan"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-label-secondary hover:text-label transition-colors"
               >
-                Oak
+                Jiwei Yuan
               </a>
             </p>
           </div>
