@@ -63,7 +63,7 @@ export function generateStaticParams() {
 }
 
 const KEYWORDS =
-  "context library, AI research agent, reading app, macOS, PDF reader, knowledge base, AI research, full-text search";
+  "context library, AI research agent, reading app, macOS, PDF reader, knowledge base, full-text search, AI chat with documents, inline translation, dictionary, highlights and notes, web clipper, citations";
 
 export async function generateMetadata({
   params,
@@ -115,12 +115,29 @@ export default async function RootLayout({
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
 
+  const dict = await getDictionary(lang);
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "OakReader",
+    applicationCategory: "ProductivityApplication",
+    operatingSystem: "macOS 15.0+",
+    description: dict.meta.description,
+    url: SITE_URL,
+    offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    author: { "@type": "Person", name: "Jiwei Yuan", url: "https://x.com/JiweiYuan" },
+  };
+
   return (
     <html
       lang={LOCALE_META[lang as Locale].htmlLang}
       className={`${inter.variable} ${spaceMono.variable} ${exposure.variable} antialiased`}
     >
       <body className="min-h-dvh overflow-x-hidden font-sans">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
         {children}
         <Analytics />
       </body>
