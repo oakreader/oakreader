@@ -13,6 +13,7 @@
     "@formatjs/intl-localematcher": "^0.8.10",
     "@gsap/react": "^2.1.2",
     "@lobehub/icons": "^5.10.0",
+    "@vercel/analytics": "^2.0.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "gsap": "^3.15.0",

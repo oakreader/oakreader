@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Space_Mono } from "next/font/google";
 import localFont from "next/font/local";
 import { notFound } from "next/navigation";
+import { Analytics } from "@vercel/analytics/next";
 import "../globals.css";
 import {
   LOCALES,
@@ -119,7 +120,10 @@ export default async function RootLayout({
       lang={LOCALE_META[lang as Locale].htmlLang}
       className={`${inter.variable} ${spaceMono.variable} ${exposure.variable} antialiased`}
     >
-      <body className="min-h-dvh overflow-x-hidden font-sans">{children}</body>
+      <body className="min-h-dvh overflow-x-hidden font-sans">
+        {children}
+        <Analytics />
+      </body>
     </html>
   );
 }
