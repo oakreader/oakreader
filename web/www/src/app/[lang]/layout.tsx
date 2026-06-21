@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Fraunces, Space_Mono } from "next/font/google";
+import { Inter, Space_Mono } from "next/font/google";
 import localFont from "next/font/local";
 import { notFound } from "next/navigation";
 import "../globals.css";
@@ -19,14 +19,6 @@ const inter = Inter({
   variable: "--font-geist-sans",
   subsets: ["latin"],
   weight: ["300", "400", "500", "600", "700"],
-  style: ["normal", "italic"],
-});
-
-// Fraunces — variable serif with SOFT axis for rounded terminals
-const fraunces = Fraunces({
-  variable: "--font-serif",
-  subsets: ["latin"],
-  axes: ["SOFT", "WONK", "opsz"],
   style: ["normal", "italic"],
 });
 
@@ -125,7 +117,7 @@ export default async function RootLayout({
   return (
     <html
       lang={LOCALE_META[lang as Locale].htmlLang}
-      className={`${inter.variable} ${fraunces.variable} ${spaceMono.variable} ${exposure.variable} antialiased`}
+      className={`${inter.variable} ${spaceMono.variable} ${exposure.variable} antialiased`}
     >
       <body className="min-h-dvh overflow-x-hidden font-sans">{children}</body>
     </html>
