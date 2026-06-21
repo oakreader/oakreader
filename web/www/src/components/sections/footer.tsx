@@ -9,20 +9,6 @@ export function Footer({ dict }: { dict: Dictionary["footer"] }) {
             <small>{dict.copyright}</small>
             <small>&copy; 2026</small>
           </div>
-          <div className="text-center text-label-secondary">
-            <p className="normal-case tracking-normal">
-              {dict.builtBy}
-              <br />
-              <a
-                href="https://x.com/JiweiYuan"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-label-secondary hover:text-label transition-colors"
-              >
-                Jiwei Yuan
-              </a>
-            </p>
-          </div>
           <div className="flex items-center gap-[2rem] text-label-secondary">
             <small className="lg:hidden">{dict.copyright} &copy; 2026</small>
             <div className="flex items-center gap-[1.6rem]">
