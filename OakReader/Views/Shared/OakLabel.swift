@@ -13,12 +13,16 @@ import SwiftUI
 ///
 /// Use this anywhere an icon+text `Label` lives in a menu, picker, or toolbar.
 /// See the `sfsymbol-a11y-locale-hang` note for the original diagnosis.
+// A capitalized factory function deliberately mimics a SwiftUI view initializer
+// (`Label`), so it reads `OakLabel(...)` at the call site.
+// swiftlint:disable:next identifier_name
 func OakLabel(_ titleKey: LocalizedStringKey, systemImage: String) -> some View {
     Label(titleKey, systemImage: systemImage)
         .accessibilityLabel(Text(titleKey))
 }
 
 /// Verbatim-title overload, for runtime strings (collection names, languages, tags …).
+// swiftlint:disable:next identifier_name
 func OakLabel(verbatim title: String, systemImage: String) -> some View {
     Label {
         Text(title)
