@@ -7,7 +7,7 @@ import { join } from "node:path";
 // CJK font, so a single image is both robust and conventional. Light theme to
 // match the landing page, with a real product screenshot. Statically generated
 // at build time; Node runtime is implied by the fs reads below.
-export const alt = "Oak — The Context Library for you and your agent";
+export const alt = "Oak — The Knowledge Library for you and your agent";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -47,7 +47,7 @@ export default async function Image() {
           <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "56px" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={iconSrc} width={42} height={42} style={{ borderRadius: 10 }} alt="" />
-            <div style={{ display: "flex", fontSize: 24, fontWeight: 400, color: "#18181b", letterSpacing: "-0.01em" }}>
+            <div style={{ display: "flex", fontSize: 30, fontWeight: 400, color: "#18181b", letterSpacing: "-0.01em" }}>
               OakReader
             </div>
           </div>
@@ -62,7 +62,7 @@ export default async function Image() {
               maxWidth: "380px",
             }}
           >
-            The Context Library for you and your agent
+            The Knowledge Library for you and your agent
           </div>
           <div
             style={{
