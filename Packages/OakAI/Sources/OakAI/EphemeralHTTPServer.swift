@@ -19,22 +19,32 @@ public actor EphemeralHTTPServer {
     }
 
     /// Start the server and wait for the OAuth callback. Returns the authorization code when received.
-    /// Automatically cancels the listener when the calling Task is cancelled.
-    public func waitForCallback(port: Int, timeoutSeconds: Int = 120) async throws -> CallbackResult {
+    ///
+    /// Waits indefinitely until the browser callback arrives, a manual result is provided
+    /// (`provideManualResult`), or the calling Task is cancelled — matching pi's flow. There is
+    /// deliberately no wall-clock timeout: OpenAI login with 2FA routinely exceeds two minutes,
+    /// and a premature teardown leaves the browser redirect hitting a dead port.
+    public func waitForCallback(port: Int) async throws -> CallbackResult {
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { cont in
                 self.continuation = cont
 
                 do {
-                    let listener = try NWListener(using: .tcp, on: NWEndpoint.Port(integerLiteral: UInt16(port)))
+                    // Allow reuse of a port still in TIME_WAIT from a prior attempt, so an
+                    // immediate retry doesn't trip over "Address already in use".
+                    let parameters = NWParameters.tcp
+                    parameters.allowLocalEndpointReuse = true
+                    let listener = try NWListener(using: parameters, on: NWEndpoint.Port(integerLiteral: UInt16(port)))
 
                     listener.stateUpdateHandler = { [weak self] state in
                         switch state {
                         case .failed(let error):
                             Task { await self?.fail(with: error) }
-                        case .waiting(let error):
-                            // Port in use or network unavailable — fail instead of hanging.
-                            Task { await self?.fail(with: error) }
+                        case .waiting:
+                            // Port held by another live process (e.g. the codex CLI's own
+                            // server). Don't fail — keep the flow alive so the user can finish
+                            // via the "paste the redirect URL" fallback, which needs no listener.
+                            break
                         default:
                             break
                         }
@@ -45,11 +55,6 @@ public actor EphemeralHTTPServer {
 
                     self.listener = listener
                     listener.start(queue: .global(qos: .userInitiated))
-
-                    Task { [weak self] in
-                        try? await Task.sleep(nanoseconds: UInt64(timeoutSeconds) * 1_000_000_000)
-                        await self?.fail(with: OAuthError.timeout)
-                    }
                 } catch {
                     cont.resume(throwing: error)
                     self.continuation = nil
