@@ -190,6 +190,18 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
 
     // MARK: - Filtering
 
+    /// Replace the panel's items wholesale (the note `#` picker rebuilds its list as
+    /// you type so a live "Create #tag" row can appear/disappear — `filter` can only
+    /// narrow a fixed list, never add a row that reflects the typed text).
+    func setItems(_ items: [ChatCompletionItem]) {
+        allItems = items
+        filtered = items
+        selectedIndex = items.isEmpty ? -1 : 0
+        buildRows()
+        updateSelection()
+        sizeAndPosition()
+    }
+
     func filter(query: String) {
         if query.isEmpty {
             filtered = allItems
@@ -412,7 +424,13 @@ private final class ChatCompletionRowView: NSView {
         // skill NAME disappears. So: title 251 > description 249 — both stay "low" so
         // neither widens the window, but the title wins the tug-of-war and the
         // description truncates first.
-        titleLabel.setContentCompressionResistancePriority(.init(251), for: .horizontal)
+        // Default: title outranks description (251 > 249) so a long skill description
+        // truncates before the skill name. When `pinnedDescription` is set (note
+        // `@`-mentions, whose description is a short fixed date that must always show),
+        // flip it — the TITLE truncates first so the date survives.
+        let titlePriority: Float = item.pinnedDescription ? 249 : 251
+        let descPriority: Float = item.pinnedDescription ? 251 : 249
+        titleLabel.setContentCompressionResistancePriority(.init(titlePriority), for: .horizontal)
         titleLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
         descLabel.font = .systemFont(ofSize: CompletionPalette.Metrics.secondarySize)
@@ -420,7 +438,7 @@ private final class ChatCompletionRowView: NSView {
         descLabel.alignment = .right
         descLabel.lineBreakMode = .byTruncatingTail
         descLabel.translatesAutoresizingMaskIntoConstraints = false
-        descLabel.setContentCompressionResistancePriority(.init(249), for: .horizontal)
+        descLabel.setContentCompressionResistancePriority(.init(descPriority), for: .horizontal)
         descLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
         addSubview(iconView)

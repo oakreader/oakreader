@@ -454,9 +454,7 @@ class DocumentViewModel {
     /// Persist a finished capture and route its markdown image into the active
     /// note composer, then leave snapshot mode.
     func deliverAreaCaptureToNote(_ pngData: Data, pageIndex: Int) {
-        if let url = NoteImageStore.save(pngData: pngData) {
-            comments.deliverCapturedImage(url)
-        }
+        Task { await comments.deliverCapturedImage(pngData: pngData) }
         state.rightPanelMode = .comments
         setEditorMode(.viewer)
     }

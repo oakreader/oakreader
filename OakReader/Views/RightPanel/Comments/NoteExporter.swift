@@ -145,7 +145,8 @@ enum NoteExporter {
         if let cached = cache[urlStr] { return cached }
 
         let srcPath: String
-        if let u = URL(string: urlStr), u.isFileURL { srcPath = u.path }
+        if let u = OakNoteImageURL.resolveToFile(urlStr) { srcPath = u.path }
+        else if let u = URL(string: urlStr), u.isFileURL { srcPath = u.path }
         else if urlStr.hasPrefix("/") { srcPath = urlStr }
         else { return nil }  // remote image — leave the link as-is
         guard fm.fileExists(atPath: srcPath) else { return nil }

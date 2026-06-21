@@ -17,6 +17,14 @@ enum MarkdownAttributedBuilder {
             return NSAttributedString(string: markdown, attributes: baseAttributes(theme))
         }
         defer { cmark_parser_free(parser) }
+        // Enable GFM `~~strikethrough~~`. Plain cmark doesn't parse it, so without
+        // this the literal `~~` would render — and the note editor's Strikethrough
+        // button emits exactly that. (Only strikethrough is attached, kept minimal;
+        // tables/autolinks aren't offered by the editors.)
+        cmark_gfm_core_extensions_ensure_registered()
+        if let strikethrough = cmark_find_syntax_extension("strikethrough") {
+            cmark_parser_attach_syntax_extension(parser, strikethrough)
+        }
         let bytes = Array(markdown.utf8)
         cmark_parser_feed(parser, bytes, bytes.count)
         guard let document = cmark_parser_finish(parser) else {
@@ -142,7 +150,11 @@ private final class Renderer {
         case CMARK_NODE_TEXT:
             return MarkdownAttributedBuilder.renderInlineMath(in: literal(node), theme: theme)
         case CMARK_NODE_SOFTBREAK:
-            return NSAttributedString(string: " ", attributes: base())
+            // A single newline should SHOW as a line break — note/chat content is
+            // hand-typed, not hard-wrapped prose, so "what you type is what you see".
+            // Standard Markdown collapses a soft break to a space; that surprised
+            // users whose notes ran multiple lines together.
+            return NSAttributedString(string: "\n", attributes: base())
         case CMARK_NODE_LINEBREAK:
             return NSAttributedString(string: "\n", attributes: base())
         case CMARK_NODE_PARAGRAPH:
@@ -181,6 +193,14 @@ private final class Renderer {
                 .font: theme.codeFont, .foregroundColor: theme.textColor,
             ])
         default:
+            // GFM strikethrough is an extension node — a runtime-registered type, not
+            // a compile-time constant usable in a `case` — so match it by name.
+            if let t = cmark_node_get_type_string(node), strcmp(t, "strikethrough") == 0 {
+                let m = NSMutableAttributedString(attributedString: renderInline(node))
+                m.addAttribute(.strikethroughStyle, value: NSUnderlineStyle.single.rawValue,
+                               range: NSRange(location: 0, length: m.length))
+                return m
+            }
             // HTML, images, unknown → fall back to the node's inline children / literal.
             let inline = renderInline(node)
             return inline.length > 0 ? inline : NSAttributedString(string: literal(node), attributes: base())
@@ -301,6 +321,9 @@ private final class Renderer {
         let loaded: NSImage?
         if let cached = Renderer.fileImageCache[key] {
             loaded = cached
+        } else if let resolved = OakMarkdownImage.urlResolver?(dest), let img = NSImage(contentsOf: resolved) {
+            loaded = img
+            Renderer.fileImageCache[key] = img
         } else if let url = URL(string: dest), url.isFileURL, let img = NSImage(contentsOf: url) {
             loaded = img
             Renderer.fileImageCache[key] = img

@@ -51,9 +51,6 @@ packages:
   PostHog:
     url: https://github.com/PostHog/posthog-ios
     from: "3.60.0"
-  MarkdownEngine:
-    url: https://github.com/nodes-app/swift-markdown-engine
-    from: "0.7.0"
 
 settings:
   base:
@@ -89,12 +86,6 @@ targets:
       - package: OakVoice
       - package: PostHog
         product: PostHog
-      - package: MarkdownEngine
-        product: MarkdownEngine
-      - package: MarkdownEngine
-        product: MarkdownEngineLatex
-      - package: MarkdownEngine
-        product: MarkdownEngineCodeBlocks
       - target: oak
     postCompileScripts:
       - script: |

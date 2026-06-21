@@ -71,7 +71,15 @@ struct CommentsPanelView: View {
         .onChange(of: model.pendingAnchorId) { _, new in
             if new != nil { focusSignal += 1 }
         }
-        .onAppear { if model.pendingAnchorId != nil { focusSignal += 1 } }
+        .onAppear {
+            // Auto-focus the composer when the Notes tab opens, so the user can start
+            // jotting immediately without clicking into the box (matches the AI chat
+            // input). Deferred ~0.1s — same as the chat — so the focus lands AFTER the
+            // toolbar tab button that switched here releases first-responder, and after
+            // the editor's text view is in the window. The anchored-note path also bumps
+            // `focusSignal` (onChange above); a double bump is harmless.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { focusSignal += 1 }
+        }
         .confirmationDialog(
             "Delete all \(model.cards.count) notes?",
             isPresented: $showDeleteAllConfirm,
@@ -296,7 +304,10 @@ struct CommentsPanelView: View {
     /// downward from just below the search input (not the chat stream's bottom edge).
     private var resultsList: some View {
         ScrollView {
-            LazyVStack(spacing: 12) {
+            // Eager `VStack` (not `LazyVStack`) so an inline editor opened on a
+            // filtered card keeps working hit-frames — see `stream` above and
+            // [[note-card-menu-detached-frame]].
+            VStack(spacing: 12) {
                 ForEach(model.filteredCards, id: \.id) { record in
                     CommentCardView(record: record, model: model, isFlashing: flashId == record.id)
                         .id(record.id)
@@ -304,6 +315,8 @@ struct CommentsPanelView: View {
                 if model.filteredCards.isEmpty { filteredEmptyHint }
             }
             .padding(12)
+            // Overlay scrollbar so filtered cards stay full-width too (see `stream`).
+            .background(OverlayScrollerConfigurator())
         }
         .frame(maxHeight: .infinity)
     }
@@ -314,7 +327,15 @@ struct CommentsPanelView: View {
     private var stream: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: 12) {
+                // Eager `VStack`, NOT `LazyVStack`. A card can switch into an inline
+                // editor (`NoteComposerBox`), and SwiftUI controls / AppKit-backed
+                // representables inside a `LazyVStack` get DETACHED hit-frames — the
+                // hit region drifts away from where the control is drawn, so clicks on
+                // the editor's Cancel/Save/format buttons fall through to the scroll
+                // view and the box looks "frozen". (Same root cause as the card `⋯`
+                // menu — see [[note-card-menu-detached-frame]].) Notes lists are small
+                // (tens), so eager layout is cheap and gives every row a stable frame.
+                VStack(spacing: 12) {
                     ForEach(model.cards, id: \.id) { record in
                         CommentCardView(record: record, model: model, isFlashing: flashId == record.id)
                             .id(record.id)
@@ -325,13 +346,22 @@ struct CommentsPanelView: View {
                     Color.clear.frame(height: 1).id("bottom")
                 }
                 .padding(12)
+                // Float the scrollbar over the content (overlay style) so a legacy /
+                // always-on scrollbar doesn't shave ~15pt off the cards' right edge —
+                // which left them misaligned with the bottom composer (it lives OUTSIDE
+                // this scroll view, so it never lost that width). Overlay keeps the cards
+                // full-width, so both share the same right margin.
+                .background(OverlayScrollerConfigurator())
             }
             // Open at the live edge (newest note), chat-style.
             .defaultScrollAnchor(.bottom)
             .frame(maxHeight: .infinity)
-            // A fresh capture lands at the bottom — follow it down.
+            // Land at the bottom on load and after a fresh capture — but WITHOUT an
+            // animated scroll. Slack-style: switching to a long thread just shows the
+            // newest message at the bottom instantly; it never animates the whole list
+            // down (which, on a long note list, reads as a distracting fly-by).
             .onChange(of: model.cards.count) { _, _ in
-                withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo("bottom") }
+                proxy.scrollTo("bottom")
             }
             .onChange(of: model.focusedCardId) { _, id in
                 guard let id else { return }
@@ -396,6 +426,7 @@ private struct CommentCardView: View {
     @State private var isEditing = false
     @State private var showDeleteConfirm = false
     @State private var showDetail = false
+    @State private var showActions = false
 
     private var anchored: Bool { model.isAnchored(record) }
     private var rawBody: String { record.comment ?? "" }
@@ -486,32 +517,50 @@ private struct CommentCardView: View {
                 .font(.system(size: 12))
                 .foregroundStyle(.tertiary)
             Spacer()
-            Menu {
-                if anchored {
-                    Button("Jump to source") { model.jump(record) }
-                }
-                Button("Copy") { copyToPasteboard() }
-                Button("Edit") { isEditing = true }
-                Button("Delete", role: .destructive) { showDeleteConfirm = true }
-            } label: {
+            // A plain Button + popover, NOT a `Menu`. SwiftUI backs a `Menu` with an
+            // AppKit `AppKitPopUpAdaptor` (NSPopUpButton); inside this ScrollView +
+            // LazyVStack that backing control gets a DETACHED/stale frame — its hit
+            // region sits hundreds of points away from where the glyph is drawn, so
+            // clicking the visible `⋯` falls through to the scroll view and the menu
+            // never opens (the card looked "frozen"). A plain Button keeps a correct
+            // hit region at its layout position, and the popover anchors to it reliably.
+            Button { showActions = true } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.secondary)
                     .frame(width: 22, height: 18)
                     .contentShape(Rectangle())
                     // Pin the a11y label so SwiftUI never resolves the `ellipsis`
-                    // symbol's *localized* accessibility description. This Menu is an
-                    // AppKitPopUpAdaptor rendered once per card; on a non-base locale
-                    // (en-GB) that resolution walks CFBundle tables and, re-applied to
-                    // every card's menu on each transaction flush the composer drives,
-                    // pegs the main thread. See [[sfsymbol-a11y-locale-hang]].
+                    // symbol's *localized* accessibility description — on a non-base
+                    // locale (en-GB) that walks CFBundle tables. See
+                    // [[sfsymbol-a11y-locale-hang]].
                     .accessibilityLabel(Text("More"))
             }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
+            .buttonStyle(.plain)
+            // Pop a REAL `NSMenu` from the button (not a SwiftUI `Menu`, which
+            // mis-frames inside the scrolling card list, nor a hand-rolled popover,
+            // which can't match the system look). A manual `popUp` is positioned at
+            // the anchor directly, so it sidesteps the scroll-view frame bug AND gets
+            // the native material / hover / metrics — identical to the header `⋯`.
+            .background(CardMenuPresenter(isPresented: $showActions, items: menuItems))
         }
     }
+
+    /// Actions for the card's `⋯`, rendered as a native `NSMenu`. Mirrors the
+    /// header menu's icon+label convention; order: navigate, copy, edit, then a
+    /// separator before the destructive delete.
+    private var menuItems: [CardMenuItem] {
+        var items: [CardMenuItem] = []
+        if anchored {
+            items.append(CardMenuItem(title: "Jump to Source", icon: "arrow.up.left") { model.jump(record) })
+        }
+        items.append(CardMenuItem(title: "Copy", icon: "doc.on.doc") { copyToPasteboard() })
+        items.append(CardMenuItem(title: "Edit", icon: "pencil") { isEditing = true })
+        items.append(.separator)
+        items.append(CardMenuItem(title: "Delete", icon: "trash") { showDeleteConfirm = true })
+        return items
+    }
+
 
     /// Copy the note to the clipboard. For an anchored note the quoted source is
     /// part of its meaning, so copy it too — the quote as a markdown blockquote,
@@ -539,16 +588,6 @@ private struct CommentCardView: View {
 
     private var content: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if !tags.isEmpty {
-                FlowLayout(spacing: 6) {
-                    ForEach(tags, id: \.self) { tag in
-                        NoteTagChip(tag: tag, isActive: model.activeTagFilter == tag) {
-                            withAnimation(.easeOut(duration: 0.15)) { model.toggleTagFilter(tag) }
-                        }
-                    }
-                }
-            }
-
             if !body0.isEmpty {
                 // Cards render with OakMarkdownUI, which sizes to its content
                 // intrinsically — no scroll view, no height measurement. (The engine
@@ -558,6 +597,25 @@ private struct CommentCardView: View {
             }
 
             cardImages
+
+            // Tags render *below* the body — metadata that closes the note, matching
+            // flomo/Bear (the timestamp frames the top, tags frame the bottom). The
+            // panel's own `tagFilterBar` is the primary filter affordance; these chips
+            // are mostly display, so they don't need to sit above the content.
+            if !tags.isEmpty {
+                FlowLayout(spacing: 6) {
+                    ForEach(tags, id: \.self) { tag in
+                        NoteTagChip(tag: tag, isActive: model.activeTagFilter == tag) {
+                            withAnimation(.easeOut(duration: 0.15)) { model.toggleTagFilter(tag) }
+                        }
+                    }
+                }
+                // A touch more breathing room than the 8pt sibling rhythm, so the tag
+                // row reads as a metadata *footer* closing the note rather than one
+                // more line of body. Small (≈11pt total) — flomo keeps tags tight to
+                // their note, so the chips stay clearly attached to this card.
+                .padding(.top, 3)
+            }
 
             if anchored, let quoted = record.text, !quoted.isEmpty {
                 sourceRow(quoted)
@@ -569,7 +627,13 @@ private struct CommentCardView: View {
             }
         }
         .contentShape(Rectangle())
-        .onTapGesture { if anchored { model.jump(record) } }
+        // Double-click an empty part of the card to edit it. A *single* click is left
+        // for the embedded markdown NSTextView, so links inside the note stay clickable
+        // and the text stays selectable — a full-area single-tap gesture here used to
+        // swallow the mouse-down before the text view could fire `clickedOnLink:`, which
+        // is why neither links nor click-to-edit worked. "Jump to source" still lives on
+        // `sourceRow`'s own button (and the ⋯ menu), so that affordance isn't lost.
+        .onTapGesture(count: 2) { isEditing = true }
     }
 
     /// flomo "关联" — the notes that reference this one. Tapping the section opens
@@ -695,4 +759,149 @@ private struct CommentCardView: View {
 
     static func color(from raw: String) -> Color { NoteColor.parse(raw) }
 
+}
+
+/// Forces the enclosing `NSScrollView` to use **overlay** scrollers (so the bar
+/// floats over the content instead of shaving ~15pt off the cards' right edge — which
+/// would misalign them with the bottom composer, which lives outside the scroll view
+/// and keeps full width) AND reveals the scrollbar only while the pointer is over the
+/// list. Slack-style: the bar is hidden at rest, fades in on hover, fades out on exit.
+/// Placed as a `.background` inside the scroll content so it can walk up to the scroll
+/// view via `enclosingScrollView`.
+private struct OverlayScrollerConfigurator: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { HoverScrollerRevealView() }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async { nsView.enclosingScrollView?.scrollerStyle = .overlay }
+    }
+}
+
+/// A zero-size probe in the scroll content. Once in the window it walks up to the
+/// enclosing `NSScrollView`, forces overlay scrollers, and installs a tracking area
+/// over the visible clip region. While the pointer is inside, it keeps the overlay
+/// scrollers flashed in (they fade ~1s after the last flash, so a short repeat keeps
+/// them up); on exit the timer stops and they fade away — so the scrollbar shows only
+/// on hover, never at rest.
+private final class HoverScrollerRevealView: NSView {
+    private weak var scrollView: NSScrollView?
+    private var tracking: NSTrackingArea?
+    private var revealTimer: Timer?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard window != nil else { stopReveal(); return }
+        let sv = enclosingScrollView
+        scrollView = sv
+        sv?.scrollerStyle = .overlay
+        installTracking()
+    }
+
+    private func installTracking() {
+        guard let clip = scrollView?.contentView else { return }
+        if let t = tracking { clip.removeTrackingArea(t) }
+        // `.inVisibleRect` keeps the area pinned to the clip's visible region as the
+        // content scrolls, so we don't have to recompute the rect on every scroll.
+        let ta = NSTrackingArea(
+            rect: clip.bounds,
+            options: [.activeInActiveApp, .mouseEnteredAndExited, .inVisibleRect],
+            owner: self
+        )
+        clip.addTrackingArea(ta)
+        tracking = ta
+    }
+
+    override func mouseEntered(with event: NSEvent) { startReveal() }
+    override func mouseExited(with event: NSEvent) { stopReveal() }
+
+    private func startReveal() {
+        scrollView?.flashScrollers()
+        revealTimer?.invalidate()
+        // Overlay scrollers fade ~1s after the last flash; re-flashing well within that
+        // window keeps them continuously visible while the pointer lingers.
+        revealTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.scrollView?.flashScrollers() }
+        }
+    }
+
+    private func stopReveal() {
+        revealTimer?.invalidate()
+        revealTimer = nil
+    }
+}
+
+/// One entry in a card's native `⋯` menu (`NSMenu`). A separator carries no title
+/// or action.
+struct CardMenuItem {
+    var title: String = ""
+    var icon: String? = nil
+    var isSeparator: Bool = false
+    var action: () -> Void = {}
+
+    static let separator = CardMenuItem(isSeparator: true)
+}
+
+/// Pops a real `NSMenu` from its host SwiftUI view when `isPresented` flips true.
+/// Used instead of a SwiftUI `Menu` (whose AppKit control mis-frames inside a
+/// scrolling `LazyVStack`, so the button becomes unclickable) and instead of a
+/// hand-rolled popover (which can't reproduce the native material / hover / metrics).
+/// A manual `popUp(positioning:at:in:)` anchors to this view directly, dodging the
+/// scroll-view frame bug while staying 100% native — matching the header `⋯`.
+private struct CardMenuPresenter: NSViewRepresentable {
+    @Binding var isPresented: Bool
+    let items: [CardMenuItem]
+
+    func makeNSView(context: Context) -> NSView {
+        let v = NSView(frame: .zero)
+        context.coordinator.anchor = v
+        return v
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        context.coordinator.items = items
+        guard isPresented, !context.coordinator.isShowing else { return }
+        context.coordinator.isShowing = true
+        // Defer past this layout pass; popping a modal menu synchronously from
+        // `updateNSView` would re-enter SwiftUI's update.
+        DispatchQueue.main.async {
+            context.coordinator.present()
+            context.coordinator.isShowing = false
+            isPresented = false
+        }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    final class Coordinator: NSObject {
+        weak var anchor: NSView?
+        var items: [CardMenuItem] = []
+        var isShowing = false
+        private var actions: [() -> Void] = []
+
+        func present() {
+            guard let anchor, anchor.window != nil else { return }
+            let menu = NSMenu()
+            menu.autoenablesItems = false
+            actions = []
+            for item in items {
+                if item.isSeparator { menu.addItem(.separator()); continue }
+                let mi = NSMenuItem(title: item.title, action: #selector(fire(_:)), keyEquivalent: "")
+                mi.target = self
+                mi.tag = actions.count
+                if let icon = item.icon {
+                    mi.image = NSImage(systemSymbolName: icon, accessibilityDescription: nil)?
+                        .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 13, weight: .regular))
+                }
+                actions.append(item.action)
+                menu.addItem(mi)
+            }
+            // Drop the menu just below the ⋯ glyph (anchor fills the button's frame).
+            menu.popUp(positioning: nil, at: NSPoint(x: 0, y: anchor.bounds.maxY + 4), in: anchor)
+        }
+
+        @objc private func fire(_ sender: NSMenuItem) {
+            let i = sender.tag
+            guard i >= 0, i < actions.count else { return }
+            actions[i]()
+        }
+    }
 }

@@ -95,10 +95,10 @@ enum LibrarySidebarMode: String, CaseIterable, Identifiable {
 }
 
 enum RightPanelMode: String, CaseIterable, Identifiable {
-    // Tab order in the document view (Metadata last).
+    // Tab order in the document view (Notes after Translation, Metadata last).
     case aiChat
-    case comments
     case translation
+    case comments
     case metadata
 
     var id: String { rawValue }

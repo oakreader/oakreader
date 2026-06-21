@@ -1,24 +1,29 @@
 import Foundation
 
-/// Persists region-capture screenshots taken into a note's compose box and hands
-/// back an absolute `file://` URL string to embed as markdown (`![](…)`). Images
-/// live under `~/OakReader[-Dev]/note-images/` — flat, UUID-named, never rewritten.
+/// Persists region-capture screenshots taken into a note's compose box. Images live
+/// under their owning library item — `…/storage/{itemKey}/images/{uuid}.png` — so they
+/// are removed when the item is deleted and travel with it on export/backup. Hands back
+/// a relocatable `oak://image/...` URL string to embed as markdown (`![](…)`); see
+/// `OakNoteImageURL` for the URL ⇄ path mapping.
 enum NoteImageStore {
-    static var directory: URL {
-        CatalogDatabase.dataDirectory.appendingPathComponent("note-images", isDirectory: true)
+    static func directory(itemKey: String) -> URL {
+        CatalogDatabase.documentDirectory(storageKey: itemKey)
+            .appendingPathComponent("images", isDirectory: true)
     }
 
-    /// Store already-encoded PNG bytes (e.g. an area-capture from the viewer).
-    static func save(pngData: Data) -> String? {
-        write(pngData, ext: "png")
+    /// Store already-encoded PNG bytes under `itemKey`'s images folder, returning the
+    /// `oak://image/...` URL to embed, or nil on failure.
+    static func save(pngData: Data, itemKey: String) -> String? {
+        write(pngData, ext: "png", itemKey: itemKey)
     }
 
-    private static func write(_ data: Data, ext: String) -> String? {
+    private static func write(_ data: Data, ext: String, itemKey: String) -> String? {
         do {
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            let dest = directory.appendingPathComponent(UUID().uuidString + "." + ext)
-            try data.write(to: dest)
-            return dest.absoluteString
+            let dir = directory(itemKey: itemKey)
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            let name = UUID().uuidString + "." + ext
+            try data.write(to: dir.appendingPathComponent(name))
+            return OakNoteImageURL.make(itemKey: itemKey, fileName: name)
         } catch {
             return nil
         }

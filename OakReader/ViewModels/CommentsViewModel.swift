@@ -90,8 +90,16 @@ final class CommentsViewModel {
     /// shared `pendingCaptureURL` must be routed.)
     var captureTargetId: String?
 
-    /// Route a finished area capture into the active note composer.
-    func deliverCapturedImage(_ url: String) {
+    /// Persist a finished region capture under the document's library item and route
+    /// the resulting `oak://image/...` markdown link into the active note composer.
+    /// Promotes a live web page into the library first (same lazy-import as saving a
+    /// memo) so the image has an owning item to live under.
+    @MainActor
+    func deliverCapturedImage(pngData: Data) async {
+        guard await ensureBackingItem(),
+              let itemKey = parent?.itemStorageKey,
+              let url = NoteImageStore.save(pngData: pngData, itemKey: itemKey)
+        else { return }
         pendingCaptureURL = url
     }
 

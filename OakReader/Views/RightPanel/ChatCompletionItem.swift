@@ -31,6 +31,12 @@ struct ChatCompletionItem: Identifiable, Equatable {
     /// The trigger character that produced this item (`/`) or empty for drag-dropped items.
     let trigger: String
 
+    /// When true the row keeps its (short, fixed-width) description fully visible and
+    /// truncates the TITLE first instead. Used for note `@`-mentions whose description is
+    /// a date that must always show; skill rows leave this false so a long skill
+    /// description truncates before squeezing the skill name.
+    var pinnedDescription: Bool = false
+
     // MARK: - Equatable
 
     static func == (lhs: ChatCompletionItem, rhs: ChatCompletionItem) -> Bool {
@@ -107,9 +113,10 @@ struct ChatCompletionItem: Identifiable, Equatable {
     /// Build a generic note-composer item (block command / tag / reference). The
     /// action is encoded in `id` (`block:` / `tag:` / `ref:` prefix).
     static func note(id: String, icon: String, label: String, description: String = "",
-                     section: String, trigger: String) -> ChatCompletionItem {
+                     section: String, trigger: String, pinnedDescription: Bool = false) -> ChatCompletionItem {
         ChatCompletionItem(id: id, icon: icon, label: label, description: description,
-                           kind: .command(section: section), trigger: trigger)
+                           kind: .command(section: section), trigger: trigger,
+                           pinnedDescription: pinnedDescription)
     }
 
     /// Matches a filter query against label and description (case-insensitive).

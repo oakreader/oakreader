@@ -5,6 +5,7 @@ import Sparkle
 import UniformTypeIdentifiers
 import SwiftUI
 import OakVoice
+import OakMarkdownUI
 
 class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     let documentController = PDFDocumentController()
@@ -25,6 +26,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     func applicationWillFinishLaunching(_ notification: Notification) {
         documentController.appState = appState
         NSApp.mainMenu = MainMenuBuilder.build(target: self)
+        // Let the markdown renderer resolve note images' relocatable oak://image URLs.
+        OakMarkdownImage.urlResolver = { OakNoteImageURL.resolveToFile($0) }
         // Restore local OpenAI-compatible providers (Ollama, LM Studio) into the registry
         // before any AI feature reads the provider list.
         LocalProviderStore.shared.applyAll()

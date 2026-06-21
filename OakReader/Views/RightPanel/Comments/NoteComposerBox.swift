@@ -5,7 +5,7 @@ import AppKit
 /// (#, image, Aa, bullet, numbered, @) and a green send button. The *same*
 /// component backs both the top capture box (`.create`) and inline card editing
 /// (`.edit`), so editing a memo looks and behaves exactly like writing one — the
-/// edit variant just adds a char count and a Cancel button, and a green border.
+/// edit variant just adds a char count and a Cancel button, and a heavier grey border.
 struct NoteComposerBox: View {
     enum Mode { case create, edit }
 
@@ -34,29 +34,19 @@ struct NoteComposerBox: View {
     /// tag instead of retyping it (recognition over recall → prevents tag sprawl).
     var tags: [String] = []
 
-    @State private var controller = MarkdownNoteController()
-    /// The note body as Markdown — `swift-markdown-engine` styles this string live
-    /// and round-trips it, so there is no rich-attribute ⇄ Markdown codec to drift.
-    @State private var markdown = ""
-    @State private var didSeedMarkdown = false
+    @State private var controller = NoteEditorController()
     @State private var isEmpty = true
     @State private var charCount = 0
-    /// Vestigial: the engine doesn't report caret formats, so toolbar buttons no
-    /// longer show a toggled-on state. Kept empty to avoid churning the format bar.
+    /// Formatting commands active at the caret (reported live by the editor), so
+    /// the toolbar can highlight the matching buttons — the affordance that tells
+    /// the user the same button toggles the style back off.
     @State private var activeFormats: Set<String> = []
-    /// Live writing-area height, driven by the engine editor's reported content
-    /// height (`controller.onHeight`) and clamped to `[minEditorHeight, maxEditorHeight]`.
-    /// The engine editor is an `NSScrollView` with no intrinsic content size, so
-    /// without this it would stretch to its `maxHeight` frame in the panel `VStack`
-    /// rather than hug the text — the cause of the over-tall empty composer.
     @State private var height: CGFloat = Self.minEditorHeight
-    /// Default writing area floor — a touch roomier than the AI chat input
-    /// (`ChatInputTextView.minContentHeight` = 40) so the composer invites a real
-    /// jot, without towering over it. The editor still grows past this with content.
+    /// Default writing area floor — matches the AI chat input
+    /// (`ChatInputTextView.minContentHeight` = 40) so a short jot (a single line, or a
+    /// one-item bullet/quote) hugs its content instead of sitting in a tall, half-empty
+    /// box. The editor still grows past this with content.
     private static let minEditorHeight: CGFloat = 40
-    /// Ceiling before the editor starts scrolling internally, so a long note never
-    /// pushes the toolbar/cards off-screen.
-    private static let maxEditorHeight: CGFloat = 220
     /// Images attached to this note, shown as a flomo-style thumbnail tray below
     /// the prose (kept out of the editor so they never crowd out the writing line).
     @State private var attachments: [String] = []
@@ -71,6 +61,12 @@ struct NoteComposerBox: View {
 
     /// Send is allowed when there's prose *or* at least one attached image.
     private var canSend: Bool { !isEmpty || !attachments.isEmpty }
+
+    /// Code is literal text, so rich inline formatting (B/I/U/S, link) is unavailable
+    /// in any code context, and inline-code can't nest inside a code block — Slack's
+    /// rule. Driven by the live `activeFormats` the editor reports at the caret.
+    private var inCodeBlock: Bool { activeFormats.contains("codeBlock") }
+    private var inCodeContext: Bool { inCodeBlock || activeFormats.contains("code") }
 
     var body: some View {
         VStack(spacing: 8) {
@@ -87,20 +83,23 @@ struct NoteComposerBox: View {
                     .transition(.opacity)
             }
 
-            MarkdownEngineNoteEditor(
-                markdown: $markdown,
+            // `@` references and `#` tags are driven inline by the editor itself
+            // (same `ChatCompletionPanel` the chat composer uses), so there are no
+            // SwiftUI popovers to host here anymore.
+            NativeNoteEditorView(
+                initialMarkdown: Self.splitBody(initialMarkdown).text,
                 controller: controller,
-                fontSize: 14,
-                placeholder: mode == .create ? "Write a note…" : "",
+                isEmpty: $isEmpty,
+                charCount: $charCount,
+                height: $height,
+                activeFormats: $activeFormats,
+                onSubmit: send,
                 references: memos,
                 tags: tags
             )
-            .frame(height: height)
-            .onChange(of: markdown) { _, md in
-                let trimmed = md.trimmingCharacters(in: .whitespacesAndNewlines)
-                if isEmpty != trimmed.isEmpty { isEmpty = trimmed.isEmpty }
-                if charCount != md.count { charCount = md.count }
-            }
+            .frame(height: max(height, Self.minEditorHeight), alignment: .topLeading)
+            // Grow the frame in lockstep with content (no height animation) so the
+            // first line stays pinned as the editor auto-grows.
 
             if !attachments.isEmpty {
                 attachmentTray
@@ -108,7 +107,7 @@ struct NoteComposerBox: View {
 
             toolbar
         }
-        .padding(12)
+        .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(Color(nsColor: .textBackgroundColor))
@@ -116,30 +115,34 @@ struct NoteComposerBox: View {
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .strokeBorder(
-                    mode == .edit ? Color.accentColor : Color.primary.opacity(0.15),
+                    // Edit mode reuses the note card's calm-grey focus ring
+                    // (Color.secondary.opacity(0.55), see CommentsPanelView) instead
+                    // of a loud accent border — neutral, but heavier than the create
+                    // hairline so it still reads as "editing an existing note".
+                    mode == .edit ? Color.secondary.opacity(0.55) : Color.primary.opacity(0.15),
                     lineWidth: mode == .edit ? 1.5 : 1
                 )
         )
         .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
         .onAppear {
-            controller.onHeight = { h in
-                let clamped = min(max(h, Self.minEditorHeight), Self.maxEditorHeight)
-                if abs(clamped - height) > 0.5 {
-                    withAnimation(.easeOut(duration: 0.12)) { height = clamped }
-                }
-            }
-            // Plain ⏎ in the editor saves the note (the help text already advertises
-            // "Save (↩)"); the controller's key monitor routes it here.
-            controller.onSubmit = { send() }
-            if !didSeedMarkdown {
-                didSeedMarkdown = true
-                markdown = Self.splitBody(initialMarkdown).text
-                isEmpty = markdown.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                charCount = markdown.count
-            }
             guard !didSeedAttachments else { return }
             didSeedAttachments = true
-            attachments = Self.splitBody(initialMarkdown).images
+            let split = Self.splitBody(initialMarkdown)
+            attachments = split.images
+            // Seed emptiness/char-count from the SwiftUI side. The editor reports these
+            // via `onChange` from inside `setMarkdown`, but that runs during the
+            // representable's `makeNSView` — and a SwiftUI @State mutation during view
+            // construction is dropped, leaving `isEmpty == true` in edit mode (content
+            // present, yet the Save button stayed disabled — "can't save my edit").
+            let seedText = split.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            isEmpty = seedText.isEmpty
+            charCount = split.text.count
+            // Editing should land the caret in the box immediately (flomo behaviour),
+            // so a double-click-to-edit is instantly typeable. Deferred a tick so the
+            // text view is in the window before we make it first responder.
+            if mode == .edit {
+                DispatchQueue.main.async { controller.focus() }
+            }
         }
         .onChange(of: focusSignal) { _, _ in controller.focus() }
         .onChange(of: captureURL) { _, url in
@@ -226,12 +229,10 @@ struct NoteComposerBox: View {
             }
             .help("Formatting")
 
-            // Inserting the trigger char opens the inline completion popup (the
-            // controller's change observer detects it), same as typing #/@.
-            toolButton("number") { controller.insert("#") }
+            toolButton("number") { controller.cmd("tag") }
                 .help("Tag")
 
-            toolButton("at") { controller.insert("@") }
+            toolButton("at") { controller.requestMention() }
                 .help("Reference a note")
 
             imageButton
@@ -273,15 +274,14 @@ struct NoteComposerBox: View {
     /// Each lights up when active at the caret so the toggle-off affordance is clear.
     private var formatBar: some View {
         HStack(spacing: 2) {
-            // B/I/U/S don't apply to literal code — disabled in any code context.
-            toolButton("bold") { controller.wrapSelection("**") }
+            // B/I/S don't apply to literal code — disabled in any code context. No
+            // Underline: Markdown has none (it serializes to raw `<u>` HTML, which the
+            // card renderer doesn't display), and underlined text reads as a link.
+            toolButton("bold", active: activeFormats.contains("bold"), disabled: inCodeContext) { controller.cmd("bold") }
                 .help("Bold")
-            toolButton("italic") { controller.wrapSelection("*") }
+            toolButton("italic", active: activeFormats.contains("italic"), disabled: inCodeContext) { controller.cmd("italic") }
                 .help("Italic")
-            // No Underline: Markdown has no underline syntax (only raw <u></u> HTML),
-            // and underlined text reads as a link. Bold/Italic/Strikethrough all map
-            // to real Markdown.
-            toolButton("strikethrough") { controller.wrapSelection("~~") }
+            toolButton("strikethrough", active: activeFormats.contains("strikethrough"), disabled: inCodeContext) { controller.cmd("strikethrough") }
                 .help("Strikethrough")
 
             toolDivider
@@ -290,25 +290,27 @@ struct NoteComposerBox: View {
                 Image(systemName: "link")
                     .font(.system(size: 14))
                     .foregroundStyle(.secondary)
-                    .frame(width: 28, height: 28)
+                    .opacity(inCodeContext ? 0.35 : 1)
+                    .frame(width: 26, height: 24)
                     .contentShape(Rectangle())
                     .accessibilityHidden(true)
             }
             .buttonStyle(ToolButtonStyle())
+            .disabled(inCodeContext)   // no links in literal code
             .help("Link")
             .popover(isPresented: $showLink, arrowEdge: .bottom) { linkPopover }
 
             toolDivider
 
-            toolButton("list.bullet") { controller.toggleLinePrefix("- ") }
+            toolButton("list.bullet", active: activeFormats.contains("bulletList")) { controller.cmd("bulletList") }
                 .help("Bulleted list")
-            toolButton("list.number") { controller.toggleLinePrefix("1. ") }
+            toolButton("list.number", active: activeFormats.contains("orderedList")) { controller.cmd("orderedList") }
                 .help("Numbered list")
             // `quote.opening` — a distinct quotation glyph for the blockquote toggle.
             // NOT `text.quote`: this app reserves that for a *source reference* (the
             // anchored-note chip / add-to-chat), so `text.quote` here read as "make a
             // reference" rather than "format this paragraph as a blockquote".
-            toolButton("quote.opening") { controller.toggleLinePrefix("> ") }
+            toolButton("quote.opening", active: activeFormats.contains("quote")) { controller.cmd("quote") }
                 .help("Quote")
 
             toolDivider
@@ -318,9 +320,9 @@ struct NoteComposerBox: View {
             // One consistent code family: inline = bare braces, block = braces-in-a-box.
             // Inline code can't nest inside a code block; the code-block toggle
             // stays enabled so you can always leave the block.
-            toolButton("curlybraces") { controller.wrapSelection("`") }
+            toolButton("curlybraces", active: activeFormats.contains("code"), disabled: inCodeBlock) { controller.cmd("code") }
                 .help("Inline code")
-            toolButton("curlybraces.square") { controller.insertCodeBlock() }
+            toolButton("curlybraces.square", active: activeFormats.contains("codeBlock")) { controller.cmd("codeBlock") }
                 .help("Code block")
 
             Spacer()
@@ -353,8 +355,7 @@ struct NoteComposerBox: View {
         showLink = false
         linkURL = ""
         guard !url.isEmpty else { return }
-        // Wrap the selection as `[sel](url)` (or `[](url)` with no selection).
-        controller.wrapSelection(open: "[", close: "](\(url))")
+        controller.insertLink(url: url)
         controller.focus()
     }
 
@@ -379,7 +380,7 @@ struct NoteComposerBox: View {
                 .font(.system(size: 14))
                 .foregroundStyle(.secondary)
                 .opacity(disabled ? 0.35 : 1)
-                .frame(width: 28, height: 28)
+                .frame(width: 26, height: 24)
                 .contentShape(Rectangle())
                 // The `.help(...)` tooltip is the real label, so hide the icon from a11y:
                 // resolving an SF Symbol's localized description on a non-base locale is
@@ -400,32 +401,15 @@ struct NoteComposerBox: View {
     // MARK: Actions
 
     private func send() {
-        let text = markdown.trimmingCharacters(in: .whitespacesAndNewlines)
-        let body = Self.combine(text: text, images: attachments)
-        guard !body.isEmpty else { return }
-        Task { @MainActor in
-            let ok = await onSubmit(body)
-            // Only clear on a successful save so a failed one keeps the text.
-            if ok, mode == .create {
-                // Collapse the writing area to its floor *before* clearing the text.
-                // The engine sizes its scroll view's document view to
-                // `max(contentHeight, viewportHeight)` and only re-measures on a
-                // *content* change — never on a viewport-only change. So clearing while
-                // the box is still tall inflates the now-empty document view to the OLD
-                // tall viewport and then never shrinks it when the frame collapses,
-                // stranding a scrollbar over the empty box. Dropping the frame first
-                // (un-animated, so the engine's clip view is the floor height by the
-                // next runloop) makes the clear's re-measure run against the small
-                // viewport, so the document view collapses with it — no lingering scroller.
-                height = Self.minEditorHeight
-                DispatchQueue.main.async {
-                    // Clear imperatively through the controller (not via `markdown = ""`):
-                    // a binding reset is a programmatic change the engine doesn't echo as a
-                    // height notification, so the box would stay stuck tall. `clear()` empties
-                    // the text view directly and re-measures the now-empty content against the
-                    // (now small) viewport, which drives `onHeight` back down to the floor.
+        controller.getMarkdown { md in
+            let text = md.trimmingCharacters(in: .whitespacesAndNewlines)
+            let body = Self.combine(text: text, images: attachments)
+            guard !body.isEmpty else { return }
+            Task { @MainActor in
+                let ok = await onSubmit(body)
+                // Only clear on a successful save so a failed one keeps the text.
+                if ok, mode == .create {
                     controller.clear()
-                    markdown = ""
                     attachments = []
                 }
             }
@@ -473,8 +457,7 @@ private struct NoteAttachmentThumbnail: View {
     @State private var showPreview = false
 
     private var image: NSImage? {
-        guard let u = URL(string: url) else { return nil }
-        return NSImage(contentsOf: u)
+        OakNoteImageURL.image(url) ?? URL(string: url).flatMap { NSImage(contentsOf: $0) }
     }
 
     var body: some View {
