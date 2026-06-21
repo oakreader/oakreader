@@ -162,11 +162,19 @@ struct LibraryTableToolbar: View {
                     chooseFiles()
                 } label: {
                     Image(systemName: "plus")
-                        .font(.system(size: OakStyle.Font.icon))
+                        // Same 0.55 grey as the filter/sort glyphs, but a heavier weight:
+                        // the thin + cross has little ink, so at the identical colour it
+                        // read fainter than the denser icons beside it. .semibold gives it
+                        // the matching visual weight without changing the hue.
+                        .font(.system(size: OakStyle.Font.icon, weight: .semibold))
                         .foregroundStyle(Color.primary.opacity(0.55))
                         .frame(width: OakStyle.Size.buttonStandard, height: OakStyle.Size.buttonStandard)
                 }
-                .buttonStyle(.borderless)
+                // `.plain` (not `.borderless`): the borderless button style tints/emphasises
+                // its template glyph, so the + rendered darker than the filter/sort menu
+                // glyphs despite the identical foregroundStyle. `.plain` renders the label
+                // exactly as specified, matching the 0.55 grey of the icons beside it.
+                .buttonStyle(.plain)
                 .help("Add files to Library")
                 .accessibilityLabel("Add files to Library")
             }
