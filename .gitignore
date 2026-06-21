@@ -75,3 +75,6 @@ tmp/
 *.key
 *.env
 *.env.*
+
+# Internal-only docs (release runbook, prompt sessions) — kept local, not published
+docs/internal/
