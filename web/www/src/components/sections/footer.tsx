@@ -4,7 +4,7 @@ export function Footer({ dict }: { dict: Dictionary["footer"] }) {
   return (
     <footer role="contentinfo" className="relative z-[1]">
       <div className="max-w-[120rem] mx-auto px-[2rem]">
-        <div className="flex flex-col md:flex-row items-center justify-between font-mono uppercase text-[1.3rem] leading-[1.6rem] tracking-[0.1em] py-[2rem] gap-y-[2.4rem] border-t border-black/10">
+        <div className="flex flex-col md:flex-row items-center justify-between font-mono uppercase text-footnote leading-[1.6rem] tracking-[0.1em] py-[2rem] gap-y-[2.4rem] border-t border-black/10">
           <div className="hidden lg:flex gap-[4rem] items-baseline text-black/50">
             <small>{dict.copyright}</small>
             <small>&copy; 2026</small>

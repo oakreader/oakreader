@@ -10,27 +10,20 @@ type HeroDict = Dictionary["hero"];
 
 // Single static accent — the page stays calm. (Was a two-theme color cycle.)
 const HERO_COLOR = "#79C9FF";
+// Apple-style: near-white, a single restrained cool bloom — no saturated rainbow.
 const HERO_GRADIENT = `radial-gradient(
   100vmax,
-  rgba(0,0,0,0) 54.81%,
-  rgb(255,172,227) 60.098%,
-  rgba(255,241,172,0.5) 62.983%,
-  rgb(121,201,255) 68.5%,
-  rgb(74,96,209) 80%,
-  rgb(80,146,199) 90%,
-  rgb(60,106,255) 93%,
-  rgb(86,86,86) 97%,
+  rgba(0,0,0,0) 60%,
+  rgba(206,222,245,0.40) 73%,
+  rgba(224,230,239,0.55) 84%,
+  rgba(198,207,221,0.28) 93%,
   rgba(0,0,0,0) 100%
 )`;
 
 function EarlyAccessBadge({ text }: { text: string }) {
   return (
-    <div className="inline-flex items-center gap-[0.8rem] bg-white/70 backdrop-blur border border-[#ededed] rounded-full px-[1.6rem] h-[3.4rem] shadow-[0_1px_3px_rgba(0,0,0,0.04)] mb-[2.4rem]">
-      <span className="relative flex h-[0.7rem] w-[0.7rem]">
-        <span className="animate-ping absolute h-full w-full rounded-full bg-emerald-400 opacity-75" />
-        <span className="relative rounded-full h-[0.7rem] w-[0.7rem] bg-emerald-500" />
-      </span>
-      <span className="text-[1.3rem] text-black/55 font-medium tracking-[0.01em]">
+    <div className="inline-flex items-center bg-white/70 backdrop-blur border border-[#ededed] rounded-full px-[1.6rem] h-[3.4rem] shadow-[0_1px_3px_rgba(0,0,0,0.04)] mb-[2.4rem]">
+      <span className="text-subhead text-black/55 font-medium tracking-[0.01em]">
         {text}
       </span>
     </div>
@@ -72,11 +65,11 @@ export function Hero({ dict }: { dict: HeroDict }) {
       >
         <EarlyAccessBadge text={dict.badge} />
 
-        <p className="font-sans italic text-[1.4rem] min-[800px]:text-[1.6rem] text-black/40 tracking-[0.01em] mb-[1.6rem]">
+        <p className="font-sans italic text-callout min-[800px]:text-subhead text-black/40 tracking-[0.01em] mb-[1.6rem]">
           {dict.tagline}
         </p>
 
-        <h1 className="flex flex-col items-center text-black leading-[1.1] tracking-[-0.02em] text-[3.2rem] min-[600px]:text-[4.8rem] min-[800px]:text-[6rem] min-[1000px]:text-[6.8rem]">
+        <h1 className="flex flex-col items-center text-black leading-[1.1] tracking-[-0.02em] text-title1 min-[600px]:text-display min-[800px]:text-display-lg min-[1000px]:text-display-xl">
           <span className="font-exposure font-semibold whitespace-nowrap">
             {dict.headline1}
           </span>
@@ -85,19 +78,19 @@ export function Hero({ dict }: { dict: HeroDict }) {
           </span>
         </h1>
 
-        <p className="font-sans font-medium tracking-[-0.01em] text-[1.6rem] min-[600px]:text-[1.8rem] min-[800px]:text-[2.2rem] text-black/55 max-w-[30rem] min-[800px]:max-w-[48rem] leading-[150%] text-pretty mt-[3.2rem] md:mt-[4rem]">
+        <p className="font-sans font-medium tracking-[-0.01em] text-subhead min-[600px]:text-body min-[800px]:text-lead text-black/55 max-w-[30rem] min-[800px]:max-w-[48rem] leading-[150%] text-pretty mt-[3.2rem] md:mt-[4rem]">
           {dict.subhead}
         </p>
 
         {/* What you can bring — Heptabase-style source pills */}
         <div className="flex flex-wrap items-center justify-center gap-[0.8rem] mt-[2.4rem]">
-          <span className="text-[1.3rem] text-black/35 font-medium mr-[0.4rem]">
+          <span className="text-footnote text-black/35 font-medium mr-[0.4rem]">
             {dict.bringYour}
           </span>
           {dict.pills.map((s) => (
             <span
               key={s}
-              className="inline-flex items-center bg-white/70 backdrop-blur border border-[#ededed] rounded-full px-[1.4rem] h-[3.2rem] text-[1.3rem] font-medium text-black/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
+              className="inline-flex items-center bg-white/70 backdrop-blur border border-[#ededed] rounded-full px-[1.4rem] h-[3.2rem] text-footnote font-medium text-black/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
             >
               {s}
             </span>
@@ -113,7 +106,7 @@ export function Hero({ dict }: { dict: HeroDict }) {
           >
             <span className="relative inline-flex items-center justify-center">
               <span
-                className="relative flex items-center justify-center rounded-[1.4rem] text-white font-sans font-medium text-[1.8rem] min-[800px]:text-[2rem] h-[5.6rem] w-[28rem] hover:opacity-85 transition-opacity"
+                className="relative flex items-center justify-center rounded-[1.4rem] text-white font-sans font-medium text-body min-[800px]:text-lead h-[5.6rem] w-[28rem] hover:opacity-85 transition-opacity"
                 style={{
                   backgroundColor: `color-mix(in srgb, ${HERO_COLOR} 8%, #0a0a0a)`,
                   boxShadow: `inset 0 1px 0 0 color-mix(in srgb, ${HERO_COLOR} 55%, transparent)`,
@@ -123,7 +116,7 @@ export function Hero({ dict }: { dict: HeroDict }) {
               </span>
             </span>
           </Button>
-          <p className="font-sans text-[1.3rem] min-[800px]:text-[1.4rem] text-black/35 tracking-[0.02em]">
+          <p className="font-sans text-footnote min-[800px]:text-callout text-black/35 tracking-[0.02em]">
             {dict.ctaNote}
           </p>
         </div>

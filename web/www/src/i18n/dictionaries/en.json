@@ -8,7 +8,7 @@
     "language": "Language"
   },
   "hero": {
-    "badge": "Early Access · macOS",
+    "badge": "Beta · macOS",
     "tagline": "A research agent for everything you read.",
     "headline1": "Read everything.",
     "headline2": "Understand anything.",
@@ -16,7 +16,7 @@
     "bringYour": "Bring your",
     "pills": ["PDFs", "Papers", "Web pages", "Books"],
     "cta": "Download for Free",
-    "ctaNote": "Available on macOS · No credit card required",
+    "ctaNote": "Free · macOS",
     "shotAlt": "Oak answering a question in context with rendered math and markdown"
   },
   "bento": {

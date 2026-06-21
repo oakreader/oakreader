@@ -50,7 +50,7 @@ export function Header({
             <LocaleSwitcher current={locale} label={dict.language} />
             <a
               href={DOWNLOAD_URL}
-              className="inline-flex items-center justify-center h-[3.6rem] px-[1.4rem] rounded-[1rem] bg-black text-white text-[1.3rem] font-medium tracking-[-0.01em] cursor-pointer whitespace-nowrap"
+              className="inline-flex items-center justify-center h-[3.6rem] px-[1.4rem] rounded-[1rem] bg-black text-white text-footnote font-medium tracking-[-0.01em] cursor-pointer whitespace-nowrap"
             >
               {dict.download}
             </a>
@@ -89,7 +89,7 @@ export function Header({
                 <Link
                   key={link.label}
                   href={link.href}
-                  className="block px-[2rem] py-[1.2rem] text-[1.6rem] text-black/70 hover:text-black rounded-[0.8rem] transition-colors"
+                  className="block px-[2rem] py-[1.2rem] text-subhead text-black/70 hover:text-black rounded-[0.8rem] transition-colors"
                   onClick={() => setMobileOpen(false)}
                 >
                   {link.label}
@@ -121,14 +121,14 @@ export function Header({
             aria-label="OakReader"
           >
             <OakLogo />
-            <span className="text-[1.6rem] font-semibold tracking-[-0.02em]">OakReader</span>
+            <span className="text-subhead font-semibold tracking-[-0.02em]">OakReader</span>
           </Link>
           <ul className="flex gap-[1.6rem] items-center justify-center">
             {navLinks.map((link) => (
               <li key={link.label}>
                 <Link
                   href={link.href}
-                  className="text-[1.6rem] relative transition-opacity duration-200 hover:opacity-100 whitespace-nowrap opacity-70"
+                  className="text-subhead relative transition-opacity duration-200 hover:opacity-100 whitespace-nowrap opacity-70"
                 >
                   {link.label}
                 </Link>
@@ -138,7 +138,7 @@ export function Header({
           <LocaleSwitcher current={locale} label={dict.language} />
           <a
             href={DOWNLOAD_URL}
-            className="inline-flex items-center justify-center h-[3.8rem] px-[1.6rem] rounded-[1.2rem] bg-black text-white text-[1.4rem] font-medium tracking-[-0.01em] transition-all duration-200 hover:bg-black/85 cursor-pointer whitespace-nowrap"
+            className="inline-flex items-center justify-center h-[3.8rem] px-[1.6rem] rounded-[1.2rem] bg-black text-white text-callout font-medium tracking-[-0.01em] transition-all duration-200 hover:bg-black/85 cursor-pointer whitespace-nowrap"
           >
             {dict.download}
           </a>
