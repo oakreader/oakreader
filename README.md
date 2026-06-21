@@ -26,15 +26,45 @@ It's a native macOS app — SwiftUI + AppKit, PDFKit — built to be fast and to
 
 ## Features
 
-| | |
-|---|---|
-| 📚 **Everything you read, one place** | Every PDF, paper, and web page in collections and tags — full-text search that even understands Chinese, Japanese, and Korean. |
-| 💬 **Chat with what you're reading** | Attach a page or selection and ask — OakReader answers right beside the document, in context, with formatted notes, code, and rendered math. |
-| 🌐 **Translate inline, never break flow** | Select any passage to see it in your language right beside the original — sentence by sentence, no copy-paste, no jumping to a separate translation app. |
-| 🔍 **Go deep on any word** | Click a word and get a detailed card — meaning, nuance, collocations, and a one-line takeaway. |
-| 📝 **Highlight, note, keep** | Mark up any page; notes and screenshot clips collect into one panel — searchable across everything you've read. |
-| 🧭 **The web, built in** | Search, open links, and read live pages signed in — then save what matters into your library. |
-| 🧠 **Use any model, switch anytime** | From the frontier labs to a local model running on your Mac. Your choice, every time. |
+### 📚 Everything you read, one place
+
+Every PDF, paper, and web page in collections and tags — full-text search that even understands Chinese, Japanese, and Korean.
+
+<img src=".github/assets/features/library.gif" width="640" alt="Library — collections, tags, and full-text search" />
+
+### 💬 Chat with what you're reading
+
+Attach a page or selection and ask — OakReader answers right beside the document, in context, with formatted notes, code, and rendered math.
+
+<img src=".github/assets/features/chat.gif" width="640" alt="Chat — ask about the document, answered in context" />
+
+### 🌐 Translate inline, never break flow
+
+Select any passage to see it in your language right beside the original — sentence by sentence, no copy-paste, no jumping to a separate translation app.
+
+<img src=".github/assets/features/translate.gif" width="640" alt="Translate — your language beside the original" />
+
+### 🔍 Go deep on any word
+
+Click a word and get a detailed card — meaning, nuance, collocations, and a one-line takeaway.
+
+<img src=".github/assets/features/define.gif" width="640" alt="Define — a detailed card for any word" />
+
+### 📝 Highlight, note, keep
+
+Mark up any page; notes and screenshot clips collect into one panel — searchable across everything you've read.
+
+<img src=".github/assets/features/notes.gif" width="640" alt="Notes — highlights and clips in one panel" />
+
+### 🧭 The web, built in
+
+Search, open links, and read live pages signed in — then save what matters into your library.
+
+<img src=".github/assets/features/browse.gif" width="640" alt="Browse — a full browser, built in" />
+
+### 🧠 Use any model, switch anytime
+
+From the frontier labs to a local model running on your Mac. Your choice, every time.
 
 ## Tech stack
 
