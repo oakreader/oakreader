@@ -69,7 +69,9 @@ struct NoteComposerBox: View {
     private var inCodeContext: Bool { inCodeBlock || activeFormats.contains("code") }
 
     var body: some View {
-        VStack(spacing: 8) {
+        // 4pt (not 8) between the format bar, editor, tray and action row: a tighter,
+        // more compact card — the format-bar→editor gap read as too airy at 8.
+        VStack(spacing: 4) {
             if let quote, !quote.isEmpty {
                 quoteChip(quote)
             }
@@ -107,7 +109,10 @@ struct NoteComposerBox: View {
 
             toolbar
         }
-        .padding(14)
+        // Tighter top/bottom breathing room (the format bar and action row sat too far
+        // from the box edges); keep the horizontal inset so text doesn't hug the border.
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(Color(nsColor: .textBackgroundColor))
@@ -273,6 +278,11 @@ struct NoteComposerBox: View {
     /// matching Slack's: B/I/U/S · link · bullet/ordered · quote · inline/block code.
     /// Each lights up when active at the caret so the toggle-off affordance is clear.
     private var formatBar: some View {
+        // Each tool button centers its glyph in a 26pt frame, so the first glyph (B)
+        // sits ~6pt in from the frame's left edge — leaving the bar visually indented
+        // from the editor text margin (and from the action row's active Aa background,
+        // which fills its frame and so reads as flush). Pull the whole bar left by that
+        // centering offset so B lines up with the text margin / Aa box.
         HStack(spacing: 2) {
             // B/I/S don't apply to literal code — disabled in any code context. No
             // Underline: Markdown has none (it serializes to raw `<u>` HTML, which the
@@ -315,18 +325,20 @@ struct NoteComposerBox: View {
 
             toolDivider
 
+            // Code glyphs: inline = a slashed `< / >` bracket pair, block = the same
+            // brackets in a rounded box. Template SVG assets so they tint like the rest
+            // of the bar — and far cleaner than `curlybraces`.
             // Inline code can't nest inside a code block; the code-block toggle
             // stays enabled so you can always leave the block.
-            // One consistent code family: inline = bare braces, block = braces-in-a-box.
-            // Inline code can't nest inside a code block; the code-block toggle
-            // stays enabled so you can always leave the block.
-            toolButton("curlybraces", active: activeFormats.contains("code"), disabled: inCodeBlock) { controller.cmd("code") }
+            toolButton(asset: "OakCode", active: activeFormats.contains("code"), disabled: inCodeBlock) { controller.cmd("code") }
                 .help("Inline code")
-            toolButton("curlybraces.square", active: activeFormats.contains("codeBlock")) { controller.cmd("codeBlock") }
+            toolButton(asset: "OakCodeBlock", active: activeFormats.contains("codeBlock")) { controller.cmd("codeBlock") }
                 .help("Code block")
 
             Spacer()
         }
+        .padding(.leading, -6)
+
     }
 
     /// Small URL entry for the link button — applies a link to the current
@@ -386,6 +398,26 @@ struct NoteComposerBox: View {
                 // resolving an SF Symbol's localized description on a non-base locale is
                 // the CPU-peg documented in [[sfsymbol-a11y-locale-hang]].
                 .accessibilityHidden(true)
+        }
+        .buttonStyle(ToolButtonStyle(active: active))
+        .disabled(disabled)
+    }
+
+    /// Same chrome as the SF-Symbol `toolButton`, but renders a template image asset
+    /// — used by the code glyphs, which have no SF Symbol equivalent.
+    private func toolButton(asset: String, active: Bool = false, disabled: Bool = false,
+                            _ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(asset)
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 15, height: 15)
+                .foregroundStyle(.secondary)
+                .opacity(disabled ? 0.35 : 1)
+                .frame(width: 26, height: 24)
+                .contentShape(Rectangle())
+                .accessibilityHidden(true)   // `.help(...)` is the real label — see above
         }
         .buttonStyle(ToolButtonStyle(active: active))
         .disabled(disabled)

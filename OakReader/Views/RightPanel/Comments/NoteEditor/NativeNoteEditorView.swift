@@ -58,7 +58,11 @@ struct NativeNoteEditorView: NSViewRepresentable {
     func makeNSView(context: Context) -> NSScrollView {
         let scroll = NSScrollView()
         scroll.drawsBackground = false
-        scroll.hasVerticalScroller = false
+        // The editor auto-grows up to `maxHeight` (the SwiftUI frame tracks the
+        // reported content height); past that it's a fixed box whose content must
+        // scroll. Show the overlay scroller so the user can reach the overflow — and
+        // so a long note isn't silently clipped under the fold.
+        scroll.hasVerticalScroller = true
         scroll.hasHorizontalScroller = false
         scroll.autohidesScrollers = true
         scroll.verticalScrollElasticity = .none
@@ -78,6 +82,7 @@ struct NativeNoteEditorView: NSViewRepresentable {
         layout.addTextContainer(container)
 
         let tv = NoteEditorTextView(frame: .zero, textContainer: container)
+        tv.maxAutoGrowHeight = maxHeight
         tv.delegate = context.coordinator
         tv.drawsBackground = false
         tv.isRichText = true
@@ -86,13 +91,28 @@ struct NativeNoteEditorView: NSViewRepresentable {
         tv.isAutomaticTextReplacementEnabled = false
         tv.allowsUndo = true
         // width 0 so the text's left edge aligns with the card body (which renders at
-        // the card's 14pt padding with no inset); height keeps a little top breathing.
-        tv.textContainerInset = NSSize(width: 0, height: 4)
+        // the card's 14pt padding with no inset). Height 5: the layout manager draws a
+        // code/quote block's surface ~2pt ABOVE its first glyph (vPad) plus a 1px border
+        // and rounded corner. On the very first line that decoration has only the top
+        // inset for clearance; at inset 4 the rounded top was shaved 1–2pt by the scroll
+        // view's top edge (it read as the toolbar covering the box). 5 leaves the box top
+        // at ~3pt — enough to clear — without the airy gap a larger inset added above
+        // every block. The composer cancels the VStack's gap above the editor (see
+        // NoteComposerBox) so this inset is the *only* space above the first block.
+        tv.textContainerInset = NSSize(width: 0, height: 5)
         tv.isVerticallyResizable = true
         tv.isHorizontallyResizable = false
+        // Standard "text view in a scroll view" recipe: without a tall maxSize the
+        // document view can't extend below the clip bounds, so once the box caps at
+        // `maxHeight` the overflow is unreachable. Let it grow unbounded vertically;
+        // the visible box stays clamped by the SwiftUI frame, the rest scrolls.
+        tv.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         tv.textContainer?.widthTracksTextView = true
         tv.font = NoteEditorStyle.baseFont
         tv.typingAttributes = NoteEditorStyle.defaultTypingAttributes
+        // Match the AI chat input's caret: a neutral `.labelColor` (black in light mode,
+        // white in dark) rather than the system-accent blue the editor defaulted to.
+        tv.insertionPointColor = .labelColor
 
         tv.onSubmit = { onSubmit() }
         tv.onChange = { empty, count in
@@ -123,6 +143,7 @@ struct NativeNoteEditorView: NSViewRepresentable {
 
     func updateNSView(_ scroll: NSScrollView, context: Context) {
         guard let tv = scroll.documentView as? NoteEditorTextView else { return }
+        tv.maxAutoGrowHeight = maxHeight
         tv.references = references
         tv.tags = tags
     }

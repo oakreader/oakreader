@@ -3,7 +3,11 @@ import AppKit
 // MARK: - Styling constants
 
 enum NoteEditorStyle {
-    static let baseFont = NSFont.systemFont(ofSize: 14)
+    // 15pt body to match the app's main reading surface (the AI chat renders markdown
+    // at 15pt); the preview card is bumped to `.oak(fontSize: 15)` in lockstep so the
+    // editor and the saved note read at the same size. Code is 2pt smaller (13), the
+    // same ratio the card's `codeFont` uses.
+    static let baseFont = NSFont.systemFont(ofSize: 15)
     static let monoFont = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
     static var accent: NSColor { .controlAccentColor }
     /// Inline `` `code` `` run background (matches the card's `inlineCodeBackground`).
@@ -59,12 +63,12 @@ enum NoteEditorStyle {
         case .code:
             // Tighter line height than prose so stacked code lines read as a compact
             // block, with even horizontal text inset (fill is 6pt from the editor edge,
-            // text another ~6pt in). The generous spacing-before/after is the block's
-            // OUTER margin — it sits outside the grey (the fill is built from the used
-            // rect), separating the block from surrounding text instead of padding it.
+            // text another ~6pt in). Spacing matches every other block — the inherited
+            // 6pt `paragraphSpacing` (after) only, NO extra spacing-before — so a code
+            // block doesn't sit lower than a quote/heading does. The outer margin sits
+            // outside the grey (the fill is built from the used rect).
             p.lineHeightMultiple = 1.15
             p.headIndent = 12; p.firstLineHeadIndent = 12; p.tailIndent = -12
-            p.paragraphSpacingBefore = 6; p.paragraphSpacing = 6
         default:
             break
         }

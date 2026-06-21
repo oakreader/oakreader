@@ -16,6 +16,10 @@ final class NoteEditorTextView: NSTextView {
     var onHeight: ((CGFloat) -> Void)?
     var onCreateTag: ((String) -> Void)?
 
+    /// The SwiftUI host's max editor height. While the measured content is at or below
+    /// this cap, the editor is in grow-mode and AppKit must not leave a scroll offset.
+    var maxAutoGrowHeight: CGFloat = .greatestFiniteMagnitude
+
     /// Data for the completion panel (kept in sync by the representable).
     var references: [NoteRef] = []
     var tags: [String] = []
@@ -66,12 +70,63 @@ final class NoteEditorTextView: NSTextView {
         // invalidation doesn't cover them — a reflow or toggle leaves a stale "ghost"
         // box behind. Force a full repaint so only the current decoration is drawn.
         needsDisplay = true
+        normalizeScrollPosition()
+        // Run one more pass after SwiftUI applies the reported height. The synchronous
+        // `scrollRangeToVisible` override below is the real race fix; this catches
+        // geometry changes from the host after the binding update lands.
+        DispatchQueue.main.async { [weak self] in self?.normalizeScrollPosition() }
+    }
+
+    /// AppKit calls this synchronously during typing, before SwiftUI has applied the
+    /// new frame height. If the content will still fit under the auto-grow cap, cancel
+    /// that scroll immediately so the clip view cannot retain a stale downward offset.
+    override func scrollRangeToVisible(_ range: NSRange) {
+        guard shouldAllowDocumentScrolling else {
+            scrollClipViewToTop()
+            return
+        }
+        super.scrollRangeToVisible(range)
+    }
+
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        normalizeScrollPosition()
+    }
+
+    private var shouldAllowDocumentScrolling: Bool {
+        measuredContentHeight() > maxAutoGrowHeight + 1
+    }
+
+    private func normalizeScrollPosition() {
+        if shouldAllowDocumentScrolling {
+            super.scrollRangeToVisible(selectedRange())
+        } else {
+            scrollClipViewToTop()
+        }
+    }
+
+    private func scrollClipViewToTop() {
+        guard let sv = enclosingScrollView else { return }
+        let origin = sv.contentView.bounds.origin
+        guard abs(origin.y) > 0.5 else { return }
+        sv.contentView.scroll(to: NSPoint(x: origin.x, y: 0))
+        sv.reflectScrolledClipView(sv.contentView)
     }
 
     private func reportHeight() {
-        guard let lm = layoutManager, let tc = textContainer else { return }
+        onHeight?(measuredContentHeight())
+    }
+
+    private func measuredContentHeight() -> CGFloat {
+        guard let lm = layoutManager, let tc = textContainer else { return textContainerInset.height * 2 }
         lm.ensureLayout(for: tc)
-        onHeight?(lm.usedRect(for: tc).height + textContainerInset.height * 2)
+        let used = lm.usedRect(for: tc)
+        var maxY = used.maxY
+        if let lm = lm as? NoteTagLayoutManager {
+            let decorations = lm.blockDecorationBoundingRect()
+            if !decorations.isNull { maxY = max(maxY, decorations.maxY) }
+        }
+        return ceil(maxY + textContainerInset.height * 2)
     }
 
     /// Re-measure and emit the content height *now*. The initial report from
@@ -87,6 +142,66 @@ final class NoteEditorTextView: NSTextView {
         handleTextChange()
     }
 
+    /// `lineHeightMultiple` (1.3, for readable spacing) makes each line fragment taller
+    /// than its glyphs, and AppKit draws the caret at the *full* fragment height — so it
+    /// towers above the text (and dwarfs a smaller inline-code run). Clamp the caret to
+    /// the caret font's own height, pinned to the baseline area at the bottom of the
+    /// fragment (this view is flipped, so that's `maxY`), so it matches the glyphs.
+    override func drawInsertionPoint(in rect: NSRect, color: NSColor, turnedOn flag: Bool) {
+        var r = rect
+        let font = (typingAttributes[.font] as? NSFont) ?? NoteEditorStyle.baseFont
+        let h = ceil(font.ascender - font.descender) + 1
+        if r.height > h {
+            r.origin.y = rect.maxY - h
+            r.size.height = h
+        }
+        super.drawInsertionPoint(in: r, color: color, turnedOn: flag)
+    }
+
+    /// Paint a quote/code block toggled onto a still-EMPTY line, behind the text/glyphs.
+    ///
+    /// An empty line has no character to hold `.oakBlock`, so the layout manager's
+    /// glyph-driven `drawBackground` can't draw it — and AppKit doesn't even call that
+    /// method when the editor is empty. `draw(_:)`, by contrast, is ALWAYS called, so
+    /// painting here makes the box appear the instant the Code/Quote button is pressed
+    /// (Slack-style), before any text exists on the line. Once a real character anchors
+    /// the block, `pendingEmptyBlock` is cleared and the run-walk in the layout manager
+    /// takes over.
+    override func draw(_ dirtyRect: NSRect) {
+        drawPendingEmptyBlockBox()
+        super.draw(dirtyRect)
+    }
+
+    private func drawPendingEmptyBlockBox() {
+        guard let pb = pendingEmptyBlock, pb == .code || pb == .quote,
+              caretParagraphIsEmpty(),
+              let lm = layoutManager as? NoteTagLayoutManager,
+              let container = textContainer else { return }
+        lm.ensureLayout(for: container)
+        let loc = selectedRange().location
+        let len = textStorage?.length ?? 0
+        // The empty line's geometry, in text-container coordinates.
+        var box = NSRect.null
+        if loc < len {
+            // An empty paragraph mid-document still has a real line fragment.
+            box = lm.lineFragmentRect(forGlyphAt: lm.glyphIndexForCharacter(at: loc), effectiveRange: nil)
+        } else if !lm.extraLineFragmentRect.isEmpty {
+            // Caret on the trailing empty line (the line after a trailing newline).
+            box = lm.extraLineFragmentRect
+        } else {
+            // Wholly empty editor (no extra fragment materialized): synthesize one line.
+            let font = pb == .code ? NoteEditorStyle.monoFont : NoteEditorStyle.baseFont
+            let lineH = ceil(font.ascender - font.descender + font.leading) * 1.15
+            box = NSRect(x: 0, y: 0, width: container.size.width, height: max(lineH, 16))
+        }
+        guard !box.isNull, !box.isEmpty else { return }
+        // Container coords → view coords: the layout manager draws glyphs at the text
+        // container's origin, which is `textContainerInset`. Match that so the box lines
+        // up with where the typed text will land.
+        let origin = NSPoint(x: textContainerInset.width, y: textContainerInset.height)
+        lm.drawBlockSurface(pb, box: box, fullWidth: container.size.width, origin: origin)
+    }
+
     // MARK: Key handling + completion triggers
 
     override func keyDown(with event: NSEvent) {
@@ -97,11 +212,12 @@ final class NoteEditorTextView: NSTextView {
         // inside a code block / list / quote it adds or continues a line instead —
         // otherwise a multi-line code block is impossible (the bug this fixes) and a
         // numbered list can never reach item 2. ⌘+Return always saves (the escape
-        // hatch from inside a block); ⇧+Return is always a literal newline.
+        // hatch from inside a block); ⇧+Return starts a fresh plain paragraph (see
+        // `insertSoftParagraph` — a bare newline made a markerless "ghost bullet").
         if event.keyCode == 36 {
             let mods = event.modifierFlags
             if mods.contains(.command) { onSubmit?(); return }
-            if mods.contains(.shift) { insertNewline(nil); return }
+            if mods.contains(.shift) { insertSoftParagraph(); return }
             switch caretBlock() {
             case .code:
                 if caretParagraphIsEmpty() { exitCurrentBlock() } else { insertNewline(nil) }
@@ -123,10 +239,47 @@ final class NoteEditorTextView: NSTextView {
                 super.keyDown(with: event); showPanel(trigger: "@"); return
             case "#" where atWordBoundary(selectedRange().location):
                 super.keyDown(with: event); showPanel(trigger: "#"); return
+            case " ":
+                // Markdown input rule: a space may complete a `- `/`* `/`1. ` list
+                // prefix — insert it first, then convert if the line now matches.
+                super.keyDown(with: event); applyListInputRuleIfNeeded(); return
             default: break
             }
         }
         super.keyDown(with: event)
+    }
+
+    /// Input rule (Notion/Bear/CommonMark parity): typing `- `, `* `, `+ ` or `N. ` at
+    /// the very start of a plain paragraph turns it into a bullet / ordered list. Runs
+    /// after the space is inserted; a no-op unless the whole line is exactly that prefix
+    /// and the line isn't already inside a list/quote/code block. We delete the typed
+    /// markers and route through `runCommand` so the result is identical to using the
+    /// toolbar / `/` menu (real marker run + block attributes), never a ghost bullet.
+    private func applyListInputRuleIfNeeded() {
+        guard let ts = textStorage else { return }
+        let sel = selectedRange()
+        guard sel.length == 0 else { return }
+        let ns = string as NSString
+        let para = ns.paragraphRange(for: sel)
+        let prefixLen = sel.location - para.location
+        guard prefixLen > 0 else { return }
+        // Don't fire inside an existing non-paragraph block.
+        if let raw = ts.attribute(.oakBlock, at: para.location, effectiveRange: nil) as? Int,
+           raw != NoteBlock.paragraph.rawValue { return }
+        let prefix = ns.substring(with: NSRange(location: para.location, length: prefixLen))
+        let target: NoteBlock
+        if prefix == "- " || prefix == "* " || prefix == "+ " {
+            target = .bullet
+        } else if prefix.range(of: #"^\d+\.\s$"#, options: .regularExpression) != nil {
+            target = .ordered
+        } else {
+            return
+        }
+        guard shouldChangeText(in: NSRange(location: para.location, length: prefixLen), replacementString: "") else { return }
+        ts.replaceCharacters(in: NSRange(location: para.location, length: prefixLen), with: "")
+        setSelectedRange(NSRange(location: para.location, length: 0))
+        didChangeText()
+        runCommand(target == .bullet ? "bulletList" : "orderedList")
     }
 
     /// Toolbar `#`/`@` buttons: insert the trigger char, then open the panel —
@@ -231,7 +384,9 @@ final class NoteEditorTextView: NSTextView {
         // `quote.opening` — matches the toolbar; NOT `text.quote`, which the app
         // reserves for a *source reference* (would read as "make a reference").
         .note(id: "block:quote", icon: "quote.opening", label: "Quote", section: "Format", trigger: "/"),
-        .note(id: "block:code", icon: "curlybraces.square", label: "Code block", section: "Format", trigger: "/"),
+        // `</>` angle brackets — matches the toolbar's code family
+        // (the menu is SF-Symbol-string based, so it uses the closest symbol).
+        .note(id: "block:code", icon: "chevron.left.forwardslash.chevron.right", label: "Code block", section: "Format", trigger: "/"),
     ]
 
     // MARK: Selection → insert
@@ -571,6 +726,34 @@ final class NoteEditorTextView: NSTextView {
         return text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    /// ⇧+Return: a new line that does NOT submit — and, outside a code block, starts a
+    /// fresh *plain paragraph* instead of inheriting the current block. A bare
+    /// `insertNewline` carried the bullet/quote block forward via `typingAttributes`
+    /// but inserted no marker run, producing a "ghost bullet": a line that looked like
+    /// prose (no marker, sitting at the left margin because a list's
+    /// `firstLineHeadIndent` is 0) yet serialized to `- …`, so the saved card grew a
+    /// bullet the editor never showed. Resetting to a paragraph makes what-you-see
+    /// equal what-you-save. Code blocks keep the literal newline (multi-line code).
+    private func insertSoftParagraph() {
+        if caretBlock() == .code { insertNewline(nil); return }
+        insertNewline(nil)
+        if let ts = textStorage {
+            // If the newline split a block (text moved down with the caret), re-tag that
+            // text as a plain paragraph; an empty new line is handled by typingAttributes.
+            let para = (string as NSString).paragraphRange(for: selectedRange())
+            if para.length > 0 {
+                NoteEditorStyle.applyBlock(.paragraph, to: ts, range: para)
+                ts.addAttribute(.font, value: NoteEditorStyle.baseFont, range: para)
+                ts.addAttribute(.foregroundColor, value: NSColor.labelColor, range: para)
+                ts.removeAttribute(.backgroundColor, range: para)
+            }
+        }
+        pendingEmptyBlock = nil
+        typingAttributes = NoteEditorStyle.defaultTypingAttributes
+        didChangeText()
+        reportActiveFormats()
+    }
+
     /// Return inside a non-empty list/quote line: open a fresh line that stays in the
     /// block. Lists get a newly rendered marker (`•` / `N.`) since a plain NSTextView
     /// won't draw one; quote/code just carry the block forward via typing attributes.
@@ -657,19 +840,29 @@ final class NoteEditorTextView: NSTextView {
         if probe[.strikethroughStyle] != nil { set.insert("strikethrough") }
         if probe[.oakInlineCode] != nil { set.insert("code") }
 
-        if let ts = textStorage, ts.length > 0 {
-            let loc = min(selectedRange().location, ts.length - 1)
-            if let raw = ts.attribute(.oakBlock, at: max(0, loc), effectiveRange: nil) as? Int, let b = NoteBlock(rawValue: raw) {
-                switch b {
-                case .bullet: set.insert("bulletList")
-                case .ordered: set.insert("orderedList")
-                case .quote: set.insert("quote")
-                case .code: set.insert("codeBlock")
-                case .h1, .h2, .h3: set.insert("heading")
-                case .paragraph: break
-                }
+        // Block kind: read from the same `probe` as the inline traits above — i.e.
+        // typingAttributes when the caret is collapsed — so a block toggled on an EMPTY
+        // line/editor still lights its toolbar button. The `.oakBlock` lives only in
+        // typingAttributes there (no character holds it), exactly like inline code; the
+        // old code probed only textStorage, so an empty code block read as plain.
+        let blockRaw = (probe[.oakBlock] as? Int) ?? {
+            guard let ts = textStorage, ts.length > 0 else { return nil }
+            let loc = min(max(selectedRange().location, 0), ts.length - 1)
+            return ts.attribute(.oakBlock, at: loc, effectiveRange: nil) as? Int
+        }()
+        if let raw = blockRaw, let b = NoteBlock(rawValue: raw) {
+            switch b {
+            case .bullet: set.insert("bulletList")
+            case .ordered: set.insert("orderedList")
+            case .quote: set.insert("quote")
+            case .code: set.insert("codeBlock")
+            case .h1, .h2, .h3: set.insert("heading")
+            case .paragraph: break
             }
         }
         onActiveFormats?(set)
+        // Selection changes route here — repaint so the empty-block surface (drawn in
+        // `draw(_:)`) appears/erases as the caret enters or leaves the pending line.
+        needsDisplay = true
     }
 }
