@@ -8,7 +8,6 @@
     "language": "Sprache"
   },
   "hero": {
-    "badge": "Beta · macOS",
     "tagline": "Ein Recherche-Agent für alles, was du liest.",
     "headline1": "Alles lesen.",
     "headline2": "Alles begreifen.",
@@ -16,7 +15,7 @@
     "bringYour": "Bring deine",
     "pills": ["PDFs", "Aufsätze", "Webseiten", "Bücher"],
     "cta": "Kostenlos herunterladen",
-    "ctaNote": "Kostenlos · macOS",
+    "ctaNote": "Beta · macOS",
     "shotAlt": "Oak beantwortet eine Frage im Kontext, mit gesetzten Formeln und Markdown"
   },
   "bento": {

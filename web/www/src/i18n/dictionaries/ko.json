@@ -8,7 +8,6 @@
     "language": "언어"
   },
   "hero": {
-    "badge": "얼리 액세스 · macOS",
     "tagline": "당신이 읽는 모든 것을 위한 리서치 에이전트.",
     "headline1": "모든 것을 읽다.",
     "headline2": "무엇이든 이해하다.",
@@ -16,7 +15,7 @@
     "bringYour": "가져오세요",
     "pills": ["PDF", "논문", "웹 페이지", "책"],
     "cta": "무료 다운로드",
-    "ctaNote": "macOS 지원 · 신용카드 불필요",
+    "ctaNote": "Beta · macOS",
     "shotAlt": "Oak가 맥락에 맞춰 질문에 답하며 수식과 마크다운을 렌더링하는 모습"
   },
   "bento": {

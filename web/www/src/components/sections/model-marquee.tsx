@@ -56,7 +56,7 @@ function Chip({ name, Icon }: Provider) {
   return (
     <div className="shrink-0 inline-flex items-center gap-[1rem] bg-white border border-[#ededed] rounded-full px-[2rem] h-[5rem] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.03)]">
       <Icon size={22} />
-      <span className="font-sans font-medium text-subhead md:text-body text-black/70 whitespace-nowrap">
+      <span className="font-sans font-medium text-subhead md:text-body text-label-secondary whitespace-nowrap">
         {name}
       </span>
     </div>
@@ -102,13 +102,13 @@ export function ModelMarquee({ dict }: { dict: Dictionary["models"] }) {
         data-reveal
         className="text-center px-[2rem] mb-[4rem] md:mb-[6rem] max-w-[120rem] mx-auto"
       >
-        <p className="font-mono uppercase tracking-[0.1em] text-caption text-black/35 mb-[1.6rem]">
+        <p className="font-mono uppercase tracking-[0.1em] text-caption text-label-tertiary mb-[1.6rem]">
           {dict.eyebrow}
         </p>
         <h2 className="font-exposure font-bold text-title1 md:text-display-sm lg:text-display leading-[1.15] tracking-[-0.01em] text-balance">
           {dict.title}
         </h2>
-        <p className="font-sans mt-[2.4rem] text-body md:text-body leading-[1.6] text-black/50 max-w-[46ch] mx-auto text-pretty">
+        <p className="font-sans mt-[2.4rem] text-body md:text-body leading-[1.6] text-label-secondary max-w-[46ch] mx-auto text-pretty">
           {dict.subhead}
         </p>
       </div>

@@ -67,9 +67,17 @@
   --text-display-xl: 6.8rem; /* 68 — hero desktop */
 }
 
+/* Text colors — Apple's label system. Solid warm-neutral grays, never
+   pure black with alpha. Use these instead of text-black/NN. */
+@theme {
+  --color-label: #1d1d1f; /* primary — headlines, strong body */
+  --color-label-secondary: #6e6e73; /* secondary — sub-copy, descriptions */
+  --color-label-tertiary: #86868b; /* tertiary — faint labels, captions */
+}
+
 :root {
   --background: #f8f8f8;
-  --foreground: #0a0a0a;
+  --foreground: #1d1d1f;
   --card: #ffffff;
   --card-foreground: #0a0a0a;
   --popover: #ffffff;

@@ -8,7 +8,6 @@
     "language": "语言"
   },
   "hero": {
-    "badge": "抢先体验 · macOS",
     "tagline": "为你所读的一切，配一位研究智能体。",
     "headline1": "读尽一切。",
     "headline2": "洞悉万物。",
@@ -16,7 +15,7 @@
     "bringYour": "带上你的",
     "pills": ["PDF", "论文", "网页", "书籍"],
     "cta": "免费下载",
-    "ctaNote": "支持 macOS · 无需信用卡",
+    "ctaNote": "Beta · macOS",
     "shotAlt": "Oak 结合上下文回答问题，并渲染出数学公式与 Markdown"
   },
   "bento": {

@@ -8,7 +8,6 @@
     "language": "言語"
   },
   "hero": {
-    "badge": "アーリーアクセス · macOS",
     "tagline": "あなたが読むすべてに、リサーチエージェントを。",
     "headline1": "すべてを、読む。",
     "headline2": "あらゆることを、理解する。",
@@ -16,7 +15,7 @@
     "bringYour": "持ち込めるのは",
     "pills": ["PDF", "論文", "Web ページ", "書籍"],
     "cta": "無料でダウンロード",
-    "ctaNote": "macOS 対応 · クレジットカード不要",
+    "ctaNote": "Beta · macOS",
     "shotAlt": "Oak が文脈に沿って質問に答え、数式と Markdown を表示している様子"
   },
   "bento": {

@@ -22,7 +22,7 @@ function Heading({ dict }: { dict: BentoDict }) {
   const ref = useReveal<HTMLDivElement>();
   return (
     <div ref={ref} data-reveal className="text-center max-w-[64rem] mx-auto">
-      <p className="font-mono uppercase tracking-[0.1em] text-caption text-black/35 mb-[1.6rem]">
+      <p className="font-mono uppercase tracking-[0.1em] text-caption text-label-tertiary mb-[1.6rem]">
         {dict.eyebrow}
       </p>
       <h2 className="font-exposure font-bold text-title1 md:text-display-sm lg:text-display leading-[1.15] tracking-[-0.01em] text-balance">
@@ -49,13 +49,13 @@ function Card({
       style={{ "--reveal-delay": `${(index % 2) * 0.08}s` } as React.CSSProperties}
       className={`rounded-[2rem] md:rounded-[2.8rem] border border-black/8 bg-gradient-to-br ${layout.tint} p-[2.4rem] md:p-[3.2rem]`}
     >
-      <span className="block font-mono text-caption uppercase tracking-[0.1em] text-black/40 mb-[1.2rem]">
+      <span className="block font-mono text-caption uppercase tracking-[0.1em] text-label-tertiary mb-[1.2rem]">
         {content.eyebrow}
       </span>
-      <h3 className="font-exposure font-bold text-title3 md:text-title2 leading-[1.15] tracking-[-0.01em] text-black">
+      <h3 className="font-exposure font-bold text-title3 md:text-title2 leading-[1.15] tracking-[-0.01em] text-label">
         {content.title}
       </h3>
-      <p className="font-sans mt-[1.2rem] text-subhead md:text-body leading-[1.6] text-black/55 max-w-[46ch]">
+      <p className="font-sans mt-[1.2rem] text-subhead md:text-body leading-[1.6] text-label-secondary max-w-[46ch]">
         {content.desc}
       </p>
       <div className="mt-[2.4rem] md:mt-[3.2rem]">

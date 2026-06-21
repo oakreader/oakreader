@@ -64,7 +64,7 @@ export function Header({
                   height="20"
                   viewBox="0 0 20 20"
                   fill="none"
-                  className="text-black"
+                  className="text-label"
                 >
                   <path
                     d="M3 5h14M3 10h14M3 15h14"
@@ -89,7 +89,7 @@ export function Header({
                 <Link
                   key={link.label}
                   href={link.href}
-                  className="block px-[2rem] py-[1.2rem] text-subhead text-black/70 hover:text-black rounded-[0.8rem] transition-colors"
+                  className="block px-[2rem] py-[1.2rem] text-subhead text-label-secondary hover:text-label rounded-[0.8rem] transition-colors"
                   onClick={() => setMobileOpen(false)}
                 >
                   {link.label}
@@ -117,7 +117,7 @@ export function Header({
         >
           <Link
             href={home}
-            className="flex items-center gap-[0.6rem] h-[4rem] px-[0.8rem] text-black transition-opacity duration-200 hover:opacity-70"
+            className="flex items-center gap-[0.6rem] h-[4rem] px-[0.8rem] text-label transition-opacity duration-200 hover:opacity-70"
             aria-label="OakReader"
           >
             <OakLogo />

@@ -8,7 +8,6 @@
     "language": "Idioma"
   },
   "hero": {
-    "badge": "Acceso anticipado · macOS",
     "tagline": "Un agente de investigación para todo lo que lees.",
     "headline1": "Léelo todo.",
     "headline2": "Compréndelo todo.",
@@ -16,7 +15,7 @@
     "bringYour": "Trae tus",
     "pills": ["PDF", "Artículos", "Páginas web", "Libros"],
     "cta": "Descargar gratis",
-    "ctaNote": "Disponible en macOS · Sin tarjeta de crédito",
+    "ctaNote": "Beta · macOS",
     "shotAlt": "Oak responde una pregunta en contexto, con fórmulas y Markdown renderizados"
   },
   "bento": {

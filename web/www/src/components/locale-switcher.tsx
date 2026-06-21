@@ -38,7 +38,7 @@ export function LocaleSwitcher({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={label}
-        className="flex items-center gap-[0.5rem] h-[3.8rem] px-[1.2rem] rounded-[1.2rem] text-callout font-medium text-black/70 hover:bg-black/5 transition-colors cursor-pointer whitespace-nowrap"
+        className="flex items-center gap-[0.5rem] h-[3.8rem] px-[1.2rem] rounded-[1.2rem] text-callout font-medium text-label-secondary hover:bg-black/5 transition-colors cursor-pointer whitespace-nowrap"
       >
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
           <circle cx="12" cy="12" r="9.5" />
@@ -60,8 +60,8 @@ export function LocaleSwitcher({
               role="menuitem"
               className={`flex items-center justify-between px-[1.4rem] py-[1rem] rounded-[0.8rem] text-subhead transition-colors ${
                 l === current
-                  ? "text-black font-medium bg-black/[0.04]"
-                  : "text-black/70 hover:bg-black/5"
+                  ? "text-label font-medium bg-black/[0.04]"
+                  : "text-label-secondary hover:bg-black/5"
               }`}
               onClick={() => setOpen(false)}
             >
