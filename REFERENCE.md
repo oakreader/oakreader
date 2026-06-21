@@ -225,9 +225,6 @@ External projects, libraries, apps, and codebases referenced during OakReader de
 ### Amazon Kindle Screensaver
 - **What Was Referenced**: Classic boy-under-tree image as initial logo design inspiration → evolved to oak leaf concept
 
-### Sarea (user's own app)
-- **What Was Referenced**: Settings page NavigationSplitView + List(selection:) for smooth tab switching, compared against OakReader's manual implementation
-
 ---
 
 ## Studied for Research (Not Directly Applied)
