@@ -16,35 +16,47 @@
     "pills": ["PDF", "Articles", "Pages web", "Livres"],
     "cta": "Télécharger gratuitement",
     "ctaNote": "Beta · macOS",
-    "shotAlt": "Oak répond à une question en contexte, avec formules et Markdown rendus"
+    "shotAlt": "La bibliothèque d'Oak bascule entre l'affichage en couvertures et en liste"
   },
   "bento": {
     "eyebrow": "Bibliothèque de contexte",
     "title": "Vos sources, vos notes et vos réponses au même endroit.",
     "cards": {
-      "ask": {
+      "library": {
+        "eyebrow": "Bibliothèque",
+        "title": "Tout ce que vous lisez, au même endroit",
+        "desc": "Chaque PDF, article et page web dans des collections et des tags — une recherche plein texte qui comprend même le chinois, le japonais et le coréen.",
+        "alt": "La bibliothèque d'Oak avec collections, tags et recherche plein texte"
+      },
+      "aichat": {
         "eyebrow": "Demander",
-        "title": "Lire entre les lignes",
-        "desc": "Ouvrez n'importe quel document et demandez à Oak ce qu'il signifie — une réponse en contexte, avec notes mises en forme, code et formules rendues.",
-        "alt": "Oak répond à une question en contexte, avec formules et Markdown rendus"
+        "title": "Discutez avec ce que vous lisez",
+        "desc": "Joignez une page ou une sélection et posez votre question — Oak répond juste à côté du document, en contexte, avec notes mises en forme, code et formules rendues.",
+        "alt": "Oak répond à une question sur le document ouvert, en streaming dans le panneau latéral"
+      },
+      "translate": {
+        "eyebrow": "Traduire",
+        "title": "L'original et votre langue, côte à côte",
+        "desc": "Lisez tout un article dans votre langue juste à côté de l'original — phrase par phrase, sans copier-coller, sans changer d'onglet.",
+        "alt": "Le panneau de traduction d'Oak montrant un article en anglais et dans votre langue côte à côte"
+      },
+      "define": {
+        "eyebrow": "Comprendre",
+        "title": "Approfondir n'importe quel mot",
+        "desc": "Touchez un mot pour une fiche riche — sens, nuance, collocations et un résumé en une ligne — pour ne rien laisser de flou.",
+        "alt": "La fiche de mot détaillée d'Oak, avec sens central et collocations"
+      },
+      "notes": {
+        "eyebrow": "Notes",
+        "title": "Surligner, annoter, garder",
+        "desc": "Annotez n'importe quelle page et vos notes se rassemblent dans un seul panneau — extraits de texte et d'image, cherchables dans tout ce que vous lisez.",
+        "alt": "Le panneau Notes d'Oak rassemblant surlignages et extraits d'image d'un article"
       },
       "browse": {
         "eyebrow": "Naviguer",
-        "title": "Le web, sans quitter l'app",
-        "desc": "Cherchez, ouvrez un lien ou interrogez l'IA dans un nouvel onglet. Consultez des pages en direct avec vos sessions, puis capturez l'essentiel.",
-        "alt": "La recherche du nouvel onglet du navigateur intégré d'Oak, dirigée vers le web ou l'IA"
-      },
-      "library": {
-        "eyebrow": "Bibliothèque",
-        "title": "Tout ce que vous gardez, consultable",
-        "desc": "Chaque PDF, article et capture web dans des collections et des tags — une recherche plein texte qui comprend même le chinois, le japonais et le coréen.",
-        "alt": "La bibliothèque d'Oak avec collections, tags et recherche plein texte"
-      },
-      "oakai": {
-        "eyebrow": "OakAI",
-        "title": "Un partenaire qui a tout lu",
-        "desc": "Discutez avec un assistant qui connaît toute votre bibliothèque et répond avec des citations que vous pouvez ouvrir et vérifier.",
-        "alt": "L'assistant OakAI d'Oak répond à partir de toute la bibliothèque"
+        "title": "Le web, intégré",
+        "desc": "Cherchez, ouvrez un lien et consultez des pages en direct avec vos sessions — puis enregistrez l'essentiel dans votre bibliothèque.",
+        "alt": "Le navigateur intégré d'Oak lit une page web en direct"
       }
     }
   },

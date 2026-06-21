@@ -1,21 +1,23 @@
 "use client";
 
 import { useReveal } from "@/hooks/use-reveal";
-import { WindowFrame } from "@/components/window-frame";
+import { MediaFrame } from "@/components/media-frame";
 import type { Dictionary } from "@/i18n/get-dictionary";
 
 type BentoDict = Dictionary["bento"];
 type CardContent = BentoDict["cards"][keyof BentoDict["cards"]];
 
 // Heptabase-style bento: centered section header, then a 2-column grid of
-// rounded cards — each an eyebrow label + one-liner + a real product shot.
-// Layout (image + gradient tint) lives here; all copy comes from the locale
-// dictionary, keyed by `key`.
+// rounded cards — each an eyebrow label + one-liner + a short looping product
+// clip. Layout (clip + gradient tint) lives here; all copy comes from the
+// locale dictionary, keyed by `key`.
 const cardLayout = [
-  { key: "ask", image: "/shots/ai-agent.png", tint: "from-sky-50 to-indigo-50" },
-  { key: "browse", image: "/shots/browser-search.png", tint: "from-emerald-50 to-teal-50" },
-  { key: "library", image: "/shots/library.png", tint: "from-violet-50 to-fuchsia-50" },
-  { key: "oakai", image: "/shots/ai-chat.png", tint: "from-amber-50 to-orange-50" },
+  { key: "library", media: "/demo/library" },
+  { key: "aichat", media: "/demo/aichat" },
+  { key: "translate", media: "/demo/translate" },
+  { key: "define", media: "/demo/wordcard" },
+  { key: "notes", media: "/demo/notes" },
+  { key: "browse", media: "/demo/browser" },
 ] as const;
 
 function Heading({ dict }: { dict: BentoDict }) {
@@ -47,7 +49,7 @@ function Card({
       ref={ref}
       data-reveal
       style={{ "--reveal-delay": `${(index % 2) * 0.08}s` } as React.CSSProperties}
-      className={`rounded-[2rem] md:rounded-[2.8rem] border border-black/8 bg-gradient-to-br ${layout.tint} p-[2.4rem] md:p-[3.2rem]`}
+      className="flex flex-col rounded-[2rem] md:rounded-[2.8rem] border border-black/[0.055] bg-gradient-to-b from-[#fdfdfe] to-[#f1f1f4] p-[2.4rem] md:p-[3.2rem] shadow-[inset_0_1px_0_rgba(255,255,255,0.7),0_1px_2px_rgba(0,0,0,0.04),0_24px_48px_-30px_rgba(0,0,0,0.18)]"
     >
       <span className="block font-mono text-caption uppercase tracking-[0.1em] text-label-tertiary mb-[1.2rem]">
         {content.eyebrow}
@@ -58,8 +60,13 @@ function Card({
       <p className="font-sans mt-[1.2rem] text-subhead md:text-body leading-[1.6] text-label-secondary max-w-[46ch]">
         {content.desc}
       </p>
-      <div className="mt-[2.4rem] md:mt-[3.2rem]">
-        <WindowFrame src={layout.image} alt={content.alt} />
+      <div className="mt-auto pt-[2.4rem] md:pt-[3.2rem]">
+        <MediaFrame
+          src={layout.media}
+          poster={`${layout.media}.jpg`}
+          alt={content.alt}
+          cropBottomPct={2}
+        />
       </div>
     </div>
   );

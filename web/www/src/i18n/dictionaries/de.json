@@ -16,35 +16,47 @@
     "pills": ["PDFs", "Aufsätze", "Webseiten", "Bücher"],
     "cta": "Kostenlos herunterladen",
     "ctaNote": "Beta · macOS",
-    "shotAlt": "Oak beantwortet eine Frage im Kontext, mit gesetzten Formeln und Markdown"
+    "shotAlt": "Oaks Bibliothek wechselt zwischen Cover- und Listenansicht"
   },
   "bento": {
     "eyebrow": "Kontext-Bibliothek",
     "title": "Deine Quellen, Notizen und Antworten an einem Ort.",
     "cards": {
-      "ask": {
+      "library": {
+        "eyebrow": "Bibliothek",
+        "title": "Alles Gelesene, an einem Ort",
+        "desc": "Jedes PDF, jeder Aufsatz und jede Webseite in Sammlungen und Tags – Volltextsuche, die sogar CJK (Chinesisch, Japanisch, Koreanisch) versteht.",
+        "alt": "Oaks Bibliothek mit Sammlungen, Tags und Volltextsuche"
+      },
+      "aichat": {
         "eyebrow": "Fragen",
-        "title": "Zwischen den Zeilen lesen",
-        "desc": "Öffne ein beliebiges Dokument und frag Oak, was es bedeutet – beantwortet im Kontext, mit formatierten Notizen, Code und gesetzten Formeln.",
-        "alt": "Oak beantwortet eine Frage im Kontext, mit gesetzten Formeln und Markdown"
+        "title": "Mit dem chatten, was du liest",
+        "desc": "Häng eine Seite oder Auswahl an und frag – Oak antwortet direkt neben dem Dokument, im Kontext, mit formatierten Notizen, Code und gesetzten Formeln.",
+        "alt": "Oak beantwortet eine Frage zum geöffneten Dokument, gestreamt in der Seitenleiste"
+      },
+      "translate": {
+        "eyebrow": "Übersetzen",
+        "title": "Original und Sprache, nebeneinander",
+        "desc": "Lies einen ganzen Aufsatz in deiner Sprache direkt neben dem Original – Satz für Satz, ohne Kopieren, ohne Tab-Wechsel.",
+        "alt": "Oaks Übersetzungspanel zeigt einen Aufsatz auf Englisch und in deiner Sprache nebeneinander"
+      },
+      "define": {
+        "eyebrow": "Verstehen",
+        "title": "Jedes Wort, bis in die Tiefe",
+        "desc": "Tippe ein Wort an für eine reiche Karte – Bedeutung, Nuance, Kollokationen und ein Ein-Satz-Kern. Nichts bleibt vage.",
+        "alt": "Oaks ausführliche Wortkarte mit Kernbedeutung und Kollokationen"
+      },
+      "notes": {
+        "eyebrow": "Notizen",
+        "title": "Markieren, notieren, behalten",
+        "desc": "Markiere jede Seite, und deine Notizen sammeln sich in einem Panel – Text- und Bildausschnitte, durchsuchbar über alles, was du liest.",
+        "alt": "Oaks Notizen-Panel sammelt Markierungen und Bildausschnitte aus einem Aufsatz"
       },
       "browse": {
         "eyebrow": "Surfen",
-        "title": "Das Web, ohne die App zu verlassen",
-        "desc": "Suche, öffne einen Link oder frag einfach die KI in einem neuen Tab. Lies Live-Seiten mit deinen Logins und sichere, was zählt.",
-        "alt": "Die Neuer-Tab-Suche von Oaks integriertem Browser leitet ins Web oder zur KI"
-      },
-      "library": {
-        "eyebrow": "Bibliothek",
-        "title": "Alles, was du sammelst – durchsuchbar",
-        "desc": "Jedes PDF, jeder Artikel und jeder Web-Snapshot in Sammlungen und Tags – Volltextsuche, die sogar CJK (Chinesisch, Japanisch, Koreanisch) versteht.",
-        "alt": "Oaks Bibliothek mit Sammlungen, Tags und Volltextsuche"
-      },
-      "oakai": {
-        "eyebrow": "OakAI",
-        "title": "Ein Partner, der alles gelesen hat",
-        "desc": "Chatte mit einem Assistenten, der deine ganze Bibliothek kennt und mit Belegen antwortet, die du öffnen und prüfen kannst.",
-        "alt": "Oaks OakAI-Assistent antwortet aus der gesamten Bibliothek"
+        "title": "Das Web, fest eingebaut",
+        "desc": "Suche, öffne einen Link und lies Live-Seiten mit deinen Logins – sichere dann, was zählt, in deiner Bibliothek.",
+        "alt": "Oaks integrierter Browser liest eine Live-Webseite"
       }
     }
   },

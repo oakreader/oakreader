@@ -3,7 +3,7 @@
 import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { DOWNLOAD_URL } from "@/lib/links";
-import { WindowFrame } from "@/components/window-frame";
+import { MediaFrame } from "@/components/media-frame";
 import type { Dictionary } from "@/i18n/get-dictionary";
 
 type HeroDict = Dictionary["hero"];
@@ -120,10 +120,11 @@ export function Hero({ dict }: { dict: HeroDict }) {
           </p>
         </div>
 
-        {/* Signature product shot — one big, legible window */}
+        {/* Signature product clip — one big, legible window, alive */}
         <div className="w-full max-w-[100rem] mt-[6rem] md:mt-[9rem]">
-          <WindowFrame
-            src="/shots/ai-agent.png"
+          <MediaFrame
+            src="/demo/hero"
+            poster="/demo/hero.jpg"
             alt={dict.shotAlt}
             priority
           />
