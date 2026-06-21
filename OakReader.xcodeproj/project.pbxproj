@@ -54,6 +54,7 @@
 		3361EE0F6F4FD80D6EFA1D5C /* SnapshotOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6176ECEF16286177BB48421B /* SnapshotOverlayView.swift */; };
 		3471F39243CDDFFC6E1476C2 /* CSLTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10A6B5888A5CF5E18A2C1559 /* CSLTypes.swift */; };
 		3569116CCF91ED3A66102DB4 /* UninstallService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47A63D583D4151C734A38F58 /* UninstallService.swift */; };
+		358A4A120DAD95C2C3BA8833 /* NotePresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 231E9D348FA16F5450F1D2A0 /* NotePresentation.swift */; };
 		359563B756BEBFD7B6BC6733 /* PDFDocument+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0419B899299907DCFA91F960 /* PDFDocument+Extensions.swift */; };
 		35AC4A178210B13C19012AD1 /* NSImage+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 162F1F2ED0B6C25AB00B057F /* NSImage+Extensions.swift */; };
 		3ADD57E9A53EC42FBA217E40 /* LookupCardRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59A9288E9C481CF6A75AB970 /* LookupCardRow.swift */; };
@@ -334,6 +335,7 @@
 		213E072D4DBDA107DB9C8194 /* LibraryCoverService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryCoverService.swift; sourceTree = "<group>"; };
 		21CDA00C280D985B61794989 /* CiteKeyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CiteKeyService.swift; sourceTree = "<group>"; };
 		22CA95845DB43F37012BFFEA /* MediaDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaDocument.swift; sourceTree = "<group>"; };
+		231E9D348FA16F5450F1D2A0 /* NotePresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotePresentation.swift; sourceTree = "<group>"; };
 		23368E03DF8FE36F7445B501 /* CLIResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIResolver.swift; sourceTree = "<group>"; };
 		237C82BC359D06F1ECCF7DCD /* ConversationMeta.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationMeta.swift; sourceTree = "<group>"; };
 		23E3E15CAB7ADECA997CBC8D /* HTMLOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTMLOverlayView.swift; sourceTree = "<group>"; };
@@ -654,6 +656,7 @@
 				AB28674401171F133AF0003D /* NoteComposerBox.swift */,
 				BCE09C2AAC01ED235CB5E49D /* NoteDetailSheet.swift */,
 				8386DF70DAD3D934A761BEB5 /* NoteExporter.swift */,
+				231E9D348FA16F5450F1D2A0 /* NotePresentation.swift */,
 				62D7A3CC47463993633A9DEC /* NotesSupport.swift */,
 			);
 			path = Comments;
@@ -1459,6 +1462,7 @@
 				BCF79D0A5024D880DD167E69 /* NoteExporter.swift in Sources */,
 				904CE886864FA94FC8C4AB6C /* NoteImageStore.swift in Sources */,
 				FED80D0396F44AD8B913C04F /* NoteMarkdownCodec.swift in Sources */,
+				358A4A120DAD95C2C3BA8833 /* NotePresentation.swift in Sources */,
 				9AF81FE50E6A21CEB721A3C4 /* NoteTagLayoutManager.swift in Sources */,
 				8FEC7772368A77E5AE2091B4 /* NotesSupport.swift in Sources */,
 				CBE3B2BF6507D35AC3F06CFD /* OakAppIcon.swift in Sources */,

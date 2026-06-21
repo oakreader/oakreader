@@ -62,6 +62,9 @@ struct CommentsPanelView: View {
             .padding(.vertical, 12)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // Same panel surface as the AI chat panel (AIChatView) — both side panels read
+        // identical. The note card separates by its OWN faint fill (see CommentCardView),
+        // mirroring how the chat separates its chips/bubbles, not by tinting the panel.
         .background(Color(nsColor: .windowBackgroundColor))
         .task(id: viewModel.attachmentId) { model.reload() }
         .onReceive(NotificationCenter.default.publisher(for: .commentsDidChange)) { note in
@@ -183,6 +186,21 @@ struct CommentsPanelView: View {
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
             Spacer()
+            Button {
+                let records = model.isFiltering ? model.filteredCards : model.cards
+                NotePresentation.show(records: records, model: model)
+            } label: {
+                Image(systemName: "play.rectangle")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 24, height: 24)
+                    .contentShape(Rectangle())
+                    .accessibilityLabel(Text("Review full screen"))
+            }
+            .buttonStyle(.plain)
+            .disabled(model.cards.isEmpty)
+            .help("Review notes full screen")
+
             Button {
                 withAnimation(.easeOut(duration: 0.15)) {
                     showSearch.toggle()
@@ -518,16 +536,22 @@ private struct CommentCardView: View {
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
+            // A faint raised fill, NOT textBackgroundColor — on current macOS that
+            // resolves identical to the panel's windowBackgroundColor, so the card would
+            // vanish borderless. A primary-opacity tint (same family as the chat chip
+            // fills) gives a real step against the panel in both light and dark.
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color(nsColor: .textBackgroundColor))
+                .fill(Color.primary.opacity(0.03))
         )
         .overlay(
-            // The "jump-to" flash uses a neutral grey ring, not the note's highlight
-            // colour — a yellow memo flashed an alarming yellow border. Grey reads as
-            // a calm focus pulse regardless of the note's colour.
+            // No resting border — the fill + soft shadow already separate the card
+            // from the panel, so a permanent stroke is redundant chrome. The ring is
+            // reserved for the "jump-to" flash: a neutral grey focus pulse (not the
+            // note's highlight colour — a yellow memo once flashed an alarming yellow
+            // border; grey reads as calm regardless of the note's colour).
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(isFlashing ? Color.secondary.opacity(0.55) : Color.primary.opacity(0.15),
-                              lineWidth: isFlashing ? 2 : 1)
+                .strokeBorder(isFlashing ? Color.secondary.opacity(0.55) : Color.clear,
+                              lineWidth: isFlashing ? 2 : 0)
         )
         .shadow(color: .black.opacity(isHovering ? 0.07 : 0.04), radius: isHovering ? 8 : 5, y: 1)
         .onHover { isHovering = $0 }

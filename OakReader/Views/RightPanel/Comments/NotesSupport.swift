@@ -142,19 +142,21 @@ struct NoteTagChip: View {
     }
 
     private var chip: some View {
-        // Neutral grey, on the app's button-fill tokens (NOT accent blue) — the
-        // active/filtered state just reads a notch darker, staying monochrome.
-        // Rounded-RECT corners (like the chat token chip / input), not a full-radius
-        // pill.
-        Text("#\(tag)")
-            .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(isActive ? OakStyle.Colors.textPrimary : OakStyle.Colors.textSecondary)
+        // Resting chips mirror the chat "skill pill" (ChatBubbleView.skillBadge): the
+        // muted `skillTint` (a blue-grey blend) text on a soft fill. The ACTIVE/filtered
+        // state switches to the full, saturated accent blue — clearly bluer and stronger
+        // than the resting chips so the selected tag is unmistakable, not just a notch
+        // darker in the same muted family.
+        let tint = isActive ? Color.accentColor : OakStyle.Colors.skillTint
+        return Text("#\(tag)")
+            .font(.system(size: 11, weight: isActive ? .semibold : .medium))
+            .foregroundStyle(tint)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
-                    .fill(isActive ? Color.primary.opacity(0.14) : OakStyle.Colors.buttonBackground)
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(tint.opacity(isActive ? 0.18 : 0.13))
             )
-            .contentShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
     }
 }
