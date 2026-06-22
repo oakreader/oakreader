@@ -7,11 +7,6 @@ import type en from "./dictionaries/en.json";
 const dictionaries = {
   en: () => import("./dictionaries/en.json").then((m) => m.default),
   zh: () => import("./dictionaries/zh.json").then((m) => m.default),
-  ja: () => import("./dictionaries/ja.json").then((m) => m.default),
-  ko: () => import("./dictionaries/ko.json").then((m) => m.default),
-  de: () => import("./dictionaries/de.json").then((m) => m.default),
-  fr: () => import("./dictionaries/fr.json").then((m) => m.default),
-  es: () => import("./dictionaries/es.json").then((m) => m.default),
 } satisfies Record<Locale, () => Promise<unknown>>;
 
 // `en.json` is the source of truth for the dictionary shape; every other locale

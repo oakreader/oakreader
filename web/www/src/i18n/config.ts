@@ -5,8 +5,8 @@
 export const DEFAULT_LOCALE = "en";
 
 // Route segment values. `en` is the default and is served at `/` (no prefix);
-// every other locale lives under its own sub-path (`/ja`, `/zh`, …).
-export const LOCALES = ["en", "zh", "ja", "ko", "de", "fr", "es"] as const;
+// every other locale lives under its own sub-path (`/zh`).
+export const LOCALES = ["en", "zh"] as const;
 
 export type Locale = (typeof LOCALES)[number];
 
@@ -28,11 +28,6 @@ type LocaleInfo = {
 export const LOCALE_META: Record<Locale, LocaleInfo> = {
   en: { hreflang: "en", htmlLang: "en", name: "English", path: "" },
   zh: { hreflang: "zh-Hans", htmlLang: "zh-Hans", name: "简体中文", path: "/zh" },
-  ja: { hreflang: "ja", htmlLang: "ja", name: "日本語", path: "/ja" },
-  ko: { hreflang: "ko", htmlLang: "ko", name: "한국어", path: "/ko" },
-  de: { hreflang: "de", htmlLang: "de", name: "Deutsch", path: "/de" },
-  fr: { hreflang: "fr", htmlLang: "fr", name: "Français", path: "/fr" },
-  es: { hreflang: "es", htmlLang: "es", name: "Español", path: "/es" },
 };
 
 /** Type guard that narrows an arbitrary string (e.g. a route param) to a Locale. */
