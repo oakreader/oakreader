@@ -9,8 +9,8 @@
   },
   "hero": {
     "tagline": "An AI knowledge base, shared by you and your agent.",
-    "headline1": "Read everything.",
-    "headline2": "Understand anything.",
+    "headline1": "Everything you read.",
+    "headline2": "Your AI can find.",
     "subhead": "Keep everything you read in one place — then let an AI search and answer across all of it, with citations you can open.",
     "bringYour": "Bring your",
     "pills": ["PDFs", "Papers", "Web pages", "Books"],
@@ -43,7 +43,7 @@
       "define": {
         "eyebrow": "Understand",
         "title": "Go deep on any word",
-        "desc": "Tap a word for a rich card — meaning, nuance, collocations, and a one-line gist — so nothing stays fuzzy.",
+        "desc": "Tap a word for a rich card — meaning, nuance, collocations, and a one-line gist.",
         "alt": "Oak's deep word card with core semantics and collocations"
       },
       "browse": {
@@ -63,7 +63,7 @@
   "models": {
     "eyebrow": "Model-agnostic",
     "title": "Use any model. Switch anytime.",
-    "subhead": "The best brain for each question — from the frontier labs to a local model running on your Mac. Your choice, every time."
+    "subhead": "Pick the best model for each question — from frontier labs to a local one on your Mac. You decide."
   },
   "footer": {
     "copyright": "Copyright",
