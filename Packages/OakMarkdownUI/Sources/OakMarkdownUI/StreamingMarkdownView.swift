@@ -84,6 +84,8 @@ private struct BlockRow: View, Equatable {
             CodeBlockView(code: CodeFence.strip(block.text), language: language, theme: theme)
         case .mathDisplay:
             MathBlockView(latex: MathDelimiters.stripDisplay(block.text), theme: theme)
+        case .table:
+            TableBlockView(source: block.text, theme: theme)
         }
     }
 }

@@ -19,8 +19,8 @@ enum MarkdownAttributedBuilder {
         defer { cmark_parser_free(parser) }
         // Enable GFM `~~strikethrough~~`. Plain cmark doesn't parse it, so without
         // this the literal `~~` would render — and the note editor's Strikethrough
-        // button emits exactly that. (Only strikethrough is attached, kept minimal;
-        // tables/autolinks aren't offered by the editors.)
+        // button emits exactly that. Tables are handled by their own block view
+        // (TableBlockView), so they're not attached here.
         cmark_gfm_core_extensions_ensure_registered()
         if let strikethrough = cmark_find_syntax_extension("strikethrough") {
             cmark_parser_attach_syntax_extension(parser, strikethrough)
@@ -33,6 +33,14 @@ enum MarkdownAttributedBuilder {
         defer { cmark_node_free(document) }
         let renderer = Renderer(theme: theme)
         return renderer.renderBlocks(document)
+    }
+
+    /// Render the inline contents of a cmark-gfm `table_cell` node into an attributed
+    /// string. The caller (TableBlockView) owns the cmark document — we just walk the
+    /// cell's children using the same inline rules used everywhere else.
+    static func renderTableCell(_ cellNode: Node, theme: MarkdownTheme) -> NSAttributedString {
+        let renderer = Renderer(theme: theme)
+        return renderer.renderTableCell(cellNode)
     }
 
     // MARK: shared attributes
@@ -143,6 +151,15 @@ private final class Renderer {
         let out = NSMutableAttributedString()
         for child in children(node) { out.append(render(child)) }
         return out
+    }
+
+    /// Walk the inline children of a `table_cell` node — same rules as a paragraph,
+    /// but without paragraph-level styling (the caller wraps the result in cell
+    /// chrome and applies alignment).
+    func renderTableCell(_ cellNode: MarkdownAttributedBuilder.Node) -> NSAttributedString {
+        let inline = renderInline(cellNode)
+        addInlineCodeSpacing(inline)
+        return inline
     }
 
     private func render(_ node: MarkdownAttributedBuilder.Node) -> NSAttributedString {
