@@ -5,6 +5,7 @@ public enum MarkdownBlockKind: Equatable {
     case prose                      // paragraphs, headings, lists, blockquotes, inline code/math
     case code(language: String?)    // fenced code → CodeBlockView (Highlightr)
     case mathDisplay                // standalone $$…$$ → MathBlockView (SwiftMath)
+    case table                      // GFM pipe table → TableBlockView (SwiftUI Grid)
 }
 
 /// One top-level block. Streaming is append-only, so a block's index is stable;
@@ -81,6 +82,36 @@ public enum MarkdownBlockSplitter {
         if trimmed.count >= 4, trimmed.hasPrefix("$$"), trimmed.hasSuffix("$$") {
             return .mathDisplay
         }
+        if isPipeTable(lines: lines) {
+            return .table
+        }
         return .prose
+    }
+
+    /// GFM pipe-table shape: a header line containing `|`, followed by a
+    /// separator line of the form `| --- | :---: |` (cells of dashes with
+    /// optional leading/trailing colons for alignment). Anything else falls
+    /// through to prose so stray pipes in text don't get misclassified.
+    private static func isPipeTable(lines: [Substring]) -> Bool {
+        guard lines.count >= 2 else { return false }
+        let header = lines[0].drop { $0 == " " || $0 == "\t" }
+        guard header.contains("|") else { return false }
+        let separator = lines[1].trimmingCharacters(in: .whitespaces)
+        guard !separator.isEmpty else { return false }
+        // Strip optional leading/trailing pipe, then validate every cell.
+        var body = separator
+        if body.hasPrefix("|") { body.removeFirst() }
+        if body.hasSuffix("|") { body.removeLast() }
+        let cells = body.split(separator: "|", omittingEmptySubsequences: false)
+        guard !cells.isEmpty else { return false }
+        for cell in cells {
+            let token = cell.trimmingCharacters(in: .whitespaces)
+            guard !token.isEmpty else { return false }
+            var scalars = Substring(token)
+            if scalars.first == ":" { scalars = scalars.dropFirst() }
+            if scalars.last == ":" { scalars = scalars.dropLast() }
+            guard !scalars.isEmpty, scalars.allSatisfy({ $0 == "-" }) else { return false }
+        }
+        return true
     }
 }
