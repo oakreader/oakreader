@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.print</key>
+	<true/>
+	<key>com.apple.security.network.client</key>
+	<true/>
+	<key>com.apple.security.network.server</key>
+	<true/>
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
+	<!-- Intentionally NO keychain-access-groups. It is a RESTRICTED entitlement
+	     that requires a provisioning profile from the signing team, which a
+	     contributor's Apple ID — or an ad-hoc build with no account — cannot
+	     grant (AMFI would SIGKILL the app at launch). Dropping it here is what
+	     lets anyone build OakReader locally. Debug builds store credentials in
+	     the login keychain instead; see OakAI/KeychainConfig.swift (`#if DEBUG`).
+	     The Release build keeps the access group in OakReader.entitlements. -->
+</dict>
+</plist>

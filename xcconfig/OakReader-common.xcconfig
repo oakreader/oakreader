@@ -1,0 +1,23 @@
+// OakReader — shared code-signing configuration
+// ----------------------------------------------
+// `project.yml` no longer hardcodes the signing team. It lives here so a
+// contributor can build with their OWN Apple ID — or ad-hoc, with no Apple
+// account at all — WITHOUT editing any tracked file. See README "Build".
+//
+// The values below are the maintainer's defaults (so a fresh clone and CI build
+// unchanged). To override them locally, create
+//     xcconfig/DeveloperSettings.xcconfig          (gitignored)
+// or run
+//     scripts/setup-signing.sh
+// The optional include at the bottom pulls it in, and because it comes last it
+// wins over the defaults.
+
+// Defaults for local development (Debug). Automatic signing lets Xcode mint and
+// refresh the development provisioning profile for the team.
+DEVELOPMENT_TEAM = 5Y27G7B6D8
+CODE_SIGN_STYLE = Automatic
+CODE_SIGN_IDENTITY = Apple Development
+
+// Per-developer override — never committed (.gitignore). The trailing `?` makes
+// the include optional, so the build still works when the file is absent.
+#include? "DeveloperSettings.xcconfig"

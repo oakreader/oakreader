@@ -98,6 +98,16 @@ targets:
       - script: |
           cp "${BUILT_PRODUCTS_DIR}/oak" "${BUILT_PRODUCTS_DIR}/OakReader.app/Contents/Resources/oak"
         name: "Embed oak CLI"
+    # All code-signing config (team, identity, style, entitlements, provisioning)
+    # lives in the xcconfig layer, NOT in project.yml, so a contributor can build
+    # with their own Apple team — or ad-hoc — by dropping a gitignored
+    # xcconfig/DeveloperSettings.xcconfig, without touching any tracked file.
+    # Scoped to THIS target only (a global xcodebuild signing override would
+    # break the SPM packages and the oak tool). See xcconfig/*.xcconfig and the
+    # README "Build" section.
+    configFiles:
+      Debug: xcconfig/OakReader-debug.xcconfig
+      Release: xcconfig/OakReader-release.xcconfig
     settings:
       base:
         PRODUCT_NAME: OakReader
@@ -112,47 +122,17 @@ targets:
         # private key is the SPARKLE_ED_KEY GitHub secret. Empty in dev builds
         # (which don't auto-update) is fine.
         SPARKLE_PUBLIC_ED_KEY: "zm3UpFrDf8tFcctK2vkEhrms6oFTp50AUb824lP9BAw="
-        CODE_SIGN_ENTITLEMENTS: OakReader/OakReader.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         COMBINE_HIDPI_IMAGES: YES
         ENABLE_HARDENED_RUNTIME: YES
-        CODE_SIGN_IDENTITY: "-"
         SWIFT_STRICT_CONCURRENCY: minimal
       configs:
         Debug:
           PRODUCT_BUNDLE_IDENTIFIER: com.oakreader.OakReader.dev
           BUNDLE_DISPLAY_NAME: "OakReader Dev"
-          # Sign local dev builds with a stable Apple Development identity, scoped
-          # to THIS target only (same reasoning as Release: global xcodebuild
-          # signing overrides break SPM package targets and the oak tool). A
-          # constant identity across rebuilds keeps TCC grants (mic, local
-          # network) from being invalidated — ad-hoc ("-") changes identity
-          # every build and re-fires those prompts.
-          CODE_SIGN_STYLE: Automatic
-          CODE_SIGN_IDENTITY: "Apple Development"
-          DEVELOPMENT_TEAM: "5Y27G7B6D8"
         Release:
           PRODUCT_BUNDLE_IDENTIFIER: com.oakreader.OakReader
           BUNDLE_DISPLAY_NAME: "OakReader"
-          # Developer ID signing for distribution, scoped to THIS target only.
-          # (Passing these as global xcodebuild overrides breaks SPM package
-          # targets and the oak tool — which is also why the provisioning profile
-          # is set here, per-target, NOT on the archive command line: a command-
-          # line tool like `oak` rejects a global PROVISIONING_PROFILE_SPECIFIER.)
-          #
-          # The app carries the `keychain-access-groups` entitlement (data-
-          # protection keychain) — a RESTRICTED key, so a Developer ID build MUST
-          # embed a provisioning profile covering `5Y27G7B6D8.com.oakreader.keys`
-          # or AMFI SIGKILLs it at launch (notarization still passes). The release
-          # workflow decodes the PROVISIONING_PROFILE secret and installs a
-          # profile named EXACTLY "OakReader Developer ID" before archiving; the
-          # specifier below makes Xcode embed it. See the macos-release-setup
-          # skill, failure mode #4.
-          CODE_SIGN_STYLE: Manual
-          CODE_SIGN_IDENTITY: "Developer ID Application"
-          DEVELOPMENT_TEAM: "5Y27G7B6D8"
-          PROVISIONING_PROFILE_SPECIFIER: "OakReader Developer ID"
-          OTHER_CODE_SIGN_FLAGS: "--timestamp"
 
   oak:
     type: tool

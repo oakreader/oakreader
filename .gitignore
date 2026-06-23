@@ -4,6 +4,12 @@ xcuserdata/
 *.xccheckout
 *.xcworkspace/xcuserdata/
 
+# Per-developer local code-signing override (your own team / ad-hoc identity).
+# Never commit it — it is meant to override the maintainer defaults in
+# xcconfig/OakReader-common.xcconfig. Copy DeveloperSettings.example.xcconfig
+# or run scripts/setup-signing.sh.
+xcconfig/DeveloperSettings.xcconfig
+
 # Build
 build/
 .build/

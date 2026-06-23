@@ -1,0 +1,25 @@
+// Copy this file to  xcconfig/DeveloperSettings.xcconfig  (gitignored) and fill
+// in your own values to build OakReader without the maintainer's Apple team.
+// Or just run:  scripts/setup-signing.sh
+//
+// ── Option 1 — you have an Apple Developer account (a FREE Apple ID works) ──
+//   Find your Team ID at developer.apple.com → Account → Membership.
+//
+//     DEVELOPMENT_TEAM   = YOURTEAMID
+//     CODE_SIGN_STYLE    = Automatic
+//     CODE_SIGN_IDENTITY = Apple Development
+//
+// ── Option 2 — no Apple account at all (ad-hoc; fine for local dev) ──
+//
+//     DEVELOPMENT_TEAM   =
+//     CODE_SIGN_STYLE    = Manual
+//     CODE_SIGN_IDENTITY = -
+//
+// Only Debug builds are meant to be built this way (Release is Developer-ID,
+// maintainer-only). API keys: enter them in Settings → AI, or export the
+// provider env vars (e.g. OPENAI_API_KEY). Debug builds keep keys in your login
+// keychain, so they survive rebuilds as long as your signing identity is stable.
+
+DEVELOPMENT_TEAM = YOURTEAMID
+CODE_SIGN_STYLE = Automatic
+CODE_SIGN_IDENTITY = Apple Development
