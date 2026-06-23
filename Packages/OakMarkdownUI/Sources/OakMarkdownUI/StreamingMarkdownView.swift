@@ -86,6 +86,8 @@ private struct BlockRow: View, Equatable {
             MathBlockView(latex: MathDelimiters.stripDisplay(block.text), theme: theme)
         case .table:
             TableBlockView(source: block.text, theme: theme)
+        case .image(let url, let alt):
+            ImageBlockView(url: url, alt: alt, theme: theme)
         }
     }
 }

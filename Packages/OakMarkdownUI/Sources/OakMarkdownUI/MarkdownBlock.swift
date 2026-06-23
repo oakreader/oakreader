@@ -2,10 +2,11 @@ import Foundation
 
 /// What kind of view renders a block. The block-stack routes on this.
 public enum MarkdownBlockKind: Equatable {
-    case prose                      // paragraphs, headings, lists, blockquotes, inline code/math
-    case code(language: String?)    // fenced code → CodeBlockView (Highlightr)
-    case mathDisplay                // standalone $$…$$ → MathBlockView (SwiftMath)
-    case table                      // GFM pipe table → TableBlockView (SwiftUI Grid)
+    case prose                          // paragraphs, headings, lists, blockquotes, inline code/math
+    case code(language: String?)        // fenced code → CodeBlockView (Highlightr)
+    case mathDisplay                    // standalone $$…$$ → MathBlockView (SwiftMath)
+    case table                          // GFM pipe table → TableBlockView (SwiftUI Grid)
+    case image(url: String, alt: String) // standalone ![alt](url) → ImageBlockView (fullscreen-able)
 }
 
 /// One top-level block. Streaming is append-only, so a block's index is stable;
@@ -85,7 +86,26 @@ public enum MarkdownBlockSplitter {
         if isPipeTable(lines: lines) {
             return .table
         }
+        if let img = singleImage(in: text) {
+            return .image(url: img.url, alt: img.alt)
+        }
         return .prose
+    }
+
+    /// A block that is *only* a single markdown image (`![alt](url)`, nothing else)
+    /// renders as its own `ImageBlockView` so it can carry a fullscreen button. An
+    /// image sitting inside a paragraph of prose stays inline (no own view). A
+    /// half-streamed `![alt](ur` won't match, so it stays prose until the URL closes.
+    private static let singleImageRegex = try! NSRegularExpression(
+        pattern: #"^!\[([^\]]*)\]\(([^)\s]+)\)$"#)
+
+    private static func singleImage(in text: String) -> (alt: String, url: String)? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !trimmed.contains("\n") else { return nil }
+        let ns = trimmed as NSString
+        guard let m = singleImageRegex.firstMatch(
+            in: trimmed, range: NSRange(location: 0, length: ns.length)) else { return nil }
+        return (ns.substring(with: m.range(at: 1)), ns.substring(with: m.range(at: 2)))
     }
 
     /// GFM pipe-table shape: a header line containing `|`, followed by a

@@ -3,13 +3,19 @@ import AppKit
 import CMarkGFM
 
 /// GFM pipe table rendered as a SwiftUI `Grid`. The raw block text is re-parsed
-/// here with the `table` GFM extension attached, so we get cmark-gfm's
-/// proper handling of alignment, escaped pipes, and inline formatting inside
-/// cells. Wrapped in a horizontal `ScrollView` so wide tables don't blow out
-/// the chat column.
+/// here with the `table` GFM extension attached, so we get cmark-gfm's proper
+/// handling of alignment, escaped pipes, and inline formatting inside cells.
+///
+/// Cells WRAP to fit the available chat width (no horizontal scroll inline — a
+/// horizontal `ScrollView` proposes unbounded width, which defeats wrapping and
+/// lets long cells run off the edge). For genuinely wide tables, a hover-revealed
+/// expand button opens a full-window sheet where the table scrolls un-wrapped.
 struct TableBlockView: View {
     let source: String
     let theme: MarkdownTheme
+
+    @State private var isHovering = false
+    @State private var showFullscreen = false
 
     var body: some View {
         let parsed = TableParser.parse(source: source, theme: theme)
@@ -24,52 +30,133 @@ struct TableBlockView: View {
                 linkPreview: nil
             )
         } else {
-            ScrollView(.horizontal, showsIndicators: false) {
-                Grid(alignment: .topLeading, horizontalSpacing: 0, verticalSpacing: 0) {
-                    ForEach(Array(parsed.rows.enumerated()), id: \.offset) { rowIndex, row in
-                        GridRow {
-                            ForEach(Array(row.enumerated()), id: \.offset) { columnIndex, cell in
-                                let alignment = parsed.alignment(forColumn: columnIndex)
-                                TableCellView(
-                                    attributed: cell,
-                                    isHeader: rowIndex == 0 && parsed.hasHeader,
-                                    alignment: alignment,
-                                    theme: theme
-                                )
-                                .gridColumnAlignment(alignment.horizontal)
-                            }
-                        }
-                        if rowIndex == 0 && parsed.hasHeader {
-                            Divider().gridCellColumns(max(parsed.columnCount, 1))
-                        }
-                    }
-                }
+            TableGridView(parsed: parsed, theme: theme, wrapsCells: true)
                 .background(Color(nsColor: theme.codeBlockBackground))
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
                         .strokeBorder(Color(nsColor: theme.codeBlockBorder), lineWidth: 1)
                 )
+                .overlay(alignment: .topTrailing) { expandButton }
+                .onHover { isHovering = $0 }
+                .sheet(isPresented: $showFullscreen) {
+                    TableFullscreenView(parsed: parsed, theme: theme)
+                }
+        }
+    }
+
+    private var expandButton: some View {
+        Button { showFullscreen = true } label: {
+            Image(systemName: "arrow.up.left.and.arrow.down.right")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Color(nsColor: theme.textColor))
+                .padding(5)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .strokeBorder(Color(nsColor: theme.codeBlockBorder), lineWidth: 0.5)
+                )
+        }
+        .buttonStyle(.plain)
+        .help("Open table in full screen")
+        // Explicit label so SF Symbol a11y lookups don't walk the localized
+        // description table on every hover re-render (see SF-symbol-a11y-hang note).
+        .accessibilityLabel("Expand table")
+        .padding(6)
+        .opacity(isHovering ? 1 : 0)
+        .animation(.easeInOut(duration: 0.12), value: isHovering)
+    }
+}
+
+/// The bordered grid itself, shared by the inline view and the fullscreen sheet.
+/// `wrapsCells` controls cell sizing: inline tables wrap to the proposed width;
+/// the fullscreen sheet lays cells out un-wrapped so a wide table scrolls.
+private struct TableGridView: View {
+    let parsed: TableParser.Parsed
+    let theme: MarkdownTheme
+    let wrapsCells: Bool
+
+    var body: some View {
+        Grid(alignment: .topLeading, horizontalSpacing: 0, verticalSpacing: 0) {
+            ForEach(Array(parsed.rows.enumerated()), id: \.offset) { rowIndex, row in
+                GridRow {
+                    ForEach(Array(row.enumerated()), id: \.offset) { columnIndex, cell in
+                        let alignment = parsed.alignment(forColumn: columnIndex)
+                        TableCellView(
+                            attributed: cell,
+                            isHeader: rowIndex == 0 && parsed.hasHeader,
+                            alignment: alignment,
+                            theme: theme,
+                            wraps: wrapsCells
+                        )
+                        .gridColumnAlignment(alignment.horizontal)
+                    }
+                }
+                if rowIndex == 0 && parsed.hasHeader {
+                    Divider().gridCellColumns(max(parsed.columnCount, 1))
+                }
             }
         }
     }
 }
 
-/// One cell rendered as an attributed-string text view. Header cells render
-/// in semibold; alignment is applied to the paragraph style.
+/// The full-window presentation: the same grid, un-wrapped, in a 2-axis scroll
+/// view so a wide table can be read in full.
+private struct TableFullscreenView: View {
+    let parsed: TableParser.Parsed
+    let theme: MarkdownTheme
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Spacer()
+                Button("Done") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+            }
+            .padding(12)
+            Divider()
+            ScrollView([.horizontal, .vertical]) {
+                TableGridView(parsed: parsed, theme: theme, wrapsCells: false)
+                    .background(Color(nsColor: theme.codeBlockBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .strokeBorder(Color(nsColor: theme.codeBlockBorder), lineWidth: 1)
+                    )
+                    .padding(20)
+            }
+        }
+        .frame(minWidth: 640, idealWidth: 820, minHeight: 420, idealHeight: 560)
+    }
+}
+
+/// One cell rendered as an attributed-string text view. Header cells render in
+/// semibold; alignment is applied to the paragraph style. When `wraps` is true the
+/// text wraps within its column; when false it keeps its natural single-line width
+/// (the fullscreen sheet scrolls instead of wrapping).
 private struct TableCellView: View {
     let attributed: NSAttributedString
     let isHeader: Bool
     let alignment: TableAlignment
     let theme: MarkdownTheme
+    let wraps: Bool
 
     var body: some View {
-        let styled = styledCell()
-        Text(AttributedString(styled))
+        let text = Text(AttributedString(styledCell()))
             .multilineTextAlignment(alignment.textAlignment)
-            .frame(maxWidth: .infinity, alignment: alignment.frameAlignment)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
+        if wraps {
+            // Allow horizontal shrink + vertical growth so long cells wrap to fit
+            // the column the Grid hands them, then fill the column for alignment.
+            text
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: alignment.frameAlignment)
+        } else {
+            // Natural single-line width; the enclosing 2-axis ScrollView scrolls.
+            text.fixedSize(horizontal: true, vertical: true)
+        }
     }
 
     private func styledCell() -> NSAttributedString {
