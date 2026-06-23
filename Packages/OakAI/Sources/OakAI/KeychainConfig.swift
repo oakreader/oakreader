@@ -22,10 +22,15 @@ enum KeychainConfig {
 
     /// Adds the access group + data-protection-keychain flag every query must
     /// carry so reads and writes target the same keychain.
+    ///
+    /// In DEBUG, ad-hoc-signed dev builds carry no team prefix and would be
+    /// rejected by the access group, so we fall back to the local file keychain.
     static func scoped(_ query: [String: Any]) -> [String: Any] {
         var q = query
+        #if !DEBUG
         q[kSecAttrAccessGroup as String] = accessGroup
         q[kSecUseDataProtectionKeychain as String] = true
+        #endif
         return q
     }
 }

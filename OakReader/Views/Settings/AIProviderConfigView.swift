@@ -60,6 +60,9 @@ private struct ProviderDetailView: View {
                 } else {
                     unconfiguredProviderContent(provider)
                 }
+                if showsSharedActionRow(provider) {
+                    sharedActionRow(provider)
+                }
             }
             .formStyle(.grouped)
             .navigationTitle(displayTitle)
@@ -68,6 +71,13 @@ private struct ProviderDetailView: View {
         } else {
             ContentUnavailableView("Unknown Provider", systemImage: "questionmark.circle")
         }
+    }
+
+    private func showsSharedActionRow(_ provider: ProviderInfo) -> Bool {
+        if provider.isLocal { return false }
+        if isOAuthProvider { return false }
+        if case .apiKey = provider.authStrategy { return true }
+        return false
     }
 
     // MARK: - Unconfigured Provider
@@ -124,24 +134,6 @@ private struct ProviderDetailView: View {
             Text("Point at a proxy or relay. End with `#` to send the URL exactly as typed.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-
-            HStack {
-                Button("Save Endpoint") {
-                    ProviderEndpointStore.shared.setOverride(baseURLOverride, for: provider.id)
-                    baseURLOverride = ProviderEndpointStore.shared.displayedBase(for: provider.id)
-                    testResult = ProviderEndpointStore.shared.hasOverride(provider.id)
-                        ? "Endpoint saved" : "Using default endpoint"
-                }
-                .disabled(baseURLOverride == ProviderEndpointStore.shared.displayedBase(for: provider.id))
-
-                Button("Reset to Default") {
-                    ProviderEndpointStore.shared.clearOverride(for: provider.id)
-                    baseURLOverride = ProviderEndpointStore.shared.defaultBase(for: provider.id)
-                    testResult = "Using default endpoint"
-                }
-                .controlSize(.small)
-                .disabled(!ProviderEndpointStore.shared.hasOverride(provider.id))
-            }
         }
     }
 
@@ -219,25 +211,6 @@ private struct ProviderDetailView: View {
             Text("Or set the \(envVar) environment variable.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-        }
-
-        HStack {
-            Button("Test & Save") {
-                testAndSaveAPIKey(provider)
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(apiKey.isEmpty || isTesting)
-
-            if isTesting {
-                ProgressView()
-                    .controlSize(.small)
-            }
-
-            if let result = testResult {
-                Text(result)
-                    .font(.caption)
-                    .foregroundStyle(result.contains("Success") ? .green : .red)
-            }
         }
     }
 
@@ -341,17 +314,9 @@ private struct ProviderDetailView: View {
             }
         } else if !isOAuthProvider {
             Section("API Key") {
-                SecureField("API Key", text: $apiKey, prompt: Text("Enter a new key to replace the saved one"))
+                SecureField("API Key", text: $apiKey, prompt: Text("API Key"))
                     .textFieldStyle(.roundedBorder)
                     .labelsHidden()
-
-                Button("Update") {
-                    if !apiKey.isEmpty {
-                        KeychainService.setAPIKey(apiKey, forProviderId: provider.id)
-                        testResult = "Key updated"
-                    }
-                }
-                .disabled(apiKey.isEmpty)
             }
         }
 
@@ -403,24 +368,6 @@ private struct ProviderDetailView: View {
             }
         }
 
-        Section("Connection") {
-            HStack {
-                Button("Test Connection") { testConnection(provider) }
-                    .disabled(isTesting)
-
-                if isTesting {
-                    ProgressView()
-                        .controlSize(.small)
-                }
-
-                if let result = testResult {
-                    Text(result)
-                        .font(.caption)
-                        .foregroundStyle(result.contains("Success") ? .green : .red)
-                }
-            }
-        }
-
         Section {
             Button("Reset Provider", role: .destructive) {
                 showResetConfirm = true
@@ -454,7 +401,7 @@ private struct ProviderDetailView: View {
     // MARK: - Helpers
 
     private func loadState() {
-        apiKey = ""
+        apiKey = KeychainService.apiKey(forProviderId: providerId) ?? ""
         testResult = nil
         isTesting = false
         discoverResult = nil
@@ -472,6 +419,7 @@ private struct ProviderDetailView: View {
         return "\(count)"
     }
 
+
     /// A titled input row: a persistent label on its own line with the field beneath it,
     /// matching the label-above-control layout used elsewhere in Settings.
     @ViewBuilder
@@ -483,21 +431,124 @@ private struct ProviderDetailView: View {
         }
     }
 
-    // MARK: - Connection Testing
+    // MARK: - Shared Action Row
 
-    private func testAndSaveAPIKey(_ provider: ProviderInfo) {
-        testConnection(provider, credential: apiKey) {
-            // Save to Keychain only after successful test
-            let saved = KeychainService.setAPIKey(apiKey, forProviderId: provider.id)
-            if saved {
-                store.refresh()
-            } else {
-                testResult = "Connection OK but failed to save key to Keychain"
+    @ViewBuilder
+    private func sharedActionRow(_ provider: ProviderInfo) -> some View {
+        Section {
+            HStack {
+                Button("Test") { testCredentials(provider) }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isTestDisabled(provider))
+
+                Button("Save") { saveCredentials(provider) }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isSaveDisabled(provider))
+
+                Button("Reset to Default") { resetEndpoint(provider) }
+                    .disabled(isResetDisabled(provider))
+
+                if isTesting {
+                    ProgressView().controlSize(.small)
+                }
+
+                if let result = testResult {
+                    Text(result)
+                        .font(.caption)
+                        .foregroundStyle(result.hasPrefix("Success") || result.hasPrefix("Saved") ? .green : .red)
+                }
             }
         }
     }
 
-    private func testConnection(_ provider: ProviderInfo, credential: String? = nil, onSuccess: (() -> Void)? = nil) {
+    private func isTestDisabled(_ provider: ProviderInfo) -> Bool {
+        if isTesting { return true }
+        let typed = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !typed.isEmpty { return false }
+        return KeychainService.apiKey(forProviderId: provider.id) == nil
+    }
+
+    private func isSaveDisabled(_ provider: ProviderInfo) -> Bool {
+        if isTesting { return true }
+        let typedKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let savedKey = KeychainService.apiKey(forProviderId: provider.id) ?? ""
+        let typedBase = baseURLOverride.trimmingCharacters(in: .whitespacesAndNewlines)
+        let savedBase = ProviderEndpointStore.shared.displayedBase(for: provider.id)
+        let keyChanged = typedKey != savedKey
+        let baseChanged = typedBase != savedBase
+        return !keyChanged && !baseChanged
+    }
+
+    /// Enabled whenever the field strays from the factory default OR an override
+    /// is persisted — the second clause matters when the override was normalized
+    /// away because the typed URL happened to equal the default.
+    private func isResetDisabled(_ provider: ProviderInfo) -> Bool {
+        let typedBase = baseURLOverride.trimmingCharacters(in: .whitespacesAndNewlines)
+        let defaultBase = ProviderEndpointStore.shared.defaultBase(for: provider.id)
+        if typedBase != defaultBase { return false }
+        return !ProviderEndpointStore.shared.hasOverride(provider.id)
+    }
+
+    // MARK: - Action Handlers
+
+    /// Dry-run validation: stage the typed Base URL into the registry just long
+    /// enough to exercise it, then roll back. Persists nothing and leaves the
+    /// field text untouched.
+    private func testCredentials(_ provider: ProviderInfo) {
+        let previousOverride = ProviderEndpointStore.shared.override(for: provider.id)
+        stageEndpointForTest(baseURLOverride, for: provider)
+
+        let trimmedKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let credential = trimmedKey.isEmpty ? nil : trimmedKey
+        let rollback = { [previousOverride] in
+            self.stageEndpointForTest(previousOverride, for: provider)
+        }
+
+        testConnection(
+            provider,
+            credential: credential,
+            onSuccess: rollback,
+            onFailure: rollback
+        )
+    }
+
+    private func stageEndpointForTest(_ raw: String, for provider: ProviderInfo) {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            ProviderEndpointStore.shared.clearOverride(for: provider.id)
+        } else {
+            ProviderEndpointStore.shared.setOverride(trimmed, for: provider.id)
+        }
+    }
+
+    private func saveCredentials(_ provider: ProviderInfo) {
+        let trimmedKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedKey.isEmpty {
+            let saved = KeychainService.setAPIKey(trimmedKey, forProviderId: provider.id)
+            guard saved else {
+                testResult = "Failed to save key to Keychain"
+                return
+            }
+        }
+        let trimmedBase = baseURLOverride.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedBase.isEmpty {
+            ProviderEndpointStore.shared.clearOverride(for: provider.id)
+        } else {
+            ProviderEndpointStore.shared.setOverride(trimmedBase, for: provider.id)
+        }
+        store.refresh()
+        testResult = "Saved."
+    }
+
+    private func resetEndpoint(_ provider: ProviderInfo) {
+        ProviderEndpointStore.shared.clearOverride(for: provider.id)
+        baseURLOverride = ProviderEndpointStore.shared.defaultBase(for: provider.id)
+        testResult = "Using default endpoint"
+    }
+
+    // MARK: - Connection Testing
+
+    private func testConnection(_ provider: ProviderInfo, credential: String? = nil, onSuccess: (() -> Void)? = nil, onFailure: (() -> Void)? = nil) {
         isTesting = true
         testResult = nil
 
@@ -524,12 +575,13 @@ private struct ProviderDetailView: View {
                 await MainActor.run {
                     testResult = gotDelta ? "Success!" : "No response received"
                     isTesting = false
-                    if gotDelta { onSuccess?() }
+                    if gotDelta { onSuccess?() } else { onFailure?() }
                 }
             } catch {
                 await MainActor.run {
                     testResult = "Error: \(error.localizedDescription)"
                     isTesting = false
+                    onFailure?()
                 }
             }
         }
