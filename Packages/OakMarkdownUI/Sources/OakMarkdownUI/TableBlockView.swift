@@ -76,10 +76,15 @@ private struct TableCellView: View {
         let result = NSMutableAttributedString(attributedString: attributed)
         let range = NSRange(location: 0, length: result.length)
         if isHeader {
+            // Semibold, not full bold: the rest of the renderer deliberately maps
+            // `**strong**` to a medium weight because SF's bold reads too heavy at
+            // body size (see MarkdownAttributedBuilder CMARK_NODE_STRONG). Headers
+            // want a touch more emphasis than strong, so semibold — but still not
+            // the heavy `.boldFontMask`.
             result.enumerateAttribute(.font, in: range, options: []) { value, sub, _ in
                 let base = (value as? NSFont) ?? theme.bodyFont
-                let bold = NSFontManager.shared.convert(base, toHaveTrait: .boldFontMask)
-                result.addAttribute(.font, value: bold, range: sub)
+                let semibold = NSFont.systemFont(ofSize: base.pointSize, weight: .semibold)
+                result.addAttribute(.font, value: semibold, range: sub)
             }
         }
         let paragraph = NSMutableParagraphStyle()
