@@ -1,0 +1,19 @@
+// OakReader — Release (Developer ID distribution; maintainer only)
+#include "OakReader-common.xcconfig"
+
+// Release ships the full OakReader.entitlements, which KEEPS the hardcoded
+// `keychain-access-groups` (5Y27G7B6D8.com.oakreader.keys). DEVELOPER_ENTITLEMENTS
+// is empty, so the path resolves to OakReader.entitlements (no -dev suffix).
+DEVELOPER_ENTITLEMENTS =
+CODE_SIGN_ENTITLEMENTS = OakReader/OakReader$(DEVELOPER_ENTITLEMENTS).entitlements
+
+// Distribution signing must be deterministic and must NOT be weakened by a
+// local DeveloperSettings.xcconfig, so re-assert it AFTER the include. Only the
+// maintainer (team 5Y27G7B6D8 + the Developer ID cert + the "OakReader Developer
+// ID" provisioning profile) can produce a Release build; the CI release workflow
+// installs that profile before archiving. See the macos-release-setup skill.
+DEVELOPMENT_TEAM = 5Y27G7B6D8
+CODE_SIGN_STYLE = Manual
+CODE_SIGN_IDENTITY = Developer ID Application
+PROVISIONING_PROFILE_SPECIFIER = OakReader Developer ID
+OTHER_CODE_SIGN_FLAGS = --timestamp

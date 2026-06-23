@@ -15,16 +15,24 @@ import Security
 /// to `<TeamID>.com.oakreader.keys`) binds items to the team entitlement
 /// instead, so credentials survive rebuilds and signing-identity changes.
 enum KeychainConfig {
-    /// Must stay in sync with the `keychain-access-groups` entitlement
-    /// (`$(AppIdentifierPrefix)com.oakreader.keys`). `AppIdentifierPrefix`
-    /// expands to the team ID, which is `5Y27G7B6D8` for both Debug and Release.
+    /// Release-only. Must stay in sync with the `keychain-access-groups`
+    /// entitlement in `OakReader.entitlements` (`5Y27G7B6D8.com.oakreader.keys`).
+    /// Debug builds ship `OakReader-dev.entitlements`, which omits that
+    /// restricted key (so any team — or ad-hoc — can build), and therefore use
+    /// the login keychain instead; see `scoped(_:)`.
     static let accessGroup = "5Y27G7B6D8.com.oakreader.keys"
 
-    /// Adds the access group + data-protection-keychain flag every query must
-    /// carry so reads and writes target the same keychain.
+    /// Targets the keychain that matches the build's entitlements.
     ///
-    /// In DEBUG, ad-hoc-signed dev builds carry no team prefix and would be
-    /// rejected by the access group, so we fall back to the local file keychain.
+    /// - Release: data-protection keychain scoped to the team-stable access
+    ///   group, so credentials survive rebuilds and signing-identity changes.
+    /// - Debug: the file-based login keychain (no access group, no
+    ///   data-protection flag). The `-dev` entitlements omit
+    ///   `keychain-access-groups`, so the data-protection keychain + access
+    ///   group is unavailable; without that, setting `kSecAttrAccessGroup` would
+    ///   fail with `errSecMissingEntitlement`. Keys persist across rebuilds as
+    ///   long as the dev signing identity is stable; otherwise inject them via
+    ///   the provider env vars (see `CredentialResolver`).
     static func scoped(_ query: [String: Any]) -> [String: Any] {
         var q = query
         #if !DEBUG

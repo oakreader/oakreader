@@ -1,0 +1,15 @@
+// OakReader — Debug (local development)
+#include "OakReader-common.xcconfig"
+
+// Dev builds ship the -dev entitlements, which OMIT the restricted
+// `keychain-access-groups` key. That key needs a provisioning profile from the
+// signing team, which a contributor's account can't grant (and an ad-hoc build
+// has none) — dropping it is what lets ANY team, or no account, build OakReader.
+// In Debug, API keys fall back to the login keychain / provider env vars; see
+// OakAI/KeychainConfig.swift (the `#if DEBUG` branch).
+DEVELOPER_ENTITLEMENTS = -dev
+CODE_SIGN_ENTITLEMENTS = OakReader/OakReader$(DEVELOPER_ENTITLEMENTS).entitlements
+
+// Identity / style / team come from OakReader-common.xcconfig and any local
+// DeveloperSettings.xcconfig override. Do NOT re-assign them here — a later
+// assignment would clobber the contributor's override.

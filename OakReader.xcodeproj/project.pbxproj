@@ -325,6 +325,7 @@
 		17EFE48B927C4FA692D2A3FB /* AgentSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSettingsView.swift; sourceTree = "<group>"; };
 		19548A405FBCC2C0C9A2E5EF /* AnnotationEditPopupPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationEditPopupPanel.swift; sourceTree = "<group>"; };
 		1980E6AB390BD5E181358F93 /* CiteLinkRewriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CiteLinkRewriter.swift; sourceTree = "<group>"; };
+		1A63D86443ACAE5AC839FCAA /* OakReader-release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "OakReader-release.xcconfig"; sourceTree = "<group>"; };
 		1BA0F12DFA84CBFFE95CD534 /* HTMLViewerRepresentable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTMLViewerRepresentable.swift; sourceTree = "<group>"; };
 		1E17653B4A5B70DEDC4E21C1 /* AppExtensionSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppExtensionSettingsView.swift; sourceTree = "<group>"; };
 		1E682F4A12F66C8D3B12A14F /* ZoteroMigrationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoteroMigrationService.swift; sourceTree = "<group>"; };
@@ -420,6 +421,7 @@
 		6AFDF99021E517B1FDC190BD /* TTSAudioCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TTSAudioCache.swift; sourceTree = "<group>"; };
 		6BC5B006B91985952010BF6E /* PDFAnnotation+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PDFAnnotation+Extensions.swift"; sourceTree = "<group>"; };
 		6BCAD1385B34DBC5A6F33CD9 /* CatalogMigrations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogMigrations.swift; sourceTree = "<group>"; };
+		6C649E9063F577EC40D9F60C /* OakReader-debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "OakReader-debug.xcconfig"; sourceTree = "<group>"; };
 		6D46DC9842C708EE4F886379 /* PDFViewCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFViewCoordinator.swift; sourceTree = "<group>"; };
 		6F1E73B68CE5C3BAB49180CE /* ImportService+PDF.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ImportService+PDF.swift"; sourceTree = "<group>"; };
 		7030A159436B3C2A9C0B7A47 /* ProviderEndpointStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderEndpointStore.swift; sourceTree = "<group>"; };
@@ -915,6 +917,15 @@
 			path = cli;
 			sourceTree = "<group>";
 		};
+		8C9C73298BBEA1713EB983DE /* xcconfig */ = {
+			isa = PBXGroup;
+			children = (
+				6C649E9063F577EC40D9F60C /* OakReader-debug.xcconfig */,
+				1A63D86443ACAE5AC839FCAA /* OakReader-release.xcconfig */,
+			);
+			path = xcconfig;
+			sourceTree = "<group>";
+		};
 		903DC3376AF804B2B35476DC /* AgentTemplates */ = {
 			isa = PBXGroup;
 			children = (
@@ -1015,6 +1026,7 @@
 				7AB287EB3D69C981FDC9D5C4 /* cli */,
 				4C31D42C6F27A5F6CC61D210 /* OakReader */,
 				FC165E5901DDAD54EC3CB28E /* Packages */,
+				8C9C73298BBEA1713EB983DE /* xcconfig */,
 				E6C40581B7F1F5E458BD8009 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -1659,15 +1671,12 @@
 		};
 		CCB30DBC10380145AA77979C /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 6C649E9063F577EC40D9F60C /* OakReader-debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				BUNDLE_DISPLAY_NAME = "OakReader Dev";
-				CODE_SIGN_ENTITLEMENTS = OakReader/OakReader.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 5Y27G7B6D8;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = OakReader/App/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1750,26 +1759,21 @@
 		};
 		E3459EB0AD43AB73F5FC756B /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 1A63D86443ACAE5AC839FCAA /* OakReader-release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				BUNDLE_DISPLAY_NAME = OakReader;
-				CODE_SIGN_ENTITLEMENTS = OakReader/OakReader.entitlements;
-				CODE_SIGN_IDENTITY = "Developer ID Application";
-				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 5Y27G7B6D8;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = OakReader/App/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.7.11;
-				OTHER_CODE_SIGN_FLAGS = "--timestamp";
+				MARKETING_VERSION = 0.7.12;
 				PRODUCT_BUNDLE_IDENTIFIER = com.oakreader.OakReader;
 				PRODUCT_NAME = OakReader;
-				PROVISIONING_PROFILE_SPECIFIER = "OakReader Developer ID";
 				SDKROOT = macosx;
 				SPARKLE_PUBLIC_ED_KEY = "zm3UpFrDf8tFcctK2vkEhrms6oFTp50AUb824lP9BAw=";
 				SWIFT_STRICT_CONCURRENCY = minimal;

@@ -91,6 +91,32 @@ git clone https://github.com/oakreader/oakreader.git
 cd oakreader
 brew install xcodegen
 xcodegen generate
+```
+
+### Code signing (one-time, for your own build)
+
+The committed project signs with the maintainer's Apple team, which you can't
+use. Point it at your own identity with a local, git-ignored override — you
+don't edit any tracked file:
+
+```bash
+scripts/setup-signing.sh
+```
+
+It asks for your Apple Developer **Team ID** (find it at
+developer.apple.com → Account → Membership; a free Apple ID works) and writes
+`xcconfig/DeveloperSettings.xcconfig`. No Apple account? Press Enter to build
+**ad-hoc** instead — fine for local development. (You can also copy
+`xcconfig/DeveloperSettings.example.xcconfig` by hand.)
+
+Debug builds drop the restricted `keychain-access-groups` entitlement so any
+team — or ad-hoc — can build. Your API keys live in your own login keychain
+(enter them in **Settings → AI**), or you can inject them via the provider env
+vars, e.g. `OPENAI_API_KEY`.
+
+### Run
+
+```bash
 open OakReader.xcodeproj
 ```
 
