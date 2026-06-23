@@ -182,7 +182,7 @@ private struct TableCellView: View {
 }
 
 /// Column alignment as set by the table separator row (`:---`, `---:`, `:---:`).
-enum TableAlignment {
+enum TableAlignment: Equatable {
     case leading, center, trailing
 
     init(cmarkByte: UInt8) {
@@ -282,8 +282,11 @@ enum TableParser {
         var hasHeader = false
         var rowNode = cmark_node_first_child(table)
         while let row = rowNode {
-            if String(cString: cmark_node_get_type_string(row)) == "table_row" {
-                if cmark_gfm_extensions_get_table_row_is_header(row) != 0 {
+            // cmark-gfm names the header row `table_header` (NOT a `table_row` with the
+            // is-header flag), so matching only "table_row" silently drops the header.
+            let rowType = String(cString: cmark_node_get_type_string(row))
+            if rowType == "table_header" || rowType == "table_row" {
+                if rowType == "table_header" || cmark_gfm_extensions_get_table_row_is_header(row) != 0 {
                     hasHeader = true
                 }
                 var cells: [NSAttributedString] = []
