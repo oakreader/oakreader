@@ -15,7 +15,6 @@ struct TableBlockView: View {
     let theme: MarkdownTheme
 
     @State private var isHovering = false
-    @State private var showFullscreen = false
 
     var body: some View {
         let parsed = TableParser.parse(source: source, theme: theme)
@@ -37,16 +36,13 @@ struct TableBlockView: View {
                     RoundedRectangle(cornerRadius: 8)
                         .strokeBorder(Color(nsColor: theme.codeBlockBorder), lineWidth: 1)
                 )
-                .overlay(alignment: .topTrailing) { expandButton }
+                .overlay(alignment: .topTrailing) { expandButton(parsed: parsed) }
                 .onHover { isHovering = $0 }
-                .sheet(isPresented: $showFullscreen) {
-                    TableFullscreenView(parsed: parsed, theme: theme)
-                }
         }
     }
 
-    private var expandButton: some View {
-        Button { showFullscreen = true } label: {
+    private func expandButton(parsed: TableParser.Parsed) -> some View {
+        Button { TableLightbox.show(parsed: parsed, theme: theme) } label: {
             Image(systemName: "arrow.up.left.and.arrow.down.right")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(Color(nsColor: theme.textColor))
@@ -92,42 +88,134 @@ private struct TableGridView: View {
                         .gridColumnAlignment(alignment.horizontal)
                     }
                 }
-                if rowIndex == 0 && parsed.hasHeader {
-                    Divider().gridCellColumns(max(parsed.columnCount, 1))
+                // Full-width hairline between rows. Spanning all columns (rather
+                // than per-cell bottom edges) keeps the line straight when cells
+                // in a row have different heights.
+                if rowIndex != parsed.rows.count - 1 {
+                    Rectangle()
+                        .fill(Color(nsColor: theme.codeBlockBorder))
+                        .frame(height: 1)
+                        .gridCellColumns(max(parsed.columnCount, 1))
                 }
             }
         }
     }
 }
 
-/// The full-window presentation: the same grid, un-wrapped, in a 2-axis scroll
-/// view so a wide table can be read in full.
-private struct TableFullscreenView: View {
+/// Full-screen table preview shown in a borderless window over the whole app with
+/// a dimmed scrim — click the scrim (or press Esc / the close button) to dismiss.
+/// Mirrors the Notes image lightbox so tables and images feel the same when
+/// expanded. Lives here (not the app) so the package stays app-agnostic.
+@MainActor
+private enum TableLightbox {
+    private static var window: NSWindow?
+    private static var escMonitor: Any?
+
+    static func show(parsed: TableParser.Parsed, theme: MarkdownTheme) {
+        guard let screen = NSScreen.main else { return }
+        dismiss()
+
+        let win = NSWindow(contentRect: screen.frame,
+                           styleMask: .borderless,
+                           backing: .buffered,
+                           defer: false)
+        win.isOpaque = false
+        win.backgroundColor = NSColor.black.withAlphaComponent(0.7)
+        win.level = .modalPanel
+        win.isReleasedWhenClosed = false
+        win.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
+        win.contentView = NSHostingView(
+            rootView: TableLightboxView(parsed: parsed, theme: theme, onClose: dismiss)
+        )
+        win.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        window = win
+
+        // A borderless window won't reliably receive SwiftUI keyboard shortcuts,
+        // so catch Esc with a local monitor.
+        escMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            if event.keyCode == 53 { dismiss(); return nil }   // Esc
+            return event
+        }
+    }
+
+    static func dismiss() {
+        if let monitor = escMonitor { NSEvent.removeMonitor(monitor); escMonitor = nil }
+        window?.orderOut(nil)
+        window = nil
+    }
+}
+
+/// Centered, solid card holding the table. Cells WRAP to a comfortable card width
+/// (much wider than inline, so the table is easier to read) and the card hugs the
+/// table's height, capped to the screen so a tall table scrolls vertically.
+private struct TableLightboxView: View {
     let parsed: TableParser.Parsed
     let theme: MarkdownTheme
-    @Environment(\.dismiss) private var dismiss
+    let onClose: () -> Void
+
+    @State private var contentHeight: CGFloat = 0
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Spacer()
-                Button("Done") { dismiss() }
-                    .keyboardShortcut(.cancelAction)
+        GeometryReader { geo in
+            // Comfortable reading width, capped so it never spans the whole screen.
+            let cardWidth = min(geo.size.width - 220, 920)
+            let maxH = geo.size.height - 140
+            ZStack {
+                // Scrim — tap anywhere outside the card to dismiss.
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture(perform: onClose)
+
+                ScrollView(.vertical) {
+                    TableGridView(parsed: parsed, theme: theme, wrapsCells: true)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .strokeBorder(Color(nsColor: theme.codeBlockBorder), lineWidth: 1)
+                        )
+                        .frame(width: cardWidth - 48)
+                        .padding(24)
+                        .background(
+                            GeometryReader { proxy in
+                                Color.clear.preference(key: TableHeightKey.self, value: proxy.size.height)
+                            }
+                        )
+                }
+                .frame(width: cardWidth, height: min(max(contentHeight, 1), maxH))
+                // Opaque base first, then the table tint on top, so an alpha-bearing
+                // code-block tint can't let the app behind show through the card.
+                .background(Color(nsColor: .windowBackgroundColor))
+                .background(Color(nsColor: theme.codeBlockBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .strokeBorder(Color(nsColor: theme.codeBlockBorder), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.45), radius: 32, y: 10)
+                .onPreferenceChange(TableHeightKey.self) { contentHeight = $0 }
             }
-            .padding(12)
-            Divider()
-            ScrollView([.horizontal, .vertical]) {
-                TableGridView(parsed: parsed, theme: theme, wrapsCells: false)
-                    .background(Color(nsColor: theme.codeBlockBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .strokeBorder(Color(nsColor: theme.codeBlockBorder), lineWidth: 1)
-                    )
-                    .padding(20)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .overlay(alignment: .topTrailing) {
+                Button(action: onClose) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 26))
+                        .foregroundStyle(.white.opacity(0.85))
+                        .padding(20)
+                }
+                .buttonStyle(.plain)
+                .keyboardShortcut(.cancelAction)
+                .accessibilityLabel("Close table")
             }
         }
-        .frame(minWidth: 640, idealWidth: 820, minHeight: 420, idealHeight: 560)
+    }
+}
+
+private struct TableHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        let next = nextValue()
+        if next != 0 { value = next }
     }
 }
 
@@ -146,7 +234,7 @@ private struct TableCellView: View {
         let text = Text(AttributedString(styledCell()))
             .multilineTextAlignment(alignment.textAlignment)
             .padding(.horizontal, 10)
-            .padding(.vertical, 6)
+            .padding(.vertical, 8)
         if wraps {
             // Allow horizontal shrink + vertical growth so long cells wrap to fit
             // the column the Grid hands them, then fill the column for alignment.
