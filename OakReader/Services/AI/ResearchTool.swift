@@ -65,8 +65,9 @@ struct ResearchTool: AgentTool, Sendable {
         Citations are required, on the load-bearing claims (the thesis, a specific \
         finding, a statistic) — not on every sentence. Each search result carries a \
         "Cite this passage as: ?c=<id>" handle. Cite using that id and copy the \
-        single sentence that STATES the claim as the anchor:
-        `oak://cite/{citeKey}?c=<id>&text=<the verbatim claim sentence from that passage>`
+        single sentence that STATES the claim as the anchor. Always write the citation \
+        as a clickable markdown link — never a bare URL:
+        [your own label](oak://cite/{citeKey}?c=<id>&text=<the verbatim claim sentence from that passage>)
         The visible [label] is your own words; the ?text= value must be copied \
         word-for-word from that passage (the host verifies it). One citation per \
         claim, on the sentence that carries it — never on an incidental phrase. \

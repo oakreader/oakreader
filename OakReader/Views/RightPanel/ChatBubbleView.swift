@@ -177,6 +177,66 @@ struct ChatBubbleView: View, Equatable {
         return norm(a) == norm(b)
     }
 
+    // MARK: - Bare citation linkification
+
+    /// A compact, human-readable label for a citation chip, derived from its anchor —
+    /// used when the model emitted a *bare* `oak://` URL with no visible link text.
+    /// We deliberately keep it short (a page/heading/timecode marker) rather than
+    /// inlining the `?text=` quote, since the claim sentence already precedes the link.
+    static func citationLabel(for anchor: CitationAnchor) -> String {
+        let raw: String
+        if let page = anchor.page {
+            raw = "p. \(page + 1)"                 // anchor.page is 0-based
+        } else if let h = anchor.heading, !h.isEmpty {
+            raw = "§ " + (h.count > 24 ? h.prefix(24) + "…" : Substring(h))
+        } else if let time = anchor.time {
+            let s = Int(time.rounded())
+            raw = String(format: "%d:%02d", s / 60, s % 60)
+        } else {
+            raw = "source"
+        }
+        // Brackets would break the `[label](url)` we wrap this in.
+        return raw.replacingOccurrences(of: "[", with: "")
+                  .replacingOccurrences(of: "]", with: "")
+    }
+
+    /// cmark only turns `[label](url)` / `<url>` into links — a *bare* `oak://…` URL
+    /// (which the model sometimes emits when it forgets the markdown wrapper) renders
+    /// as raw percent-encoded text with no link, hover card, or click-to-jump. This
+    /// rewrites any such bare citation URL into `[label](url)` so it always shows the
+    /// proper citation chip. URLs already inside `[](…)` or `<…>` are left untouched.
+    static func linkifyBareCitations(_ markdown: String, isStreaming: Bool) -> String {
+        guard markdown.contains("oak://") else { return markdown }
+        let ns = markdown as NSString
+        // Bare `oak://…` not opened by `(` (link destination) or `<` (autolink),
+        // stopping at whitespace / closing brackets / angle brackets.
+        guard let re = try? NSRegularExpression(pattern: "(?<![(<])oak://[^\\s)\\]<>]+") else {
+            return markdown
+        }
+        let matches = re.matches(in: markdown, range: NSRange(location: 0, length: ns.length))
+        guard !matches.isEmpty else { return markdown }
+
+        let out = NSMutableString(string: markdown)
+        // Replace back-to-front so earlier (still-original) ranges stay valid.
+        for m in matches.reversed() {
+            var range = m.range
+            // While streaming, a URL touching the end is likely still growing —
+            // leave it bare until a delimiter follows so we don't wrap a partial URL.
+            if isStreaming && range.location + range.length == ns.length { continue }
+            var urlStr = ns.substring(with: range)
+            // Trim trailing sentence punctuation that isn't really part of the URL.
+            let trailing = CharacterSet(charactersIn: ".,;:!?")
+            while let last = urlStr.unicodeScalars.last, trailing.contains(last) {
+                urlStr = String(urlStr.unicodeScalars.dropLast())
+                range.length -= 1
+            }
+            guard let url = URL(string: urlStr),
+                  let (_, anchor) = CitationAnchor.parse(from: url) else { continue }
+            out.replaceCharacters(in: range, with: "[\(Self.citationLabel(for: anchor))](\(urlStr))")
+        }
+        return out as String
+    }
+
     /// Renders chat markdown via the native `StreamingMarkdownView` (OakMarkdownUI).
     ///
     /// It splits the (growing) markdown into fence-aware blocks and re-renders only the
@@ -296,7 +356,9 @@ struct ChatBubbleView: View, Equatable {
         // prefix — so there's no truncation here. No sealing/backslash protection
         // needed: StreamingMarkdownView renders partial markdown as-is (unclosed
         // markers stay literal) and handles math via its own block splitter.
-        return turn.content
+        // Defensive: linkify any bare `oak://` citation the model forgot to wrap in
+        // `[label](…)`, so it renders as a clean chip instead of a raw URL blob.
+        return Self.linkifyBareCitations(turn.content, isStreaming: turn.isStreaming)
     }
 
     private var skillBadges: [String] {
