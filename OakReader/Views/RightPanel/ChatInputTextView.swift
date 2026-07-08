@@ -67,6 +67,7 @@ struct ChatInputTextView: NSViewRepresentable {
         textView.drawsBackground = false
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
+        textView.autoresizingMask = [.width]
         textView.textContainerInset = NSSize(width: 0, height: 4)
         textView.textContainer?.lineFragmentPadding = 0
         textView.textContainer?.widthTracksTextView = true
@@ -104,6 +105,13 @@ struct ChatInputTextView: NSViewRepresentable {
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let textView = scrollView.documentView as? ChatNSTextView else { return }
+
+        // Fix zero-width: when the scroll view hasn't been given a width by
+        // SwiftUI's layout, take it from the superview so the NSTextView has
+        // horizontal space to render text.
+        if scrollView.frame.width == 0, let superview = scrollView.superview, superview.frame.width > 0 {
+            scrollView.frame.size.width = superview.frame.width
+        }
 
         if context.coordinator.lastResetToken != resetToken {
             context.coordinator.lastResetToken = resetToken
