@@ -1,4 +1,5 @@
 import SwiftUI
+import OakAI
 import OakAgent
 
 // MARK: - Provider Config View (Right Panel)
@@ -554,23 +555,15 @@ private struct ProviderDetailView: View {
 
         Task {
             do {
-                let router = ProviderRouter()
-                let testModel = provider.defaultModelId
-                let config = ProviderConfig(providerId: provider.id, model: testModel)
-                let svc: LLMProviderService
-                if let credential {
-                    svc = try router.provider(for: config, credential: credential)
-                } else {
-                    svc = try await router.provider(for: config)
-                }
-                let messages = [LLMMessage(role: .user, text: "Say 'OK' and nothing else.")]
-                let stream = svc.sendMessage(
-                    messages: messages, model: testModel,
-                    systemPrompt: nil, maxTokens: 50
+                let request = CompletionRequest(
+                    providerId: provider.id, model: provider.defaultModelId,
+                    user: "Say 'OK' and nothing else.", maxTokens: 50,
+                    overrideCredential: credential
                 )
                 var gotDelta = false
-                for try await chunk in stream {
-                    if case .delta = chunk { gotDelta = true; break }
+                for try await delta in AIBackend.completions.stream(request) where !delta.isEmpty {
+                    gotDelta = true
+                    break
                 }
                 await MainActor.run {
                     testResult = gotDelta ? "Success!" : "No response received"

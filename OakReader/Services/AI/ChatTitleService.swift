@@ -1,4 +1,5 @@
 import Foundation
+import OakAI
 import OakAgent
 
 /// Generates a short, human-readable title for a chat from its first exchange.
@@ -35,42 +36,21 @@ struct ChatTitleService {
 
     // MARK: - Private
 
-    /// Single no-tools completion via an ephemeral session in a temp dir.
+    /// Single no-tools completion through the completion facade.
     private static func complete(system: String, user: String, config: ProviderConfig) async -> String? {
-        let tmp = FileManager.default.temporaryDirectory
-            .appendingPathComponent("oak-title-\(UUID().uuidString)", isDirectory: true)
-        let session = AgentSession(chatsDirectory: tmp)
-        defer { try? FileManager.default.removeItem(at: tmp) }
-
+        let request = CompletionRequest(
+            providerId: config.providerId, model: config.model,
+            system: system, user: user, maxTokens: 200
+        )
         var streamed = ""
-        var finalText: String?
         do {
-            let stream = await session.send(
-                userContent: user,
-                attachments: [],
-                history: [],
-                sessionId: UUID(),
-                config: config,
-                systemPrompt: system,
-                tools: nil,
-                toolContext: nil,
-                maxIterations: 1
-            )
-            for try await event in stream {
-                switch event {
-                case .delta(let d):
-                    streamed += d
-                case .finished(let turn) where turn.role == .assistant:
-                    finalText = turn.content
-                default:
-                    break
-                }
+            for try await delta in AIBackend.completions.stream(request) {
+                streamed += delta
             }
         } catch {
             return nil
         }
-
-        let result = (finalText ?? streamed).trimmingCharacters(in: .whitespacesAndNewlines)
+        let result = streamed.trimmingCharacters(in: .whitespacesAndNewlines)
         return result.isEmpty ? nil : result
     }
 

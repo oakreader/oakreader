@@ -100,6 +100,9 @@ final class Preferences {
         // ChatGPT `bio`-style memory: the agent saves durable facts about the user
         // (one global profile) and injects them into every conversation.
         static let memoryEnabled = "memoryEnabled"
+        // Node sidecar backend (docs/architecture/node-backend-migration.md).
+        // Kill switch: when off, all completion traffic stays on the in-process OakAI path.
+        static let nodeBackendEnabled = "nodeBackendEnabled"
         // Thinking budget
         static let thinkingBudget = "thinkingBudget"
         static let thinkingEffort = "thinkingEffort"
@@ -311,6 +314,11 @@ final class Preferences {
     /// Whether the agent remembers durable facts about the user across
     /// conversations (saved via the `manage_memory` tool, injected into every
     /// chat). Defaults to ON. When off, the tool and profile are not present.
+    var nodeBackendEnabled: Bool {
+        get { defaults.object(forKey: Keys.nodeBackendEnabled) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: Keys.nodeBackendEnabled) }
+    }
+
     var memoryEnabled: Bool {
         get { defaults.object(forKey: Keys.memoryEnabled) as? Bool ?? true }
         set { defaults.set(newValue, forKey: Keys.memoryEnabled) }

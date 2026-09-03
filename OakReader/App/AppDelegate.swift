@@ -60,6 +60,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         oakServer = OakServer(importService: appState.importService)
         oakServer?.start()
 
+        // Warm the Node AI sidecar so the first completion doesn't pay spawn cost.
+        // Fail-soft: completions fall back to the in-process path if unavailable.
+        if Preferences.shared.nodeBackendEnabled {
+            Task.detached(priority: .utility) { _ = await NodeBackend.shared.ensureRunning() }
+        }
+
         createMainWindow()
     }
 
@@ -70,6 +76,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             object: nil
         )
         oakServer?.stop()
+
+        let backend = NodeBackend.shared
+        Task { await backend.shutdown() }
     }
 
     func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool {

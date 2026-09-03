@@ -1,4 +1,5 @@
 packages:
+  - backend
   - extension
   - webviews
   - www
