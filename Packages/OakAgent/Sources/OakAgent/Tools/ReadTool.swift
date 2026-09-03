@@ -1,4 +1,5 @@
 import Foundation
+import OakAI
 
 /// Read file contents with optional offset/limit and truncation.
 public struct ReadTool: AgentTool {

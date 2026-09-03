@@ -1,4 +1,5 @@
 import Foundation
+import OakAI
 
 /// File search by glob pattern using find.
 public struct FindTool: AgentTool {

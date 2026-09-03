@@ -1,4 +1,5 @@
 import Foundation
+import OakAI
 
 /// Content search using grep -rn.
 public struct GrepTool: AgentTool {

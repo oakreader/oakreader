@@ -1,4 +1,5 @@
 import Foundation
+import OakAI
 import OakAgent
 
 /// Manages on-machine OpenAI-compatible providers (Ollama, LM Studio).

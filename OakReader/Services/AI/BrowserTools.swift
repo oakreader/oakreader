@@ -1,4 +1,5 @@
 import Foundation
+import OakAI
 import OakAgent
 
 /// Reads the web page the user is currently viewing in browser mode, extracted as

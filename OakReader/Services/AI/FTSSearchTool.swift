@@ -1,5 +1,6 @@
 import Foundation
 import GRDB
+import OakAI
 import OakAgent
 
 /// Searches the full text of the user's library using FTS5 BM25 keyword ranking.

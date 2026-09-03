@@ -1,6 +1,7 @@
 import AVFoundation
 import CoreAudio
 import SwiftUI
+import OakAI
 import OakAgent
 import OakVoice
 

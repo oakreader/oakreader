@@ -1,4 +1,5 @@
 import Foundation
+import OakAI
 
 /// Directory listing tool.
 public struct LsTool: AgentTool {

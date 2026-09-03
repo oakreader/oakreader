@@ -1,4 +1,5 @@
 import Foundation
+import OakAI
 
 /// Actor that coordinates message flow: routes to provider, persists turns.
 public actor AgentSession {

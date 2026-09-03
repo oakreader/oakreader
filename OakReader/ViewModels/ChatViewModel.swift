@@ -1,6 +1,7 @@
 import Foundation
 import AppKit
 import PDFKit
+import OakAI
 import OakAgent
 
 struct CitationAnchor {

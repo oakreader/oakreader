@@ -1,4 +1,5 @@
 import Foundation
+import OakAI
 
 /// Factory for creating sets of agent tools.
 public enum ToolKit {

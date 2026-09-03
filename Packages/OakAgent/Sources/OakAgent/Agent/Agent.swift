@@ -1,4 +1,5 @@
 import Foundation
+import OakAI
 
 /// Agentic loop: sends messages to an LLM provider, executes tools, and iterates.
 public actor Agent {

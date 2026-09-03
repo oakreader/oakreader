@@ -1,4 +1,5 @@
 import SwiftUI
+import OakAI
 import OakAgent
 
 struct AISettingsView: View {

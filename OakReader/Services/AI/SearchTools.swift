@@ -1,4 +1,5 @@
 import Foundation
+import OakAI
 import OakAgent
 
 // MARK: - Academic Search Tool

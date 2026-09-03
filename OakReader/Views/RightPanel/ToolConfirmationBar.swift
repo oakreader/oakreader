@@ -1,4 +1,5 @@
 import SwiftUI
+import OakAI
 import OakAgent
 
 /// Compact sticky bar shown between messages and input when a tool call

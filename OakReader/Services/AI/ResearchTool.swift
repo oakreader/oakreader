@@ -1,4 +1,5 @@
 import Foundation
+import OakAI
 import OakAgent
 
 /// A research **subagent**: runs its own nested, read-only agent loop over the

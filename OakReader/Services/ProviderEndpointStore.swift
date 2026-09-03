@@ -1,4 +1,5 @@
 import Foundation
+import OakAI
 import OakAgent
 
 /// Per-provider base-URL overrides for cloud LLM providers.
