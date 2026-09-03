@@ -28,11 +28,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         NSApp.mainMenu = MainMenuBuilder.build(target: self)
         // Let the markdown renderer resolve note images' relocatable oak://image URLs.
         OakMarkdownImage.urlResolver = { OakNoteImageURL.resolveToFile($0) }
-        // Restore local OpenAI-compatible providers (Ollama, LM Studio) into the registry
-        // before any AI feature reads the provider list.
-        LocalProviderStore.shared.applyAll()
-        // Re-apply per-provider base-URL overrides (proxy / relay endpoints) for cloud providers.
-        ProviderEndpointStore.shared.applyAll()
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -60,10 +55,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         oakServer = OakServer(importService: appState.importService)
         oakServer?.start()
 
-        // Warm the Node AI sidecar so the first completion doesn't pay spawn cost.
-        // Fail-soft: completions fall back to the in-process path if unavailable.
-        if Preferences.shared.nodeBackendEnabled {
-            Task.detached(priority: .utility) { _ = await NodeBackend.shared.ensureRunning() }
+        // Start the Node AI sidecar, run the one-time credential migration
+        // (Keychain / UserDefaults → backend), and load the provider catalog.
+        Task.detached(priority: .utility) {
+            await BackendCredentialMigrator.runIfNeeded()
+            await AIProviderCatalog.shared.refresh()
         }
 
         createMainWindow()

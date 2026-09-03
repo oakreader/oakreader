@@ -1,7 +1,6 @@
 import Foundation
 import AppKit
 import PDFKit
-import OakAI
 import OakAgent
 
 struct CitationAnchor {
@@ -114,7 +113,7 @@ class ChatViewModel {
 
     // MARK: - Private
 
-    private let engine: AgentSession
+    private let engine: BackendChatEngine
     private let contextProvider = LLMContextProvider()
     private var streamTask: Task<Void, Never>?
     /// Whether a DB record has been created for the current session.
@@ -129,7 +128,7 @@ class ChatViewModel {
 
     init(parent: DocumentViewModel, documentStoragePath: URL? = nil) {
         self.parent = parent
-        self.engine = AgentSession(chatsDirectory: CatalogDatabase.chatsDirectory)
+        self.engine = BackendChatEngine(chatsDirectory: CatalogDatabase.chatsDirectory)
         if let path = documentStoragePath {
             // Sandbox tool access to the document storage directory
             self.toolContext = ToolExecutionContext(
@@ -142,7 +141,7 @@ class ChatViewModel {
 
     init() {
         self.parent = nil
-        self.engine = AgentSession(chatsDirectory: CatalogDatabase.chatsDirectory)
+        self.engine = BackendChatEngine(chatsDirectory: CatalogDatabase.chatsDirectory)
         observeCiteKeyRewrites()
     }
 
@@ -169,42 +168,36 @@ class ChatViewModel {
 
     // MARK: - Configuration
 
-    var config: ProviderConfig {
+    var config: AIRequestConfig {
         let prefs = Preferences.shared
+        let catalog = AIProviderCatalog.shared
         let storedPid = prefs.aiProviderId
-        let pid = ConfiguredProviderStore.shared.resolvedProviderId(preferred: storedPid)
-        let provider = ProviderRegistry.shared.provider(for: pid)
-        let defaultModel = provider?.defaultModelId ?? ""
+        let pid = catalog.resolvedProviderId(preferred: storedPid)
         // Keep the stored model only when it belongs to the provider we resolved to;
         // otherwise (e.g. we fell back from an unconfigured default) use the provider's
         // own default rather than a model from a different vendor.
-        let storedModelValid = pid == storedPid
-            && !prefs.aiModel.isEmpty
-            && provider?.models.contains { $0.id == prefs.aiModel } == true
-        let modelId = storedModelValid ? prefs.aiModel : defaultModel
-        let modelInfo = provider?.models.first { $0.id == modelId }
-        let isReasoning = modelInfo?.reasoning == true
+        let modelId = catalog.resolvedModelId(
+            providerId: pid, stored: pid == storedPid ? prefs.aiModel : ""
+        )
+        let isReasoning = catalog.modelInfo(providerId: pid, modelId: modelId)?.reasoning == true
         let effort = prefs.thinkingEffort
         let thinkingEnabled = isReasoning && effort != "off"
-        return ProviderConfig(
+        return AIRequestConfig(
             providerId: pid,
             model: modelId,
-            thinkingBudget: thinkingEnabled ? prefs.thinkingBudget : nil,
-            thinkingEffort: thinkingEnabled ? effort : nil
+            reasoningEffort: thinkingEnabled ? effort : nil
         )
     }
 
     /// Config for the research subagent's loop: same provider, but a cheaper/faster
     /// model when `researchModel` is set, and no extended thinking (it's tool-driven).
-    var researchConfig: ProviderConfig {
+    var researchConfig: AIRequestConfig {
         let prefs = Preferences.shared
         let researchModel = prefs.researchModel
         let base = config
-        return ProviderConfig(
+        return AIRequestConfig(
             providerId: base.providerId,
-            model: researchModel.isEmpty ? base.model : researchModel,
-            thinkingBudget: nil,
-            thinkingEffort: nil
+            model: researchModel.isEmpty ? base.model : researchModel
         )
     }
 
@@ -316,8 +309,11 @@ class ChatViewModel {
         // active model's context window (replaces the old fixed 4 000-char cap), so a
         // whole short document loads in full on a large window.
         let contextMode = effectiveSkill?.contextMode ?? .currentPage
+        let currentConfig = config
         let docCharBudget = LLMContextProvider.documentCharBudget(
-            contextWindow: config.modelInfo?.contextWindow ?? 200_000
+            contextWindow: AIProviderCatalog.shared.modelInfo(
+                providerId: currentConfig.providerId, modelId: currentConfig.model
+            )?.contextWindow ?? 200_000
         )
         let snapshot = LLMContextProvider.buildContextSnapshot(
             from: parent,
@@ -333,7 +329,6 @@ class ChatViewModel {
 
         let currentHistory = turns.filter { !$0.isStreaming }
         let currentSessionId = sessionId
-        let currentConfig = config
         let turnMetadata: [String: String] = currentSkill.map { ["skill": $0.id] } ?? [:]
 
         let prefs = Preferences.shared
@@ -432,8 +427,6 @@ class ChatViewModel {
 
         // Load file-based agent skills from standard directories
         let agentSkills = Self.loadAgentSkills()
-        let thinkingBudget = currentConfig.thinkingBudget
-        let thinkingEffort = currentConfig.thinkingEffort
 
         streamTask = Task { @MainActor [weak self] in
             do {
@@ -460,8 +453,6 @@ class ChatViewModel {
                     tools: currentTools,
                     toolContext: effectiveToolContext,
                     agentSkills: agentSkills,
-                    thinkingBudget: thinkingBudget,
-                    thinkingEffort: thinkingEffort,
                     toolConfirmation: self?.makeToolConfirmation(level: permissionLevel)
                 )
 

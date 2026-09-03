@@ -1,5 +1,5 @@
 import SwiftUI
-import OakAI
+import OakAgent
 
 struct WebSearchSettingsView: View {
     @State private var selectedProviderId: String = Preferences.shared.webSearchProviderId

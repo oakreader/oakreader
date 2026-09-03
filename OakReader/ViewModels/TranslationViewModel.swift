@@ -1,5 +1,4 @@
 import Foundation
-import OakAI
 import OakAgent
 
 @Observable
@@ -104,13 +103,11 @@ class TranslationViewModel {
 
         let prefs = Preferences.shared
         let storedPid = prefs.translationAIProviderId
-        let pid = ConfiguredProviderStore.shared.resolvedProviderId(preferred: storedPid)
-        let model: String = {
-            let m = prefs.translationAIModel
-            let valid = pid == storedPid && !m.isEmpty
-                && ProviderRegistry.shared.provider(for: pid)?.models.contains { $0.id == m } == true
-            return valid ? m : (ProviderRegistry.shared.provider(for: pid)?.defaultModelId ?? "")
-        }()
+        let catalog = AIProviderCatalog.shared
+        let pid = catalog.resolvedProviderId(preferred: storedPid)
+        let model = catalog.resolvedModelId(
+            providerId: pid, stored: pid == storedPid ? prefs.translationAIModel : ""
+        )
 
         let (systemPrompt, userPrompt) = buildPrompts(text: text)
 
@@ -275,13 +272,11 @@ class TranslationViewModel {
 
         let prefs = Preferences.shared
         let storedPid = prefs.translationAIProviderId
-        let pid = ConfiguredProviderStore.shared.resolvedProviderId(preferred: storedPid)
-        let model: String = {
-            let m = prefs.translationAIModel
-            let valid = pid == storedPid && !m.isEmpty
-                && ProviderRegistry.shared.provider(for: pid)?.models.contains { $0.id == m } == true
-            return valid ? m : (ProviderRegistry.shared.provider(for: pid)?.defaultModelId ?? "")
-        }()
+        let catalog = AIProviderCatalog.shared
+        let pid = catalog.resolvedProviderId(preferred: storedPid)
+        let model = catalog.resolvedModelId(
+            providerId: pid, stored: pid == storedPid ? prefs.translationAIModel : ""
+        )
 
         let systemPrompt = buildExplanationSystemPrompt()
         let userPrompt = buildExplanationUserPrompt(selection: trimmed, sentence: sentence)

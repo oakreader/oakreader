@@ -1,6 +1,5 @@
 import SwiftUI
 import UniformTypeIdentifiers
-import OakAI
 import OakAgent
 import OakMarkdownUI
 
@@ -728,40 +727,39 @@ struct AIChatView: View {
     // MARK: - Config Menu
 
     private var currentModelName: String {
-        let store = ConfiguredProviderStore.shared
-        let pair = store.availableLLMModels.first { $0.model.id == settingsModel }
+        let pair = AIProviderCatalog.shared.availableModels.first { $0.model.id == settingsModel }
         return pair?.model.name ?? settingsModel
     }
 
     @State private var settingsModel: String = {
         let prefs = Preferences.shared
-        let store = ConfiguredProviderStore.shared
+        let catalog = AIProviderCatalog.shared
         // Honor the stored model only when it's actually available (configured provider,
         // not toggled off); otherwise fall back to the resolved provider's default so the
         // picker never shows a model from a vendor the user hasn't set up.
         if !prefs.aiModel.isEmpty,
-           store.availableLLMModels.contains(where: { $0.model.id == prefs.aiModel }) {
+           catalog.availableModels.contains(where: { $0.model.id == prefs.aiModel }) {
             return prefs.aiModel
         }
-        let pid = store.resolvedProviderId(preferred: prefs.aiProviderId)
-        return ProviderRegistry.shared.provider(for: pid)?.defaultModelId ?? ""
+        let pid = catalog.resolvedProviderId(preferred: prefs.aiProviderId)
+        return catalog.provider(for: pid)?.defaultModel ?? ""
     }()
     @State private var settingsEffort: String = Preferences.shared.thinkingEffort
     @State private var settingsPermission: AgentPermissionLevel = Preferences.shared.agentPermissionLevel
 
     private var settingsMenu: some View {
         let prefs = Preferences.shared
-        let store = ConfiguredProviderStore.shared
-        let configuredProviders = store.configuredLLMProviders
+        let catalog = AIProviderCatalog.shared
+        let configuredProviders = catalog.configuredProviders
         let currentModel = settingsModel
-        let currentModelInfo = store.availableLLMModels.first { $0.model.id == currentModel }?.model
+        let currentModelInfo = catalog.availableModels.first { $0.model.id == currentModel }?.model
         let modelSelection = Binding<String>(
             get: { currentModel },
             set: { newValue in
                 prefs.aiModel = newValue
                 settingsModel = newValue
                 // Auto-switch provider when selecting a model from a different provider
-                if let pair = store.availableLLMModels.first(where: { $0.model.id == newValue }) {
+                if let pair = AIProviderCatalog.shared.availableModels.first(where: { $0.model.id == newValue }) {
                     prefs.aiProviderId = pair.provider.id
                 }
             }
@@ -787,7 +785,7 @@ struct AIChatView: View {
                 ForEach(configuredProviders) { provider in
                     let models = provider.models.filter { !disabled.contains($0.id) }
                     if !models.isEmpty {
-                        Section(provider.displayName) {
+                        Section(provider.name) {
                             ForEach(models) { model in
                                 Text(model.name).tag(model.id)
                             }

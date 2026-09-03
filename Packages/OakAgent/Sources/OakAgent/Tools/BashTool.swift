@@ -1,5 +1,4 @@
 import Foundation
-import OakAI
 
 /// Shell command execution with configurable timeout.
 public struct BashTool: AgentTool {

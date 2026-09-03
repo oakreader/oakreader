@@ -1,15 +1,39 @@
 # Node Backend Migration
 
-Status: **Phase 0 + Phase 1 done** (this branch; build-green, protocol-tested) ·
-Phases 2–4 planned
+Status: **Phases 0–3 done** (this branch; build-green, protocol-tested).
+`Packages/OakAI` is deleted; the Node sidecar (protocol v2) owns providers,
+credentials, OAuth, endpoint overrides, and the agentic chat loop. Swift owns
+UI, sessions (JSONL via OakAgent's `SessionStore`), and tool execution
+(`tool_exec` → `tool_result` round-trips). Phase 4 (Windows / shared React
+surfaces) remains.
 
-Phase 1 verification level: the sidecar protocol + a real streamed completion are
-covered by `web/backend/test/protocol.test.mjs` (mock OpenAI-compatible SSE server —
-verifies endpoint path math, system-prompt forwarding, delta reassembly, abort, clean
-exit), and the embedded `oak-backend.cjs` answers the ping handshake when spawned the
-way the app spawns it. **Not yet live-verified:** in-app streaming against real
-providers, and the anthropic-messages / openai-responses / google api mappings
-(only openai-completions ran against the mock).
+What moved where:
+- `web/backend` (pi-ai): provider catalog (pi's builtin providers, OakReader ids
+  preserved — `kimi`↔`moonshotai` mapped), credentials in a 0600 `auth.json`
+  (`<dataDir>/backend/`), OAuth login flows (incl. NEW Anthropic-subscription
+  sign-in), base-URL overrides + Ollama/LM Studio in `config.json`, the
+  chat loop (`streamSimple` + client-tool round-trips), stateless `complete`.
+- Swift `BackendChatEngine` replaces OakAgent's `AgentSession` 1:1 (same
+  `send(...)` surface + `SessionEvent` semantics) so `ChatViewModel`'s event
+  loop is unchanged; `AIProviderCatalog` replaces `ProviderRegistry` +
+  `ConfiguredProviderStore` + `LocalProviderStore` + `ProviderEndpointStore`.
+- `Packages/OakAgent` is now LLM-free: tools/skills/sessions/Turn types plus the
+  tool-call types and `KeychainService` (still used for skill env secrets and
+  web-search keys) moved in from OakAI.
+- One-time `BackendCredentialMigrator`: Keychain API keys + UserDefaults
+  endpoint/local-provider config → backend. OAuth sign-ins are NOT migrated
+  (users re-connect once); thinking *budget* is retired (pi thinking levels).
+
+Verification level: `web/backend/test/protocol.test.mjs` covers ping, the 0600
+credential store, catalog serving, id mapping, `get_api_key`, local-provider
+discovery, the full chat loop with a tool_exec/tool_result round-trip against a
+mock OpenAI-compatible SSE server, and override persistence. The embedded
+bundle answers protocol-2 ping + list_providers when spawned exactly as the app
+spawns it. **Not yet live-verified:** in-app runtime against real providers
+(chat, translation, OAuth UI, voice key sharing).
+
+**Node.js ≥ 22 is now required** for all AI features (no in-process fallback
+remains). Bundling a Node runtime into the app is the next follow-up.
 
 ## Goal
 

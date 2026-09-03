@@ -1,70 +1,66 @@
 import Foundation
-import OakAI
 
-/// One stateless streaming completion — the single contract behind translation,
+/// Provider/model selection for one AI request. Replaces OakAI's
+/// `ProviderConfig` — resolution (credentials, endpoints, model catalog)
+/// happens in the Node backend; this is just the address.
+struct AIRequestConfig: Sendable {
+    var providerId: String
+    var model: String
+    /// pi-ai thinking level ("low" | "medium" | "high" | …); nil = no thinking.
+    var reasoningEffort: String?
+
+    init(providerId: String, model: String, reasoningEffort: String? = nil) {
+        self.providerId = providerId
+        self.model = model
+        self.reasoningEffort = reasoningEffort
+    }
+}
+
+/// One stateless streaming completion — the contract behind translation,
 /// word define/explain, chat-title generation, and Settings "Test Connection".
-///
-/// This is the seam for the Node backend migration (docs/architecture/
-/// node-backend-migration.md): consumers depend on this instead of
-/// `ProviderRouter`/`StreamChunk`, so the transport can move out of process
-/// without touching feature code.
 struct CompletionRequest: Sendable {
     var providerId: String
     var model: String
     var system: String?
     var user: String
     var maxTokens: Int = 4096
-    /// Explicit credential (Test Connection verifies a key before it is saved);
-    /// nil resolves normally (Keychain → env var → OAuth).
+    /// Explicit credential (Test Connection verifies a key before it is saved).
     var overrideCredential: String? = nil
+    /// Explicit endpoint base (Test Connection dry-runs a typed base URL).
+    var overrideBaseUrl: String? = nil
 }
 
 protocol CompletionStreaming: Sendable {
-    /// Yields text deltas; finishes when the model is done; throws on any failure
-    /// (including provider-reported stream errors). Cancel the consuming task to abort.
+    /// Yields text deltas; finishes when the model is done; throws on any failure.
+    /// Cancel the consuming task to abort.
     func stream(_ request: CompletionRequest) -> AsyncThrowingStream<String, Error>
 }
 
-enum CompletionStreamError: LocalizedError {
-    case provider(String)
-
-    var errorDescription: String? {
-        switch self {
-        case .provider(let message): return message
-        }
-    }
+/// The completion transport. All AI traffic runs through the Node sidecar.
+enum AIBackend {
+    static let completions: any CompletionStreaming = NodeCompletionClient()
 }
 
-/// In-process implementation on OakAI's `ProviderRouter`. The legacy path, and the
-/// fallback whenever the Node sidecar is unavailable.
-struct LocalCompletionClient: CompletionStreaming {
-    private let router = ProviderRouter()
-
+struct NodeCompletionClient: CompletionStreaming {
     func stream(_ request: CompletionRequest) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    let config = ProviderConfig(providerId: request.providerId, model: request.model)
-                    let service: LLMProviderService
-                    if let credential = request.overrideCredential {
-                        service = try router.provider(for: config, credential: credential)
-                    } else {
-                        service = try await router.provider(for: config)
-                    }
-                    let chunks = service.sendMessage(
-                        messages: [LLMMessage(role: .user, text: request.user)],
+                    let id = await NodeBackend.shared.makeRequestId(prefix: "c")
+                    let command = BackendCommand(
+                        id: id,
+                        type: "complete",
+                        providerId: request.providerId,
                         model: request.model,
-                        systemPrompt: request.system,
-                        maxTokens: request.maxTokens
+                        system: request.system,
+                        messages: [.user(parts: [.text(request.user)])],
+                        maxTokens: request.maxTokens,
+                        apiKey: request.overrideCredential,
+                        baseUrl: request.overrideBaseUrl
                     )
-                    for try await chunk in chunks {
-                        switch chunk {
-                        case .delta(let text):
+                    for try await event in await NodeBackend.shared.events(for: command) {
+                        if event.type == "delta", let text = event.text {
                             continuation.yield(text)
-                        case .error(let message):
-                            throw CompletionStreamError.provider(message)
-                        case .thinking, .toolUse, .toolInputDelta, .finished:
-                            break
                         }
                     }
                     continuation.finish()

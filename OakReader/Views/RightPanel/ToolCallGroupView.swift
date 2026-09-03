@@ -1,5 +1,4 @@
 import SwiftUI
-import OakAI
 import OakAgent
 
 /// Collapses multiple tool calls into a single summary line with optional expansion.

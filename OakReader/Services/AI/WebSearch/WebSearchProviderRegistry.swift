@@ -1,5 +1,5 @@
 import Foundation
-import OakAI
+import OakAgent
 
 /// Registry of available web search providers.
 /// Resolves which provider to use based on user preference and available credentials.

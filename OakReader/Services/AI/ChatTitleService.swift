@@ -1,5 +1,4 @@
 import Foundation
-import OakAI
 import OakAgent
 
 /// Generates a short, human-readable title for a chat from its first exchange.
@@ -22,7 +21,7 @@ struct ChatTitleService {
     """
 
     /// Returns a cleaned title, or `nil` on any failure / empty result.
-    static func generate(firstUser: String, firstAssistant: String, config: ProviderConfig) async -> String? {
+    static func generate(firstUser: String, firstAssistant: String, config: AIRequestConfig) async -> String? {
         let user = """
         User: \(firstUser.prefix(inputClip))
 
@@ -37,7 +36,7 @@ struct ChatTitleService {
     // MARK: - Private
 
     /// Single no-tools completion through the completion facade.
-    private static func complete(system: String, user: String, config: ProviderConfig) async -> String? {
+    private static func complete(system: String, user: String, config: AIRequestConfig) async -> String? {
         let request = CompletionRequest(
             providerId: config.providerId, model: config.model,
             system: system, user: user, maxTokens: 200

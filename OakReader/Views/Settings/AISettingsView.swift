@@ -1,11 +1,9 @@
 import SwiftUI
-import OakAI
-import OakAgent
 
 struct AISettingsView: View {
     // MARK: - State
 
-    @State private var store = ConfiguredProviderStore.shared
+    @State private var catalog = AIProviderCatalog.shared
     @State private var navigationPath = NavigationPath()
     @State private var showAddProviderSheet = false
 
@@ -13,22 +11,15 @@ struct AISettingsView: View {
     @State private var chatProviderId: String
     @State private var chatModel: String
 
-    // Thinking
-    @State private var thinkingBudget: Int
-
     // MARK: - Init
 
     init() {
         let prefs = Preferences.shared
-
-        // Chat
         let pid = prefs.aiProviderId
         _chatProviderId = State(initialValue: pid)
-        let defaultModel = ProviderRegistry.shared.provider(for: pid)?.defaultModelId ?? ""
-        _chatModel = State(initialValue: prefs.aiModel.isEmpty ? defaultModel : prefs.aiModel)
-
-        // Thinking
-        _thinkingBudget = State(initialValue: prefs.thinkingBudget)
+        _chatModel = State(initialValue: AIProviderCatalog.shared.resolvedModelId(
+            providerId: pid, stored: prefs.aiModel
+        ))
     }
 
     // MARK: - Body
@@ -36,17 +27,22 @@ struct AISettingsView: View {
     var body: some View {
         NavigationStack(path: $navigationPath) {
             Form {
+                if let error = catalog.backendError {
+                    Section {
+                        Label(error, systemImage: "exclamationmark.triangle")
+                            .foregroundStyle(.orange)
+                    }
+                }
                 providersSection
                 chatSection
-                thinkingSection
             }
             .formStyle(.grouped)
             .navigationTitle("LLM")
             .navigationDestination(for: String.self) { providerId in
-                AIProviderConfigView(providerId: providerId, store: store)
+                AIProviderConfigView(providerId: providerId)
             }
             .sheet(isPresented: $showAddProviderSheet) {
-                AddProviderSheet(store: store) { selectedId in
+                AddProviderSheet { selectedId in
                     showAddProviderSheet = false
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         navigationPath.append(selectedId)
@@ -54,6 +50,7 @@ struct AISettingsView: View {
                 }
             }
         }
+        .task { await catalog.refresh() }
         .onDisappear { save() }
     }
 
@@ -62,7 +59,7 @@ struct AISettingsView: View {
     @ViewBuilder
     private var providersSection: some View {
         Section("Providers") {
-            ForEach(store.configuredLLMProviders) { provider in
+            ForEach(catalog.configuredProviders) { provider in
                 NavigationLink(value: provider.id) {
                     HStack(spacing: 10) {
                         ProviderIconView(
@@ -70,7 +67,7 @@ struct AISettingsView: View {
                             fallbackSymbol: provider.isLocal ? "desktopcomputer" : "cpu"
                         )
 
-                        Text(provider.displayName)
+                        Text(provider.name)
 
                         Spacer()
 
@@ -103,20 +100,20 @@ struct AISettingsView: View {
     @ViewBuilder
     private var chatSection: some View {
         Section("Chat") {
-            if store.configuredLLMProviders.isEmpty {
+            if catalog.configuredProviders.isEmpty {
                 Text("Add a provider above to select a default LLM.")
                     .foregroundStyle(.secondary)
             } else {
                 Picker("Provider", selection: $chatProviderId) {
-                    ForEach(store.configuredLLMProviders) { p in
-                        Text(p.displayName).tag(p.id)
+                    ForEach(catalog.configuredProviders) { p in
+                        Text(p.name).tag(p.id)
                     }
                 }
                 .onChange(of: chatProviderId) { _, newValue in
-                    chatModel = ProviderRegistry.shared.provider(for: newValue)?.defaultModelId ?? ""
+                    chatModel = catalog.provider(for: newValue)?.defaultModel ?? ""
                 }
 
-                if let provider = ProviderRegistry.shared.provider(for: chatProviderId) {
+                if let provider = catalog.provider(for: chatProviderId) {
                     Picker("Model", selection: $chatModel) {
                         ForEach(provider.models) { m in
                             Text(m.name).tag(m.id)
@@ -124,35 +121,12 @@ struct AISettingsView: View {
                     }
                 }
 
-                if let provider = ProviderRegistry.shared.provider(for: chatProviderId),
-                   let info = provider.models.first(where: { $0.id == chatModel }) {
+                if let info = catalog.modelInfo(providerId: chatProviderId, modelId: chatModel) {
                     LabeledContent("Context Window", value: formatTokens(info.contextWindow))
                     LabeledContent("Max Output", value: formatTokens(info.maxTokens))
-                    LabeledContent("Vision", value: info.supportsVision ? "Yes" : "No")
+                    LabeledContent("Vision", value: info.vision ? "Yes" : "No")
                     LabeledContent("Reasoning", value: info.reasoning ? "Yes" : "No")
                 }
-            }
-        }
-    }
-
-    // MARK: - Thinking Section
-
-    @ViewBuilder
-    private var thinkingSection: some View {
-        if let provider = ProviderRegistry.shared.provider(for: chatProviderId),
-           let info = provider.models.first(where: { $0.id == chatModel }),
-           info.reasoning {
-            Section("Extended Thinking") {
-                Stepper(
-                    "Budget: \(formatTokens(thinkingBudget)) tokens",
-                    value: $thinkingBudget,
-                    in: 1000...128000,
-                    step: 1000
-                )
-
-                Text("Token budget for model reasoning. Higher values allow deeper thinking but increase latency and cost.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -167,12 +141,7 @@ struct AISettingsView: View {
 
     private func save() {
         let prefs = Preferences.shared
-
-        // Chat
         prefs.aiProviderId = chatProviderId
         prefs.aiModel = chatModel
-
-        // Thinking
-        prefs.thinkingBudget = thinkingBudget
     }
 }

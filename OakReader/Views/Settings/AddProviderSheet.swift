@@ -1,15 +1,13 @@
 import SwiftUI
-import OakAI
-import OakAgent
 
 struct AddProviderSheet: View {
-    let store: ConfiguredProviderStore
     let onSelect: (String) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @State private var catalog = AIProviderCatalog.shared
 
-    private var unconfiguredLLM: [ProviderInfo] {
-        store.unconfiguredLLMProviders
+    private var unconfiguredLLM: [BackendProviderSummary] {
+        catalog.unconfiguredProviders
     }
 
     var body: some View {
@@ -36,7 +34,7 @@ struct AddProviderSheet: View {
                                 providerRow(
                                     iconAsset: "provider-\(provider.id)",
                                     fallbackSymbol: provider.isLocal ? "desktopcomputer" : "cpu",
-                                    title: provider.displayName
+                                    title: provider.name
                                 )
                             }
                             .buttonStyle(.plain)

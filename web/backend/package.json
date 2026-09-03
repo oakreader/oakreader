@@ -1,6 +1,6 @@
 {
   "name": "@oakreader/backend",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "OakReader AI sidecar: JSONL-over-stdio protocol on top of pi-ai. See docs/architecture/node-backend-migration.md.",
   "type": "module",

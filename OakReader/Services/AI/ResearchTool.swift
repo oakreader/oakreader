@@ -1,5 +1,4 @@
 import Foundation
-import OakAI
 import OakAgent
 
 /// A research **subagent**: runs its own nested, read-only agent loop over the
@@ -29,7 +28,7 @@ struct ResearchTool: AgentTool, Sendable {
     /// Full-text search service shared with the parent (read-only use here).
     let searchService: FTSIndexService
     /// LLM provider/model config for the child loop (typically a cheaper/faster model).
-    let config: ProviderConfig
+    let config: AIRequestConfig
     /// GROUNDED scope: when set, the subagent's search is physically restricted to
     /// this collection's members (catalog id / UUID string).
     var scopeCollectionId: String?
@@ -96,7 +95,7 @@ struct ResearchTool: AgentTool, Sendable {
         try? FileManager.default.createDirectory(at: sessionDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: sessionDir) }
 
-        let child = AgentSession(chatsDirectory: sessionDir)
+        let child = BackendChatEngine(chatsDirectory: sessionDir)
         let log = RetrievalLog()
 
         // Restricted toolset: search + read only. The search tool reports its
