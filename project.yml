@@ -27,8 +27,6 @@ knownRegions:
 packages:
   OakAgent:
     path: Packages/OakAgent
-  OakAI:
-    path: Packages/OakAI
   OakMarkdownUI:
     path: Packages/OakMarkdownUI
   GRDB:
@@ -71,11 +69,14 @@ targets:
         excludes:
           - "**/Info.plist"
           - "**/*.entitlements"
+      # Node sidecar bundle (committed artifact; rebuild with `pnpm --filter
+      # @oakreader/backend build`). See docs/architecture/node-backend-migration.md.
+      - path: web/backend/dist/oak-backend.cjs
+        buildPhase: resources
     resources:
       - path: skills
       - path: prompts
     dependencies:
-      - package: OakAI
       - package: OakAgent
       - package: OakMarkdownUI
       - package: GRDB

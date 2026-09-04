@@ -35,7 +35,7 @@ struct AudioSettingsView: View {
 
     // MARK: - Voice / AI state
 
-    @State private var store = ConfiguredProviderStore.shared
+    @State private var catalog = AIProviderCatalog.shared
 
     // Chat default (read-only display for Voice Chat LLM)
     @State private var chatProviderId: String = ""
@@ -79,7 +79,7 @@ struct AudioSettingsView: View {
 
         // Chat default
         let pid = prefs.aiProviderId
-        let defaultModel = ProviderRegistry.shared.provider(for: pid)?.defaultModelId ?? ""
+        let defaultModel = AIProviderCatalog.shared.provider(for: pid)?.defaultModel ?? ""
         _chatProviderId = State(initialValue: pid)
         _chatModel = State(initialValue: prefs.aiModel.isEmpty ? defaultModel : prefs.aiModel)
 
@@ -102,8 +102,8 @@ struct AudioSettingsView: View {
         // Inline API keys
         _elevenLabsAPIKey = State(initialValue: prefs.elevenLabsAPIKey)
         _fishAudioAPIKey = State(initialValue: prefs.fishAudioAPIKey)
-        let openAIKey = KeychainService.apiKey(forProviderId: "openai") ?? ""
-        let geminiKey = KeychainService.apiKey(forProviderId: "google") ?? ""
+        let openAIKey = AIProviderCatalog.shared.sharedVoiceKeys["openai"] ?? ""
+        let geminiKey = AIProviderCatalog.shared.sharedVoiceKeys["google"] ?? ""
         _openAIAPIKey = State(initialValue: openAIKey)
         _geminiAPIKey = State(initialValue: geminiKey)
         _originalOpenAIAPIKey = State(initialValue: openAIKey)
@@ -115,7 +115,7 @@ struct AudioSettingsView: View {
     }
 
     private static func providerForModel(_ modelId: String) -> String? {
-        for provider in ConfiguredProviderStore.shared.configuredLLMProviders {
+        for provider in AIProviderCatalog.shared.configuredProviders {
             if provider.models.contains(where: { $0.id == modelId }) {
                 return provider.id
             }
@@ -378,7 +378,7 @@ struct AudioSettingsView: View {
     /// Placeholder for the OpenAI voice Base URL: the chat Endpoint override if set,
     /// otherwise the OpenAI default — so it's clear what an empty field resolves to.
     private var openAIBasePlaceholder: String {
-        let chat = ProviderEndpointStore.shared.override(for: "openai")
+        let chat = (AIProviderCatalog.shared.provider(for: "openai")?.baseUrlOverride ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         return chat.isEmpty ? "https://api.openai.com/v1" : chat
     }
@@ -393,20 +393,20 @@ struct AudioSettingsView: View {
 
     @ViewBuilder
     private func llmPickers(providerId: Binding<String>, model: Binding<String>) -> some View {
-        if store.configuredLLMProviders.isEmpty {
+        if catalog.configuredProviders.isEmpty {
             Text("Add a provider in AI settings to select a model.")
                 .foregroundStyle(.secondary)
         } else {
             Picker("Provider", selection: providerId) {
-                ForEach(store.configuredLLMProviders) { p in
-                    Text(p.displayName).tag(p.id)
+                ForEach(catalog.configuredProviders) { p in
+                    Text(p.name).tag(p.id)
                 }
             }
             .onChange(of: providerId.wrappedValue) { _, newValue in
-                model.wrappedValue = ProviderRegistry.shared.provider(for: newValue)?.defaultModelId ?? ""
+                model.wrappedValue = catalog.provider(for: newValue)?.defaultModel ?? ""
             }
 
-            if let provider = ProviderRegistry.shared.provider(for: providerId.wrappedValue) {
+            if let provider = catalog.provider(for: providerId.wrappedValue) {
                 Picker("Model", selection: model) {
                     ForEach(provider.models) { m in
                         Text(m.name).tag(m.id)
@@ -417,8 +417,8 @@ struct AudioSettingsView: View {
     }
 
     private var chatDefaultLabel: some View {
-        let providerName = ProviderRegistry.shared.provider(for: chatProviderId)?.displayName ?? chatProviderId
-        let modelName = ProviderRegistry.shared.provider(for: chatProviderId)?.models.first(where: { $0.id == chatModel })?.name ?? chatModel
+        let providerName = AIProviderCatalog.shared.provider(for: chatProviderId)?.name ?? chatProviderId
+        let modelName = AIProviderCatalog.shared.modelInfo(providerId: chatProviderId, modelId: chatModel)?.name ?? chatModel
         return LabeledContent("Using", value: "\(providerName) / \(modelName)")
             .foregroundStyle(.secondary)
     }
@@ -656,22 +656,22 @@ struct AudioSettingsView: View {
         prefs.elevenLabsAPIKey = elevenLabsAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
         prefs.fishAudioAPIKey = fishAudioAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        // OpenAI / Gemini keys share the chat provider's Keychain entry. Only write when
-        // changed and non-empty so clearing the field never wipes the chat provider's key.
+        // OpenAI / Gemini keys share the chat provider's backend credential. Only write
+        // when changed and non-empty so clearing the field never wipes the chat key.
         let trimmedOpenAI = openAIAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmedOpenAI != originalOpenAIAPIKey, !trimmedOpenAI.isEmpty {
-            KeychainService.setAPIKey(trimmedOpenAI, forProviderId: "openai")
-        }
         let trimmedGemini = geminiAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmedGemini != originalGeminiAPIKey, !trimmedGemini.isEmpty {
-            KeychainService.setAPIKey(trimmedGemini, forProviderId: "google")
+        Task { @MainActor in
+            if trimmedOpenAI != originalOpenAIAPIKey, !trimmedOpenAI.isEmpty {
+                _ = await AIProviderCatalog.shared.setAPIKey(trimmedOpenAI, providerId: "openai")
+            }
+            if trimmedGemini != originalGeminiAPIKey, !trimmedGemini.isEmpty {
+                _ = await AIProviderCatalog.shared.setAPIKey(trimmedGemini, providerId: "google")
+            }
         }
 
         // Base URL overrides (proxy / relay)
         prefs.setVoiceBaseURL(openAIBaseURL.trimmingCharacters(in: .whitespacesAndNewlines), forProvider: "openai")
         prefs.setVoiceBaseURL(geminiBaseURL.trimmingCharacters(in: .whitespacesAndNewlines), forProvider: "gemini")
-
-        store.refresh()
     }
 }
 

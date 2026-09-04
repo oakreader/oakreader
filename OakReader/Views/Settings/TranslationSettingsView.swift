@@ -18,7 +18,7 @@ struct TranslationSettingsView: View {
     @State private var exportRange: ExportRange = .all
     @State private var sinceDate: Date = Calendar.current.startOfDay(for: Date())
 
-    private let providerStore = ConfiguredProviderStore.shared
+    private let catalog = AIProviderCatalog.shared
 
     init(store: LibraryStore) {
         self.store = store
@@ -34,7 +34,7 @@ struct TranslationSettingsView: View {
         _translationProviderId = State(initialValue: prefs.translationAIProviderId)
         let tm = prefs.translationAIModel
         _translationModel = State(initialValue: tm.isEmpty
-            ? (ProviderRegistry.shared.provider(for: prefs.translationAIProviderId)?.defaultModelId ?? "") : tm)
+            ? (AIProviderCatalog.shared.provider(for: prefs.translationAIProviderId)?.defaultModel ?? "") : tm)
     }
 
     var body: some View {
@@ -91,20 +91,20 @@ struct TranslationSettingsView: View {
 
     @ViewBuilder
     private var llmPickers: some View {
-        if providerStore.configuredLLMProviders.isEmpty {
+        if catalog.configuredProviders.isEmpty {
             Text("Configure a provider in AI Providers first.")
                 .foregroundStyle(.secondary)
         } else {
             Picker("Provider", selection: $translationProviderId) {
-                ForEach(providerStore.configuredLLMProviders) { p in
-                    Text(p.displayName).tag(p.id)
+                ForEach(catalog.configuredProviders) { p in
+                    Text(p.name).tag(p.id)
                 }
             }
             .onChange(of: translationProviderId) { _, newValue in
-                translationModel = ProviderRegistry.shared.provider(for: newValue)?.defaultModelId ?? ""
+                translationModel = catalog.provider(for: newValue)?.defaultModel ?? ""
             }
 
-            if let provider = ProviderRegistry.shared.provider(for: translationProviderId) {
+            if let provider = catalog.provider(for: translationProviderId) {
                 Picker("Model", selection: $translationModel) {
                     ForEach(provider.models) { m in
                         Text(m.name).tag(m.id)
@@ -118,8 +118,8 @@ struct TranslationSettingsView: View {
         let prefs = Preferences.shared
         let pid = prefs.aiProviderId
         let model = prefs.aiModel
-        let providerName = ProviderRegistry.shared.provider(for: pid)?.displayName ?? pid
-        let modelName = ProviderRegistry.shared.provider(for: pid)?.models.first(where: { $0.id == model })?.name ?? model
+        let providerName = AIProviderCatalog.shared.provider(for: pid)?.name ?? pid
+        let modelName = AIProviderCatalog.shared.modelInfo(providerId: pid, modelId: model)?.name ?? model
         return LabeledContent("Using", value: "\(providerName) / \(modelName)")
             .foregroundStyle(.secondary)
     }

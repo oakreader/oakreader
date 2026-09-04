@@ -15,9 +15,9 @@ enum VoiceProviderFactory {
         case .fishAudio:
             return prefs.fishAudioAPIKey.isEmpty ? nil : prefs.fishAudioAPIKey
         case .openAI:
-            return CredentialResolver.resolve(for: "openai")
+            return AIProviderCatalog.shared.sharedVoiceKeys["openai"]
         case .gemini:
-            return CredentialResolver.resolve(for: "google")
+            return AIProviderCatalog.shared.sharedVoiceKeys["google"]
         }
     }
 
@@ -111,7 +111,7 @@ enum VoiceProviderFactory {
         let explicit = prefs.voiceBaseURL(forProvider: voiceId).trimmingCharacters(in: .whitespacesAndNewlines)
         if !explicit.isEmpty { return normalizeBase(explicit) }
         if let chatId {
-            let chat = ProviderEndpointStore.shared.override(for: chatId)
+            let chat = (AIProviderCatalog.shared.provider(for: chatId)?.baseUrlOverride ?? "")
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             if !chat.isEmpty { return normalizeBase(chat) }
         }

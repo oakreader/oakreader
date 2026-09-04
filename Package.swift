@@ -7,7 +7,6 @@ let package = Package(
         .macOS(.v15)
     ],
     dependencies: [
-        .package(path: "Packages/OakAI"),
         .package(path: "Packages/OakAgent"),
         .package(path: "Packages/OakVoice"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),

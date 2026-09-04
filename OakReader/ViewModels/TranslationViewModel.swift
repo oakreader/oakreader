@@ -25,7 +25,6 @@ class TranslationViewModel {
     private var debounceTask: Task<Void, Never>?
     private var wordExplanationTask: Task<Void, Never>?
     private var skipNextDebounce = false
-    private let router = ProviderRouter()
 
     init(parent: DocumentViewModel) {
         self.parent = parent
@@ -104,42 +103,22 @@ class TranslationViewModel {
 
         let prefs = Preferences.shared
         let storedPid = prefs.translationAIProviderId
-        let pid = ConfiguredProviderStore.shared.resolvedProviderId(preferred: storedPid)
-        let model: String = {
-            let m = prefs.translationAIModel
-            let valid = pid == storedPid && !m.isEmpty
-                && ProviderRegistry.shared.provider(for: pid)?.models.contains { $0.id == m } == true
-            return valid ? m : (ProviderRegistry.shared.provider(for: pid)?.defaultModelId ?? "")
-        }()
+        let catalog = AIProviderCatalog.shared
+        let pid = catalog.resolvedProviderId(preferred: storedPid)
+        let model = catalog.resolvedModelId(
+            providerId: pid, stored: pid == storedPid ? prefs.translationAIModel : ""
+        )
 
         let (systemPrompt, userPrompt) = buildPrompts(text: text)
 
-        let config = ProviderConfig(providerId: pid, model: model)
-        let messages = [LLMMessage(role: .user, text: userPrompt)]
+        let request = CompletionRequest(
+            providerId: pid, model: model, system: systemPrompt, user: userPrompt
+        )
 
         streamTask = Task { @MainActor in
             do {
-                let svc = try await router.provider(for: config)
-                let stream = svc.sendMessage(
-                    messages: messages,
-                    model: model,
-                    systemPrompt: systemPrompt,
-                    maxTokens: 4096
-                )
-
-                for try await chunk in stream {
-                    switch chunk {
-                    case .delta(let delta):
-                        translatedText += delta
-                    case .thinking:
-                        break
-                    case .toolUse, .toolInputDelta:
-                        break
-                    case .finished:
-                        break
-                    case .error(let msg):
-                        errorMessage = msg
-                    }
+                for try await delta in AIBackend.completions.stream(request) {
+                    translatedText += delta
                 }
             } catch {
                 if !(error is CancellationError) {
@@ -293,41 +272,24 @@ class TranslationViewModel {
 
         let prefs = Preferences.shared
         let storedPid = prefs.translationAIProviderId
-        let pid = ConfiguredProviderStore.shared.resolvedProviderId(preferred: storedPid)
-        let model: String = {
-            let m = prefs.translationAIModel
-            let valid = pid == storedPid && !m.isEmpty
-                && ProviderRegistry.shared.provider(for: pid)?.models.contains { $0.id == m } == true
-            return valid ? m : (ProviderRegistry.shared.provider(for: pid)?.defaultModelId ?? "")
-        }()
+        let catalog = AIProviderCatalog.shared
+        let pid = catalog.resolvedProviderId(preferred: storedPid)
+        let model = catalog.resolvedModelId(
+            providerId: pid, stored: pid == storedPid ? prefs.translationAIModel : ""
+        )
 
         let systemPrompt = buildExplanationSystemPrompt()
         let userPrompt = buildExplanationUserPrompt(selection: trimmed, sentence: sentence)
 
-        let config = ProviderConfig(providerId: pid, model: model)
-        let messages = [LLMMessage(role: .user, text: userPrompt)]
+        let request = CompletionRequest(
+            providerId: pid, model: model, system: systemPrompt, user: userPrompt
+        )
 
         wordExplanationTask = Task { @MainActor in
             var hadError = false
             do {
-                let svc = try await router.provider(for: config)
-                let stream = svc.sendMessage(
-                    messages: messages,
-                    model: model,
-                    systemPrompt: systemPrompt,
-                    maxTokens: 4096
-                )
-
-                for try await chunk in stream {
-                    switch chunk {
-                    case .delta(let delta):
-                        wordExplanation += delta
-                    case .thinking, .toolUse, .toolInputDelta, .finished:
-                        break
-                    case .error(let msg):
-                        wordExplanation += "\n\n⚠️ \(msg)"
-                        hadError = true
-                    }
+                for try await delta in AIBackend.completions.stream(request) {
+                    wordExplanation += delta
                 }
             } catch {
                 if !(error is CancellationError) {

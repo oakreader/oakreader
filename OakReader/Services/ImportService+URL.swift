@@ -1,6 +1,6 @@
 import Foundation
-import AppKit
 import OakAgent
+import AppKit
 
 struct URLImportOptions {}
 
