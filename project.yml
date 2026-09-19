@@ -69,10 +69,6 @@ targets:
         excludes:
           - "**/Info.plist"
           - "**/*.entitlements"
-      # Node sidecar bundle (committed artifact; rebuild with `pnpm --filter
-      # @oakreader/backend build`). See docs/architecture/node-backend-migration.md.
-      - path: web/backend/dist/oak-backend.cjs
-        buildPhase: resources
     resources:
       - path: skills
       - path: prompts
@@ -99,6 +95,35 @@ targets:
       - script: |
           cp "${BUILT_PRODUCTS_DIR}/oak" "${BUILT_PRODUCTS_DIR}/OakReader.app/Contents/Resources/oak"
         name: "Embed oak CLI"
+      # The AI sidecar is a self-contained executable from `bun build --compile`
+      # (the Bun runtime is inside it), so the app never looks for `node` and
+      # there is no minimum runtime version. Too large to commit -- 63 MB arm64,
+      # 132 MB universal -- so it is built here and gitignored. Release builds
+      # must be universal to match the app. Being a Mach-O inside the bundle it
+      # has to be signed inside-out, before Xcode seals the app.
+      - script: |
+          set -e
+          BACKEND="${SRCROOT}/web/backend"
+          export PATH="$PATH:$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin"
+          if ! command -v bun >/dev/null 2>&1; then
+            echo "error: bun not found — install from https://bun.sh; the AI sidecar is compiled with it" >&2
+            exit 1
+          fi
+          if [ "${CONFIGURATION}" = "Release" ]; then
+            OAK_UNIVERSAL=1 bash "$BACKEND/scripts/build-binary.sh"
+          else
+            bash "$BACKEND/scripts/build-binary.sh"
+          fi
+          DEST="${BUILT_PRODUCTS_DIR}/OakReader.app/Contents/Resources/oak-backend"
+          cp "$BACKEND/dist/oak-backend" "$DEST"
+          chmod +x "$DEST"
+          if [ -n "${EXPANDED_CODE_SIGN_IDENTITY:-}" ] && [ "${EXPANDED_CODE_SIGN_IDENTITY}" != "-" ]; then
+            codesign --force --options runtime --timestamp=none \
+                     --sign "${EXPANDED_CODE_SIGN_IDENTITY}" "$DEST"
+          else
+            codesign --force --sign - "$DEST"
+          fi
+        name: "Build & embed AI sidecar (bun --compile)"
     # All code-signing config (team, identity, style, entitlements, provisioning)
     # lives in the xcconfig layer, NOT in project.yml, so a contributor can build
     # with their own Apple team — or ad-hoc — by dropping a gitignored

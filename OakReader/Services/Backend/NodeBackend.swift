@@ -153,13 +153,11 @@ actor NodeBackend {
 
     private func spawn() throws {
         terminate()
-        guard let node = Self.findNode() else { throw NodeBackendError.nodeNotFound }
-        guard let script = Self.findScript() else { throw NodeBackendError.scriptNotFound }
+        guard let binary = Self.findBinary() else { throw NodeBackendError.scriptNotFound }
 
         let proc = Process()
-        proc.executableURL = node
+        proc.executableURL = binary
         proc.arguments = [
-            script.path,
             "--data-dir", CatalogDatabase.dataDirectory.appendingPathComponent("backend").path,
         ]
         let stdin = Pipe(), stdout = Pipe(), stderr = Pipe()
@@ -186,7 +184,7 @@ actor NodeBackend {
         process = proc
         stdinHandle = stdin.fileHandleForWriting
         stdoutBuffer = Data()
-        Self.log.info("sidecar spawned: \(node.path) \(script.path)")
+        Self.log.info("sidecar spawned: \(binary.path)")
     }
 
     private func processDied() {
@@ -246,22 +244,14 @@ actor NodeBackend {
 
     // MARK: - Discovery
 
-    /// GUI apps don't inherit a shell PATH; probe the usual install locations.
-    /// A bundled Node runtime replaces this in a later phase.
-    private static func findNode() -> URL? {
-        let candidates = [
-            "/opt/homebrew/bin/node",
-            "/usr/local/bin/node",
-            "/usr/bin/node",
-        ]
-        for path in candidates where FileManager.default.isExecutableFile(atPath: path) {
-            return URL(fileURLWithPath: path)
-        }
-        return nil
-    }
-
-    private static func findScript() -> URL? {
-        if let url = Bundle.main.url(forResource: "oak-backend", withExtension: "cjs") {
+    /// The sidecar is a self-contained executable produced by `bun build
+    /// --compile` (web/backend/scripts/build-binary.sh), so the Bun runtime is
+    /// inside it. Nothing is probed on the user's machine: there is no `node`
+    /// lookup and no minimum runtime version. This is what Dia ships too — its
+    /// agent-server, handler and claude binaries are all compiled the same way.
+    private static func findBinary() -> URL? {
+        if let url = Bundle.main.url(forResource: "oak-backend", withExtension: nil),
+           FileManager.default.isExecutableFile(atPath: url.path) {
             return url
         }
         #if DEBUG
@@ -269,15 +259,14 @@ actor NodeBackend {
         let source = URL(fileURLWithPath: #filePath)  // …/OakReader/Services/Backend/NodeBackend.swift
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent()
-            .appendingPathComponent("web/backend/dist/oak-backend.cjs")
-        if FileManager.default.fileExists(atPath: source.path) { return source }
+            .appendingPathComponent("web/backend/dist/oak-backend")
+        if FileManager.default.isExecutableFile(atPath: source.path) { return source }
         #endif
         return nil
     }
 }
 
 enum NodeBackendError: LocalizedError {
-    case nodeNotFound
     case scriptNotFound
     case notRunning
     case crashed
@@ -285,9 +274,7 @@ enum NodeBackendError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .nodeNotFound:
-            return "Node.js 22+ is required for AI features but was not found. Install it from https://nodejs.org or via Homebrew."
-        case .scriptNotFound: return "oak-backend.cjs not found in app resources"
+        case .scriptNotFound: return "The AI backend executable is missing from the app bundle."
         case .notRunning: return "AI backend is not running"
         case .crashed: return "AI backend exited unexpectedly"
         case .commandFailed(let message): return message

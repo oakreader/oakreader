@@ -84,3 +84,6 @@ tmp/
 
 # Internal-only docs (release runbook, prompt sessions) — kept local, not published
 docs/internal/
+
+# Compiled AI sidecar (63-132 MB, built by web/backend/scripts/build-binary.sh)
+web/backend/dist/

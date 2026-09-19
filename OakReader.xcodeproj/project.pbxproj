@@ -220,7 +220,6 @@
 		C4A4B6846CACAAFC6BAC27E1 /* SystemPermissionStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = FADC7847A8EEE480FA43B301 /* SystemPermissionStatus.swift */; };
 		C609C0587B9526025F590C39 /* TTSAudioCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AFDF99021E517B1FDC190BD /* TTSAudioCache.swift */; };
 		C754AC99FFFED38894DD27B8 /* NativeNoteEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76757A9FEAE3BA266939DCEF /* NativeNoteEditorView.swift */; };
-		C76D36FDD6C3B8B16BFB2A0F /* oak-backend.cjs in Resources */ = {isa = PBXBuildFile; fileRef = A0837803A9463BC0EF36F354 /* oak-backend.cjs */; };
 		C7FE49CF7D7C4FA6E5EAB53F /* OakToolButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = D18E67DFB5D1EAA11B2B5A07 /* OakToolButton.swift */; };
 		C8AC25FEFABF9ED9ECCB2FEE /* ItemPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 480A67A2AF6B7A4B34639C05 /* ItemPanelView.swift */; };
 		C8FAF0D7C7CE58A1B43E6F2F /* AppExtensionSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E17653B4A5B70DEDC4E21C1 /* AppExtensionSettingsView.swift */; };
@@ -484,7 +483,6 @@
 		9C53D79EA2BCE3297F2496EA /* ImageExportOptionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageExportOptionsView.swift; sourceTree = "<group>"; };
 		9D1079994250EC357F664ECC /* PDFMarkupOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFMarkupOverlay.swift; sourceTree = "<group>"; };
 		9F2452181C93824A747B28F8 /* SmartCollectionEditorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartCollectionEditorSheet.swift; sourceTree = "<group>"; };
-		A0837803A9463BC0EF36F354 /* oak-backend.cjs */ = {isa = PBXFileReference; path = "oak-backend.cjs"; sourceTree = "<group>"; };
 		A08B4E1A4D92D1A9CAF93355 /* WordLookup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WordLookup.swift; sourceTree = "<group>"; };
 		A10E57E661596E49EB03F2F2 /* Marketplace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Marketplace.swift; sourceTree = "<group>"; };
 		A1A0EE8E4D060414A9DE9009 /* SecuritySettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecuritySettings.swift; sourceTree = "<group>"; };
@@ -917,22 +915,6 @@
 			path = Models;
 			sourceTree = "<group>";
 		};
-		6FF1523604C94B31FFDE1978 /* dist */ = {
-			isa = PBXGroup;
-			children = (
-				A0837803A9463BC0EF36F354 /* oak-backend.cjs */,
-			);
-			path = dist;
-			sourceTree = "<group>";
-		};
-		7AAB053E1904FEF087EC3366 /* backend */ = {
-			isa = PBXGroup;
-			children = (
-				6FF1523604C94B31FFDE1978 /* dist */,
-			);
-			path = backend;
-			sourceTree = "<group>";
-		};
 		7AB287EB3D69C981FDC9D5C4 /* cli */ = {
 			isa = PBXGroup;
 			children = (
@@ -964,14 +946,6 @@
 				45CA5369BCA5767E15F0D5F3 /* VOICE.md */,
 			);
 			path = AgentTemplates;
-			sourceTree = "<group>";
-		};
-		90E22B4B71A074D21C02850C /* web */ = {
-			isa = PBXGroup;
-			children = (
-				7AAB053E1904FEF087EC3366 /* backend */,
-			);
-			path = web;
 			sourceTree = "<group>";
 		};
 		998546E0D94680953B11A38D /* Settings */ = {
@@ -1066,7 +1040,6 @@
 				7AB287EB3D69C981FDC9D5C4 /* cli */,
 				4C31D42C6F27A5F6CC61D210 /* OakReader */,
 				FC165E5901DDAD54EC3CB28E /* Packages */,
-				90E22B4B71A074D21C02850C /* web */,
 				8C9C73298BBEA1713EB983DE /* xcconfig */,
 				E6C40581B7F1F5E458BD8009 /* Products */,
 			);
@@ -1205,6 +1178,7 @@
 				5CA8C06B341F452D65421825 /* Sources */,
 				FAC8682D3503EF53F2D18813 /* SwiftLint */,
 				268AB549AE9096152DA86C5E /* Embed oak CLI */,
+				F10046E9AF3F95B0BC8D2E7C /* Build & embed AI sidecar (bun --compile) */,
 				F9CC889C03A7ACCE2AEC7526 /* Resources */,
 				A02FDAF25B969EA882935FC0 /* Frameworks */,
 			);
@@ -1293,7 +1267,6 @@
 				6EB17E48EFDF2EFCB2F8DDFA /* TsangerJinKai02-W04.ttf in Resources */,
 				6239041962999CDBF1BD2D02 /* VOICE.md in Resources */,
 				F955D6B65A1EBAF357AFF994 /* grant_voice.wav in Resources */,
-				C76D36FDD6C3B8B16BFB2A0F /* oak-backend.cjs in Resources */,
 				5F912B6B746065725639A456 /* oak in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1318,6 +1291,24 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "cp \"${BUILT_PRODUCTS_DIR}/oak\" \"${BUILT_PRODUCTS_DIR}/OakReader.app/Contents/Resources/oak\"\n";
+		};
+		F10046E9AF3F95B0BC8D2E7C /* Build & embed AI sidecar (bun --compile) */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Build & embed AI sidecar (bun --compile)";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\nBACKEND=\"${SRCROOT}/web/backend\"\nexport PATH=\"$PATH:$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin\"\nif ! command -v bun >/dev/null 2>&1; then\n  echo \"error: bun not found — install from https://bun.sh; the AI sidecar is compiled with it\" >&2\n  exit 1\nfi\nif [ \"${CONFIGURATION}\" = \"Release\" ]; then\n  OAK_UNIVERSAL=1 bash \"$BACKEND/scripts/build-binary.sh\"\nelse\n  bash \"$BACKEND/scripts/build-binary.sh\"\nfi\nDEST=\"${BUILT_PRODUCTS_DIR}/OakReader.app/Contents/Resources/oak-backend\"\ncp \"$BACKEND/dist/oak-backend\" \"$DEST\"\nchmod +x \"$DEST\"\nif [ -n \"${EXPANDED_CODE_SIGN_IDENTITY:-}\" ] && [ \"${EXPANDED_CODE_SIGN_IDENTITY}\" != \"-\" ]; then\n  codesign --force --options runtime --timestamp=none \\\n           --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" \"$DEST\"\nelse\n  codesign --force --sign - \"$DEST\"\nfi\n";
 		};
 		FAC8682D3503EF53F2D18813 /* SwiftLint */ = {
 			isa = PBXShellScriptBuildPhase;
