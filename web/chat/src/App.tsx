@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import clsx from "clsx";
 import { onShellEvent, postToShell, type InboundEvent, type SerializedTurn } from "./bridge";
+import { shouldUseRestingComposerLayout } from "./vendor/t3code/composerFooterLayout";
 import {
   appendOptimisticUserTurn,
   deriveTimelineRows,
@@ -61,6 +62,7 @@ export function App() {
 
   const rows = useMemo(() => deriveTimelineRows(state), [state]);
   const streaming = state.activeTurnId !== null;
+  const [timelineLayout, setTimelineLayout] = useState({ overflows: false, scrollCollapsed: false });
 
   const send = useCallback((text: string) => {
     dispatch({ kind: "optimistic", text });
@@ -69,25 +71,51 @@ export function App() {
 
   return (
     <div className="flex h-full flex-col bg-background text-foreground">
-      <MessagesTimeline rows={rows} streaming={streaming} />
-      <ChatComposer onSend={send} streaming={streaming} onAbort={() => postToShell({ type: "abort" })} />
+      <MessagesTimeline rows={rows} streaming={streaming} onLayoutChange={setTimelineLayout} />
+      <ChatComposer
+        onSend={send}
+        streaming={streaming}
+        onAbort={() => postToShell({ type: "abort" })}
+        hasThread={rows.length > 0}
+        timelineOverflows={timelineLayout.overflows}
+        isScrollCollapsed={timelineLayout.scrollCollapsed}
+      />
     </div>
   );
 }
 
 /* ------------------------------------------------------------------ timeline */
 
-function MessagesTimeline({ rows, streaming }: { rows: Row[]; streaming: boolean }) {
+function MessagesTimeline({
+  rows,
+  streaming,
+  onLayoutChange,
+}: {
+  rows: Row[];
+  streaming: boolean;
+  /** Reports the two facts the composer needs to decide its resting state. */
+  onLayoutChange: (state: { overflows: boolean; scrollCollapsed: boolean }) => void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const pinned = useRef(true);
 
+  const report = () => {
+    const el = ref.current;
+    if (!el) return;
+    const overflows = el.scrollHeight > el.clientHeight + 8;
+    // Scrolled up off the bottom: the user asked for reading space.
+    const scrollCollapsed = overflows && el.scrollHeight - el.scrollTop - el.clientHeight > 80;
+    onLayoutChange({ overflows, scrollCollapsed });
+  };
   const onScroll = () => {
     const el = ref.current;
     if (!el) return;
     pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+    report();
   };
   useLayoutEffect(() => {
     if (pinned.current && ref.current) ref.current.scrollTop = ref.current.scrollHeight;
+    report();
   }, [rows]);
 
   return (
@@ -234,10 +262,16 @@ function ChatComposer({
   onSend,
   streaming,
   onAbort,
+  hasThread,
+  timelineOverflows,
+  isScrollCollapsed,
 }: {
   onSend: (text: string) => void;
   streaming: boolean;
   onAbort: () => void;
+  hasThread: boolean;
+  timelineOverflows: boolean;
+  isScrollCollapsed: boolean;
 }) {
   const [text, setText] = useState("");
   const [focused, setFocused] = useState(false);
@@ -257,7 +291,19 @@ function ChatComposer({
     setText("");
   };
 
-  const resting = !focused && text.length === 0;
+  // Blur must NOT collapse the composer: clicking into a message to copy a
+  // quote would otherwise shrink the input under the user. Resting is a
+  // deliberate scroll gesture on a timeline that actually overflows.
+  // shouldUseRestingComposerLayout is vendored from t3code -- see
+  // src/vendor/t3code/README.md.
+  const resting = shouldUseRestingComposerLayout({
+    isExistingThread: hasThread,
+    isMobileViewport: false,          // the panel is never a phone viewport
+    isScrollCollapsed,
+    hasExpandedChrome: focused,
+    hasMultilinePrompt: text.includes("\n"),
+    timelineOverflows,
+  });
 
   return (
     <div className="px-3 pb-3">
