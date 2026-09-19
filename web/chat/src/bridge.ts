@@ -22,6 +22,22 @@ export interface ToolRecord {
   isError?: boolean;
 }
 
+/** One row in the `/` or `@` menu, supplied by the shell. */
+export interface CompletionItem {
+  id: string;
+  label: string;
+  detail?: string;
+  /** Text substituted into the prompt; defaults to `label`. */
+  insert?: string;
+}
+
+export interface ModelOption {
+  providerId: string;
+  providerName: string;
+  modelId: string;
+  modelName: string;
+}
+
 export type InboundEvent =
   | { type: "reset"; turns: SerializedTurn[] }
   | { type: "turnStarted"; turnId: string }
@@ -32,7 +48,10 @@ export type InboundEvent =
   | { type: "toolUseCompleted"; turnId: string; tool: ToolRecord }
   | { type: "finished"; turnId: string }
   | { type: "error"; turnId?: string; message: string }
-  | { type: "appearance"; theme: "light" | "dark" };
+  | { type: "appearance"; theme: "light" | "dark" }
+  /** Answer to requestCompletions; `kind` echoes the request. */
+  | { type: "completions"; kind: "slash" | "mention"; query: string; items: CompletionItem[] }
+  | { type: "models"; options: ModelOption[]; current?: { providerId: string; modelId: string } };
 
 /** A completed turn as restored from the shell's session store. */
 export interface SerializedTurn {
@@ -50,6 +69,9 @@ export type OutboundMessage =
   | { type: "abort" }
   | { type: "approveTool"; toolId: string; approved: boolean }
   | { type: "openCitation"; href: string }
+  /** Ask the shell for `/` skills or `@` library references matching `query`. */
+  | { type: "requestCompletions"; kind: "slash" | "mention"; query: string }
+  | { type: "setModel"; providerId: string; modelId: string }
   /** Surfaced so the shell can log JS failures instead of losing them. */
   | { type: "log"; level: "warn" | "error"; message: string };
 

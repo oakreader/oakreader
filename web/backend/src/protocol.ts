@@ -198,5 +198,9 @@ export type Event =
   | { id: string; type: "assistant"; text: string; thinking?: string; toolCalls: { id: string; name: string; args: Record<string, unknown> }[] }
   | { id: string; type: "oauth_notify"; kind: "info" | "auth_url" | "device_code" | "progress"; message?: string; url?: string; userCode?: string; verificationUri?: string }
   | { id: string; type: "oauth_prompt"; promptId: string; promptType: "text" | "secret" | "select" | "manual_code"; message: string; placeholder?: string; options?: { id: string; label: string }[] }
+  /** Unsolicited, once, when the WebSocket transport is listening. The
+      parent process learns the ephemeral port this way; the token it passed
+      in is not echoed back. */
+  | { id: ""; type: "ws_ready"; port: number }
   | { id: string; type: "done"; stopReason: string }
   | { id: string; type: "error"; message: string };
