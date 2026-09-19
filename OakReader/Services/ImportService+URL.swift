@@ -2,7 +2,13 @@ import Foundation
 import OakAgent
 import AppKit
 
-struct URLImportOptions {}
+struct URLImportOptions {
+    /// Store a full offline snapshot as well as the link + `content.md`.
+    /// `nil` defers to `Preferences.shared.archiveWebPages` (off by default).
+    var archive: Bool?
+
+    init(archive: Bool? = nil) { self.archive = archive }
+}
 
 enum URLImportError: LocalizedError {
     case invalidURL
@@ -67,7 +73,10 @@ extension ImportService {
 
     /// Import a remote URL into the library.
     /// - PDF URLs are downloaded and imported as PDFs.
-    /// - HTML pages are archived with monolith, converted to `content.md`, and imported as HTML documents.
+    /// - HTML pages are saved as a **bookmark** (link + `content.md`) by default;
+    ///   they are archived with monolith into a full offline snapshot only when
+    ///   `options.archive` says so, or `Preferences.shared.archiveWebPages` is on.
+    ///   Snapshots are what make a library huge — see `archiveWebPages`.
     @discardableResult
     func importURL(_ sourceURL: URL, options: URLImportOptions = URLImportOptions()) async throws -> LibraryItem? {
         guard sourceURL.scheme?.lowercased().hasPrefix("http") == true else {
@@ -82,8 +91,10 @@ extension ImportService {
         let imported: LibraryItem?
         if Self.isLikelyPDFURL(sourceURL, contentType: info.contentType) {
             imported = try await importRemotePDF(sourceURL, suggestedTitle: info.title)
-        } else {
+        } else if options.archive ?? Preferences.shared.archiveWebPages {
             imported = try await importRemoteWebPage(sourceURL, fallbackHTML: info.html, title: info.title)
+        } else {
+            imported = await importRemoteLink(sourceURL, info: info)
         }
         if imported != nil {
             Analytics.capture("content_imported", properties: ["source": "url"])
@@ -147,6 +158,30 @@ extension ImportService {
                 contentMarkdown: (markdown?.isEmpty == false) ? markdown : nil
             ))
         }
+    }
+
+    /// Bookmark a remote page without archiving it: stores the link plus a
+    /// `content.md` derived from the fetched HTML, which is what full-text
+    /// search and the AI tools actually read. This is the default path for
+    /// `importURL` — see `Preferences.archiveWebPages` for why.
+    ///
+    /// Unlike `importBrowserLink` there is no live DOM here, so the markdown
+    /// comes from the static fetch in `remoteInfo`. A client-rendered SPA may
+    /// therefore yield little or no text; the bookmark is still created, and
+    /// saving from the browser (live DOM) or turning snapshots on both recover
+    /// the content.
+    private func importRemoteLink(_ sourceURL: URL, info: RemoteInfo) async -> LibraryItem? {
+        var markdown: String?
+        if let html = info.html, !html.isEmpty {
+            let tempURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent(UUID().uuidString)
+                .appendingPathExtension("html")
+            if (try? html.write(to: tempURL, atomically: true, encoding: .utf8)) != nil {
+                markdown = await markdownFromHTML(htmlURL: tempURL)
+                try? FileManager.default.removeItem(at: tempURL)
+            }
+        }
+        return await importBrowserLink(sourceURL, liveTitle: info.title, liveMarkdown: markdown)
     }
 
     // MARK: - PDF URL Import

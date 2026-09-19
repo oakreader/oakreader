@@ -4,6 +4,7 @@ import GRDB
 struct LibrarySettingsView: View {
     let store: LibraryStore
 
+    @State private var archiveWebPages = Preferences.shared.archiveWebPages
     @State private var indexedCount = 0
     @State private var processedCount = 0
     @State private var totalCount = 0
@@ -46,6 +47,18 @@ struct LibrarySettingsView: View {
                         Label(item.name, systemImage: item.icon)
                     }
                 }
+            }
+
+            Section("Web Pages") {
+                Toggle("Save an offline snapshot", isOn: $archiveWebPages)
+                    .onChange(of: archiveWebPages) { _, newValue in
+                        Preferences.shared.archiveWebPages = newValue
+                    }
+                Text("Off: a saved page stores its link plus the extracted text, "
+                     + "and reopens live. On: a full offline copy is archived too — "
+                     + "typically a few megabytes per page.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section("Search Index") {

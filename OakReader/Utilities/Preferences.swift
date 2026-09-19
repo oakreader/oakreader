@@ -66,6 +66,7 @@ final class Preferences {
         static let showSidebar = "showSidebar"
         static let sidebarMode = "sidebarMode"
         static let autoSave = "autoSave"
+        static let archiveWebPages = "archiveWebPages"
         static let compressionQuality = "compressionQuality"
         static let defaultFontName = "defaultFontName"
         static let defaultFontSize = "defaultFontSize"
@@ -142,6 +143,7 @@ final class Preferences {
             Keys.showSidebar: true,
             Keys.sidebarMode: SidebarMode.thumbnails.rawValue,
             Keys.autoSave: true,
+            Keys.archiveWebPages: false,
             Keys.compressionQuality: CompressionQuality.medium.rawValue,
             Keys.defaultFontName: PDFDefaults.defaultFontName,
             Keys.defaultFontSize: PDFDefaults.defaultFontSize,
@@ -182,6 +184,19 @@ final class Preferences {
     var autoSave: Bool {
         get { defaults.bool(forKey: Keys.autoSave) }
         set { defaults.set(newValue, forKey: Keys.autoSave) }
+    }
+
+    /// Whether importing a web page stores a full offline snapshot (monolith
+    /// SingleFile archive) in addition to the link + `content.md`.
+    ///
+    /// Off by default: snapshots dominate library size. Measured on a real
+    /// 2,329-item library — 437 archives held 2.2 GB of a 5.2 GB storage dir
+    /// (median 4.9 MB each), while the `content.md` that search and AI actually
+    /// read totalled 23 MB. A bookmark keeps the page readable and searchable
+    /// and reopens it live; turn this on when offline fidelity matters more.
+    var archiveWebPages: Bool {
+        get { defaults.bool(forKey: Keys.archiveWebPages) }
+        set { defaults.set(newValue, forKey: Keys.archiveWebPages) }
     }
 
     var compressionQuality: CompressionQuality {
