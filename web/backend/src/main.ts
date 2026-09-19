@@ -34,6 +34,28 @@ const registry = new ProviderRegistry(credentials, config);
 
 // --- IO -------------------------------------------------------------------
 
+/**
+ * stdout is the protocol channel and nothing else may write to it.
+ *
+ * A single `console.log` from any dependency injects a non-JSON line into the
+ * event stream, and `console.log(obj)` injects *several* — pretty-printed
+ * objects span multiple lines, which breaks LF framing, not just one message.
+ * The Swift reader logs and skips undecodable lines so this degrades rather
+ * than deadlocks, but the noise is untraceable and a logged object that happens
+ * to parse as an event with a live request id would be acted on.
+ *
+ * Route every console method to stderr, which is already the free-form log
+ * channel. This is the one durable advantage a Unix-socket transport would
+ * have had; stdio keeps the Windows portability that made it the choice.
+ */
+for (const method of ["log", "info", "warn", "debug", "trace", "dir"] as const) {
+  console[method] = (...args: unknown[]) => {
+    process.stderr.write(
+      "[console] " + args.map((a) => (typeof a === "string" ? a : JSON.stringify(a))).join(" ") + "\n",
+    );
+  };
+}
+
 function emit(event: Event): void {
   process.stdout.write(JSON.stringify(event) + "\n");
 }
