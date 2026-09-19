@@ -167,12 +167,63 @@ final class AppState {
         do {
             database = try CatalogDatabase()
         } catch {
-            fatalError("[AppState] Failed to initialize database: \(error)")
+            Self.reportUnopenableCatalog(error)
         }
         self.libraryStore = LibraryStore(database: database)
         self.referenceService = ReferenceService(database: database)
         self.importService = ImportService(store: libraryStore, coverService: coverService, referenceService: referenceService)
         startAutosaveTimer()
+    }
+
+    /// The catalog *is* the app, so a database we can't open is still fatal — but it
+    /// is usually fixable by hand (most often a library written before the migration
+    /// history was collapsed, whose `grdb_migrations` rows no longer match this
+    /// build's migrator, so `migrate()` re-runs a `CREATE TABLE`). Trapping turned
+    /// that into an opaque "OakReader quit unexpectedly" report that named neither
+    /// the file nor the reason. Name both, then exit. Mirrors the refusal
+    /// `BackupService` gives when restoring an incompatible backup.
+    ///
+    /// Runs from `AppDelegate`'s stored-property initialization, i.e. before
+    /// `NSApplication.run()`. `runModal` spins its own event loop, but AppKit will
+    /// not order the panel on screen until the app has finished launching — without
+    /// the `finishLaunching()` below the process just hangs with no window, which is
+    /// worse than the trap this replaced. Safe to call here: `main.swift` assigns
+    /// `app.delegate` only *after* this initializer returns, so there is no delegate
+    /// yet to receive the launch callbacks early.
+    private static func reportUnopenableCatalog(_ error: Error) -> Never {
+        let directory = CatalogDatabase.dataDirectory
+        let databasePath = directory.appendingPathComponent("library.sqlite").path
+        // Interpolate rather than use localizedDescription: GRDB's DatabaseError
+        // carries the failing SQL in its description, and that is the whole
+        // diagnostic. Written to the log too, since the alert is transient.
+        let detail = "\(error)"
+        LogFileWriter.shared.write(
+            level: "ERROR",
+            category: "AppState",
+            message: "Failed to open catalog at \(databasePath): \(detail)"
+        )
+
+        let alert = NSAlert()
+        alert.alertStyle = .critical
+        alert.messageText = "OakReader can't open your library."
+        alert.informativeText = """
+            The catalog database couldn't be opened or brought up to date with this \
+            version of OakReader. Your documents in this folder are untouched.
+
+            \(databasePath)
+
+            \(detail)
+            """
+        alert.addButton(withTitle: "Quit")
+        alert.addButton(withTitle: "Show Library Folder")
+
+        NSApp.setActivationPolicy(.regular)
+        NSApp.finishLaunching()
+        NSApp.activate()
+        if alert.runModal() == .alertSecondButtonReturn {
+            NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: databasePath)])
+        }
+        exit(1)
     }
 
     // MARK: - Tab Operations
