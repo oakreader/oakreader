@@ -1,0 +1,89 @@
+name: CI
+
+# A clean build on every push and PR. This exists because the repo had no CI at
+# all: `release.yml` only runs on push to main, and it skips unless the version
+# changed. A branch that did not compile from a fresh checkout sat undetected
+# for 16 days -- every local worktree still had a stale module in DerivedData,
+# so `xcodebuild` succeeded everywhere except on a machine that had never built
+# it. CI is the only place that is always clean.
+on:
+  push:
+    branches-ignore: [main]   # main is covered by release.yml
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  APP_NAME: OakReader
+  SCHEME: OakReader
+
+jobs:
+  build:
+    # Same image as release.yml so CI and the shipped build share a toolchain.
+    runs-on: macos-26
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # The sidecar is compiled by an Xcode build phase with `bun build
+      # --compile`, so bun has to exist before the app build.
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.14'
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install backend dependencies
+        working-directory: web/backend
+        run: pnpm install --frozen-lockfile
+
+      # Cheap and fails fast: typecheck + the protocol/tokenizer suites run in
+      # seconds, long before the ~10 minute Swift build.
+      - name: Typecheck backend
+        working-directory: web/backend
+        run: pnpm typecheck
+
+      - name: Test backend
+        working-directory: web/backend
+        run: pnpm test
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Resolve packages
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -onlyUsePackageVersionsFromResolvedFile \
+            -project ${{ env.APP_NAME }}.xcodeproj \
+            -scheme ${{ env.SCHEME }}
+
+      # The actual guard. Ad-hoc signing (CODE_SIGNING_ALLOWED=NO) keeps this
+      # runnable without secrets, so forks and PRs get the same check. Debug
+      # carries no restricted entitlement, so nothing here needs a real identity.
+      - name: Clean build
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project ${{ env.APP_NAME }}.xcodeproj \
+            -scheme ${{ env.SCHEME }} \
+            -configuration Debug \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build 2>&1 | tail -40
+
+      - name: Verify the sidecar was embedded
+        run: |
+          APP="$RUNNER_TEMP/DerivedData/Build/Products/Debug/${{ env.APP_NAME }}.app"
+          test -x "$APP/Contents/Resources/oak-backend" \
+            || { echo "::error::oak-backend missing from the app bundle"; exit 1; }
+          echo "embedded sidecar: $(du -h "$APP/Contents/Resources/oak-backend" | cut -f1)"
