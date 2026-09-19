@@ -1,7 +1,16 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import clsx from "clsx";
 import { Markdown } from "./Markdown";
-import { onShellEvent, postToShell, type InboundEvent, type SerializedTurn } from "./bridge";
+import {
+  ComposerCommandMenu,
+  type ComposerCommandItem,
+} from "./vendor/t3code/components/chat/ComposerCommandMenu";
+import {
+  detectComposerTrigger,
+  replaceTextRange,
+  type ComposerTrigger,
+} from "./vendor/t3code/shared/composerTrigger";
+import { onShellEvent, postToShell, type CompletionItem, type InboundEvent, type ModelOption, type SerializedTurn } from "./bridge";
 import { shouldUseRestingComposerLayout } from "./vendor/t3code/components/composerFooterLayout";
 import {
   appendOptimisticUserTurn,
@@ -39,6 +48,18 @@ type Action = { kind: "event"; event: InboundEvent } | { kind: "optimistic"; tex
 const chatReducer = (state: ChatState, action: Action): ChatState =>
   action.kind === "event" ? reduce(state, action.event) : appendOptimisticUserTurn(state, action.text);
 
+const PREVIEW_SLASH: CompletionItem[] = [
+  { id: "quiz", label: "quiz", detail: "Generate explain-cards from this document" },
+  { id: "summarize", label: "summarize", detail: "Summarise the open document" },
+  { id: "socratic", label: "socratic", detail: "Question me about what I just read" },
+  { id: "grill", label: "grill", detail: "Challenge my understanding" },
+];
+const PREVIEW_MENTION: CompletionItem[] = [
+  { id: "m1", label: "Attention Is All You Need", detail: "PDF · 12 pages", insert: "attention-2017" },
+  { id: "m2", label: "Flow Matching and Diffusion", detail: "PDF · 41 pages", insert: "flow-2024" },
+  { id: "m3", label: "Kafka Replication", detail: "Clip · confluent.io", insert: "kafka-replication" },
+];
+
 export function App() {
   const [state, dispatch] = useReducer(chatReducer, initialState);
 
@@ -48,9 +69,31 @@ export function App() {
         document.documentElement.dataset.theme = event.theme;
         return;
       }
+      if (event.type === "completions") {
+        setCompletions({ kind: event.kind, items: event.items });
+        return;
+      }
+      if (event.type === "models") {
+        setModels({ options: event.options, current: event.current });
+        return;
+      }
       dispatch({ kind: "event", event });
     });
     postToShell({ type: "ready" });
+
+    // In a browser there is no shell to answer requestCompletions, so the
+    // preview answers itself. Never reached inside the app.
+    const inShellNow = Boolean((window as unknown as { webkit?: { messageHandlers?: unknown } }).webkit?.messageHandlers);
+    if (!inShellNow) {
+      (window as unknown as { __previewCompletions: (k: "slash" | "mention", q: string) => void }).__previewCompletions =
+        (kind, query) => {
+          const pool = kind === "slash" ? PREVIEW_SLASH : PREVIEW_MENTION;
+          const items = pool.filter((i) => i.label.toLowerCase().includes(query.toLowerCase()));
+          // setCompletions, not dispatch: the chat reducer only knows turn
+          // events and would drop this one through its default branch.
+          setCompletions({ kind, items });
+        };
+    }
 
     // Outside the WKWebView there is no shell to drive the panel, so seed a
     // representative conversation. This is how the surface gets reviewed in a
@@ -58,12 +101,27 @@ export function App() {
     const inShell = Boolean((window as unknown as { webkit?: { messageHandlers?: unknown } }).webkit?.messageHandlers);
     if (!inShell && new URLSearchParams(location.search).get("preview") !== "0") {
       dispatch({ kind: "event", event: { type: "reset", turns: PREVIEW_TURNS as unknown as SerializedTurn[] } });
+      setModels({
+        options: [
+          { providerId: "anthropic", providerName: "Anthropic", modelId: "claude-fable-5", modelName: "Claude Fable 5" },
+          { providerId: "anthropic", providerName: "Anthropic", modelId: "claude-opus-5", modelName: "Claude Opus 5" },
+          { providerId: "openai", providerName: "OpenAI", modelId: "gpt-5", modelName: "GPT-5" },
+        ],
+        current: { providerId: "anthropic", modelId: "claude-fable-5" },
+      });
     }
   }, []);
 
   const rows = useMemo(() => deriveTimelineRows(state), [state]);
   const streaming = state.activeTurnId !== null;
   const [timelineLayout, setTimelineLayout] = useState({ overflows: false, scrollCollapsed: false });
+  const [completions, setCompletions] = useState<{ kind: "slash" | "mention"; items: CompletionItem[] }>({
+    kind: "slash",
+    items: [],
+  });
+  const [models, setModels] = useState<{ options: ModelOption[]; current?: { providerId: string; modelId: string } }>({
+    options: [],
+  });
 
   const send = useCallback((text: string) => {
     dispatch({ kind: "optimistic", text });
@@ -80,6 +138,8 @@ export function App() {
         hasThread={rows.length > 0}
         timelineOverflows={timelineLayout.overflows}
         isScrollCollapsed={timelineLayout.scrollCollapsed}
+        completions={completions}
+        models={models}
       />
     </div>
   );
@@ -266,6 +326,8 @@ function ChatComposer({
   hasThread,
   timelineOverflows,
   isScrollCollapsed,
+  completions,
+  models,
 }: {
   onSend: (text: string) => void;
   streaming: boolean;
@@ -273,9 +335,13 @@ function ChatComposer({
   hasThread: boolean;
   timelineOverflows: boolean;
   isScrollCollapsed: boolean;
+  completions: { kind: "slash" | "mention"; items: CompletionItem[] };
+  models: { options: ModelOption[]; current?: { providerId: string; modelId: string } };
 }) {
   const [text, setText] = useState("");
   const [focused, setFocused] = useState(false);
+  const [trigger, setTrigger] = useState<ComposerTrigger | null>(null);
+  const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
 
   useLayoutEffect(() => {
@@ -285,11 +351,77 @@ function ChatComposer({
     el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
   }, [text]);
 
+  // Re-detect on every edit and caret move. t3code's detector is the whole
+  // rule set for `/`, `@` and `$skill`; keeping it in one place is why the
+  // composer does not need its own parsing.
+  const syncTrigger = (value: string, caret: number) => {
+    const next = detectComposerTrigger(value, caret);
+    setTrigger(next);
+    if (!next) return;
+    if (next.kind === "slash-command" || next.kind === "skill") {
+      postToShell({ type: "requestCompletions", kind: "slash", query: next.query });
+    } else if (next.kind === "path") {
+      postToShell({ type: "requestCompletions", kind: "mention", query: next.query });
+    }
+  };
+
+  const menuItems: ComposerCommandItem[] =
+    trigger?.kind === "slash-model"
+      ? models.options.map((o) => ({
+          id: `${o.providerId}/${o.modelId}`,
+          type: "skill" as const,
+          label: o.modelName,
+          description: o.providerName,
+        }))
+      : trigger
+        ? completions.items.map((i) => ({
+            id: i.id,
+            type: trigger.kind === "path" ? ("path" as const) : ("skill" as const),
+            ...(trigger.kind === "path" ? { path: i.insert ?? i.label } : {}),
+            label: i.label,
+            description: i.detail ?? "",
+          })) as ComposerCommandItem[]
+        : [];
+
+  const menuOpen = trigger !== null && menuItems.length > 0;
+  const activeIndex = Math.max(0, menuItems.findIndex((i) => i.id === activeItemId));
+
+  const commit = (item: ComposerCommandItem) => {
+    if (trigger?.kind === "slash-model") {
+      const [providerId, ...rest] = item.id.split("/");
+      postToShell({ type: "setModel", providerId: providerId!, modelId: rest.join("/") });
+      // `/model` is a command, not text: drop it from the prompt.
+      const cleared = replaceTextRange(text, trigger.rangeStart, trigger.rangeEnd, "");
+      setText(cleared.text);
+      setTrigger(null);
+      return;
+    }
+    if (!trigger) return;
+    const insert = item.type === "path" ? `@${item.path} ` : `/${item.label} `;
+    const next = replaceTextRange(text, trigger.rangeStart, trigger.rangeEnd, insert);
+    setText(next.text);
+    setTrigger(null);
+    requestAnimationFrame(() => {
+      const el = ref.current;
+      if (el) {
+        el.focus();
+        el.setSelectionRange(next.cursor, next.cursor);
+      }
+    });
+  };
+
+  const move = (delta: number) => {
+    if (menuItems.length === 0) return;
+    const i = (activeIndex + delta + menuItems.length) % menuItems.length;
+    setActiveItemId(menuItems[i]!.id);
+  };
+
   const submit = () => {
     const value = text.trim();
     if (!value || streaming) return;
     onSend(value);
     setText("");
+    setTrigger(null);
   };
 
   // Blur must NOT collapse the composer: clicking into a message to copy a
@@ -308,6 +440,19 @@ function ChatComposer({
 
   return (
     <div className="px-3 pb-3">
+      {menuOpen && (
+        <div className="mb-1.5 overflow-hidden rounded-xl border border-border bg-card shadow-lg">
+          <ComposerCommandMenu
+            items={menuItems}
+            resolvedTheme={document.documentElement.dataset.theme === "dark" ? "dark" : "light"}
+            isLoading={false}
+            triggerKind={trigger?.kind ?? null}
+            activeItemId={menuItems[activeIndex]?.id ?? null}
+            onHighlightedItemChange={setActiveItemId}
+            onSelect={commit}
+          />
+        </div>
+      )}
       {/* Surface: t3code's 20px radius, colour-transitioned, ring on focus. */}
       <div
         className={clsx(
@@ -323,8 +468,28 @@ function ChatComposer({
             placeholder="Ask about this document…"
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => {
+              setText(e.target.value);
+              syncTrigger(e.target.value, e.target.selectionStart ?? e.target.value.length);
+            }}
+            onSelect={(e) => {
+              const el = e.currentTarget;
+              syncTrigger(el.value, el.selectionStart ?? el.value.length);
+            }}
             onKeyDown={(e) => {
+              // While the menu is open it owns the arrows, Enter and Tab --
+              // otherwise Enter would send a half-typed `/comm` as a message.
+              if (menuOpen) {
+                if (e.key === "ArrowDown") { e.preventDefault(); move(1); return; }
+                if (e.key === "ArrowUp") { e.preventDefault(); move(-1); return; }
+                if (e.key === "Enter" || e.key === "Tab") {
+                  e.preventDefault();
+                  const item = menuItems[activeIndex];
+                  if (item) commit(item);
+                  return;
+                }
+                if (e.key === "Escape") { e.preventDefault(); setTrigger(null); return; }
+              }
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 submit();

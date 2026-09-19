@@ -83,9 +83,14 @@ export function postToShell(message: OutboundMessage): void {
   const webkit = (window as unknown as { webkit?: WebKitBridge }).webkit;
   const handler = webkit?.messageHandlers?.oakChat;
   if (handler) handler.postMessage(message);
-  // Running in a browser during `pnpm dev`: log instead of throwing so the UI
-  // is still developable without the app.
-  else console.info("[oakChat -> shell]", message);
+  // Running in a browser: let the preview answer completion requests so the
+  // menus are reviewable without the app.
+  else {
+    const preview = (window as unknown as { __previewCompletions?: (k: "slash" | "mention", q: string) => void })
+      .__previewCompletions;
+    if (message.type === "requestCompletions" && preview) preview(message.kind, message.query);
+    else console.info("[oakChat -> shell]", message);
+  }
 }
 
 export function onShellEvent(handler: (event: InboundEvent) => void): void {
