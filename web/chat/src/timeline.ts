@@ -135,17 +135,22 @@ function fromSerialized(t: SerializedTurn): Turn {
 
 /** Row = one rendered unit, with an id stable across the whole stream. */
 export type Row =
-  | { kind: "message"; id: string; turn: Turn }
+  | { kind: "thinking"; id: string; turnId: string; text: string }
   | { kind: "tool"; id: string; turnId: string; tool: ToolEntry }
+  | { kind: "message"; id: string; turn: Turn }
   | { kind: "error"; id: string; turnId: string; message: string };
 
+/**
+ * Flatten to the order things actually happened in: the model reasons, calls
+ * tools, then writes its answer. Hoisting every tool above the message (or
+ * burying reasoning inside it) reads backwards.
+ */
 export function deriveTimelineRows(state: ChatState): Row[] {
   const rows: Row[] = [];
   for (const turn of state.turns) {
-    // Thinking and tool activity belong above the prose they produced, which
-    // is the order they actually happened in.
+    if (turn.thinking) rows.push({ kind: "thinking", id: `${turn.id}:think`, turnId: turn.id, text: turn.thinking });
     for (const tool of turn.tools) rows.push({ kind: "tool", id: `${turn.id}:tool:${tool.id}`, turnId: turn.id, tool });
-    if (turn.text || turn.thinking || turn.streaming)
+    if (turn.text || turn.streaming || turn.role === "user")
       rows.push({ kind: "message", id: `${turn.id}:msg`, turn });
     if (turn.error) rows.push({ kind: "error", id: `${turn.id}:err`, turnId: turn.id, message: turn.error });
   }

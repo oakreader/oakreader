@@ -1,43 +1,90 @@
 @import "tailwindcss";
 
-/* The panel is hosted in a WKWebView inside a native window, so it must adopt
-   the app's appearance rather than the system default. Swift sets
-   data-theme on <html> from NSApp.effectiveAppearance. */
-@theme {
-  --color-surface: #ffffff;
-  --color-surface-raised: #f6f6f7;
-  --color-ink: #16161a;
-  --color-ink-muted: #6b6b76;
-  --color-line: #e3e3e7;
-  --color-accent: #3b6ef5;
+/* Token names and values follow t3code's apps/web/src/index.css so the panel
+   reads as the same product. Palette is Tailwind's zinc (light) / neutral
+   (dark); `primary` is their exact oklch blue. */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-secondary-label: var(--secondary-label);
+  --color-accent: var(--accent);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-message-action: var(--message-action);
+  --color-message-action-foreground: var(--message-action-foreground);
+  --color-message-action-hover: var(--message-action-hover);
+  --color-message-foreground: var(--message-foreground);
+  --color-placeholder: var(--placeholder);
+  --font-sans: var(--font-sans);
 }
 
+:root {
+  --background: oklch(0.985 0 0);
+  --foreground: oklch(0.31 0.005 285);
+  --card: #ffffff;
+  --muted: oklch(0.97 0.001 286);
+  --muted-foreground: oklch(0.55 0.014 286);
+  --secondary-label: var(--muted-foreground);
+  --accent: oklch(0.94 0.003 286);
+  --border: oklch(0.92 0.004 286);
+  --input: oklch(0.87 0.006 286);
+  --primary: oklch(0.488 0.217 264);
+  --primary-foreground: #ffffff;
+  --ring: var(--primary);
+  --message-action: var(--primary);
+  --message-action-foreground: var(--primary-foreground);
+  --message-action-hover: color-mix(in srgb, var(--primary) 90%, var(--background));
+  --message-foreground: var(--foreground);
+  --placeholder: oklch(0.65 0.01 286);
+  --control-radius: 0.5rem;
+  --app-scrollbar-width: 6px;
+  --app-scrollbar-thumb: rgb(217 217 217);
+  --app-scrollbar-thumb-hover: rgb(191 191 191);
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+}
+
+/* Swift stamps data-theme from NSApp.effectiveAppearance; the media query is
+   the fallback while that round-trip is in flight. */
 html[data-theme="dark"] {
-  --color-surface: #1b1b1f;
-  --color-surface-raised: #232329;
-  --color-ink: #ececf0;
-  --color-ink-muted: #9a9aa6;
-  --color-line: #33333b;
-  --color-accent: #6f96ff;
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.96 0 0);
+  --card: color-mix(in srgb, var(--background) 97%, #ffffff);
+  --muted: color-mix(in srgb, #ffffff 4%, var(--background));
+  --muted-foreground: oklch(0.63 0 0);
+  --accent: color-mix(in srgb, #ffffff 8%, var(--background));
+  --border: color-mix(in srgb, #ffffff 10%, var(--background));
+  --input: color-mix(in srgb, #ffffff 14%, var(--background));
+  --primary: oklch(0.571 0.21 264);
+  --placeholder: oklch(0.5 0 0);
+  --app-scrollbar-thumb: rgb(255 255 255 / 8%);
+  --app-scrollbar-thumb-hover: rgb(255 255 255 / 12%);
 }
 
 html, body, #root { height: 100%; }
 
 body {
   margin: 0;
-  background: var(--color-surface);
-  color: var(--color-ink);
-  font: 13px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
-  /* The native window owns scrolling chrome and rubber-banding. */
-  overscroll-behavior: none;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.55;
+  overscroll-behavior: none;       /* the native window owns rubber-banding */
   -webkit-user-select: none;
   user-select: none;
+  -webkit-font-smoothing: antialiased;
 }
 
 /* Message text is the one thing that must stay selectable. */
 .selectable { -webkit-user-select: text; user-select: text; }
 
-/* A native-feeling scrollbar: present while scrolling, invisible at rest. */
-::-webkit-scrollbar { width: 9px; }
-::-webkit-scrollbar-thumb { background: transparent; border-radius: 5px; }
-:hover::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--color-ink) 22%, transparent); }
+::-webkit-scrollbar { width: var(--app-scrollbar-width); }
+::-webkit-scrollbar-thumb { background: var(--app-scrollbar-thumb); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--app-scrollbar-thumb-hover); }
+::-webkit-scrollbar-track { background: transparent; }
