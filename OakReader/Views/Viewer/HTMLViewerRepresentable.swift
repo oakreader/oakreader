@@ -381,6 +381,10 @@ struct HTMLViewerRepresentable: NSViewRepresentable {
         #endif
         webView.coordinator = context.coordinator
         context.coordinator.webView = webView
+        // Let the snapshot overlays capture *this* tab's web view instead of
+        // searching the window for the first WKWebView (which finds the wrong
+        // tab when several are open). Mirrors markupOverlay.pdfView for PDF tabs.
+        viewModel.contentWebView = webView
         context.coordinator.setupScrollMonitor()
         context.coordinator.setupNotificationObservers()
         context.coordinator.setupProgressObservation()

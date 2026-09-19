@@ -2,6 +2,7 @@ import Foundation
 import PDFKit
 import AppKit
 import Combine
+import WebKit
 import OakAgent
 
 @Observable
@@ -29,6 +30,14 @@ class DocumentViewModel {
     /// Renders DB-backed text-markup highlights as an overlay (not baked into
     /// the PDF). Set as `pdfDocument.delegate` at read time. See PDFMarkupOverlay.
     let markupOverlay = PDFMarkupOverlayController()
+
+    /// The HTML/live-web `WKWebView` backing this tab, set by the web view
+    /// coordinator in `HTMLViewerRepresentable.makeNSView`. The snapshot overlays
+    /// use this to capture *this* tab's web view: every open tab keeps its view
+    /// alive in the shared window hierarchy (see RootView), so searching the
+    /// window for "the first WKWebView" would grab the wrong tab. Weak — owned by
+    /// the view hierarchy; mirrors `markupOverlay.pdfView` for PDF tabs.
+    weak var contentWebView: WKWebView?
 
     // MARK: - Child ViewModels (lazy)
 
