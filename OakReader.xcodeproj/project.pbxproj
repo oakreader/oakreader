@@ -1257,7 +1257,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "cp \"${BUILT_PRODUCTS_DIR}/oak\" \"${BUILT_PRODUCTS_DIR}/OakReader.app/Contents/Resources/oak\"\n";
+			shellScript = "# CONTENTS_FOLDER_PATH, not a hardcoded OakReader.app: the Debug\n# config overrides PRODUCT_NAME, so its wrapper is OakReader-Dev.app.\ncp \"${BUILT_PRODUCTS_DIR}/oak\" \"${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Resources/oak\"\n";
 		};
 		FAC8682D3503EF53F2D18813 /* SwiftLint */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -1646,8 +1646,8 @@
 			baseConfigurationReference = 6C649E9063F577EC40D9F60C /* OakReader-debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = "AppIcon-Dev";
-				BUNDLE_DISPLAY_NAME = "OakReader Dev";
-				BUNDLE_NAME = "OakReader Dev";
+				BUNDLE_DISPLAY_NAME = "OakReader-Dev";
+				BUNDLE_NAME = "OakReader-Dev";
 				BUNDLE_URL_SCHEME = "oakreader-dev";
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -1659,7 +1659,8 @@
 				);
 				MARKETING_VERSION = 0.7.14;
 				PRODUCT_BUNDLE_IDENTIFIER = com.oakreader.OakReader.dev;
-				PRODUCT_NAME = OakReader;
+				PRODUCT_MODULE_NAME = OakReader;
+				PRODUCT_NAME = "OakReader-Dev";
 				SDKROOT = macosx;
 				SPARKLE_PUBLIC_ED_KEY = "zm3UpFrDf8tFcctK2vkEhrms6oFTp50AUb824lP9BAw=";
 				SWIFT_STRICT_CONCURRENCY = minimal;
@@ -1749,6 +1750,7 @@
 				);
 				MARKETING_VERSION = 0.7.14;
 				PRODUCT_BUNDLE_IDENTIFIER = com.oakreader.OakReader;
+				PRODUCT_MODULE_NAME = OakReader;
 				PRODUCT_NAME = OakReader;
 				SDKROOT = macosx;
 				SPARKLE_PUBLIC_ED_KEY = "zm3UpFrDf8tFcctK2vkEhrms6oFTp50AUb824lP9BAw=";

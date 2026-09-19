@@ -96,7 +96,9 @@ targets:
           fi
         name: "SwiftLint"
       - script: |
-          cp "${BUILT_PRODUCTS_DIR}/oak" "${BUILT_PRODUCTS_DIR}/OakReader.app/Contents/Resources/oak"
+          # CONTENTS_FOLDER_PATH, not a hardcoded OakReader.app: the Debug
+          # config overrides PRODUCT_NAME, so its wrapper is OakReader-Dev.app.
+          cp "${BUILT_PRODUCTS_DIR}/oak" "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Resources/oak"
         name: "Embed oak CLI"
     # All code-signing config (team, identity, style, entitlements, provisioning)
     # lives in the xcconfig layer, NOT in project.yml, so a contributor can build
@@ -111,6 +113,11 @@ targets:
     settings:
       base:
         PRODUCT_NAME: OakReader
+        # Pinned so the Debug PRODUCT_NAME override below cannot rename the
+        # Swift module: PRODUCT_MODULE_NAME defaults to a sanitised PRODUCT_NAME,
+        # which would make the dev build's module "OakReader_Dev" and break
+        # anything resolving classes by the "OakReader." prefix.
+        PRODUCT_MODULE_NAME: OakReader
         INFOPLIST_FILE: OakReader/App/Info.plist
         # Marketing version is the release trigger and source of truth: bump it
         # (SemVer X.Y.Z) and merge to main to ship. CURRENT_PROJECT_VERSION is a
@@ -128,12 +135,22 @@ targets:
       configs:
         Debug:
           PRODUCT_BUNDLE_IDENTIFIER: com.oakreader.OakReader.dev
-          BUNDLE_DISPLAY_NAME: "OakReader Dev"
+          # The wrapper's FILE name, and the only one the Dock and Finder
+          # actually show. They label a tile from the on-disk bundle name, not
+          # from CFBundleDisplayName — a localised InfoPlist.strings would
+          # override that, but none of the .lproj folders ship one, so
+          # localizedInfoDictionary is nil and the filename wins. Without this
+          # override the dev build inherits the base PRODUCT_NAME and ships as
+          # OakReader.app, so the Dock says "OakReader" no matter what the two
+          # BUNDLE_* settings below say. Hyphen, not a space: matches the
+          # sibling termio repo's termio-dev and keeps the path quote-free.
+          PRODUCT_NAME: "OakReader-Dev"
+          BUNDLE_DISPLAY_NAME: "OakReader-Dev"
           # CFBundleName — NOT the same thing as CFBundleDisplayName: the macOS
-          # menu bar reads CFBundleName, while Finder/Dock read the display name.
-          # Both must be set or the dev build still says "OakReader" in the menu
-          # bar. Keep <= 16 chars or the menu bar truncates it.
-          BUNDLE_NAME: "OakReader Dev"
+          # menu bar reads CFBundleName, while the Dock and Finder go by the
+          # filename above. All three must agree or the dev build says
+          # "OakReader" somewhere. Keep <= 16 chars or the menu bar truncates it.
+          BUNDLE_NAME: "OakReader-Dev"
           # Own URL scheme, mirroring termio's dev channel (build-app.sh sets
           # CFBundleURLSchemes to "termio-dev"). Without this the dev and
           # release apps both register "oakreader" and LaunchServices routes
