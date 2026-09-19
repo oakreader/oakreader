@@ -21,7 +21,7 @@ enum Log {
     static let characters = Logger(subsystem: subsystem, category: "characters")
     static let stt        = Logger(subsystem: subsystem, category: "stt")
     static let tts        = Logger(subsystem: subsystem, category: "tts")
-    static let fts        = Logger(subsystem: subsystem, category: "fts")
+    static let ocr        = Logger(subsystem: subsystem, category: "ocr")
     static let audio      = Logger(subsystem: subsystem, category: "audio")
     static let search     = Logger(subsystem: subsystem, category: "search")
     static let meeting    = Logger(subsystem: subsystem, category: "meeting")
@@ -91,7 +91,7 @@ private extension Logger {
         case Log.characters: return "characters"
         case Log.stt:        return "stt"
         case Log.tts:        return "tts"
-        case Log.fts:        return "fts"
+        case Log.ocr:        return "ocr"
         case Log.audio:      return "audio"
         case Log.search:     return "search"
         case Log.meeting:    return "meeting"

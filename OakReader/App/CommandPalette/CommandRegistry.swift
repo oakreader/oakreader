@@ -1,7 +1,7 @@
 import AppKit
 
 enum CommandRegistry {
-    static let commands: [PaletteCommand] = navigation + view + file + settings + search + theme
+    static let commands: [PaletteCommand] = navigation + view + file + settings + theme
 
     // MARK: - Navigation (3)
 
@@ -257,18 +257,6 @@ enum CommandRegistry {
             action: .settingsTab(tab.rawValue)
         )
     }
-
-    // MARK: - Search (1)
-
-    private static let search: [PaletteCommand] = [
-        PaletteCommand(
-            id: "search.rebuildIndex",
-            title: "Rebuild Search Index",
-            category: .search,
-            icon: "arrow.triangle.2.circlepath",
-            action: .rebuildSearchIndex
-        ),
-    ]
 
     // MARK: - Theme (3)
 

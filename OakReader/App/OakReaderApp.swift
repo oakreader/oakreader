@@ -34,7 +34,6 @@ enum DocumentAction: String {
 
 extension Notification.Name {
     static let documentAction = Notification.Name("OakReaderDocumentAction")
-    static let searchIndexRebuildRequested = Notification.Name("OakReaderSearchIndexRebuildRequested")
     static let settingsNavigateToTab = Notification.Name("OakReaderSettingsNavigateToTab")
 
     // Per-coordinator selection-action signals (one tab fires; both coordinators

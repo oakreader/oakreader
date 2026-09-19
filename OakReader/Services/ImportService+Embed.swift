@@ -111,19 +111,6 @@ extension ImportService {
         try? referenceService.saveMetadata(csl, forItemId: docId.uuidString)
         store.invalidate()
 
-        // Full-text search index (FTS5)
-        if let service = ftsIndexService {
-            Task {
-                await service.indexItem(
-                    itemId: docId.uuidString,
-                    contentType: resolvedContentType.rawValue,
-                    storageKey: itemStorageKey,
-                    attStorageKey: attStorageKey,
-                    fileName: "metadata.json"
-                )
-            }
-        }
-
         // Derive the cover off the main thread. For YouTube we ALWAYS derive the poster from the
         // video id (16:9 maxresdefault) and ignore any supplied thumbnail — a watch page's
         // og:image is frequently the square channel avatar, which would otherwise be stored raw

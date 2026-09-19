@@ -85,7 +85,6 @@ class ChatViewModel {
     var errorMessage: String?
     var pendingToolConfirmation: PendingConfirmation?
     /// Live status from the research subagent while it runs (nil when idle).
-    var researchActivity: String?
 
     /// Transient "memory updated / saved" notice shown in the chat (nil when idle).
     /// Set by the `manage_memory` tool when it writes; auto-clears.
@@ -193,8 +192,8 @@ class ChatViewModel {
         )
     }
 
-    /// Config for the research subagent's loop: same provider, but a cheaper/faster
-    /// model when `researchModel` is set, and no extended thinking (it's tool-driven).
+    /// Config for background utility calls (e.g. auto chat titles): same provider,
+    /// but a cheaper/faster model when `researchModel` is set, and no extended thinking.
     var researchConfig: ProviderConfig {
         let prefs = Preferences.shared
         let researchModel = prefs.researchModel
@@ -360,31 +359,7 @@ class ChatViewModel {
             }
         }
 
-        // 2. Full-text content search (FTS5 over the indexed library), plus a
-        //    research subagent for deep multi-document questions (its own loop).
-        if let ftsService = appState?.ftsIndexService {
-            // GROUNDED scope: when a real collection is selected, physically restrict
-            // retrieval to its members so the agent literally cannot answer from
-            // outside the user's sources. `scopeId` is nil for smart / "All Items".
-            let scopeId = snapshot.activeCollection?.scopeId
-
-            var fts = FTSSearchTool(service: ftsService)
-            fts.scopeCollectionId = scopeId
-            tools.append(fts)
-
-            let activitySink: @Sendable (String) -> Void = { [weak self] status in
-                Task { @MainActor in self?.researchActivity = status }
-            }
-            var research = ResearchTool(
-                searchService: ftsService,
-                config: researchConfig,
-                onActivity: activitySink
-            )
-            research.scopeCollectionId = scopeId
-            tools.append(research)
-        }
-
-        // 3. Web search (always)
+        // 2. Web search (always)
         tools.append(AcademicSearchTool())
         tools.append(WebSearchTool())
         tools.append(WebFetchTool())
@@ -436,16 +411,10 @@ class ChatViewModel {
 
         streamTask = Task { @MainActor [weak self] in
             do {
-                // Inject the open document's current page as citable `?c=` passages
-                // (PDF, when indexed) so the model cites the page it's reading the
-                // same validated way it cites retrieved passages. Built here, not in
-                // the synchronous prelude, because the chunk fetch is async.
-                let pageChunks = await self?.currentPageChunks(snapshot: snapshot) ?? []
                 let systemPrompt = LLMContextProvider.buildSystemPrompt(
                     skill: currentSkill,
                     context: snapshot,
-                    documentCharBudget: docCharBudget,
-                    currentPageChunks: pageChunks
+                    documentCharBudget: docCharBudget
                 )
 
                 let stream = await engine.send(
@@ -599,18 +568,12 @@ class ChatViewModel {
                         // The resolved content below is authoritative and replaces
                         // whatever was streamed, so drop any uncommitted tail.
                         pendingText = ""
-                        // Resolve any chunk-id citations (`?c=<id>`) the model emitted
-                        // into durable, validated `?page=&text=` anchors before the
-                        // message settles into history. No-op when there are none.
-                        let resolvedContent = turn.role == .assistant
-                            ? await self?.resolveChunkCitations(turn.content) ?? turn.content
-                            : turn.content
                         if turn.role == .user {
                             turns.append(turn)
                         } else if let id = assistantTurnId,
                                   let idx = turns.lastIndex(where: { $0.id == id })
                         {
-                            turns[idx].content = resolvedContent
+                            turns[idx].content = turn.content
                             turns[idx].isStreaming = false
                             turns[idx].toolUses = turn.toolUses
                             if let thinking = turn.thinking {
@@ -624,7 +587,6 @@ class ChatViewModel {
                             }
                         } else {
                             var finalTurn = turn
-                            finalTurn.content = resolvedContent
                             finalTurn.isStreaming = false
                             turns.append(finalTurn)
 
@@ -657,7 +619,6 @@ class ChatViewModel {
             // would stop the new chat's indicator.
             if sessionId == currentSessionId {
                 isStreaming = false
-                researchActivity = nil
             }
             self?.titleIfNeeded()
         }
@@ -789,38 +750,6 @@ class ChatViewModel {
         }
     }
 
-    /// Resolve `?c=<chunkId>` citations in a settled assistant message into durable
-    /// `?page=&text=` anchors, validated against the FTS chunk store. No-op without a
-    /// chunk id in the text or an available index service.
-    private func resolveChunkCitations(_ content: String) async -> String {
-        guard let fts = (appState ?? parent?.appState)?.ftsIndexService else { return content }
-        return await ChunkCitationResolver.resolve(in: content, using: fts)
-    }
-
-    /// The open document's citable `?c=` passages, when indexed. For PDFs this is the
-    /// current page's chunks; for non-paginated docs (HTML / markdown / saved web clips)
-    /// it's the whole body's chunks. Empty otherwise — the prompt then falls back to raw
-    /// page text. Giving HTML the same chunk-id path as PDF is what lets web citations
-    /// resolve to a verbatim, reliably-anchorable quote instead of a model paraphrase.
-    private func currentPageChunks(snapshot: ChatContextSnapshot) async -> [LLMContextProvider.CurrentPageChunk] {
-        guard let doc = snapshot.document,
-              let itemId,
-              let fts = (appState ?? parent?.appState)?.ftsIndexService
-        else { return [] }
-        let chunks: [FTSChunk]
-        switch doc.contentType {
-        case .pdf:
-            chunks = await fts.currentPageChunks(itemId: itemId, page: doc.currentPageIndex)
-        case .html, .markdown, .link:
-            chunks = await fts.allChunks(itemId: itemId)
-        default:
-            return []
-        }
-        return chunks.compactMap { c in
-            c.id.map { LLMContextProvider.CurrentPageChunk(id: $0, page: c.pageStart, text: c.chunkText) }
-        }
-    }
-
     private func navigateInPlace(vm: DocumentViewModel, anchor: CitationAnchor) {
         // A live web page is `.link` with no timeline; it navigates like HTML
         // (find-text / scroll-to-heading) rather than opening a `?time=` source.
@@ -892,7 +821,6 @@ class ChatViewModel {
         streamTask?.cancel()
         streamTask = nil
         isStreaming = false
-        researchActivity = nil
 
         // Finalize any streaming turn
         if let idx = turns.lastIndex(where: { $0.isStreaming }) {
@@ -972,7 +900,6 @@ class ChatViewModel {
         streamTask?.cancel()
         streamTask = nil
         isStreaming = false
-        researchActivity = nil
     }
 
     func newSession() {

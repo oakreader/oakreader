@@ -10,6 +10,13 @@ final class CatalogDatabase {
         // Tier 2 — Bootstrap: ensure filesystem directories exist
         try Self.createBaseDirectories()
 
+        // Reclaim the chunk/FTS5 index left by older builds. The app no longer
+        // indexes document content — chat grounds on the open document and the
+        // `oak` CLI reads items directly — so search.sqlite is dead weight (it
+        // reached hundreds of MB on large libraries). Best-effort; never blocks
+        // opening the catalog.
+        Self.removeLegacySearchIndex()
+
         let dbPath = Self.dataDirectory.appendingPathComponent("library.sqlite").path
         var config = Configuration()
         config.foreignKeysEnabled = true
@@ -27,6 +34,15 @@ final class CatalogDatabase {
 
         // Tier 3 — Seeding: ensure system rows exist
         try Self.ensureSystemData(dbQueue)
+    }
+
+    /// Deletes the regenerable full-text chunk index (and its WAL/SHM siblings)
+    /// written by builds that shipped the FTS5 content index.
+    private static func removeLegacySearchIndex() {
+        let dir = Self.dataDirectory
+        for name in ["search.sqlite", "search.sqlite-wal", "search.sqlite-shm"] {
+            try? FileManager.default.removeItem(at: dir.appendingPathComponent(name))
+        }
     }
 
     /// Idempotently seeds system collections, properties, and status options.
