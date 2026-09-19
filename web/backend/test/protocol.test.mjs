@@ -1,4 +1,5 @@
-// Protocol v2 smoke test: spawns dist/oak-backend.cjs with an isolated data
+// Protocol v2 smoke test: spawns the shipped dist/oak-backend binary (bun
+// --compile output) with an isolated data
 // dir, checks ping/credential/list_providers, then registers a mock
 // OpenAI-compatible server as the "ollama" local provider and runs the full
 // agentic chat loop through it — including a tool_exec → tool_result round-trip.
@@ -58,7 +59,7 @@ await new Promise((r) => mock.listen(0, "127.0.0.1", r));
 const port = mock.address().port;
 
 // --- Spawn backend --------------------------------------------------------
-const child = spawn(process.execPath, [join(root, "dist", "oak-backend.cjs"), "--data-dir", dataDir], {
+const child = spawn(join(root, "dist", "oak-backend"), ["--data-dir", dataDir], {
   stdio: ["pipe", "pipe", "pipe"],
 });
 child.stderr.on("data", (d) => process.stderr.write(`  [stderr] ${d}`));

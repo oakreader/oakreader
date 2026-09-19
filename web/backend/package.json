@@ -8,7 +8,7 @@
     "node": ">=22.19.0"
   },
   "scripts": {
-    "build": "esbuild src/main.ts --bundle --platform=node --target=node22 --format=cjs --outfile=dist/oak-backend.cjs",
+    "build": "bash scripts/build-binary.sh",
     "typecheck": "tsc --noEmit",
     "test": "npm run build && node test/protocol.test.mjs && node --experimental-strip-types --test test/tokenizer.test.mjs",
     "build:binary": "bash scripts/build-binary.sh",
@@ -16,7 +16,8 @@
     "build:binary:win": "OAK_TARGET=win bash scripts/build-binary.sh"
   },
   "dependencies": {
-    "@earendil-works/pi-ai": "^0.84.4",
+    "@earendil-works/pi-agent-core": "^0.85.1",
+    "@earendil-works/pi-ai": "^0.85.1",
     "defuddle": "^0.18.1",
     "linkedom": "^0.18.13",
     "turndown": "^7.2.4",
