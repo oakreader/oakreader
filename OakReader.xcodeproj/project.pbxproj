@@ -1714,8 +1714,10 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 6C649E9063F577EC40D9F60C /* OakReader-debug.xcconfig */;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "AppIcon-Dev";
 				BUNDLE_DISPLAY_NAME = "OakReader Dev";
+				BUNDLE_NAME = "OakReader Dev";
+				BUNDLE_URL_SCHEME = "oakreader-dev";
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -1804,6 +1806,8 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				BUNDLE_DISPLAY_NAME = OakReader;
+				BUNDLE_NAME = OakReader;
+				BUNDLE_URL_SCHEME = oakreader;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_HARDENED_RUNTIME = YES;
