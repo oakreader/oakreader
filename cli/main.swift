@@ -1113,7 +1113,28 @@ struct Open: ParsableCommand {
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-        process.arguments = ["-a", "OakReader", resolved.path]
+        // Target the app this CLI was shipped inside, not "OakReader" by name.
+        // `open -a OakReader` resolves through LaunchServices, which picks
+        // whichever bundle is named that -- so a dev-build `oak` launched the
+        // *release* app, handing it paths from a library it does not own.
+        // The binary lives at <App>.app/Contents/Resources/oak, so walk up.
+        let selfURL = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
+        let containingApp = selfURL
+            .deletingLastPathComponent()   // Resources
+            .deletingLastPathComponent()   // Contents
+            .deletingLastPathComponent()   // <App>.app
+        if containingApp.pathExtension == "app",
+           FileManager.default.fileExists(atPath: containingApp.path) {
+            process.arguments = ["-a", containingApp.path, resolved.path]
+        } else {
+            // Standalone install (`oak install`): fall back to the bundle id of
+            // the channel this CLI was built for.
+            #if DEBUG
+            process.arguments = ["-b", "com.oakreader.OakReader.dev", resolved.path]
+            #else
+            process.arguments = ["-b", "com.oakreader.OakReader", resolved.path]
+            #endif
+        }
         try process.run()
         process.waitUntilExit()
 

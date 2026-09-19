@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+/* The panel is hosted in a WKWebView inside a native window, so it must adopt
+   the app's appearance rather than the system default. Swift sets
+   data-theme on <html> from NSApp.effectiveAppearance. */
+@theme {
+  --color-surface: #ffffff;
+  --color-surface-raised: #f6f6f7;
+  --color-ink: #16161a;
+  --color-ink-muted: #6b6b76;
+  --color-line: #e3e3e7;
+  --color-accent: #3b6ef5;
+}
+
+html[data-theme="dark"] {
+  --color-surface: #1b1b1f;
+  --color-surface-raised: #232329;
+  --color-ink: #ececf0;
+  --color-ink-muted: #9a9aa6;
+  --color-line: #33333b;
+  --color-accent: #6f96ff;
+}
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: 13px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  /* The native window owns scrolling chrome and rubber-banding. */
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Message text is the one thing that must stay selectable. */
+.selectable { -webkit-user-select: text; user-select: text; }
+
+/* A native-feeling scrollbar: present while scrolling, invisible at rest. */
+::-webkit-scrollbar { width: 9px; }
+::-webkit-scrollbar-thumb { background: transparent; border-radius: 5px; }
+:hover::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--color-ink) 22%, transparent); }
