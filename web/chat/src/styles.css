@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./vendor/t3code/styles/chat-markdown.css";
 
 /* Token names and values follow t3code's apps/web/src/index.css so the panel
    reads as the same product. Palette is Tailwind's zinc (light) / neutral
@@ -46,6 +47,19 @@
   --app-scrollbar-width: 6px;
   --app-scrollbar-thumb: rgb(217 217 217);
   --app-scrollbar-thumb-hover: rgb(191 191 191);
+
+  /* Tokens the vendored .chat-markdown rules reference. Mapped onto the
+     palette above rather than re-inventing values. */
+  --contrast-foreground: var(--foreground);
+  --contrast-message-foreground: var(--foreground);
+  --contrast-muted-foreground: var(--muted-foreground);
+  --contrast-border: var(--border);
+  --message-surface: var(--card);
+  --code-background: var(--muted);
+  --code-foreground: var(--foreground);
+  --info-foreground: var(--primary);
+  --list-gutter: 1.25rem;
+  --font-size-code: 12px;
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
 }
 

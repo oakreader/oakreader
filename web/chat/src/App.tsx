@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import clsx from "clsx";
+import { Markdown } from "./Markdown";
 import { onShellEvent, postToShell, type InboundEvent, type SerializedTurn } from "./bridge";
-import { shouldUseRestingComposerLayout } from "./vendor/t3code/composerFooterLayout";
+import { shouldUseRestingComposerLayout } from "./vendor/t3code/components/composerFooterLayout";
 import {
   appendOptimisticUserTurn,
   deriveTimelineRows,
@@ -17,7 +18,7 @@ const PREVIEW_TURNS = [
   {
     id: "a1",
     role: "assistant" as const,
-    text: "The paper frames flow matching and diffusion as two views of the same transport problem. Diffusion learns a score function and integrates a reverse SDE; flow matching regresses the velocity field of a probability path directly, which removes the need to simulate the forward process during training.\n\nThe practical consequence is training stability: the flow-matching objective is a plain regression loss, so it does not inherit the variance of score estimates at low noise levels.",
+    text: "## Flow matching vs diffusion\n\nThe paper frames them as two views of the same transport problem:\n\n| | Diffusion | Flow matching |\n| --- | --- | --- |\n| Learns | score function | velocity field |\n| Sampling | reverse SDE | ODE integration |\n| Training | needs forward simulation | plain regression |\n\nThe practical consequence is **training stability** — the objective is a regression loss, so it does not inherit the variance of score estimates at low noise.\n\n```python\ndef loss(model, x0, x1, t):\n    xt = (1 - t) * x0 + t * x1\n    return ((model(xt, t) - (x1 - x0)) ** 2).mean()\n```\n\n1. Sample a pair `(x0, x1)`\n2. Interpolate at a random `t`\n3. Regress the velocity\n\n> Section 4.2 gives the equivalence proof.",
     thinking: "The user is asking for the core distinction. Section 3 sets up the probability path; section 4.2 has the direct comparison. Cite the velocity-field framing rather than the SDE derivation.",
     tools: [
       { id: "t1", name: "search_document", args: '{\n  "query": "flow matching vs diffusion"\n}', result: "4 passages on pages 7, 11, 12, 19", isError: false },
@@ -158,8 +159,8 @@ function TimelineRow({ row }: { row: Row }) {
     );
 
   return (
-    <div className="selectable px-0.5 text-[13px] leading-[1.6] whitespace-pre-wrap">
-      {turn.text}
+    <div className="px-0.5 text-[13px]">
+      <Markdown text={turn.text} />
       {turn.streaming && <Caret />}
     </div>
   );
