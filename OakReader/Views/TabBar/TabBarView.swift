@@ -202,6 +202,7 @@ private struct DocumentTabStrip: View {
     let appState: AppState
 
     @State private var hoveredTabID: DocumentTab.ID?
+    @State private var isPlusHovering = false
 
     private let cr: CGFloat = 10           // concave radius (matches DocumentTabView)
     private let plusWidth: CGFloat = 40    // "+" button + its horizontal padding
@@ -272,10 +273,17 @@ private struct DocumentTabStrip: View {
                 Image(systemName: "plus")
                     .font(.system(size: 14, weight: .medium))
                     .frame(width: 28, height: 28)
+                    .background {
+                        // Same hover treatment as an inactive tab.
+                        RoundedRectangle(cornerRadius: OakStyle.Radius.standard)
+                            .fill(Color.primary.opacity(isPlusHovering ? 0.08 : 0))
+                    }
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+            .foregroundStyle(Color(nsColor: isPlusHovering ? .labelColor : .secondaryLabelColor))
+            .onHover { isPlusHovering = $0 }
+            .animation(.easeOut(duration: 0.12), value: isPlusHovering)
             .help("New Tab")
             .accessibilityLabel("New Tab")
             .padding(.leading, 4)
