@@ -6,7 +6,6 @@ import PDFKit
 @Observable
 final class LibraryStore {
     let database: CatalogDatabase
-    var ftsIndexService: FTSIndexService?
 
     // Search & filter state
     var searchText: String = ""
@@ -28,13 +27,6 @@ final class LibraryStore {
     private(set) var coverRevision: Int = 0
     func bumpCoverRevision() { coverRevision &+= 1 }
 
-    // Full-text search state
-    var isFullTextSearchActive: Bool = false
-    var fullTextSearchResults: [UUID: FTSIndexService.SearchResult]?
-    var fullTextSearchOrder: [UUID]?
-    var isFullTextSearching: Bool = false
-    @ObservationIgnored var fullTextSearchTask: Task<Void, Never>?
-
     // Toolbar filter state
     var selectedTypes: Set<String> = []
     var selectedTagOptionIds: Set<UUID> = []
@@ -50,47 +42,6 @@ final class LibraryStore {
         selectedStatusOptionIds = []
     }
 
-    func clearFullTextSearch() {
-        fullTextSearchTask?.cancel()
-        fullTextSearchTask = nil
-        fullTextSearchResults = nil
-        fullTextSearchOrder = nil
-        isFullTextSearching = false
-    }
-
-    func performFullTextSearch() {
-        fullTextSearchTask?.cancel()
-
-        guard isFullTextSearchActive, !searchText.isEmpty,
-              let service = ftsIndexService else {
-            clearFullTextSearch()
-            return
-        }
-
-        let query = searchText
-        isFullTextSearching = true
-
-        fullTextSearchTask = Task { @MainActor in
-            // Debounce 300ms
-            try? await Task.sleep(for: .milliseconds(300))
-            guard !Task.isCancelled else { return }
-
-            let results = await service.search(query: query, maxResults: 50)
-            guard !Task.isCancelled else { return }
-
-            var resultsMap: [UUID: FTSIndexService.SearchResult] = [:]
-            var order: [UUID] = []
-            for result in results {
-                guard let id = UUID(uuidString: result.itemId) else { continue }
-                resultsMap[id] = result
-                order.append(id)
-            }
-            fullTextSearchResults = resultsMap
-            fullTextSearchOrder = order
-            isFullTextSearching = false
-        }
-    }
-
     /// Resolved collection for the current selection.
     var selectedCollection: PDFCollection? {
         guard let id = selectedCollectionId else { return nil }
@@ -101,14 +52,12 @@ final class LibraryStore {
     func selectCollection(_ id: UUID?) {
         selectedCollectionId = id
         selectedTagOptionId = nil
-        clearFullTextSearch()
     }
 
     /// Select a tag and clear collection selection.
     func selectTag(_ optionId: UUID?) {
         selectedTagOptionId = optionId
         selectedCollectionId = nil
-        clearFullTextSearch()
     }
 
     /// The system "Tags" property definition.
@@ -394,21 +343,8 @@ final class LibraryStore {
 
     // MARK: - Search & Sort Helpers
 
-    /// Apply keyword or full-text search filtering to the given items.
+    /// Apply keyword search filtering (title / author / filename) to the given items.
     private func applySearch(to items: inout [LibraryItem]) {
-        if isFullTextSearchActive && !searchText.isEmpty {
-            if let order = fullTextSearchOrder, let resultsMap = fullTextSearchResults {
-                let matchingIds = Set(order)
-                items = items.filter { matchingIds.contains($0.id) }
-                items.sort { a, b in
-                    let scoreA = resultsMap[a.id]?.score ?? 0
-                    let scoreB = resultsMap[b.id]?.score ?? 0
-                    return scoreA > scoreB
-                }
-            }
-            return
-        }
-
         if !searchText.isEmpty {
             let query = searchText.lowercased()
             items = items.filter {
@@ -419,9 +355,8 @@ final class LibraryStore {
         }
     }
 
-    /// Apply the current sort order. Skipped when full-text search is active (sorted by relevance).
+    /// Apply the current sort order.
     private func applySort(to items: inout [LibraryItem]) {
-        guard !(isFullTextSearchActive && !searchText.isEmpty) else { return }
         // The Recently Read collection always orders by last-opened time (most recent first),
         // matching its "Last Opened" column — regardless of the global sort default.
         let effectiveSort: LibrarySortOrder = isRecentlyReadSelected ? .dateOpened : currentSort

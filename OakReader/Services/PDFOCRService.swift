@@ -4,34 +4,9 @@ import ImageIO
 import PDFKit
 import Vision
 
-/// On-device OCR for image-only / scanned PDFs, using Apple's Vision framework.
-/// Each page is rendered to a bitmap and run through `VNRecognizeTextRequest`, then
-/// chunked page-anchored so OCR'd text lands in the same citable shape as extracted
-/// text. Heavy (seconds per document) — run off the main thread, one doc at a time.
+/// On-device OCR using Apple's Vision framework. Renders to a bitmap and runs
+/// `VNRecognizeTextRequest`. Heavy (seconds per page) — run off the main thread.
 enum PDFOCRService {
-
-    /// OCR every page of a PDF into page-anchored chunks. Pages that yield no text are
-    /// skipped; an all-blank document returns `[]`. Respects task cancellation.
-    static func recognizeChunks(
-        pdfURL: URL,
-        languages: [String] = ["zh-Hans", "en-US"]
-    ) -> [ContentChunker.Chunk] {
-        guard let doc = PDFDocument(url: pdfURL) else {
-            Log.error(Log.fts, "OCR: cannot open PDF \(pdfURL.lastPathComponent)")
-            return []
-        }
-
-        var chunks: [ContentChunker.Chunk] = []
-        for i in 0..<doc.pageCount {
-            if Task.isCancelled { break }
-            guard let page = doc.page(at: i), let image = renderPage(page) else { continue }
-            let text = recognize(image, languages: languages)
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !text.isEmpty else { continue }
-            chunks += ContentChunker.chunkPlainText(text, type: "page", pageStart: i, pageEnd: i)
-        }
-        return chunks
-    }
 
     /// OCR a standalone image (e.g. a Translation region snapshot) into plain
     /// text, joining recognized lines top-to-bottom. Returns "" on failure or
@@ -42,7 +17,7 @@ enum PDFOCRService {
     ) -> String {
         guard let source = CGImageSourceCreateWithData(pngData as CFData, nil),
               let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
-            Log.error(Log.fts, "OCR: cannot decode region snapshot image")
+            Log.error(Log.ocr, "OCR: cannot decode region snapshot image")
             return ""
         }
         return recognize(image, languages: languages)
@@ -85,7 +60,7 @@ enum PDFOCRService {
         do {
             try handler.perform([request])
         } catch {
-            Log.error(Log.fts, "OCR: Vision request failed: \(error)")
+            Log.error(Log.ocr, "OCR: Vision request failed: \(error)")
             return ""
         }
 

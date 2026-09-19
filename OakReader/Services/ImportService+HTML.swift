@@ -128,19 +128,6 @@ extension ImportService {
             }
         }
 
-        // Full-text search index (FTS5)
-        if let service = ftsIndexService {
-            Task {
-                await service.indexItem(
-                    itemId: docId.uuidString,
-                    contentType: ContentType.html.rawValue,
-                    storageKey: itemStorageKey,
-                    attStorageKey: attStorageKey,
-                    fileName: sourceURL.lastPathComponent
-                )
-            }
-        }
-
         return item
     }
 

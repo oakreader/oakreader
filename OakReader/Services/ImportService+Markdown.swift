@@ -113,19 +113,6 @@ extension ImportService {
             Log.error(Log.importer, "Failed to save markdown reference metadata: \(error)")
         }
 
-        // Full-text search index (FTS5)
-        if let service = ftsIndexService {
-            Task {
-                await service.indexItem(
-                    itemId: docId.uuidString,
-                    contentType: ContentType.markdown.rawValue,
-                    storageKey: itemStorageKey,
-                    attStorageKey: attStorageKey,
-                    fileName: sourceURL.lastPathComponent
-                )
-            }
-        }
-
         return item
     }
 

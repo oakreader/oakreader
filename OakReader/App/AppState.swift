@@ -125,8 +125,6 @@ final class AppState {
     let coverService = LibraryCoverService()
     let referenceService: ReferenceService
     let importService: ImportService
-    var ftsIndexService: FTSIndexService?
-    private var backgroundIndexTask: Task<Void, Never>?
 
     var openTabs: [DocumentTab] = []
     var activeTabID: UUID?
@@ -175,43 +173,6 @@ final class AppState {
         self.referenceService = ReferenceService(database: database)
         self.importService = ImportService(store: libraryStore, coverService: coverService, referenceService: referenceService)
         startAutosaveTimer()
-
-        // Initialize the full-text index service asynchronously
-        startContentIndexing(database: database)
-
-        // Listen for rebuild requests from settings
-        NotificationCenter.default.addObserver(
-            forName: .searchIndexRebuildRequested,
-            object: nil,
-            queue: nil
-        ) { [weak self] _ in
-            guard let self else { return }
-            self.backgroundIndexTask?.cancel()
-            self.startContentIndexing(database: self.libraryStore.database)
-        }
-    }
-
-    private func startContentIndexing(database: CatalogDatabase) {
-        backgroundIndexTask = Task {
-            do {
-                let ftsDB = try FTSDatabase()
-                let service = FTSIndexService.create(
-                    ftsDB: ftsDB,
-                    catalogDBQueue: database.dbQueue
-                )
-                await MainActor.run {
-                    self.ftsIndexService = service
-                    self.importService.ftsIndexService = service
-                    self.libraryStore.ftsIndexService = service
-                }
-                Log.info(Log.fts, "Full-text index service initialized")
-                await service.backgroundIndexAll()
-                // Lower-priority second pass: OCR the image-only PDFs left empty above.
-                await service.backgroundOCRBackfill()
-            } catch {
-                Log.error(Log.fts, "Failed to initialize full-text index service: \(error)")
-            }
-        }
     }
 
     // MARK: - Tab Operations
@@ -711,6 +672,5 @@ final class AppState {
 
     deinit {
         autosaveTimer?.invalidate()
-        backgroundIndexTask?.cancel()
     }
 }

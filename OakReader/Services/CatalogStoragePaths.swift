@@ -17,11 +17,6 @@ extension CatalogDatabase {
         dataDirectory.appendingPathComponent("storage", isDirectory: true)
     }
 
-    /// ~/OakReader/search.sqlite — regenerable chunk text + metadata + FTS5
-    static var searchDatabaseURL: URL {
-        dataDirectory.appendingPathComponent("search.sqlite")
-    }
-
     /// ~/OakReader/logs/
     static var logsDirectory: URL {
         dataDirectory.appendingPathComponent("logs", isDirectory: true)
