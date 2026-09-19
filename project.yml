@@ -122,7 +122,6 @@ targets:
         # private key is the SPARKLE_ED_KEY GitHub secret. Empty in dev builds
         # (which don't auto-update) is fine.
         SPARKLE_PUBLIC_ED_KEY: "zm3UpFrDf8tFcctK2vkEhrms6oFTp50AUb824lP9BAw="
-        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         COMBINE_HIDPI_IMAGES: YES
         ENABLE_HARDENED_RUNTIME: YES
         SWIFT_STRICT_CONCURRENCY: minimal
@@ -130,9 +129,30 @@ targets:
         Debug:
           PRODUCT_BUNDLE_IDENTIFIER: com.oakreader.OakReader.dev
           BUNDLE_DISPLAY_NAME: "OakReader Dev"
+          # CFBundleName — NOT the same thing as CFBundleDisplayName: the macOS
+          # menu bar reads CFBundleName, while Finder/Dock read the display name.
+          # Both must be set or the dev build still says "OakReader" in the menu
+          # bar. Keep <= 16 chars or the menu bar truncates it.
+          BUNDLE_NAME: "OakReader Dev"
+          # Own URL scheme, mirroring termio's dev channel (build-app.sh sets
+          # CFBundleURLSchemes to "termio-dev"). Without this the dev and
+          # release apps both register "oakreader" and LaunchServices routes
+          # oakreader://open to whichever it feels like. NOTE: the browser
+          # extension hardcodes oakreader://open, so it now always targets the
+          # RELEASE app -- deterministic, where before it was a coin flip.
+          BUNDLE_URL_SCHEME: "oakreader-dev"
+          # Inverted (light) icon so the dev app is distinguishable from an
+          # installed release build in the Dock and Cmd-Tab. Same convention as
+          # the sibling termio repo's AppIcon-dev.png. Art lives in
+          # Resources/AppIcon-Dev.icon (macOS 26 Icon Composer) and
+          # Assets.xcassets/AppIcon-Dev.appiconset (fallback).
+          ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon-Dev
         Release:
           PRODUCT_BUNDLE_IDENTIFIER: com.oakreader.OakReader
           BUNDLE_DISPLAY_NAME: "OakReader"
+          BUNDLE_NAME: "OakReader"
+          BUNDLE_URL_SCHEME: "oakreader"
+          ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
 
   oak:
     type: tool

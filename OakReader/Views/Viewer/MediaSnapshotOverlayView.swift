@@ -62,8 +62,11 @@ struct MediaSnapshotOverlayView: View {
             return
         }
 
+        // Use *this* tab's web view, not the first one in the window — every open
+        // tab keeps its view alive in the shared hierarchy (see RootView), so a
+        // window-wide search would capture the wrong (inactive) tab.
         guard let window = NSApp.keyWindow,
-              let webView = findWKWebView(in: window.contentView),
+              let webView = viewModel.contentWebView,
               let hitTestView = findMediaSnapshotHitTestView(in: window.contentView) else {
             showSelection = false
             return
@@ -155,15 +158,6 @@ struct MediaSnapshotOverlayView: View {
                 }
             }
         }
-    }
-
-    private func findWKWebView(in view: NSView?) -> WKWebView? {
-        guard let view else { return nil }
-        if let webView = view as? WKWebView { return webView }
-        for subview in view.subviews {
-            if let found = findWKWebView(in: subview) { return found }
-        }
-        return nil
     }
 
     private func findMediaSnapshotHitTestView(in view: NSView?) -> MediaSnapshotHitTestNSView? {

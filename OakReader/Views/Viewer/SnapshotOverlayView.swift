@@ -62,8 +62,11 @@ struct SnapshotOverlayView: View {
             return
         }
 
+        // Use *this* tab's PDFView, not the first one in the window — every open
+        // tab keeps its view alive in the shared hierarchy (see RootView), so a
+        // window-wide search would capture the wrong (inactive) tab.
         guard let window = NSApp.keyWindow,
-              let pdfView = findPDFView(in: window.contentView),
+              let pdfView = viewModel.markupOverlay.pdfView,
               let hitTestView = findSnapshotHitTestView(in: window.contentView) else {
             showSelection = false
             return
@@ -165,15 +168,6 @@ struct SnapshotOverlayView: View {
               let bitmap = NSBitmapImageRep(data: tiffData),
               let pngData = bitmap.representation(using: .png, properties: [:]) else { return nil }
         return pngData
-    }
-
-    private func findPDFView(in view: NSView?) -> PDFView? {
-        guard let view else { return nil }
-        if let pdfView = view as? PDFView { return pdfView }
-        for subview in view.subviews {
-            if let found = findPDFView(in: subview) { return found }
-        }
-        return nil
     }
 
     private func findSnapshotHitTestView(in view: NSView?) -> SnapshotHitTestNSView? {

@@ -51,17 +51,17 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>OakReader</string>
+	<string>$(BUNDLE_NAME)</string>
 	<key>CFBundleDisplayName</key>
 	<string>$(BUNDLE_DISPLAY_NAME)</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>com.oakreader.OakReader</string>
+			<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>oakreader</string>
+				<string>$(BUNDLE_URL_SCHEME)</string>
 			</array>
 		</dict>
 	</array>
