@@ -10,7 +10,7 @@
   "scripts": {
     "build": "esbuild src/main.ts --bundle --platform=node --target=node22 --format=cjs --outfile=dist/oak-backend.cjs",
     "typecheck": "tsc --noEmit",
-    "test": "npm run build && node test/protocol.test.mjs"
+    "test": "npm run build && node test/protocol.test.mjs && node --experimental-strip-types --test test/tokenizer.test.mjs"
   },
   "dependencies": {
     "@earendil-works/pi-ai": "^0.84.4",
