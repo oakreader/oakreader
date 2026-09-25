@@ -15,6 +15,10 @@ actor NodeBackend {
 
     private static let log = Logger(subsystem: "com.oakreader.OakReader", category: "NodeBackend")
     private static let maxSpawnAttempts = 3
+    private static let writeQueue = DispatchQueue(label: "com.oakreader.NodeBackend.stdin")
+    /// Ceiling for a single-response command. Generous: model-catalog
+    /// refreshes and OAuth token exchanges both hit the network.
+    private static let requestTimeout = Duration.seconds(30)
 
     private var process: Process?
     private var stdinHandle: FileHandle?
@@ -57,6 +61,15 @@ actor NodeBackend {
     /// unavailable or the command fails.
     func request(_ command: BackendCommand) async throws -> BackendEvent {
         guard await ensureRunning() else { throw NodeBackendError.notRunning }
+        // A sidecar that wedges without exiting never fires terminationHandler,
+        // so without this the caller waits forever on a reply that is not
+        // coming. Streaming commands are deliberately exempt: a chat turn can
+        // legitimately sit idle while the user decides on a tool confirmation.
+        let deadline = Task {
+            try await Task.sleep(for: Self.requestTimeout)
+            await self.failStream(id: command.id, with: .timedOut)
+        }
+        defer { deadline.cancel() }
         for try await event in eventStream(for: command) {
             if event.type == "response" || event.type == "error" { return event }
         }
@@ -138,15 +151,33 @@ actor NodeBackend {
         return false
     }
 
-    private func failStream(id: String) {
-        streams.removeValue(forKey: id)?.finish(throwing: NodeBackendError.notRunning)
+    private func failStream(id: String, with error: NodeBackendError = .notRunning) {
+        streams.removeValue(forKey: id)?.finish(throwing: error)
     }
 
+    /// Frame a command onto the sidecar's stdin.
+    ///
+    /// The write itself happens off the actor. A pipe blocks its writer once
+    /// the reader is ~64 KB behind, and a frame can exceed that on its own — a
+    /// base64 image part, or a fat tool result. Blocking inside the actor would
+    /// stall every other call into it, including the `tool_result` or
+    /// `credential_result` the sidecar is waiting for before it drains its
+    /// input: a deadlock, not just latency. The queue is serial, so frames
+    /// still reach the sidecar in the order they were produced.
     private func write(_ command: BackendCommand) throws {
         guard let stdinHandle else { throw NodeBackendError.notRunning }
         var data = try JSONEncoder().encode(command)
         data.append(0x0A)
-        try stdinHandle.write(contentsOf: data)
+        let handle = stdinHandle
+        Self.writeQueue.async {
+            do {
+                try handle.write(contentsOf: data)
+            } catch {
+                // The sidecar died mid-write; terminationHandler fails the
+                // in-flight streams, and request deadlines cover the rest.
+                Self.log.error("stdin write failed: \(error.localizedDescription)")
+            }
+        }
     }
 
     // MARK: - Process lifecycle
@@ -277,6 +308,7 @@ enum NodeBackendError: LocalizedError {
     case scriptNotFound
     case notRunning
     case crashed
+    case timedOut
     case commandFailed(String)
 
     var errorDescription: String? {
@@ -284,6 +316,7 @@ enum NodeBackendError: LocalizedError {
         case .scriptNotFound: return "The AI backend executable is missing from the app bundle."
         case .notRunning: return "AI backend is not running"
         case .crashed: return "AI backend exited unexpectedly"
+        case .timedOut: return "AI backend stopped responding"
         case .commandFailed(let message): return message
         }
     }
