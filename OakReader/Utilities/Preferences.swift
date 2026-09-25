@@ -67,7 +67,6 @@ final class Preferences {
         static let sidebarMode = "sidebarMode"
         static let autoSave = "autoSave"
         static let archiveWebPages = "archiveWebPages"
-        static let webChatPanel = "webChatPanel"
         static let compressionQuality = "compressionQuality"
         static let defaultFontName = "defaultFontName"
         static let defaultFontSize = "defaultFontSize"
@@ -145,7 +144,6 @@ final class Preferences {
             Keys.sidebarMode: SidebarMode.thumbnails.rawValue,
             Keys.autoSave: true,
             Keys.archiveWebPages: false,
-            Keys.webChatPanel: true,
             Keys.compressionQuality: CompressionQuality.medium.rawValue,
             Keys.defaultFontName: PDFDefaults.defaultFontName,
             Keys.defaultFontSize: PDFDefaults.defaultFontSize,
@@ -199,15 +197,6 @@ final class Preferences {
     var archiveWebPages: Bool {
         get { defaults.bool(forKey: Keys.archiveWebPages) }
         set { defaults.set(newValue, forKey: Keys.archiveWebPages) }
-    }
-
-    /// Render the AI chat panel with the React/Tailwind surface (`web/chat`)
-    /// instead of the native SwiftUI one. Default on: the web panel is the
-    /// surface Windows will reuse. The native views stay in the tree as a
-    /// fallback while the swap is proven.
-    var webChatPanel: Bool {
-        get { defaults.bool(forKey: Keys.webChatPanel) }
-        set { defaults.set(newValue, forKey: Keys.webChatPanel) }
     }
 
     var compressionQuality: CompressionQuality {

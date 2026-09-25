@@ -1,6 +1,5 @@
 packages:
   - backend
-  - chat
   - extension
   - webviews
   - www

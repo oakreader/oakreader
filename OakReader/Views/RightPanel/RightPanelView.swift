@@ -12,14 +12,10 @@ struct RightPanelContentView: View {
                 case .metadata:
                     ItemPanelView(viewModel: viewModel)
                 case .aiChat:
-                    if Preferences.shared.webChatPanel {
-                        ChatWebView(viewModel: viewModel.chat)
-                    } else {
-                        AIChatView(
-                            chatVM: viewModel.chat,
-                            voiceVM: viewModel.voice
-                        )
-                    }
+                    AIChatView(
+                        chatVM: viewModel.chat,
+                        voiceVM: viewModel.voice
+                    )
                 case .comments:
                     if Preferences.shared.isExtensionEnabled(.notes) {
                         CommentsPanelView(viewModel: viewModel)

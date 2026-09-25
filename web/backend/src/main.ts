@@ -45,8 +45,7 @@ const registry = new ProviderRegistry(credentials, config);
  * to parse as an event with a live request id would be acted on.
  *
  * Route every console method to stderr, which is already the free-form log
- * channel. This is the one durable advantage a Unix-socket transport would
- * have had; stdio keeps the Windows portability that made it the choice.
+ * channel.
  */
 for (const method of ["log", "info", "warn", "debug", "trace", "dir"] as const) {
   console[method] = (...args: unknown[]) => {
@@ -57,28 +56,14 @@ for (const method of ["log", "info", "warn", "debug", "trace", "dir"] as const) 
 }
 
 /**
- * Fan an event out to every attached transport.
+ * Emit one protocol event on stdout.
  *
- * stdio is always present (the parent owns the process). A WebSocket client
- * attaches when the shell runs the sidecar with `--ws-token`, which is how the
- * React panel talks to the backend *without* relaying through the shell: a
- * WKWebView cannot speak stdio. Both transports carry the same protocol, so a
- * command is answered on every channel -- the request ids keep callers from
- * acting on each other's replies, and the shell needs to observe UI-initiated
- * turns anyway to run the tools that read local app state.
+ * stdio is the only transport: the shell owns this process, so the channel
+ * needs no port, no authentication and no lifecycle of its own, and it is the
+ * same on every platform the shell is eventually written for.
  */
-const sockets = new Set<{ send(data: string): void }>();
-
 function emit(event: Event): void {
-  const line = JSON.stringify(event);
-  process.stdout.write(line + "\n");
-  for (const socket of sockets) {
-    try {
-      socket.send(line);
-    } catch {
-      sockets.delete(socket);
-    }
-  }
+  process.stdout.write(JSON.stringify(event) + "\n");
 }
 
 function log(message: string): void {
@@ -411,49 +396,6 @@ process.stdin.on("end", () => {
   for (const controller of aborts.values()) controller.abort();
   process.exit(0);
 });
-
-// --- WebSocket transport (opt-in) ------------------------------------------
-//
-// Bound to 127.0.0.1 on an ephemeral port and gated on a token the shell
-// generates and passes in, because this socket carries the user's provider
-// credentials and can run the shell's tools. Without the token any local
-// process -- or any page the user happens to have open -- could drive it.
-// The port is reported back over stdio (`ws_ready`) since the shell cannot
-// know an ephemeral port in advance.
-const wsTokenIndex = process.argv.indexOf("--ws-token");
-const wsToken = wsTokenIndex !== -1 ? process.argv[wsTokenIndex + 1] : undefined;
-
-if (wsToken) {
-  const server = Bun.serve({
-    hostname: "127.0.0.1",
-    port: 0,
-    fetch(request, srv) {
-      const url = new URL(request.url);
-      // Constant-time-ish: compare full strings, never short-circuit on prefix.
-      const offered = url.searchParams.get("token") ?? "";
-      if (offered.length !== wsToken.length || offered !== wsToken) {
-        return new Response("forbidden", { status: 403 });
-      }
-      return srv.upgrade(request) ? undefined : new Response("expected websocket", { status: 400 });
-    },
-    websocket: {
-      open(ws) {
-        sockets.add(ws);
-        log(`ws client attached (${sockets.size} total)`);
-      },
-      close(ws) {
-        sockets.delete(ws);
-        log(`ws client detached (${sockets.size} remaining)`);
-      },
-      message(_ws, message) {
-        // Same JSONL framing as stdio; a frame may still carry several lines.
-        for (const line of String(message).split("\n")) handleLine(line);
-      },
-    },
-  });
-  emit({ id: "", type: "ws_ready", port: server.port ?? 0 });
-  log(`ws listening on 127.0.0.1:${server.port}`);
-}
 
 // Restore any persisted dynamic model lists / warm local discovery, best-effort.
 void registry.models.refresh({ allowNetwork: true }).catch(() => {});
