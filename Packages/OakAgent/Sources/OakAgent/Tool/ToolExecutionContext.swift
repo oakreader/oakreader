@@ -11,19 +11,16 @@ public struct ToolExecutionContext: Sendable {
     /// Operations backends (pluggable for testing).
     public let fileOperations: FileOperations
     public let bashOperations: BashOperations
-    public let lsOperations: LsOperations
 
     public init(
         workingDirectory: URL,
         allowedPaths: [URL] = [],
         fileOperations: FileOperations = LocalFileOperations(),
-        bashOperations: BashOperations = LocalBashOperations(),
-        lsOperations: LsOperations = LocalLsOperations()
+        bashOperations: BashOperations = LocalBashOperations()
     ) {
         self.workingDirectory = workingDirectory
         self.allowedPaths = allowedPaths
         self.fileOperations = fileOperations
         self.bashOperations = bashOperations
-        self.lsOperations = lsOperations
     }
 }
