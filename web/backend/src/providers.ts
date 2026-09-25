@@ -26,7 +26,8 @@ import { xiaomiProvider } from "@earendil-works/pi-ai/providers/xiaomi";
 import { openaiCodexProvider } from "@earendil-works/pi-ai/providers/openai-codex";
 import { githubCopilotProvider } from "@earendil-works/pi-ai/providers/github-copilot";
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
-import type { ConfigStore, FileCredentialStore } from "./store.js";
+import type { CredentialStore } from "@earendil-works/pi-ai";
+import type { ConfigStore } from "./store.js";
 
 /**
  * The provider registry: pi-ai `Models` seeded with OakReader's curated
@@ -70,7 +71,7 @@ export class ProviderRegistry {
   readonly models: MutableModels;
 
   constructor(
-    credentials: FileCredentialStore,
+    credentials: CredentialStore,
     private config: ConfigStore,
   ) {
     this.models = createModels({ credentials });

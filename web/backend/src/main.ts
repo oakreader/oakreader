@@ -1,8 +1,9 @@
 /**
  * OakReader AI sidecar, protocol v2. JSONL over stdio: commands in on stdin,
  * events out on stdout, free-form logging on stderr. Owns the provider
- * catalog, credentials (auth.json), OAuth flows, endpoint overrides, and the
- * agentic chat loop; the Swift shell owns UI, sessions, and tool execution.
+ * catalog, OAuth flows, endpoint overrides, and the agentic chat loop; the
+ * Swift shell owns UI, sessions, tool execution, and the keystore -- provider
+ * credentials live in its Keychain and are fetched per use over the protocol.
  *
  * See src/protocol.ts and docs/architecture/node-backend-migration.md.
  */
@@ -11,7 +12,7 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import type { AuthEvent, AuthPrompt, ThinkingLevel } from "@earendil-works/pi-ai";
 import { Command, PROTOCOL_VERSION, type Event, type ProviderSummary } from "./protocol.js";
-import { ConfigStore, FileCredentialStore, dataPaths } from "./store.js";
+import { ConfigStore, IPCCredentialStore, dataPaths, type CredentialOp, type CredentialReply } from "./store.js";
 import { ProviderRegistry, toPiId } from "./providers.js";
 import { runChat, toPiMessages } from "./chat.js";
 
@@ -28,7 +29,9 @@ function resolveDataDir(): string {
 const dataDir = resolveDataDir();
 mkdirSync(dataDir, { recursive: true });
 const paths = dataPaths(dataDir);
-const credentials = new FileCredentialStore(paths.auth);
+const credentials = new IPCCredentialStore((op, providerId, credential) =>
+  requestCredential(op, providerId, credential),
+);
 const config = new ConfigStore(paths.config);
 const registry = new ProviderRegistry(credentials, config);
 
@@ -89,6 +92,50 @@ interface PromptWaiter {
 }
 /** loginId:promptId → waiter for the client's oauth_prompt_result. */
 const promptWaiters = new Map<string, PromptWaiter>();
+
+interface CredentialWaiter {
+  resolve(reply: CredentialReply): void;
+  reject(error: Error): void;
+}
+/** credential_request id → waiter for the client's credential_result. */
+const credentialWaiters = new Map<string, CredentialWaiter>();
+let nextCredentialId = 0;
+
+/**
+ * Ask the shell to touch the platform keystore, and wait for its answer.
+ *
+ * The shell holds the secrets (macOS: the data-protection keychain), so this
+ * process never persists them. The deadline matters: pi-ai resolves auth on
+ * the request path, so a shell that stopped answering must surface as an auth
+ * failure rather than hang every completion forever.
+ */
+function requestCredential(
+  op: CredentialOp,
+  providerId?: string,
+  credential?: unknown,
+): Promise<CredentialReply> {
+  const id = `cred-${++nextCredentialId}`;
+  return new Promise<CredentialReply>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      if (credentialWaiters.delete(id)) {
+        reject(new Error(`keystore ${op} timed out after ${CREDENTIAL_TIMEOUT_MS}ms`));
+      }
+    }, CREDENTIAL_TIMEOUT_MS);
+    credentialWaiters.set(id, {
+      resolve: (reply) => {
+        clearTimeout(timer);
+        resolve(reply);
+      },
+      reject: (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    });
+    emit({ id, type: "credential_request", op, providerId, credential });
+  });
+}
+
+const CREDENTIAL_TIMEOUT_MS = 10_000;
 
 // --- Handlers -------------------------------------------------------------
 
@@ -317,6 +364,15 @@ async function dispatch(cmd: Command): Promise<void> {
     case "oauth_login":
       void handleOAuthLogin(cmd);
       return;
+
+    case "credential_result": {
+      const waiter = credentialWaiters.get(cmd.id);
+      credentialWaiters.delete(cmd.id);
+      if (!waiter) return;
+      if (cmd.ok) waiter.resolve({ credential: cmd.credential as never, credentials: cmd.credentials });
+      else waiter.reject(new Error(cmd.error ?? "keystore operation failed"));
+      return;
+    }
 
     case "oauth_prompt_result": {
       const waiter = promptWaiters.get(`${cmd.id}:${cmd.promptId}`);

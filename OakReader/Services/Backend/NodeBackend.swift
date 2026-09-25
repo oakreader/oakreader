@@ -228,6 +228,13 @@ actor NodeBackend {
     }
 
     private func dispatch(_ event: BackendEvent) {
+        // Keystore round-trips are unsolicited: the sidecar originates them, so
+        // there is no request stream waiting on this id. Answer before the
+        // stream lookup below, which drops ids it does not own.
+        if event.type == "credential_request" {
+            try? write(BackendCredentialResponder.reply(to: event))
+            return
+        }
         guard let continuation = streams[event.id] else { return }
         switch event.type {
         case "done", "response":

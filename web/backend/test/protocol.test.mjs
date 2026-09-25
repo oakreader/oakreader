@@ -1,11 +1,12 @@
 // Protocol v2 smoke test: spawns the shipped dist/oak-backend binary (bun
 // --compile output) with an isolated data
-// dir, checks ping/credential/list_providers, then registers a mock
+// dir, plays the shell's half of the keystore protocol, checks
+// ping/credential/list_providers, then registers a mock
 // OpenAI-compatible server as the "ollama" local provider and runs the full
 // agentic chat loop through it — including a tool_exec → tool_result round-trip.
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
-import { mkdtempSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -74,13 +75,48 @@ child.stdout.on("data", (d) => {
     const line = buf.slice(0, nl);
     buf = buf.slice(nl + 1);
     if (line.trim()) {
-      events.push(JSON.parse(line));
+      const event = JSON.parse(line);
+      // Play the shell's half of the keystore protocol: the backend no longer
+      // persists credentials, it asks whoever spawned it.
+      if (event.type === "credential_request") {
+        answerCredentialRequest(event);
+        continue;
+      }
+      events.push(event);
       waiters.forEach((w) => w());
     }
   }
 });
 
 const send = (obj) => child.stdin.write(JSON.stringify(obj) + "\n");
+
+// --- Fake shell keystore --------------------------------------------------
+// Stands in for the macOS Keychain that BackendCredentialResponder reads.
+const keystore = new Map();
+let credentialOps = 0;
+
+function answerCredentialRequest(event) {
+  credentialOps++;
+  const reply = { id: event.id, type: "credential_result", ok: true };
+  switch (event.op) {
+    case "read":
+      reply.credential = keystore.get(event.providerId);
+      break;
+    case "list":
+      reply.credentials = [...keystore].map(([providerId, c]) => ({ providerId, type: c.type }));
+      break;
+    case "write":
+      keystore.set(event.providerId, event.credential);
+      break;
+    case "delete":
+      keystore.delete(event.providerId);
+      break;
+    default:
+      reply.ok = false;
+      reply.error = `unknown op ${event.op}`;
+  }
+  send(reply);
+}
 
 function waitFor(pred, label, timeoutMs = 15000) {
   return new Promise((resolve, reject) => {
@@ -100,13 +136,13 @@ try {
   const pong = await waitFor((e) => e.id === "p1" && e.type === "response", "pong");
   assert(pong.success === true && pong.protocol === 2, "ping → success + protocol 2");
 
-  // 2. credential store: set → list_providers reflects configured; 0600 on disk
+  // 2. credential store: set → the shell is asked to store it, nothing is
+  //    written to the data dir, and list_providers reflects it as configured.
   send({ id: "k1", type: "set_api_key", providerId: "anthropic", key: "sk-test-123" });
   await waitFor((e) => e.id === "k1" && e.type === "response" && e.success, "set_api_key ok");
-  const mode = statSync(join(dataDir, "auth.json")).mode & 0o777;
-  assert(mode === 0o600, `auth.json is 0600 (got ${mode.toString(8)})`);
-  const stored = JSON.parse(readFileSync(join(dataDir, "auth.json"), "utf8"));
-  assert(stored.anthropic?.key === "sk-test-123", "auth.json holds the key (pi format)");
+  assert(keystore.get("anthropic")?.key === "sk-test-123", "key handed to the shell keystore");
+  assert(credentialOps > 0, `credential ops round-tripped (${credentialOps})`);
+  assert(!existsSync(join(dataDir, "auth.json")), "no auth.json written to the data dir");
 
   send({ id: "l1", type: "list_providers" });
   const list = await waitFor((e) => e.id === "l1" && e.type === "response", "list_providers");

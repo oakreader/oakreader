@@ -43,6 +43,7 @@
 		27926C8DE8B6E9E53CF5553D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35C3D7C67DA37CE045FCE96F /* ContentView.swift */; };
 		28D3A097DDD467370B2F8C01 /* RecordingTranscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9741E79B8A2B0C06ED59E2BE /* RecordingTranscriptionService.swift */; };
 		292A1C4192568BEACFE65E88 /* DatabaseRecords.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2E4089D54ED9BD0D3F84946 /* DatabaseRecords.swift */; };
+		29436661870A20B051A8B593 /* BackendCredentialResponder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9081F93515EDF7DE65A28EB9 /* BackendCredentialResponder.swift */; };
 		2BEB2B630AF8E575DE9FE809 /* LibraryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6E956A0342EDE33F8AC2ACB /* LibraryStore.swift */; };
 		2C7A8913E8D1A3D022686066 /* FlowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31E4F106C2F0C64B0191320B /* FlowLayout.swift */; };
 		2C994311B6EF6ECF4E014F23 /* ImportService+Audio.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52295EE3D3631D17337FF543 /* ImportService+Audio.swift */; };
@@ -455,6 +456,7 @@
 		8E9F2651F00EFFB87568A1CE /* TranslationSourceTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationSourceTextView.swift; sourceTree = "<group>"; };
 		8EE6B08AE42F5F5093B698DF /* CLIImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIImporter.swift; sourceTree = "<group>"; };
 		8F738341643EF3BE5A70CB44 /* ReferenceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReferenceService.swift; sourceTree = "<group>"; };
+		9081F93515EDF7DE65A28EB9 /* BackendCredentialResponder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendCredentialResponder.swift; sourceTree = "<group>"; };
 		912AD36ADFACA2448194EBB7 /* TsangerJinKai02-W04.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "TsangerJinKai02-W04.ttf"; sourceTree = "<group>"; };
 		91FDAC96786D8B4011B623B5 /* HTMLDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTMLDocument.swift; sourceTree = "<group>"; };
 		936AA0D7A9E66908D29318BA /* AnnotationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationStore.swift; sourceTree = "<group>"; };
@@ -680,6 +682,7 @@
 				80D83D3E9448590142864B00 /* AIProviderCatalog.swift */,
 				A8B7CBD8E7912A25AE905F43 /* BackendChatEngine.swift */,
 				6451D1F8F1A01BBED78DB169 /* BackendCredentialMigrator.swift */,
+				9081F93515EDF7DE65A28EB9 /* BackendCredentialResponder.swift */,
 				F6C0515BFAD30AAD2829F495 /* BackendProtocol.swift */,
 				25372DB2A05FBC40D14514FE /* CompletionClient.swift */,
 				346D15088F8A4D1253867D03 /* NodeBackend.swift */,
@@ -1355,6 +1358,7 @@
 				A68B2638A8791B12A8DAD805 /* AudioSettingsView.swift in Sources */,
 				2463929458F21978DDE22917 /* BackendChatEngine.swift in Sources */,
 				DE7727E2EBDAD3A87FB073CA /* BackendCredentialMigrator.swift in Sources */,
+				29436661870A20B051A8B593 /* BackendCredentialResponder.swift in Sources */,
 				36504374F4A47BAC61ECD36C /* BackendProtocol.swift in Sources */,
 				249505FEB7F2FB8F5ABF87ED /* BackupProgressView.swift in Sources */,
 				557C5F1F5CA816F6CEA107CB /* BackupService.swift in Sources */,

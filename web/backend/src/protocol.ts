@@ -92,6 +92,19 @@ export const ToolResultCommand = z.object({
   isError: z.boolean().default(false),
 });
 
+export const CredentialResultCommand = z.object({
+  id, // the credential_request id this answers
+  type: z.literal("credential_result"),
+  ok: z.boolean().default(true),
+  error: z.string().optional(),
+  /** `read`: the stored credential, absent when there is none. */
+  credential: z.record(z.string(), z.any()).optional(),
+  /** `list`: non-secret metadata for every stored credential. */
+  credentials: z
+    .array(z.object({ providerId: z.string(), type: z.enum(["api_key", "oauth"]) }))
+    .optional(),
+});
+
 export const ListProvidersCommand = z.object({ id, type: z.literal("list_providers") });
 
 export const SetApiKeyCommand = z.object({
@@ -152,6 +165,7 @@ export const Command = z.discriminatedUnion("type", [
   CompleteCommand,
   ChatCommand,
   ToolResultCommand,
+  CredentialResultCommand,
   ListProvidersCommand,
   SetApiKeyCommand,
   GetApiKeyCommand,
@@ -198,5 +212,9 @@ export type Event =
   | { id: string; type: "assistant"; text: string; thinking?: string; toolCalls: { id: string; name: string; args: Record<string, unknown> }[] }
   | { id: string; type: "oauth_notify"; kind: "info" | "auth_url" | "device_code" | "progress"; message?: string; url?: string; userCode?: string; verificationUri?: string }
   | { id: string; type: "oauth_prompt"; promptId: string; promptType: "text" | "secret" | "select" | "manual_code"; message: string; placeholder?: string; options?: { id: string; label: string }[] }
+  /** Backend -> shell keystore round-trip; answered with `credential_result`.
+      The shell owns the platform keychain, so secrets never reach this
+      process's data dir. `write` carries the credential to store. */
+  | { id: string; type: "credential_request"; op: "read" | "list" | "write" | "delete"; providerId?: string; credential?: unknown }
   | { id: string; type: "done"; stopReason: string }
   | { id: string; type: "error"; message: string };
