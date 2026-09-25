@@ -303,12 +303,6 @@ extension LibraryStore {
             let dir = CatalogDatabase.documentDirectory(storageKey: item.storageKey)
             try? FileManager.default.removeItem(at: dir)
 
-            // Clean up full-text chunks (GRDB side handled by CASCADE, explicit for safety)
-            let itemIdForCleanup = item.id.uuidString
-            Task { [weak self] in
-                await self?.ftsIndexService?.removeChunks(forItemId: itemIdForCleanup)
-            }
-
             invalidate()
         } catch {
             Log.error(Log.store, "removeItem failed: \(error)")

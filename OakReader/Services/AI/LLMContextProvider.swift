@@ -196,19 +196,10 @@ struct LLMContextProvider {
     /// Build a system prompt from a skill and enriched context snapshot.
     /// Uses structured XML for metadata, includes current page text, and references
     /// available tools for on-demand document reading.
-    /// A current-page passage injected as a citable `?c=` unit, sourced from the FTS
-    /// index so its id resolves through the shared `ChunkCitationResolver`.
-    struct CurrentPageChunk: Sendable {
-        let id: Int64
-        let page: Int?   // 0-based
-        let text: String
-    }
-
     static func buildSystemPrompt(
         skill: Skill?,
         context: ChatContextSnapshot,
-        documentCharBudget: Int,
-        currentPageChunks: [CurrentPageChunk] = []
+        documentCharBudget: Int
     ) -> String {
         var parts: [String] = []
 
@@ -335,24 +326,8 @@ struct LLMContextProvider {
             }
 
             // Current page / document body text (always include — immediately
-            // relevant). When the open page is indexed, inject it as numbered
-            // [c<id>] passages so the model cites it by ?c= (validated, page-accurate)
-            // exactly like retrieved passages; otherwise fall back to raw page text
-            // (cited via ?text=). Bounded by the model-window budget either way.
-            if !currentPageChunks.isEmpty {
-                let currentPageHeader = "  <current-page index=\"\(doc.currentPageIndex + 1)\" "
-                    + "note=\"each [c&lt;id&gt;] is a citable passage — cite it as "
-                    + "oak://cite/CITEKEY?c=&lt;id&gt;&amp;text=&lt;verbatim claim sentence&gt;\">"
-                var lines = [currentPageHeader]
-                var remaining = documentCharBudget
-                for ch in currentPageChunks where remaining > 0 {
-                    let snippet = String(ch.text.prefix(remaining))
-                    lines.append("    [c\(ch.id)] \(snippet)")
-                    remaining -= snippet.count
-                }
-                lines.append("  </current-page>")
-                docParts.append(lines.joined(separator: "\n"))
-            } else if !doc.currentPageText.isEmpty {
+            // relevant). Bounded by the model-window budget.
+            if !doc.currentPageText.isEmpty {
                 let truncated = String(doc.currentPageText.prefix(documentCharBudget))
                 docParts.append("  <current-page index=\"\(doc.currentPageIndex + 1)\">\n\(truncated)\n  </current-page>")
             }
@@ -364,12 +339,10 @@ struct LLMContextProvider {
 
             // Tool usage hint
             parts.append("""
-                You have tools to read document pages (read_document), search within the \
-                document (search_document), and search the full text of the library by \
-                keyword (search_content — BM25 keyword ranking, NOT semantic: if a query \
-                returns too little, vary the terms and search again). Use the read tool \
-                to read note files by their path listed above. Use the oak tool to search \
-                the library (oak search <query>), read any item's content \
+                You have tools to read document pages (read_document) and search within \
+                the document (search_document). Use the read tool to read note files by \
+                their path listed above. Use the oak tool to search the library \
+                (oak search <query>), read any item's content \
                 (oak items read <citeKey> --pages 1-5), list collections \
                 (oak collections list), list tags (oak tags list), and manage items.
                 """)
@@ -397,17 +370,14 @@ struct LLMContextProvider {
                 read any item's content (oak items read <citeKey> --pages 1-5), \
                 list collections (oak collections list), list tags (oak tags list), \
                 browse items (oak items list), and manage the library. \
-                Use search_content to find passages by keyword (BM25 keyword \
-                ranking, NOT semantic — vary the terms and search again if results \
-                are thin) and search_academic to find papers on the web.
+                Use search_academic to find papers on the web.
 
-                When you do cite a passage returned by search_content or research, it \
-                carries a "Cite this passage as: ?c=<id>" handle — cite using that id \
-                and copy the single sentence that states the claim:
-                [your own label](oak://cite/{citeKey}?c=<id>&text=<verbatim claim sentence>)
-                The app resolves the id to the exact page and verifies the quote. The \
-                [label] is your own wording; the ?text= value is copied word-for-word. \
-                Cite the load-bearing claim, not incidental phrases — one cite per claim.
+                When you cite a passage you read, copy the single sentence that \
+                states the claim:
+                [your own label](oak://cite/{citeKey}?page=N&text=<verbatim claim sentence>)
+                The [label] is your own wording; the ?text= value is copied \
+                word-for-word. Cite the load-bearing claim, not incidental \
+                phrases — one cite per claim.
                 """)
         }
 
@@ -426,19 +396,18 @@ struct LLMContextProvider {
             answer and cite with oak://cite/...
             """)
 
-        // GROUNDED mode — scoped to a real collection. Retrieval (search_content /
-        // research) is already PHYSICALLY restricted to this collection's members,
-        // so the model cannot accidentally pull from the rest of the library.
+        // GROUNDED mode — scoped to a real collection. The scope is instructional:
+        // the model is told to answer only from this collection's documents.
         if let collection = context.activeCollection, collection.isScopable {
             let name = collection.name
             let countText = collection.itemCount.map { " (\($0) sources)" } ?? ""
             parts.append("""
                 GROUNDED MODE — you are scoped to the "\(xmlEscape(name))" collection\(countText).
-                Answer ONLY from the documents in this collection. Retrieve before \
-                you answer: use search_content and research (both already restricted \
-                to this collection) and `oak items read <citeKey> --pages N-M` to pull \
-                the actual passages, then cite each claim with oak://cite/... so the \
-                user can jump to the exact spot.
+                Answer ONLY from the documents in this collection. Read before \
+                you answer: use `oak search <query>` and \
+                `oak items read <citeKey> --pages N-M` to pull the actual passages, \
+                then cite each claim with oak://cite/... so the user can jump to \
+                the exact spot.
 
                 If this collection does not contain the answer, say so explicitly \
                 first — e.g. "The sources in \(xmlEscape(name)) don't cover this." \
@@ -482,12 +451,6 @@ struct LLMContextProvider {
                 visible [label] can be your own wording; only the anchor value must \
                 be the quote. If you are not certain of the exact wording, omit \
                 ?text= and cite the page alone — never invent a phrase.
-
-                Most reliable anchor: when a passage came from search_content or \
-                research it carries a "Cite this passage as: ?c=<id>" handle. Cite \
-                by that id — oak://cite/{citeKey}?c=<id>&text=<verbatim claim \
-                sentence> — and the app resolves it to the exact page and verifies \
-                the quote, which is safer than writing the page number yourself.
                 """)
 
             // Format + example per citation style. A live web page is `.link` with
@@ -507,9 +470,7 @@ struct LLMContextProvider {
                     This PDF's cite-key is "\(eck)". Citation format:
                     [p. N](oak://cite/\(eck)?page=N)
                     [p. N](oak://cite/\(eck)?page=N&text=verbatim+quote)
-                    (spaces in the anchor encoded as +). If the <current-page> above \
-                    is shown as [c<id>] passages, prefer oak://cite/\(eck)?c=<id>&text=… \
-                    over writing the page number yourself.
+                    (spaces in the anchor encoded as +).
 
                     Example — the [label] is paraphrased, the &text= anchor is an exact quote:
                     \"The transformer replaces recurrence with self-attention \
@@ -523,12 +484,6 @@ struct LLMContextProvider {
                     This document's cite-key is "\(eck)". Citation format:
                     [§ Heading](oak://cite/\(eck)?heading=HeadingText)
                     [your own label](oak://cite/\(eck)?text=verbatim+claim+sentence)
-
-                    Most reliable: if the <current-page> above is shown as [c<id>] \
-                    passages, cite by that id — oak://cite/\(eck)?c=<id>&text=<verbatim \
-                    sentence copied exactly from that passage>. The app then anchors on \
-                    the passage's own verbatim text, so the highlight lands even if your \
-                    wording differs — far more reliable than writing ?text= from memory.
 
                     Copy ?text= from the RENDERED text (not the raw markdown source); \
                     matching is case-insensitive, so only casing may differ. Prefer \
@@ -571,8 +526,8 @@ struct LLMContextProvider {
 
             // Cross-document references
             parts.append("""
-                For cross-document references (from search_content, \
-                oak search, or <referenced-documents> in the user message), \
+                For cross-document references (from oak search or \
+                <referenced-documents> in the user message), \
                 use the target document's cite-key:
                 [citeKey, p. N](oak://cite/targetCiteKey?page=N)
                 For <doc> elements, use the `link` attribute as the base URL and \

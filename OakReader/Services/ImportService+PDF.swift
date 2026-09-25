@@ -126,21 +126,8 @@ extension ImportService {
             await autoExtractReference(itemId: docId.uuidString, pdfURL: destURL, title: title, author: author, webSourceURL: webSourceURL)
         }
 
-        // Extract structured markdown from PDF (for full-text indexing and CLI reading)
-        if let service = ftsIndexService {
-            Task {
-                await extractPDFMarkdown(pdfURL: destURL, attachmentDir: attDir)
-                await service.indexItem(
-                    itemId: docId.uuidString,
-                    contentType: ContentType.pdf.rawValue,
-                    storageKey: itemStorageKey,
-                    attStorageKey: attStorageKey,
-                    fileName: sourceURL.lastPathComponent
-                )
-            }
-        } else {
-            Task { await extractPDFMarkdown(pdfURL: destURL, attachmentDir: attDir) }
-        }
+        // Extract structured markdown from PDF (for CLI reading)
+        Task { await extractPDFMarkdown(pdfURL: destURL, attachmentDir: attDir) }
 
         return item
     }

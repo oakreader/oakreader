@@ -7,7 +7,6 @@ enum CommandCategory: String, CaseIterable {
     case view = "View"
     case file = "File"
     case settings = "Settings"
-    case search = "Search"
     case theme = "Theme"
 }
 
@@ -40,8 +39,6 @@ enum PaletteAction {
     case settingsTab(String)
     /// Change appearance mode.
     case appearanceMode(String)
-    /// Rebuild the full-text search index.
-    case rebuildSearchIndex
 }
 
 // MARK: - Palette Command

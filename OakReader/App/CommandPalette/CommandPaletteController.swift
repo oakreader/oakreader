@@ -174,9 +174,6 @@ final class CommandPaletteController: NSObject, CommandPalettePanelDelegate {
 
         case .appearanceMode(let mode):
             Preferences.shared.appearanceMode = mode
-
-        case .rebuildSearchIndex:
-            NotificationCenter.default.post(name: .searchIndexRebuildRequested, object: nil)
         }
     }
 }

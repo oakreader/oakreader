@@ -93,7 +93,9 @@ targets:
           fi
         name: "SwiftLint"
       - script: |
-          cp "${BUILT_PRODUCTS_DIR}/oak" "${BUILT_PRODUCTS_DIR}/OakReader.app/Contents/Resources/oak"
+          # CONTENTS_FOLDER_PATH, not a hardcoded OakReader.app: the Debug
+          # config overrides PRODUCT_NAME, so its wrapper is OakReader-Dev.app.
+          cp "${BUILT_PRODUCTS_DIR}/oak" "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Resources/oak"
         name: "Embed oak CLI"
       # The AI sidecar is a self-contained executable from `bun build --compile`
       # (the Bun runtime is inside it), so the app never looks for `node` and
@@ -114,7 +116,9 @@ targets:
           else
             bash "$BACKEND/scripts/build-binary.sh"
           fi
-          DEST="${BUILT_PRODUCTS_DIR}/OakReader.app/Contents/Resources/oak-backend"
+          # CONTENTS_FOLDER_PATH, not a hardcoded OakReader.app: the Debug
+          # config overrides PRODUCT_NAME, so its wrapper is OakReader-Dev.app.
+          DEST="${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Resources/oak-backend"
           cp "$BACKEND/dist/oak-backend" "$DEST"
           chmod +x "$DEST"
           if [ -n "${EXPANDED_CODE_SIGN_IDENTITY:-}" ] && [ "${EXPANDED_CODE_SIGN_IDENTITY}" != "-" ]; then
@@ -137,11 +141,16 @@ targets:
     settings:
       base:
         PRODUCT_NAME: OakReader
+        # Pinned so the Debug PRODUCT_NAME override below cannot rename the
+        # Swift module: PRODUCT_MODULE_NAME defaults to a sanitised PRODUCT_NAME,
+        # which would make the dev build's module "OakReader_Dev" and break
+        # anything resolving classes by the "OakReader." prefix.
+        PRODUCT_MODULE_NAME: OakReader
         INFOPLIST_FILE: OakReader/App/Info.plist
         # Marketing version is the release trigger and source of truth: bump it
         # (SemVer X.Y.Z) and merge to main to ship. CURRENT_PROJECT_VERSION is a
         # placeholder; CI overrides it with the git commit count at archive time.
-        MARKETING_VERSION: "0.7.14"
+        MARKETING_VERSION: "0.7.15"
         CURRENT_PROJECT_VERSION: "1"
         # Sparkle EdDSA public key (NOT secret). Paste the key printed by
         # Sparkle's generate_keys here after generating the keypair; the matching
@@ -154,15 +163,34 @@ targets:
       configs:
         Debug:
           PRODUCT_BUNDLE_IDENTIFIER: com.oakreader.OakReader.dev
-          BUNDLE_DISPLAY_NAME: "OakReader Dev"
-          # CFBundleName drives the menu bar; CFBundleDisplayName drives Finder
-          # and Cmd-Tab. Both must be set or the dev build still says
-          # "OakReader" in the menu bar. <= 16 chars or it truncates.
-          BUNDLE_NAME: "OakReader Dev"
-          # Own URL scheme so the dev and release apps do not both register
-          # "oakreader" and let LaunchServices pick between them.
+          # The wrapper's FILE name, and the only one the Dock and Finder
+          # actually show. They label a tile from the on-disk bundle name, not
+          # from CFBundleDisplayName — a localised InfoPlist.strings would
+          # override that, but none of the .lproj folders ship one, so
+          # localizedInfoDictionary is nil and the filename wins. Without this
+          # override the dev build inherits the base PRODUCT_NAME and ships as
+          # OakReader.app, so the Dock says "OakReader" no matter what the two
+          # BUNDLE_* settings below say. Hyphen, not a space: matches the
+          # sibling termio repo's termio-dev and keeps the path quote-free.
+          PRODUCT_NAME: "OakReader-Dev"
+          BUNDLE_DISPLAY_NAME: "OakReader-Dev"
+          # CFBundleName — NOT the same thing as CFBundleDisplayName: the macOS
+          # menu bar reads CFBundleName, while the Dock and Finder go by the
+          # filename above. All three must agree or the dev build says
+          # "OakReader" somewhere. Keep <= 16 chars or the menu bar truncates it.
+          BUNDLE_NAME: "OakReader-Dev"
+          # Own URL scheme, mirroring termio's dev channel (build-app.sh sets
+          # CFBundleURLSchemes to "termio-dev"). Without this the dev and
+          # release apps both register "oakreader" and LaunchServices routes
+          # oakreader://open to whichever it feels like. NOTE: the browser
+          # extension hardcodes oakreader://open, so it now always targets the
+          # RELEASE app -- deterministic, where before it was a coin flip.
           BUNDLE_URL_SCHEME: "oakreader-dev"
-          # Inverted icon so the two builds are distinguishable in the Dock.
+          # Inverted (light) icon so the dev app is distinguishable from an
+          # installed release build in the Dock and Cmd-Tab. Same convention as
+          # the sibling termio repo's AppIcon-dev.png. Art lives in
+          # Resources/AppIcon-Dev.icon (macOS 26 Icon Composer) and
+          # Assets.xcassets/AppIcon-Dev.appiconset (fallback).
           ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon-Dev
         Release:
           PRODUCT_BUNDLE_IDENTIFIER: com.oakreader.OakReader

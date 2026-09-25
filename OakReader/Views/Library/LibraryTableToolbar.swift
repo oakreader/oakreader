@@ -27,50 +27,17 @@ struct LibraryTableToolbar: View {
             HStack(spacing: 8) {
                 // Search field
                 HStack(spacing: 6) {
-                    if store.ftsIndexService != nil {
-                        Button {
-                            store.isFullTextSearchActive.toggle()
-                            if store.isFullTextSearchActive && !searchText.isEmpty {
-                                store.performFullTextSearch()
-                            } else if !store.isFullTextSearchActive {
-                                store.clearFullTextSearch()
-                            }
-                        } label: {
-                            Image(systemName: store.isFullTextSearchActive
-                                  ? "text.magnifyingglass"
-                                  : "magnifyingglass")
-                                .font(OakStyle.Font.styledCaption)
-                                .foregroundStyle(store.isFullTextSearchActive
-                                    ? Color.accentColor
-                                    : Color.primary.opacity(0.55))
-                        }
-                        .buttonStyle(.plain)
-                        .help(store.isFullTextSearchActive ? "Switch to title search" : "Switch to full-text content search")
-                        .accessibilityLabel(store.isFullTextSearchActive ? "Full-text search active" : "Title search active")
-                    } else {
-                        Image(systemName: "magnifyingglass")
-                            .font(OakStyle.Font.styledCaption)
-                            .foregroundStyle(Color.primary.opacity(0.55))
-                            .accessibilityHidden(true)
-                    }
-                    TextField(
-                        store.isFullTextSearchActive ? "Search by meaning..." : "Search Library",
-                        text: $searchText
-                    )
+                    Image(systemName: "magnifyingglass")
+                        .font(OakStyle.Font.styledCaption)
+                        .foregroundStyle(Color.primary.opacity(0.55))
+                        .accessibilityHidden(true)
+                    TextField("Search Library", text: $searchText)
                         .font(.system(size: 14))
                         .textFieldStyle(.plain)
                         .accessibilityLabel("Search library")
                         .onChange(of: searchText) { _, newValue in
                             store.searchText = newValue
-                            if store.isFullTextSearchActive {
-                                store.performFullTextSearch()
-                            }
                         }
-                    if store.isFullTextSearching {
-                        ProgressView()
-                            .controlSize(.small)
-                            .scaleEffect(0.7)
-                    }
                     if !searchText.isEmpty {
                         Button {
                             searchText = ""

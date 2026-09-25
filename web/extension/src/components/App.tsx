@@ -256,9 +256,11 @@ function Header() {
   return (
     <div className="px-4 pt-4 pb-3">
       <div className="flex items-center gap-2.5">
-        <div className="flex size-8 items-center justify-center rounded-[10px] bg-card shadow-[var(--shadow-card)]">
-          <img src="/oakreader-logo.svg" alt="" className="size-[18px]" />
-        </div>
+        <img
+          src="/oakreader-logo.svg"
+          alt=""
+          className="size-8 rounded-[10px] shadow-[var(--shadow-card)]"
+        />
         <div>
           <p className="text-[15px] font-semibold leading-tight text-foreground">OakReader</p>
           <p className="text-[11px] leading-tight text-secondary">Clip into your reading library</p>
