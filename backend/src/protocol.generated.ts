@@ -2,10 +2,10 @@
 // Run `pnpm protocol:generate` after changing the schema.
 
 import { z } from "zod";
-import { WireMessage, WireToolDef, WordLookup, Annotation, Conversation, Collection, type ProviderSummary, type EventToolCall, type PromptOption } from "./protocol.base.js";
+import { WireMessage, WireToolDef, WordLookup, Annotation, Conversation, Collection, Item, type ProviderSummary, type EventToolCall, type PromptOption } from "./protocol.base.js";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- refs used by generated shapes
 
-export const PROTOCOL_VERSION = 8;
+export const PROTOCOL_VERSION = 9;
 
 /** JSON-RPC 2.0 error codes. Below -32000 is ours; the rest is the spec's. */
 export const RpcError = {
@@ -267,6 +267,60 @@ export type CollectionsItemsResult = {
   count: number;
 };
 
+/** `catalog/items/list` — The whole library as one graph: items with attachments, memberships, citations and property values. Covers are NOT included -- at ten thousand items that would pin hundreds of MB; views load them lazily by storage key. */
+export const ItemsListParams = z.object({
+  trashed: z.boolean().default(false),
+});
+export type ItemsListParams = z.infer<typeof ItemsListParams>;
+export type ItemsListResult = {
+  items: Item[];
+};
+
+/** `catalog/items/find` — One item by a unique handle. `source` needs `sourceKey` too. */
+export const ItemsFindParams = z.object({
+  by: z.enum(["id", "citeKey", "storageKey", "fileName", "sourceUrl", "source"]),
+  value: z.string(),
+  sourceKey: z.string().optional(),
+});
+export type ItemsFindParams = z.infer<typeof ItemsFindParams>;
+export type ItemsFindResult = {
+  item?: Item;
+};
+
+/** `catalog/items/insert` — Item and its attachments, in one transaction. */
+export const ItemsInsertParams = z.object({
+  item: Item,
+});
+export type ItemsInsertParams = z.infer<typeof ItemsInsertParams>;
+export type ItemsInsertResult = Record<string, never>;
+
+/** `catalog/items/updateField` — One scalar field. The column set is fixed so a name cannot reach SQL from the wire. */
+export const ItemsUpdateFieldParams = z.object({
+  id: z.string(),
+  field: z.enum(["title", "processingStatus", "lastPosition", "lastOpenedAt", "citeKey"]),
+  stringValue: z.string().nullable().optional(),
+  numberValue: z.number().int().positive().nullable().optional(),
+  at: z.string(),
+});
+export type ItemsUpdateFieldParams = z.infer<typeof ItemsUpdateFieldParams>;
+export type ItemsUpdateFieldResult = Record<string, never>;
+
+/** `catalog/items/setTrashed` — Move to or out of the trash. The rows stay either way. */
+export const ItemsSetTrashedParams = z.object({
+  ids: z.array(z.string()),
+  trashed: z.boolean(),
+  at: z.string(),
+});
+export type ItemsSetTrashedParams = z.infer<typeof ItemsSetTrashedParams>;
+export type ItemsSetTrashedResult = Record<string, never>;
+
+/** `catalog/items/remove` — Permanent. Cascades to attachments, annotations, memberships and citations. */
+export const ItemsRemoveParams = z.object({
+  ids: z.array(z.string()),
+});
+export type ItemsRemoveParams = z.infer<typeof ItemsRemoveParams>;
+export type ItemsRemoveResult = Record<string, never>;
+
 /** `prompts/compose` — The static half of the system prompt: base.md plus the named mixins. The shell appends live context afterwards -- that half cannot be a file. */
 export const PromptsComposeParams = z.object({
   /** Mixin names, without .md, in the order they should appear. */
@@ -407,6 +461,12 @@ export const ClientRequests = {
   "catalog/collections/delete": CollectionsDeleteParams,
   "catalog/collections/setMembership": CollectionsSetMembershipParams,
   "catalog/collections/items": CollectionsItemsParams,
+  "catalog/items/list": ItemsListParams,
+  "catalog/items/find": ItemsFindParams,
+  "catalog/items/insert": ItemsInsertParams,
+  "catalog/items/updateField": ItemsUpdateFieldParams,
+  "catalog/items/setTrashed": ItemsSetTrashedParams,
+  "catalog/items/remove": ItemsRemoveParams,
   "prompts/compose": PromptsComposeParams,
   "catalog/wordLookups/list": WordLookupsListParams,
   "catalog/wordLookups/save": WordLookupsSaveParams,
@@ -448,6 +508,12 @@ export interface ClientRequestResults {
   "catalog/collections/delete": CollectionsDeleteResult;
   "catalog/collections/setMembership": CollectionsSetMembershipResult;
   "catalog/collections/items": CollectionsItemsResult;
+  "catalog/items/list": ItemsListResult;
+  "catalog/items/find": ItemsFindResult;
+  "catalog/items/insert": ItemsInsertResult;
+  "catalog/items/updateField": ItemsUpdateFieldResult;
+  "catalog/items/setTrashed": ItemsSetTrashedResult;
+  "catalog/items/remove": ItemsRemoveResult;
   "prompts/compose": PromptsComposeResult;
   "catalog/wordLookups/list": WordLookupsListResult;
   "catalog/wordLookups/save": WordLookupsSaveResult;

@@ -10,7 +10,7 @@
  * fails if the committed output is stale.
  */
 
-export const PROTOCOL_VERSION = 8;
+export const PROTOCOL_VERSION = 9;
 
 export type FieldType =
   | { k: "string" }
@@ -264,6 +264,59 @@ export const METHODS: Method[] = [
       { name: "itemIds", type: { k: "array", of: str } },
       { name: "count", type: int },
     ],
+  },
+
+  {
+    name: "catalog/items/list", type: "ItemsList", kind: "request", from: "client",
+    doc: "The whole library as one graph: items with attachments, memberships, " +
+         "citations and property values. Covers are NOT included -- at ten thousand " +
+         "items that would pin hundreds of MB; views load them lazily by storage key.",
+    params: [{ name: "trashed", type: bool, default: "false" }],
+    result: [{ name: "items", type: { k: "array", of: { k: "ref", ts: "Item", swift: "CatalogItem" } } }],
+  },
+  {
+    name: "catalog/items/find", type: "ItemsFind", kind: "request", from: "client",
+    doc: "One item by a unique handle. `source` needs `sourceKey` too.",
+    params: [
+      { name: "by", type: { k: "enum", values: ["id", "citeKey", "storageKey", "fileName", "sourceUrl", "source"] } },
+      { name: "value", type: str },
+      { name: "sourceKey", type: str, optional: true },
+    ],
+    result: [{ name: "item", type: { k: "ref", ts: "Item", swift: "CatalogItem" }, optional: true }],
+  },
+  {
+    name: "catalog/items/insert", type: "ItemsInsert", kind: "request", from: "client",
+    doc: "Item and its attachments, in one transaction.",
+    params: [{ name: "item", type: { k: "ref", ts: "Item", swift: "CatalogItem" } }],
+    result: [],
+  },
+  {
+    name: "catalog/items/updateField", type: "ItemsUpdateField", kind: "request", from: "client",
+    doc: "One scalar field. The column set is fixed so a name cannot reach SQL from the wire.",
+    params: [
+      { name: "id", type: str },
+      { name: "field", type: { k: "enum", values: ["title", "processingStatus", "lastPosition", "lastOpenedAt", "citeKey"] } },
+      { name: "stringValue", type: str, optional: true, nullable: true },
+      { name: "numberValue", type: int, optional: true, nullable: true },
+      { name: "at", type: str },
+    ],
+    result: [],
+  },
+  {
+    name: "catalog/items/setTrashed", type: "ItemsSetTrashed", kind: "request", from: "client",
+    doc: "Move to or out of the trash. The rows stay either way.",
+    params: [
+      { name: "ids", type: { k: "array", of: str } },
+      { name: "trashed", type: bool },
+      { name: "at", type: str },
+    ],
+    result: [],
+  },
+  {
+    name: "catalog/items/remove", type: "ItemsRemove", kind: "request", from: "client",
+    doc: "Permanent. Cascades to attachments, annotations, memberships and citations.",
+    params: [{ name: "ids", type: { k: "array", of: str } }],
+    result: [],
   },
 
   {

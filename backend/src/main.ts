@@ -14,6 +14,9 @@ import {
   PROTOCOL_VERSION, RpcError,
   PingParams, ProvidersListParams,
   PromptsComposeParams, type PromptsComposeResult,
+  ItemsListParams, ItemsFindParams, ItemsInsertParams,
+  ItemsUpdateFieldParams, ItemsSetTrashedParams, ItemsRemoveParams,
+  type ItemsListResult, type ItemsFindResult,
   CollectionsListParams, CollectionsFindBySourceParams, CollectionsUpsertParams,
   CollectionsDeleteParams, CollectionsSetMembershipParams, CollectionsItemsParams,
   type CollectionsListResult, type CollectionsFindBySourceResult, type CollectionsItemsResult,
@@ -42,6 +45,7 @@ import { WordLookupStore } from "./catalog/wordLookups.js";
 import { AnnotationStore } from "./catalog/annotations.js";
 import { ConversationStore } from "./catalog/conversations.js";
 import { CollectionStore } from "./catalog/collections.js";
+import { ItemStore } from "./catalog/items.js";
 
 const BACKEND_ID = "oak-backend 0.2.0";
 
@@ -343,6 +347,44 @@ function registerMethods(): void {
   // --- catalog ----------------------------------------------------------
   // Phase 1: the shell stops opening library.sqlite and asks instead. Exactly
   // one process owns the schema, and it is this one.
+
+  peer.onRequest("catalog/items/list", ItemsListParams, (p): ItemsListResult => {
+    const store = new ItemStore(catalog().db, LOCAL_USER);
+    return { items: p.trashed ? store.listTrashed() : store.list() };
+  });
+
+  peer.onRequest("catalog/items/find", ItemsFindParams, (p): ItemsFindResult => {
+    const store = new ItemStore(catalog().db, LOCAL_USER);
+    const found = p.by === "source"
+      ? store.findBySource(p.value, p.sourceKey ?? "")
+      : store.find(p.by, p.value);
+    return found ? { item: found } : {};
+  });
+
+  peer.onRequest("catalog/items/insert", ItemsInsertParams, (p) => {
+    new ItemStore(catalog().db, LOCAL_USER).insert(p.item);
+    return {};
+  });
+
+  peer.onRequest("catalog/items/updateField", ItemsUpdateFieldParams, (p) => {
+    // One of the two value slots carries the payload; which one depends on the
+    // column, and typing them separately beats a union on the wire.
+    const value = p.numberValue ?? p.stringValue ?? null;
+    new ItemStore(catalog().db, LOCAL_USER).updateField(p.id, p.field, value, p.at);
+    return {};
+  });
+
+  peer.onRequest("catalog/items/setTrashed", ItemsSetTrashedParams, (p) => {
+    const store = new ItemStore(catalog().db, LOCAL_USER);
+    if (p.trashed) store.trash(p.ids, p.at);
+    else store.restore(p.ids, p.at);
+    return {};
+  });
+
+  peer.onRequest("catalog/items/remove", ItemsRemoveParams, (p) => {
+    new ItemStore(catalog().db, LOCAL_USER).remove(p.ids);
+    return {};
+  });
 
   peer.onRequest("catalog/collections/list", CollectionsListParams,
     (): CollectionsListResult => ({

@@ -180,3 +180,60 @@ export const Collection = z.object({
   updatedAt: z.string(),
 });
 export type Collection = z.infer<typeof Collection>;
+
+/** One file attached to an item. */
+export const Attachment = z.object({
+  id: z.string(),
+  itemId: z.string(),
+  storageKey: z.string(),
+  fileName: z.string(),
+  contentType: z.string(),
+  linkMode: z.string(),
+  sourceUrl: z.string().nullable(),
+  fileSize: z.number().int(),
+  pageCount: z.number().int(),
+  isPrimary: z.boolean(),
+});
+export type Attachment = z.infer<typeof Attachment>;
+
+/** A tag or status value on an item, joined with its property definition. */
+export const PropertyValue = z.object({
+  id: z.string(),
+  propertyId: z.string(),
+  propertyName: z.string(),
+  propertyType: z.string(),
+  optionId: z.string().nullable(),
+  optionName: z.string().nullable(),
+  optionColorHex: z.string().nullable(),
+  textValue: z.string().nullable(),
+});
+export type PropertyValue = z.infer<typeof PropertyValue>;
+
+/**
+ * A library item with everything hanging off it.
+ *
+ * Covers are absent by design; see catalog/items.ts. `citationJson` is CSL
+ * JSON carried opaquely, like a collection's filter rules.
+ */
+export const Item = z.object({
+  id: z.string(),
+  storageKey: z.string(),
+  title: z.string(),
+  author: z.string(),
+  lastOpenedAt: z.string().nullable(),
+  lastPosition: z.number().nullable(),
+  citeKey: z.string().nullable(),
+  source: z.string().nullable(),
+  sourceKey: z.string().nullable(),
+  extra: z.string().nullable(),
+  processingStatus: z.string(),
+  /** Tombstone while in the trash. */
+  deletedAt: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  attachments: z.array(Attachment),
+  collectionIds: z.array(z.string()),
+  citationJson: z.string().nullable(),
+  propertyValues: z.array(PropertyValue),
+});
+export type Item = z.infer<typeof Item>;

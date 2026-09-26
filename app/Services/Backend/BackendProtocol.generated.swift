@@ -9,7 +9,7 @@ import Foundation
 /// Reverse calls (tool/execute, oauth/prompt) are ordinary requests in the
 /// other direction, so they need no separate machinery.
 enum RPC {
-    static let version = 8
+    static let version = 9
 
     /// JSON-RPC error codes. The shell branches on these: re-authenticate
     /// is a different affordance from retry, and the old single error string
@@ -66,6 +66,12 @@ enum RPC {
         static let collectionsDelete = "catalog/collections/delete"
         static let collectionsSetMembership = "catalog/collections/setMembership"
         static let collectionsItems = "catalog/collections/items"
+        static let itemsList = "catalog/items/list"
+        static let itemsFind = "catalog/items/find"
+        static let itemsInsert = "catalog/items/insert"
+        static let itemsUpdateField = "catalog/items/updateField"
+        static let itemsSetTrashed = "catalog/items/setTrashed"
+        static let itemsRemove = "catalog/items/remove"
         static let promptsCompose = "prompts/compose"
         static let wordLookupsList = "catalog/wordLookups/list"
         static let wordLookupsSave = "catalog/wordLookups/save"
@@ -325,6 +331,68 @@ enum RPC {
     struct CollectionsItemsResult: Decodable {
         var itemIds: [String]
         var count: Int
+    }
+
+    // MARK: catalog/items/list
+    /// The whole library as one graph: items with attachments, memberships, citations and property values. Covers are NOT included -- at ten thousand items that would pin hundreds of MB; views load them lazily by storage key.
+    struct ItemsListParams: Encodable {
+        var trashed: Bool?
+    }
+    struct ItemsListResult: Decodable {
+        var items: [CatalogItem]
+    }
+
+    // MARK: catalog/items/find
+    /// One item by a unique handle. `source` needs `sourceKey` too.
+    struct ItemsFindParams: Encodable {
+        var by: String
+        var value: String
+        var sourceKey: String?
+    }
+    struct ItemsFindResult: Decodable {
+        var item: CatalogItem?
+    }
+
+    // MARK: catalog/items/insert
+    /// Item and its attachments, in one transaction.
+    struct ItemsInsertParams: Encodable {
+        var item: CatalogItem
+    }
+    struct ItemsInsertResult: Decodable {
+        init() {}
+    }
+
+    // MARK: catalog/items/updateField
+    /// One scalar field. The column set is fixed so a name cannot reach SQL from the wire.
+    struct ItemsUpdateFieldParams: Encodable {
+        var `id`: String
+        var field: String
+        var stringValue: String?
+        var numberValue: Int?
+        var at: String
+    }
+    struct ItemsUpdateFieldResult: Decodable {
+        init() {}
+    }
+
+    // MARK: catalog/items/setTrashed
+    /// Move to or out of the trash. The rows stay either way.
+    struct ItemsSetTrashedParams: Encodable {
+        var ids: [String]
+        var trashed: Bool
+        var at: String
+    }
+    struct ItemsSetTrashedResult: Decodable {
+        init() {}
+    }
+
+    // MARK: catalog/items/remove
+    /// Permanent. Cascades to attachments, annotations, memberships and citations.
+    struct ItemsRemoveParams: Encodable {
+        var ids: [String]
+    }
+    struct ItemsRemoveResult: Decodable {
+        init() {}
     }
 
     // MARK: prompts/compose
