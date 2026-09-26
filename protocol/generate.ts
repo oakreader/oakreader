@@ -27,6 +27,7 @@ function zodType(t: FieldType): string {
   switch (t.k) {
     case "string": return "z.string()";
     case "int": return "z.number().int().positive()";
+    case "double": return "z.number()";
     case "bool": return "z.boolean()";
     case "json": return "z.record(z.string(), z.any())";
     case "enum": return `z.enum([${t.values.map((v) => `"${v}"`).join(", ")}])`;
@@ -45,6 +46,7 @@ function tsType(t: FieldType): string {
   switch (t.k) {
     case "string": return "string";
     case "int": return "number";
+    case "double": return "number";
     case "bool": return "boolean";
     case "json": return "Record<string, unknown>";
     case "enum": return t.values.map((v) => `"${v}"`).join(" | ");
@@ -157,6 +159,7 @@ function swiftType(t: FieldType, decoding: boolean): string {
   switch (t.k) {
     case "string": return "String";
     case "int": return "Int";
+    case "double": return "Double";
     case "bool": return "Bool";
     case "json": return decoding ? "[String: JSONFragment]" : "AnyJSONObject";
     case "enum": return "String";

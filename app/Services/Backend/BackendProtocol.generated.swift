@@ -373,7 +373,8 @@ enum RPC {
         var `id`: String
         var field: String
         var stringValue: String?
-        var numberValue: Int?
+        /// Used for lastPosition; the other fields travel in stringValue.
+        var numberValue: Double?
         var at: String
     }
     struct ItemsUpdateFieldResult: Decodable {

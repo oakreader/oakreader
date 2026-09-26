@@ -299,7 +299,8 @@ export const ItemsUpdateFieldParams = z.object({
   id: z.string(),
   field: z.enum(["title", "processingStatus", "lastPosition", "lastOpenedAt", "citeKey"]),
   stringValue: z.string().nullable().optional(),
-  numberValue: z.number().int().positive().nullable().optional(),
+  /** Used for lastPosition; the other fields travel in stringValue. */
+  numberValue: z.number().nullable().optional(),
   at: z.string(),
 });
 export type ItemsUpdateFieldParams = z.infer<typeof ItemsUpdateFieldParams>;

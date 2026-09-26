@@ -173,91 +173,74 @@ extension LibraryStore {
         }
     }
 
+    /// Delete an item permanently: its rows, and the files they pointed at.
+    ///
+    /// Two owners, in order. The core drops the row and everything the schema
+    /// cascades from it — attachments, annotations, memberships, citations,
+    /// conversation rows. The shell then deletes what lives on disk: the
+    /// document's storage directory and each conversation's JSONL transcript.
+    ///
+    /// The conversation ids have to be read *before* the row goes, because the
+    /// cascade takes them with it and the transcripts are named after them.
     func removeItem(_ item: LibraryItem) {
-        do {
-            // Collect conversation IDs
-            let convIds = try database.dbQueue.read { db in
-                try Row.fetchAll(db, sql: "SELECT id FROM conversations WHERE item_id = ?", arguments: [item.id.uuidString])
-                    .compactMap { UUID(uuidString: $0["id"] as String) }
+        removeItems([item])
+    }
+
+    func removeItems(_ items: [LibraryItem]) {
+        guard !items.isEmpty else { return }
+        Task {
+            var transcripts: [UUID] = []
+            for item in items {
+                let conversations = await ConversationService()
+                    .fetchSessions(forItemId: item.id.uuidString)
+                transcripts.append(contentsOf: conversations.map(\.id))
             }
 
-            // Delete from DB (cascades to conversations records)
-            try database.dbQueue.write { db in
-                try db.execute(sql: "DELETE FROM items WHERE id = ?", arguments: [item.id.uuidString])
+            await LibraryCatalog.remove(ids: items.map { $0.id.uuidString })
+
+            // Files, now that nothing references them.
+            for id in transcripts {
+                try? FileManager.default.removeItem(at: CatalogDatabase.chatFileURL(sessionId: id))
+                try? FileManager.default.removeItem(
+                    at: CatalogDatabase.chatAttachmentDirectory(sessionId: id))
+            }
+            for item in items {
+                try? FileManager.default.removeItem(
+                    at: CatalogDatabase.documentDirectory(storageKey: item.storageKey))
             }
 
-            // Remove chat files
-            for convId in convIds {
-                let url = CatalogDatabase.chatFileURL(sessionId: convId)
-                try? FileManager.default.removeItem(at: url)
-                try? FileManager.default.removeItem(at: CatalogDatabase.chatAttachmentDirectory(sessionId: convId))
-            }
-            // Remove storage directory (PDFs, covers, etc.)
-            let dir = CatalogDatabase.documentDirectory(storageKey: item.storageKey)
-            try? FileManager.default.removeItem(at: dir)
-
-            invalidate()
-        } catch {
-            Log.error(Log.store, "removeItem failed: \(error)")
+            await MainActor.run { self.invalidate() }
         }
     }
 
+    /// These stay synchronous: every caller is a UI action, and the write is
+    /// fire-and-forget followed by `invalidate()`, which reloads behind itself.
+    /// Waiting on the round trip would stall a click to confirm something the
+    /// interface has already shown.
+
     func markOpened(_ item: LibraryItem) {
-        let now = Date().iso8601String
-        do {
-            try database.dbQueue.write { db in
-                try db.execute(
-                    sql: "UPDATE items SET last_opened_at = ?, updated_at = ? WHERE id = ?",
-                    arguments: [now, now, item.id.uuidString]
-                )
-            }
-            invalidate()
-        } catch {
-            Log.error(Log.store, "markOpened failed: \(error)")
-        }
+        update(item, field: "lastOpenedAt", string: Date().iso8601String)
     }
 
     func updateTitle(_ item: LibraryItem, title: String) {
-        let now = Date().iso8601String
-        do {
-            try database.dbQueue.write { db in
-                try db.execute(
-                    sql: "UPDATE items SET title = ?, updated_at = ? WHERE id = ?",
-                    arguments: [title, now, item.id.uuidString]
-                )
-            }
-            invalidate()
-        } catch {
-            Log.error(Log.store, "updateTitle failed: \(error)")
-        }
+        update(item, field: "title", string: title)
     }
 
     func updateProcessingStatus(_ item: LibraryItem, status: ProcessingStatus) {
-        let now = Date().iso8601String
-        do {
-            try database.dbQueue.write { db in
-                try db.execute(
-                    sql: "UPDATE items SET processing_status = ?, updated_at = ? WHERE id = ?",
-                    arguments: [status.rawValue, now, item.id.uuidString]
-                )
-            }
-            invalidate()
-        } catch {
-            Log.error(Log.store, "updateProcessingStatus failed: \(error)")
-        }
+        update(item, field: "processingStatus", string: status.rawValue)
     }
 
     func updateLastPosition(_ item: LibraryItem, position: Double) {
-        let now = Date().iso8601String
-        do {
-            try database.dbQueue.write { db in
-                try db.execute(
-                    sql: "UPDATE items SET last_position = ?, updated_at = ? WHERE id = ?",
-                    arguments: [position, now, item.id.uuidString]
-                )
-            }
-        } catch {
-            Log.error(Log.store, "updateLastPosition failed: \(error)")
+        // Deliberately no invalidate: scroll position changes constantly and
+        // reloading the library on every one would be absurd. Nothing displays
+        // it, so the in-memory copy going stale costs nothing.
+        Task { await LibraryCatalog.update(id: item.id.uuidString, field: "lastPosition", number: position) }
+    }
+
+    private func update(_ item: LibraryItem, field: String, string: String) {
+        Task {
+            await LibraryCatalog.update(id: item.id.uuidString, field: field, string: string)
+            await MainActor.run { self.invalidate() }
         }
     }
 
@@ -449,79 +432,37 @@ extension LibraryStore {
         }
     }
 
-    func trashItem(_ item: LibraryItem) {
-        let now = Date().iso8601String
-        do {
-            try database.dbQueue.write { db in
-                try db.execute(
-                    sql: "UPDATE items SET deleted_at = ?, updated_at = ? WHERE id = ?",
-                    arguments: [now, now, item.id.uuidString]
-                )
-            }
-            invalidate()
-        } catch {
-            Log.error(Log.store, "trashItem failed: \(error)")
-        }
-    }
+    /// Bin operations.
+    ///
+    /// Singular and plural collapse into one call each: the core takes an id
+    /// list, so `trashItem` is `trashItems` with one element and the four Swift
+    /// methods that differed only in arity become two.
+
+    func trashItem(_ item: LibraryItem) { trashItems([item]) }
 
     func trashItems(_ items: [LibraryItem]) {
-        let now = Date().iso8601String
-        do {
-            try database.dbQueue.write { db in
-                for item in items {
-                    try db.execute(
-                        sql: "UPDATE items SET deleted_at = ?, updated_at = ? WHERE id = ?",
-                        arguments: [now, now, item.id.uuidString]
-                    )
-                }
-            }
-            invalidate()
-        } catch {
-            Log.error(Log.store, "trashItems failed: \(error)")
-        }
+        setTrashed(items, trashed: true)
     }
 
-    func restoreItem(_ item: LibraryItem) {
-        let now = Date().iso8601String
-        do {
-            try database.dbQueue.write { db in
-                try db.execute(
-                    sql: "UPDATE items SET deleted_at = NULL, updated_at = ? WHERE id = ?",
-                    arguments: [now, item.id.uuidString]
-                )
-            }
-            invalidate()
-        } catch {
-            Log.error(Log.store, "restoreItem failed: \(error)")
-        }
-    }
+    func restoreItem(_ item: LibraryItem) { restoreItems([item]) }
 
     func restoreItems(_ items: [LibraryItem]) {
-        let now = Date().iso8601String
-        do {
-            try database.dbQueue.write { db in
-                for item in items {
-                    try db.execute(
-                        sql: "UPDATE items SET deleted_at = NULL, updated_at = ? WHERE id = ?",
-                        arguments: [now, item.id.uuidString]
-                    )
-                }
-            }
-            invalidate()
-        } catch {
-            Log.error(Log.store, "restoreItems failed: \(error)")
+        setTrashed(items, trashed: false)
+    }
+
+    private func setTrashed(_ items: [LibraryItem], trashed: Bool) {
+        guard !items.isEmpty else { return }
+        let ids = items.map { $0.id.uuidString }
+        Task {
+            await LibraryCatalog.setTrashed(ids: ids, trashed: trashed)
+            await MainActor.run { self.invalidate() }
         }
     }
 
+    /// One call rather than a loop: the core deletes the batch in a
+    /// transaction, so an interrupted empty cannot leave the bin half-cleared.
     func emptyBin() {
-        do {
-            let trashedItems = try fetchTrashedItems()
-            for item in trashedItems {
-                removeItem(item)
-            }
-        } catch {
-            Log.error(Log.store, "emptyBin failed: \(error)")
-        }
+        removeItems(loadedTrashedItems)
     }
 
     // MARK: - Cover helpers

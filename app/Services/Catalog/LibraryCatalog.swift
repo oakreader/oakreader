@@ -74,7 +74,7 @@ enum LibraryCatalog {
             at: Date().iso8601String))
     }
 
-    static func update(id: String, field: String, number: Int?) async {
+    static func update(id: String, field: String, number: Double?) async {
         await perform(RPC.Method.itemsUpdateField, RPC.ItemsUpdateFieldParams(
             id: id, field: field, stringValue: nil, numberValue: number,
             at: Date().iso8601String))

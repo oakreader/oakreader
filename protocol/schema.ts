@@ -15,6 +15,9 @@ export const PROTOCOL_VERSION = 9;
 export type FieldType =
   | { k: "string" }
   | { k: "int" }
+  /** A real number. `int` generates a positive-integer guard, which a scroll
+   *  position (0.0–1.0, and legitimately zero) fails. */
+  | { k: "double" }
   | { k: "bool" }
   | { k: "enum"; values: string[] }
   | { k: "json" }
@@ -47,6 +50,7 @@ export interface Method {
 
 const str: FieldType = { k: "string" };
 const int: FieldType = { k: "int" };
+const double: FieldType = { k: "double" };
 const bool: FieldType = { k: "bool" };
 const json: FieldType = { k: "json" };
 const wireMessage: FieldType = { k: "ref", ts: "WireMessage", swift: "WireMessage" };
@@ -297,7 +301,8 @@ export const METHODS: Method[] = [
       { name: "id", type: str },
       { name: "field", type: { k: "enum", values: ["title", "processingStatus", "lastPosition", "lastOpenedAt", "citeKey"] } },
       { name: "stringValue", type: str, optional: true, nullable: true },
-      { name: "numberValue", type: int, optional: true, nullable: true },
+      { name: "numberValue", type: double, optional: true, nullable: true,
+        doc: "Used for lastPosition; the other fields travel in stringValue." },
       { name: "at", type: str },
     ],
     result: [],
