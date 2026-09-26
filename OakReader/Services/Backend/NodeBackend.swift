@@ -160,10 +160,10 @@ actor NodeBackend {
     /// The write itself happens off the actor. A pipe blocks its writer once
     /// the reader is ~64 KB behind, and a frame can exceed that on its own — a
     /// base64 image part, or a fat tool result. Blocking inside the actor would
-    /// stall every other call into it, including the `tool_result` or
-    /// `credential_result` the sidecar is waiting for before it drains its
-    /// input: a deadlock, not just latency. The queue is serial, so frames
-    /// still reach the sidecar in the order they were produced.
+    /// stall every other call into it, including the `tool_result` the sidecar
+    /// is waiting for before it drains its input: a deadlock, not just
+    /// latency. The queue is serial, so frames still reach the sidecar in the
+    /// order they were produced.
     private func write(_ command: BackendCommand) throws {
         guard let stdinHandle else { throw NodeBackendError.notRunning }
         var data = try JSONEncoder().encode(command)
@@ -259,13 +259,6 @@ actor NodeBackend {
     }
 
     private func dispatch(_ event: BackendEvent) {
-        // Keystore round-trips are unsolicited: the sidecar originates them, so
-        // there is no request stream waiting on this id. Answer before the
-        // stream lookup below, which drops ids it does not own.
-        if event.type == "credential_request" {
-            try? write(BackendCredentialResponder.reply(to: event))
-            return
-        }
         guard let continuation = streams[event.id] else { return }
         switch event.type {
         case "done", "response":

@@ -3,11 +3,9 @@ import Foundation
 /// Swift mirror of the sidecar protocol v2 (web/backend/src/protocol.ts —
 /// keep the two in sync). JSONL over stdio, LF-delimited.
 ///
-/// v2: the backend owns the provider catalog, OAuth, endpoint overrides, and
-/// the agentic chat loop. Swift sends provider/model ids, executes tools when
-/// the backend asks (`tool_exec` → `tool_result`), and answers keystore reads
-/// and writes (`credential_request` → `credential_result`) — the secrets stay
-/// on this side, in the Keychain.
+/// v2: the backend owns the provider catalog, credentials, OAuth, endpoint
+/// overrides, and the agentic chat loop. Swift sends provider/model ids and
+/// executes tools when the backend asks (`tool_exec` → `tool_result`).
 enum BackendProtocol {
     static let version = 2
 }
@@ -153,25 +151,13 @@ struct BackendCommand: Encodable {
     var isError: Bool?
     var promptId: String?
     var value: String?
-    // credential_result
-    var ok: Bool?
-    var error: String?
-    var credential: AnyJSONObject?
-    var credentials: [BackendCredentialInfo]?
-}
-
-/// Non-secret credential metadata: what the sidecar's `list` needs to show a
-/// provider as configured, without handing it the secret.
-struct BackendCredentialInfo: Encodable {
-    var providerId: String
-    var type: String  // api_key | oauth
 }
 
 // MARK: - Events
 
 struct BackendEvent: Decodable {
     var id: String
-    var type: String  // response | delta | thinking | tool_exec | assistant | credential_request | oauth_notify | oauth_prompt | done | error
+    var type: String  // response | delta | thinking | tool_exec | assistant | oauth_notify | oauth_prompt | done | error
 
     // response
     var command: String?
@@ -193,12 +179,6 @@ struct BackendEvent: Decodable {
     // assistant
     var thinking: String?
     var toolCalls: [BackendToolCall]?
-
-    // credential_request
-    var op: String?
-    var providerId: String?
-    /// `write` only: the credential to store, opaque to the shell.
-    var credential: JSONFragment?
 
     // oauth
     var kind: String?

@@ -1,17 +1,14 @@
 import Foundation
+import OakAgent
 
-/// One-time migration of AI provider *configuration* into the Node backend:
+/// One-time migration of AI provider configuration into the Node backend:
+/// - API keys from the Keychain (the old OakAI credential store)
 /// - base-URL overrides from UserDefaults (`providerEndpoints.v1`)
 /// - local provider URLs from UserDefaults (`localProviders.v1`)
 ///
-/// API keys are not migrated, because there is nowhere to migrate them to: the
-/// backend reads credentials back out of this app's Keychain over the protocol
-/// (`BackendCredentialResponder`), and a key saved under the old plain-string
-/// scheme is served as a fallback there. The Keychain never stopped being the
-/// store.
-///
 /// OAuth sign-ins (Codex, Copilot) are not migrated — token shapes differ;
-/// users re-connect once from Settings.
+/// users re-connect once from Settings. Keychain entries are left in place
+/// (harmless, and a downgrade path).
 enum BackendCredentialMigrator {
     private static let doneKey = "backendCredentialMigration.v1"
 
@@ -23,7 +20,14 @@ enum BackendCredentialMigrator {
         await catalog.refresh()
         guard catalog.backendError == nil, !catalog.providers.isEmpty else { return }
 
-        // 1. Endpoint overrides (providerId → raw base URL, `#` marker preserved).
+        // 1. API keys: Keychain → backend, only where the backend has nothing.
+        for provider in catalog.providers where !provider.auth.configured {
+            if let key = KeychainService.apiKey(forProviderId: provider.id) {
+                _ = await catalog.setAPIKey(key, providerId: provider.id)
+            }
+        }
+
+        // 2. Endpoint overrides (providerId → raw base URL, `#` marker preserved).
         if let data = UserDefaults.standard.data(forKey: "providerEndpoints.v1"),
            let overrides = try? JSONDecoder().decode([String: String].self, from: data) {
             for (providerId, baseUrl) in overrides where !baseUrl.isEmpty {
@@ -31,7 +35,7 @@ enum BackendCredentialMigrator {
             }
         }
 
-        // 2. Local providers (Ollama / LM Studio server URLs).
+        // 3. Local providers (Ollama / LM Studio server URLs).
         struct LocalConfig: Decodable { var apiBase: String }
         if let data = UserDefaults.standard.data(forKey: "localProviders.v1"),
            let configs = try? JSONDecoder().decode([String: LocalConfig].self, from: data) {
