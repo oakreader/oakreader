@@ -59,186 +59,77 @@ extension LibraryStore {
         }
     }
 
+    // MARK: - Mutations
+    //
+    // Every one of these was the same three steps: build a record, write it,
+    // invalidate. They now build a wire value and hand it to one upsert, which
+    // is why creating, renaming, re-parenting and re-ruling a collection are
+    // four lines each rather than four near-identical twenty-line bodies.
+
     @discardableResult
-    func createCollection(name: String, icon: String = "folder.fill", source: String? = nil, sourceKey: String? = nil) -> PDFCollection {
-        let now = Date().iso8601String
-        let record = CollectionRecord(
-            id: UUID().uuidString,
-            userId: localUserId,
-            name: name,
-            icon: icon,
-            sortOrder: userCollections.count,
-            parentId: nil,
-            isSmart: false,
-            isSystem: false,
-            filterRules: nil,
-            createdAt: now,
-            updatedAt: now,
-            source: source,
-            sourceKey: sourceKey
-        )
-        do {
-            try database.dbQueue.write { db in
-                var r = record
-                try r.insert(db)
-            }
-            invalidate()
-        } catch {
-            Log.error(Log.store, "createCollection failed: \(error)")
-        }
-        return PDFCollection(record: record)
+    func createCollection(name: String, icon: String = "folder.fill",
+                          source: String? = nil, sourceKey: String? = nil) -> PDFCollection {
+        save(makeCollection(name: name, icon: icon, sortOrder: userCollections.count,
+                            source: source, sourceKey: sourceKey))
     }
 
     @discardableResult
-    func createSmartCollection(name: String, icon: String = "magnifyingglass", rules: FilterRuleSet) -> PDFCollection {
-        let now = Date().iso8601String
-        let rulesJSON = (try? JSONEncoder().encode(rules)).flatMap { String(data: $0, encoding: .utf8) }
-        let record = CollectionRecord(
-            id: UUID().uuidString,
-            userId: localUserId,
-            name: name,
-            icon: icon,
-            sortOrder: userCollections.count,
-            parentId: nil,
-            isSmart: true,
-            isSystem: false,
-            filterRules: rulesJSON,
-            createdAt: now,
-            updatedAt: now
-        )
-        do {
-            try database.dbQueue.write { db in
-                var r = record
-                try r.insert(db)
-            }
-            invalidate()
-        } catch {
-            Log.error(Log.store, "createSmartCollection failed: \(error)")
-        }
-        return PDFCollection(record: record)
+    func createSmartCollection(name: String, icon: String = "magnifyingglass",
+                               rules: FilterRuleSet) -> PDFCollection {
+        save(makeCollection(name: name, icon: icon, sortOrder: userCollections.count,
+                            isSmart: true, filterRules: encode(rules)))
+    }
+
+    @discardableResult
+    func createSubcollection(name: String, icon: String = "folder.fill", parent: PDFCollection,
+                             source: String? = nil, sourceKey: String? = nil) -> PDFCollection {
+        save(makeCollection(name: name, icon: icon, sortOrder: parent.subcollections.count,
+                            parentId: parent.id.uuidString, source: source, sourceKey: sourceKey))
     }
 
     func updateSmartCollectionRules(_ collection: PDFCollection, rules: FilterRuleSet) {
-        let now = Date().iso8601String
-        let rulesJSON = (try? JSONEncoder().encode(rules)).flatMap { String(data: $0, encoding: .utf8) }
-        do {
-            try database.dbQueue.write { db in
-                try db.execute(
-                    sql: "UPDATE collections SET filter_rules = ?, updated_at = ? WHERE id = ?",
-                    arguments: [rulesJSON, now, collection.id.uuidString]
-                )
-            }
-            invalidate()
-        } catch {
-            Log.error(Log.store, "updateSmartCollectionRules failed: \(error)")
-        }
-    }
-
-    @discardableResult
-    func createSubcollection(name: String, icon: String = "folder.fill", parent: PDFCollection, source: String? = nil, sourceKey: String? = nil) -> PDFCollection {
-        let now = Date().iso8601String
-        let record = CollectionRecord(
-            id: UUID().uuidString,
-            userId: localUserId,
-            name: name,
-            icon: icon,
-            sortOrder: parent.subcollections.count,
-            parentId: parent.id.uuidString,
-            isSmart: false,
-            isSystem: false,
-            filterRules: nil,
-            createdAt: now,
-            updatedAt: now,
-            source: source,
-            sourceKey: sourceKey
-        )
-        do {
-            try database.dbQueue.write { db in
-                var r = record
-                try r.insert(db)
-            }
-            invalidate()
-        } catch {
-            Log.error(Log.store, "createSubcollection failed: \(error)")
-        }
-        return PDFCollection(record: record)
-    }
-
-    func moveCollection(_ collection: PDFCollection, toParent newParent: PDFCollection?) {
-        let now = Date().iso8601String
-        do {
-            try database.dbQueue.write { db in
-                try db.execute(
-                    sql: "UPDATE collections SET parent_id = ?, updated_at = ? WHERE id = ?",
-                    arguments: [newParent?.id.uuidString, now, collection.id.uuidString]
-                )
-            }
-            invalidate()
-        } catch {
-            Log.error(Log.store, "moveCollection failed: \(error)")
-        }
-    }
-
-    func deleteCollection(_ collection: PDFCollection) {
-        guard !collection.isSystem else { return }
-        do {
-            try database.dbQueue.write { db in
-                try db.execute(sql: "DELETE FROM collections WHERE id = ?", arguments: [collection.id.uuidString])
-            }
-            if selectedCollectionId == collection.id {
-                selectedCollectionId = SystemCollectionID.readingList
-            }
-            invalidate()
-        } catch {
-            Log.error(Log.store, "deleteCollection failed: \(error)")
-        }
+        save(wire(collection, filterRules: encode(rules)))
     }
 
     func renameCollection(_ collection: PDFCollection, to name: String) {
-        let now = Date().iso8601String
-        do {
-            try database.dbQueue.write { db in
-                try db.execute(
-                    sql: "UPDATE collections SET name = ?, updated_at = ? WHERE id = ?",
-                    arguments: [name, now, collection.id.uuidString]
-                )
-            }
-            invalidate()
-        } catch {
-            Log.error(Log.store, "renameCollection failed: \(error)")
+        save(wire(collection, name: name))
+    }
+
+    func moveCollection(_ collection: PDFCollection, toParent newParent: PDFCollection?) {
+        save(wire(collection, parentId: newParent?.id.uuidString ?? nil, clearParent: newParent == nil))
+    }
+
+    func deleteCollection(_ collection: PDFCollection) {
+        // System collections are built in; deleting one would leave the sidebar
+        // without a section it assumes exists.
+        guard !collection.isSystem else { return }
+        let id = collection.id.uuidString
+        Task {
+            await LibraryCatalog.deleteCollection(id: id)
+            await MainActor.run { self.invalidate() }
         }
     }
 
+    // MARK: - Membership
+
     func addItem(_ item: LibraryItem, to collection: PDFCollection) {
-        // Check if already in collection
-        if item.collections.contains(where: { $0.id == collection.id }) { return }
-        let now = Date().iso8601String
-        let junction = CollectionItemRecord(
-            itemId: item.id.uuidString,
-            collectionId: collection.id.uuidString,
-            createdAt: now
-        )
-        do {
-            try database.dbQueue.write { db in
-                try junction.insert(db)
-            }
-            invalidate()
-        } catch {
-            Log.error(Log.store, "addItem to collection failed: \(error)")
-        }
+        // Already a member: the core would no-op anyway, but skipping the round
+        // trip keeps a repeated drag free.
+        guard !item.collections.contains(where: { $0.id == collection.id }) else { return }
+        setMembership(item, collection, member: true)
     }
 
     func removeItem(_ item: LibraryItem, from collection: PDFCollection) {
-        do {
-            try database.dbQueue.write { db in
-                try db.execute(
-                    sql: "DELETE FROM collection_items WHERE item_id = ? AND collection_id = ?",
-                    arguments: [item.id.uuidString, collection.id.uuidString]
-                )
-            }
-            invalidate()
-        } catch {
-            Log.error(Log.store, "removeItem from collection failed: \(error)")
+        setMembership(item, collection, member: false)
+    }
+
+    private func setMembership(_ item: LibraryItem, _ collection: PDFCollection, member: Bool) {
+        let itemId = item.id.uuidString
+        let collectionId = collection.id.uuidString
+        Task {
+            await LibraryCatalog.setMembership(
+                itemId: itemId, collectionId: collectionId, member: member)
+            await MainActor.run { self.invalidate() }
         }
     }
 
@@ -249,8 +140,58 @@ extension LibraryStore {
         return exts
     }()
 
-    /// Import all supported files from a folder, creating a collection named after the folder.
+    // MARK: - Private
+
+    private func encode(_ rules: FilterRuleSet) -> String? {
+        (try? JSONEncoder().encode(rules)).flatMap { String(data: $0, encoding: .utf8) }
+    }
+
+    private func makeCollection(
+        name: String, icon: String, sortOrder: Int,
+        parentId: String? = nil, isSmart: Bool = false,
+        filterRules: String? = nil, source: String? = nil, sourceKey: String? = nil
+    ) -> CatalogCollection {
+        let now = Date().iso8601String
+        return CatalogCollection(
+            id: UUID().uuidString, name: name, icon: icon, sortOrder: sortOrder,
+            parentId: parentId, isSmart: isSmart, isSystem: false,
+            filterRules: filterRules, source: source, sourceKey: sourceKey,
+            createdAt: now, updatedAt: now)
+    }
+
+    /// An existing collection as a wire value, with selected fields replaced.
+    /// `clearParent` exists because nil means "leave alone" for every other
+    /// argument, and moving a collection to the root has to mean nil parent.
+    private func wire(
+        _ c: PDFCollection, name: String? = nil, parentId: String?? = nil,
+        filterRules: String? = nil, clearParent: Bool = false
+    ) -> CatalogCollection {
+        CatalogCollection(
+            id: c.id.uuidString,
+            name: name ?? c.name,
+            icon: c.icon,
+            sortOrder: c.sortOrder,
+            parentId: clearParent ? nil : (parentId ?? c.parentId?.uuidString),
+            isSmart: c.isSmart,
+            isSystem: c.isSystem,
+            filterRules: filterRules ?? c.filterRules.flatMap(encode),
+            source: c.source,
+            sourceKey: c.sourceKey,
+            createdAt: Date().iso8601String,
+            updatedAt: Date().iso8601String)
+    }
+
     @discardableResult
+    private func save(_ collection: CatalogCollection) -> PDFCollection {
+        Task {
+            await LibraryCatalog.upsert(collection)
+            await MainActor.run { self.invalidate() }
+        }
+        // Returned immediately so callers can use it before the write lands;
+        // the reload will replace it with the stored form.
+        return PDFCollection(wire: collection)
+    }
+
     func importFolder(_ folderURL: URL, importService: ImportService) async -> Int {
         let folderName = folderURL.lastPathComponent
         let collection = createCollection(name: folderName, icon: "folder.fill")
