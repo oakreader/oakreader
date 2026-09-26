@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Catalog } from "../src/catalog/db.ts";
 import { AnnotationStore, type Annotation } from "../src/catalog/annotations.ts";
+import { seed } from "./seed.ts";
 
 /** A catalog with one item and one attachment to hang annotations off. */
 function withAttachment<T>(body: (store: AnnotationStore, db: Catalog) => T): T {
@@ -16,7 +17,7 @@ function withAttachment<T>(body: (store: AnnotationStore, db: Catalog) => T): T 
   try {
     const catalog = Catalog.open(join(dir, "library.sqlite"));
     try {
-      catalog.db.exec(`
+      seed(catalog.db, `
         INSERT INTO items (id, user_id, storage_key, title, created_at, updated_at)
         VALUES ('item-1', 'local', 'sk-1', 'A Paper', '2026-01-01', '2026-01-01');
         INSERT INTO attachments (id, item_id, storage_key, file_name, created_at, updated_at)
@@ -114,7 +115,7 @@ describe("annotations", () => {
 
   test("scopes to the attachment asked for", () => {
     withAttachment((store, catalog) => {
-      catalog.db.exec(
+      seed(catalog.db, 
         `INSERT INTO attachments (id, item_id, storage_key, file_name, created_at, updated_at)
          VALUES ('att-2', 'item-1', 'sk-3', 'other.pdf', '2026-01-01', '2026-01-01')`);
       store.upsert(annotation({ attachmentId: "att-1" }));
@@ -128,7 +129,7 @@ describe("annotations", () => {
   test("deleting the attachment cascades, as the schema says", () => {
     withAttachment((store, catalog) => {
       store.upsert(annotation());
-      catalog.db.exec("DELETE FROM attachments WHERE id = 'att-1'");
+      seed(catalog.db, "DELETE FROM attachments WHERE id = 'att-1'");
       expect(store.listForAttachment("att-1")).toHaveLength(0);
     });
   });

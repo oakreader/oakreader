@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Catalog } from "../src/catalog/db.ts";
 import { CollectionStore, type Collection } from "../src/catalog/collections.ts";
+import { seed } from "./seed.ts";
 
 function withCatalog<T>(items: string[], body: (s: CollectionStore, c: Catalog) => T): T {
   const dir = mkdtempSync(join(tmpdir(), "oak-collections-"));
@@ -154,7 +155,7 @@ describe("collections", () => {
       store.upsert(c);
       store.addItem("doc-1", c.id, "");
 
-      catalog.db.exec("DELETE FROM items WHERE id = 'doc-1'");
+      seed(catalog.db, "DELETE FROM items WHERE id = 'doc-1'");
       expect(store.itemCount(c.id)).toBe(0);
       expect(store.list()).toHaveLength(1);   // the collection survives
     });

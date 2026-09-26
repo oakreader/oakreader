@@ -19,7 +19,7 @@ import {
   PropertiesAddSelectValueParams, PropertiesRemoveSelectValueParams,
   PropertiesSetTextValueParams,
   type PropertiesListResult,
-  ItemsListParams, ItemsFindParams, ItemsInsertParams,
+  ItemsListParams, ItemsMergeParams, ItemsFindParams, ItemsInsertParams,
   ItemsUpdateFieldParams, ItemsSetTrashedParams, ItemsRemoveParams,
   type ItemsListResult, type ItemsFindResult,
   CollectionsListParams, CollectionsFindBySourceParams, CollectionsUpsertParams,
@@ -353,6 +353,11 @@ function registerMethods(): void {
   // --- catalog ----------------------------------------------------------
   // Phase 1: the shell stops opening library.sqlite and asks instead. Exactly
   // one process owns the schema, and it is this one.
+
+  peer.onRequest("catalog/items/merge", ItemsMergeParams, (p) => {
+    new ItemStore(catalog().db, LOCAL_USER).merge(p.keeperId, p.duplicateIds, p.at);
+    return {};
+  });
 
   peer.onRequest("catalog/properties/list", PropertiesListParams,
     (): PropertiesListResult => ({

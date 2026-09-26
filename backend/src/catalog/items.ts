@@ -223,6 +223,84 @@ export class ItemStore {
     this.db.transaction(() => { for (const id of ids) stmt.run(id); })();
   }
 
+  /**
+   * Fold duplicates into a keeper: one transaction, six tables.
+   *
+   * Everything the duplicates own is re-parented before they are deleted, so
+   * the cascade only ever collects what was already moved. Two rules are not
+   * symmetric and are the reason this is a method rather than a loop of
+   * updates: a transferred attachment stops being primary (the keeper already
+   * has one), and a citation moves only if the keeper lacks one, because the
+   * keeper's own metadata is the one the user chose to keep.
+   *
+   * Files on disk are the shell's job and stay there — this moves rows only.
+   */
+  merge(keeperId: string, duplicateIds: string[], at: string): void {
+    this.db.transaction(() => {
+      for (const dupId of duplicateIds) {
+        if (dupId === keeperId) continue;
+
+        this.db.prepare(
+          `UPDATE attachments SET item_id = ?, is_primary = 0, updated_at = ?
+            WHERE item_id = ?`).run(keeperId, at, dupId);
+
+        this.db.prepare(
+          `INSERT OR IGNORE INTO collection_items (item_id, collection_id, created_at)
+           SELECT ?, collection_id, ? FROM collection_items WHERE item_id = ?`,
+        ).run(keeperId, at, dupId);
+
+        this.transferPropertyValues(keeperId, dupId);
+
+        this.db.prepare(
+          "UPDATE conversations SET item_id = ?, updated_at = ? WHERE item_id = ?")
+          .run(keeperId, at, dupId);
+        this.db.prepare(
+          "UPDATE annotations SET item_id = ?, updated_at = ? WHERE item_id = ?")
+          .run(keeperId, at, dupId);
+
+        const keeperHasCitation = this.db.query<{ n: number }, [string]>(
+          "SELECT count(*) AS n FROM citations WHERE item_id = ?").get(keeperId)!.n;
+        if (keeperHasCitation === 0) {
+          this.db.prepare(
+            "UPDATE citations SET item_id = ?, updated_at = ? WHERE item_id = ?")
+            .run(keeperId, at, dupId);
+        }
+
+        this.db.prepare("DELETE FROM items WHERE id = ?").run(dupId);
+      }
+    })();
+  }
+
+  /**
+   * Move a duplicate's property values across, skipping any the keeper already
+   * holds — matched on the option, or on the text when there is no option.
+   * A repeated tag would otherwise show up twice on the merged item.
+   */
+  private transferPropertyValues(keeperId: string, dupId: string): void {
+    const rows = this.db.query<
+      { property_id: string; option_id: string | null; text_value: string | null }, [string]
+    >(`SELECT property_id, option_id, text_value FROM item_property_values
+        WHERE item_id = ?`).all(dupId);
+
+    for (const row of rows) {
+      const already = row.option_id !== null
+        ? this.db.query<{ n: number }, [string, string, string]>(
+          `SELECT count(*) AS n FROM item_property_values
+            WHERE item_id = ? AND property_id = ? AND option_id = ?`,
+        ).get(keeperId, row.property_id, row.option_id)!.n
+        : this.db.query<{ n: number }, [string, string, string | null]>(
+          `SELECT count(*) AS n FROM item_property_values
+            WHERE item_id = ? AND property_id = ? AND text_value IS ?`,
+        ).get(keeperId, row.property_id, row.text_value)!.n;
+      if (already > 0) continue;
+
+      this.db.prepare(
+        `INSERT INTO item_property_values (id, item_id, property_id, option_id, text_value)
+         VALUES (?, ?, ?, ?, ?)`,
+      ).run(crypto.randomUUID(), keeperId, row.property_id, row.option_id, row.text_value);
+    }
+  }
+
   // --- assembly ----------------------------------------------------------
 
   /**

@@ -1,5 +1,4 @@
 import Foundation
-import GRDB
 
 extension LibraryStore {
     // MARK: - Collections
@@ -25,48 +24,6 @@ extension LibraryStore {
         collections.filter { $0.parentId == nil && !$0.isSystem }
     }
 
-    func fetchAllCollections() throws -> [PDFCollection] {
-        try database.dbQueue.read { db in
-            let records = try CollectionRecord.order(CollectionRecord.CodingKeys.sortOrder).fetchAll(db)
-            // Count items per collection
-            let countRows = try Row.fetchAll(db, sql: """
-                SELECT collection_id, COUNT(*) as cnt FROM collection_items GROUP BY collection_id
-            """)
-            var itemCounts: [String: Int] = [:]
-            for row in countRows {
-                itemCounts[row["collection_id"]] = row["cnt"]
-            }
-            return buildCollectionTree(from: records, itemCounts: itemCounts)
-        }
-    }
-
-    private func buildCollectionTree(from records: [CollectionRecord], itemCounts: [String: Int]) -> [PDFCollection] {
-        var childrenMap: [String?: [CollectionRecord]] = [:]
-        for r in records {
-            childrenMap[r.parentId, default: []].append(r)
-        }
-
-        func build(parentId: String?) -> [PDFCollection] {
-            (childrenMap[parentId] ?? []).map { record in
-                let subs = build(parentId: record.id)
-                return PDFCollection(record: record, subcollections: subs, itemCount: itemCounts[record.id] ?? 0)
-            }
-        }
-
-        return records.map { record in
-            let subs = build(parentId: record.id)
-            return PDFCollection(record: record, subcollections: subs, itemCount: itemCounts[record.id] ?? 0)
-        }
-    }
-
-    // MARK: - Mutations
-    //
-    // Every one of these was the same three steps: build a record, write it,
-    // invalidate. They now build a wire value and hand it to one upsert, which
-    // is why creating, renaming, re-parenting and re-ruling a collection are
-    // four lines each rather than four near-identical twenty-line bodies.
-
-    @discardableResult
     func createCollection(name: String, icon: String = "folder.fill",
                           source: String? = nil, sourceKey: String? = nil) -> PDFCollection {
         save(makeCollection(name: name, icon: icon, sortOrder: userCollections.count,

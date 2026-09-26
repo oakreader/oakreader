@@ -72,6 +72,7 @@ enum RPC {
         static let itemsUpdateField = "catalog/items/updateField"
         static let itemsSetTrashed = "catalog/items/setTrashed"
         static let itemsRemove = "catalog/items/remove"
+        static let itemsMerge = "catalog/items/merge"
         static let propertiesList = "catalog/properties/list"
         static let propertiesUpsert = "catalog/properties/upsert"
         static let propertiesDelete = "catalog/properties/delete"
@@ -406,6 +407,18 @@ enum RPC {
         var ids: [String]
     }
     struct ItemsRemoveResult: Decodable {
+        init() {}
+    }
+
+    // MARK: catalog/items/merge
+    /// Fold duplicates into a keeper: re-parent everything they own, then delete them. Rows only —
+    /// the files on disk are the shell's to move.
+    struct ItemsMergeParams: Encodable {
+        var keeperId: String
+        var duplicateIds: [String]
+        var at: String
+    }
+    struct ItemsMergeResult: Decodable {
         init() {}
     }
 

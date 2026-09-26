@@ -21,6 +21,7 @@ import { join } from "node:path";
 import { Catalog } from "../src/catalog/db.ts";
 import { MIGRATIONS } from "../src/catalog/schema.ts";
 import { WordLookupStore, type WordLookup } from "../src/catalog/wordLookups.ts";
+import { seed } from "./seed.ts";
 
 const REAL_LIBRARY = process.env.OAK_LIBRARY ?? join(homedir(), "OakReader", "library.sqlite");
 const hasReal = existsSync(REAL_LIBRARY);
@@ -58,7 +59,7 @@ function scratch(): string {
 function snapshot(source: string, destination: string): void {
   const db = new Database(source, { readonly: true });
   try {
-    db.exec(`VACUUM INTO '${destination.replace(/'/g, "''")}'`);
+    seed(db, `VACUUM INTO '${destination.replace(/'/g, "''")}'`);
   } finally {
     db.close();
   }
@@ -97,7 +98,7 @@ describe("fresh database", () => {
     try {
       const catalog = Catalog.open(join(dir, "library.sqlite"));
       expect(() =>
-        catalog.db.exec(
+        seed(catalog.db, 
           `INSERT INTO attachments (id, item_id, storage_key, file_name, created_at, updated_at)
            VALUES ('a', 'no-such-item', 'k', 'f.pdf', '', '')`),
       ).toThrow();
@@ -266,13 +267,13 @@ describe("word lookups", () => {
 
   test("deleting the document keeps the card, per ON DELETE SET NULL", () => {
     withCatalog([], (c) => {
-      c.db.exec(
+      seed(c.db, 
         `INSERT INTO items (id, user_id, storage_key, title, created_at, updated_at)
          VALUES ('doomed', 'local', 'k1', 'Doomed', '', '')`);
       const store = new WordLookupStore(c.db, "local");
       store.save(lookup({ itemId: "doomed", itemTitle: "Doomed" }));
 
-      c.db.exec("DELETE FROM items WHERE id = 'doomed'");
+      seed(c.db, "DELETE FROM items WHERE id = 'doomed'");
 
       const all = store.listAll();
       expect(all).toHaveLength(1);

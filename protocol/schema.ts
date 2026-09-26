@@ -325,6 +325,18 @@ export const METHODS: Method[] = [
   },
 
   {
+    name: "catalog/items/merge", type: "ItemsMerge", kind: "request", from: "client",
+    doc: "Fold duplicates into a keeper: re-parent everything they own, then " +
+         "delete them. Rows only — the files on disk are the shell's to move.",
+    params: [
+      { name: "keeperId", type: str },
+      { name: "duplicateIds", type: { k: "array", of: str } },
+      { name: "at", type: str },
+    ],
+    result: [],
+  },
+
+  {
     name: "catalog/properties/list", type: "PropertiesList", kind: "request", from: "client",
     doc: "Every property with its options, both in display order.",
     params: [],

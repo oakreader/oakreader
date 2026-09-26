@@ -322,6 +322,15 @@ export const ItemsRemoveParams = z.object({
 export type ItemsRemoveParams = z.infer<typeof ItemsRemoveParams>;
 export type ItemsRemoveResult = Record<string, never>;
 
+/** `catalog/items/merge` — Fold duplicates into a keeper: re-parent everything they own, then delete them. Rows only — the files on disk are the shell's to move. */
+export const ItemsMergeParams = z.object({
+  keeperId: z.string(),
+  duplicateIds: z.array(z.string()),
+  at: z.string(),
+});
+export type ItemsMergeParams = z.infer<typeof ItemsMergeParams>;
+export type ItemsMergeResult = Record<string, never>;
+
 /** `catalog/properties/list` — Every property with its options, both in display order. */
 export const PropertiesListParams = z.object({
 });
@@ -533,6 +542,7 @@ export const ClientRequests = {
   "catalog/items/updateField": ItemsUpdateFieldParams,
   "catalog/items/setTrashed": ItemsSetTrashedParams,
   "catalog/items/remove": ItemsRemoveParams,
+  "catalog/items/merge": ItemsMergeParams,
   "catalog/properties/list": PropertiesListParams,
   "catalog/properties/upsert": PropertiesUpsertParams,
   "catalog/properties/delete": PropertiesDeleteParams,
@@ -588,6 +598,7 @@ export interface ClientRequestResults {
   "catalog/items/updateField": ItemsUpdateFieldResult;
   "catalog/items/setTrashed": ItemsSetTrashedResult;
   "catalog/items/remove": ItemsRemoveResult;
+  "catalog/items/merge": ItemsMergeResult;
   "catalog/properties/list": PropertiesListResult;
   "catalog/properties/upsert": PropertiesUpsertResult;
   "catalog/properties/delete": PropertiesDeleteResult;

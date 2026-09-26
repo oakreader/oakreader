@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Catalog } from "../src/catalog/db.ts";
 import { ConversationStore, type Conversation } from "../src/catalog/conversations.ts";
+import { seed } from "./seed.ts";
 
 function withCatalog<T>(items: string[], body: (store: ConversationStore, c: Catalog) => T): T {
   const dir = mkdtempSync(join(tmpdir(), "oak-conversations-"));
@@ -99,7 +100,7 @@ describe("conversations", () => {
       store.create(conversation({ itemId: "doc-1" }));
       store.create(conversation({ itemId: null, title: "library chat" }));
 
-      catalog.db.exec("DELETE FROM items WHERE id = 'doc-1'");
+      seed(catalog.db, "DELETE FROM items WHERE id = 'doc-1'");
 
       expect(store.list("doc-1")).toHaveLength(0);
       expect(store.list(null)).toHaveLength(1);   // library chat survives

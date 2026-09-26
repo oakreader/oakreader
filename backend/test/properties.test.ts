@@ -11,13 +11,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Catalog } from "../src/catalog/db.ts";
 import { PropertyStore } from "../src/catalog/properties.ts";
+import { seed } from "./seed.ts";
 
 function withCatalog<T>(body: (s: PropertyStore, c: Catalog) => T): T {
   const dir = mkdtempSync(join(tmpdir(), "oak-properties-"));
   try {
     const catalog = Catalog.open(join(dir, "library.sqlite"));
     try {
-      catalog.db.exec(
+      seed(catalog.db, 
         `INSERT INTO items (id, user_id, storage_key, title, created_at, updated_at)
          VALUES ('doc-1', 'local', 'sk-1', 'A Paper', '', ''),
                 ('doc-2', 'local', 'sk-2', 'Another', '', '')`);

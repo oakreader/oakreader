@@ -92,6 +92,12 @@ enum LibraryCatalog {
         await perform(RPC.Method.itemsRemove, RPC.ItemsRemoveParams(ids: ids))
     }
 
+    /// Fold duplicates into a keeper. Rows only; the caller moves the files.
+    static func merge(keeperId: String, duplicateIds: [String]) async {
+        await perform(RPC.Method.itemsMerge, RPC.ItemsMergeParams(
+            keeperId: keeperId, duplicateIds: duplicateIds, at: Date().iso8601String))
+    }
+
     // MARK: - Collections
 
     static func collections() async -> [CatalogCollection] {
