@@ -15,7 +15,7 @@ final class CommentsViewModel {
     /// All comment cards for the current doc, oldest first (newest at the bottom).
     /// Chat-to-self model: you jot at the bottom and the stream grows downward,
     /// like Telegram Saved Messages / 微信文件传输助手.
-    var cards: [AnnotationRecord] = []
+    var cards: [CatalogAnnotation] = []
     var isLoaded = false
 
     /// When set, the stream shows only cards carrying this `#tag`. Document-scoped:
@@ -42,7 +42,7 @@ final class CommentsViewModel {
 
     /// Cards after applying the tag filter and the free-text search (either/both,
     /// or neither). Text matches the note's clean body plus its tag names.
-    var filteredCards: [AnnotationRecord] {
+    var filteredCards: [CatalogAnnotation] {
         var result = cards
         if let tag = activeTagFilter {
             result = result.filter { NoteTags.extract($0.comment ?? "").contains(tag) }
@@ -107,29 +107,23 @@ final class CommentsViewModel {
         self.parent = parent
     }
 
-    private var store: AnnotationStore? {
-        guard let db = parent?.database else { return nil }
-        return AnnotationStore(database: db)
-    }
-
     /// A card points at something in the document (vs a freestanding memo).
-    func isAnchored(_ record: AnnotationRecord) -> Bool {
+    func isAnchored(_ record: CatalogAnnotation) -> Bool {
         record.positionKind != "memo"
     }
 
     // MARK: - Load
 
-    func reload() {
-        guard let store, let attId = parent?.attachmentId else {
+    func reload() async {
+        guard let attId = parent?.attachmentId else {
             cards = []
             isLoaded = true
             return
         }
-        cards = store.fetch(attachmentId: attId)
-            .filter {
-                $0.deletedAt == nil
-                    && ($0.comment?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
-            }
+        // The core already excludes tombstones; only the has-a-comment filter
+        // is ours, since a highlight without one is not a card.
+        cards = await AnnotationCatalog.list(attachmentId: attId)
+            .filter { $0.comment?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false }
             .sorted { $0.createdAt < $1.createdAt }
         isLoaded = true
         // Drop a filter whose tag no longer exists (its last note was deleted/edited).
@@ -140,11 +134,11 @@ final class CommentsViewModel {
 
     /// Begin writing the note for a freshly-created highlight. The highlight row
     /// already exists (empty comment); the composer commits the text into it.
-    func startNote(forAnnotationId id: String) {
+    func startNote(forAnnotationId id: String) async {
         pendingAnchorId = id
-        pendingQuote = store?.fetch(id: id)?.text
+        pendingQuote = await AnnotationCatalog.get(id: id)?.text
         focusedCardId = nil
-        reload()
+        await reload()
     }
 
     func cancelPending() {
@@ -161,9 +155,9 @@ final class CommentsViewModel {
     /// state off the main thread deadlocks SwiftUI's observation lock (`_MovableLock`).
     @MainActor
     @discardableResult
-    func commitPending(_ text: String) -> Bool {
+    func commitPending(_ text: String) async -> Bool {
         guard let id = pendingAnchorId else { return false }
-        let ok = updateComment(id: id, text: text)
+        let ok = await updateComment(id: id, text: text)
         if ok { cancelPending() }
         return ok
     }
@@ -172,7 +166,11 @@ final class CommentsViewModel {
     func focusCard(id: String) {
         pendingAnchorId = nil
         focusedCardId = id
-        reload()
+        // Task, not await: the caller is a synchronous UI action. Being
+        // @MainActor-isolated, this inherits the actor, so `cards` is still
+        // mutated on the main thread — which the comment on `commitPending`
+        // explains is load-bearing for SwiftUI's observation lock.
+        Task { await reload() }
     }
 
     // MARK: - Mutations
@@ -218,8 +216,7 @@ final class CommentsViewModel {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return false }
         guard await ensureBackingItem() else { return false }
-        guard let store,
-              let attId = parent?.attachmentId,
+        guard let attId = parent?.attachmentId,
               let itmId = parent?.itemId else { return false }
 
         // A just-jotted note may not match the active filter/search — clear both so
@@ -228,12 +225,11 @@ final class CommentsViewModel {
         searchQuery = ""
 
         let now = Date().iso8601String
-        let record = AnnotationRecord(
+        let record = CatalogAnnotation(
             id: UUID().uuidString,
-            userId: localUserId,
             itemId: itmId,
             attachmentId: attId,
-            key: AnnotationStore.generateKey(),
+            key: AnnotationKeys.generate(),
             type: "note",
             authorName: nil,
             text: nil,
@@ -250,8 +246,8 @@ final class CommentsViewModel {
             updatedAt: now,
             deletedAt: nil
         )
-        store.upsert(record)
-        reload()
+        AnnotationCatalog.save(record)
+        await reload()
         postChanged()
         return true
     }
@@ -259,32 +255,32 @@ final class CommentsViewModel {
     /// Edit a card's comment text. Clearing it drops the card from the stream;
     /// for anchored notes the highlight row itself stays (just uncommented).
     @discardableResult
-    func updateComment(id: String, text: String) -> Bool {
-        guard let store, var record = store.fetch(id: id) else { return false }
+    func updateComment(id: String, text: String) async -> Bool {
+        guard var record = await AnnotationCatalog.get(id: id) else { return false }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         record.comment = trimmed.isEmpty ? nil : text
         record.updatedAt = Date().iso8601String
-        store.upsert(record)
-        reload()
+        AnnotationCatalog.save(record)
+        await reload()
         postChanged()
         return true
     }
 
     /// Delete a card. Anchored cards also drop their on-page highlight.
-    func delete(_ record: AnnotationRecord) {
+    func delete(_ record: CatalogAnnotation) {
         switch record.positionKind {
         case "pdf-overlay":
             // Removes the DB row + the overlay markup + refreshes (also posts change).
             parent?.annotation.deleteOverlayMarkup(id: record.id)
         case "web":
-            store?.softDelete(id: record.id)
+            AnnotationCatalog.delete(id: record.id)
             NotificationCenter.default.post(
                 name: .webDeleteHighlight, object: parent, userInfo: ["id": record.id]
             )
         default:  // "memo"
-            store?.softDelete(id: record.id)
+            AnnotationCatalog.delete(id: record.id)
         }
-        reload()
+        Task { await reload() }
         postChanged()
     }
 
@@ -298,20 +294,20 @@ final class CommentsViewModel {
             case "pdf-overlay":
                 parent?.annotation.deleteOverlayMarkup(id: record.id)
             case "web":
-                store?.softDelete(id: record.id)
+                AnnotationCatalog.delete(id: record.id)
                 NotificationCenter.default.post(
                     name: .webDeleteHighlight, object: parent, userInfo: ["id": record.id]
                 )
             default:  // "memo"
-                store?.softDelete(id: record.id)
+                AnnotationCatalog.delete(id: record.id)
             }
         }
-        reload()
+        Task { await reload() }
         postChanged()
     }
 
     /// A plain-text `NoteRef` (preview + time) for a card, for pickers / backlinks.
-    private func noteRef(_ record: AnnotationRecord) -> NoteRef {
+    private func noteRef(_ record: CatalogAnnotation) -> NoteRef {
         let raw = record.comment ?? ""
         // Drop images, then tags + collapse `[label](url)` links to clean text.
         let preview = NoteTags.preview(NoteComposerBox.splitBody(raw).text)
@@ -339,18 +335,18 @@ final class CommentsViewModel {
     /// The full records (not just previews) of the notes that reference the given
     /// card — backing the flomo-style "Note Detail" popup, which renders each
     /// referencing note in full rather than as a one-line backlink.
-    func backlinkRecords(to id: String) -> [AnnotationRecord] {
+    func backlinkRecords(to id: String) -> [CatalogAnnotation] {
         let href = NoteLink.href(id)
         return cards.filter { $0.id != id && ($0.comment ?? "").contains(href) }
     }
 
     /// Look up a single card record by id (for the detail popup's left column).
-    func card(id: String) -> AnnotationRecord? {
+    func card(id: String) -> CatalogAnnotation? {
         cards.first { $0.id == id }
     }
 
     /// Scroll the document to a card's source and surface it.
-    func jump(_ record: AnnotationRecord) {
+    func jump(_ record: CatalogAnnotation) {
         switch record.positionKind {
         case "web":
             NotificationCenter.default.post(

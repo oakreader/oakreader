@@ -24,7 +24,6 @@
 		0C2805E219EAC413E9A9663A /* PDFConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 750ACFCE92F080ABDCB9EE94 /* PDFConstants.swift */; };
 		0CB072E2C3B9A5CFB9E25EF3 /* PDFViewerRepresentable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 233AF801A2F13BA9D7760108 /* PDFViewerRepresentable.swift */; };
 		0CF9F961D8DD5DB257B2D4A5 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 537214EDB1CDA6D76E3AF0ED /* SettingsView.swift */; };
-		0D3DCE718F8D8C12FD91C3B7 /* AnnotationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78058534C4F91EF0D867F137 /* AnnotationStore.swift */; };
 		0D45CE0FEEABDFB4EE8E0826 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 3F8F65FB4DD4744B1A704AD8 /* AppIcon.icon */; };
 		0DC3A49D563A44F4ECE5D61C /* FannedAttachmentStack.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA237E65AF0728789822FE10 /* FannedAttachmentStack.swift */; };
 		0E17C11829C1155A97BB3186 /* CLICommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0934E40C45D625649E6E481 /* CLICommands.swift */; };
@@ -68,6 +67,7 @@
 		2FD30C0FB1C008E2B15C3910 /* SkillManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5F51769F0F2907C06833C49 /* SkillManagementView.swift */; };
 		31D75CEE8AEEFE3C3681CB21 /* SkillCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE1B1725466F2575C959C69A /* SkillCommands.swift */; };
 		3281ADF51936301853268F66 /* NoteExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 536F369AF3FE91891E58F659 /* NoteExporter.swift */; };
+		36E6CAD489F405C77C296B52 /* AnnotationCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = B87D7729365DE50DE6C6E33A /* AnnotationCatalog.swift */; };
 		37E1D7549A70847EA452C14B /* ReferenceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD1DAE24E40C0139F3FB1F2E /* ReferenceService.swift */; };
 		382B5B6DA5F0840A09ED2C7E /* NoteEditorModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19F2340729A85D5B298436E5 /* NoteEditorModel.swift */; };
 		382C58A589A5B07FE565E864 /* ToolCallGroupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4269BAEE5AF9C0D3C46B5B7 /* ToolCallGroupView.swift */; };
@@ -427,7 +427,6 @@
 		7451262FB6A54AC13404EAE9 /* DocumentToolbarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentToolbarView.swift; sourceTree = "<group>"; };
 		750ACFCE92F080ABDCB9EE94 /* PDFConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFConstants.swift; sourceTree = "<group>"; };
 		7758CEAED2C9DB1C8AA302AE /* MediaDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaDocument.swift; sourceTree = "<group>"; };
-		78058534C4F91EF0D867F137 /* AnnotationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationStore.swift; sourceTree = "<group>"; };
 		788A9B717E3BD6E7C740B85E /* WebSearchProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSearchProvider.swift; sourceTree = "<group>"; };
 		7955F2134AA428B6E9807253 /* DocumentState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentState.swift; sourceTree = "<group>"; };
 		79951E482830D01F67D1BE3A /* ImportService+HTML.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ImportService+HTML.swift"; sourceTree = "<group>"; };
@@ -490,6 +489,7 @@
 		B6F1E9FF6205017386AE255E /* LookupCardRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LookupCardRow.swift; sourceTree = "<group>"; };
 		B752A8C563385212863EACE8 /* TagNode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagNode.swift; sourceTree = "<group>"; };
 		B84806D33405EC25B2CABB4A /* PaletteCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaletteCommand.swift; sourceTree = "<group>"; };
+		B87D7729365DE50DE6C6E33A /* AnnotationCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationCatalog.swift; sourceTree = "<group>"; };
 		B97A66899E801C35CA5CFB83 /* TranslationSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationSettingsView.swift; sourceTree = "<group>"; };
 		B9F631481D70E6E3856F1EA5 /* CatalogDatabase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogDatabase.swift; sourceTree = "<group>"; };
 		BA0AEB90CE3CA5B531BAC02F /* DocumentTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentTabView.swift; sourceTree = "<group>"; };
@@ -699,7 +699,6 @@
 				C9B5C0D0103D9F41A2ED5F45 /* Backend */,
 				5C2B670D55143EDDBC6DF6D1 /* Catalog */,
 				C161A5F879B0AB71C51C5509 /* Analytics.swift */,
-				78058534C4F91EF0D867F137 /* AnnotationStore.swift */,
 				5538035AACE4569BB925D05E /* BackupService.swift */,
 				C617DEDEDC18EAF0BC506C61 /* BrowserSearchEngine.swift */,
 				532F03FA8904BC484DF777A1 /* BrowserSession.swift */,
@@ -805,6 +804,7 @@
 		5C2B670D55143EDDBC6DF6D1 /* Catalog */ = {
 			isa = PBXGroup;
 			children = (
+				B87D7729365DE50DE6C6E33A /* AnnotationCatalog.swift */,
 				EF2387B271A13F8720377194 /* PromptCatalog.swift */,
 				F1549879703EE0C34737AD8E /* WordLookupCatalog.swift */,
 			);
@@ -1418,11 +1418,11 @@
 				FC893F57858FF6EA5A4A04B3 /* AddProviderSheet.swift in Sources */,
 				53554C04FA1CD77F30742485 /* AgentSettingsView.swift in Sources */,
 				81855E70E1BF5F864449FA7B /* Analytics.swift in Sources */,
+				36E6CAD489F405C77C296B52 /* AnnotationCatalog.swift in Sources */,
 				A2E4A1C9BB9384E31E74F835 /* AnnotationEditPopupPanel.swift in Sources */,
 				7BEC08010D5E9DCE9F957606 /* AnnotationModel.swift in Sources */,
 				0B799273AC1F162F0CDA6752 /* AnnotationPosition.swift in Sources */,
 				1333A5FB9975D7CDDFB40D29 /* AnnotationPropertyPanel.swift in Sources */,
-				0D3DCE718F8D8C12FD91C3B7 /* AnnotationStore.swift in Sources */,
 				C0D1E23B6D649F29EA168A74 /* AnnotationViewModel.swift in Sources */,
 				BE4194731097CEDB15625B74 /* AppDelegate.swift in Sources */,
 				4F3EFDF8CD606E6376AE7734 /* AppExtensionSettingsView.swift in Sources */,

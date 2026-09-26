@@ -15,7 +15,7 @@ enum NoteExporter {
 
     // MARK: Combined (single file)
 
-    static func combinedMarkdown(records: [AnnotationRecord], title: String) -> String {
+    static func combinedMarkdown(records: [CatalogAnnotation], title: String) -> String {
         var out = "# \(title) — Notes\n\n"
         out += "*\(records.count) note\(records.count == 1 ? "" : "s")*\n"
         for record in records {
@@ -30,7 +30,7 @@ enum NoteExporter {
     /// Write one `.md` per note into a freshly-created `<title> Notes` folder under
     /// `parentDir`, copying any local images into `images/`. Returns the folder URL.
     @discardableResult
-    static func exportToFolder(records: [AnnotationRecord], title: String, parentDir: URL) throws -> URL {
+    static func exportToFolder(records: [CatalogAnnotation], title: String, parentDir: URL) throws -> URL {
         let fm = FileManager.default
 
         var folder = parentDir.appendingPathComponent(safeFileName("\(title) Notes"), isDirectory: true)
@@ -60,7 +60,7 @@ enum NoteExporter {
     /// anchored note) as a blockquote, then the note body verbatim (tags, image
     /// links and note links preserved). `body` overrides `record.comment` so the
     /// folder export can pass an image-rewritten copy.
-    static func noteSection(record: AnnotationRecord, body overrideBody: String? = nil) -> String {
+    static func noteSection(record: CatalogAnnotation, body overrideBody: String? = nil) -> String {
         var s = ""
         let ts = NoteTime.absolute(record.createdAt)
         s += ts.isEmpty ? "## Note\n\n" : "## \(ts)\n\n"
@@ -79,7 +79,7 @@ enum NoteExporter {
 
     // MARK: Filenames
 
-    private static func uniqueFileName(for record: AnnotationRecord, index: Int, used: inout Set<String>) -> String {
+    private static func uniqueFileName(for record: CatalogAnnotation, index: Int, used: inout Set<String>) -> String {
         let ts = NoteTime.absolute(record.createdAt).replacingOccurrences(of: ":", with: "")
         let slug = slugify(NoteTags.preview(NoteComposerBox.splitBody(record.comment ?? "").text))
         var base = [ts, slug].filter { !$0.isEmpty }.joined(separator: " - ")

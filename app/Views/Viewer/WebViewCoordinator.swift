@@ -216,9 +216,7 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
             let escaped = id.replacingOccurrences(of: "\\", with: "\\\\")
                 .replacingOccurrences(of: "'", with: "\\'")
             self.webView?.evaluateJavaScript("OakHighlighter.remove('\(escaped)');", completionHandler: nil)
-            if let db = self.viewModel.database {
-                AnnotationStore(database: db).softDelete(id: id)
-            }
+            AnnotationCatalog.delete(id: id)
         }
     }
 
@@ -453,7 +451,7 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         viewModel.state.webLoadProgress = 1
         webView.evaluateJavaScript("OakHighlighter.init();") { [weak self] _, _ in
-            self?.restoreSavedHighlights()
+            Task { await self?.restoreSavedHighlights() }
         }
         autofillSavedCredentials()
         extractTableOfContents()
@@ -629,7 +627,7 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
         if message.name == "highlightFocus",
            let body = message.body as? [String: Any],
            let hlId = body["id"] as? String {
-            openNoteInPanel(highlightId: hlId)
+            Task { await openNoteInPanel(highlightId: hlId) }
             return
         }
 
@@ -658,10 +656,12 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
            let vpWidth = body["vpWidth"] as? CGFloat, vpWidth > 0,
            let vpHeight = body["vpHeight"] as? CGFloat, vpHeight > 0,
            let webView = self.webView {
-            showHighlightContextMenu(
-                highlightId: hlId, jsX: x, jsY: y,
-                vpWidth: vpWidth, vpHeight: vpHeight, in: webView
-            )
+            Task {
+                await showHighlightContextMenu(
+                    highlightId: hlId, jsX: x, jsY: y,
+                    vpWidth: vpWidth, vpHeight: vpHeight, in: webView
+                )
+            }
             return
         }
 
@@ -744,16 +744,14 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
     /// surface). Reused by the highlight context menu and the click/sidebar focus
     /// flow. An existing note scrolls to + flashes its card; a fresh highlight
     /// (empty comment) starts an anchored compose.
-    func openNoteInPanel(highlightId: String) {
+    func openNoteInPanel(highlightId: String) async {
         HTMLSelectionPopupPanel.dismissCurrent()
         viewModel.state.rightPanelMode = .comments
-        let comment = viewModel.database.flatMap {
-            AnnotationStore(database: $0).fetch(id: highlightId)?.comment
-        }
+        let comment = await AnnotationCatalog.get(id: highlightId)?.comment
         if (comment?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false) {
             viewModel.comments.focusCard(id: highlightId)
         } else {
-            viewModel.comments.startNote(forAnnotationId: highlightId)
+            await viewModel.comments.startNote(forAnnotationId: highlightId)
         }
     }
 
@@ -778,13 +776,11 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
         }
 
         let now = Date().iso8601String
-        let store = AnnotationStore(database: db)
-        let record = AnnotationRecord(
+        let record = CatalogAnnotation(
             id: highlightId,
-            userId: localUserId,
             itemId: itmId,
             attachmentId: attId,
-            key: AnnotationStore.generateKey(),
+            key: AnnotationKeys.generate(),
             type: type,
             authorName: nil,
             text: text,
@@ -801,17 +797,17 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
             updatedAt: now,
             deletedAt: nil
         )
-        store.upsert(record)
+        AnnotationCatalog.save(record)
     }
 
     /// Restore all saved web highlights from the annotation store.
-    private func restoreSavedHighlights() {
+    private func restoreSavedHighlights() async {
         guard let db = viewModel.database,
               let attId = viewModel.attachmentId else { return }
 
-        let store = AnnotationStore(database: db)
-        let records = store.fetch(attachmentId: attId)
-            .filter { $0.positionKind == "web" && $0.deletedAt == nil }
+        // Tombstones are already excluded by the core; the kind filter is ours.
+        let records = await AnnotationCatalog.list(attachmentId: attId)
+            .filter { $0.positionKind == "web" }
 
         guard let webView, !records.isEmpty else { return }
 
@@ -841,7 +837,11 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
     private func showHighlightContextMenu(
         highlightId: String, jsX: CGFloat, jsY: CGFloat,
         vpWidth: CGFloat, vpHeight: CGFloat, in webView: WKWebView
-    ) {
+    ) async {
+        // Read before building the menu: the label depends on whether this
+        // highlight already carries a note, and that read crosses a process now.
+        let existingComment = await AnnotationCatalog.get(id: highlightId)?.comment
+
         let scaleX = webView.bounds.width / vpWidth
         let scaleY = webView.bounds.height / vpHeight
         let viewY = webView.isFlipped ? jsY * scaleY : webView.bounds.height - jsY * scaleY
@@ -849,9 +849,7 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
 
         // Does this highlight already carry a note? Drives the "Add" vs "Edit" label.
         let hasNote: Bool = {
-            guard let db = viewModel.database,
-                  let record = AnnotationStore(database: db).fetch(id: highlightId),
-                  let comment = record.comment else { return false }
+            guard let comment = existingComment else { return false }
             return !comment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }()
 
@@ -896,7 +894,7 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
 
     @objc private func openWebHighlightNote(_ sender: NSMenuItem) {
         guard let ctx = sender.representedObject as? WebNoteMenuContext else { return }
-        openNoteInPanel(highlightId: ctx.highlightId)
+        Task { await openNoteInPanel(highlightId: ctx.highlightId) }
     }
 
     @objc private func deleteWebHighlight(_ sender: NSMenuItem) {
@@ -905,9 +903,7 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
         let escapedId = hlId.replacingOccurrences(of: "'", with: "\\'")
         webView?.evaluateJavaScript("OakHighlighter.remove('\(escapedId)');", completionHandler: nil)
         // Soft-delete from DB
-        guard let db = viewModel.database else { return }
-        let store = AnnotationStore(database: db)
-        store.softDelete(id: hlId)
+        AnnotationCatalog.delete(id: hlId)
     }
 
     // MARK: - Mouse Monitor (dismiss popup on outside click)

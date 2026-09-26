@@ -313,7 +313,7 @@ class HTMLSelectionPopupPanel: NSPanel, AppResignDismissable {
             // Single capture surface: open the right-panel Notes stream and start
             // an anchored note for the just-created highlight.
             vm.state.rightPanelMode = .comments
-            vm.comments.startNote(forAnnotationId: id)
+            Task { await vm.comments.startNote(forAnnotationId: id) }
         }
         dismiss()
     }

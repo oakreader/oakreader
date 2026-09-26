@@ -15,7 +15,7 @@ enum NotePresentation {
     private static var keyMonitor: Any?
     private static var controller: NotePresentationController?
 
-    static func show(records: [AnnotationRecord], model: CommentsViewModel, startIndex: Int = 0) {
+    static func show(records: [CatalogAnnotation], model: CommentsViewModel, startIndex: Int = 0) {
         guard !records.isEmpty, let screen = NSScreen.main else { return }
         dismiss()
 
@@ -64,7 +64,7 @@ enum NotePresentation {
 /// card.
 @MainActor
 final class NotePresentationController: ObservableObject {
-    let records: [AnnotationRecord]
+    let records: [CatalogAnnotation]
     let model: CommentsViewModel
     /// Slide order — indices into `records`. Shuffling reorders this, not `records`.
     @Published var order: [Int]
@@ -72,7 +72,7 @@ final class NotePresentationController: ObservableObject {
     /// +1 when moving forward, -1 when moving back — read by the slide transition.
     @Published var direction: Int = 1
 
-    init(records: [AnnotationRecord], model: CommentsViewModel, startIndex: Int) {
+    init(records: [CatalogAnnotation], model: CommentsViewModel, startIndex: Int) {
         self.records = records
         self.model = model
         self.order = Array(records.indices)
@@ -84,7 +84,7 @@ final class NotePresentationController: ObservableObject {
     var isFirst: Bool { index <= 0 }
     var isLast: Bool { index >= lastIndex }
     var isClosing: Bool { index >= records.count }
-    var current: AnnotationRecord { records[order[min(index, records.count - 1)]] }
+    var current: CatalogAnnotation { records[order[min(index, records.count - 1)]] }
 
     /// 0…1 fill for the top progress bar; full on the closing card.
     var progressFraction: Double {
@@ -331,7 +331,7 @@ private struct SlideHeightKey: PreferenceKey {
 /// `#tag` chips, and the anchored source quote. Reuses the same body/image/tag split
 /// as the panel cards.
 private struct NoteContent: View {
-    let record: AnnotationRecord
+    let record: CatalogAnnotation
     let model: CommentsViewModel
 
     private var rawBody: String { record.comment ?? "" }

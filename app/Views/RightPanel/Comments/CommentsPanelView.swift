@@ -66,10 +66,10 @@ struct CommentsPanelView: View {
         // identical. The note card separates by its OWN faint fill (see CommentCardView),
         // mirroring how the chat separates its chips/bubbles, not by tinting the panel.
         .background(Color(nsColor: .windowBackgroundColor))
-        .task(id: viewModel.attachmentId) { model.reload() }
+        .task(id: viewModel.attachmentId) { await model.reload() }
         .onReceive(NotificationCenter.default.publisher(for: .commentsDidChange)) { note in
             guard (note.object as AnyObject) === viewModel else { return }
-            model.reload()
+            Task { await model.reload() }
         }
         .onChange(of: model.pendingAnchorId) { _, new in
             if new != nil { focusSignal += 1 }
@@ -462,7 +462,7 @@ struct CommentsPanelView: View {
 // MARK: - Card
 
 private struct CommentCardView: View {
-    let record: AnnotationRecord
+    let record: CatalogAnnotation
     let model: CommentsViewModel
     var isFlashing: Bool = false
 
@@ -490,7 +490,7 @@ private struct CommentCardView: View {
                     // so an anchored note doesn't look like a freestanding memo.
                     quote: anchored ? record.text : nil,
                     onSubmit: { md in
-                        let ok = model.updateComment(id: record.id, text: md)
+                        let ok = await model.updateComment(id: record.id, text: md)
                         if ok { isEditing = false }
                         return ok
                     },

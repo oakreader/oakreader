@@ -28,10 +28,9 @@ class AnnotationViewModel {
 
     private var pdfDocument: PDFDocument? { parent?.pdfDocument }
 
-    private var annotationStore: AnnotationStore? {
-        guard let db = parent?.database else { return nil }
-        return AnnotationStore(database: db)
-    }
+    // The catalog lives in the sidecar now; see AnnotationCatalog. What stayed
+    // in Swift is AnnotationKeys — sort-index geometry and key generation,
+    // neither of which is storage.
 
     private var attachmentId: String? { parent?.attachmentId }
     private var itemId: String? { parent?.itemId }
@@ -133,33 +132,37 @@ class AnnotationViewModel {
 
     /// Switch a markup's style (highlight ↔ underline) from the note editor.
     func updateOverlayMarkupKind(id: String, kind: PDFMarkupKind) {
-        guard let store = annotationStore, let record = store.fetch(id: id) else { return }
-        var updated = record
-        updated.type = kind.rawValue
-        updated.updatedAt = Date().iso8601String
-        store.upsert(updated)
+        // Overlay first: it is what the view renders, so the change is visible
+        // before the write leaves this process.
         parent?.markupOverlay.updateKind(id: id, kind: kind)
         refreshAnnotationModels()
+        Task {
+            guard var updated = await AnnotationCatalog.get(id: id) else { return }
+            updated.type = kind.rawValue
+            updated.updatedAt = Date().iso8601String
+            AnnotationCatalog.save(updated)
+        }
     }
 
     /// Save (or clear) a note's comment. An empty/whitespace comment turns the
     /// note back into a plain highlight (marker disappears).
     func updateOverlayMarkupComment(id: String, comment: String) {
-        guard let store = annotationStore, let record = store.fetch(id: id) else { return }
         let trimmed = comment.trimmingCharacters(in: .whitespacesAndNewlines)
         let stored: String? = trimmed.isEmpty ? nil : comment
-        var updated = record
-        updated.comment = stored
-        updated.updatedAt = Date().iso8601String
-        store.upsert(updated)
         parent?.markupOverlay.updateComment(id: id, comment: stored)
         refreshAnnotationModels()
         NotificationCenter.default.post(name: .commentsDidChange, object: parent)
+        Task {
+            guard var updated = await AnnotationCatalog.get(id: id) else { return }
+            updated.comment = stored
+            updated.updatedAt = Date().iso8601String
+            AnnotationCatalog.save(updated)
+        }
     }
 
     /// Delete an overlay markup by its DB id.
     func deleteOverlayMarkup(id: String) {
-        annotationStore?.softDelete(id: id)
+        AnnotationCatalog.delete(id: id)
         parent?.markupOverlay.remove(id: id)
         refreshAnnotationModels()
         NotificationCenter.default.post(name: .commentsDidChange, object: parent)
@@ -167,30 +170,37 @@ class AnnotationViewModel {
 
     /// Recolor an overlay markup, preserving its current alpha.
     func updateOverlayMarkupColor(id: String, color: NSColor) {
-        guard let store = annotationStore, let record = store.fetch(id: id) else { return }
+        Task { await applyOverlayMarkupColor(id: id, color: color) }
+    }
+
+    /// The colour change itself. Split out because the stored alpha has to be
+    /// read before the new colour can be composed, and that read now crosses a
+    /// process.
+    private func applyOverlayMarkupColor(id: String, color: NSColor) async {
+        guard let record = await AnnotationCatalog.get(id: id) else { return }
         let alpha = AnnotationStyle.fromJSON(record.styleJson ?? "")?.opacity ?? color.alphaComponent
         let newColor = color.withAlphaComponent(alpha)
         var updated = record
         updated.color = newColor.hexString
         updated.updatedAt = Date().iso8601String
-        store.upsert(updated)
+        AnnotationCatalog.save(updated)
         parent?.markupOverlay.updateColor(id: id, color: newColor)
         refreshAnnotationModels()
     }
 
     /// Load all `pdf-overlay` markups for this attachment from the DB and hand
     /// them to the overlay controller. Idempotent — safe to call on every open.
-    func loadOverlayMarkups() {
-        guard let store = annotationStore,
-              let attId = attachmentId,
+    func loadOverlayMarkups() async {
+        guard let attId = attachmentId,
               let overlay = parent?.markupOverlay else { return }
 
         // Greenfield: drop any old baked text markups so they don't double-draw
         // against the overlay. We don't migrate them — overlay + DB is the only model.
         stripBakedTextMarkups()
 
-        let records = store.fetch(attachmentId: attId)
-            .filter { $0.positionKind == "pdf-overlay" && $0.deletedAt == nil }
+        // The core already excludes tombstones; the kind filter is ours.
+        let records = await AnnotationCatalog.list(attachmentId: attId)
+            .filter { $0.positionKind == "pdf-overlay" }
 
         var byPage: [Int: [PDFTextMarkup]] = [:]
         for record in records {
@@ -252,7 +262,7 @@ class AnnotationViewModel {
         page.removeAnnotation(annotation)
         // Soft-delete from DB
         if let dbId = persistentId(for: annotation) {
-            annotationStore?.softDelete(id: dbId)
+            AnnotationCatalog.delete(id: dbId)
             removeMapping(annotation)
         }
         parent?.state.selectedAnnotation = nil
@@ -392,9 +402,7 @@ class AnnotationViewModel {
         selectedText: String?,
         comment: String? = nil
     ) {
-        guard let store = annotationStore,
-              let attId = attachmentId,
-              let itmId = itemId else { return }
+        guard let attId = attachmentId, let itmId = itemId else { return }
 
         let position = PDFAnnotationPosition(pageIndex: pageIndex, bounds: bounds, quadPoints: quadPoints)
         guard let positionJson = position.toJSON() else { return }
@@ -411,19 +419,18 @@ class AnnotationViewModel {
 
         let pageHeight = pdfDocument?.page(at: pageIndex)?.bounds(for: .mediaBox).height ?? 792
         let now = Date().iso8601String
-        let record = AnnotationRecord(
+        let record = CatalogAnnotation(
             id: id,
-            userId: localUserId,
             itemId: itmId,
             attachmentId: attId,
-            key: AnnotationStore.generateKey(),
+            key: AnnotationKeys.generate(),
             type: kind.rawValue,
             authorName: nil,
             text: selectedText,
             comment: comment,
             color: color.hexString,
             pageLabel: "\(pageIndex + 1)",
-            sortIndex: AnnotationStore.makeSortIndex(pageIndex: pageIndex, bounds: bounds, pageHeight: pageHeight),
+            sortIndex: AnnotationKeys.sortIndex(pageIndex: pageIndex, bounds: bounds, pageHeight: pageHeight),
             positionKind: "pdf-overlay",
             positionJson: positionJson,
             styleJson: style.toJSON(),
@@ -433,22 +440,27 @@ class AnnotationViewModel {
             updatedAt: now,
             deletedAt: nil
         )
-        store.upsert(record)
+        AnnotationCatalog.save(record)
     }
 
     /// Persist (or re-persist) a PDFAnnotation to the database.
+    /// Persist a PDFAnnotation.
+    ///
+    /// The id and its mapping are established synchronously, before any await:
+    /// a caller may look the annotation up again in the same turn, and a
+    /// mapping that appeared only after a round trip would be missing when it
+    /// did. Only the database work is deferred.
     private func persistToStore(
         pdfAnnotation: PDFAnnotation,
         pageIndex: Int,
         selectedText: String?,
         existingId: String?
     ) {
-        guard let store = annotationStore,
-              let attId = attachmentId,
-              let itmId = itemId else { return }
+        guard let attId = attachmentId, let itmId = itemId else { return }
 
         let id = existingId ?? UUID().uuidString
-        let key = existingId != nil ? nil : AnnotationStore.generateKey()
+        let key = existingId != nil ? nil : AnnotationKeys.generate()
+        registerMapping(pdfAnnotation, id: id)
         let now = Date().iso8601String
 
         // Encode position
@@ -481,20 +493,23 @@ class AnnotationViewModel {
 
         // Compute sort index
         let pageHeight = pdfAnnotation.page?.bounds(for: .mediaBox).height ?? 792
-        let sortIndex = AnnotationStore.makeSortIndex(
+        let sortIndex = AnnotationKeys.sortIndex(
             pageIndex: pageIndex,
             bounds: pdfAnnotation.bounds,
             pageHeight: pageHeight
         )
 
         // Build or update record
-        let existingRecord = existingId.flatMap { store.fetch(id: $0) }
-        let record = AnnotationRecord(
+        Task {
+        // Preserve the fields an edit must not invent: the original key, its
+        // provenance, and when it was first created.
+        let existingRecord: CatalogAnnotation? = existingId == nil
+            ? nil : await AnnotationCatalog.get(id: existingId!)
+        let record = CatalogAnnotation(
             id: id,
-            userId: localUserId,
             itemId: itmId,
             attachmentId: attId,
-            key: existingRecord?.key ?? key ?? AnnotationStore.generateKey(),
+            key: existingRecord?.key ?? key ?? AnnotationKeys.generate(),
             type: annotationType,
             authorName: nil,
             text: selectedText ?? existingRecord?.text,
@@ -512,8 +527,8 @@ class AnnotationViewModel {
             deletedAt: nil
         )
 
-        store.upsert(record)
-        registerMapping(pdfAnnotation, id: id)
+        AnnotationCatalog.save(record)
+        }
     }
 
     /// Convenience: persist an update for an existing annotation already in the view.

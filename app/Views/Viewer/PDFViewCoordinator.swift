@@ -186,7 +186,7 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
         if (comment?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false) {
             viewModel.comments.focusCard(id: markupId)
         } else {
-            viewModel.comments.startNote(forAnnotationId: markupId)
+            Task { await viewModel.comments.startNote(forAnnotationId: markupId) }
         }
     }
 

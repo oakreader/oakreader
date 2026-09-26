@@ -74,7 +74,7 @@ struct PDFViewerRepresentable: NSViewRepresentable {
         // Wire the markup overlay to this view and load saved highlights from
         // the DB (the overlay is the source of truth, not the PDF file).
         viewModel.markupOverlay.pdfView = pdfView
-        viewModel.annotation.loadOverlayMarkups()
+        Task { await viewModel.annotation.loadOverlayMarkups() }
 
         context.coordinator.setupObservers(for: pdfView)
         context.coordinator.pdfView = pdfView
@@ -110,7 +110,7 @@ struct PDFViewerRepresentable: NSViewRepresentable {
 
             // Re-wire and reload the overlay for the new document.
             viewModel.markupOverlay.pdfView = pdfView
-            viewModel.annotation.loadOverlayMarkups()
+            Task { await viewModel.annotation.loadOverlayMarkups() }
 
             // Scale to fit when a new document is opened
             DispatchQueue.main.async {

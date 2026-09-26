@@ -7,11 +7,11 @@ import OakMarkdownUI
 /// rather than as a truncated one-line backlink. Tapping a referencing card
 /// focuses it back in the stream and dismisses the sheet.
 struct NoteDetailSheet: View {
-    let record: AnnotationRecord
+    let record: CatalogAnnotation
     let model: CommentsViewModel
     let onDismiss: () -> Void
 
-    private var backlinks: [AnnotationRecord] { model.backlinkRecords(to: record.id) }
+    private var backlinks: [CatalogAnnotation] { model.backlinkRecords(to: record.id) }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -90,7 +90,7 @@ struct NoteDetailSheet: View {
 /// source) used inside the detail popup — no menu, no edit, no hover chrome.
 /// Optional `onTap` makes the whole card a button (used for backlinks).
 private struct NoteReadCard: View {
-    let record: AnnotationRecord
+    let record: CatalogAnnotation
     let model: CommentsViewModel
     var onDismiss: (() -> Void)? = nil
     var onTap: (() -> Void)? = nil
