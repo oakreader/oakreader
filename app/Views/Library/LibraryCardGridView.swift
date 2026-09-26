@@ -19,10 +19,13 @@ struct LibraryCardGridView: View {
     private var isBinMode: Bool { store.isBinSelected }
 
     // Document cards carry a title/source label, so they need more breathing room than an
-    // image-only moodboard (GatherOS uses a tight ~10pt gutter; text cards read better at ~16pt).
-    private let columnSpacing: CGFloat = 16
-    private let cardSpacing: CGFloat = 16
-    private let outerPadding: CGFloat = 16
+    // image-only moodboard (GatherOS uses a tight ~10pt gutter; text cards need roughly double
+    // that so the caption block reads as part of its own card rather than as a run of text
+    // spanning the grid). The outer margin runs a notch wider than the gutter — the standard
+    // Photos/Finder proportion, which keeps the grid from looking pinned to the pane edges.
+    private let columnSpacing: CGFloat = 28
+    private let cardSpacing: CGFloat = 28
+    private let outerPadding: CGFloat = 32
 
     // Column count is responsive, not user-set: we hold the *card size* roughly constant and let
     // the number of columns fall out of the window width, so resizing reflows the grid (Finder /
@@ -206,8 +209,16 @@ private struct LibraryCardView: View {
     let onOpen: () -> Void
 
     @State private var cover: NSImage?
+    @Environment(\.colorScheme) private var colorScheme
 
-    private let cornerRadius: CGFloat = 10
+    private let cornerRadius: CGFloat = 6
+
+    /// Continuous (squircle) corners, not circular. Every rounded surface in macOS — window
+    /// chrome, icons, sheets — is continuous; a circular corner next to them reads subtly wrong
+    /// even when nobody can name why.
+    private var cardShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+    }
 
     /// Display aspect ratio (w/h). The card adopts the cover's *own* ratio so the page shows whole;
     /// the band is wide enough to hold every normal document shape (A4 portrait ≈ 0.71 … 16:9 slide
@@ -232,15 +243,33 @@ private struct LibraryCardView: View {
             thumbnail
                 .aspectRatio(aspectRatio, contentMode: .fit)
                 .frame(maxWidth: .infinity)
-                .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-                .shadow(color: .black.opacity(0.12), radius: 5, x: 0, y: 2)
+                .clipShape(cardShape)
+                // The hairline is *definition*, not separation: its only job is to stop a
+                // white cover from bleeding into a light pane (and a dark cover from
+                // dissolving into a dark one). Half a point, inside the clip, so it reads as
+                // the edge of the artwork rather than as a frame drawn around it.
+                .overlay { cardShape.strokeBorder(hairline, lineWidth: 0.5) }
+                // Elevation in two layers. A single mid-blur drop shadow is what makes a card
+                // look like a 2016 web tile: it is too soft to anchor the card and too tight to
+                // lift it, so it lands as a grey smudge. Real depth is a tight *contact* shadow
+                // that pins the card to the surface plus a wide, very faint *ambient* shadow
+                // that does the lifting — the same split UIKit/AppKit use for their own
+                // elevated surfaces.
+                .shadow(color: contactShadow, radius: 1.5, y: 1)
+                .shadow(color: ambientShadow, radius: 9, y: 3)
+                // Selection is a ring *outside* the artwork with a gap, like a focus ring —
+                // not a thicker border. Growing a `strokeBorder` from 1pt to 2.5pt moves the
+                // image edge by 1.5pt, so every card twitched when you selected it; macOS never
+                // reflows content to indicate state. Monochrome, not accent: the covers are the
+                // only colour in this grid (see the colourless placeholder below), so an accent
+                // ring is the loudest thing on screen for a state as ordinary as "selected".
                 .overlay {
-                    RoundedRectangle(cornerRadius: cornerRadius)
-                        .strokeBorder(
-                            isSelected ? OakStyle.Colors.border : Color.primary.opacity(0.06),
-                            lineWidth: isSelected ? 2.5 : 1
-                        )
+                    RoundedRectangle(cornerRadius: cornerRadius + 4, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.35), lineWidth: 1.5)
+                        .padding(-4)
+                        .opacity(isSelected ? 1 : 0)
                 }
+                .animation(.easeOut(duration: 0.12), value: isSelected)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.title)
@@ -265,6 +294,25 @@ private struct LibraryCardView: View {
         .onTapGesture(count: 2, perform: onOpen)
         .onTapGesture(perform: onTap)
         .task(id: "\(item.id.uuidString):\(coverRevision)") { await loadCover() }
+    }
+
+    // MARK: - Card surface
+
+    /// Light mode puts a faint dark edge on the artwork; dark mode flips to a rim light, because
+    /// a dark edge on a dark pane is invisible. Same perceptual weight either way.
+    private var hairline: Color {
+        colorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.08)
+    }
+
+    /// Anchors the card to the pane — tight, barely offset, so the card does not appear to float
+    /// free of the surface it sits on.
+    private var contactShadow: Color {
+        colorScheme == .dark ? Color.black.opacity(0.45) : Color.black.opacity(0.09)
+    }
+
+    /// Does the lifting. Deeper in dark mode, where a light-mode-weight shadow reads as nothing.
+    private var ambientShadow: Color {
+        colorScheme == .dark ? Color.black.opacity(0.40) : Color.black.opacity(0.10)
     }
 
     private var thumbnail: some View {
