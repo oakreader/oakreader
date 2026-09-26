@@ -44,6 +44,23 @@ jobs:
         with:
           bun-version: '1.3.14'
 
+      # `bun build --compile` resolves the sidecar's imports (pi-ai, zod,
+      # defuddle, linkedom, turndown) from node_modules, so the workspace has
+      # to be installed before the archive or the build phase dies with
+      # "Could not resolve: @earendil-works/pi-ai". ci.yml already does this;
+      # release.yml did not, because it predates the sidecar.
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install backend dependencies
+        working-directory: web/backend
+        # --ignore-scripts: installing the workspace otherwise runs the
+        # extension's `wxt prepare`, which fails on a fresh checkout (its
+        # tsconfig extends .wxt/tsconfig.json, the very file prepare generates)
+        # and would fail the job. The sidecar bundle needs none of those
+        # scripts -- its deps are pure JS and bun does the bundling.
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
       - name: Extract version
         id: version
         run: |

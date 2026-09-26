@@ -42,7 +42,12 @@ jobs:
 
       - name: Install backend dependencies
         working-directory: web/backend
-        run: pnpm install --frozen-lockfile
+        # --ignore-scripts: installing the workspace otherwise runs the
+        # extension's `wxt prepare`, which fails on a fresh checkout (its
+        # tsconfig extends .wxt/tsconfig.json, the very file prepare generates)
+        # and would fail the job. The sidecar bundle needs none of those
+        # scripts -- its deps are pure JS and bun does the bundling.
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       # Cheap and fails fast: typecheck + the protocol/tokenizer suites run in
       # seconds, long before the ~10 minute Swift build.
@@ -81,9 +86,13 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             clean build 2>&1 | tail -40
 
+      # The Debug config overrides PRODUCT_NAME, so the wrapper is
+      # OakReader-Dev.app, not OakReader.app -- glob for it rather than
+      # hardcoding either name.
       - name: Verify the sidecar was embedded
         run: |
-          APP="$RUNNER_TEMP/DerivedData/Build/Products/Debug/${{ env.APP_NAME }}.app"
+          APP=$(find "$RUNNER_TEMP/DerivedData/Build/Products/Debug" -maxdepth 1 -name '*.app' | head -1)
+          test -n "$APP" || { echo "::error::no .app produced by the Debug build"; exit 1; }
           test -x "$APP/Contents/Resources/oak-backend" \
-            || { echo "::error::oak-backend missing from the app bundle"; exit 1; }
-          echo "embedded sidecar: $(du -h "$APP/Contents/Resources/oak-backend" | cut -f1)"
+            || { echo "::error::oak-backend missing from $(basename "$APP")"; exit 1; }
+          echo "embedded sidecar in $(basename "$APP"): $(du -h "$APP/Contents/Resources/oak-backend" | cut -f1)"
