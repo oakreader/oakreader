@@ -1,5 +1,4 @@
 import Foundation
-import AppKit
 import GRDB
 
 extension LibraryStore {
