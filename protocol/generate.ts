@@ -130,6 +130,25 @@ function emitTypeScript(): string {
 
 // --- Swift ----------------------------------------------------------------
 
+
+/**
+ * Wrap a doc comment so generated Swift stays inside the line-length lint.
+ * The schema's prose is written as one string; where it lands is our problem,
+ * not the author's.
+ */
+function swiftDoc(text: string, indent: string): string[] {
+  const words = text.split(/\s+/);
+  const limit = 96 - indent.length;
+  const lines: string[] = [];
+  let line = "";
+  for (const word of words) {
+    if (line && (line + " " + word).length > limit) { lines.push(line); line = word; }
+    else line = line ? `${line} ${word}` : word;
+  }
+  if (line) lines.push(line);
+  return lines.map((l) => `${indent}/// ${l}`);
+}
+
 const SWIFT_RESERVED = new Set(["protocol", "default", "class", "struct", "enum", "case",
                                 "import", "extension", "return", "func", "let", "var", "id"]);
 const swiftName = (n: string) => (SWIFT_RESERVED.has(n) ? `\`${n}\`` : n);
@@ -152,7 +171,7 @@ function swiftStruct(name: string, fields: Field[], conformance: string, decodin
     o.push("        init() {}");
   } else {
     for (const f of fields) {
-      if (f.doc) o.push(`        /// ${f.doc}`);
+      if (f.doc) o.push(...swiftDoc(f.doc, "        "));
       // Anything with a default is optional on the wire: the peer fills it in.
       const opt = f.optional || f.nullable || f.default !== undefined ? "?" : "";
       o.push(`        var ${swiftName(f.name)}: ${swiftType(f.type, decoding)}${opt}`);
@@ -177,7 +196,7 @@ function emitSwift(): string {
     "    /// could not distinguish them.",
     "    enum ErrorCode {");
   for (const e of ERRORS) {
-    o.push(`        /// ${e.doc}`);
+    o.push(...swiftDoc(e.doc, "        "));
     o.push(`        static let ${e.name} = ${e.code}`);
   }
   o.push("    }", "");
@@ -192,7 +211,7 @@ function emitSwift(): string {
   for (const m of METHODS) {
     const outbound = m.from === "client";
     o.push(`    // MARK: ${m.name}`);
-    if (m.doc) o.push(`    /// ${m.doc}`);
+    if (m.doc) o.push(...swiftDoc(m.doc, "    "));
     o.push(...swiftStruct(`${m.type}Params`, m.params,
       outbound ? "Encodable" : "Decodable", !outbound));
     if (m.kind === "request") {

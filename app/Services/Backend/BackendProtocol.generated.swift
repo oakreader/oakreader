@@ -217,7 +217,8 @@ enum RPC {
     }
 
     // MARK: catalog/annotations/upsert
-    /// Insert or replace. sortIndex arrives already computed -- it encodes PDF geometry, which stays in the shell.
+    /// Insert or replace. sortIndex arrives already computed -- it encodes PDF geometry, which
+    /// stays in the shell.
     struct AnnotationsUpsertParams: Encodable {
         var annotation: CatalogAnnotation
     }
@@ -226,7 +227,8 @@ enum RPC {
     }
 
     // MARK: catalog/annotations/delete
-    /// Soft by default: the row stays as a tombstone so a later sync can tell deleted from never-existed. `hard` removes it outright.
+    /// Soft by default: the row stays as a tombstone so a later sync can tell deleted from
+    /// never-existed. `hard` removes it outright.
     struct AnnotationsDeleteParams: Encodable {
         var `id`: String
         var hard: Bool?
@@ -238,7 +240,8 @@ enum RPC {
     }
 
     // MARK: catalog/conversations/list
-    /// Sessions for one document, or the library-wide ones when itemId is absent. Most recently updated first.
+    /// Sessions for one document, or the library-wide ones when itemId is absent. Most recently
+    /// updated first.
     struct ConversationsListParams: Encodable {
         var itemId: String?
     }
@@ -334,7 +337,9 @@ enum RPC {
     }
 
     // MARK: catalog/items/list
-    /// The whole library as one graph: items with attachments, memberships, citations and property values. Covers are NOT included -- at ten thousand items that would pin hundreds of MB; views load them lazily by storage key.
+    /// The whole library as one graph: items with attachments, memberships, citations and property
+    /// values. Covers are NOT included -- at ten thousand items that would pin hundreds of MB;
+    /// views load them lazily by storage key.
     struct ItemsListParams: Encodable {
         var trashed: Bool?
     }
@@ -396,7 +401,8 @@ enum RPC {
     }
 
     // MARK: prompts/compose
-    /// The static half of the system prompt: base.md plus the named mixins. The shell appends live context afterwards -- that half cannot be a file.
+    /// The static half of the system prompt: base.md plus the named mixins. The shell appends live
+    /// context afterwards -- that half cannot be a file.
     struct PromptsComposeParams: Encodable {
         /// Mixin names, without .md, in the order they should appear.
         var mixins: [String]?
@@ -452,7 +458,8 @@ enum RPC {
     }
 
     // MARK: tool/execute
-    /// The shell runs the tool and answers. Tools read local app state, so they cannot run in the sidecar.
+    /// The shell runs the tool and answers. Tools read local app state, so they cannot run in the
+    /// sidecar.
     struct ToolExecuteParams: Decodable {
         /// Id of the request this belongs to.
         var token: String

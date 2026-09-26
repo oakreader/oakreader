@@ -236,3 +236,74 @@ struct CatalogConversation: Codable {
     var createdAt: String
     var updatedAt: String
 }
+
+/// A collection on the wire. `filterRules` is an opaque string — the rule
+/// language belongs to whoever evaluates it, which is this side.
+struct CatalogCollection: Codable {
+    var id: String
+    var name: String
+    var icon: String
+    var sortOrder: Int
+    /// Nil at the top level.
+    var parentId: String?
+    var isSmart: Bool
+    var isSystem: Bool
+    var filterRules: String?
+    var source: String?
+    var sourceKey: String?
+    var createdAt: String
+    var updatedAt: String
+}
+
+/// One file attached to an item.
+struct CatalogAttachment: Codable {
+    var id: String
+    var itemId: String
+    var storageKey: String
+    var fileName: String
+    var contentType: String
+    var linkMode: String
+    var sourceUrl: String?
+    var fileSize: Int
+    var pageCount: Int
+    var isPrimary: Bool
+}
+
+/// A tag or status value, joined with its property definition.
+struct CatalogPropertyValue: Codable {
+    var id: String
+    var propertyId: String
+    var propertyName: String
+    var propertyType: String
+    var optionId: String?
+    var optionName: String?
+    var optionColorHex: String?
+    var textValue: String?
+}
+
+/// A library item with everything hanging off it.
+///
+/// Covers are absent by design — at ten thousand items, carrying image data
+/// here would pin hundreds of megabytes. Views load a cover lazily by storage
+/// key instead. `citationJson` is CSL JSON, opaque on the wire.
+struct CatalogItem: Codable {
+    var id: String
+    var storageKey: String
+    var title: String
+    var author: String
+    var lastOpenedAt: String?
+    var lastPosition: Double?
+    var citeKey: String?
+    var source: String?
+    var sourceKey: String?
+    var extra: String?
+    var processingStatus: String
+    /// Tombstone while in the trash.
+    var deletedAt: String?
+    var createdAt: String
+    var updatedAt: String
+    var attachments: [CatalogAttachment]
+    var collectionIds: [String]
+    var citationJson: String?
+    var propertyValues: [CatalogPropertyValue]
+}
