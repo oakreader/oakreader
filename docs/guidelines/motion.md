@@ -1,6 +1,6 @@
 # Motion & Animation Guidelines
 
-Reusable conventions for UI animation in OakReader. Unlike `ADR.md` (one-time
+Reusable conventions for UI animation in OakReader. Unlike `docs/ADR.md` (one-time
 decisions) these are standing rules — apply them to *every* new animation, not
 just the one that prompted them.
 
