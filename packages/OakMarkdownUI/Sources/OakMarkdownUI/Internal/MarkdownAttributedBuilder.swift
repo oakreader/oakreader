@@ -248,17 +248,22 @@ private final class Renderer {
         return m
     }
 
-    /// Inline-code pills draw their rounded background a few points wider than the
-    /// glyphs (see `HuggingLayoutManager`). Without compensation that overshoot eats
-    /// the space between a code span and its neighboring words, so text ends up
-    /// touching the pill. Re-open that space by kerning the characters immediately
-    /// before and after each pill run by the amount the pill overshoots, which
+    /// Pill-drawn runs — inline code and citation chips — paint a rounded background a
+    /// few points wider than their glyphs (see `HuggingLayoutManager`). Without
+    /// compensation that overshoot eats the space between the pill and its neighboring
+    /// words, so text ends up touching it. Re-open that space by kerning the characters
+    /// immediately before and after each pill run by the amount it overshoots, which
     /// restores a normal single-space gap. Skip newline neighbors.
     private func addInlineCodeSpacing(_ m: NSMutableAttributedString) {
+        addPillSpacing(m, key: .inlineCodePill, gap: MarkdownInlineCodePill.horizontalPadding)
+        addPillSpacing(m, key: .citationPill, gap: MarkdownCitationPill.horizontalPadding)
+    }
+
+    private func addPillSpacing(_ m: NSMutableAttributedString,
+                                key: NSAttributedString.Key, gap: CGFloat) {
         let ns = m.string as NSString
-        let gap = MarkdownInlineCodePill.horizontalPadding
         var pillRanges: [NSRange] = []
-        m.enumerateAttribute(.inlineCodePill, in: NSRange(location: 0, length: m.length)) { value, range, _ in
+        m.enumerateAttribute(key, in: NSRange(location: 0, length: m.length)) { value, range, _ in
             if value != nil, range.length > 0 { pillRanges.append(range) }
         }
         for range in pillRanges {
@@ -367,10 +372,25 @@ private final class Renderer {
     private func link(_ node: MarkdownAttributedBuilder.Node) -> NSAttributedString {
         let m = NSMutableAttributedString(attributedString: renderInline(node))
         let full = NSRange(location: 0, length: m.length)
+        var destination = ""
         if let urlPtr = cmark_node_get_url(node) {
-            let dest = String(cString: urlPtr)
-            if let url = URL(string: dest) { m.addAttribute(.link, value: url, range: full) }
+            destination = String(cString: urlPtr)
+            if let url = URL(string: destination) { m.addAttribute(.link, value: url, range: full) }
         }
+
+        // An internal reference (`oak:14`) is a jump-to-source marker, not a web
+        // link, so it gets Dia's treatment: a tinted capsule with no underline. Underlining
+        // them striped every cited paragraph and made a citation look like a destination
+        // the reader was leaving the app for.
+        if destination.hasPrefix(StreamingMarkdownSanitizer.internalScheme) {
+            m.addAttribute(.foregroundColor, value: theme.citationForeground, range: full)
+            // `.backgroundColor` is what routes the run through the layout manager's
+            // fill hook; `.citationPill` tells it to draw a capsule instead of a rect.
+            m.addAttribute(.backgroundColor, value: theme.citationBackground, range: full)
+            m.addAttribute(.citationPill, value: true, range: full)
+            return addWeight(.medium, to: m)
+        }
+
         m.addAttribute(.foregroundColor, value: theme.linkColor, range: full)
         m.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: full)
         return m

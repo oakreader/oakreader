@@ -37,7 +37,7 @@ struct ProseBlockView: NSViewRepresentable {
         }
 
         /// Suppress the default raw-URL tooltip for custom-scheme links (e.g.
-        /// `oak://cite/…`) — their hover affordance is the preview card, not the raw URI,
+        /// `oak:14`) — their hover affordance is the preview card, not the raw URI,
         /// and that's true even when the card itself is suppressed as redundant. Plain
         /// web links (http/https) keep their normal tooltip.
         func textView(_ textView: NSTextView, willDisplayToolTip tooltip: String,

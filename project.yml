@@ -215,3 +215,22 @@ targets:
         # app bundle by the "Embed oak CLI" script, not shipped as a standalone
         # tool. Leaving it installed bloats the archive with a stray /usr/local/bin/oak.
         SKIP_INSTALL: YES
+
+  # Unit tests for app services that are pure value logic. Deliberately NOT hosted on
+  # the OakReader target: that would make every `swift test` run the app's script
+  # phases, including the bun --compile of the AI sidecar. Instead the tested file is
+  # compiled straight into this bundle, which keeps the suite fast and independent.
+  #
+  # The constraint that buys that: a file listed here must depend on Foundation only.
+  # If one grows an app dependency, host this target on OakReader rather than widening
+  # the source list.
+  OakReaderTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: tests
+      - path: app/Services/AI/CitationSourceRegistry.swift
+    settings:
+      base:
+        SWIFT_STRICT_CONCURRENCY: minimal
+        GENERATE_INFOPLIST_FILE: YES

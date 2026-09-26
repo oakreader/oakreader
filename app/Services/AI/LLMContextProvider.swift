@@ -174,6 +174,7 @@ struct LLMContextProvider {
             currentPageIndex: currentPageIndex,
             currentPageText: currentPageText,
             selectedText: vm.state.selectedText,
+            itemId: item?.id.uuidString,
             title: title,
             author: author,
             citeKey: citeKey,
@@ -199,7 +200,8 @@ struct LLMContextProvider {
     static func buildSystemPrompt(
         skill: Skill?,
         context: ChatContextSnapshot,
-        documentCharBudget: Int
+        documentCharBudget: Int,
+        sources: CitationSourceRegistry
     ) -> String {
         var parts: [String] = []
 
@@ -211,23 +213,6 @@ struct LLMContextProvider {
             you retrieve — not from memory. Base your answers on those sources and \
             prefer retrieving over recalling.
 
-            Citations let the user verify a claim and jump to the exact evidence, \
-            written as oak://cite/{citeKey}?page=N&text=<a verbatim quote from the \
-            passage> (include &page= for documents and &time= for audio/video).
-
-            When to cite — and when NOT to. Citations are PURPOSEFUL, not automatic: \
-            add one only when you are reporting specific content FROM a source the \
-            user would want to check — a direct quotation, a statistic, date, or \
-            definition, a named finding or causal claim ("X reduces Y by 40%"), or \
-            the main conclusion of a passage you are summarizing. Cite especially \
-            when the user asks you to summarize a document, find evidence, or pin \
-            down where something is stated. Do NOT attach citations to ordinary \
-            conversation, your own reasoning or synthesis, generic background, \
-            transitions, or general-knowledge answers — leave that prose clean. \
-            When in doubt, prefer clean prose over a citation. One citation on the \
-            load-bearing claim beats several on incidental phrases — over-citing \
-            buries the source that actually matters; never end with a trailing list \
-            of citations, and never cite the same passage twice in a row.
 
             Do not fabricate citations, quotes, or facts. If the sources don't \
             answer the question, say so plainly rather than guessing. Do not praise \
@@ -327,9 +312,20 @@ struct LLMContextProvider {
 
             // Current page / document body text (always include — immediately
             // relevant). Bounded by the model-window budget.
+            //
+            // Numbered on the way in, so every passage the model can see is already
+            // citable as `oak:N` and it never has to reproduce the text to point at it.
             if !doc.currentPageText.isEmpty {
                 let truncated = String(doc.currentPageText.prefix(documentCharBudget))
-                docParts.append("  <current-page index=\"\(doc.currentPageIndex + 1)\">\n\(truncated)\n  </current-page>")
+                let numbered = sources.numbered(
+                    truncated,
+                    itemId: doc.itemId ?? "",
+                    // A paged document locates the passage by page; a timeline medium by
+                    // its transcript timecodes, which we don't have here, so it falls back
+                    // to a whole-document anchor until the read tool supplies them.
+                    page: doc.contentType == .pdf ? doc.currentPageIndex : nil
+                )
+                docParts.append("  <current-page index=\"\(doc.currentPageIndex + 1)\">\n\(numbered)\n  </current-page>")
             }
 
             let docBlock = docParts.joined(separator: "\n")
@@ -372,12 +368,6 @@ struct LLMContextProvider {
                 browse items (oak items list), and manage the library. \
                 Use search_academic to find papers on the web.
 
-                When you cite a passage you read, copy the single sentence that \
-                states the claim:
-                [your own label](oak://cite/{citeKey}?page=N&text=<verbatim claim sentence>)
-                The [label] is your own wording; the ?text= value is copied \
-                word-for-word. Cite the load-bearing claim, not incidental \
-                phrases — one cite per claim.
                 """)
         }
 
@@ -393,7 +383,7 @@ struct LLMContextProvider {
             the <doc> element's `read-with` attribute, or its title / cite-key), and \
             `search <query>` to locate a passage. Never reply that you "haven't read it" \
             or ask the user to summarize/open it — you have the tools, so use them, then \
-            answer and cite with oak://cite/...
+            answer, citing the numbered passages they return.
             """)
 
         // GROUNDED mode — scoped to a real collection. The scope is instructional:
@@ -406,7 +396,7 @@ struct LLMContextProvider {
                 Answer ONLY from the documents in this collection. Read before \
                 you answer: use `oak search <query>` and \
                 `oak items read <citeKey> --pages N-M` to pull the actual passages, \
-                then cite each claim with oak://cite/... so the user can jump to \
+                then cite each claim by its passage number so the user can jump to \
                 the exact spot.
 
                 If this collection does not contain the answer, say so explicitly \
@@ -417,132 +407,23 @@ struct LLMContextProvider {
                 """)
         }
 
-        // Citation link instructions — MUST use oak://cite/{citeKey} for all refs
-        if let doc = context.document, let ck = doc.citeKey {
-            let eck = xmlEscape(ck)
+        // Citation format. The whole wire protocol is one number: passages arrive in
+        // context already numbered (see CitationSourceRegistry), and the model cites one
+        // by linking its number. It never reproduces a quote, a page, or a cite key, so
+        // the anchor cannot be paraphrased, mis-encoded, or invented — which is what the
+        // ~4 KB of "copy the anchor VERBATIM" rules this replaced were trying to prevent.
+        parts.append("""
+            Citations. Passages you are shown are numbered like [14]. Cite one by \
+            linking its number: [your own label](oak:14). Only ever cite a number you \
+            were actually shown — never invent one, and never write a bare page number \
+            like "p. 5" instead of a link.
 
-            // Citation FORMAT rule (the base prompt governs WHEN to cite; this
-            // governs HOW). Imperative so a citation, once made, is always clickable.
-            parts.append("""
-                Citation format: when you DO cite document content, write it as a \
-                clickable markdown link using the oak://cite/ scheme — never a bare \
-                page number like "page 5" or "p. 5". Wrap any such reference in \
-                [link text](oak://cite/...). This applies to the current document \
-                AND any cross-document references.
-                """)
-
-            // Verbatim-anchor rule — the #1 cause of citations that don't highlight is a
-            // paraphrased ?text=. The visible label may be your own words, but the anchor
-            // must be an exact quote so the reader can locate it in the document.
-            parts.append("""
-                CRITICAL — The ?text= (and ?heading=) anchor MUST be copied \
-                VERBATIM from the document: an exact, contiguous run of words as \
-                it literally appears — same spelling, numbers, capitalization and \
-                punctuation. Do NOT paraphrase, summarize, reorder, abbreviate \
-                (e.g. "36 million" not "36M"), or stitch together non-adjacent \
-                words for the anchor. Anchor on the CLAIM, not a catchy fragment: \
-                copy the clause or sentence that actually states the point you are \
-                citing (the span a reader would underline as "this is it"), exactly \
-                as it appears — typically a full clause up to one sentence (line \
-                breaks inside the quote are fine). Do not shrink it to a short, \
-                quotable noun-phrase just because that is easier to copy. If the \
-                claim sentence is long, anchor on its core assertion (subject + verb \
-                + object), still a single contiguous verbatim run. The link's \
-                visible [label] can be your own wording; only the anchor value must \
-                be the quote. If you are not certain of the exact wording, omit \
-                ?text= and cite the page alone — never invent a phrase.
-                """)
-
-            // Format + example per citation style. A live web page is `.link` with
-            // no timeline, so it cites like HTML (textual) rather than by `?time=`.
-            enum CitationStyle { case paged, textual, timeline }
-            let style: CitationStyle
-            switch doc.contentType {
-            case .pdf:                  style = .paged
-            case .html, .markdown:      style = .textual
-            case .link:                 style = doc.isTimelineMedia ? .timeline : .textual
-            case .audio:                style = .timeline
-            }
-
-            switch style {
-            case .paged:
-                parts.append("""
-                    This PDF's cite-key is "\(eck)". Citation format:
-                    [p. N](oak://cite/\(eck)?page=N)
-                    [p. N](oak://cite/\(eck)?page=N&text=verbatim+quote)
-                    (spaces in the anchor encoded as +).
-
-                    Example — the [label] is paraphrased, the &text= anchor is an exact quote:
-                    \"The transformer replaces recurrence with self-attention \
-                    ([p. 2](oak://cite/\(eck)?page=2&text=based+solely+on+attention+mechanisms)). \
-                    The scaled dot-product formula is defined on \
-                    [p. 3](oak://cite/\(eck)?page=3&text=Scaled+Dot-Product+Attention), and \
-                    multi-head attention extends it on [p. 4](oak://cite/\(eck)?page=4).\"
-                    """)
-            case .textual:
-                parts.append("""
-                    This document's cite-key is "\(eck)". Citation format:
-                    [§ Heading](oak://cite/\(eck)?heading=HeadingText)
-                    [your own label](oak://cite/\(eck)?text=verbatim+claim+sentence)
-
-                    Copy ?text= from the RENDERED text (not the raw markdown source); \
-                    matching is case-insensitive, so only casing may differ. Prefer \
-                    ?text= for specific passages; use ?heading= only for a whole section.
-
-                    CRITICAL for this page type — the highlighter locates ?text= by \
-                    matching it as a CONTIGUOUS run of characters in the page. The \
-                    anchor must therefore be one unbroken span that literally exists \
-                    on the page. NEVER synthesize a sentence by flattening a table, \
-                    list, or chart into prose, and never stitch together numbers or \
-                    words that are not physically adjacent — such a "quote" appears \
-                    nowhere contiguously and will not highlight. When the claim comes \
-                    from a table, figure, or other non-prose layout, do NOT fabricate \
-                    a sentence: cite the surrounding section with \
-                    ?heading=<exact heading> instead (your [label] still carries the \
-                    synthesized numbers). Use ?text= only when an actual contiguous \
-                    sentence or clause on the page states the claim.
-
-                    Example — the label names the idea, the anchor is the claim sentence:
-                    \"Batch jobs are processed asynchronously \
-                    ([§ Batch Endpoints](oak://cite/\(eck)?heading=Batch%20Endpoints)), \
-                    and the docs guarantee completion \
-                    ([within 24 hours](oak://cite/\(eck)?text=batch+jobs+are+processed+asynchronously+within+24+hours)).\"
-
-                    Do not use page numbers — this document has no pages.
-                    """)
-            case .timeline:
-                parts.append("""
-                    This media's cite-key is "\(eck)". Citation format:
-                    [MM:SS](oak://cite/\(eck)?time=SECONDS)
-
-                    Example:
-                    \"Gradient descent is introduced at \
-                    [12:30](oak://cite/\(eck)?time=750) and backpropagation \
-                    follows at [15:45](oak://cite/\(eck)?time=945).\"
-
-                    Do not use page numbers — this is media content.
-                    """)
-            }
-
-            // Cross-document references
-            parts.append("""
-                For cross-document references (from oak search or \
-                <referenced-documents> in the user message), \
-                use the target document's cite-key:
-                [citeKey, p. N](oak://cite/targetCiteKey?page=N)
-                For <doc> elements, use the `link` attribute as the base URL and \
-                append the appropriate anchor (?page=, ?heading=, ?text=, ?time=) \
-                based on the doc's `format` attribute.
-                For <note> elements, read them with the read tool using the \
-                provided path.
-                Only cite content you have actually read or found via tools.
-                """)
-        } else if context.document != nil {
-            parts.append("""
-                This document has no citation key. You may reference content \
-                descriptively but cannot create clickable citation links.
-                """)
-        }
+            Cite the load-bearing claim: a quotation, a statistic, a named finding, or \
+            the conclusion of a passage you are summarizing. Do not cite your own \
+            reasoning, generic background, or ordinary conversation. At most one \
+            citation per sentence, placed at the end — never make the whole sentence \
+            the link, and never end an answer with a list of citations.
+            """)
 
         // User memory (ChatGPT `bio`-style): one global profile of durable facts
         // about the user, injected into every conversation. The `manage_memory`

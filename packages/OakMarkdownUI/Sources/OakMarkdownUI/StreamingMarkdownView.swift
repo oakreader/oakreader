@@ -75,8 +75,8 @@ private struct BlockRow: View, Equatable {
         case .prose:
             ProseBlockView(
                 // While streaming, optimistically close a half-arrived trailing link so
-                // a citation shows its short label instead of flashing the raw oak://cite
-                // URL until the closing `)` lands. See StreamingMarkdownSanitizer.
+                // a citation shows its short label instead of flashing the bare `oak:14`
+                // destination until the closing `)` lands. See StreamingMarkdownSanitizer.
                 attributed: MarkdownAttributedBuilder.attributedString(
                     for: streaming ? StreamingMarkdownSanitizer.completeTrailingLink(block.text) : block.text,
                     theme: theme),

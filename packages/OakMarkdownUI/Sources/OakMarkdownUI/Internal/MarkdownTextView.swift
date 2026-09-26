@@ -9,6 +9,9 @@ extension NSAttributedString.Key {
     static let blockquoteFill = NSAttributedString.Key("OakMarkdownBlockquoteFill")
     /// Bar color (`NSColor`) for a block-quote range — drawn as a left vertical accent.
     static let blockquoteBar = NSAttributedString.Key("OakMarkdownBlockquoteBar")
+    /// Marks an internal-reference run (`oak:14`) so `HuggingLayoutManager` draws it
+    /// as a tinted capsule — a jump-to-source chip rather than an underlined web link.
+    static let citationPill = NSAttributedString.Key("OakMarkdownCitationPill")
 }
 
 enum MarkdownInlineCodePill {
@@ -16,6 +19,12 @@ enum MarkdownInlineCodePill {
     /// builder kerns the neighboring characters by the same amount so the overshoot
     /// no longer eats the space between a code span and its surrounding words.
     static let horizontalPadding: CGFloat = 4.5
+}
+
+enum MarkdownCitationPill {
+    /// Points the capsule extends past the label glyphs on each side. Wider than the
+    /// code pill so a two-character label ("p. 2") still reads as a tappable chip.
+    static let horizontalPadding: CGFloat = 5.5
 }
 
 /// Draws inline-code spans as rounded pills that hug the glyph height, while leaving
@@ -78,16 +87,15 @@ final class HuggingLayoutManager: NSLayoutManager {
     ) {
         guard let storage = textStorage, storage.length > 0,
               let container = textContainers.first,
-              let font = pillFont(at: charRange, in: storage) else {
+              let style = pillStyle(at: charRange, in: storage) else {
             super.fillBackgroundRectArray(rectArray, count: rectCount,
                                           forCharacterRange: charRange, color: color)
             return
         }
 
-        let padding: CGFloat = 1.5
-        let expand = MarkdownInlineCodePill.horizontalPadding
+        let font = style.font
         // ascender is positive, descender negative → full glyph extent around the baseline.
-        let height = ceil(font.ascender - font.descender) + padding * 2
+        let height = ceil(font.ascender - font.descender) + style.verticalPadding * 2
 
         color.set()
         for i in 0..<rectCount {
@@ -96,21 +104,47 @@ final class HuggingLayoutManager: NSLayoutManager {
             let glyph = glyphIndex(for: CGPoint(x: r.minX + 1, y: r.midY), in: container)
             let baselineY = lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil).minY
                 + location(forGlyphAt: glyph).y
-            let left = max(r.minX - expand, 0)
+            let left = max(r.minX - style.expand, 0)
             let pill = NSRect(x: left,
-                              y: (baselineY - font.ascender - padding).rounded(),
-                              width: r.maxX + expand - left,
+                              y: (baselineY - font.ascender - style.verticalPadding).rounded(),
+                              width: r.maxX + style.expand - left,
                               height: height)
-            NSBezierPath(roundedRect: pill, xRadius: 4, yRadius: 4).fill()
+            // A nil radius means capsule — the citation chip stays fully rounded at any
+            // font size, where a fixed radius would read as a rectangle on a tall line.
+            let radius = style.cornerRadius ?? height / 2
+            NSBezierPath(roundedRect: pill, xRadius: radius, yRadius: radius).fill()
         }
     }
 
-    /// The code font for an inline-code run, or nil if `charRange` isn't tagged as a pill.
-    private func pillFont(at charRange: NSRange, in storage: NSTextStorage) -> NSFont? {
+    /// Geometry for a pill-drawn run — inline code or a citation chip. `nil` when
+    /// `charRange` is an ordinary `.backgroundColor` run (or the selection), which must
+    /// keep AppKit's default square fill so multi-line selection stays continuous.
+    private struct PillStyle {
+        let font: NSFont
+        let expand: CGFloat
+        let verticalPadding: CGFloat
+        /// `nil` → capsule (radius derived from the drawn height).
+        let cornerRadius: CGFloat?
+    }
+
+    private func pillStyle(at charRange: NSRange, in storage: NSTextStorage) -> PillStyle? {
         let index = min(max(charRange.location, 0), storage.length - 1)
-        guard storage.attribute(.inlineCodePill, at: index, effectiveRange: nil) != nil else { return nil }
-        return (storage.attribute(.font, at: index, effectiveRange: nil) as? NSFont)
-            ?? .monospacedSystemFont(ofSize: 13, weight: .regular)
+        func font(_ fallback: NSFont) -> NSFont {
+            (storage.attribute(.font, at: index, effectiveRange: nil) as? NSFont) ?? fallback
+        }
+        if storage.attribute(.citationPill, at: index, effectiveRange: nil) != nil {
+            return PillStyle(font: font(.systemFont(ofSize: 13)),
+                             expand: MarkdownCitationPill.horizontalPadding,
+                             verticalPadding: 1.0,
+                             cornerRadius: nil)
+        }
+        if storage.attribute(.inlineCodePill, at: index, effectiveRange: nil) != nil {
+            return PillStyle(font: font(.monospacedSystemFont(ofSize: 13, weight: .regular)),
+                             expand: MarkdownInlineCodePill.horizontalPadding,
+                             verticalPadding: 1.5,
+                             cornerRadius: 4)
+        }
+        return nil
     }
 }
 

@@ -5,6 +5,11 @@ import OakAgent
 /// search items, manage the library, and more.  Always appends `--json`
 /// for structured output the LLM can parse easily.
 struct OakCLITool: AgentTool, Sendable {
+    /// Table that turns a library row into a citable `oak:N` handle. Search and list
+    /// results get a whole-document handle so the model can cite a source it found but
+    /// has not read yet; reading it mints finer-grained numbers for the passages inside.
+    let sources: CitationSourceRegistry
+
     let name = "oak"
     let description = """
         Run an oak CLI command to interact with the user's library. \
@@ -15,7 +20,8 @@ struct OakCLITool: AgentTool, Sendable {
         tags list | tags create <name> | tags add <tag> <item> | \
         search <query> [--limit N] | status <item> [unread|reading|completed|archived]. \
         Output is always JSON. The response includes a meta.count field with the total count. \
-        For "search", use --limit (max 20) to control result size.
+        For "search", use --limit (max 20) to control result size. \
+        Each result carries a `cite` handle (e.g. "oak:7") — link that to cite the document.
         """
 
     private static let oakPath = "/usr/local/bin/oak"
@@ -86,7 +92,7 @@ struct OakCLITool: AgentTool, Sendable {
                 timeout: 30
             )
 
-            var output = result.combinedOutput
+            var output = annotateWithCiteHandles(result.combinedOutput)
             output = OutputTruncation.truncate(output, maxLength: Self.maxOutputLength)
 
             if result.exitCode != 0 {
@@ -100,6 +106,38 @@ struct OakCLITool: AgentTool, Sendable {
         } catch {
             return .error("Failed to execute oak command: \(error.localizedDescription)")
         }
+    }
+
+    /// Add a `cite` handle to every result row that names a library item, so the model can
+    /// cite a document straight out of a search or list without re-typing its identity.
+    ///
+    /// Done by rewriting the CLI's JSON rather than by teaching the CLI about chat sessions:
+    /// `oak` is a standalone binary that also runs outside the app, and citation handles are
+    /// a property of a conversation, not of the library.
+    private func annotateWithCiteHandles(_ output: String) -> String {
+        guard let data = output.data(using: .utf8),
+              var envelope = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              var rows = envelope["results"] as? [[String: Any]], !rows.isEmpty
+        else { return output }
+
+        var annotated = false
+        for index in rows.indices {
+            // `search` rows carry `itemId`; `items list`/`items show` rows carry `id`.
+            guard let itemId = (rows[index]["itemId"] as? String) ?? (rows[index]["id"] as? String),
+                  !itemId.isEmpty else { continue }
+            let handle = sources.register(CitationSourceRegistry.Source(
+                itemId: itemId, page: nil, time: nil, heading: nil, text: nil))
+            rows[index]["cite"] = "oak:\(handle)"
+            annotated = true
+        }
+        guard annotated else { return output }
+
+        envelope["results"] = rows
+        guard let encoded = try? JSONSerialization.data(withJSONObject: envelope,
+                                                        options: [.sortedKeys]),
+              let text = String(data: encoded, encoding: .utf8)
+        else { return output }
+        return text
     }
 
     /// Split a command string into argv tokens, honoring single/double quotes and

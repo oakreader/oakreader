@@ -88,7 +88,7 @@ struct NoteRef: Identifiable, Hashable {
 }
 
 /// A note-to-note `@` reference link. Follows the app's `oak://<type>/…` scheme
-/// convention (cf. `oak://cite/…`, `oak://page/N`): a note reference is
+/// convention (cf. `oak:14` citations): a note reference is
 /// `oak://note/<annotationId>`.
 enum NoteLink {
     static func href(_ id: String) -> String { "oak://note/\(id)" }

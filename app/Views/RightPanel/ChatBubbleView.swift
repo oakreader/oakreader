@@ -8,6 +8,9 @@ struct ChatBubbleView: View, Equatable {
     var onPlayAudio: ((Turn) -> Void)?
     var isPlayingAudio: Bool = false
     var onStopAudio: (() -> Void)?
+    /// Resolves an `oak:N` citation link to the passage it names. Supplied by the host
+    /// because the source table belongs to the conversation, not to the bubble.
+    var resolveCitation: ((URL) -> (itemId: String, anchor: CitationAnchor)?)?
     var onOpenCitation: ((String, CitationAnchor) -> Void)?
     /// Optional markdown theme override (e.g. `.dia` for the agent canvas).
     /// When nil, falls back to the user-configured `.oak` theme.
@@ -133,14 +136,12 @@ struct ChatBubbleView: View, Equatable {
         plainMessageBubble
     }
 
-    /// `OpenURLAction` that intercepts `oak://` citation links and delegates
-    /// to `onOpenCitation`. Non-oak URLs fall through to the system handler.
+    /// `OpenURLAction` that intercepts `oak:N` citation links and delegates to
+    /// `onOpenCitation`. Everything else falls through to the system handler.
     private var citationOpenURLAction: OpenURLAction {
         OpenURLAction { url in
-            guard let (citeKey, anchor) = CitationAnchor.parse(from: url) else {
-                return .systemAction
-            }
-            onOpenCitation?(citeKey, anchor)
+            guard let (itemId, anchor) = resolveCitation?(url) else { return .systemAction }
+            onOpenCitation?(itemId, anchor)
             return .handled
         }
     }
@@ -200,17 +201,19 @@ struct ChatBubbleView: View, Equatable {
                   .replacingOccurrences(of: "]", with: "")
     }
 
-    /// cmark only turns `[label](url)` / `<url>` into links — a *bare* `oak://…` URL
-    /// (which the model sometimes emits when it forgets the markdown wrapper) renders
-    /// as raw percent-encoded text with no link, hover card, or click-to-jump. This
-    /// rewrites any such bare citation URL into `[label](url)` so it always shows the
-    /// proper citation chip. URLs already inside `[](…)` or `<…>` are left untouched.
-    static func linkifyBareCitations(_ markdown: String, isStreaming: Bool) -> String {
-        guard markdown.contains("oak://") else { return markdown }
+    /// cmark only turns `[label](url)` into a link — a *bare* `oak:14` (which the model
+    /// sometimes emits when it forgets the markdown wrapper) would render as the literal
+    /// text "oak:14" with no chip, hover card, or click-to-jump. This wraps any such bare
+    /// citation in `[label](oak:14)`. Numbers already inside `[](…)` are left untouched.
+    static func linkifyBareCitations(
+        _ markdown: String,
+        isStreaming: Bool,
+        resolve: ((URL) -> (itemId: String, anchor: CitationAnchor)?)?
+    ) -> String {
+        guard let resolve, markdown.contains("oak:") else { return markdown }
         let ns = markdown as NSString
-        // Bare `oak://…` not opened by `(` (link destination) or `<` (autolink),
-        // stopping at whitespace / closing brackets / angle brackets.
-        guard let re = try? NSRegularExpression(pattern: "(?<![(<])oak://[^\\s)\\]<>]+") else {
+        // `oak:` + digits, not already opened by `(` (a link destination).
+        guard let re = try? NSRegularExpression(pattern: "(?<!\\()oak:[0-9]+\\b") else {
             return markdown
         }
         let matches = re.matches(in: markdown, range: NSRange(location: 0, length: ns.length))
@@ -219,20 +222,12 @@ struct ChatBubbleView: View, Equatable {
         let out = NSMutableString(string: markdown)
         // Replace back-to-front so earlier (still-original) ranges stay valid.
         for m in matches.reversed() {
-            var range = m.range
-            // While streaming, a URL touching the end is likely still growing —
-            // leave it bare until a delimiter follows so we don't wrap a partial URL.
-            if isStreaming && range.location + range.length == ns.length { continue }
-            var urlStr = ns.substring(with: range)
-            // Trim trailing sentence punctuation that isn't really part of the URL.
-            let trailing = CharacterSet(charactersIn: ".,;:!?")
-            while let last = urlStr.unicodeScalars.last, trailing.contains(last) {
-                urlStr = String(urlStr.unicodeScalars.dropLast())
-                range.length -= 1
-            }
-            guard let url = URL(string: urlStr),
-                  let (_, anchor) = CitationAnchor.parse(from: url) else { continue }
-            out.replaceCharacters(in: range, with: "[\(Self.citationLabel(for: anchor))](\(urlStr))")
+            // While streaming, a number touching the end is likely still growing —
+            // leave it bare until a delimiter follows so we don't wrap a partial id.
+            if isStreaming && m.range.location + m.range.length == ns.length { continue }
+            let raw = ns.substring(with: m.range)
+            guard let url = URL(string: raw), let (_, anchor) = resolve(url) else { continue }
+            out.replaceCharacters(in: m.range, with: "[\(Self.citationLabel(for: anchor))](\(raw))")
         }
         return out as String
     }
@@ -256,18 +251,18 @@ struct ChatBubbleView: View, Equatable {
             fadesAppendedText: fadesAppendedText,
             onOpenURL: { url in
                 // Intercept oak:// citation links; let everything else open in the browser.
-                guard let (citeKey, anchor) = CitationAnchor.parse(from: url) else { return false }
-                onOpenCitation?(citeKey, anchor)
+                guard let (itemId, anchor) = resolveCitation?(url) else { return false }
+                onOpenCitation?(itemId, anchor)
                 return true
             },
             linkPreview: { url, label in
                 // Hovering a citation shows the cited source instead of the raw oak:// URL.
-                guard let (citeKey, anchor) = CitationAnchor.parse(from: url) else { return nil }
+                guard let (_, anchor) = resolveCitation?(url) else { return nil }
                 // Skip the card when it would only echo the link's own visible text.
                 // Web citations often inline the quote itself as the label, so a card
                 // repeating that quote adds nothing; a page/heading/timestamp still does.
                 guard Self.citationCardAddsInfo(anchor, label: label) else { return nil }
-                return AnyView(CitationHoverCard(citeKey: citeKey, anchor: anchor))
+                return AnyView(CitationHoverCard(anchor: anchor))
             }
         )
     }
@@ -358,7 +353,8 @@ struct ChatBubbleView: View, Equatable {
         // markers stay literal) and handles math via its own block splitter.
         // Defensive: linkify any bare `oak://` citation the model forgot to wrap in
         // `[label](…)`, so it renders as a clean chip instead of a raw URL blob.
-        return Self.linkifyBareCitations(turn.content, isStreaming: turn.isStreaming)
+        return Self.linkifyBareCitations(turn.content, isStreaming: turn.isStreaming,
+                                         resolve: resolveCitation)
     }
 
     private var skillBadges: [String] {

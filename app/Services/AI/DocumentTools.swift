@@ -109,6 +109,13 @@ struct ReadDocumentTool: AgentTool, Sendable {
     let filePath: String
     let documentType: ContentType
     let pageCount: Int
+    /// Stable library id of the document being read, used to attribute the passages
+    /// this tool numbers. Empty for a document with no library row — citations then
+    /// resolve to "the open document", which is all such a file can be.
+    let itemId: String
+    /// Passages are numbered as they are handed to the model so it can cite one by
+    /// number (`oak:14`) instead of reproducing its text. See `CitationSourceRegistry`.
+    let sources: CitationSourceRegistry
 
     var inputSchema: [String: Any] {
         [
@@ -133,7 +140,7 @@ struct ReadDocumentTool: AgentTool, Sendable {
         case .link:
             let mdURL = url.deletingLastPathComponent().appendingPathComponent("content.md")
             if let md = try? String(contentsOf: mdURL, encoding: .utf8), !md.isEmpty {
-                return .success(String(md.prefix(50_000)))
+                return .success(numberedBody(md))
             }
             return readTextFile(url: url)
         case .html:
@@ -164,7 +171,8 @@ struct ReadDocumentTool: AgentTool, Sendable {
             guard let page = pdf.page(at: index) else { continue }
             let text = page.string ?? ""
             if !text.isEmpty {
-                parts.append("--- Page \(index + 1) ---\n\(text)")
+                let numbered = sources.numbered(text, itemId: itemId, page: index)
+                parts.append("--- Page \(index + 1) ---\n\(numbered)")
             }
         }
 
@@ -179,7 +187,14 @@ struct ReadDocumentTool: AgentTool, Sendable {
         guard let content = try? String(contentsOf: url, encoding: .utf8) else {
             return .error("Failed to read file at \(filePath)")
         }
-        return .success(String(content.prefix(50_000)))
+        return .success(numberedBody(content))
+    }
+
+    /// Number an unpaged body (markdown, article text, transcript) so every passage in it
+    /// is citable. `numbered` tracks the nearest markdown heading, which is what an
+    /// unpaged document navigates by.
+    private func numberedBody(_ text: String) -> String {
+        sources.numbered(String(text.prefix(50_000)), itemId: itemId)
     }
 
     private func readHTML(url: URL) -> ToolOutput {
@@ -197,7 +212,7 @@ struct ReadDocumentTool: AgentTool, Sendable {
         if text.isEmpty {
             return .error("Failed to extract text from web page")
         }
-        return .success(String(text.prefix(50_000)))
+        return .success(numberedBody(text))
     }
 }
 
@@ -214,6 +229,13 @@ struct SearchDocumentTool: AgentTool, Sendable {
     let filePath: String
     let documentType: ContentType
     let pageCount: Int
+    /// Stable library id of the document being read, used to attribute the passages
+    /// this tool numbers. Empty for a document with no library row — citations then
+    /// resolve to "the open document", which is all such a file can be.
+    let itemId: String
+    /// Passages are numbered as they are handed to the model so it can cite one by
+    /// number (`oak:14`) instead of reproducing its text. See `CitationSourceRegistry`.
+    let sources: CitationSourceRegistry
 
     var inputSchema: [String: Any] {
         [
@@ -276,7 +298,8 @@ struct SearchDocumentTool: AgentTool, Sendable {
                 let snippets = SnippetExtractor.extractSnippets(
                     from: pageText, query: query, maxSnippets: 2
                 )
-                let snippetText = snippets.joined(separator: "\n  ...\n")
+                let snippetText = numberedSnippets(snippets, page: pageIndex)
+                    .joined(separator: "\n  ...\n  ")
                 results.append("Page \(pageIndex + 1):\n  \(snippetText)")
             }
         }
@@ -320,7 +343,8 @@ struct SearchDocumentTool: AgentTool, Sendable {
                 let start = max(0, lineNum - 1)
                 let end = min(lines.count - 1, lineNum + 1)
                 let ctx = lines[start...end].joined(separator: "\n")
-                results.append("Line \(lineNum + 1):\n  \(ctx)")
+                let numbered = numberedSnippets([ctx], page: nil)[0]
+                results.append("Line \(lineNum + 1):\n  \(numbered)")
             }
         }
 
@@ -329,6 +353,22 @@ struct SearchDocumentTool: AgentTool, Sendable {
         }
         let joined = results.joined(separator: "\n\n")
         return .success("Found \(results.count) match(es) for \"\(query)\":\n\n\(joined)")
+    }
+
+    /// Number each search hit so the model can cite the exact passage it matched — the
+    /// search→cite path is where a hand-copied anchor went wrong most often, because the
+    /// model would re-type a snippet it had just been given.
+    private func numberedSnippets(_ snippets: [String], page: Int?) -> [String] {
+        snippets.map { snippet in
+            let id = sources.register(CitationSourceRegistry.Source(
+                itemId: itemId,
+                page: page,
+                time: nil,
+                heading: nil,
+                text: CitationSourceRegistry.normalized(snippet)
+            ))
+            return "[\(id)] \(snippet)"
+        }
     }
 }
 

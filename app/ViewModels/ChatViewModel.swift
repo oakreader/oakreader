@@ -3,61 +3,24 @@ import AppKit
 import PDFKit
 import OakAgent
 
+/// Where a citation points inside a document. Produced by resolving an `oak:N` link
+/// against the conversation's ``CitationSourceRegistry`` — never parsed out of the URL,
+/// which carries nothing but the number.
 struct CitationAnchor {
-    var page: Int?      // 0-based page index (already converted from 1-based)
+    var page: Int?      // 0-based page index
     var heading: String?
     var time: Double?   // seconds
-    var text: String?   // text fragment to find & highlight
+    var text: String?   // verbatim passage to find & highlight
 
-    /// Parse an `oak://cite/{citeKey}?page=N&heading=...&time=S&text=...` URL
-    /// into a `(citeKey, anchor)` pair. Returns nil for non-citation URLs.
-    static func parse(from url: URL) -> (citeKey: String, anchor: CitationAnchor)? {
+    /// The passage number in an `oak:N` citation link, or nil for any other URL.
+    ///
+    /// The whole wire format is one integer: the model can only name a passage it was
+    /// shown, so a citation can't carry a misspelled quote or a mis-encoded space.
+    static func sourceID(in url: URL) -> Int? {
         guard url.scheme == "oak" else { return nil }
-
-        // oak://page/N → current-document page citation (empty citeKey)
-        if url.host == "page",
-           let pageStr = url.pathComponents.dropFirst().first,
-           let page = Int(pageStr) {
-            return ("", CitationAnchor(page: page - 1))
-        }
-
-        // oak://cite/{citeKey}?page=N&heading=...&time=S&text=...
-        guard url.host == "cite",
-              let citeKey = url.pathComponents.dropFirst().first else {
-            return nil
-        }
-
-        let queryItems = URLComponents(url: url, resolvingAgainstBaseURL: false)?
-            .queryItems ?? []
-
-        var anchor = CitationAnchor()
-        for item in queryItems {
-            switch item.name {
-            case "page":
-                if let v = item.value, let p = Int(v) { anchor.page = p - 1 }
-            case "heading":
-                anchor.heading = formDecode(item.value)
-            case "time":
-                if let v = item.value, let t = Double(v) { anchor.time = t }
-            case "text":
-                anchor.text = formDecode(item.value)
-            default:
-                break
-            }
-        }
-
-        return (citeKey, anchor)
-    }
-
-    /// Form-urlencoded decode for query values. `URLComponents.queryItems` already
-    /// percent-decodes `%XX`, but it does NOT turn `+` into a space — and the model
-    /// is told to encode spaces as `+` (see LLMContextProvider citation examples).
-    /// Without this, `text=a+b+c` would be searched literally (plus signs and all)
-    /// and never match the PDF, so the citation jumps to the page but never highlights.
-    private static func formDecode(_ value: String?) -> String? {
-        guard let value else { return nil }
-        let spaced = value.replacingOccurrences(of: "+", with: " ")
-        return spaced.removingPercentEncoding ?? spaced
+        // `oak:14` is an opaque URL — the number lands in `path`, with no host.
+        guard url.host == nil else { return nil }
+        return Int(url.path)
     }
 }
 
@@ -122,8 +85,9 @@ class ChatViewModel {
     /// Tool context for AI agent tool use (path sandbox).
     private var toolContext: ToolExecutionContext?
 
-    /// Observer for cite-key rewrites, so an open chat reloads stale `oak://cite/` links.
-    private var citeKeyRewriteObserver: NSObjectProtocol?
+    /// Table behind `oak:N` citation links for the active conversation.
+    let citationSources = CitationSourceRegistry(
+        sessionId: UUID(), directory: CatalogDatabase.chatsDirectory)
 
     init(parent: DocumentViewModel, documentStoragePath: URL? = nil) {
         self.parent = parent
@@ -135,34 +99,22 @@ class ChatViewModel {
                 allowedPaths: [path]
             )
         }
-        observeCiteKeyRewrites()
+        citationSources.activate(sessionId: sessionId)
     }
 
     init() {
         self.parent = nil
         self.engine = BackendChatEngine(chatsDirectory: CatalogDatabase.chatsDirectory)
-        observeCiteKeyRewrites()
+        citationSources.activate(sessionId: sessionId)
     }
 
-    deinit {
-        if let citeKeyRewriteObserver {
-            NotificationCenter.default.removeObserver(citeKeyRewriteObserver)
-        }
-    }
-
-    /// When a cite key is regenerated, its `oak://cite/` links are rewritten on disk. If this
-    /// chat is showing an affected session and isn't mid-stream, reload it so the displayed
-    /// links match disk (the persisted data is already correct either way).
-    private func observeCiteKeyRewrites() {
-        citeKeyRewriteObserver = NotificationCenter.default.addObserver(
-            forName: .oakCiteKeysRewritten, object: nil, queue: .main
-        ) { [weak self] note in
-            let sessions = note.userInfo?["sessions"] as? [UUID] ?? []
-            Task { @MainActor in
-                guard let self, !self.isStreaming, sessions.contains(self.sessionId) else { return }
-                self.loadSession(self.sessionId)
-            }
-        }
+    /// Resolve an `oak:N` link to the passage it names. Returns nil for any other URL, so
+    /// callers can let real web links fall through to the browser.
+    func resolveCitation(_ url: URL) -> (itemId: String, anchor: CitationAnchor)? {
+        guard let id = CitationAnchor.sourceID(in: url),
+              let source = citationSources.source(for: id) else { return nil }
+        return (source.itemId, CitationAnchor(page: source.page, heading: source.heading,
+                                              time: source.time, text: source.text))
     }
 
     // MARK: - Configuration
@@ -273,7 +225,8 @@ class ChatViewModel {
             return nil
         }
         if !libraryRefs.isEmpty {
-            userContent += "\n\n" + Self.buildReferencedDocumentsXML(libraryRefs: libraryRefs)
+            userContent += "\n\n" + Self.buildReferencedDocumentsXML(
+                libraryRefs: libraryRefs, sources: citationSources)
         }
 
         // Create or update session record in DB
@@ -340,12 +293,16 @@ class ChatViewModel {
             tools.append(ReadDocumentTool(
                 filePath: doc.filePath,
                 documentType: doc.contentType,
-                pageCount: doc.pageCount
+                pageCount: doc.pageCount,
+                itemId: doc.itemId ?? "",
+                sources: citationSources
             ))
             tools.append(SearchDocumentTool(
                 filePath: doc.filePath,
                 documentType: doc.contentType,
-                pageCount: doc.pageCount
+                pageCount: doc.pageCount,
+                itemId: doc.itemId ?? "",
+                sources: citationSources
             ))
 
             // Browser tool — only when viewing a live web page (.link). Lets the agent
@@ -361,7 +318,7 @@ class ChatViewModel {
         tools.append(WebFetchTool())
 
         // 3b. Oak CLI (library search, read items, list collections/tags, manage library)
-        tools.append(OakCLITool())
+        tools.append(OakCLITool(sources: citationSources))
 
         // 3c. Memory — ChatGPT `bio`-style: the model saves durable facts about the
         //     user inline (proactively when they share something lasting, and on
@@ -408,7 +365,9 @@ class ChatViewModel {
                 let systemPrompt = LLMContextProvider.buildSystemPrompt(
                     skill: currentSkill,
                     context: snapshot,
-                    documentCharBudget: docCharBudget
+                    documentCharBudget: docCharBudget,
+                    sources: self?.citationSources ?? CitationSourceRegistry(
+                        sessionId: currentSessionId, directory: CatalogDatabase.chatsDirectory)
                 )
 
                 let stream = await engine.send(
@@ -612,6 +571,9 @@ class ChatViewModel {
             if sessionId == currentSessionId {
                 isStreaming = false
             }
+            // Persist the passages this turn numbered, so reopening the conversation
+            // later still resolves its `oak:N` citations.
+            self?.citationSources.save()
             self?.titleIfNeeded()
         }
     }
@@ -708,26 +670,25 @@ class ChatViewModel {
 
     // MARK: - Citation Navigation
 
-    func openCitation(citeKey: String, anchor: CitationAnchor) {
-        // Backward compat: empty citeKey means current document (oak://page/N)
-        if citeKey.isEmpty {
+    func openCitation(itemId: String, anchor: CitationAnchor) {
+        // A passage with no item id can only have come from the open document.
+        if itemId.isEmpty {
             if let vm = parent {
                 navigateInPlace(vm: vm, anchor: anchor)
             }
             return
         }
 
-        // Check if the citeKey matches the current document
-        let currentCiteKey = parent?.libraryItem?.citeKey
-        if let currentCiteKey, currentCiteKey == citeKey, let vm = parent {
+        // Already looking at it — just move within the open view.
+        if parent?.libraryItem?.id.uuidString == itemId, let vm = parent {
             navigateInPlace(vm: vm, anchor: anchor)
             return
         }
 
         // Cross-document: find item in library, open it, then navigate
-        guard let appState else { return }
+        guard let appState, let uuid = UUID(uuidString: itemId) else { return }
         let store = appState.libraryStore
-        guard let item = store.findItem(byCiteKey: citeKey) else { return }
+        guard let item = store.findItem(byId: uuid) else { return }
 
         // Media (podcast / video) has no local seekable copy — open the source
         // platform at the timestamp instead of opening a document tab.
@@ -898,6 +859,7 @@ class ChatViewModel {
         cancelActiveStreamForSwitch()
         turns = []
         sessionId = UUID()
+        citationSources.activate(sessionId: sessionId)
         sessionRecordCreated = false
         titleGenerated = false
         selectedSkill = nil
@@ -911,6 +873,7 @@ class ChatViewModel {
     func loadSession(_ id: UUID) {
         cancelActiveStreamForSwitch()
         sessionId = id
+        citationSources.activate(sessionId: sessionId)
         sessionRecordCreated = true  // already exists in DB
         titleGenerated = true  // existing session already has a title; don't overwrite
         turns = []
@@ -933,9 +896,12 @@ class ChatViewModel {
         if sessionRecordCreated {
             try? sessionService?.deleteSession(id: oldSessionId)
         }
+        CitationSourceRegistry.deleteTable(sessionId: oldSessionId,
+                                           directory: CatalogDatabase.chatsDirectory)
         turns = []
         errorMessage = nil
         sessionId = UUID()
+        citationSources.activate(sessionId: sessionId)
         sessionRecordCreated = false
         titleGenerated = false
     }
@@ -958,10 +924,12 @@ class ChatViewModel {
     func deleteSessionFromList(_ id: UUID) {
         // Delete from DB
         try? sessionService?.deleteSession(id: id)
-        // Delete JSONL file
+        // Delete JSONL file + the conversation's citation source table
         Task {
             await engine.deleteSession(id)
         }
+        CitationSourceRegistry.deleteTable(sessionId: id,
+                                           directory: CatalogDatabase.chatsDirectory)
         // Remove from local list
         sessionList.removeAll { $0.id == id }
         // If the deleted session is the current one, start fresh
@@ -1022,7 +990,8 @@ class ChatViewModel {
     // MARK: - Referenced Documents XML
 
     private static func buildReferencedDocumentsXML(
-        libraryRefs: [ChatCompletionItem.LibraryRefPayload]
+        libraryRefs: [ChatCompletionItem.LibraryRefPayload],
+        sources: CitationSourceRegistry
     ) -> String {
         // The user attached these library documents as context, but their full text
         // is NOT inlined here (it can be large). Tell the model exactly how to pull a
@@ -1054,8 +1023,14 @@ class ChatViewModel {
                 + "format=\"\(xmlEsc(ref.contentType))\" "
                 + "read-with=\"items read &quot;\(xmlEsc(readKey))&quot;\""
             if let ck = ref.citeKey, !ck.isEmpty {
-                attrs = "cite-key=\"\(xmlEsc(ck))\" " + attrs + " link=\"oak://cite/\(xmlEsc(ck))\""
+                attrs = "cite-key=\"\(xmlEsc(ck))\" " + attrs
             }
+            // A whole-document handle, so the model can cite the source itself before it
+            // has read a passage from it. Reading the document mints finer-grained
+            // numbers for the passages inside.
+            let handle = sources.register(CitationSourceRegistry.Source(
+                itemId: ref.itemId, page: nil, time: nil, heading: nil, text: nil))
+            attrs += " cite=\"oak:\(handle)\""
             lines.append("  <doc \(attrs) />")
         }
         lines.append("</referenced-documents>")

@@ -14,6 +14,8 @@ struct ChatCompletionItem: Identifiable, Equatable {
     }
 
     struct LibraryRefPayload: Equatable {
+        /// Stable library row id — what a citation handle resolves through.
+        let itemId: String
         let storageKey: String
         let title: String
         let author: String
@@ -73,6 +75,7 @@ struct ChatCompletionItem: Identifiable, Equatable {
             label: label,
             description: desc,
             kind: .libraryReference(LibraryRefPayload(
+                itemId: item.id.uuidString,
                 storageKey: item.storageKey,
                 title: item.title,
                 author: item.author,

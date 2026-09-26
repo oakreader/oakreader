@@ -1,11 +1,13 @@
 import SwiftUI
 
-/// Rich hover card shown when the cursor dwells on an `oak://cite/...` citation link in
-/// the chat. It replaces the raw-URL tooltip (`oak://cite/…?page=1&text=…`) with the cited
-/// source itself, the way OpenAI's research/annotation UI surfaces a passage: a small
-/// location chip (page / heading / timestamp) above the verbatim quoted text.
+/// Rich hover card shown when the cursor dwells on an `oak:N` citation chip in the chat.
+/// It shows the cited source itself, the way OpenAI's research/annotation UI surfaces a
+/// passage: a small location chip (page / heading / timestamp) above the quoted text.
+///
+/// The quote is the passage the app handed the model, looked up by number — not something
+/// the model reproduced — so what the card shows is always exactly what the reader will
+/// see highlighted after clicking.
 struct CitationHoverCard: View {
-    let citeKey: String
     let anchor: CitationAnchor
 
     var body: some View {

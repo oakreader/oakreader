@@ -48,6 +48,9 @@ struct ChatContextSnapshot: Sendable {
         let selectedText: String?
 
         // Library metadata
+        /// Stable library row id — what citations resolve through. Nil for a document
+        /// with no library row (a file opened directly).
+        let itemId: String?
         let title: String
         let author: String
         let citeKey: String?

@@ -20,7 +20,6 @@ struct ReferenceMetadataView: View {
     @State private var citeKeyError: String?
     @State private var citeKeyInfo: String?
     @State private var pendingRegenKey: String?
-    @State private var regenAffectedCount: Int = 0
     @State private var showRegenConfirm = false
     @State private var isRegenerating = false
     @State private var extraText: String = ""
@@ -51,11 +50,7 @@ struct ReferenceMetadataView: View {
                     Button("Regenerate") { commitRegenerate(to: newKey) }
                     Button("Cancel", role: .cancel) {}
                 } message: { newKey in
-                    if regenAffectedCount > 0 {
-                        Text("“\(citeKeyText)” → “\(newKey)”.\n\(regenAffectedCount) citation\(regenAffectedCount == 1 ? "" : "s") in your chat history will be updated to the new key.")
-                    } else {
-                        Text("“\(citeKeyText)” → “\(newKey)”.")
-                    }
+                    Text("“\(citeKeyText)” → “\(newKey)”.")
                 }
         } else {
             extractingState
@@ -617,7 +612,7 @@ struct ReferenceMetadataView: View {
             let service = CiteKeyService(database: database)
             let proposed = (try? service.proposedKey(forItemId: itemId)) ?? nil
             let isChange = proposed != nil && !proposed!.isEmpty && proposed != current
-            let count = (isChange && !current.isEmpty) ? CiteLinkRewriter.countReferences(toKey: current) : 0
+            _ = isChange
             await MainActor.run {
                 isRegenerating = false
                 guard let proposed, !proposed.isEmpty else {
@@ -629,31 +624,31 @@ struct ReferenceMetadataView: View {
                     return
                 }
                 pendingRegenKey = proposed
-                regenAffectedCount = count
                 showRegenConfirm = true
             }
         }
     }
 
-    /// Write the new key and rewrite matching `oak://cite/` links in chat history, off the
-    /// main thread. Surfaces any write failures, and notifies open chat views to reload.
+    /// Write the new key off the main thread and surface any write failure.
+    ///
+    /// Renaming a cite key used to have to rewrite every `oak://cite/{key}` link in every
+    /// stored transcript, because the key was baked into the citation URL. Citations now
+    /// carry a passage number that resolves through the conversation's source table to a
+    /// stable item id, so a rename is invisible to them and nothing needs rewriting.
     private func commitRegenerate(to newKey: String) {
         guard !isRegenerating else { return }
-        let oldKey = citeKeyText.trimmingCharacters(in: .whitespaces)
         let database = store.database
         let itemId = item.id.uuidString
         isRegenerating = true
         Task.detached {
-            var saveError: String?
-            var result = CiteLinkRewriter.RewriteResult.empty
-            do {
-                try CiteKeyService(database: database).saveCiteKey(newKey, forItemId: itemId)
-                if !oldKey.isEmpty {
-                    result = CiteLinkRewriter.rewrite(from: oldKey, to: newKey)
+            let saveError: String? = {
+                do {
+                    try CiteKeyService(database: database).saveCiteKey(newKey, forItemId: itemId)
+                    return nil
+                } catch {
+                    return error.localizedDescription
                 }
-            } catch {
-                saveError = error.localizedDescription
-            }
+            }()
             await MainActor.run {
                 isRegenerating = false
                 if let saveError {
@@ -662,22 +657,8 @@ struct ReferenceMetadataView: View {
                 }
                 citeKeyText = newKey
                 citeKeyError = nil
-                var parts: [String] = []
-                if result.linksRewritten > 0 {
-                    parts.append("Updated \(result.linksRewritten) citation\(result.linksRewritten == 1 ? "" : "s") in chat history.")
-                }
-                if result.failedFiles > 0 {
-                    parts.append("\(result.failedFiles) chat file\(result.failedFiles == 1 ? "" : "s") could not be updated.")
-                }
-                citeKeyInfo = parts.isEmpty ? nil : parts.joined(separator: " ")
+                citeKeyInfo = nil
                 store.invalidate()
-                if !result.affectedSessions.isEmpty {
-                    NotificationCenter.default.post(
-                        name: .oakCiteKeysRewritten,
-                        object: nil,
-                        userInfo: ["sessions": result.affectedSessions]
-                    )
-                }
             }
         }
     }

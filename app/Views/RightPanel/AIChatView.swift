@@ -371,8 +371,9 @@ struct AIChatView: View {
                             onPlayAudio: voiceVM != nil ? { t in playAudio(t) } : nil,
                             isPlayingAudio: playingTurnId == turn.id && (voiceVM?.isSpeaking ?? false),
                             onStopAudio: { stopAudio() },
-                            onOpenCitation: { citeKey, anchor in
-                                chatVM.openCitation(citeKey: citeKey, anchor: anchor)
+                            resolveCitation: { chatVM.resolveCitation($0) },
+                            onOpenCitation: { itemId, anchor in
+                                chatVM.openCitation(itemId: itemId, anchor: anchor)
                             },
                             markdownTheme: presentation == .canvas ? .dia : nil
                         )

@@ -1,20 +1,27 @@
 import Foundation
 
-/// Small repairs applied ONLY to the streaming trailing block, so half-arrived
-/// markdown doesn't flash an ugly intermediate state before the next token lands.
+/// Small repair applied ONLY to the streaming trailing block, so half-arrived markdown
+/// doesn't flash an ugly intermediate state before the next token lands.
 ///
-/// The motivating case is citations. A link streams in character by character, so for
-/// a moment the block ends mid-link — `[label](oak://cite/key?page=2&text=verbat` —
-/// and cmark, unable to see the closing `)`, renders the *entire raw URL as plain
-/// text*. The instant `)` arrives it collapses to the short label, producing a visible
-/// "long URL → pill" flicker. Optimistically closing the dangling link makes only the
-/// label show, immediately and stably (the same idea as Streamdown/remend's
+/// The motivating case is citations. A link streams in character by character, so for a
+/// moment the block ends mid-link — `[p. 2](oak:1` — and cmark, unable to see the closing
+/// `)`, renders the destination as plain text. Optimistically closing the dangling link
+/// makes only the label show, immediately and stably (the same idea as Streamdown/remend's
 /// complete-incomplete-markdown pass).
+///
+/// This stays small because the wire format is small: a citation destination is `oak:` plus
+/// a number, so it contains no spaces to encode, no quote to escape, and is over in one or
+/// two deltas. The previous format put a verbatim quote in the URL, which needed both a
+/// re-encoding pass (a raw space makes cmark refuse to parse the link at all — permanently,
+/// not just while streaming) and a much wider flicker window.
 enum StreamingMarkdownSanitizer {
 
-    /// If `text` ends with an unclosed inline link/image (`…](url-with-no-closing-paren`),
+    /// Destinations that are internal references rather than web links.
+    static let internalScheme = "oak:"
+
+    /// If `text` ends with an unclosed inline link/image (`…](destination-with-no-closing-paren`),
     /// append the `)` so it renders as a link (label only) instead of flashing the raw
-    /// URL. Returns `text` unchanged when there's nothing to close. Append-only safe:
+    /// destination. Returns `text` unchanged when there's nothing to close. Append-only safe:
     /// once the real `)` streams in, the last `](` is already closed and this is a no-op.
     static func completeTrailingLink(_ text: String) -> String {
         // The link being formed is always the LAST `](` in an append-only stream.
@@ -23,7 +30,7 @@ enum StreamingMarkdownSanitizer {
         guard text[..<open.lowerBound].contains("[") else { return text }
         let urlFragment = text[open.upperBound...]
         // Bail if already closed, or if the fragment can't be a bare URL (a space or
-        // newline means it's prose / a titled link, not a clean citation URL).
+        // newline means it's prose / a titled link, not a clean destination).
         guard !urlFragment.isEmpty,
               !urlFragment.contains(")"),
               !urlFragment.contains("("),
