@@ -237,13 +237,22 @@ final class CLIDatabase {
             }
 
             if let search {
-                conditions.append("i.rowid IN (SELECT rowid FROM items_fts WHERE items_fts MATCH ?)")
-                // FTS5: tokenize each word as a prefix match
-                let terms = search.split(separator: " ").map { term -> String in
-                    let escaped = term.replacingOccurrences(of: "\"", with: "\"\"")
-                    return "\"\(escaped)\"*"
-                }
-                args.append(terms.joined(separator: " "))
+                // Case-insensitive substring over title / author / filename,
+                // mirroring LibraryStore.applySearch so the CLI and the app
+                // agree on what "search" means. This was an FTS5 MATCH against
+                // items_fts until that virtual table was dropped as unused --
+                // it was not unused, and the query has been throwing "no such
+                // table" ever since. instr() rather than LIKE so that a % or _
+                // the user types stays a literal.
+                conditions.append("""
+                    (instr(LOWER(i.title), ?) > 0
+                     OR instr(LOWER(i.author), ?) > 0
+                     OR EXISTS (SELECT 1 FROM attachments a_search
+                                WHERE a_search.item_id = i.id
+                                  AND instr(LOWER(a_search.file_name), ?) > 0))
+                    """)
+                let needle = search.lowercased()
+                args.append(contentsOf: [needle, needle, needle])
             }
 
             if !conditions.isEmpty {
@@ -664,7 +673,7 @@ final class CLIDatabase {
         let tags: String?
     }
 
-    /// Keyword search using FTS5 + abstract/DOI/journal/tag LIKE queries (mirrors SearchLibraryTool).
+    /// Keyword search across title/author plus abstract, DOI, journal and tags.\n    /// Union of the facets: an item matches if any one of them does.
     func keywordSearch(query: String, limit: Int = 20) throws -> [SearchResultRow] {
         try dbQueue.read { db in
             let words = query.lowercased()
@@ -674,20 +683,16 @@ final class CLIDatabase {
 
             var matchingIds = Set<String>()
 
-            // FTS5 on title + author
-            let ftsTokens = words.compactMap { word -> String? in
-                let clean = word.filter { $0.isLetter || $0.isNumber }
-                return clean.isEmpty ? nil : "\"\(clean)\""
-            }
-            if !ftsTokens.isEmpty {
-                let ftsQuery = ftsTokens.joined(separator: " ")
-                for row in try Row.fetchAll(db, sql: """
-                    SELECT i.id FROM items i
-                    JOIN items_fts ON items_fts.rowid = i.rowid
-                    WHERE items_fts MATCH ?
-                    """, arguments: [ftsQuery]) {
-                    matchingIds.insert(row["id"] as String)
-                }
+            // Title + author: every word must appear somewhere across the two,
+            // which is what the FTS5 MATCH this replaces did with its tokens
+            // (space-separated terms are AND-ed). `words` is already lowercased.
+            let titleConditions = words
+                .map { _ in "instr(LOWER(i.title || ' ' || i.author), ?) > 0" }
+                .joined(separator: " AND ")
+            for row in try Row.fetchAll(db, sql: """
+                SELECT i.id FROM items i WHERE \(titleConditions)
+                """, arguments: StatementArguments(words)) {
+                matchingIds.insert(row["id"] as String)
             }
 
             // Abstract LIKE
