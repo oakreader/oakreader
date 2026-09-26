@@ -1,7 +1,17 @@
+import { resolveServerBase } from "@/src/lib/server";
 import type { HTMLSnapshotPayload, PDFCapturePayload } from "@/src/lib/types";
 
 export default defineBackground(() => {
-  const CLIP_URL = "http://127.0.0.1:23119/clip";
+  /**
+   * The popup resolves the server base and passes it down, so a capture that takes
+   * 30s cannot end up posting to a different OakReader build than the one the popup
+   * checked. Fall back to probing when the message carries no base.
+   */
+  async function clipURL(serverBase?: string | null): Promise<string> {
+    const base = serverBase ?? (await resolveServerBase());
+    if (!base) throw new Error("OakReader is not running.");
+    return `${base}/clip`;
+  }
 
   // ─── PDF Detection via webRequest ──────────────────────────────────────────────
 
@@ -183,6 +193,7 @@ export default defineBackground(() => {
     payload: {
       url: string;
       title: string | null;
+      serverBase?: string | null;
     }
   ): Promise<{ status: string; message?: string }> {
     // 0. Extract markdown (best-effort)
@@ -246,7 +257,7 @@ export default defineBackground(() => {
       thumbnailURL,
     };
 
-    const response = await fetch(CLIP_URL, {
+    const response = await fetch(await clipURL(payload.serverBase), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -266,6 +277,7 @@ export default defineBackground(() => {
     payload: {
       url: string;
       title: string | null;
+      serverBase?: string | null;
     }
   ): Promise<{ status: string; message?: string }> {
     // 0. Extract markdown from the page before attaching debugger
@@ -358,7 +370,7 @@ export default defineBackground(() => {
       markdown,
     };
 
-    const response = await fetch(CLIP_URL, {
+    const response = await fetch(await clipURL(payload.serverBase), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

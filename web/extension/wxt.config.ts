@@ -10,7 +10,13 @@ export default defineConfig({
     name: "OakReader",
     description: "Save web pages and articles to OakReader",
     permissions: ["activeTab", "scripting", "tabs", "webRequest", "cookies", "debugger", "storage"],
-    host_permissions: ["http://localhost:23119/*", "https://*/*", "http://*/*"],
+    // 23119 = release build, 23120 = Debug build (see src/lib/server.ts).
+    host_permissions: [
+      "http://127.0.0.1:23119/*",
+      "http://127.0.0.1:23120/*",
+      "https://*/*",
+      "http://*/*",
+    ],
     action: {
       default_icon: {
         "16": "icon-16.png",

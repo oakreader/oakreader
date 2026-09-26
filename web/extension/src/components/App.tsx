@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Archive, CheckCircle2, Link2 } from "lucide-react";
 import { usePopupData } from "@/src/hooks/use-popup-data";
 import { postClip } from "@/src/lib/api";
+import { isDevBase } from "@/src/lib/server";
 import type { PageCapture, PDFSavePayload } from "@/src/lib/types";
 import { PageCard } from "./PageCard";
 import { SaveButton, type SaveState } from "./SaveButton";
@@ -34,7 +35,7 @@ interface CaptureProgress {
 }
 
 export function App() {
-  const { pageMeta, tabId, loading, error } = usePopupData();
+  const { pageMeta, tabId, serverBase, loading, error } = usePopupData();
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [errorMessage, setErrorMessage] = useState("");
   const [saveMode, setSaveMode] = useState<SaveMode>("link");
@@ -134,6 +135,7 @@ export function App() {
           payload: {
             url: pageMeta.url,
             title: pageMeta.title,
+            serverBase,
           },
         }) as { status: string; message?: string } | undefined;
 
@@ -168,7 +170,7 @@ export function App() {
         setSaveState("saving");
       }
 
-      const result = await postClip(payload);
+      const result = await postClip(payload, serverBase);
 
       if (result.status === "ok") {
         setSaveState("saved");
@@ -187,7 +189,7 @@ export function App() {
         setErrorMessage(msg);
       }
     }
-  }, [pageMeta, tabId, saveMode]);
+  }, [pageMeta, tabId, saveMode, serverBase]);
 
   if (loading) {
     return <LoadingState />;
@@ -227,7 +229,7 @@ export function App() {
 
   return (
     <>
-      <Header />
+      <Header isDev={isDevBase(serverBase)} />
       <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-2 space-y-3">
         {pageMeta && <PageCard pageMeta={pageMeta} />}
 
@@ -252,7 +254,7 @@ export function App() {
   );
 }
 
-function Header() {
+function Header({ isDev = false }: { isDev?: boolean }) {
   return (
     <div className="px-4 pt-4 pb-3">
       <div className="flex items-center gap-2.5">
@@ -262,7 +264,15 @@ function Header() {
           className="size-8 rounded-[10px] shadow-[var(--shadow-card)]"
         />
         <div>
-          <p className="text-[15px] font-semibold leading-tight text-foreground">OakReader</p>
+          <p className="flex items-center gap-1.5 text-[15px] font-semibold leading-tight text-foreground">
+            OakReader
+            {/* Both builds can run at once; name the one this clip will land in. */}
+            {isDev && (
+              <span className="rounded-full bg-fill px-1.5 py-px text-[9px] font-semibold uppercase tracking-[0.06em] text-secondary">
+                Dev
+              </span>
+            )}
+          </p>
           <p className="text-[11px] leading-tight text-secondary">Clip into your reading library</p>
         </div>
       </div>

@@ -1,14 +1,25 @@
 import Foundation
 import Network
 
-/// Lightweight HTTP server on `127.0.0.1:23119` that bridges the OakReader browser
+/// Lightweight HTTP server on `127.0.0.1` that bridges the OakReader browser
 /// extension and the app: it receives clip payloads on `POST /clip` (routed to
 /// `ImportService`) and serves library data back via `GET /collections`, `/tags`,
 /// and `/selected-collection`.
 final class OakServer {
     private var listener: NWListener?
     private let importService: ImportService
+
+    /// Debug builds listen on their own port so a dev build and an installed release
+    /// build can run side by side. They used to share 23119, and because
+    /// `allowLocalEndpointReuse` lets a second listener bind an already-owned port
+    /// without error, whichever app launched last silently captured every clip.
+    /// The extension probes 23119 first, then 23120 (see `web/extension/src/lib/server.ts`).
+    #if DEBUG
+    private let port: UInt16 = 23120
+    #else
     private let port: UInt16 = 23119
+    #endif
+
     private let maxPayload = 100 * 1024 * 1024 // 100 MB
 
     init(importService: ImportService) {
@@ -18,6 +29,18 @@ final class OakServer {
     // MARK: - Start / Stop
 
     func start() {
+        // Endpoint reuse means a port already served by another process binds silently
+        // instead of failing, so probe first and make the collision visible in the log.
+        probeExistingOwner { [weak self] isOwned in
+            guard let self else { return }
+            if isOwned {
+                Log.error(Log.server, "127.0.0.1:\(self.port) is already served by another process (a second OakReader build?) — clips may be delivered there instead of here.")
+            }
+            self.startListener()
+        }
+    }
+
+    private func startListener() {
         let params = NWParameters.tcp
         params.allowLocalEndpointReuse = true
 
@@ -44,6 +67,44 @@ final class OakServer {
         }
 
         listener?.start(queue: .global(qos: .userInitiated))
+    }
+
+    /// Reports whether something is already listening on our port. Called *before* the
+    /// listener is created, so a successful connect can only mean another process.
+    private func probeExistingOwner(_ completion: @escaping (Bool) -> Void) {
+        guard let endpointPort = NWEndpoint.Port(rawValue: port) else {
+            completion(false)
+            return
+        }
+
+        final class ProbeState { var settled = false }
+        let state = ProbeState()
+        let queue = DispatchQueue(label: "com.oakreader.server.probe")
+        let probe = NWConnection(host: "127.0.0.1", port: endpointPort, using: .tcp)
+
+        // Always resolved on `queue`, so the `settled` guard needs no extra locking.
+        func finish(_ isOwned: Bool) {
+            guard !state.settled else { return }
+            state.settled = true
+            probe.stateUpdateHandler = nil
+            probe.cancel()
+            completion(isOwned)
+        }
+
+        probe.stateUpdateHandler = { connectionState in
+            switch connectionState {
+            case .ready:
+                finish(true)
+            case .failed, .waiting, .cancelled:
+                // .waiting on loopback means connection refused — nothing is listening.
+                finish(false)
+            default:
+                break
+            }
+        }
+
+        probe.start(queue: queue)
+        queue.asyncAfter(deadline: .now() + 0.5) { finish(false) }
     }
 
     func stop() {
