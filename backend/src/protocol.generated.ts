@@ -331,6 +331,16 @@ export const ItemsMergeParams = z.object({
 export type ItemsMergeParams = z.infer<typeof ItemsMergeParams>;
 export type ItemsMergeResult = Record<string, never>;
 
+/** `catalog/validate` — Can this database file be opened by the build that owns the schema? Used before a restore swaps a backup in, while nothing live has been touched, so an incompatible one is a refusal rather than a crash. */
+export const CatalogValidateParams = z.object({
+  path: z.string(),
+});
+export type CatalogValidateParams = z.infer<typeof CatalogValidateParams>;
+export type CatalogValidateResult = {
+  ok: boolean;
+  error?: string | null;
+};
+
 /** `catalog/references/get` — An item's CSL JSON, or null when it has no citation. */
 export const ReferencesGetParams = z.object({
   itemId: z.string(),
@@ -590,6 +600,7 @@ export const ClientRequests = {
   "catalog/items/setTrashed": ItemsSetTrashedParams,
   "catalog/items/remove": ItemsRemoveParams,
   "catalog/items/merge": ItemsMergeParams,
+  "catalog/validate": CatalogValidateParams,
   "catalog/references/get": ReferencesGetParams,
   "catalog/references/save": ReferencesSaveParams,
   "catalog/citeKeys/propose": CiteKeysProposeParams,
@@ -651,6 +662,7 @@ export interface ClientRequestResults {
   "catalog/items/setTrashed": ItemsSetTrashedResult;
   "catalog/items/remove": ItemsRemoveResult;
   "catalog/items/merge": ItemsMergeResult;
+  "catalog/validate": CatalogValidateResult;
   "catalog/references/get": ReferencesGetResult;
   "catalog/references/save": ReferencesSaveResult;
   "catalog/citeKeys/propose": CiteKeysProposeResult;

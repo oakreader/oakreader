@@ -231,6 +231,7 @@
 		C416E5661676EC44E3A78C50 /* CSLTypeFieldSpec.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC9E41C801BDA197566BB8FD /* CSLTypeFieldSpec.swift */; };
 		C501DC8875C0B1327A4474E7 /* ChatCompletionPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2781D3BACDC448CA4822441F /* ChatCompletionPanel.swift */; };
 		C53D7BF9F563B5F2BC090BC9 /* SearchTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84D5B228AFF14A92C8F4086C /* SearchTools.swift */; };
+		C61D87DF2E45FB5947B47F4A /* CatalogValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39B7FC65D5042E407F0A5959 /* CatalogValidation.swift */; };
 		C6E36402CD138FC77497133D /* NodeBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAB69A8E275EA484EE926D06 /* NodeBackend.swift */; };
 		C71ECA650FF10807F2502899 /* WebDownloadManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 527859AA57575D61EFF0789F /* WebDownloadManager.swift */; };
 		C7528D6A8D505EBE4CC6F07C /* DocumentState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7955F2134AA428B6E9807253 /* DocumentState.swift */; };
@@ -356,6 +357,7 @@
 		3925419E2D0EA1C7B9EC62CA /* LibraryCollectionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryCollectionStore.swift; sourceTree = "<group>"; };
 		396CA60ACCE7275E2A854565 /* SecuritySettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecuritySettings.swift; sourceTree = "<group>"; };
 		39991F237616EABCEC8BDE63 /* BackendCredentialMigrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendCredentialMigrator.swift; sourceTree = "<group>"; };
+		39B7FC65D5042E407F0A5959 /* CatalogValidation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogValidation.swift; sourceTree = "<group>"; };
 		39EE1618C698DDFC82B45605 /* PDFOCRService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFOCRService.swift; sourceTree = "<group>"; };
 		39FDE79F06FF90DD9878BA38 /* AppExtensionSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppExtensionSettingsView.swift; sourceTree = "<group>"; };
 		3A68585DFA1B0465F1A5F87E /* PillTabButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PillTabButton.swift; sourceTree = "<group>"; };
@@ -810,6 +812,7 @@
 			isa = PBXGroup;
 			children = (
 				B87D7729365DE50DE6C6E33A /* AnnotationCatalog.swift */,
+				39B7FC65D5042E407F0A5959 /* CatalogValidation.swift */,
 				AB161803654383723D0C5EC6 /* CatalogWireMapping.swift */,
 				A8E5A3FBC7CC4C65B1D49130 /* LibraryCatalog.swift */,
 				EF2387B271A13F8720377194 /* PromptCatalog.swift */,
@@ -1458,6 +1461,7 @@
 				11F9FFA5B28E93D145B9D0DE /* CatalogDatabase.swift in Sources */,
 				1D4FE68A7A107B64C48D661B /* CatalogMigrations.swift in Sources */,
 				0644E77359CA1D0870D764BA /* CatalogStoragePaths.swift in Sources */,
+				C61D87DF2E45FB5947B47F4A /* CatalogValidation.swift in Sources */,
 				E7E22C9D8FF31587FF28C779 /* CatalogWireMapping.swift in Sources */,
 				A3E26FA4D99E787F2832A03F /* ChatBubbleView.swift in Sources */,
 				A0952A7DF2C3B005004B83ED /* ChatCompletionItem.swift in Sources */,

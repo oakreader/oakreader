@@ -1,6 +1,5 @@
 import AppKit
 import Foundation
-import GRDB
 
 // MARK: - Progress & Result Types
 
@@ -286,24 +285,22 @@ final class BackupService {
             return result
         }
 
-        // Validate that the backup's schema can actually be migrated to the
-        // current version. The integer check above only compares version
-        // *numbers*; it can't detect a database whose migration identifiers are
-        // incompatible with this build — e.g. a backup made before the migration
-        // history was collapsed, whose `grdb_migrations` rows don't match the
-        // current migrator and would re-run `CREATE TABLE` and crash on next
-        // launch. We migrate an extracted *copy* here (nothing live has been
-        // touched yet), so an incompatible backup becomes a clean refusal that
-        // leaves the current library intact instead of a crash after the swap.
-        // On success the extracted copy is now migrated up-to-date, so the next
-        // launch's migrate() is a no-op.
-        do {
-            var config = Configuration()
-            config.foreignKeysEnabled = true
-            let testQueue = try DatabaseQueue(path: backupDBPath, configuration: config)
-            try CatalogDatabase.migrator.migrate(testQueue)
-        } catch {
-            result.errors.append("This backup is not compatible with the current version of OakReader and cannot be restored: \(error.localizedDescription)")
+        // Ask the core whether it can open this database.
+        //
+        // The version check above only compares manifest *numbers*. It cannot
+        // see a database whose migration identifiers this build does not
+        // recognise — a backup from before the migration history was collapsed,
+        // say, whose rows would send the next launch through DDL it has already
+        // applied. The core owns the schema, so it is the one that can answer,
+        // and it answers against the extracted copy while the live library is
+        // still untouched: an incompatible backup becomes a clean refusal
+        // rather than a crash after the swap. A backup that passes is left
+        // migrated, so the next launch finds nothing to do.
+        let validation = await CatalogValidation.check(path: backupDBPath)
+        if !validation.ok {
+            result.errors.append(
+                "This backup is not compatible with the current version of OakReader "
+                + "and cannot be restored: \(validation.error ?? "unknown error")")
             return result
         }
 

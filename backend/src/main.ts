@@ -14,6 +14,7 @@ import {
   PROTOCOL_VERSION, RpcError,
   PingParams, ProvidersListParams,
   PromptsComposeParams, type PromptsComposeResult,
+  CatalogValidateParams, type CatalogValidateResult,
   ReferencesGetParams, ReferencesSaveParams, type ReferencesGetResult,
   CiteKeysProposeParams, CiteKeysSaveParams, CiteKeysAssignParams,
   type CiteKeysProposeResult, type CiteKeysAssignResult,
@@ -363,6 +364,18 @@ function registerMethods(): void {
     new ItemStore(catalog().db, LOCAL_USER).merge(p.keeperId, p.duplicateIds, p.at);
     return {};
   });
+
+  peer.onRequest("catalog/validate", CatalogValidateParams,
+    (p): CatalogValidateResult => {
+      try {
+        // Opening applies anything missing, so a backup that survives this is
+        // also left migrated — the next launch finds nothing to do.
+        Catalog.open(p.path).close();
+        return { ok: true, error: null };
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    });
 
   peer.onRequest("catalog/references/get", ReferencesGetParams,
     (p): ReferencesGetResult => ({

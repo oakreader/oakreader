@@ -73,6 +73,7 @@ enum RPC {
         static let itemsSetTrashed = "catalog/items/setTrashed"
         static let itemsRemove = "catalog/items/remove"
         static let itemsMerge = "catalog/items/merge"
+        static let catalogValidate = "catalog/validate"
         static let referencesGet = "catalog/references/get"
         static let referencesSave = "catalog/references/save"
         static let citeKeysPropose = "catalog/citeKeys/propose"
@@ -425,6 +426,18 @@ enum RPC {
     }
     struct ItemsMergeResult: Decodable {
         init() {}
+    }
+
+    // MARK: catalog/validate
+    /// Can this database file be opened by the build that owns the schema? Used before a restore
+    /// swaps a backup in, while nothing live has been touched, so an incompatible one is a refusal
+    /// rather than a crash.
+    struct CatalogValidateParams: Encodable {
+        var path: String
+    }
+    struct CatalogValidateResult: Decodable {
+        var ok: Bool
+        var error: String?
     }
 
     // MARK: catalog/references/get

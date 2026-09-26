@@ -337,6 +337,18 @@ export const METHODS: Method[] = [
   },
 
   {
+    name: "catalog/validate", type: "CatalogValidate", kind: "request", from: "client",
+    doc: "Can this database file be opened by the build that owns the schema? " +
+         "Used before a restore swaps a backup in, while nothing live has been " +
+         "touched, so an incompatible one is a refusal rather than a crash.",
+    params: [{ name: "path", type: str }],
+    result: [
+      { name: "ok", type: bool },
+      { name: "error", type: str, optional: true, nullable: true },
+    ],
+  },
+
+  {
     name: "catalog/references/get", type: "ReferencesGet", kind: "request", from: "client",
     doc: "An item's CSL JSON, or null when it has no citation.",
     params: [{ name: "itemId", type: str }],

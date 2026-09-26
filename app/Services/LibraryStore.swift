@@ -1,5 +1,4 @@
 import Foundation
-import GRDB
 
 @Observable
 final class LibraryStore {

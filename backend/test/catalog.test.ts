@@ -282,3 +282,33 @@ describe("word lookups", () => {
     });
   });
 });
+
+describe("validation", () => {
+  test("a library this build wrote is accepted", () => {
+    const dir = mkdtempSync(join(tmpdir(), "oak-validate-"));
+    try {
+      const path = join(dir, "library.sqlite");
+      Catalog.open(path).close();
+      expect(() => Catalog.open(path).close()).not.toThrow();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("a library from a build we do not know is refused, not modified", () => {
+    // Partial migration state is the shape a backup from an unknown version
+    // takes. Running DDL over tables we have not seen is the one thing worse
+    // than refusing to open it.
+    const dir = mkdtempSync(join(tmpdir(), "oak-validate-"));
+    try {
+      const path = join(dir, "library.sqlite");
+      const catalog = Catalog.open(path);
+      catalog.db.exec("DELETE FROM grdb_migrations WHERE rowid = (SELECT max(rowid) FROM grdb_migrations)");
+      catalog.close();
+
+      expect(() => Catalog.open(path)).toThrow(/unknown build/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
