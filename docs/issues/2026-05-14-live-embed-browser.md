@@ -109,20 +109,20 @@ EmbedCardView
 
 **新建文件：**
 
-1. `OakReader/Views/Viewer/LiveEmbedWebView.swift`
+1. `app/Views/Viewer/LiveEmbedWebView.swift`
    - `EmbedWebViewPool` — 共享 ProcessPool 单例
    - `LiveEmbedNavState` — @Observable 导航状态（canGoBack, title, url, isLoading...）
    - `LiveEmbedNavAction` — 导航动作通道（goBack, goForward, reload）
    - `LiveEmbedWebView` — NSViewRepresentable，WKNavigationDelegate + WKUIDelegate
    - `LiveEmbedNavigationPolicy` — URL scheme、localhost、私网地址、外部打开策略
 
-2. `OakReader/Views/Viewer/LiveEmbedBrowserBar.swift`
+2. `app/Views/Viewer/LiveEmbedBrowserBar.swift`
    - 最小化浏览器工具栏：[←] [→] [↻] [URL/Title 显示] [↗ 在浏览器打开]
    - 使用 `OakToolButton` + `OakStyle` 保持设计一致性
 
 **修改文件：**
 
-3. `OakReader/Services/SnapshotServer.swift`
+3. `app/Services/SnapshotServer.swift`
    - 添加 token 鉴权、Origin 校验和 CORS allowlist
    - 这是 live embed 的 blocker，不应跳过
 
@@ -130,13 +130,13 @@ EmbedCardView
    - 对 OakReader localhost API 请求添加 token header
    - 处理 401/403，引导用户重新配对 extension
 
-5. `OakReader/Views/Viewer/EmbedCardView.swift`
+5. `app/Views/Viewer/EmbedCardView.swift`
    - 改为 `LiveEmbedBrowserBar` + `LiveEmbedWebView` 组合
    - 加载 `media.sourceURL` 而非本地 `embed.html`
    - 保留 `LocalEmbedWebView`，作为失败/离线/站点阻止嵌入时的 fallback
    - 错误遮罩显示 Retry、Use Snapshot Card、Open in Browser
 
-6. `OakReader/Views/Viewer/WebArchiveViewerRepresentable.swift`
+6. `app/Views/Viewer/WebArchiveViewerRepresentable.swift`
    - 显式使用独立 `WKProcessPool`
    - 考虑显式使用 `.nonPersistent()` 或独立 `WKWebsiteDataStore`，避免和 live embed 默认存储发生隐式共享
 

@@ -12,7 +12,7 @@ just the one that prompted them.
 capsule that reveals a text label (icon + word), while the others stay
 icon-only. Modeled on Dia's command bar / iOS active-tab labels.
 
-**Reference implementation:** `OakReader/Views/TabBar/TabBarView.swift` —
+**Reference implementation:** `app/Views/TabBar/TabBarView.swift` —
 `PillTabButton` (the right-side title-bar buttons: AI Chat / Metadata /
 Translation / Notes, and the library detail tabs).
 

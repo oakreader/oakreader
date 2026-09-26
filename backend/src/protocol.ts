@@ -2,7 +2,7 @@ import { z } from "zod";
 
 /**
  * Protocol v2: JSONL over stdio, LF-delimited (never split on U+2028/U+2029).
- * The Swift mirror lives in OakReader/Services/Backend/BackendProtocol.swift —
+ * The Swift mirror lives in app/Services/Backend/BackendProtocol.swift —
  * keep the two in sync.
  *
  * v2 moves provider/credential resolution into the backend: requests carry an

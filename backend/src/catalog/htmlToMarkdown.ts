@@ -2,7 +2,7 @@
  * Extract readable markdown from a saved HTML page.
  *
  * Mirrors what the browser extension does in-page (Defuddle → markdown, see
- * `web/extension/entrypoints/content.ts`) so an archive saved before that
+ * `extension/entrypoints/content.ts`) so an archive saved before that
  * pipeline existed — or on a platform without a WebView — yields the same
  * `content.md` that search and the AI tools read.
  *

@@ -55,10 +55,21 @@ Thumbs.db
 *.mobileprovision
 *.provisionprofile
 
-# Browser Extension
-browser-extension/node_modules/
-browser-extension/.output/
-browser-extension/.wxt/
+# JS workspace (pnpm) — the workspace root is the repo root
+node_modules/
+*.tsbuildinfo
+
+# Browser extension (WXT)
+extension/.output/
+extension/.wxt/
+extension/public/lib/
+SingleFile-MV3/
+
+# Website (Next.js)
+website/.next/
+website/out/
+website/next-env.d.ts
+.vercel/
 
 # TTS samples
 tts_samples/
@@ -85,5 +96,5 @@ tmp/
 # Internal-only docs (release runbook, prompt sessions) — kept local, not published
 docs/internal/
 
-# Compiled AI sidecar (63-132 MB, built by web/backend/scripts/build-binary.sh)
-web/backend/dist/
+# Compiled AI sidecar (63-132 MB, built by backend/scripts/build-binary.sh)
+backend/dist/

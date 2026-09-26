@@ -101,11 +101,11 @@ Zotero 是学术文献管理领域的标杆，其 URL scheme 设计值得借鉴�
 
 | 文件 | 改动 |
 |------|------|
-| `OakReader/Views/RightPanel/ChatBubbleView.swift` | 添加 `onNavigateToPage` / `onOpenCitation` 回调 + `OpenURLAction` 拦截 |
-| `OakReader/Views/RightPanel/AIChatView.swift` | 传递导航闭包到 ChatBubbleView |
-| `OakReader/ViewModels/ChatViewModel.swift` | 新增 `openCitation(citeKey:pageIndex:)` 方法 |
-| `OakReader/Services/AI/LLMContextProvider.swift` | system prompt 追加引用格式指令 |
-| `OakReader/Services/LibraryItemStore.swift` | 可能需新增 `findItem(byCiteKey:)` |
+| `app/Views/RightPanel/ChatBubbleView.swift` | 添加 `onNavigateToPage` / `onOpenCitation` 回调 + `OpenURLAction` 拦截 |
+| `app/Views/RightPanel/AIChatView.swift` | 传递导航闭包到 ChatBubbleView |
+| `app/ViewModels/ChatViewModel.swift` | 新增 `openCitation(citeKey:pageIndex:)` 方法 |
+| `app/Services/AI/LLMContextProvider.swift` | system prompt 追加引用格式指令 |
+| `app/Services/LibraryItemStore.swift` | 可能需新增 `findItem(byCiteKey:)` |
 
 ### Step 1: ChatBubbleView — 拦截 `oak://` 链接
 

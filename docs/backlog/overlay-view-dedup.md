@@ -8,9 +8,9 @@
 Collapse the ~110 lines of near-identical logic shared by the three drag-to-select
 snapshot overlays into a small reusable layer.
 
-- `OakReader/Views/Viewer/SnapshotOverlayView.swift` (PDF area capture)
-- `OakReader/Views/Viewer/HTMLOverlayView.swift` (HTML snapshot capture)
-- `OakReader/Views/Viewer/MediaSnapshotOverlayView.swift` (media webview capture)
+- `app/Views/Viewer/SnapshotOverlayView.swift` (PDF area capture)
+- `app/Views/Viewer/HTMLOverlayView.swift` (HTML snapshot capture)
+- `app/Views/Viewer/MediaSnapshotOverlayView.swift` (media webview capture)
 
 ## Why this is NOT urgent
 

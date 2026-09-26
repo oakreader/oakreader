@@ -228,7 +228,7 @@ Two complementary levers — prefer (A); add (B) if churn is still high:
 
 **A. Pin accessibility on the offending pop-up's symbol content.** Per
 `sfsymbol-a11y-locale-hang`, the canonical fix is the **`OakLabel(_:systemImage:)`**
-factory in `OakReader/Views/Shared/OakLabel.swift` (it is `Label(...).accessibilityLabel(Text(title))`,
+factory in `app/Views/Shared/OakLabel.swift` (it is `Label(...).accessibilityLabel(Text(title))`,
 which pins the label so SwiftUI skips the symbol's localized-description resolution).
 For icon-only `Image(systemName:)` inside a `Menu`/`Picker` item, give an explicit
 `.accessibilityLabel(Text("…"))` (semantic name) or `.accessibilityHidden(true)`.
@@ -266,11 +266,11 @@ Verify with `Self._printChanges()` on the suspect views, or Instruments
 
 | File | What |
 |---|---|
-| `OakReader/Views/RightPanel/Comments/NativeNoteEditorView.swift` | the new native editor; `NSViewRepresentable` + `NoteEditorTextView` + `NoteTagLayoutManager`. Bindings at `:417-424`, selection→activeFormats at `:447-449`, `drawBackground` blockquote at `~:461`. |
-| `OakReader/Views/RightPanel/Comments/NoteComposerBox.swift` | the composer card (toolbar, `Aa`, format bar). `Aa` toggle `:205`; `toolButton` factory `~:336`. |
-| `OakReader/Views/RightPanel/Comments/CommentsPanelView.swift` | hosts the composer; per-card `Menu` `:351`, references `Label` `:433`. |
-| `OakReader/Views/RightPanel/AIChatView.swift` | model/effort/permission `Picker`s `:754-790` (labels already `OakLabel`-pinned). |
-| `OakReader/Views/Shared/OakLabel.swift` | the canonical a11y-pinning `Label` factory. |
+| `app/Views/RightPanel/Comments/NativeNoteEditorView.swift` | the new native editor; `NSViewRepresentable` + `NoteEditorTextView` + `NoteTagLayoutManager`. Bindings at `:417-424`, selection→activeFormats at `:447-449`, `drawBackground` blockquote at `~:461`. |
+| `app/Views/RightPanel/Comments/NoteComposerBox.swift` | the composer card (toolbar, `Aa`, format bar). `Aa` toggle `:205`; `toolButton` factory `~:336`. |
+| `app/Views/RightPanel/Comments/CommentsPanelView.swift` | hosts the composer; per-card `Menu` `:351`, references `Label` `:433`. |
+| `app/Views/RightPanel/AIChatView.swift` | model/effort/permission `Picker`s `:754-790` (labels already `OakLabel`-pinned). |
+| `app/Views/Shared/OakLabel.swift` | the canonical a11y-pinning `Label` factory. |
 
 ## 13. Project memory references (read these)
 

@@ -28,7 +28,7 @@ Because PDF view (no WKWebView at all) shows the same overflow, the cause is the
 
 ## 2. The core tension (the single most important insight)
 
-The bug lives in `Packages/OakMarkdownUI/Sources/OakMarkdownUI/ProseBlockView.swift`
+The bug lives in `packages/OakMarkdownUI/Sources/OakMarkdownUI/ProseBlockView.swift`
 — an `NSViewRepresentable` wrapping a TextKit-1 `NSTextView` (`MarkdownTextView`).
 Each assistant prose block is one such NSTextView.
 
@@ -207,22 +207,22 @@ room once the overflow is truly fixed (separate, cosmetic).
 
 ## 8. Key files
 
-- `Packages/OakMarkdownUI/Sources/OakMarkdownUI/ProseBlockView.swift`
+- `packages/OakMarkdownUI/Sources/OakMarkdownUI/ProseBlockView.swift`
   — `makeNSView` (container/tracking setup), `sizeThatFits` (measurement +
   `.infinity` guard), `updateNSView` (incremental text replace; `isSelectable`
   flips on settle).
-- `Packages/OakMarkdownUI/Sources/OakMarkdownUI/Internal/MarkdownTextView.swift`
+- `packages/OakMarkdownUI/Sources/OakMarkdownUI/Internal/MarkdownTextView.swift`
   — the `NSTextView` subclass (custom `HuggingLayoutManager`, link hover). Add the
   `intrinsicContentSize` cap here.
-- `Packages/OakMarkdownUI/Sources/OakMarkdownUI/StreamingMarkdownView.swift`
+- `packages/OakMarkdownUI/Sources/OakMarkdownUI/StreamingMarkdownView.swift`
   — block splitting + memoization; `selectable: !streaming` (the stream→settle flip
   that re-renders the tail block and is the timing trigger).
-- `OakReader/Views/RightPanel/ChatBubbleView.swift`
+- `app/Views/RightPanel/ChatBubbleView.swift`
   — `AssistantBubbleStyle` (4px h-padding), `chatMarkdown`, `.clipped()` at ~line 150.
-- `OakReader/Views/RightPanel/AIChatView.swift`
+- `app/Views/RightPanel/AIChatView.swift`
   — `messageList` frame chain, `canvasConstrained`, `presentation` (.panel vs
   .canvas), `canvasContentWidth = 760`.
-- `OakReader/Views/MainWindow/ContentView.swift`
+- `app/Views/MainWindow/ContentView.swift`
   — right panel `.frame(width: min(rightPanelWidth, maxRightPanel))` (line ~83),
   content-column `.clipped()` for WKWebView (line ~72; NOT the cause — see §1).
 

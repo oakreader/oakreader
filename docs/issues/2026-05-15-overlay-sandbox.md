@@ -8,7 +8,7 @@ Bridge 的解决方案是内嵌 Linux 虚拟机 + OverlayFS：Agent 在 overlay 
 
 ### Current state
 
-- OakAgent 已有可插拔的 `FileOperations` / `BashOperations` / `LsOperations` 协议（`Packages/OakAgent/Sources/OakAgent/Operations/`）
+- OakAgent 已有可插拔的 `FileOperations` / `BashOperations` / `LsOperations` 协议（`packages/OakAgent/Sources/OakAgent/Operations/`）
 - `ToolExecutionContext` 组装这三个协议实例，传给所有 Tool 的 `execute()` 方法（`Tool/ToolExecutionContext.swift`）
 - `PathSandbox` 做路径验证，防止 Agent 越界访问（`Operations/PathSandbox.swift`）
 - 现有 Tool 权限分级：`readOnly` / `write` / `dangerous`，写操作需要用户确认（`Tool/AgentTool.swift`）
@@ -263,7 +263,7 @@ OakAgent 的 Skill 系统已有 `SkillRequirements.bins` 字段。扩展为 sand
 
 ## Component Design (OakBox Package)
 
-所有 sandbox 组件独立为 `Packages/OakBox/` Swift 包，依赖 OakAgent（使用其 Operations 协议）。
+所有 sandbox 组件独立为 `packages/OakBox/` Swift 包，依赖 OakAgent（使用其 Operations 协议）。
 
 ### 1. SandboxVM — VM 生命周期管理
 
@@ -822,7 +822,7 @@ Apple 的 Containerization 框架使用 Kata Containers 的 Linux kernel (ARM64 
 | `MoveTool.swift` | `OakAgent/Tools/` | 移动/重命名 |
 | `DeleteTool.swift` | `OakAgent/Tools/` | 删除文件 |
 | `CopyTool.swift` | `OakAgent/Tools/` | 复制文件 |
-| `ChangeReviewView.swift` | `OakReader/Views/Chat/` | Review UI |
+| `ChangeReviewView.swift` | `app/Views/Chat/` | Review UI |
 | `sandbox-init/` | `Resources/` | VM init 进程源码 + 预编译 kernel |
 
 ### 修改文件

@@ -636,18 +636,18 @@ Export should generate Zotero-compatible reader JSON from OakReader records.
 
 ## Affected OakReader Areas
 
-- `OakReader/Models/AnnotationModel.swift` - replace runtime-only snapshot with canonical model or add separate canonical model
-- `OakReader/Models/DatabaseRecords.swift` - add `AnnotationRecord`
-- `OakReader/Services/CatalogDatabase.swift` - add annotation migrations and indexes
-- `OakReader/Services/AnnotationStore.swift` - new DB service
-- `OakReader/ViewModels/AnnotationViewModel.swift` - becomes mutation boundary and projection coordinator
-- `OakReader/ViewModels/DocumentViewModel.swift` - expose active attachment ID/key, not only item storage key
-- `OakReader/Document/OakReaderDocument.swift` - stop using PDF save for annotation-only edits
-- `OakReader/App/AppState.swift` - pass item and attachment identity into document tabs
-- `OakReader/Views/Sidebar/AnnotationListView.swift` - query store rather than scan PDF pages
-- `OakReader/Views/Annotations/AnnotationPropertyPanel.swift` - route all edits through `AnnotationViewModel`
-- `OakReader/Views/Viewer/PDFViewCoordinator.swift` - route annotation context menu changes through `AnnotationViewModel`
-- `OakReader/Views/Viewer/AreaSelectionPopupPanel.swift` - route area annotations through `AnnotationViewModel`
+- `app/Models/AnnotationModel.swift` - replace runtime-only snapshot with canonical model or add separate canonical model
+- `app/Models/DatabaseRecords.swift` - add `AnnotationRecord`
+- `app/Services/CatalogDatabase.swift` - add annotation migrations and indexes
+- `app/Services/AnnotationStore.swift` - new DB service
+- `app/ViewModels/AnnotationViewModel.swift` - becomes mutation boundary and projection coordinator
+- `app/ViewModels/DocumentViewModel.swift` - expose active attachment ID/key, not only item storage key
+- `app/Document/OakReaderDocument.swift` - stop using PDF save for annotation-only edits
+- `app/App/AppState.swift` - pass item and attachment identity into document tabs
+- `app/Views/Sidebar/AnnotationListView.swift` - query store rather than scan PDF pages
+- `app/Views/Annotations/AnnotationPropertyPanel.swift` - route all edits through `AnnotationViewModel`
+- `app/Views/Viewer/PDFViewCoordinator.swift` - route annotation context menu changes through `AnnotationViewModel`
+- `app/Views/Viewer/AreaSelectionPopupPanel.swift` - route area annotations through `AnnotationViewModel`
 - `OakReader/Coordinators/UndoCoordinator.swift` - undo/redo DB annotation operations, then update projection
 - Web snapshot viewer - add JS selection/projector bridge
 - Future EPUB reader - add CFI/projector bridge

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Bundles for the OakReader app's embedded WKWebViews — built into ../../OakReader/Resources/Preview.bundle/js (committed artifacts, no Xcode build phase).",
+  "description": "Bundles for the OakReader app's embedded WKWebViews — built into ../../app/Resources/Preview.bundle/js (committed artifacts, no Xcode build phase).",
   "scripts": {
     "build:defuddle": "rollup -c rollup.defuddle.config.js",
     "build:cite-anchor": "rollup -c rollup.cite-anchor.config.js",

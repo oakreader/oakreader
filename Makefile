@@ -28,16 +28,16 @@ build: generate
 # ---------- Browser Extension ----------
 
 extension-install:
-	cd web && pnpm install
+	pnpm install
 
 extension: extension-install
-	cd web/extension && pnpm build
+	cd extension && pnpm build
 
 extension-dev: extension-install
-	cd web/extension && pnpm dev
+	cd extension && pnpm dev
 
 extension-clean:
-	rm -rf web/extension/.output web/node_modules web/extension/node_modules
+	rm -rf extension/.output node_modules extension/node_modules
 
 # ---------- Clean ----------
 

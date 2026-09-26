@@ -35,7 +35,7 @@ client at all.** It must be rebuilt, which is acceptable because `FTSDatabase`
 already documents it as "fully regenerable from source content".
 
 Resolution: move the identical expansion into userland
-(`web/backend/src/catalog/tokenizer.ts`) and let plain `unicode61` tokenize the
+(`backend/src/catalog/tokenizer.ts`) and let plain `unicode61` tokenize the
 result. Same token stream in, same ranking out. The invariant is that expansion
 must run at **both** index and query time — Swift's `accept()` ignores its
 `FTS5Tokenization` argument, so it behaves identically for both.
@@ -44,7 +44,7 @@ Validation on the real corpus (201,707 chunks, 12 highest-frequency CJK terms,
 2- and 3-character): FTS results **byte-identical** to a `LIKE '%term%'` scan —
 zero false negatives, zero false positives. Reindexing the full corpus in Node
 took **5.8 s**, so the one-time rebuild is a non-event. Locked in by
-`web/backend/test/tokenizer.test.mjs`.
+`backend/test/tokenizer.test.mjs`.
 
 ## Blocker 2 — PDF text extraction — OPEN
 

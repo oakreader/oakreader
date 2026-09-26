@@ -2,7 +2,7 @@ packages:
   - backend
   - extension
   - webviews
-  - www
+  - website
 
 allowBuilds:
   esbuild: true

@@ -276,7 +276,7 @@ actor NodeBackend {
     // MARK: - Discovery
 
     /// The sidecar is a self-contained executable produced by `bun build
-    /// --compile` (web/backend/scripts/build-binary.sh), so the Bun runtime is
+    /// --compile` (backend/scripts/build-binary.sh), so the Bun runtime is
     /// inside it. Nothing is probed on the user's machine: there is no `node`
     /// lookup and no minimum runtime version. This is what Dia ships too — its
     /// agent-server, handler and claude binaries are all compiled the same way.
@@ -287,10 +287,10 @@ actor NodeBackend {
         }
         #if DEBUG
         // Debug builds can run straight out of the checkout.
-        let source = URL(fileURLWithPath: #filePath)  // …/OakReader/Services/Backend/NodeBackend.swift
+        let source = URL(fileURLWithPath: #filePath)  // …/app/Services/Backend/NodeBackend.swift
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent()
-            .appendingPathComponent("web/backend/dist/oak-backend")
+            .appendingPathComponent("backend/dist/oak-backend")
         if FileManager.default.isExecutableFile(atPath: source.path) { return source }
         #endif
         return nil

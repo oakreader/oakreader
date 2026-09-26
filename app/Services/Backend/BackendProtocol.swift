@@ -1,6 +1,6 @@
 import Foundation
 
-/// Swift mirror of the sidecar protocol v2 (web/backend/src/protocol.ts —
+/// Swift mirror of the sidecar protocol v2 (backend/src/protocol.ts —
 /// keep the two in sync). JSONL over stdio, LF-delimited.
 ///
 /// v2: the backend owns the provider catalog, credentials, OAuth, endpoint

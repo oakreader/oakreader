@@ -9,10 +9,10 @@ Delete the one-time, upgrade-only back-compat code that migrates a user's librar
 the **old SwiftData storage** into the current GRDB + filesystem model. In a greenfield
 build (no users coming from a pre-GRDB version) this code is dead weight.
 
-- `OakReader/Services/MigrationService.swift` (~110 lines) — opens the old SwiftData
+- `app/Services/MigrationService.swift` (~110 lines) — opens the old SwiftData
   sqlite directly, copies items/files into the new model, sets
   `oakreader.migration.v1.done`.
-- `OakReader/App/AppDelegate.swift:48-50` — the `migrateIfNeeded()` call on launch.
+- `app/App/AppDelegate.swift:48-50` — the `migrateIfNeeded()` call on launch.
 - The `OldLibraryItem` shim it decodes (lives inside / alongside `MigrationService`).
 
 ## Why this surfaced

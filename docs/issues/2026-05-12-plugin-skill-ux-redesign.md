@@ -239,18 +239,18 @@ This is the simplest path to user-created skills — no marketplace, no install 
 
 | Area | File | Change |
 |------|------|--------|
-| Skill model | `Packages/OakAgent/.../AgentSkill.swift` | Add icon, brandColor fields |
-| Skill model | `Packages/OakAgent/.../FrontmatterParser.swift` | Parse icon, brand-color |
-| Skill model | `Packages/OakAgent/.../Skill.swift` | Conform to SkillPresentable |
-| Skill UI | `OakReader/Views/RightPanel/SkillPickerBar.swift` | Unified list, brand colors |
-| Skill loader | `Packages/OakAgent/.../SkillLoader.swift` | No change (already works) |
-| Plugin model | `OakReader/Models/PluginManifest.swift` | Add interface, mcpServers |
-| Plugin service | `OakReader/Services/PluginService.swift` | Update bundled defs, MCP lifecycle |
-| Plugin UI | New: `OakReader/Views/Settings/PluginManagerView.swift` | Card grid |
+| Skill model | `packages/OakAgent/.../AgentSkill.swift` | Add icon, brandColor fields |
+| Skill model | `packages/OakAgent/.../FrontmatterParser.swift` | Parse icon, brand-color |
+| Skill model | `packages/OakAgent/.../Skill.swift` | Conform to SkillPresentable |
+| Skill UI | `app/Views/RightPanel/SkillPickerBar.swift` | Unified list, brand colors |
+| Skill loader | `packages/OakAgent/.../SkillLoader.swift` | No change (already works) |
+| Plugin model | `app/Models/PluginManifest.swift` | Add interface, mcpServers |
+| Plugin service | `app/Services/PluginService.swift` | Update bundled defs, MCP lifecycle |
+| Plugin UI | New: `app/Views/Settings/PluginManagerView.swift` | Card grid |
 | Plugin skills | New: bundled `skills/` dirs with SKILL.md files | Actual skill content |
-| MCP client | New: `Packages/OakAgent/.../MCPClient.swift` | stdio transport |
-| Chat VM | `OakReader/ViewModels/ChatViewModel.swift` | Register MCP tools |
-| Settings | `OakReader/Views/Settings/AISettingsView.swift` | Link to Plugin Manager |
+| MCP client | New: `packages/OakAgent/.../MCPClient.swift` | stdio transport |
+| Chat VM | `app/ViewModels/ChatViewModel.swift` | Register MCP tools |
+| Settings | `app/Views/Settings/AISettingsView.swift` | Link to Plugin Manager |
 
 ## Comparison: Codex vs OakReader (current → proposed)
 

@@ -1,0 +1,16 @@
+{
+  "name": "oakreader",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "OakReader monorepo root. Swift lives in app/, cli/ and packages/; the portable core and web surfaces are the pnpm workspaces below.",
+  "scripts": {
+    "build:webviews": "pnpm --filter oakreader-webviews build:all",
+    "build:extension": "pnpm --filter oakreader-extension build",
+    "build:backend": "pnpm --filter @oakreader/backend build",
+    "test:backend": "pnpm --filter @oakreader/backend test",
+    "dev:website": "pnpm --filter oakreader-www dev",
+    "build:website": "pnpm --filter oakreader-www build"
+  },
+  "packageManager": "pnpm@10.33.0"
+}

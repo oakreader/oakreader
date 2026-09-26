@@ -13,7 +13,7 @@ final class OakServer {
     /// build can run side by side. They used to share 23119, and because
     /// `allowLocalEndpointReuse` lets a second listener bind an already-owned port
     /// without error, whichever app launched last silently captured every clip.
-    /// The extension probes 23119 first, then 23120 (see `web/extension/src/lib/server.ts`).
+    /// The extension probes 23119 first, then 23120 (see `extension/src/lib/server.ts`).
     #if DEBUG
     private let port: UInt16 = 23120
     #else

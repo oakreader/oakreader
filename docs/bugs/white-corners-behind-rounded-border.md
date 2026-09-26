@@ -6,7 +6,7 @@ In the Library view, the rounded top-left corner (table pane) and top-right corn
 
 ## Location
 
-- **File:** `OakReader/Views/Library/LibraryRootView.swift`
+- **File:** `app/Views/Library/LibraryRootView.swift`
 - **Affected views:** Table pane (top-left corner), Detail content panel (top-right corner)
 
 ## Root cause

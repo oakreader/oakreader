@@ -132,13 +132,13 @@ User: [document content from LLMContextProvider]
 
 ### Affected Areas
 
-- `OakReader/Views/Viewer/MediaViewerView.swift` (extend for audio playback)
-- `OakReader/Views/RightPanel/` (new AudioSummaryListView)
-- `OakReader/ViewModels/` (new AudioSummaryViewModel)
-- `OakReader/Services/` (new AudioSummaryService)
-- `OakReader/Services/ImportService+Audio.swift` (store generated audio)
-- `OakReader/Services/AI/LLMContextProvider.swift` (reuse for context)
-- `Packages/OakVoiceAI/` (expose batch TTS API)
+- `app/Views/Viewer/MediaViewerView.swift` (extend for audio playback)
+- `app/Views/RightPanel/` (new AudioSummaryListView)
+- `app/ViewModels/` (new AudioSummaryViewModel)
+- `app/Services/` (new AudioSummaryService)
+- `app/Services/ImportService+Audio.swift` (store generated audio)
+- `app/Services/AI/LLMContextProvider.swift` (reuse for context)
+- `packages/OakVoiceAI/` (expose batch TTS API)
 
 ---
 
@@ -188,9 +188,9 @@ Optional focus: [user's focus prompt]
 
 ### Affected Areas
 
-- `OakReader/Services/AudioSummaryService.swift` (conversation mode)
-- `OakReader/Views/Viewer/AudioPlayerView.swift` (dual-speaker UI)
-- `Packages/OakVoiceAI/` (multi-voice synthesis, crossfade)
+- `app/Services/AudioSummaryService.swift` (conversation mode)
+- `app/Views/Viewer/AudioPlayerView.swift` (dual-speaker UI)
+- `packages/OakVoiceAI/` (multi-voice synthesis, crossfade)
 
 ---
 
@@ -250,10 +250,10 @@ Expose audio summaries as a Podcast RSS feed so users can listen in Apple Podcas
 
 ### Affected Areas
 
-- New: `OakReader/Services/PodcastFeedService.swift`
-- New: `OakReader/Services/LocalHTTPServer.swift`
-- `OakReader/Views/RightPanel/AudioSummaryListView.swift` (feed button)
-- `OakReader/Services/ShareService.swift` (cloud feed upload, if sharing exists)
+- New: `app/Services/PodcastFeedService.swift`
+- New: `app/Services/LocalHTTPServer.swift`
+- `app/Views/RightPanel/AudioSummaryListView.swift` (feed button)
+- `app/Services/ShareService.swift` (cloud feed upload, if sharing exists)
 
 ---
 
@@ -280,10 +280,10 @@ Generate summaries for multiple items without babysitting.
 
 ### Affected Areas
 
-- New: `OakReader/Services/AudioSummaryQueueService.swift`
-- `OakReader/Views/StatusBar/` (queue progress indicator)
-- `OakReader/Utilities/Preferences.swift` (auto-generate settings)
-- `OakReader/Views/Settings/` (audio summary preferences pane)
+- New: `app/Services/AudioSummaryQueueService.swift`
+- `app/Views/StatusBar/` (queue progress indicator)
+- `app/Utilities/Preferences.swift` (auto-generate settings)
+- `app/Views/Settings/` (audio summary preferences pane)
 
 ---
 

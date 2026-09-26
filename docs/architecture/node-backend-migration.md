@@ -1,14 +1,14 @@
 # Node Backend Migration
 
 Status: **Phases 0–3 done** (this branch; build-green, protocol-tested).
-`Packages/OakAI` is deleted; the Node sidecar (protocol v2) owns providers,
+`packages/OakAI` is deleted; the Node sidecar (protocol v2) owns providers,
 credentials, OAuth, endpoint overrides, and the agentic chat loop. Swift owns
 UI, sessions (JSONL via OakAgent's `SessionStore`), and tool execution
 (`tool_exec` → `tool_result` round-trips). Phase 4 (Windows / shared React
 surfaces) remains.
 
 What moved where:
-- `web/backend` (pi-ai): provider catalog (pi's builtin providers, OakReader ids
+- `backend` (pi-ai): provider catalog (pi's builtin providers, OakReader ids
   preserved — `kimi`↔`moonshotai` mapped), credentials in a 0600 `auth.json`
   (`<dataDir>/backend/`), OAuth login flows (incl. NEW Anthropic-subscription
   sign-in), base-URL overrides + Ollama/LM Studio in `config.json`, the
@@ -17,14 +17,14 @@ What moved where:
   `send(...)` surface + `SessionEvent` semantics) so `ChatViewModel`'s event
   loop is unchanged; `AIProviderCatalog` replaces `ProviderRegistry` +
   `ConfiguredProviderStore` + `LocalProviderStore` + `ProviderEndpointStore`.
-- `Packages/OakAgent` is now LLM-free: tools/skills/sessions/Turn types plus the
+- `packages/OakAgent` is now LLM-free: tools/skills/sessions/Turn types plus the
   tool-call types and `KeychainService` (still used for skill env secrets and
   web-search keys) moved in from OakAI.
 - One-time `BackendCredentialMigrator`: Keychain API keys + UserDefaults
   endpoint/local-provider config → backend. OAuth sign-ins are NOT migrated
   (users re-connect once); thinking *budget* is retired (pi thinking levels).
 
-Verification level: `web/backend/test/protocol.test.mjs` covers ping, the 0600
+Verification level: `backend/test/protocol.test.mjs` covers ping, the 0600
 credential store, catalog serving, id mapping, `get_api_key`, local-provider
 discovery, the full chat loop with a tool_exec/tool_result round-trip against a
 mock OpenAI-compatible SSE server, and override persistence. The embedded
@@ -37,7 +37,7 @@ remains). Bundling a Node runtime into the app is the next follow-up.
 
 ## Goal
 
-Replace the in-process Swift AI stack (`Packages/OakAI` + `Packages/OakAgent`) with a
+Replace the in-process Swift AI stack (`packages/OakAI` + `packages/OakAgent`) with a
 long-lived **Node.js sidecar** built on [pi.dev](https://pi.dev)
 (`@earendil-works/pi-ai` for provider transport, `@earendil-works/pi-agent-core` for the
 agent loop), following the Raycast v2 architecture: thin native shells per platform, one
@@ -49,9 +49,9 @@ shared Node backend, so a future Windows client reuses all AI/business logic.
 │ PDFKit viewer, tabs,       │  │                          │
 │ Keychain, WebViews         │  │                          │
 └─────────┬──────────────────┘  └───────────┬──────────────┘
-          │  JSONL over stdio (typed protocol, defined in web/backend/src/protocol.ts)
+          │  JSONL over stdio (typed protocol, defined in backend/src/protocol.ts)
 ┌─────────┴──────────────────────────────────┴─────────────┐
-│ oak-backend — bundled Node process (pnpm: web/backend)   │
+│ oak-backend — bundled Node process (pnpm: backend)   │
 │ pi-ai (providers/streaming)  ·  pi-agent-core (loop)     │
 └──────────────────────────────────────────────────────────┘
 ```
@@ -80,7 +80,7 @@ shared Node backend, so a future Windows client reuses all AI/business logic.
    uses OakAI symbols imports it explicitly. (Before: 44 files silently depended on the
    transport layer through `import OakAgent`.)
 2. Remove dead `import OakAgent` from `ImportService+PDF.swift` / `+URL.swift`.
-3. New **`CompletionClient` facade** (`OakReader/Services/Backend/`): the single
+3. New **`CompletionClient` facade** (`app/Services/Backend/`): the single
    completion contract for *stateless* AI calls — translation, word define, chat titles,
    Settings "Test Connection". Two implementations:
    - `LocalCompletionClient` — wraps `ProviderRouter`/`StreamChunk` (existing path).
@@ -92,9 +92,9 @@ shared Node backend, so a future Windows client reuses all AI/business logic.
 
 ### Phase 1 — Node sidecar, completion path ✅ this branch
 
-- `web/backend/` (pnpm workspace member): TypeScript, dep `@earendil-works/pi-ai`.
+- `backend/` (pnpm workspace member): TypeScript, dep `@earendil-works/pi-ai`.
   - `src/protocol.ts` — the typed protocol (zod schemas). Swift mirrors these in
-    `OakReader/Services/Backend/BackendProtocol.swift`. **Keep the two in sync.**
+    `app/Services/Backend/BackendProtocol.swift`. **Keep the two in sync.**
   - `src/main.ts` — JSONL loop: `ping` / `complete` / `abort` commands →
     `delta` / `done` / `error` events, keyed by request id.
   - Uses pi-ai **direct API implementations** (`@earendil-works/pi-ai/api/<api-id>`),
@@ -109,7 +109,7 @@ shared Node backend, so a future Windows client reuses all AI/business logic.
   `openaiResponses → openai-responses`, `googleGenerativeAI → google-generative-ai`.
   OakAI's `ProviderInfo.baseURL` stores the *full endpoint* URL; the protocol carries the
   *API base* (endpoint minus the format suffix) because pi-ai appends paths itself.
-- Swift side (`OakReader/Services/Backend/`):
+- Swift side (`app/Services/Backend/`):
   - `NodeBackendProcess` — locate node (bundled later; system node for now), spawn
     `main.cjs`, supervise, restart on crash, kill on quit.
   - `NodeBackendClient` — actor: JSONL framing (split on `\n` only), id correlation,
@@ -147,13 +147,13 @@ node. Adds ~50 MB; do it once Phase 1 proves out.
 - Credentials: file-backed pi `CredentialStore`; one-time Swift-side Keychain export
   hands existing keys to the backend. OAuth (OpenAI PKCE, Copilot device-code) runs in
   Node (pi-ai provider-owned login flows); shell just opens the browser.
-- Delete `Packages/OakAI` + `Packages/OakAgent`. `oak` CLI becomes a client of the same
+- Delete `packages/OakAI` + `packages/OakAgent`. `oak` CLI becomes a client of the same
   sidecar. `OakVoice` gets keys via the backend instead of importing OakAI.
 
 ### Phase 4 — Windows + shared React surfaces
 
 Thin Windows shell speaking the same protocol. Chat/notes/settings panels become shared
-React-in-system-WebView surfaces (extension of the existing `web/webviews` →
+React-in-system-WebView surfaces (extension of the existing `webviews` →
 Preview.bundle pattern). React extensions ride the same Node runtime.
 
 **Consciously out of scope:** the GRDB catalog / FTS / importers stay Swift for now.

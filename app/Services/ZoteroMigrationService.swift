@@ -752,7 +752,7 @@ final class ZoteroMigrationService {
     /// social media. On Zotero import these become `.link` items that open as a live web
     /// tab, instead of a stale static snapshot or a dead "Open in Browser" card.
     /// Matched on the registrable host (exact or subdomain), so `m.youtube.com` counts.
-    /// Keep in sync with `LIVE_WEB_HOSTS` in web/extension/src/lib/translators/url-utils.ts
+    /// Keep in sync with `LIVE_WEB_HOSTS` in extension/src/lib/translators/url-utils.ts
     private static let liveWebHosts: Set<String> = [
         // Video
         "youtube.com", "youtu.be", "vimeo.com", "dailymotion.com", "dai.ly",

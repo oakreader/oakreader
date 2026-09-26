@@ -2,7 +2,7 @@
  * Locating the OakReader clip server.
  *
  * The release build listens on 23119 and the Debug build on 23120, so both can run at
- * the same time (see `OakReader/Services/OakServer.swift`). Probe in that order: when
+ * the same time (see `app/Services/OakServer.swift`). Probe in that order: when
  * both are up, the installed release app wins; when only a dev build is running, clips
  * still land somewhere instead of failing.
  */

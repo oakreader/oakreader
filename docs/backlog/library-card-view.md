@@ -3,7 +3,7 @@
 **Status:** Card grid already shipped (`LibraryCardGridView`). 2026-06-15 corrections **implemented & build-green**: (1) PDF covers now real first-page renders, (2) neutral grey/material placeholder (no per-item color), (3) 16pt gaps. Remaining (designed, not built): the unified web-preview `preview.json` + OG-first chain + text-fallback card for `.html`/`.link`.
 **Created:** 2026-06-15
 **Reference app:** GatherOS (`gatheros.co`, internal name *moodmark*) — see skill `gatheros-source-analysis`
-**Related code:** `OakReader/Views/Library/LibraryCardGridView.swift` (grid + neutral placeholder), `LibraryCoverSweeper.swift` (backfill + `.render` marker), `OakReader/Services/LibraryCoverService.swift` (`generateCover` first-page / `generateHTMLCover` / `generateLinkCover`), `ImportService+PDF.swift`, `ImportService+HTML.swift`, `ImportService+Embed.swift`, `OakReader/Utilities/HTMLMetaParse.swift`; `browser-extension/src/lib/translators/link.ts` (`extractLinkMetadata`)
+**Related code:** `app/Views/Library/LibraryCardGridView.swift` (grid + neutral placeholder), `LibraryCoverSweeper.swift` (backfill + `.render` marker), `app/Services/LibraryCoverService.swift` (`generateCover` first-page / `generateHTMLCover` / `generateLinkCover`), `ImportService+PDF.swift`, `ImportService+HTML.swift`, `ImportService+Embed.swift`, `app/Utilities/HTMLMetaParse.swift`; `browser-extension/src/lib/translators/link.ts` (`extractLinkMetadata`)
 
 ## Implemented 2026-06-15 (the "empty state" fix)
 

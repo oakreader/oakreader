@@ -63,10 +63,10 @@ Both use the same underlying editor component, but they do not yet share a full 
 
 ### Affected Areas
 
-- `OakReader/Services/AI/LLMContextProvider.swift`
-- `OakReader/Views/RightPanel/NotePreviewView.swift`
-- `OakReader/ViewModels/NotesViewModel.swift`
-- `OakReader/Services/MarkdownRenderer.swift`
+- `app/Services/AI/LLMContextProvider.swift`
+- `app/Views/RightPanel/NotePreviewView.swift`
+- `app/ViewModels/NotesViewModel.swift`
+- `app/Services/MarkdownRenderer.swift`
 - `Package.swift` or Xcode test target setup
 
 ---
@@ -100,13 +100,13 @@ Bring the existing Markdown editor closer to Nota-level daily usability before a
 
 ### Affected Areas
 
-- `OakReader/Views/RightPanel/MarkdownTextView.swift`
-- `OakReader/Views/RightPanel/NoteEditorView.swift`
-- `OakReader/Views/Viewer/MarkdownViewerView.swift`
-- `OakReader/ViewModels/NotesViewModel.swift`
-- `OakReader/Services/NoteService.swift`
-- `OakReader/Utilities/Preferences.swift`
-- `OakReader/Views/Settings/NoteSettingsView.swift`
+- `app/Views/RightPanel/MarkdownTextView.swift`
+- `app/Views/RightPanel/NoteEditorView.swift`
+- `app/Views/Viewer/MarkdownViewerView.swift`
+- `app/ViewModels/NotesViewModel.swift`
+- `app/Services/NoteService.swift`
+- `app/Utilities/Preferences.swift`
+- `app/Views/Settings/NoteSettingsView.swift`
 
 ---
 
@@ -139,14 +139,14 @@ Recommendation: keep both user-facing concepts but share a common internal note/
 
 ### Affected Areas
 
-- `OakReader/Models/NoteModel.swift`
-- `OakReader/Models/DatabaseRecords.swift`
-- `OakReader/Services/NoteService.swift`
-- `OakReader/Services/ImportService+Markdown.swift`
-- `OakReader/Views/RightPanel/NoteEditorView.swift`
-- `OakReader/Views/Viewer/MarkdownViewerView.swift`
-- `OakReader/Document/MarkdownDocument.swift`
-- `OakReader/Services/CatalogMigrations.swift`
+- `app/Models/NoteModel.swift`
+- `app/Models/DatabaseRecords.swift`
+- `app/Services/NoteService.swift`
+- `app/Services/ImportService+Markdown.swift`
+- `app/Views/RightPanel/NoteEditorView.swift`
+- `app/Views/Viewer/MarkdownViewerView.swift`
+- `app/Document/MarkdownDocument.swift`
+- `app/Services/CatalogMigrations.swift`
 
 ---
 
@@ -208,13 +208,13 @@ CREATE TABLE note_links (
 
 ### Affected Areas
 
-- New: `OakReader/Services/NoteIndexService.swift`
-- New: `OakReader/Models/NoteBlock.swift`
-- New: `OakReader/Models/NoteLink.swift`
-- `OakReader/Services/CatalogMigrations.swift`
-- `OakReader/ViewModels/NotesViewModel.swift`
-- `OakReader/Services/SemanticIndexService.swift`
-- `OakReader/Views/Sidebar/MarkdownOutlineSidebarView.swift`
+- New: `app/Services/NoteIndexService.swift`
+- New: `app/Models/NoteBlock.swift`
+- New: `app/Models/NoteLink.swift`
+- `app/Services/CatalogMigrations.swift`
+- `app/ViewModels/NotesViewModel.swift`
+- `app/Services/SemanticIndexService.swift`
+- `app/Views/Sidebar/MarkdownOutlineSidebarView.swift`
 
 ---
 
@@ -246,14 +246,14 @@ Citation:   cite_key + page/locator
 
 ### Affected Areas
 
-- `OakReader/Views/Viewer/TextSelectionPopupPanel.swift`
-- `OakReader/Views/Viewer/AreaSelectionPopupPanel.swift`
-- `OakReader/Views/Viewer/WebSelectionPopupPanel.swift`
-- `OakReader/ViewModels/NotesViewModel.swift`
-- `OakReader/Services/NoteService.swift`
-- `OakReader/Services/AnnotationStore.swift`
-- `OakReader/Models/AnnotationPosition.swift`
-- New: `OakReader/Models/SourceReference.swift`
+- `app/Views/Viewer/TextSelectionPopupPanel.swift`
+- `app/Views/Viewer/AreaSelectionPopupPanel.swift`
+- `app/Views/Viewer/WebSelectionPopupPanel.swift`
+- `app/ViewModels/NotesViewModel.swift`
+- `app/Services/NoteService.swift`
+- `app/Services/AnnotationStore.swift`
+- `app/Models/AnnotationPosition.swift`
+- New: `app/Models/SourceReference.swift`
 
 ---
 
@@ -278,12 +278,12 @@ Use the index to make notes easy to find and traverse.
 
 ### Affected Areas
 
-- `OakReader/Views/Library/LibraryRootView.swift`
-- `OakReader/Views/RightPanel/NoteListView.swift`
-- `OakReader/Views/Sidebar/MarkdownOutlineSidebarView.swift`
-- `OakReader/Services/LibraryStore.swift`
-- New: `OakReader/Views/Notes/NoteSearchView.swift`
-- New: `OakReader/Services/NoteMergeService.swift`
+- `app/Views/Library/LibraryRootView.swift`
+- `app/Views/RightPanel/NoteListView.swift`
+- `app/Views/Sidebar/MarkdownOutlineSidebarView.swift`
+- `app/Services/LibraryStore.swift`
+- New: `app/Views/Notes/NoteSearchView.swift`
+- New: `app/Services/NoteMergeService.swift`
 
 ---
 
@@ -308,12 +308,12 @@ Make notes first-class AI context.
 
 ### Affected Areas
 
-- `OakReader/ViewModels/ChatViewModel.swift`
-- `OakReader/Services/AI/LLMContextProvider.swift`
-- `OakReader/Services/AI/SearchTools.swift`
-- `OakReader/Services/SemanticIndexService.swift`
-- `OakReader/Views/RightPanel/ChatInputTextView.swift`
-- `OakReader/Views/RightPanel/MarkdownSelectionPopupPanel.swift`
+- `app/ViewModels/ChatViewModel.swift`
+- `app/Services/AI/LLMContextProvider.swift`
+- `app/Services/AI/SearchTools.swift`
+- `app/Services/SemanticIndexService.swift`
+- `app/Views/RightPanel/ChatInputTextView.swift`
+- `app/Views/RightPanel/MarkdownSelectionPopupPanel.swift`
 
 ---
 
