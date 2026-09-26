@@ -321,8 +321,15 @@ function registerMethods(): void {
   });
 
   peer.onRequest("credentials/get", CredentialsGetParams, async (p) => {
+    // The registry answers for providers it knows, which is how an OAuth
+    // provider's key gets resolved. It knows nothing about a provider with no
+    // models — ElevenLabs and Fish Audio only do voice — so the store itself
+    // is the fallback, and it is the thing actually holding the key either way.
     const auth = await registry.models.getAuth(toPiId(p.providerId));
-    return { apiKey: auth?.auth.apiKey ?? null };
+    if (auth?.auth.apiKey !== undefined) return { apiKey: auth.auth.apiKey };
+
+    const stored = await credentials.read(toPiId(p.providerId));
+    return { apiKey: stored?.type === "api_key" ? stored.key : null };
   });
 
   peer.onRequest("credentials/delete", CredentialsDeleteParams, async (p) => {

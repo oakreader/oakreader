@@ -3,6 +3,7 @@ import OakAgent
 
 /// One-time migration of AI provider configuration into the Node backend:
 /// - API keys from the Keychain (the old OakAI credential store)
+/// - the two voice API keys from UserDefaults (ElevenLabs, Fish Audio)
 /// - base-URL overrides from UserDefaults (`providerEndpoints.v1`)
 /// - local provider URLs from UserDefaults (`localProviders.v1`)
 ///
@@ -10,7 +11,16 @@ import OakAgent
 /// users re-connect once from Settings. Keychain entries are left in place
 /// (harmless, and a downgrade path).
 enum BackendCredentialMigrator {
-    private static let doneKey = "backendCredentialMigration.v1"
+    private static let doneKey = "backendCredentialMigration.v2"
+
+    /// Voice keys that lived in the preferences plist rather than the backend's
+    /// 0600 auth.json. Cleared from UserDefaults once the backend has them —
+    /// unlike the Keychain entries above, which are left as a downgrade path,
+    /// because a plaintext plist is not somewhere to leave a secret lying.
+    private static let voiceKeys: [(defaultsKey: String, providerId: String)] = [
+        ("elevenLabsAPIKey", "elevenlabs"),
+        ("fishAudioAPIKey", "fishaudio"),
+    ]
 
     static func runIfNeeded() async {
         guard !UserDefaults.standard.bool(forKey: doneKey) else { return }
@@ -27,7 +37,19 @@ enum BackendCredentialMigrator {
             }
         }
 
-        // 2. Endpoint overrides (providerId → raw base URL, `#` marker preserved).
+        // 2. Voice keys: UserDefaults → backend, then out of UserDefaults. The
+        //    old copy goes only after the new one is stored, so a failed write
+        //    leaves the key where it was and the migration runs again.
+        for entry in voiceKeys {
+            let key = (UserDefaults.standard.string(forKey: entry.defaultsKey) ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !key.isEmpty else { continue }
+            if await catalog.setAPIKey(key, providerId: entry.providerId) == nil {
+                UserDefaults.standard.removeObject(forKey: entry.defaultsKey)
+            }
+        }
+
+        // 3. Endpoint overrides (providerId → raw base URL, `#` marker preserved).
         if let data = UserDefaults.standard.data(forKey: "providerEndpoints.v1"),
            let overrides = try? JSONDecoder().decode([String: String].self, from: data) {
             for (providerId, baseUrl) in overrides where !baseUrl.isEmpty {
@@ -35,7 +57,7 @@ enum BackendCredentialMigrator {
             }
         }
 
-        // 3. Local providers (Ollama / LM Studio server URLs).
+        // 4. Local providers (Ollama / LM Studio server URLs).
         struct LocalConfig: Decodable { var apiBase: String }
         if let data = UserDefaults.standard.data(forKey: "localProviders.v1"),
            let configs = try? JSONDecoder().decode([String: LocalConfig].self, from: data) {

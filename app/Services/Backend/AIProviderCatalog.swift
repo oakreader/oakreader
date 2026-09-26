@@ -80,6 +80,13 @@ final class AIProviderCatalog {
             for pid in ["openai", "google"] where provider(for: pid)?.auth.configured == true {
                 keys[pid] = await Self.apiKey(for: pid)
             }
+            // ElevenLabs and Fish Audio only do voice, so they never appear in
+            // the provider list and cannot be gated on it — but their keys
+            // live in the same 0600 auth.json as everyone else's, which is
+            // the point: one credential store, not one plus UserDefaults.
+            for pid in ["elevenlabs", "fishaudio"] {
+                keys[pid] = await Self.apiKey(for: pid)
+            }
             sharedVoiceKeys = keys.compactMapValues { $0 }
         } catch {
             backendError = error.localizedDescription

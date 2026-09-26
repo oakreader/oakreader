@@ -62,6 +62,8 @@ struct AudioSettingsView: View {
     @State private var geminiAPIKey: String = ""
     @State private var originalOpenAIAPIKey: String = ""
     @State private var originalGeminiAPIKey: String = ""
+    @State private var originalElevenLabsAPIKey: String = ""
+    @State private var originalFishAudioAPIKey: String = ""
 
     // Base URL overrides (proxy / relay) for OpenAI & Gemini voice
     @State private var openAIBaseURL: String = ""
@@ -100,14 +102,17 @@ struct AudioSettingsView: View {
         _fishAudioReferenceId = State(initialValue: prefs.fishAudioReferenceId)
 
         // Inline API keys
-        _elevenLabsAPIKey = State(initialValue: prefs.elevenLabsAPIKey)
-        _fishAudioAPIKey = State(initialValue: prefs.fishAudioAPIKey)
-        let openAIKey = AIProviderCatalog.shared.sharedVoiceKeys["openai"] ?? ""
-        let geminiKey = AIProviderCatalog.shared.sharedVoiceKeys["google"] ?? ""
+        let voiceKeys = AIProviderCatalog.shared.sharedVoiceKeys
+        _elevenLabsAPIKey = State(initialValue: voiceKeys["elevenlabs"] ?? "")
+        _fishAudioAPIKey = State(initialValue: voiceKeys["fishaudio"] ?? "")
+        let openAIKey = voiceKeys["openai"] ?? ""
+        let geminiKey = voiceKeys["google"] ?? ""
         _openAIAPIKey = State(initialValue: openAIKey)
         _geminiAPIKey = State(initialValue: geminiKey)
         _originalOpenAIAPIKey = State(initialValue: openAIKey)
         _originalGeminiAPIKey = State(initialValue: geminiKey)
+        _originalElevenLabsAPIKey = State(initialValue: voiceKeys["elevenlabs"] ?? "")
+        _originalFishAudioAPIKey = State(initialValue: voiceKeys["fishaudio"] ?? "")
 
         // Base URL overrides
         _openAIBaseURL = State(initialValue: prefs.voiceBaseURL(forProvider: "openai"))
@@ -652,20 +657,20 @@ struct AudioSettingsView: View {
         prefs.geminiTTSVoice = geminiTTSVoice
         prefs.fishAudioReferenceId = fishAudioReferenceId.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        // Inline API keys
-        prefs.elevenLabsAPIKey = elevenLabsAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        prefs.fishAudioAPIKey = fishAudioAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        // OpenAI / Gemini keys share the chat provider's backend credential. Only write
-        // when changed and non-empty so clearing the field never wipes the chat key.
-        let trimmedOpenAI = openAIAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedGemini = geminiAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Every key goes to the backend's credential store. Written only when
+        // changed and non-empty, so clearing a field never silently wipes a key
+        // that a chat provider is also using.
+        let keys: [(value: String, original: String, providerId: String)] = [
+            (elevenLabsAPIKey, originalElevenLabsAPIKey, "elevenlabs"),
+            (fishAudioAPIKey, originalFishAudioAPIKey, "fishaudio"),
+            (openAIAPIKey, originalOpenAIAPIKey, "openai"),
+            (geminiAPIKey, originalGeminiAPIKey, "google"),
+        ]
         Task { @MainActor in
-            if trimmedOpenAI != originalOpenAIAPIKey, !trimmedOpenAI.isEmpty {
-                _ = await AIProviderCatalog.shared.setAPIKey(trimmedOpenAI, providerId: "openai")
-            }
-            if trimmedGemini != originalGeminiAPIKey, !trimmedGemini.isEmpty {
-                _ = await AIProviderCatalog.shared.setAPIKey(trimmedGemini, providerId: "google")
+            for key in keys {
+                let trimmed = key.value.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard trimmed != key.original, !trimmed.isEmpty else { continue }
+                _ = await AIProviderCatalog.shared.setAPIKey(trimmed, providerId: key.providerId)
             }
         }
 

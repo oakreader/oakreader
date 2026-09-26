@@ -2,23 +2,27 @@ import Foundation
 import OakAgent
 import OakVoice
 
-/// Builds cloud voice (TTS/STT) providers from user preferences, resolving API
-/// keys from the shared credential store where the provider doubles as a chat
-/// provider (OpenAI, Gemini) and from Preferences otherwise (ElevenLabs, Fish).
+/// Builds cloud voice (TTS/STT) providers from user preferences.
+///
+/// Every key comes from the backend's credential store now. ElevenLabs and
+/// Fish Audio used to keep theirs in UserDefaults — a plain plist in the user's
+/// home — while OpenAI's and Google's sat in a 0600 auth.json. One secret store
+/// or the other; having both meant the weaker one decided how safe the keys
+/// were.
 enum VoiceProviderFactory {
+    /// The credential-store id for a voice provider.
+    static func credentialId(for type: VoiceProviderType) -> String {
+        switch type {
+        case .elevenLabs: return "elevenlabs"
+        case .fishAudio:  return "fishaudio"
+        case .openAI:     return "openai"
+        case .gemini:     return "google"
+        }
+    }
+
     /// Resolve the API key for a voice provider, or nil if not configured.
     static func apiKey(for type: VoiceProviderType) -> String? {
-        let prefs = Preferences.shared
-        switch type {
-        case .elevenLabs:
-            return prefs.elevenLabsAPIKey.isEmpty ? nil : prefs.elevenLabsAPIKey
-        case .fishAudio:
-            return prefs.fishAudioAPIKey.isEmpty ? nil : prefs.fishAudioAPIKey
-        case .openAI:
-            return AIProviderCatalog.shared.sharedVoiceKeys["openai"]
-        case .gemini:
-            return AIProviderCatalog.shared.sharedVoiceKeys["google"]
-        }
+        AIProviderCatalog.shared.sharedVoiceKeys[credentialId(for: type)]
     }
 
     // MARK: - TTS

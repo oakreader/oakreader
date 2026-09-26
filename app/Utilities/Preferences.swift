@@ -115,12 +115,10 @@ final class Preferences {
         // Cloud voice providers
         static let voiceSTTProvider = "voiceSTTProvider"
         static let voiceTTSProvider = "voiceTTSProvider"
-        static let elevenLabsAPIKey = "elevenLabsAPIKey"
         static let elevenLabsVoiceId = "elevenLabsVoiceId"
         static let elevenLabsTTSModelId = "elevenLabsTTSModelId"
         static let openAITTSVoice = "openAITTSVoice"
         static let geminiTTSVoice = "geminiTTSVoice"
-        static let fishAudioAPIKey = "fishAudioAPIKey"
         static let fishAudioReferenceId = "fishAudioReferenceId"
         // Disabled models
         static let disabledModelIds = "disabledModelIds"
@@ -480,12 +478,6 @@ final class Preferences {
         set { defaults.set(newValue, forKey: Keys.voiceTTSProvider) }
     }
 
-    /// ElevenLabs API key (shared by STT and TTS).
-    var elevenLabsAPIKey: String {
-        get { defaults.string(forKey: Keys.elevenLabsAPIKey) ?? "" }
-        set { defaults.set(newValue, forKey: Keys.elevenLabsAPIKey) }
-    }
-
     /// ElevenLabs voice ID for TTS.
     var elevenLabsVoiceId: String {
         get { defaults.string(forKey: Keys.elevenLabsVoiceId) ?? "" }
@@ -508,12 +500,6 @@ final class Preferences {
     var geminiTTSVoice: String {
         get { defaults.string(forKey: Keys.geminiTTSVoice) ?? "Kore" }
         set { defaults.set(newValue, forKey: Keys.geminiTTSVoice) }
-    }
-
-    /// Fish Audio API key (shared by STT and TTS).
-    var fishAudioAPIKey: String {
-        get { defaults.string(forKey: Keys.fishAudioAPIKey) ?? "" }
-        set { defaults.set(newValue, forKey: Keys.fishAudioAPIKey) }
     }
 
     /// Fish Audio voice model reference id (empty uses the account default).
