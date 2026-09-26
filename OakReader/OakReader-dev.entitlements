@@ -15,7 +15,7 @@
 	     contributor's Apple ID — or an ad-hoc build with no account — cannot
 	     grant (AMFI would SIGKILL the app at launch). Dropping it here is what
 	     lets anyone build OakReader locally. Debug builds store credentials in
-	     the login keychain instead; see OakAI/KeychainConfig.swift (`#if DEBUG`).
+	     the login keychain instead; see OakAgent/KeychainConfig.swift (`#if DEBUG`).
 	     The Release build keeps the access group in OakReader.entitlements. -->
 </dict>
 </plist>

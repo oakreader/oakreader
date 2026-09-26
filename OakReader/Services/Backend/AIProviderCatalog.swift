@@ -2,7 +2,8 @@ import Foundation
 
 /// App-side mirror of the backend's provider catalog. Replaces the old
 /// `ProviderRegistry` + `ConfiguredProviderStore` + `LocalProviderStore` +
-/// `ProviderEndpointStore` quartet: the backend (`list_providers`) is the
+/// `ProviderEndpointStore` quartet, all deleted with OakAI: the backend
+/// (`list_providers`) is the
 /// single source of truth; this store caches it for synchronous SwiftUI reads
 /// and proxies every mutation back to the backend.
 @Observable

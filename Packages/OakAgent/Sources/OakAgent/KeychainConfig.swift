@@ -1,8 +1,7 @@
 import Foundation
 import Security
 
-/// Shared Keychain configuration for every OakAI credential store
-/// (`KeychainService`, `OAuthTokenStore`).
+/// Shared Keychain configuration for `KeychainService`.
 ///
 /// All items are written to the **data-protection keychain** and scoped to a
 /// team-stable access group rather than the file-based login keychain's
@@ -32,7 +31,7 @@ enum KeychainConfig {
     ///   group is unavailable; without that, setting `kSecAttrAccessGroup` would
     ///   fail with `errSecMissingEntitlement`. Keys persist across rebuilds as
     ///   long as the dev signing identity is stable; otherwise inject them via
-    ///   the provider env vars (see `CredentialResolver`).
+    ///   the provider env vars, which the sidecar also reads.
     static func scoped(_ query: [String: Any]) -> [String: Any] {
         var q = query
         #if !DEBUG

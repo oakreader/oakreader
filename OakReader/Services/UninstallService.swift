@@ -30,7 +30,7 @@ enum UninstallService {
     }
 
     /// Keychain access group shared by every OakReader credential (must match
-    /// the `keychain-access-groups` entitlement and `OakAI.KeychainConfig`).
+    /// the `keychain-access-groups` entitlement and `OakAgent.KeychainConfig`).
     private static let keychainAccessGroup = "5Y27G7B6D8.com.oakreader.keys"
 
     // MARK: - Orchestration

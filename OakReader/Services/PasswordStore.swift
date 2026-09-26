@@ -15,7 +15,7 @@ struct WebCredential: Identifiable, Hashable {
 /// (`kSecAttrServer`) + username (`kSecAttrAccount`), so they're isolated per
 /// site and visible in Keychain Access. This mirrors how every third-party
 /// WKWebView browser handles passwords — the system autofill UI is reserved for
-/// Safari, so we roll our own. Same Keychain approach as `CredentialResolver`.
+/// Safari, so we roll our own. Same Keychain approach as `KeychainService`.
 enum PasswordStore {
     /// Save (or update) a credential for a host.
     @discardableResult

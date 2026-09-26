@@ -59,8 +59,8 @@ final class WebSearchProviderRegistry: @unchecked Sendable {
 
     /// Resolve API key for a web search provider.
     /// Fallback chain: Keychain → environment variable → nil.
-    /// (CredentialResolver.resolve only checks env vars for ProviderRegistry-registered LLM providers,
-    /// so web search providers need this explicit env var check.)
+    /// (LLM provider credentials live in the sidecar now; web search providers
+    /// are resolved here, so they need this explicit env var check.)
     static func resolveAPIKey(for provider: any WebSearchProvider) -> String? {
         // 1. Keychain
         if let key = KeychainService.apiKey(forProviderId: provider.id), !key.isEmpty {

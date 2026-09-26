@@ -6,7 +6,7 @@
 // signing team, which a contributor's account can't grant (and an ad-hoc build
 // has none) — dropping it is what lets ANY team, or no account, build OakReader.
 // In Debug, API keys fall back to the login keychain / provider env vars; see
-// OakAI/KeychainConfig.swift (the `#if DEBUG` branch).
+// OakAgent/KeychainConfig.swift (the `#if DEBUG` branch).
 DEVELOPER_ENTITLEMENTS = -dev
 CODE_SIGN_ENTITLEMENTS = OakReader/OakReader$(DEVELOPER_ENTITLEMENTS).entitlements
 
