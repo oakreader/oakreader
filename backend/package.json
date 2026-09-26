@@ -18,6 +18,7 @@
   "dependencies": {
     "@earendil-works/pi-agent-core": "^0.85.1",
     "@earendil-works/pi-ai": "^0.85.1",
+    "any-ascii": "^0.3.3",
     "defuddle": "^0.18.1",
     "linkedom": "^0.18.13",
     "turndown": "^7.2.4",

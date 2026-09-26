@@ -170,7 +170,7 @@ final class AppState {
             Self.reportUnopenableCatalog(error)
         }
         self.libraryStore = LibraryStore(database: database)
-        self.referenceService = ReferenceService(database: database)
+        self.referenceService = ReferenceService()
         self.importService = ImportService(store: libraryStore, coverService: coverService, referenceService: referenceService)
         startAutosaveTimer()
 

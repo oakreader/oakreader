@@ -73,6 +73,11 @@ enum RPC {
         static let itemsSetTrashed = "catalog/items/setTrashed"
         static let itemsRemove = "catalog/items/remove"
         static let itemsMerge = "catalog/items/merge"
+        static let referencesGet = "catalog/references/get"
+        static let referencesSave = "catalog/references/save"
+        static let citeKeysPropose = "catalog/citeKeys/propose"
+        static let citeKeysAssign = "catalog/citeKeys/assign"
+        static let citeKeysSave = "catalog/citeKeys/save"
         static let propertiesList = "catalog/properties/list"
         static let propertiesUpsert = "catalog/properties/upsert"
         static let propertiesDelete = "catalog/properties/delete"
@@ -419,6 +424,60 @@ enum RPC {
         var at: String
     }
     struct ItemsMergeResult: Decodable {
+        init() {}
+    }
+
+    // MARK: catalog/references/get
+    /// An item's CSL JSON, or null when it has no citation.
+    struct ReferencesGetParams: Encodable {
+        var itemId: String
+    }
+    struct ReferencesGetResult: Decodable {
+        var cslJson: String?
+    }
+
+    // MARK: catalog/references/save
+    /// Save an item's metadata: the citation, the columns derived from it, the item's own author
+    /// and title, and a cite key if it had none.
+    struct ReferencesSaveParams: Encodable {
+        var itemId: String
+        var cslJson: String
+        var extra: String?
+        var at: String
+    }
+    struct ReferencesSaveResult: Decodable {
+        init() {}
+    }
+
+    // MARK: catalog/citeKeys/propose
+    /// The key this item's current metadata would produce, without writing it. Null when there is
+    /// not enough metadata to form one.
+    struct CiteKeysProposeParams: Encodable {
+        var itemId: String
+    }
+    struct CiteKeysProposeResult: Decodable {
+        var key: String?
+    }
+
+    // MARK: catalog/citeKeys/assign
+    /// Give an item a cite key unless it already has one. Returns the key it settled on, or null
+    /// when the metadata cannot form one.
+    struct CiteKeysAssignParams: Encodable {
+        var itemId: String
+        var at: String
+    }
+    struct CiteKeysAssignResult: Decodable {
+        var key: String?
+    }
+
+    // MARK: catalog/citeKeys/save
+    /// Save a key the user typed. Fails if another item already uses it.
+    struct CiteKeysSaveParams: Encodable {
+        var key: String
+        var itemId: String
+        var at: String
+    }
+    struct CiteKeysSaveResult: Decodable {
         init() {}
     }
 

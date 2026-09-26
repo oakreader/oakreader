@@ -194,11 +194,13 @@ struct LibrarySidebarPanel: View {
         if !item.author.isEmpty {
             csl.author = [CSLName(family: item.author, given: nil)]
         }
-        do {
-            try appState.referenceService.saveMetadata(csl, forItemId: item.id.uuidString)
-            store.invalidate()
-        } catch {
-            Log.error(Log.store, "Failed to create empty reference metadata: \(error)")
+        Task { @MainActor in
+            do {
+                try await appState.referenceService.saveMetadata(csl, forItemId: item.id.uuidString)
+                store.invalidate()
+            } catch {
+                Log.error(Log.store, "Failed to create empty reference metadata: \(error)")
+            }
         }
     }
 

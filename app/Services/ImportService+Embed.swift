@@ -108,8 +108,12 @@ extension ImportService {
             csl.author = [CSLName(family: input.author, given: nil)]
         }
         csl.URL = input.sourceURL.absoluteString
-        try? referenceService.saveMetadata(csl, forItemId: docId.uuidString)
-        store.invalidate()
+        // Fired rather than awaited: the import returns the item now, and the
+        // reload that follows the save is what shows its metadata.
+        Task { @MainActor in
+            try? await referenceService.saveMetadata(csl, forItemId: docId.uuidString)
+            store.invalidate()
+        }
 
         // Derive the cover off the main thread. For YouTube we ALWAYS derive the poster from the
         // video id (16:9 maxresdefault) and ignore any supplied thumbnail — a watch page's

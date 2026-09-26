@@ -33,6 +33,16 @@ extension LibraryStore {
         loadedTrashedItems.first { $0.id == id }
     }
 
+    /// Insert an item with its first attachment.
+    ///
+    /// Still a direct write, and the last one in this store. The import
+    /// pipeline that calls it is synchronous from the drop handler down, so
+    /// routing this through the core means making seven entry points async —
+    /// that is its own step, not a rider on this one.
+    ///
+    /// The cite key is assigned by the core afterwards rather than inline. The
+    /// returned item therefore has no key yet; the reload that `invalidate()`
+    /// triggers brings it back with one.
     func insertItem(_ record: ItemRecord, attachment: AttachmentRecord) -> LibraryItem? {
         do {
             var rec = record
@@ -41,14 +51,9 @@ extension LibraryStore {
                 try rec.insert(db)
                 try attRec.insert(db)
             }
-            // Auto-assign cite key for the new item
-            let citeKeyService = CiteKeyService(database: database)
-            try? citeKeyService.assignCiteKey(forItemId: rec.id)
-            // Re-read to pick up the assigned cite key
-            if let updated = try? database.dbQueue.read({ db in
-                try ItemRecord.fetchOne(db, key: rec.id)
-            }) {
-                rec = updated
+            Task { @MainActor in
+                await ReferenceCatalog.assignCiteKey(forItemId: rec.id)
+                self.invalidate()
             }
             invalidate()
             let att = Attachment(record: attRec, itemStorageKey: rec.storageKey)

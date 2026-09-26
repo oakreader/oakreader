@@ -337,6 +337,49 @@ export const METHODS: Method[] = [
   },
 
   {
+    name: "catalog/references/get", type: "ReferencesGet", kind: "request", from: "client",
+    doc: "An item's CSL JSON, or null when it has no citation.",
+    params: [{ name: "itemId", type: str }],
+    result: [{ name: "cslJson", type: str, optional: true, nullable: true }],
+  },
+  {
+    name: "catalog/references/save", type: "ReferencesSave", kind: "request", from: "client",
+    doc: "Save an item's metadata: the citation, the columns derived from it, " +
+         "the item's own author and title, and a cite key if it had none.",
+    params: [
+      { name: "itemId", type: str },
+      { name: "cslJson", type: str },
+      { name: "extra", type: str, optional: true, nullable: true },
+      { name: "at", type: str },
+    ],
+    result: [],
+  },
+  {
+    name: "catalog/citeKeys/propose", type: "CiteKeysPropose", kind: "request", from: "client",
+    doc: "The key this item's current metadata would produce, without writing " +
+         "it. Null when there is not enough metadata to form one.",
+    params: [{ name: "itemId", type: str }],
+    result: [{ name: "key", type: str, optional: true, nullable: true }],
+  },
+  {
+    name: "catalog/citeKeys/assign", type: "CiteKeysAssign", kind: "request", from: "client",
+    doc: "Give an item a cite key unless it already has one. Returns the key " +
+         "it settled on, or null when the metadata cannot form one.",
+    params: [{ name: "itemId", type: str }, { name: "at", type: str }],
+    result: [{ name: "key", type: str, optional: true, nullable: true }],
+  },
+  {
+    name: "catalog/citeKeys/save", type: "CiteKeysSave", kind: "request", from: "client",
+    doc: "Save a key the user typed. Fails if another item already uses it.",
+    params: [
+      { name: "key", type: str },
+      { name: "itemId", type: str },
+      { name: "at", type: str },
+    ],
+    result: [],
+  },
+
+  {
     name: "catalog/properties/list", type: "PropertiesList", kind: "request", from: "client",
     doc: "Every property with its options, both in display order.",
     params: [],

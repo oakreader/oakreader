@@ -331,6 +331,53 @@ export const ItemsMergeParams = z.object({
 export type ItemsMergeParams = z.infer<typeof ItemsMergeParams>;
 export type ItemsMergeResult = Record<string, never>;
 
+/** `catalog/references/get` — An item's CSL JSON, or null when it has no citation. */
+export const ReferencesGetParams = z.object({
+  itemId: z.string(),
+});
+export type ReferencesGetParams = z.infer<typeof ReferencesGetParams>;
+export type ReferencesGetResult = {
+  cslJson?: string | null;
+};
+
+/** `catalog/references/save` — Save an item's metadata: the citation, the columns derived from it, the item's own author and title, and a cite key if it had none. */
+export const ReferencesSaveParams = z.object({
+  itemId: z.string(),
+  cslJson: z.string(),
+  extra: z.string().nullable().optional(),
+  at: z.string(),
+});
+export type ReferencesSaveParams = z.infer<typeof ReferencesSaveParams>;
+export type ReferencesSaveResult = Record<string, never>;
+
+/** `catalog/citeKeys/propose` — The key this item's current metadata would produce, without writing it. Null when there is not enough metadata to form one. */
+export const CiteKeysProposeParams = z.object({
+  itemId: z.string(),
+});
+export type CiteKeysProposeParams = z.infer<typeof CiteKeysProposeParams>;
+export type CiteKeysProposeResult = {
+  key?: string | null;
+};
+
+/** `catalog/citeKeys/assign` — Give an item a cite key unless it already has one. Returns the key it settled on, or null when the metadata cannot form one. */
+export const CiteKeysAssignParams = z.object({
+  itemId: z.string(),
+  at: z.string(),
+});
+export type CiteKeysAssignParams = z.infer<typeof CiteKeysAssignParams>;
+export type CiteKeysAssignResult = {
+  key?: string | null;
+};
+
+/** `catalog/citeKeys/save` — Save a key the user typed. Fails if another item already uses it. */
+export const CiteKeysSaveParams = z.object({
+  key: z.string(),
+  itemId: z.string(),
+  at: z.string(),
+});
+export type CiteKeysSaveParams = z.infer<typeof CiteKeysSaveParams>;
+export type CiteKeysSaveResult = Record<string, never>;
+
 /** `catalog/properties/list` — Every property with its options, both in display order. */
 export const PropertiesListParams = z.object({
 });
@@ -543,6 +590,11 @@ export const ClientRequests = {
   "catalog/items/setTrashed": ItemsSetTrashedParams,
   "catalog/items/remove": ItemsRemoveParams,
   "catalog/items/merge": ItemsMergeParams,
+  "catalog/references/get": ReferencesGetParams,
+  "catalog/references/save": ReferencesSaveParams,
+  "catalog/citeKeys/propose": CiteKeysProposeParams,
+  "catalog/citeKeys/assign": CiteKeysAssignParams,
+  "catalog/citeKeys/save": CiteKeysSaveParams,
   "catalog/properties/list": PropertiesListParams,
   "catalog/properties/upsert": PropertiesUpsertParams,
   "catalog/properties/delete": PropertiesDeleteParams,
@@ -599,6 +651,11 @@ export interface ClientRequestResults {
   "catalog/items/setTrashed": ItemsSetTrashedResult;
   "catalog/items/remove": ItemsRemoveResult;
   "catalog/items/merge": ItemsMergeResult;
+  "catalog/references/get": ReferencesGetResult;
+  "catalog/references/save": ReferencesSaveResult;
+  "catalog/citeKeys/propose": CiteKeysProposeResult;
+  "catalog/citeKeys/assign": CiteKeysAssignResult;
+  "catalog/citeKeys/save": CiteKeysSaveResult;
   "catalog/properties/list": PropertiesListResult;
   "catalog/properties/upsert": PropertiesUpsertResult;
   "catalog/properties/delete": PropertiesDeleteResult;

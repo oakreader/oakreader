@@ -81,7 +81,7 @@ struct ReferenceMetadataView: View {
                 if let foundDOI = DOIExtractorService.extractDOI(from: item.fileURL) {
                     do {
                         let cslItem = try await CrossRefService.fetchMetadata(doi: foundDOI)
-                        try referenceService.saveMetadata(cslItem, forItemId: item.id.uuidString)
+                        try await referenceService.saveMetadata(cslItem, forItemId: item.id.uuidString)
                         await MainActor.run {
                             store.invalidate()
                             if let title = cslItem.title, !title.isEmpty { onTitleChange?(title) }
@@ -570,14 +570,16 @@ struct ReferenceMetadataView: View {
 
     private func saveDebounced() {
         let csl = buildCSLItem()
-        do {
-            try referenceService.saveMetadata(csl, forItemId: item.id.uuidString)
-            store.invalidate()
-            if let title = csl.title, !title.isEmpty {
-                onTitleChange?(title)
+        Task { @MainActor in
+            do {
+                try await referenceService.saveMetadata(csl, forItemId: item.id.uuidString)
+                store.invalidate()
+                if let title = csl.title, !title.isEmpty {
+                    onTitleChange?(title)
+                }
+            } catch {
+                Log.error(Log.store, "Failed to save reference metadata: \(error)")
             }
-        } catch {
-            Log.error(Log.store, "Failed to save reference metadata: \(error)")
         }
     }
 
@@ -596,40 +598,36 @@ struct ReferenceMetadataView: View {
         }
     }
 
-    /// Compute the cite key the item *would* get from its current metadata. If it differs
-    /// from the stored key, count how many chat citations reference the old key and ask the
-    /// user to confirm before committing. The DB read and the chat-history scan run off the
-    /// main thread so the panel never hitches on a large library.
+    /// Offer the cite key the item's current metadata would produce.
+    ///
+    /// The proposal comes from the core, which computes it and checks it
+    /// against every other key in one pass — the panel only asks, and shows a
+    /// confirmation before anything is renamed.
     private func prepareRegenerate() {
         guard !isRegenerating else { return }
         citeKeyError = nil
         citeKeyInfo = nil
         isRegenerating = true
-        let database = store.database
         let itemId = item.id.uuidString
         let current = citeKeyText.trimmingCharacters(in: .whitespaces)
-        Task.detached {
-            let service = CiteKeyService(database: database)
-            let proposed = (try? service.proposedKey(forItemId: itemId)) ?? nil
-            let isChange = proposed != nil && !proposed!.isEmpty && proposed != current
-            _ = isChange
-            await MainActor.run {
-                isRegenerating = false
-                guard let proposed, !proposed.isEmpty else {
-                    citeKeyInfo = "Not enough metadata to generate a cite key."
-                    return
-                }
-                guard proposed != current else {
-                    citeKeyInfo = "Already up to date."
-                    return
-                }
-                pendingRegenKey = proposed
-                showRegenConfirm = true
+        Task { @MainActor in
+            let proposed = await ReferenceCatalog.proposedCiteKey(forItemId: itemId)
+            isRegenerating = false
+            guard let proposed, !proposed.isEmpty else {
+                citeKeyInfo = "Not enough metadata to generate a cite key."
+                return
             }
+            guard proposed != current else {
+                citeKeyInfo = "Already up to date."
+                return
+            }
+            pendingRegenKey = proposed
+            showRegenConfirm = true
         }
     }
 
-    /// Write the new key off the main thread and surface any write failure.
+    /// Commit the rename, surfacing a clash rather than silently picking
+    /// another key.
     ///
     /// Renaming a cite key used to have to rewrite every `oak://cite/{key}` link in every
     /// stored transcript, because the key was baked into the citation URL. Citations now
@@ -637,29 +635,20 @@ struct ReferenceMetadataView: View {
     /// stable item id, so a rename is invisible to them and nothing needs rewriting.
     private func commitRegenerate(to newKey: String) {
         guard !isRegenerating else { return }
-        let database = store.database
         let itemId = item.id.uuidString
         isRegenerating = true
-        Task.detached {
-            let saveError: String? = {
-                do {
-                    try CiteKeyService(database: database).saveCiteKey(newKey, forItemId: itemId)
-                    return nil
-                } catch {
-                    return error.localizedDescription
-                }
-            }()
-            await MainActor.run {
-                isRegenerating = false
-                if let saveError {
-                    citeKeyError = saveError
-                    return
-                }
-                citeKeyText = newKey
-                citeKeyError = nil
-                citeKeyInfo = nil
-                store.invalidate()
+        Task { @MainActor in
+            defer { isRegenerating = false }
+            do {
+                try await ReferenceCatalog.saveCiteKey(newKey, forItemId: itemId)
+            } catch {
+                citeKeyError = error.localizedDescription
+                return
             }
+            citeKeyText = newKey
+            citeKeyError = nil
+            citeKeyInfo = nil
+            store.invalidate()
         }
     }
 
@@ -670,7 +659,7 @@ struct ReferenceMetadataView: View {
         Task {
             do {
                 let cslItem = try await CrossRefService.fetchMetadata(doi: doi)
-                try referenceService.saveMetadata(cslItem, forItemId: item.id.uuidString)
+                try await referenceService.saveMetadata(cslItem, forItemId: item.id.uuidString)
                 await MainActor.run {
                     store.invalidate()
                     if let title = cslItem.title, !title.isEmpty { onTitleChange?(title) }
@@ -689,11 +678,13 @@ struct ReferenceMetadataView: View {
         if !item.author.isEmpty {
             csl.author = [CSLName(family: item.author, given: nil)]
         }
-        do {
-            try referenceService.saveMetadata(csl, forItemId: item.id.uuidString)
-            store.invalidate()
-        } catch {
-            Log.error(Log.store, "Failed to create empty reference metadata: \(error)")
+        Task { @MainActor in
+            do {
+                try await referenceService.saveMetadata(csl, forItemId: item.id.uuidString)
+                store.invalidate()
+            } catch {
+                Log.error(Log.store, "Failed to create empty reference metadata: \(error)")
+            }
         }
     }
 }

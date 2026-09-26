@@ -1,94 +1,27 @@
 import Foundation
-import GRDB
 
-/// Stateless service for reference metadata CRUD operations.
-/// Stores CSL JSON as the canonical representation in the `citations` table.
+/// Reference metadata, on its way to and from the core.
+///
+/// What remains here is the parsing that has no business in a catalog: reading
+/// Zotero's free-text `extra` block, where a line like "DOI: 10.1000/x" stands
+/// in for a CSL field. The rows themselves live in the core — see
+/// `ReferenceCatalog`.
 struct ReferenceService {
-    let database: CatalogDatabase
-    private var citeKeyService: CiteKeyService { CiteKeyService(database: database) }
-
-    // MARK: - Fetch
-
-    func fetchMetadata(forItemId itemId: String) -> ReferenceMetadata? {
-        guard let record = try? database.dbQueue.read({ db in
-            try CitationRecord
-                .filter(CitationRecord.CodingKeys.itemId == itemId)
-                .fetchOne(db)
-        }) else { return nil }
-        return ReferenceMetadata(jsonString: record.cslJson)
+    /// An item's stored metadata, or nil when it has no citation.
+    func fetchMetadata(forItemId itemId: String) async -> ReferenceMetadata? {
+        guard let json = await ReferenceCatalog.metadata(forItemId: itemId) else { return nil }
+        return ReferenceMetadata(jsonString: json)
     }
 
-    // MARK: - Save
-
-    func saveMetadata(_ cslItem: CSLItem, forItemId itemId: String, extra: String? = nil) throws {
+    /// Save an item's metadata. The core derives the indexed columns, renames
+    /// the item from the citation and assigns a cite key if it had none.
+    func saveMetadata(_ cslItem: CSLItem, forItemId itemId: String, extra: String? = nil) async throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
-        let jsonData = try encoder.encode(cslItem)
-        guard let jsonString = String(data: jsonData, encoding: .utf8) else {
+        guard let jsonString = String(data: try encoder.encode(cslItem), encoding: .utf8) else {
             throw ReferenceError.encodingFailed
         }
-
-        let now = Date().iso8601String
-
-        // Extract identifiers from CSL fields and extra
-        let isbn = cslItem.ISBN
-        let issn = cslItem.ISSN
-        let pmid = Self.extractPMID(from: cslItem, extra: extra)
-        let arxivId = Self.extractArXivID(from: cslItem, extra: extra)
-
-        try database.dbQueue.write { db in
-            // Check if record exists
-            let existing = try CitationRecord
-                .filter(CitationRecord.CodingKeys.itemId == itemId)
-                .fetchOne(db)
-
-            var record = CitationRecord(
-                itemId: itemId,
-                cslJson: jsonString,
-                cslType: cslItem.type,
-                doi: cslItem.DOI,
-                year: cslItem.issued?.year,
-                containerTitle: cslItem.containerTitle,
-                abstract: cslItem.abstract,
-                pmid: pmid,
-                arxivId: arxivId,
-                isbn: isbn,
-                issn: issn,
-                createdAt: existing?.createdAt ?? now,
-                updatedAt: now
-            )
-
-            try record.save(db)
-
-            // Update ItemRecord author/title from CSL data
-            let authorDisplay = (cslItem.author ?? [])
-                .map { $0.displayString }
-                .joined(separator: ", ")
-
-            if !authorDisplay.isEmpty {
-                try db.execute(
-                    sql: "UPDATE items SET author = ?, updated_at = ? WHERE id = ?",
-                    arguments: [authorDisplay, now, itemId]
-                )
-            }
-            if let title = cslItem.title, !title.isEmpty {
-                try db.execute(
-                    sql: "UPDATE items SET title = ?, updated_at = ? WHERE id = ?",
-                    arguments: [title, now, itemId]
-                )
-            }
-
-            // Save extra field to items table
-            if let extra, !extra.isEmpty {
-                try db.execute(
-                    sql: "UPDATE items SET extra = ?, updated_at = ? WHERE id = ?",
-                    arguments: [extra, now, itemId]
-                )
-            }
-        }
-
-        // Auto-assign cite key if none exists
-        try? citeKeyService.assignCiteKey(forItemId: itemId)
+        try await ReferenceCatalog.save(cslJson: jsonString, forItemId: itemId, extra: extra)
     }
 
     // MARK: - Extra Field Parsing
@@ -110,37 +43,6 @@ struct ReferenceService {
         }
     }
 
-    /// Extract PMID from CSL note field or extra text.
-    static func extractPMID(from csl: CSLItem, extra: String?) -> String? {
-        for source in [extra, csl.note] {
-            guard let text = source else { continue }
-            for line in text.components(separatedBy: .newlines) {
-                let trimmed = line.trimmingCharacters(in: .whitespaces)
-                if trimmed.lowercased().hasPrefix("pmid:") {
-                    let val = trimmed.dropFirst(5).trimmingCharacters(in: .whitespaces)
-                    if !val.isEmpty { return val }
-                }
-            }
-        }
-        return nil
-    }
-
-    /// Extract arXiv ID from CSL note field or extra text.
-    static func extractArXivID(from csl: CSLItem, extra: String?) -> String? {
-        for source in [extra, csl.note] {
-            guard let text = source else { continue }
-            for line in text.components(separatedBy: .newlines) {
-                let trimmed = line.trimmingCharacters(in: .whitespaces)
-                let lower = trimmed.lowercased()
-                if lower.hasPrefix("arxiv:") {
-                    let val = trimmed.dropFirst(6).trimmingCharacters(in: .whitespaces)
-                    if !val.isEmpty { return val }
-                }
-            }
-        }
-        return nil
-    }
-
     /// Mapping from extra field keys (lowercased) to CSL JSON wire keys.
     private static let extraKeyToCSLField: [String: String] = [
         "doi": "DOI",
@@ -153,16 +55,6 @@ struct ReferenceService {
         "language": "language",
     ]
 
-    // MARK: - Delete
-
-    func deleteMetadata(forItemId itemId: String) throws {
-        try database.dbQueue.write { db in
-            try db.execute(
-                sql: "DELETE FROM citations WHERE item_id = ?",
-                arguments: [itemId]
-            )
-        }
-    }
 }
 
 enum ReferenceError: Error {

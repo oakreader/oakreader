@@ -107,10 +107,13 @@ extension ImportService {
             month: cal.component(.month, from: today),
             day: cal.component(.day, from: today)
         )
-        do {
-            try referenceService.saveMetadata(csl, forItemId: docId.uuidString)
-        } catch {
-            Log.error(Log.importer, "Failed to save markdown reference metadata: \(error)")
+        Task { @MainActor in
+            do {
+                try await referenceService.saveMetadata(csl, forItemId: docId.uuidString)
+                store.invalidate()
+            } catch {
+                Log.error(Log.importer, "Failed to save markdown reference metadata: \(error)")
+            }
         }
 
         return item

@@ -572,7 +572,7 @@ final class ZoteroMigrationService {
 
             // Save citation metadata (with extra for PMID/arXiv extraction)
             do {
-                try referenceService.saveMetadata(cslItem, forItemId: docId.uuidString, extra: extraText)
+                try await referenceService.saveMetadata(cslItem, forItemId: docId.uuidString, extra: extraText)
             } catch {
                 Log.error(Log.zotero, "Failed to save citation for '\(title)': \(error)")
             }
@@ -584,7 +584,7 @@ final class ZoteroMigrationService {
                     attachmentStorageKey: attStorageKey,
                     fileName: attFileName
                 )
-                enrichHTMLMetadata(htmlURL: destURL, itemId: docId.uuidString)
+                await enrichHTMLMetadata(htmlURL: destURL, itemId: docId.uuidString)
             }
 
             itemMap[zItem.itemID] = docId.uuidString
@@ -832,11 +832,11 @@ final class ZoteroMigrationService {
 
     /// Supplement already-saved Zotero CSL data with HTML meta tags for HTML documents.
     /// Only fills in fields that are empty in the existing metadata.
-    private func enrichHTMLMetadata(htmlURL: URL, itemId: String) {
+    private func enrichHTMLMetadata(htmlURL: URL, itemId: String) async {
         guard let htmlString = try? String(contentsOf: htmlURL, encoding: .utf8) else { return }
 
         // Load existing metadata saved from Zotero fields
-        guard let existing = referenceService.fetchMetadata(forItemId: itemId) else {
+        guard let existing = await referenceService.fetchMetadata(forItemId: itemId) else {
             return
         }
         var csl = existing.cslItem
@@ -882,7 +882,7 @@ final class ZoteroMigrationService {
 
         if changed {
             do {
-                try referenceService.saveMetadata(csl, forItemId: itemId)
+                try await referenceService.saveMetadata(csl, forItemId: itemId)
             } catch {
                 Log.error(Log.zotero, "Failed to enrich HTML metadata: \(error)")
             }

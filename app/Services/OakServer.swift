@@ -472,7 +472,7 @@ final class OakServer {
 
             if let csl = cslItem {
                 do {
-                    try self.importService.referenceService.saveMetadata(csl, forItemId: itemId)
+                    try await self.importService.referenceService.saveMetadata(csl, forItemId: itemId)
                     await MainActor.run {
                         self.importService.store.invalidate()
                     }

@@ -205,10 +205,13 @@ extension ImportService {
             )
         }()
 
-        do {
-            try referenceService.saveMetadata(csl, forItemId: itemId)
-        } catch {
-            Log.error(Log.importer, "Failed to save HTML reference metadata: \(error)")
+        Task { @MainActor in
+            do {
+                try await referenceService.saveMetadata(csl, forItemId: itemId)
+                store.invalidate()
+            } catch {
+                Log.error(Log.importer, "Failed to save HTML reference metadata: \(error)")
+            }
         }
     }
 

@@ -14,6 +14,9 @@ import {
   PROTOCOL_VERSION, RpcError,
   PingParams, ProvidersListParams,
   PromptsComposeParams, type PromptsComposeResult,
+  ReferencesGetParams, ReferencesSaveParams, type ReferencesGetResult,
+  CiteKeysProposeParams, CiteKeysSaveParams, CiteKeysAssignParams,
+  type CiteKeysProposeResult, type CiteKeysAssignResult,
   PropertiesListParams, PropertiesUpsertParams, PropertiesDeleteParams,
   PropertiesUpsertOptionParams, PropertiesDeleteOptionParams,
   PropertiesAddSelectValueParams, PropertiesRemoveSelectValueParams,
@@ -52,6 +55,8 @@ import { ConversationStore } from "./catalog/conversations.js";
 import { CollectionStore } from "./catalog/collections.js";
 import { ItemStore } from "./catalog/items.js";
 import { PropertyStore } from "./catalog/properties.js";
+import { ReferenceStore } from "./catalog/references.js";
+import { CiteKeyStore } from "./catalog/citekeys.js";
 
 const BACKEND_ID = "oak-backend 0.2.0";
 
@@ -356,6 +361,31 @@ function registerMethods(): void {
 
   peer.onRequest("catalog/items/merge", ItemsMergeParams, (p) => {
     new ItemStore(catalog().db, LOCAL_USER).merge(p.keeperId, p.duplicateIds, p.at);
+    return {};
+  });
+
+  peer.onRequest("catalog/references/get", ReferencesGetParams,
+    (p): ReferencesGetResult => ({
+      cslJson: new ReferenceStore(catalog().db).get(p.itemId),
+    }));
+
+  peer.onRequest("catalog/references/save", ReferencesSaveParams, (p) => {
+    new ReferenceStore(catalog().db).save(p.itemId, p.cslJson, p.extra ?? null, p.at);
+    return {};
+  });
+
+  peer.onRequest("catalog/citeKeys/propose", CiteKeysProposeParams,
+    (p): CiteKeysProposeResult => ({
+      key: new CiteKeyStore(catalog().db).propose(p.itemId),
+    }));
+
+  peer.onRequest("catalog/citeKeys/assign", CiteKeysAssignParams,
+    (p): CiteKeysAssignResult => ({
+      key: new CiteKeyStore(catalog().db).assign(p.itemId, p.at),
+    }));
+
+  peer.onRequest("catalog/citeKeys/save", CiteKeysSaveParams, (p) => {
+    new CiteKeyStore(catalog().db).save(p.key, p.itemId, p.at);
     return {};
   });
 

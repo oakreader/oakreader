@@ -98,7 +98,7 @@ struct ItemPanelView: View {
                 if let doi = DOIExtractorService.extractDOI(from: item.fileURL) {
                     do {
                         let cslItem = try await CrossRefService.fetchMetadata(doi: doi)
-                        try refService.saveMetadata(cslItem, forItemId: item.id.uuidString)
+                        try await refService.saveMetadata(cslItem, forItemId: item.id.uuidString)
                         await MainActor.run { store.invalidate() }
                         return
                     } catch {
@@ -114,7 +114,7 @@ struct ItemPanelView: View {
                 csl.author = [CSLName(family: item.author, given: nil)]
             }
             do {
-                try refService.saveMetadata(csl, forItemId: item.id.uuidString)
+                try await refService.saveMetadata(csl, forItemId: item.id.uuidString)
                 await MainActor.run { store.invalidate() }
             } catch {
                 Log.error(Log.importer, "Failed to create fallback reference metadata: \(error)")

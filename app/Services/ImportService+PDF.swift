@@ -159,7 +159,7 @@ extension ImportService {
         if let doi = DOIExtractorService.extractDOI(from: pdfURL) {
             do {
                 let cslItem = try await CrossRefService.fetchMetadata(doi: doi)
-                try referenceService.saveMetadata(cslItem, forItemId: itemId)
+                try await referenceService.saveMetadata(cslItem, forItemId: itemId)
                 await MainActor.run { store.invalidate() }
                 return
             } catch {
@@ -178,7 +178,7 @@ extension ImportService {
             csl.URL = webSourceURL.absoluteString
         }
         do {
-            try referenceService.saveMetadata(csl, forItemId: itemId)
+            try await referenceService.saveMetadata(csl, forItemId: itemId)
             await MainActor.run { store.invalidate() }
         } catch {
             Log.error(Log.importer, "Failed to create fallback reference metadata: \(error)")
