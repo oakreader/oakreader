@@ -94,10 +94,12 @@ targets:
             echo "error: bun not found — install from https://bun.sh; the oak CLI is compiled with it" >&2
             exit 1
           fi
+          # OAK_CHANNEL is this CLI's `#if DEBUG`: a dev build's `oak` must
+          # read ~/OakReader-Dev, not the release library.
           if [ "${CONFIGURATION}" = "Release" ]; then
             OAK_UNIVERSAL=1 bash "$CLI/scripts/build-binary.sh"
           else
-            bash "$CLI/scripts/build-binary.sh"
+            OAK_CHANNEL=dev bash "$CLI/scripts/build-binary.sh"
           fi
           # CONTENTS_FOLDER_PATH, not a hardcoded OakReader.app: the Debug
           # config overrides PRODUCT_NAME, so its wrapper is OakReader-Dev.app.

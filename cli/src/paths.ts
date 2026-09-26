@@ -2,22 +2,30 @@
  * Where the library lives, and which one.
  *
  * Two channels share this machine: a release app under ~/OakReader and a debug
- * build under ~/OakReader-Dev. The Swift CLI picked between them with a `#if
- * DEBUG` baked in at compile time. A single portable binary has no such flag,
- * so the channel is read from the environment — OAK_CHANNEL=dev, or the
- * OAK_DATA_DIR that overrides both — and defaults to the release library.
- *
- * Getting this wrong is not a cosmetic mistake: it points the CLI at a library
- * the running app does not own.
+ * build under ~/OakReader-Dev. Pointing at the wrong one is not a cosmetic
+ * mistake — it hands the CLI a library the running app does not own — so the
+ * channel is decided the same way the Swift version decided it, at build time.
+ * `#if DEBUG` became a `--define`, stamped in by the Xcode phase that compiles
+ * this; `OAK_CHANNEL` overrides it for a binary run outside a bundle, and
+ * `OAK_DATA_DIR` overrides everything, which is how the tests get a scratch
+ * library.
  */
 import { homedir } from "node:os";
 import { join } from "node:path";
 
+/** Stamped in at compile time by `build-binary.sh`; absent in a source run. */
+declare const OAK_BUILD_CHANNEL: string | undefined;
+
+function channel(): string {
+  const fromEnvironment = process.env.OAK_CHANNEL;
+  if (fromEnvironment !== undefined && fromEnvironment !== "") return fromEnvironment;
+  return typeof OAK_BUILD_CHANNEL === "undefined" ? "release" : OAK_BUILD_CHANNEL;
+}
+
 export function dataDirectory(): string {
   const override = process.env.OAK_DATA_DIR;
   if (override !== undefined && override !== "") return override;
-  const dev = process.env.OAK_CHANNEL === "dev";
-  return join(homedir(), dev ? "OakReader-Dev" : "OakReader");
+  return join(homedir(), channel() === "dev" ? "OakReader-Dev" : "OakReader");
 }
 
 export function libraryPath(override?: string): string {
