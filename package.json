@@ -10,7 +10,9 @@
     "build:backend": "pnpm --filter @oakreader/backend build",
     "test:backend": "pnpm --filter @oakreader/backend test",
     "dev:website": "pnpm --filter oakreader-www dev",
-    "build:website": "pnpm --filter oakreader-www build"
+    "build:website": "pnpm --filter oakreader-www build",
+    "protocol:generate": "bun protocol/generate.ts",
+    "protocol:check": "bun protocol/generate.ts --check"
   },
   "packageManager": "pnpm@10.33.0"
 }

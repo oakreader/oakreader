@@ -51,8 +51,14 @@ jobs:
         # scripts -- its deps are pure JS and bun does the bundling.
         run: pnpm install --frozen-lockfile --ignore-scripts
 
-      # Cheap and fails fast: typecheck + the protocol/tokenizer suites run in
-      # seconds, long before the ~10 minute Swift build.
+      # The cheapest guard there is: regenerate both sides of the protocol and
+      # fail if the committed output differs. Catches the drift that the old
+      # "keep the two in sync" comment could not.
+      - name: Check generated protocol is current
+        run: pnpm protocol:check
+
+      # Cheap and fails fast: typecheck + the protocol suite run in seconds,
+      # long before the ~10 minute Swift build.
       - name: Typecheck backend
         working-directory: backend
         run: pnpm typecheck

@@ -1,13 +1,19 @@
 import Foundation
 
-/// Swift mirror of the sidecar protocol v2 (backend/src/protocol.ts —
-/// keep the two in sync). JSONL over stdio, LF-delimited.
+/// Hand-written half of the sidecar protocol. JSONL over stdio, LF-delimited.
+///
+/// `BackendCommand` and `BackendEvent` are NOT here — they are generated from
+/// protocol/schema.ts into BackendProtocol.generated.swift, together with the
+/// backend's zod schemas, so the two sides cannot drift. What stays here are
+/// the types whose Swift and TypeScript shapes genuinely differ: WireMessage
+/// encodes through a custom `Encodable`, and JSONFragment/AnyJSONObject are
+/// Swift-specific JSON passthroughs.
 ///
 /// v2: the backend owns the provider catalog, credentials, OAuth, endpoint
 /// overrides, and the agentic chat loop. Swift sends provider/model ids and
 /// executes tools when the backend asks (`tool_exec` → `tool_result`).
 enum BackendProtocol {
-    static let version = 2
+    static let version = GeneratedProtocol.version
 }
 
 // MARK: - Wire messages (Turn history → backend)
@@ -130,69 +136,7 @@ indirect enum JSONFragment: Codable {
     }
 }
 
-// MARK: - Commands
-
-struct BackendCommand: Encodable {
-    var id: String
-    var type: String
-    var providerId: String?
-    var model: String?
-    var system: String?
-    var messages: [WireMessage]?
-    var tools: [WireToolDef]?
-    var maxTokens: Int?
-    var reasoning: String?
-    var maxIterations: Int?
-    var apiKey: String?
-    var baseUrl: String?
-    var key: String?
-    var callId: String?
-    var content: String?
-    var isError: Bool?
-    var promptId: String?
-    var value: String?
-}
-
-// MARK: - Events
-
-struct BackendEvent: Decodable {
-    var id: String
-    var type: String  // response | delta | thinking | tool_exec | assistant | oauth_notify | oauth_prompt | done | error
-
-    // response
-    var command: String?
-    var success: Bool?
-    var `protocol`: Int?
-    var backend: String?
-    var message: String?
-    var providers: [BackendProviderSummary]?
-    var apiKey: String?
-
-    // delta / thinking
-    var text: String?
-
-    // tool_exec
-    var callId: String?
-    var name: String?
-    var args: [String: JSONFragment]?
-
-    // assistant
-    var thinking: String?
-    var toolCalls: [BackendToolCall]?
-
-    // oauth
-    var kind: String?
-    var url: String?
-    var userCode: String?
-    var verificationUri: String?
-    var promptId: String?
-    var promptType: String?
-    var placeholder: String?
-    var options: [BackendPromptOption]?
-
-    // done
-    var stopReason: String?
-}
+// MARK: - Event payloads
 
 struct BackendToolCall: Decodable {
     var id: String
