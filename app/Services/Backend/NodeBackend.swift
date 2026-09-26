@@ -15,7 +15,8 @@ import OSLog
 ///  - `stream(_:params:as:)` — request whose progress notifications are yielded
 ///                             until the response finishes the stream
 ///  - `notify(_:params:)`    — notification, no reply expected
-/// Inbound requests are served by handlers registered with `setHandler`.
+/// Inbound requests are answered only when they are scoped to a streaming
+/// request of ours (`tool/execute`); anything else gets methodNotFound.
 actor NodeBackend {
     static let shared = NodeBackend()
 
@@ -40,21 +41,12 @@ actor NodeBackend {
     /// Streaming calls, by request id, fed by notifications carrying that token.
     private var progress: [String: AsyncThrowingStream<RPCStreamEvent, Error>.Continuation] = [:]
     /// Handlers for requests the sidecar sends us.
-    private var handlers: [String: (JSONFragment?) async -> Result<JSONFragment?, RPCErrorObject>] = [:]
 
     // MARK: - Public
 
     private func nextRequestId() -> String {
         nextId += 1
         return "c\(nextId)"
-    }
-
-    /// Serve inbound requests for one method. Registered once at startup.
-    func setHandler(
-        _ method: String,
-        _ handler: @escaping (JSONFragment?) async -> Result<JSONFragment?, RPCErrorObject>
-    ) {
-        handlers[method] = handler
     }
 
     /// True when the sidecar is running and answered the ping handshake.
@@ -249,18 +241,8 @@ actor NodeBackend {
                 continuation.yield(.request(id: id, method: method, params: envelope.params))
                 return
             }
-            guard let handler = handlers[method] else {
-                try? write(.failure(id: id, code: RPC.ErrorCode.methodNotFound,
-                                    message: "no handler for \(method)"))
-                return
-            }
-            Task {
-                switch await handler(envelope.params) {
-                case .success(let result): try? await self.write(.response(id: id, result: result))
-                case .failure(let error):
-                    try? await self.write(.failure(id: id, code: error.code, message: error.message))
-                }
-            }
+            try? write(.failure(id: id, code: RPC.ErrorCode.methodNotFound,
+                                message: "no handler for \(method)"))
 
         case .malformed:
             Self.log.error("malformed envelope")
@@ -388,16 +370,6 @@ enum NodeBackendError: LocalizedError {
         case .crashed: return "AI backend exited unexpectedly"
         case .timedOut: return "AI backend stopped responding"
         case .commandFailed(let message): return message
-        }
-    }
-}
-
-enum CompletionStreamError: LocalizedError {
-    case provider(String)
-
-    var errorDescription: String? {
-        switch self {
-        case .provider(let message): return message
         }
     }
 }

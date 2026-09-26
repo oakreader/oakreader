@@ -114,13 +114,6 @@ extension LibraryStore {
         return fetchItem(whereSQL: "id = ?", arguments: [id.uuidString])
     }
 
-    func findItem(byCiteKey citeKey: String) -> LibraryItem? {
-        if let cached = itemsCache, cached.revision == revision {
-            if let found = cached.items.first(where: { $0.citeKey == citeKey }) { return found }
-        }
-        return fetchItem(whereSQL: "cite_key = ?", arguments: [citeKey])
-    }
-
     func findItem(byStorageKey key: String) -> LibraryItem? {
         if let cached = itemsCache, cached.revision == revision {
             if let found = cached.items.first(where: { $0.storageKey == key }) { return found }

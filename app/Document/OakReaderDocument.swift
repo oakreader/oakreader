@@ -75,18 +75,6 @@ class OakReaderDocument: NSDocument {
             throw OakReaderError.invalidPDF
         }
 
-        let security = documentViewModel.security.settings
-        if security.needsEncryption {
-            // Rewrite with encryption via CGPDFContext
-            let tempURL = FileCoordination.temporaryURL()
-            defer { try? FileManager.default.removeItem(at: tempURL) }
-            try PDFRewriter.rewriteWithSecurity(pdfDocument, to: tempURL, settings: security)
-            guard let data = try? Data(contentsOf: tempURL) else {
-                throw OakReaderError.encryptionFailed("Failed to read encrypted PDF")
-            }
-            return data
-        }
-
         guard let data = pdfDocument.dataRepresentation() else {
             throw OakReaderError.fileWriteFailed(fileURL ?? URL(fileURLWithPath: "unknown"), underlying: nil)
         }

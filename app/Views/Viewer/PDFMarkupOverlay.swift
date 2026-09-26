@@ -46,18 +46,6 @@ struct PDFTextMarkup: Identifiable {
     }
 }
 
-extension PDFMarkupKind {
-    /// Maps to the PDFKit subtype rawValue ("Highlight" / "Underline" /
-    /// "StrikeOut") so overlay markups share the sidebar's type labels.
-    var subtype: PDFAnnotationSubtype {
-        switch self {
-        case .highlight: return .highlight
-        case .underline: return .underline
-        case .strikethrough: return .strikeOut
-        }
-    }
-}
-
 /// Vends the markups for a given page index to the custom `PDFPage` subclass.
 protocol PDFMarkupOverlaySource: AnyObject {
     func textMarkups(forPageIndex index: Int) -> [PDFTextMarkup]
@@ -313,11 +301,6 @@ final class PDFMarkupOverlayController: NSObject, PDFDocumentDelegate, PDFMarkup
             }
         }
         return nil
-    }
-
-    /// All markups paired with their page index — used to build the sidebar list.
-    func allMarkups() -> [(pageIndex: Int, markup: PDFTextMarkup)] {
-        byPage.flatMap { page, markups in markups.map { (page, $0) } }
     }
 
     /// Hit-test a point (in page coordinate space) on a given page; returns the
