@@ -1,0 +1,726 @@
+#!/usr/bin/env bun
+/**
+ * `oak` — the OakReader command line.
+ *
+ * Reads are this program's own (see `queries.ts`); writes go through the core's
+ * stores, the same ones the app's sidecar uses. That split is the reason this
+ * was rewritten from Swift: the old CLI carried a second implementation of the
+ * catalog, so every rule with two copies — Tags is multi-select, Status is
+ * single-select, a cite key must be unique — could drift between them.
+ */
+import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
+import { basename, resolve as resolvePath } from "node:path";
+import { homedir } from "node:os";
+import { Catalog } from "../../backend/src/catalog/db.ts";
+import { CollectionStore } from "../../backend/src/catalog/collections.ts";
+import { LOCAL_USER } from "../../backend/src/catalog/system.ts";
+import { PropertyStore } from "../../backend/src/catalog/properties.ts";
+import { flag, integer, option, parse, type Parsed } from "./args.ts";
+import { childNames, findCommand, helpText } from "./help.ts";
+import { Importer, type ImportResult } from "./import.ts";
+import { Output } from "./output.ts";
+import { libraryPath } from "./paths.ts";
+import { Queries } from "./queries.ts";
+import * as wire from "./wire.ts";
+import { OakError, Resolver, notFound } from "./resolve.ts";
+import { readDocument } from "./extract.ts";
+import * as format from "./format.ts";
+import * as skills from "./skills.ts";
+
+const VERSION = "1.0.0";
+
+/** Long tokens that never take a value. Everything else expects one. */
+const BOOLEANS = new Set([
+  "json", "quiet", "version", "help", "h", "today", "csv", "markdown",
+]);
+
+interface Context {
+  parsed: Parsed;
+  out: Output;
+  catalog: Catalog;
+  q: Queries;
+  resolver: Resolver;
+  now: string;
+}
+
+async function main(argv: string[]): Promise<number> {
+  const parsed = parse(argv, childNames, BOOLEANS);
+  const out = new Output(flag(parsed, "json"), flag(parsed, "quiet"));
+
+  if (flag(parsed, "version")) {
+    console.log(VERSION);
+    return 0;
+  }
+  if (flag(parsed, "help") || flag(parsed, "h")) {
+    console.log(helpText(parsed.path));
+    return 0;
+  }
+
+  // A subcommand group with nothing after it runs its default, the way
+  // `oak items` has always meant `oak items list`.
+  const node = findCommand(parsed.path);
+  if (node?.defaultSubcommand !== undefined && parsed.path.length > 0) {
+    parsed.path.push(node.defaultSubcommand);
+  }
+
+  const command = parsed.path.join(" ");
+  const operation = OPERATIONS[command];
+  if (command !== "" && operation === undefined) {
+    out.error(command, `Unknown command '${command}'.`, "unknown_command");
+    if (!out.json) console.error(helpText([]));
+    return 1;
+  }
+
+  const path = libraryPath(option(parsed, "db") ?? undefined);
+  if (!existsSync(path)) {
+    out.error(command === "" ? "stats" : command,
+      `Database not found at ${path}. Is OakReader installed and has it been launched at least once?`,
+      "no_database");
+    return 1;
+  }
+
+  const catalog = Catalog.open(path);
+  try {
+    const context: Context = {
+      parsed, out, catalog,
+      q: new Queries(catalog.db),
+      resolver: new Resolver(new Queries(catalog.db)),
+      now: new Date().toISOString(),
+    };
+    await (operation ?? showStats)(context);
+    return 0;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const code = error instanceof OakError ? error.code : "error";
+    out.error(command === "" ? "stats" : command, message, code);
+    return 1;
+  } finally {
+    catalog.close();
+  }
+}
+
+// --- root ----------------------------------------------------------------
+
+function showStats({ q, out }: Context): void {
+  const stats = q.stats();
+  if (out.json) {
+    out.success("stats", stats);
+    return;
+  }
+  console.log(format.stats(stats));
+  console.log("");
+  console.log("Run 'oak --help' for available commands.");
+}
+
+// --- items ---------------------------------------------------------------
+
+function itemsList({ parsed, q, out }: Context): void {
+  const entries = q.listItems({
+    collectionName: option(parsed, "collection") ?? undefined,
+    tagName: option(parsed, "tag") ?? undefined,
+    type: option(parsed, "type") ?? undefined,
+    search: option(parsed, "search") ?? undefined,
+    sort: option(parsed, "sort") ?? undefined,
+    limit: integer(parsed, "limit") ?? undefined,
+  });
+
+  if (out.json) {
+    out.results("items.list", entries.map(wire.itemResult), { count: entries.length });
+    return;
+  }
+  console.log(format.itemList(entries));
+}
+
+function itemsShow({ parsed, q, resolver, out }: Context): void {
+  const input = requireArgument(parsed, 0, "item");
+  const resolved = resolver.item(input);
+  const found = q.findItem(resolved.id);
+  if (found === null) throw notFound("item", input);
+
+  const tags = q.itemTags(resolved.id);
+  const status = q.itemStatus(resolved.id);
+  const collections = q.itemCollections(resolved.id);
+
+  if (out.json) {
+    // `status` is omitted rather than null when an item has none, matching
+    // how the struct this replaces encoded an absent optional.
+    out.success("items.show", {
+      ...wire.itemResult(found),
+      tags: tags.map(wire.option),
+      ...(status === null ? {} : { status: wire.option(status) }),
+      collections: collections.map(wire.collection),
+    });
+    return;
+  }
+  console.log(format.itemDetail(found.item, found.attachments, tags, status, collections));
+}
+
+async function itemsRead({ parsed, q, resolver, out }: Context): Promise<void> {
+  const resolved = resolver.item(requireArgument(parsed, 0, "item"));
+  const location = q.itemFilePath(resolved.id);
+  if (location === null) {
+    throw new OakError(`No primary attachment found for '${resolved.title}'.`);
+  }
+
+  const { attachmentFile } = await import("./paths.ts");
+  const path = attachmentFile(
+    location.itemStorageKey, location.attachmentStorageKey, location.fileName);
+  if (!existsSync(path)) throw new OakError(`File not found: ${path}`);
+
+  const text = await readDocument(path, location.contentType, option(parsed, "pages"));
+  // Capped for the same reason the Swift original capped it: this output is
+  // usually being read by a model with a context window.
+  const content = text.slice(0, 100_000);
+
+  if (out.json) {
+    out.success("items.read", {
+      title: resolved.title, citeKey: resolved.citeKey,
+      contentType: location.contentType, pageCount: location.pageCount, content,
+    });
+    return;
+  }
+  console.log(content);
+}
+
+function itemsOpen({ parsed, resolver, out }: Context): void {
+  const resolved = resolver.item(requireArgument(parsed, 0, "item"));
+  Bun.spawnSync(["/usr/bin/open", `oakreader://open/${resolved.id}`]);
+
+  const message = `Opening '${resolved.title}' in OakReader...`;
+  if (out.json) out.success("items.open", { id: resolved.id, message });
+  else console.log(message);
+}
+
+// --- collections ---------------------------------------------------------
+
+function collectionsList({ q, out }: Context): void {
+  const collections = q.listCollections();
+  const counts = new Map(collections.map((c) => [c.id, q.collectionItemCount(c.id)]));
+
+  if (out.json) {
+    out.results("collections.list",
+      collections.map((c) => ({ collection: wire.collection(c), count: counts.get(c.id) ?? 0 })),
+      { count: collections.length });
+    return;
+  }
+  console.log(format.collectionTree(collections, counts));
+}
+
+function collectionsCreate({ parsed, catalog, q, resolver, out, now }: Context): void {
+  const name = requireArgument(parsed, 0, "name");
+  const parentName = option(parsed, "parent");
+  const parentId = parentName === null ? null : resolver.collection(parentName).id;
+
+  const id = randomUUID();
+  new CollectionStore(catalog.db, LOCAL_USER).upsert({
+    id, name, icon: "folder", sortOrder: q.nextCollectionOrder(), parentId,
+    isSmart: false, isSystem: false, filterRules: null, source: null, sourceKey: null,
+    createdAt: now, updatedAt: now,
+  });
+
+  const message = `Created collection '${name}'`;
+  if (out.json) out.success("collections.create", { id, message });
+  else console.log(`${message} [${id.slice(0, 8)}]`);
+}
+
+function collectionsRename({ parsed, catalog, resolver, out, now }: Context): void {
+  const collection = resolver.collection(requireArgument(parsed, 0, "collection"));
+  const newName = requireArgument(parsed, 1, "new name");
+
+  if (collection.isSystem) {
+    throw new OakError(`Cannot rename system collection '${collection.name}'.`);
+  }
+
+  new CollectionStore(catalog.db, LOCAL_USER).upsert({
+    ...collection, name: newName, filterRules: null, source: null, sourceKey: null,
+    createdAt: collection.createdAt, updatedAt: now,
+  });
+
+  const message = `Renamed '${collection.name}' -> '${newName}'`;
+  if (out.json) out.success("collections.rename", { id: collection.id, message });
+  else console.log(`Renamed collection '${collection.name}' -> '${newName}'`);
+}
+
+function collectionsAdd(context: Context): void {
+  setMembership(context, true);
+}
+
+function collectionsRemove(context: Context): void {
+  setMembership(context, false);
+}
+
+function setMembership(
+  { parsed, catalog, resolver, out, now }: Context, member: boolean,
+): void {
+  const collection = resolver.collection(requireArgument(parsed, 0, "collection"));
+  const item = resolver.item(requireArgument(parsed, 1, "item"));
+
+  if (member && (collection.isSmart || collection.isSystem)) {
+    throw new OakError(
+      `Cannot manually add items to smart/system collection '${collection.name}'.`);
+  }
+
+  const store = new CollectionStore(catalog.db, LOCAL_USER);
+  if (member) store.addItem(item.id, collection.id, now);
+  else store.removeItem(item.id, collection.id);
+
+  const operation = member ? "collections.add" : "collections.remove";
+  const message = member
+    ? `Added '${item.title}' to '${collection.name}'`
+    : `Removed '${item.title}' from '${collection.name}'`;
+  if (out.json) out.success(operation, { id: item.id, message });
+  else console.log(member
+    ? `Added '${item.title}' to collection '${collection.name}'`
+    : `Removed '${item.title}' from collection '${collection.name}'`);
+}
+
+// --- tags ----------------------------------------------------------------
+
+function tagsList({ q, out }: Context): void {
+  const tags = q.listTags();
+  if (out.json) {
+    out.results("tags.list",
+      tags.map(({ tag, count }) => ({ tag: wire.option(tag), count })),
+      { count: tags.length });
+    return;
+  }
+  console.log(format.tagList(tags));
+}
+
+function tagsCreate({ parsed, catalog, q, out }: Context): void {
+  const name = requireArgument(parsed, 0, "name");
+  const propertyId = requireProperty(q, "Tags");
+
+  const id = randomUUID();
+  new PropertyStore(catalog.db).upsertOption({
+    id, propertyId, name, colorHex: option(parsed, "color") ?? "999999",
+    position: q.nextOptionPosition(propertyId),
+  });
+
+  const message = `Created tag '${name}'`;
+  if (out.json) out.success("tags.create", { id, message });
+  else console.log(`${message} [${id.slice(0, 8)}]`);
+}
+
+function tagsRename({ parsed, catalog, resolver, out }: Context): void {
+  const tag = resolver.tag(requireArgument(parsed, 0, "tag"));
+  const newName = requireArgument(parsed, 1, "new name");
+
+  new PropertyStore(catalog.db).upsertOption({ ...tag, name: newName });
+
+  const message = `Renamed '${tag.name}' -> '${newName}'`;
+  if (out.json) out.success("tags.rename", { id: tag.id, message });
+  else console.log(`Renamed tag '${tag.name}' -> '${newName}'`);
+}
+
+function tagsAdd({ parsed, catalog, q, resolver, out }: Context): void {
+  const tag = resolver.tag(requireArgument(parsed, 0, "tag"));
+  const item = resolver.item(requireArgument(parsed, 1, "item"));
+  const propertyId = requireProperty(q, "Tags");
+
+  // The core decides whether this appends or replaces, by reading the
+  // property's type. Tags is multi-select, so it appends.
+  new PropertyStore(catalog.db).addSelectValue(randomUUID(), item.id, propertyId, tag.id);
+
+  const message = `Tagged '${item.title}' with '${tag.name}'`;
+  if (out.json) out.success("tags.add", { id: item.id, message });
+  else console.log(message);
+}
+
+function tagsRemove({ parsed, catalog, q, resolver, out }: Context): void {
+  const tag = resolver.tag(requireArgument(parsed, 0, "tag"));
+  const item = resolver.item(requireArgument(parsed, 1, "item"));
+  const propertyId = requireProperty(q, "Tags");
+
+  new PropertyStore(catalog.db).removeSelectValue(item.id, propertyId, tag.id);
+
+  const message = `Removed tag '${tag.name}' from '${item.title}'`;
+  if (out.json) out.success("tags.remove", { id: item.id, message });
+  else console.log(`Removed tag '${tag.name}' from '${item.title}'`);
+}
+
+// --- status --------------------------------------------------------------
+
+function status({ parsed, catalog, q, resolver, out }: Context): void {
+  const item = resolver.item(requireArgument(parsed, 0, "item"));
+  const value = parsed.positionals[1];
+
+  if (value === undefined) {
+    const current = q.itemStatus(item.id);
+    if (out.json) {
+      out.success("status.show",
+        { itemId: item.id, title: item.title, status: current?.name ?? null });
+      return;
+    }
+    console.log(format.status(item, current));
+    return;
+  }
+
+  const option_ = resolver.status(value);
+  const propertyId = requireProperty(q, "Status");
+  // Status is single-select, so the core replaces rather than appends.
+  new PropertyStore(catalog.db).addSelectValue(
+    randomUUID(), item.id, propertyId, option_.id);
+
+  const message = `Set status of '${item.title}' to '${option_.name}'`;
+  if (out.json) out.success("status.set", { id: item.id, message });
+  else console.log(message);
+}
+
+// --- import and open -----------------------------------------------------
+
+async function importSource(context: Context): Promise<void> {
+  const { parsed, catalog, q, resolver, out, now } = context;
+  const source = requireArgument(parsed, 0, "source");
+  const title = option(parsed, "title");
+  const importer = new Importer(catalog.db, q);
+
+  let result: ImportResult;
+  if (source.startsWith("http://") || source.startsWith("https://")) {
+    result = await importer.importURL(source, title);
+  } else {
+    const path = resolvePath(source.replace(/^~/, homedir()));
+    if (!existsSync(path)) throw notFound("file", source);
+
+    const extension = basename(path).split(".").pop()?.toLowerCase() ?? "";
+    switch (extension) {
+      case "pdf": result = await importer.importPDF(path, title); break;
+      case "html": case "htm": result = await importer.importHTML(path, title, null); break;
+      case "md": case "markdown": result = await importer.importMarkdown(path, title); break;
+      default:
+        throw new OakError(
+          `Unsupported file type: ${extension === "" ? "(none)" : `.${extension}`}`);
+    }
+  }
+
+  if (result.isDuplicate) {
+    const message = `Already imported '${result.title}'`;
+    if (out.json) out.success("import", { id: result.itemId, message });
+    else console.log(`${message} [${result.itemId.slice(0, 8)}]`);
+    return;
+  }
+
+  // --collection and --tag are conveniences on top of the import; a failure to
+  // apply one is a warning, not a reason to disown the item just filed.
+  const collectionName = option(parsed, "collection");
+  if (collectionName !== null) {
+    try {
+      const collection = resolver.collection(collectionName);
+      new CollectionStore(catalog.db, LOCAL_USER).addItem(result.itemId, collection.id, now);
+    } catch (error) {
+      warn(`Failed to add to collection '${collectionName}'`, error);
+    }
+  }
+  const tagName = option(parsed, "tag");
+  if (tagName !== null) {
+    try {
+      const tag = resolver.tag(tagName);
+      new PropertyStore(catalog.db).addSelectValue(
+        randomUUID(), result.itemId, requireProperty(q, "Tags"), tag.id);
+    } catch (error) {
+      warn(`Failed to add tag '${tagName}'`, error);
+    }
+  }
+
+  const message = `Imported '${result.title}'`;
+  if (out.json) out.success("import", { id: result.itemId, message });
+  else console.log(`${message} [${result.itemId.slice(0, 8)}]`);
+}
+
+function openFile({ parsed, out }: Context): void {
+  const input = requireArgument(parsed, 0, "file");
+  const path = resolvePath(input.replace(/^~/, homedir()));
+  if (!existsSync(path)) throw notFound("file", path);
+
+  // Target the app this CLI ships inside rather than "OakReader" by name:
+  // LaunchServices resolves a name to whichever bundle claims it, so a dev
+  // build's `oak` would hand the release app a path from a library it does
+  // not own.
+  const bundle = process.env.OAK_CHANNEL === "dev"
+    ? "com.oakreader.OakReader.dev" : "com.oakreader.OakReader";
+  Bun.spawnSync(["/usr/bin/open", "-b", bundle, path]);
+
+  if (out.json) {
+    out.success("open", { id: null, message: `Opened '${basename(path)}' in OakReader` });
+  }
+}
+
+// --- search --------------------------------------------------------------
+
+function search({ parsed, q, out }: Context): void {
+  const query = parsed.positionals.join(" ");
+  if (query === "") throw new OakError("Search query cannot be empty.");
+
+  const results = q.search(query, integer(parsed, "limit") ?? 20);
+  if (out.json) {
+    out.results("search", results.map(wire.searchResult), { count: results.length });
+    return;
+  }
+  console.log(format.searchResults(results, query, "keyword"));
+}
+
+// --- words and notes -----------------------------------------------------
+
+/**
+ * `--today` / `--since` as an ISO8601 lower bound.
+ *
+ * Compared lexically against the stored timestamps, which works because they
+ * are all UTC in the same format — and breaks silently if that ever stops
+ * being true.
+ */
+function resolveSince(parsed: Parsed): string | null {
+  if (flag(parsed, "today")) {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    return start.toISOString();
+  }
+  const since = option(parsed, "since");
+  if (since === null) return null;
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(since)) {
+    throw new OakError(`Invalid --since date '${since}'. Use YYYY-MM-DD.`);
+  }
+  const [year, month, day] = since.split("-").map(Number) as [number, number, number];
+  return new Date(year, month - 1, day, 0, 0, 0, 0).toISOString();
+}
+
+function words({ parsed, q, out }: Context): void {
+  const lookups = q.wordLookups(resolveSince(parsed), integer(parsed, "limit") ?? 100);
+
+  if (out.json) {
+    out.results("words.list", lookups.map(wire.wordLookup), { count: lookups.length });
+    return;
+  }
+  if (flag(parsed, "csv")) {
+    console.log(wordsCSV(lookups));
+    return;
+  }
+  if (lookups.length === 0) {
+    console.log(flag(parsed, "today") ? "No words looked up today." : "No word lookups found.");
+    return;
+  }
+  for (const l of lookups) {
+    const sentence = l.sentence.replaceAll("\n", " ");
+    const snippet = sentence.length > 64 ? `${sentence.slice(0, 64)}…` : sentence;
+    const document = l.itemTitle === "" ? "" : `  (${l.itemTitle})`;
+    console.log(`${l.word}  —  ${snippet}${document}  ·  ${format.shortDate(l.createdAt)}`);
+  }
+  out.message(`\n${format.plural(lookups.length, "word")}.`);
+}
+
+function wordsCSV(lookups: ReturnType<Queries["wordLookups"]>): string {
+  const escape = (field: string) => `"${field.replaceAll('"', '""')}"`;
+  return ["Word,Sentence,Explanation,Document,Created At",
+    ...lookups.map((l) =>
+      [l.word, l.sentence, l.explanation, l.itemTitle, l.createdAt].map(escape).join(",")),
+  ].join("\n");
+}
+
+function notes({ parsed, q, resolver, out }: Context): void {
+  const itemInput = option(parsed, "item");
+  let itemId: string | null = null;
+  let title = "Library";
+  if (itemInput !== null) {
+    const item = resolver.item(itemInput);
+    itemId = item.id;
+    title = item.title;
+  }
+
+  const found = q.notes(itemId, resolveSince(parsed), integer(parsed, "limit"));
+
+  // Markdown wins over --json: it is the copy-into-your-notes path, and a
+  // caller that asked for a document does not want an envelope around it.
+  if (flag(parsed, "markdown")) {
+    console.log(format.notesMarkdown(found, title));
+    return;
+  }
+  if (out.json) {
+    out.results("notes.list", found.map(wire.note), { count: found.length });
+    return;
+  }
+  if (found.length === 0) {
+    console.log(itemInput === null ? "No notes yet." : `No notes for '${title}'.`);
+    return;
+  }
+  for (const note of found) {
+    const preview = format.truncate(note.comment.replaceAll("\n", " "), 72);
+    const document = itemInput === null && note.itemTitle !== "" ? `  (${note.itemTitle})` : "";
+    console.log(`${format.noteTimestamp(note.createdAt)}  —  ${preview}${document}`);
+  }
+  out.message(`\n${format.plural(found.length, "note")}.`);
+}
+
+// --- skills --------------------------------------------------------------
+
+async function skillsList({ out }: Context): Promise<void> {
+  const catalog = await skills.loadCatalog();
+  const installed = await skills.installedNames();
+
+  if (out.json) {
+    out.results("skills.list", catalog.map((s) => ({
+      name: s.name, description: s.description, installed: installed.has(s.name),
+    })), { count: catalog.length });
+    return;
+  }
+  if (catalog.length === 0) {
+    console.log("No skills found.");
+    return;
+  }
+
+  console.log("SKILLS");
+  console.log("─".repeat(80));
+  console.log(`${format.pad("NAME", 20)}${format.pad("STATUS", 12)}`
+    + `${format.pad("DESCRIPTION", 32)}BINS`);
+  console.log("─".repeat(80));
+  for (const skill of catalog) {
+    const missing = skill.bins.filter((b) => skills.locateBin(b) === null).length;
+    const bins = skill.bins.length === 0
+      ? "—" : missing === 0 ? `${skill.bins.length} ok` : `${missing}/${skill.bins.length} missing`;
+    console.log(
+      `${format.pad(skill.name, 20)}`
+      + `${format.pad(installed.has(skill.name) ? "installed" : "available", 12)}`
+      + `${format.pad(skill.description.slice(0, 30), 32)}${bins}`);
+  }
+}
+
+async function skillsShow({ parsed, out }: Context): Promise<void> {
+  const name = requireArgument(parsed, 0, "name");
+  const skill = (await skills.loadCatalog()).find((s) => s.name === name);
+  if (skill === undefined) {
+    throw new OakError(
+      `Skill '${name}' not found. Run 'oak skills' to see available skills.`, "not_found");
+  }
+  const installed = (await skills.installedNames()).has(name);
+
+  if (out.json) {
+    out.success("skills.show", {
+      name: skill.name, description: skill.description,
+      installed, author: skill.author, baseDir: skill.baseDir,
+    });
+    return;
+  }
+
+  console.log(`${skill.name} (${installed ? "installed" : "not installed"})`);
+  if (skill.description !== "") console.log(skill.description);
+  if (skill.author !== null) console.log(`Author: ${skill.author}`);
+  console.log("");
+
+  if (skill.bins.length > 0) {
+    console.log("DEPENDENCIES");
+    console.log("─".repeat(60));
+    for (const bin of skill.bins) {
+      const path = skills.locateBin(bin);
+      console.log(`  ${path !== null ? "✓" : "✗"} ${bin.name}`);
+      if (bin.description !== undefined) console.log(`    ${bin.description}`);
+      console.log(`    ${path ?? "not found"}`);
+    }
+    console.log("");
+  }
+
+  console.log(`Location: ${skill.baseDir}`);
+}
+
+async function skillsInstall({ parsed, out }: Context): Promise<void> {
+  const name = requireArgument(parsed, 0, "name");
+  const skill = (await skills.loadCatalog()).find((s) => s.name === name);
+  if (skill === undefined) {
+    throw new OakError(
+      `Skill '${name}' not found. Run 'oak skills' to see available skills.`, "not_found");
+  }
+
+  const destination = await skills.install(skill);
+  const message = `Installed '${name}' to ${destination}`;
+  if (out.json) out.success("skills.install", { id: null, message });
+  else console.log(message);
+}
+
+async function skillsUninstall({ parsed, out }: Context): Promise<void> {
+  const name = requireArgument(parsed, 0, "name");
+  if (!await skills.uninstall(name)) {
+    throw new OakError(`Skill '${name}' is not installed.`, "not_found");
+  }
+
+  const message = `Uninstalled '${name}'.`;
+  if (out.json) out.success("skills.uninstall", { id: null, message });
+  else console.log(message);
+}
+
+async function skillsCheck({ out }: Context): Promise<void> {
+  const installed = await skills.loadInstalled();
+  if (installed.length === 0) {
+    const message = "No skills installed.";
+    if (out.json) out.success("skills.check", { id: null, message });
+    else console.log("No skills installed. Run 'oak skills install <name>' to install one.");
+    return;
+  }
+
+  const issues = installed.flatMap((skill) =>
+    skill.bins.filter((b) => skills.locateBin(b) === null)
+      .map((b) => `${skill.name}: ${b.name} not found`));
+
+  if (out.json) {
+    if (issues.length === 0) {
+      out.success("skills.check",
+        { id: null, message: "All installed skill dependencies are satisfied." });
+    } else {
+      out.error("skills.check", issues.join("; "), "missing_deps");
+    }
+    return;
+  }
+  if (issues.length === 0) console.log("All installed skill dependencies are satisfied.");
+  else for (const issue of issues) console.log(`WARNING: ${issue}`);
+}
+
+// --- plumbing ------------------------------------------------------------
+
+const OPERATIONS: Record<string, (c: Context) => void | Promise<void>> = {
+  "items list": itemsList,
+  "items show": itemsShow,
+  "items read": itemsRead,
+  "items open": itemsOpen,
+  "collections list": collectionsList,
+  "collections create": collectionsCreate,
+  "collections rename": collectionsRename,
+  "collections add": collectionsAdd,
+  "collections remove": collectionsRemove,
+  "tags list": tagsList,
+  "tags create": tagsCreate,
+  "tags rename": tagsRename,
+  "tags add": tagsAdd,
+  "tags remove": tagsRemove,
+  "import": importSource,
+  "search": search,
+  "status": status,
+  "open": openFile,
+  "words": words,
+  "notes": notes,
+  "skills list": skillsList,
+  "skills show": skillsShow,
+  "skills install": skillsInstall,
+  "skills uninstall": skillsUninstall,
+  "skills check": skillsCheck,
+};
+
+function requireArgument(parsed: Parsed, index: number, name: string): string {
+  const value = parsed.positionals[index];
+  if (value === undefined) throw new OakError(`Missing required argument <${name}>.`, "usage");
+  return value;
+}
+
+/** A library without its system properties is a corrupted one, not an empty one. */
+function requireProperty(q: Queries, name: string): string {
+  const id = q.propertyId(name);
+  if (id === null) {
+    throw new OakError(
+      `${name} property not found in database. The database may be corrupted.`);
+  }
+  return id;
+}
+
+function warn(context: string, error: unknown): void {
+  const message = error instanceof Error ? error.message : String(error);
+  process.stderr.write(`Warning: ${context}: ${message}\n`);
+}
+
+process.exit(await main(process.argv.slice(2)));

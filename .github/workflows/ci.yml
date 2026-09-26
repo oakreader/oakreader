@@ -42,13 +42,14 @@ jobs:
         # which is also the pnpm workspace root since the layout flattened.
         uses: pnpm/action-setup@v4
 
-      - name: Install backend dependencies
+      - name: Install workspace dependencies
         working-directory: backend
         # --ignore-scripts: installing the workspace otherwise runs the
         # extension's `wxt prepare`, which fails on a fresh checkout (its
         # tsconfig extends .wxt/tsconfig.json, the very file prepare generates)
         # and would fail the job. The sidecar bundle needs none of those
-        # scripts -- its deps are pure JS and bun does the bundling.
+        # scripts -- its deps are pure JS and bun does the bundling. The
+        # install is workspace-wide, so the `oak` CLI's deps come with it.
         run: pnpm install --frozen-lockfile --ignore-scripts
 
       # The cheapest guard there is: regenerate both sides of the protocol and
@@ -65,6 +66,16 @@ jobs:
 
       - name: Test backend
         working-directory: backend
+        run: pnpm test
+
+      # The CLI shares the core's catalog, so it is checked the same way and
+      # for the same reason: a change to a store has two callers now.
+      - name: Typecheck CLI
+        working-directory: cli
+        run: pnpm typecheck
+
+      - name: Test CLI
+        working-directory: cli
         run: pnpm test
 
       - name: Install XcodeGen
@@ -104,3 +115,6 @@ jobs:
           test -x "$APP/Contents/Resources/oak-backend" \
             || { echo "::error::oak-backend missing from $(basename "$APP")"; exit 1; }
           echo "embedded sidecar in $(basename "$APP"): $(du -h "$APP/Contents/Resources/oak-backend" | cut -f1)"
+          test -x "$APP/Contents/Resources/oak" \
+            || { echo "::error::oak CLI missing from $(basename "$APP")"; exit 1; }
+          echo "embedded CLI in $(basename "$APP"): $(du -h "$APP/Contents/Resources/oak" | cut -f1)"

@@ -1,5 +1,6 @@
 packages:
   - backend
+  - cli
   - extension
   - webviews
   - website

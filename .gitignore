@@ -98,3 +98,6 @@ docs/internal/
 
 # Compiled AI sidecar (63-132 MB, built by backend/scripts/build-binary.sh)
 backend/dist/
+
+# Compiled oak CLI (63 MB arm64 / 132 MB universal); built by the Xcode phase.
+cli/dist/

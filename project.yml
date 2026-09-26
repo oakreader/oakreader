@@ -29,9 +29,6 @@ packages:
     path: packages/OakAgent
   OakMarkdownUI:
     path: packages/OakMarkdownUI
-  GRDB:
-    url: https://github.com/groue/GRDB.swift
-    from: "7.0.0"
   Highlightr:
     url: https://github.com/raspu/Highlightr.git
     from: "2.3.0"
@@ -78,7 +75,6 @@ targets:
       - package: OakVoice
       - package: PostHog
         product: PostHog
-      - target: oak
     postCompileScripts:
       - script: |
           if which swiftlint > /dev/null; then
@@ -87,10 +83,33 @@ targets:
             echo "warning: SwiftLint not installed"
           fi
         name: "SwiftLint"
+      # The `oak` CLI, compiled the same way as the sidecar and for the same
+      # reason: it shares the core's catalog, so it is TypeScript now rather
+      # than a second Swift implementation of the same tables.
       - script: |
+          set -e
+          CLI="${SRCROOT}/cli"
+          export PATH="$PATH:$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin"
+          if ! command -v bun >/dev/null 2>&1; then
+            echo "error: bun not found — install from https://bun.sh; the oak CLI is compiled with it" >&2
+            exit 1
+          fi
+          if [ "${CONFIGURATION}" = "Release" ]; then
+            OAK_UNIVERSAL=1 bash "$CLI/scripts/build-binary.sh"
+          else
+            bash "$CLI/scripts/build-binary.sh"
+          fi
           # CONTENTS_FOLDER_PATH, not a hardcoded OakReader.app: the Debug
           # config overrides PRODUCT_NAME, so its wrapper is OakReader-Dev.app.
-          cp "${BUILT_PRODUCTS_DIR}/oak" "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Resources/oak"
+          DEST="${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Resources/oak"
+          cp "$CLI/dist/oak" "$DEST"
+          chmod +x "$DEST"
+          if [ -n "${EXPANDED_CODE_SIGN_IDENTITY:-}" ] && [ "${EXPANDED_CODE_SIGN_IDENTITY}" != "-" ]; then
+            codesign --force --options runtime --timestamp=none \
+                     --sign "${EXPANDED_CODE_SIGN_IDENTITY}" "$DEST"
+          else
+            codesign --force --sign - "$DEST"
+          fi
         name: "Embed oak CLI"
       # Prompt files travel with the app so the sidecar can read them. They are
       # data, not code: editing one changes what the assistant is told without
@@ -205,26 +224,6 @@ targets:
           BUNDLE_NAME: "OakReader"
           BUNDLE_URL_SCHEME: "oakreader"
           ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-
-  oak:
-    type: tool
-    platform: macOS
-    sources:
-      - path: cli
-    dependencies:
-      - package: OakAgent
-      - package: GRDB
-        product: GRDB
-      - package: swift-argument-parser
-        product: ArgumentParser
-    settings:
-      base:
-        PRODUCT_NAME: oak
-        SWIFT_STRICT_CONCURRENCY: minimal
-        # Keep oak out of the archive's install products — it's embedded into the
-        # app bundle by the "Embed oak CLI" script, not shipped as a standalone
-        # tool. Leaving it installed bloats the archive with a stray /usr/local/bin/oak.
-        SKIP_INSTALL: YES
 
   # Unit tests for app services that are pure value logic. Deliberately NOT hosted on
   # the OakReader target: that would make every `swift test` run the app's script
