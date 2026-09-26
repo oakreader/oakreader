@@ -5,7 +5,7 @@
 // `keychain-access-groups` (5Y27G7B6D8.com.oakreader.keys). DEVELOPER_ENTITLEMENTS
 // is empty, so the path resolves to OakReader.entitlements (no -dev suffix).
 DEVELOPER_ENTITLEMENTS =
-CODE_SIGN_ENTITLEMENTS = OakReader/OakReader$(DEVELOPER_ENTITLEMENTS).entitlements
+CODE_SIGN_ENTITLEMENTS = app/OakReader$(DEVELOPER_ENTITLEMENTS).entitlements
 
 // Distribution signing must be deterministic and must NOT be weakened by a
 // local DeveloperSettings.xcconfig, so re-assert it AFTER the include. Only the

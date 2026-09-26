@@ -8,7 +8,7 @@
 // In Debug, API keys fall back to the login keychain / provider env vars; see
 // OakAgent/KeychainConfig.swift (the `#if DEBUG` branch).
 DEVELOPER_ENTITLEMENTS = -dev
-CODE_SIGN_ENTITLEMENTS = OakReader/OakReader$(DEVELOPER_ENTITLEMENTS).entitlements
+CODE_SIGN_ENTITLEMENTS = app/OakReader$(DEVELOPER_ENTITLEMENTS).entitlements
 
 // Identity / style / team come from OakReader-common.xcconfig and any local
 // DeveloperSettings.xcconfig override. Do NOT re-assign them here — a later
