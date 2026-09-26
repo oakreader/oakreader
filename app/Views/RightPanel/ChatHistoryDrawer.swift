@@ -17,7 +17,7 @@ struct ChatHistoryDrawer: View {
             }
         }
         .onAppear {
-            chatVM.loadSessionList()
+            Task { await chatVM.loadSessionList() }
         }
         .confirmationDialog(
             "Delete this conversation?",

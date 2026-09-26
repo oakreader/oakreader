@@ -224,3 +224,15 @@ struct BackendProviderSummary: Decodable, Identifiable, Hashable {
     var baseUrlOverride: String?
     var localUrl: String?
 }
+
+/// A chat session's metadata on the wire. The transcript is a JSONL file the
+/// shell owns; this row is the index over it.
+struct CatalogConversation: Codable {
+    var id: String
+    /// Null for library-wide chats not about one document.
+    var itemId: String?
+    var title: String
+    var messageCount: Int
+    var createdAt: String
+    var updatedAt: String
+}

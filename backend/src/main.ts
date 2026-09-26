@@ -14,6 +14,9 @@ import {
   PROTOCOL_VERSION, RpcError,
   PingParams, ProvidersListParams,
   PromptsComposeParams, type PromptsComposeResult,
+  ConversationsListParams, ConversationsCreateParams,
+  ConversationsUpdateParams, ConversationsDeleteParams,
+  type ConversationsListResult,
   AnnotationsListParams, AnnotationsGetParams,
   AnnotationsUpsertParams, AnnotationsDeleteParams,
   type AnnotationsListResult, type AnnotationsGetResult,
@@ -34,6 +37,7 @@ import { PromptLibrary } from "./prompts.js";
 import { Catalog } from "./catalog/db.js";
 import { WordLookupStore } from "./catalog/wordLookups.js";
 import { AnnotationStore } from "./catalog/annotations.js";
+import { ConversationStore } from "./catalog/conversations.js";
 
 const BACKEND_ID = "oak-backend 0.2.0";
 
@@ -335,6 +339,28 @@ function registerMethods(): void {
   // --- catalog ----------------------------------------------------------
   // Phase 1: the shell stops opening library.sqlite and asks instead. Exactly
   // one process owns the schema, and it is this one.
+
+  peer.onRequest("catalog/conversations/list", ConversationsListParams,
+    (p): ConversationsListResult => {
+      const store = new ConversationStore(catalog().db, LOCAL_USER);
+      return { conversations: store.list(p.itemId ?? null) };
+    });
+
+  peer.onRequest("catalog/conversations/create", ConversationsCreateParams, (p) => {
+    new ConversationStore(catalog().db, LOCAL_USER).create(p.conversation);
+    return {};
+  });
+
+  peer.onRequest("catalog/conversations/update", ConversationsUpdateParams, (p) => {
+    new ConversationStore(catalog().db, LOCAL_USER)
+      .update(p.id, p.title, p.messageCount, p.at);
+    return {};
+  });
+
+  peer.onRequest("catalog/conversations/delete", ConversationsDeleteParams, (p) => {
+    new ConversationStore(catalog().db, LOCAL_USER).delete(p.id);
+    return {};
+  });
 
   peer.onRequest("catalog/annotations/list", AnnotationsListParams, (p): AnnotationsListResult => {
     const store = new AnnotationStore(catalog().db, LOCAL_USER);

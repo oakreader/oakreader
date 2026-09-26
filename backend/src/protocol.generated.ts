@@ -2,10 +2,10 @@
 // Run `pnpm protocol:generate` after changing the schema.
 
 import { z } from "zod";
-import { WireMessage, WireToolDef, WordLookup, Annotation, type ProviderSummary, type EventToolCall, type PromptOption } from "./protocol.base.js";
+import { WireMessage, WireToolDef, WordLookup, Annotation, Conversation, type ProviderSummary, type EventToolCall, type PromptOption } from "./protocol.base.js";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- refs used by generated shapes
 
-export const PROTOCOL_VERSION = 6;
+export const PROTOCOL_VERSION = 7;
 
 /** JSON-RPC 2.0 error codes. Below -32000 is ours; the rest is the spec's. */
 export const RpcError = {
@@ -182,6 +182,39 @@ export const AnnotationsDeleteParams = z.object({
 export type AnnotationsDeleteParams = z.infer<typeof AnnotationsDeleteParams>;
 export type AnnotationsDeleteResult = Record<string, never>;
 
+/** `catalog/conversations/list` — Sessions for one document, or the library-wide ones when itemId is absent. Most recently updated first. */
+export const ConversationsListParams = z.object({
+  itemId: z.string().optional(),
+});
+export type ConversationsListParams = z.infer<typeof ConversationsListParams>;
+export type ConversationsListResult = {
+  conversations: Conversation[];
+};
+
+/** `catalog/conversations/create` */
+export const ConversationsCreateParams = z.object({
+  conversation: Conversation,
+});
+export type ConversationsCreateParams = z.infer<typeof ConversationsCreateParams>;
+export type ConversationsCreateResult = Record<string, never>;
+
+/** `catalog/conversations/update` — Title and message count, as the session grows. */
+export const ConversationsUpdateParams = z.object({
+  id: z.string(),
+  title: z.string(),
+  messageCount: z.number().int().positive(),
+  at: z.string(),
+});
+export type ConversationsUpdateParams = z.infer<typeof ConversationsUpdateParams>;
+export type ConversationsUpdateResult = Record<string, never>;
+
+/** `catalog/conversations/delete` — Removes the index row. The JSONL transcript is the shell's to delete. */
+export const ConversationsDeleteParams = z.object({
+  id: z.string(),
+});
+export type ConversationsDeleteParams = z.infer<typeof ConversationsDeleteParams>;
+export type ConversationsDeleteResult = Record<string, never>;
+
 /** `prompts/compose` — The static half of the system prompt: base.md plus the named mixins. The shell appends live context afterwards -- that half cannot be a file. */
 export const PromptsComposeParams = z.object({
   /** Mixin names, without .md, in the order they should appear. */
@@ -312,6 +345,10 @@ export const ClientRequests = {
   "catalog/annotations/get": AnnotationsGetParams,
   "catalog/annotations/upsert": AnnotationsUpsertParams,
   "catalog/annotations/delete": AnnotationsDeleteParams,
+  "catalog/conversations/list": ConversationsListParams,
+  "catalog/conversations/create": ConversationsCreateParams,
+  "catalog/conversations/update": ConversationsUpdateParams,
+  "catalog/conversations/delete": ConversationsDeleteParams,
   "prompts/compose": PromptsComposeParams,
   "catalog/wordLookups/list": WordLookupsListParams,
   "catalog/wordLookups/save": WordLookupsSaveParams,
@@ -343,6 +380,10 @@ export interface ClientRequestResults {
   "catalog/annotations/get": AnnotationsGetResult;
   "catalog/annotations/upsert": AnnotationsUpsertResult;
   "catalog/annotations/delete": AnnotationsDeleteResult;
+  "catalog/conversations/list": ConversationsListResult;
+  "catalog/conversations/create": ConversationsCreateResult;
+  "catalog/conversations/update": ConversationsUpdateResult;
+  "catalog/conversations/delete": ConversationsDeleteResult;
   "prompts/compose": PromptsComposeResult;
   "catalog/wordLookups/list": WordLookupsListResult;
   "catalog/wordLookups/save": WordLookupsSaveResult;

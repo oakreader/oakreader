@@ -194,7 +194,7 @@ struct AIChatView: View {
                 if chatVM.showHistory {
                     chatVM.showHistory = false
                 } else {
-                    chatVM.loadSessionList()
+                    Task { await chatVM.loadSessionList() }
                     chatVM.showHistory = true
                 }
             }

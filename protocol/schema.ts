@@ -10,7 +10,7 @@
  * fails if the committed output is stale.
  */
 
-export const PROTOCOL_VERSION = 6;
+export const PROTOCOL_VERSION = 7;
 
 export type FieldType =
   | { k: "string" }
@@ -182,6 +182,38 @@ export const METHODS: Method[] = [
       { name: "hard", type: bool, default: "false" },
       { name: "at", type: str, optional: true, doc: "Tombstone timestamp; required unless hard." },
     ],
+    result: [],
+  },
+
+  {
+    name: "catalog/conversations/list", type: "ConversationsList", kind: "request", from: "client",
+    doc: "Sessions for one document, or the library-wide ones when itemId is absent. " +
+         "Most recently updated first.",
+    params: [{ name: "itemId", type: str, optional: true }],
+    result: [{ name: "conversations",
+      type: { k: "array", of: { k: "ref", ts: "Conversation", swift: "CatalogConversation" } } }],
+  },
+  {
+    name: "catalog/conversations/create", type: "ConversationsCreate", kind: "request", from: "client",
+    params: [{ name: "conversation",
+      type: { k: "ref", ts: "Conversation", swift: "CatalogConversation" } }],
+    result: [],
+  },
+  {
+    name: "catalog/conversations/update", type: "ConversationsUpdate", kind: "request", from: "client",
+    doc: "Title and message count, as the session grows.",
+    params: [
+      { name: "id", type: str },
+      { name: "title", type: str },
+      { name: "messageCount", type: int },
+      { name: "at", type: str },
+    ],
+    result: [],
+  },
+  {
+    name: "catalog/conversations/delete", type: "ConversationsDelete", kind: "request", from: "client",
+    doc: "Removes the index row. The JSONL transcript is the shell's to delete.",
+    params: [{ name: "id", type: str }],
     result: [],
   },
 

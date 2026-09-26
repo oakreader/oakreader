@@ -177,27 +177,6 @@ struct ItemPropertyValueRecord: Codable, FetchableRecord, MutablePersistableReco
 
 // MARK: - Conversations
 
-struct ConversationRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable {
-    static let databaseTableName = "conversations"
-
-    var id: String
-    var userId: String
-    var itemId: String?
-    var title: String
-    var messageCount: Int
-    var createdAt: String
-    var updatedAt: String
-
-    enum CodingKeys: String, CodingKey, ColumnExpression {
-        case id
-        case userId = "user_id"
-        case itemId = "item_id"
-        case title
-        case messageCount = "message_count"
-        case createdAt = "created_at"
-        case updatedAt = "updated_at"
-    }
-}
 
 // MARK: - Citations
 

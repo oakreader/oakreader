@@ -144,3 +144,15 @@ export const Annotation = z.object({
   deletedAt: z.string().nullable(),
 });
 export type Annotation = z.infer<typeof Annotation>;
+
+/** A chat session's metadata. The transcript itself is a JSONL file the shell owns. */
+export const Conversation = z.object({
+  id: z.string(),
+  /** Null for library-wide chats not about one document. */
+  itemId: z.string().nullable(),
+  title: z.string(),
+  messageCount: z.number().int(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type Conversation = z.infer<typeof Conversation>;

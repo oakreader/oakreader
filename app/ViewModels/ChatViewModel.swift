@@ -609,7 +609,7 @@ class ChatViewModel {
                   )
             else { return }
             // Persist and reflect into the in-memory list so the sidebar updates live.
-            try? self.sessionService?.updateSession(id: sid, title: title, messageCount: count)
+            await self.sessionService?.updateSession(id: sid, title: title, messageCount: count)
             if let idx = self.sessionList.firstIndex(where: { $0.id == sid }) {
                 self.sessionList[idx].title = title
             }
@@ -896,11 +896,10 @@ class ChatViewModel {
     func clearSession() {
         cancelActiveStreamForSwitch()
         let oldSessionId = sessionId
-        Task {
+        let hadRecord = sessionRecordCreated
+        Task { [sessionService] in
             await engine.deleteSession(oldSessionId)
-        }
-        if sessionRecordCreated {
-            try? sessionService?.deleteSession(id: oldSessionId)
+            if hadRecord { await sessionService?.deleteSession(id: oldSessionId) }
         }
         CitationSourceRegistry.deleteTable(sessionId: oldSessionId,
                                            directory: CatalogDatabase.chatsDirectory)
@@ -914,24 +913,20 @@ class ChatViewModel {
 
     // MARK: - Session History
 
-    func loadSessionList() {
+    func loadSessionList() async {
         guard let service = sessionService else { return }
-        do {
-            if let docId = itemId {
-                sessionList = try service.fetchSessions(forItemId: docId)
-            } else {
-                sessionList = try service.fetchLibrarySessions()
-            }
-        } catch {
-            sessionList = []
+        if let docId = itemId {
+            sessionList = await service.fetchSessions(forItemId: docId)
+        } else {
+            sessionList = await service.fetchLibrarySessions()
         }
     }
 
     func deleteSessionFromList(_ id: UUID) {
-        // Delete from DB
-        try? sessionService?.deleteSession(id: id)
-        // Delete JSONL file + the conversation's citation source table
+        // The index row and the transcript are deleted by their owners: the
+        // core drops the row, the shell drops the JSONL file.
         Task {
+            await sessionService?.deleteSession(id: id)
             await engine.deleteSession(id)
         }
         CitationSourceRegistry.deleteTable(sessionId: id,
@@ -1066,14 +1061,14 @@ class ChatViewModel {
         if !sessionRecordCreated {
             // First message in this session — create the DB record
             let title = String(firstUserMessage.prefix(50))
-            try? service.createSession(id: sessionId, title: title, itemId: itemId)
+            Task { await service.createSession(id: sessionId, title: title, itemId: itemId) }
             sessionRecordCreated = true
         } else {
             // Subsequent messages — update count and timestamp
             let messageCount = turns.filter { !$0.isStreaming }.count + 1 // +1 for this message
             let title = turns.first(where: { $0.role == .user })?.content.prefix(50).description
                 ?? firstUserMessage.prefix(50).description
-            try? service.updateSession(id: sessionId, title: title, messageCount: messageCount)
+            Task { await service.updateSession(id: sessionId, title: title, messageCount: messageCount) }
         }
     }
 }

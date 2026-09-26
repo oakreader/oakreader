@@ -31,13 +31,15 @@ struct ConversationMeta: Identifiable, Hashable {
         self.snippet = snippet
     }
 
-    init(record: ConversationRecord, snippet: String = "") {
-        self.id = UUID(uuidString: record.id) ?? UUID()
-        self.title = record.title
-        self.itemId = record.itemId.flatMap { UUID(uuidString: $0) }
-        self.createdAt = Date(iso8601String: record.createdAt) ?? Date()
-        self.lastMessageAt = Date(iso8601String: record.updatedAt) ?? Date()
-        self.messageCount = record.messageCount
+    /// From the core's row. `snippet` is filled in separately, from the JSONL
+    /// transcript on disk — the shell owns those files, so it owns the teaser.
+    init(wire: CatalogConversation, snippet: String = "") {
+        self.id = UUID(uuidString: wire.id) ?? UUID()
+        self.title = wire.title
+        self.itemId = wire.itemId.flatMap { UUID(uuidString: $0) }
+        self.createdAt = Date(iso8601String: wire.createdAt) ?? Date()
+        self.lastMessageAt = Date(iso8601String: wire.updatedAt) ?? Date()
+        self.messageCount = wire.messageCount
         self.snippet = snippet
     }
 }

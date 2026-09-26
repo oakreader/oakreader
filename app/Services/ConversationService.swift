@@ -1,33 +1,39 @@
 import Foundation
-import GRDB
 
-/// Stateless service for conversation CRUD operations.
-/// Metadata lives in the GRDB `conversations` table; message content lives as JSONL files on disk.
+/// Chat-session metadata, indexed by the core; transcripts are JSONL files here.
+///
+/// The split is older than the migration and worth keeping: a transcript is an
+/// append-only log, which a relational row models badly. So the core owns the
+/// index and this owns the files — including `snippet`, which reads a bounded
+/// prefix of one to produce the history list's teaser.
 struct ConversationService {
-    let database: CatalogDatabase
-
     // MARK: - Fetch
 
-    /// Fetch all conversations for a specific item, ordered by updated_at descending.
-    func fetchSessions(forItemId itemId: String) throws -> [ConversationMeta] {
-        let records = try database.dbQueue.read { db in
-            try ConversationRecord
-                .filter(ConversationRecord.CodingKeys.itemId == itemId)
-                .order(ConversationRecord.CodingKeys.updatedAt.desc)
-                .fetchAll(db)
-        }
-        return records.map { ConversationMeta(record: $0, snippet: snippet(forId: $0.id)) }
+    /// Sessions for one document, newest first, each with its teaser line.
+    func fetchSessions(forItemId itemId: String) async -> [ConversationMeta] {
+        await fetch(itemId: itemId)
     }
 
-    /// Fetch all library conversations (item_id IS NULL), ordered by updated_at descending.
-    func fetchLibrarySessions() throws -> [ConversationMeta] {
-        let records = try database.dbQueue.read { db in
-            try ConversationRecord
-                .filter(ConversationRecord.CodingKeys.itemId == nil)
-                .order(ConversationRecord.CodingKeys.updatedAt.desc)
-                .fetchAll(db)
+    /// Library-wide sessions (no document), newest first.
+    func fetchLibrarySessions() async -> [ConversationMeta] {
+        await fetch(itemId: nil)
+    }
+
+    private func fetch(itemId: String?) async -> [ConversationMeta] {
+        do {
+            let result = try await NodeBackend.shared.call(
+                RPC.Method.conversationsList,
+                params: RPC.ConversationsListParams(itemId: itemId),
+                as: RPC.ConversationsListResult.self)
+            // The teaser comes from the transcript on disk, so it is filled in
+            // here rather than travelling over the protocol.
+            return (result.conversations ?? []).map {
+                ConversationMeta(wire: $0, snippet: snippet(forId: $0.id))
+            }
+        } catch {
+            Log.error(Log.store, "conversations/list failed: \(error.localizedDescription)")
+            return []
         }
-        return records.map { ConversationMeta(record: $0, snippet: snippet(forId: $0.id)) }
     }
 
     // MARK: - Snippet
@@ -82,40 +88,44 @@ struct ConversationService {
     // MARK: - Create
 
     @discardableResult
-    func createSession(id: UUID, title: String, itemId: String?) throws -> ConversationMeta {
+    func createSession(id: UUID, title: String, itemId: String?) async -> ConversationMeta {
         let now = Date().iso8601String
-        var record = ConversationRecord(
-            id: id.uuidString,
-            userId: localUserId,
-            itemId: itemId,
-            title: title,
-            messageCount: 0,
-            createdAt: now,
-            updatedAt: now
-        )
-        try database.dbQueue.write { db in
-            try record.insert(db)
+        let wire = CatalogConversation(
+            id: id.uuidString, itemId: itemId, title: title,
+            messageCount: 0, createdAt: now, updatedAt: now)
+        do {
+            try await NodeBackend.shared.call(
+                RPC.Method.conversationsCreate,
+                params: RPC.ConversationsCreateParams(conversation: wire))
+        } catch {
+            Log.error(Log.store, "conversations/create failed: \(error.localizedDescription)")
         }
-        return ConversationMeta(record: record)
+        return ConversationMeta(wire: wire, snippet: "")
     }
 
     // MARK: - Update
 
-    func updateSession(id: UUID, title: String, messageCount: Int) throws {
-        let now = Date().iso8601String
-        try database.dbQueue.write { db in
-            try db.execute(
-                sql: "UPDATE conversations SET title = ?, message_count = ?, updated_at = ? WHERE id = ?",
-                arguments: [title, messageCount, now, id.uuidString]
-            )
+    func updateSession(id: UUID, title: String, messageCount: Int) async {
+        do {
+            try await NodeBackend.shared.call(
+                RPC.Method.conversationsUpdate,
+                params: RPC.ConversationsUpdateParams(
+                    id: id.uuidString, title: title,
+                    messageCount: messageCount, at: Date().iso8601String))
+        } catch {
+            Log.error(Log.store, "conversations/update failed: \(error.localizedDescription)")
         }
     }
 
     // MARK: - Delete
 
-    func deleteSession(id: UUID) throws {
-        try database.dbQueue.write { db in
-            try db.execute(sql: "DELETE FROM conversations WHERE id = ?", arguments: [id.uuidString])
+    func deleteSession(id: UUID) async {
+        do {
+            try await NodeBackend.shared.call(
+                RPC.Method.conversationsDelete,
+                params: RPC.ConversationsDeleteParams(id: id.uuidString))
+        } catch {
+            Log.error(Log.store, "conversations/delete failed: \(error.localizedDescription)")
         }
     }
 }

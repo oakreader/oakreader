@@ -9,7 +9,7 @@ import Foundation
 /// Reverse calls (tool/execute, oauth/prompt) are ordinary requests in the
 /// other direction, so they need no separate machinery.
 enum RPC {
-    static let version = 6
+    static let version = 7
 
     /// JSON-RPC error codes. The shell branches on these: re-authenticate
     /// is a different affordance from retry, and the old single error string
@@ -56,6 +56,10 @@ enum RPC {
         static let annotationsGet = "catalog/annotations/get"
         static let annotationsUpsert = "catalog/annotations/upsert"
         static let annotationsDelete = "catalog/annotations/delete"
+        static let conversationsList = "catalog/conversations/list"
+        static let conversationsCreate = "catalog/conversations/create"
+        static let conversationsUpdate = "catalog/conversations/update"
+        static let conversationsDelete = "catalog/conversations/delete"
         static let promptsCompose = "prompts/compose"
         static let wordLookupsList = "catalog/wordLookups/list"
         static let wordLookupsSave = "catalog/wordLookups/save"
@@ -218,6 +222,44 @@ enum RPC {
         var at: String?
     }
     struct AnnotationsDeleteResult: Decodable {
+        init() {}
+    }
+
+    // MARK: catalog/conversations/list
+    /// Sessions for one document, or the library-wide ones when itemId is absent. Most recently updated first.
+    struct ConversationsListParams: Encodable {
+        var itemId: String?
+    }
+    struct ConversationsListResult: Decodable {
+        var conversations: [CatalogConversation]
+    }
+
+    // MARK: catalog/conversations/create
+    struct ConversationsCreateParams: Encodable {
+        var conversation: CatalogConversation
+    }
+    struct ConversationsCreateResult: Decodable {
+        init() {}
+    }
+
+    // MARK: catalog/conversations/update
+    /// Title and message count, as the session grows.
+    struct ConversationsUpdateParams: Encodable {
+        var `id`: String
+        var title: String
+        var messageCount: Int
+        var at: String
+    }
+    struct ConversationsUpdateResult: Decodable {
+        init() {}
+    }
+
+    // MARK: catalog/conversations/delete
+    /// Removes the index row. The JSONL transcript is the shell's to delete.
+    struct ConversationsDeleteParams: Encodable {
+        var `id`: String
+    }
+    struct ConversationsDeleteResult: Decodable {
         init() {}
     }
 

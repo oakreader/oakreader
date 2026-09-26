@@ -80,7 +80,7 @@ class DocumentViewModel {
         let storagePath = documentStoragePath
         let vm = ChatViewModel(parent: self, documentStoragePath: storagePath)
         if let db = database {
-            vm.sessionService = ConversationService(database: db)
+            vm.sessionService = ConversationService()
         }
         if let item = libraryItem {
             vm.itemId = item.id.uuidString
