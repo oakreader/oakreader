@@ -1,38 +1,60 @@
 import Foundation
 import OSLog
 
-/// Owns the Node sidecar process: locate, spawn, handshake, supervise, and
-/// multiplex JSONL requests over its stdio. One instance per app.
+/// Owns the sidecar process and speaks JSON-RPC 2.0 to it over stdio.
 ///
-/// v2: the sidecar owns providers/credentials/OAuth and the agentic loop, so
-/// this actor exposes three shapes:
-///  - `request(_:)`  — single response commands (catalog, credentials, config)
-///  - `events(for:)` — streaming commands (`complete`, `chat`, `oauth_login`);
-///    the stream yields every event for the request id until a terminal one
-///  - `send(_:)`     — fire-and-forget replies (`tool_result`, prompt results)
+/// The peer is symmetric: both sides send requests, and a reverse call
+/// (`tool/execute`, `oauth/prompt`) is an ordinary request that happens to
+/// arrive rather than depart. That is why there is one `pending` map instead
+/// of the three bespoke correlation tables the previous protocol needed, and
+/// why cancellation is one notification rather than a prefix scan over
+/// string-concatenated keys.
+///
+/// Three call shapes, matching the spec rather than our old ad-hoc scheme:
+///  - `call(_:params:as:)`   — request, awaits a typed result or throws RPCErrorObject
+///  - `stream(_:params:as:)` — request whose progress notifications are yielded
+///                             until the response finishes the stream
+///  - `notify(_:params:)`    — notification, no reply expected
+/// Inbound requests are served by handlers registered with `setHandler`.
 actor NodeBackend {
     static let shared = NodeBackend()
 
     private static let log = Logger(subsystem: "com.oakreader.OakReader", category: "NodeBackend")
     private static let maxSpawnAttempts = 3
     private static let writeQueue = DispatchQueue(label: "com.oakreader.NodeBackend.stdin")
-    /// Ceiling for a single-response command. Generous: model-catalog
-    /// refreshes and OAuth token exchanges both hit the network.
+    /// Ceiling for a plain request. Generous: model-catalog refreshes and OAuth
+    /// token exchanges both hit the network. Streaming calls are exempt — a chat
+    /// turn may idle while the user decides on a tool confirmation.
     private static let requestTimeout = Duration.seconds(30)
 
     private var process: Process?
     private var stdinHandle: FileHandle?
     private var stdoutBuffer = Data()
-    private var streams: [String: AsyncThrowingStream<BackendEvent, Error>.Continuation] = [:]
     private var nextId = 0
     private var spawnAttempts = 0
     private var handshaken = false
 
+    /// Requests we sent, awaiting their response. Both plain and streaming
+    /// calls live here; a streaming one also has an entry in `progress`.
+    private var pending: [String: CheckedContinuation<JSONFragment?, Error>] = [:]
+    /// Streaming calls, by request id, fed by notifications carrying that token.
+    private var progress: [String: AsyncThrowingStream<RPCStreamEvent, Error>.Continuation] = [:]
+    /// Handlers for requests the sidecar sends us.
+    private var handlers: [String: (JSONFragment?) async -> Result<JSONFragment?, RPCErrorObject>] = [:]
+
     // MARK: - Public
 
-    func makeRequestId(prefix: String = "r") -> String {
+    private func nextRequestId() -> String {
         nextId += 1
-        return "\(prefix)\(nextId)"
+        return "c\(nextId)"
+    }
+
+    /// Serve inbound requests for one method. Registered once at startup.
+    func setHandler(
+        _ method: String,
+        _ handler: @escaping (JSONFragment?) async -> Result<JSONFragment?, RPCErrorObject>
+    ) {
+        handlers[method] = handler
     }
 
     /// True when the sidecar is running and answered the ping handshake.
@@ -57,126 +79,191 @@ actor NodeBackend {
         return handshaken
     }
 
-    /// Single-response command. Throws `NodeBackendError` when the sidecar is
-    /// unavailable or the command fails.
-    func request(_ command: BackendCommand) async throws -> BackendEvent {
+    /// A request that returns once. Throws `RPCErrorObject` when the sidecar
+    /// answers with an error — the code is what lets callers branch.
+    func call<P: Encodable, R: Decodable>(
+        _ method: String, params: P, as: R.Type
+    ) async throws -> R {
         guard await ensureRunning() else { throw NodeBackendError.notRunning }
-        // A sidecar that wedges without exiting never fires terminationHandler,
-        // so without this the caller waits forever on a reply that is not
-        // coming. Streaming commands are deliberately exempt: a chat turn can
-        // legitimately sit idle while the user decides on a tool confirmation.
+        let id = nextRequestId()
         let deadline = Task {
             try await Task.sleep(for: Self.requestTimeout)
-            await self.failStream(id: command.id, with: .timedOut)
+            await self.failPending(id: id, with: NodeBackendError.timedOut)
         }
         defer { deadline.cancel() }
-        for try await event in eventStream(for: command) {
-            if event.type == "response" || event.type == "error" { return event }
-        }
-        throw NodeBackendError.crashed
+        let result = try await send(id: id, method: method, params: params)
+        return try RPCCoding.decode(R.self, from: result)
     }
 
-    /// Streaming command: yields every event carrying the command's id.
-    /// Terminal events (`done`, `error` for complete/chat; `response` for
-    /// oauth_login) finish the stream — an `error` event finishes by throwing.
-    /// Cancelling the consumer sends `abort`.
-    func events(for command: BackendCommand) async -> AsyncThrowingStream<BackendEvent, Error> {
+    /// A request whose only outcome is success or an error.
+    func call<P: Encodable>(_ method: String, params: P) async throws {
+        _ = try await call(method, params: params, as: RPCEmpty.self)
+    }
+
+    /// A request whose progress notifications are delivered as they arrive.
+    /// The stream finishes when the response lands and throws when it is an
+    /// error. Cancelling the consumer sends `$/cancelRequest`.
+    func stream<P: Encodable>(
+        _ method: String, params: P
+    ) async -> AsyncThrowingStream<RPCStreamEvent, Error> {
         guard await ensureRunning() else {
             return AsyncThrowingStream { $0.finish(throwing: NodeBackendError.notRunning) }
         }
-        return eventStream(for: command)
-    }
-
-    /// Fire-and-forget (tool_result, oauth_prompt_result, abort).
-    func send(_ command: BackendCommand) {
-        try? write(command)
-    }
-
-    func shutdown() {
-        terminate()
-    }
-
-    // MARK: - Stream plumbing
-
-    private func eventStream(for command: BackendCommand) -> AsyncThrowingStream<BackendEvent, Error> {
-        let id = command.id
+        let id = nextRequestId()
         return AsyncThrowingStream { continuation in
             continuation.onTermination = { termination in
                 if case .cancelled = termination {
-                    Task { await self.abortRequest(id: id) }
-                } else {
-                    Task { await self.dropStream(id: id) }
+                    Task { await self.cancel(id: id) }
                 }
             }
-            Task { await self.begin(id: id, command: command, continuation: continuation) }
+            Task {
+                await self.attachProgress(id: id, continuation: continuation)
+                do {
+                    _ = try await self.send(id: id, method: method, params: params)
+                    await self.finishProgress(id: id, error: nil)
+                } catch {
+                    await self.finishProgress(id: id, error: error)
+                }
+            }
         }
     }
 
-    private func begin(
-        id: String, command: BackendCommand,
-        continuation: AsyncThrowingStream<BackendEvent, Error>.Continuation
+    /// Answer a reverse call that arrived on a stream.
+    func respond<R: Encodable>(to id: String, with result: R) {
+        guard let fragment = try? RPCCoding.fragment(result) else {
+            respondError(to: id, code: RPC.ErrorCode.internalError, message: "could not encode result")
+            return
+        }
+        try? write(.response(id: id, result: fragment))
+    }
+
+    func respondError(to id: String, code: Int, message: String) {
+        try? write(.failure(id: id, code: code, message: message))
+    }
+
+    /// Fire-and-forget. No id, so the peer must not reply.
+    func notify<P: Encodable>(_ method: String, params: P) async {
+        guard let fragment = try? RPCCoding.fragment(params) else { return }
+        try? write(.notification(method: method, params: fragment))
+    }
+
+    func shutdown() { terminate() }
+
+    // MARK: - Request plumbing
+
+    private func send<P: Encodable>(id: String, method: String, params: P) async throws -> JSONFragment? {
+        let fragment = try RPCCoding.fragment(params)
+        return try await withCheckedThrowingContinuation { continuation in
+            pending[id] = continuation
+            do {
+                try write(.request(id: id, method: method, params: fragment))
+            } catch {
+                pending.removeValue(forKey: id)
+                continuation.resume(throwing: error)
+            }
+        }
+    }
+
+    private func attachProgress(
+        id: String, continuation: AsyncThrowingStream<RPCStreamEvent, Error>.Continuation
     ) {
-        streams[id] = continuation
-        do {
-            try write(command)
-        } catch {
-            streams.removeValue(forKey: id)
-            continuation.finish(throwing: error)
-        }
+        progress[id] = continuation
     }
 
-    private func abortRequest(id: String) {
-        guard streams.removeValue(forKey: id) != nil else { return }
-        try? write(BackendCommand(id: id, type: "abort"))
+    private func finishProgress(id: String, error: Error?) {
+        guard let continuation = progress.removeValue(forKey: id) else { return }
+        if let error { continuation.finish(throwing: error) } else { continuation.finish() }
     }
 
-    private func dropStream(id: String) {
-        streams.removeValue(forKey: id)
+    private func failPending(id: String, with error: Error) {
+        pending.removeValue(forKey: id)?.resume(throwing: error)
+    }
+
+    /// One notification replaces the previous protocol's per-request abort
+    /// command plus the prefix scan that cleaned up its children.
+    private func cancel(id: String) async {
+        guard pending[id] != nil else { return }
+        await notify(RPC.Method.cancelRequest, params: RPC.CancelRequestParams(id: id))
     }
 
     private func pingHandshake() async -> Bool {
-        let id = makeRequestId(prefix: "p")
         do {
+            let id = nextRequestId()
             let deadline = Task {
                 try await Task.sleep(for: .seconds(5))
-                await self.failStream(id: id)
+                await self.failPending(id: id, with: NodeBackendError.timedOut)
             }
             defer { deadline.cancel() }
-            for try await event in eventStream(for: BackendCommand(id: id, type: "ping")) {
-                if event.type == "response" {
-                    return event.success == true && event.protocol == BackendProtocol.version
-                }
+            let raw = try await send(id: id, method: RPC.Method.ping, params: RPC.PingParams())
+            let result = try RPCCoding.decode(RPC.PingResult.self, from: raw)
+            if result.protocol != RPC.version {
+                Self.log.error("protocol mismatch: sidecar \(result.protocol), shell \(RPC.version)")
+                return false
             }
-        } catch {}
-        return false
+            Self.log.info("sidecar \(result.backend)")
+            return true
+        } catch {
+            return false
+        }
     }
 
-    private func failStream(id: String, with error: NodeBackendError = .notRunning) {
-        streams.removeValue(forKey: id)?.finish(throwing: error)
-    }
-
-    /// Frame a command onto the sidecar's stdin.
-    ///
-    /// The write itself happens off the actor. A pipe blocks its writer once
-    /// the reader is ~64 KB behind, and a frame can exceed that on its own — a
-    /// base64 image part, or a fat tool result. Blocking inside the actor would
-    /// stall every other call into it, including the `tool_result` the sidecar
-    /// is waiting for before it drains its input: a deadlock, not just
-    /// latency. The queue is serial, so frames still reach the sidecar in the
-    /// order they were produced.
-    private func write(_ command: BackendCommand) throws {
+    private func write(_ envelope: RPCEnvelope) throws {
         guard let stdinHandle else { throw NodeBackendError.notRunning }
-        var data = try JSONEncoder().encode(command)
+        var data = try JSONEncoder().encode(envelope)
         data.append(0x0A)
         let handle = stdinHandle
+        // Off the actor: a pipe blocks its writer once the reader is ~64 KB
+        // behind, and one frame can exceed that on its own. Blocking here would
+        // stall every other call into this actor, including the response the
+        // sidecar is waiting for before it drains its input. The queue is
+        // serial, so frames still arrive in order.
         Self.writeQueue.async {
-            do {
-                try handle.write(contentsOf: data)
-            } catch {
-                // The sidecar died mid-write; terminationHandler fails the
-                // in-flight streams, and request deadlines cover the rest.
-                Self.log.error("stdin write failed: \(error.localizedDescription)")
+            do { try handle.write(contentsOf: data) }
+            catch { Self.log.error("stdin write failed: \(error.localizedDescription)") }
+        }
+    }
+
+    // MARK: - Incoming
+
+    private func dispatch(_ envelope: RPCEnvelope) {
+        switch envelope.kind {
+        case .response(let id):
+            pending.removeValue(forKey: id)?.resume(returning: envelope.result)
+
+        case .failure(let id, let error):
+            pending.removeValue(forKey: id)?.resume(throwing: error)
+
+        case .notification(let method):
+            // Progress is addressed by the token naming the request it belongs to.
+            guard case .object(let fields)? = envelope.params,
+                  case .string(let token)? = fields["token"],
+                  let continuation = progress[token] else { return }
+            continuation.yield(.notification(method: method, params: envelope.params))
+
+        case .request(let id, let method):
+            // Scoped reverse call: if the params name a request of ours that is
+            // still streaming, its consumer owns the answer.
+            if case .object(let fields)? = envelope.params,
+               case .string(let token)? = fields["token"],
+               let continuation = progress[token] {
+                continuation.yield(.request(id: id, method: method, params: envelope.params))
+                return
             }
+            guard let handler = handlers[method] else {
+                try? write(.failure(id: id, code: RPC.ErrorCode.methodNotFound,
+                                    message: "no handler for \(method)"))
+                return
+            }
+            Task {
+                switch await handler(envelope.params) {
+                case .success(let result): try? await self.write(.response(id: id, result: result))
+                case .failure(let error):
+                    try? await self.write(.failure(id: id, code: error.code, message: error.message))
+                }
+            }
+
+        case .malformed:
+            Self.log.error("malformed envelope")
         }
     }
 
@@ -222,9 +309,14 @@ actor NodeBackend {
         handshaken = false
         stdinHandle = nil
         process = nil
-        let waiting = streams
-        streams = [:]
-        for (_, continuation) in waiting {
+        let waitingRequests = pending
+        pending = [:]
+        for (_, continuation) in waitingRequests {
+            continuation.resume(throwing: NodeBackendError.crashed)
+        }
+        let waitingStreams = progress
+        progress = [:]
+        for (_, continuation) in waitingStreams {
             continuation.finish(throwing: NodeBackendError.crashed)
         }
         Self.log.error("sidecar exited")
@@ -240,36 +332,21 @@ actor NodeBackend {
         handshaken = false
     }
 
-    // MARK: - Incoming events
+    // MARK: - Framing
 
     private func receive(_ data: Data) {
         guard !data.isEmpty else { return }
         stdoutBuffer.append(data)
-        // Strict JSONL: split on LF bytes only.
+        // Strict JSONL: split on LF bytes only, never on U+2028/U+2029.
         while let newline = stdoutBuffer.firstIndex(of: 0x0A) {
             let line = stdoutBuffer.subdata(in: stdoutBuffer.startIndex..<newline)
             stdoutBuffer.removeSubrange(stdoutBuffer.startIndex...newline)
             guard !line.isEmpty else { continue }
-            guard let event = try? JSONDecoder().decode(BackendEvent.self, from: line) else {
-                Self.log.error("undecodable event: \(String(data: line, encoding: .utf8) ?? "?")")
+            guard let envelope = try? JSONDecoder().decode(RPCEnvelope.self, from: line) else {
+                Self.log.error("undecodable envelope: \(String(data: line, encoding: .utf8) ?? "?")")
                 continue
             }
-            dispatch(event)
-        }
-    }
-
-    private func dispatch(_ event: BackendEvent) {
-        guard let continuation = streams[event.id] else { return }
-        switch event.type {
-        case "done", "response":
-            continuation.yield(event)
-            streams.removeValue(forKey: event.id)
-            continuation.finish()
-        case "error":
-            streams.removeValue(forKey: event.id)
-            continuation.finish(throwing: CompletionStreamError.provider(event.message ?? "backend error"))
-        default:
-            continuation.yield(event)
+            dispatch(envelope)
         }
     }
 

@@ -3,35 +3,70 @@
 
 import { z } from "zod";
 import { WireMessage, WireToolDef, type ProviderSummary, type EventToolCall, type PromptOption } from "./protocol.base.js";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- refs used by generated shapes
 
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
-// --- Commands (shell -> backend) ---------------------------------------
+/** JSON-RPC 2.0 error codes. Below -32000 is ours; the rest is the spec's. */
+export const RpcError = {
+  /** Malformed JSON (spec). */
+  parseError: -32700,
+  /** Not a valid Request object (spec). */
+  invalidRequest: -32600,
+  /** Unknown method (spec). */
+  methodNotFound: -32601,
+  /** Params failed validation (spec). */
+  invalidParams: -32602,
+  /** Unhandled failure (spec). */
+  internalError: -32603,
+  /** Rejected credentials; offer re-authentication. */
+  providerAuth: -31001,
+  /** Throttled; offer retry, `data.retryAfter` when known. */
+  providerRateLimit: -31002,
+  /** Unreachable or failing; offer another provider. */
+  providerUnavailable: -31003,
+  /** Ended by $/cancelRequest. */
+  cancelled: -31004,
+  /** The shell could not run the tool. */
+  toolFailed: -31005,
+  /** No credential or model configured for the provider. */
+  notConfigured: -31006,
+} as const;
+export type RpcErrorCode = (typeof RpcError)[keyof typeof RpcError];
 
-const id = z.string();
+// --- Params / results by method ----------------------------------------
 
-export const PingCommand = z.object({ id, type: z.literal("ping") });
+// zod schemas exist only for messages the shell SENDS us: you validate
+// what you receive, not what you produce. Server-originated messages get
+// plain types, which also keeps refs like ProviderSummary type-only.
 
-export const AbortCommand = z.object({ id, type: z.literal("abort") });
+/** `ping` — Handshake. The shell refuses to proceed on a protocol mismatch. */
+export const PingParams = z.object({
+});
+export type PingParams = z.infer<typeof PingParams>;
+export type PingResult = {
+  protocol: number;
+  backend: string;
+};
 
-/** One-shot completion (no tool loop). */
-export const CompleteCommand = z.object({
-  id,
-  type: z.literal("complete"),
+/** `complete` — One-shot completion. Streams chat/delta, resolves when finished. */
+export const CompleteParams = z.object({
   providerId: z.string(),
   model: z.string(),
   system: z.string().optional(),
   messages: z.array(WireMessage).min(1),
   maxTokens: z.number().int().positive().default(4096),
-  /** Explicit key for Test Connection (verify before saving). */
+  /** Explicit key for Test Connection, before anything is saved. */
   apiKey: z.string().optional(),
   baseUrl: z.string().optional(),
 });
+export type CompleteParams = z.infer<typeof CompleteParams>;
+export type CompleteResult = {
+  stopReason: string;
+};
 
-/** The agentic loop; calls back with tool_exec. */
-export const ChatCommand = z.object({
-  id,
-  type: z.literal("chat"),
+/** `chat` — The agentic loop. Streams chat/* notifications and calls tool/execute back. */
+export const ChatParams = z.object({
   providerId: z.string(),
   model: z.string(),
   system: z.string().optional(),
@@ -41,100 +76,192 @@ export const ChatCommand = z.object({
   reasoning: z.enum(["minimal", "low", "medium", "high", "xhigh", "max"]).optional(),
   maxIterations: z.number().int().positive().default(10),
 });
+export type ChatParams = z.infer<typeof ChatParams>;
+export type ChatResult = {
+  stopReason: string;
+};
 
-/** Answers a tool_exec event; `id` is the chat request id. */
-export const ToolResultCommand = z.object({
-  id,
-  type: z.literal("tool_result"),
-  callId: z.string(),
-  content: z.string(),
-  isError: z.boolean().default(false),
+/** `providers/list` */
+export const ProvidersListParams = z.object({
 });
+export type ProvidersListParams = z.infer<typeof ProvidersListParams>;
+export type ProvidersListResult = {
+  providers: ProviderSummary[];
+};
 
-export const ListProvidersCommand = z.object({ id, type: z.literal("list_providers") });
-
-export const SetApiKeyCommand = z.object({
-  id,
-  type: z.literal("set_api_key"),
+/** `credentials/set` */
+export const CredentialsSetParams = z.object({
   providerId: z.string(),
   key: z.string(),
 });
+export type CredentialsSetParams = z.infer<typeof CredentialsSetParams>;
+export type CredentialsSetResult = Record<string, never>;
 
-export const GetApiKeyCommand = z.object({
-  id,
-  type: z.literal("get_api_key"),
+/** `credentials/get` */
+export const CredentialsGetParams = z.object({
   providerId: z.string(),
 });
+export type CredentialsGetParams = z.infer<typeof CredentialsGetParams>;
+export type CredentialsGetResult = {
+  /** null when the provider has no key stored. */
+  apiKey?: string | null;
+};
 
-export const DeleteCredentialCommand = z.object({
-  id,
-  type: z.literal("delete_credential"),
+/** `credentials/delete` */
+export const CredentialsDeleteParams = z.object({
   providerId: z.string(),
 });
+export type CredentialsDeleteParams = z.infer<typeof CredentialsDeleteParams>;
+export type CredentialsDeleteResult = Record<string, never>;
 
-export const OAuthLoginCommand = z.object({
-  id,
-  type: z.literal("oauth_login"),
+/** `oauth/login` — Streams oauth/notify and calls oauth/prompt back for user input. */
+export const OAuthLoginParams = z.object({
   providerId: z.string(),
 });
+export type OAuthLoginParams = z.infer<typeof OAuthLoginParams>;
+export type OAuthLoginResult = Record<string, never>;
 
-/** Answers an oauth_prompt; `id` is the oauth_login request id. */
-export const OAuthPromptResultCommand = z.object({
-  id,
-  type: z.literal("oauth_prompt_result"),
-  promptId: z.string(),
-  /** Absent = cancelled. */
-  value: z.string().optional(),
-});
-
-export const SetBaseUrlCommand = z.object({
-  id,
-  type: z.literal("set_base_url"),
+/** `config/setBaseUrl` */
+export const ConfigSetBaseUrlParams = z.object({
   providerId: z.string(),
-  /** Absent = clear the override. */
+  /** Absent clears the override. */
   baseUrl: z.string().optional(),
 });
+export type ConfigSetBaseUrlParams = z.infer<typeof ConfigSetBaseUrlParams>;
+export type ConfigSetBaseUrlResult = Record<string, never>;
 
-export const SetLocalUrlCommand = z.object({
-  id,
-  type: z.literal("set_local_url"),
+/** `config/setLocalUrl` */
+export const ConfigSetLocalUrlParams = z.object({
   providerId: z.enum(["ollama", "lmstudio"]),
   baseUrl: z.string(),
 });
+export type ConfigSetLocalUrlParams = z.infer<typeof ConfigSetLocalUrlParams>;
+export type ConfigSetLocalUrlResult = Record<string, never>;
 
-export const RefreshModelsCommand = z.object({
-  id,
-  type: z.literal("refresh_models"),
+/** `models/refresh` */
+export const ModelsRefreshParams = z.object({
   providerId: z.string().optional(),
 });
+export type ModelsRefreshParams = z.infer<typeof ModelsRefreshParams>;
+export type ModelsRefreshResult = {
+  message?: string;
+};
 
-export const Command = z.discriminatedUnion("type", [
-  PingCommand,
-  AbortCommand,
-  CompleteCommand,
-  ChatCommand,
-  ToolResultCommand,
-  ListProvidersCommand,
-  SetApiKeyCommand,
-  GetApiKeyCommand,
-  DeleteCredentialCommand,
-  OAuthLoginCommand,
-  OAuthPromptResultCommand,
-  SetBaseUrlCommand,
-  SetLocalUrlCommand,
-  RefreshModelsCommand,
-]);
-export type Command = z.infer<typeof Command>;
+/** `$/cancelRequest` — LSP's spelling. The peer fails the named request and anything it spawned. */
+export const CancelRequestParams = z.object({
+  id: z.string(),
+});
+export type CancelRequestParams = z.infer<typeof CancelRequestParams>;
 
-// --- Events (backend -> shell) -----------------------------------------
+/** `tool/execute` — The shell runs the tool and answers. Tools read local app state, so they cannot run in the sidecar. */
+export type ToolExecuteParams = {
+  /** Id of the request this belongs to. */
+  token: string;
+  name: string;
+  args: Record<string, unknown>;
+};
+export type ToolExecuteResult = {
+  content: string;
+  isError: boolean;
+};
 
-export type Event =
-  | { id: string; type: "response"; command: string; success: boolean; protocol?: number; backend?: string; message?: string; providers?: ProviderSummary[]; apiKey?: string | null }
-  | { id: string; type: "delta"; text: string }
-  | { id: string; type: "thinking"; text: string }
-  | { id: string; type: "tool_exec"; callId: string; name: string; args: Record<string, unknown> }
-  | { id: string; type: "assistant"; text: string; thinking?: string; toolCalls: EventToolCall[] }
-  | { id: string; type: "oauth_notify"; kind: "info" | "auth_url" | "device_code" | "progress"; message?: string; url?: string; userCode?: string; verificationUri?: string }
-  | { id: string; type: "oauth_prompt"; promptId: string; promptType: "text" | "secret" | "select" | "manual_code"; message: string; placeholder?: string; options?: PromptOption[] }
-  | { id: string; type: "done"; stopReason: string }
-  | { id: string; type: "error"; message: string };
+/** `oauth/prompt` — Asks the shell for one piece of user input during a login. */
+export type OAuthPromptParams = {
+  /** Id of the request this belongs to. */
+  token: string;
+  promptType: "text" | "secret" | "select" | "manual_code";
+  message: string;
+  placeholder?: string;
+  options?: PromptOption[];
+};
+export type OAuthPromptResult = {
+  /** Absent means cancelled. */
+  value?: string;
+};
+
+/** `chat/delta` */
+export type ChatDeltaParams = {
+  /** Id of the request this belongs to. */
+  token: string;
+  text: string;
+};
+
+/** `chat/thinking` */
+export type ChatThinkingParams = {
+  /** Id of the request this belongs to. */
+  token: string;
+  text: string;
+};
+
+/** `chat/assistant` — Authoritative snapshot of one iteration's assistant message. */
+export type ChatAssistantParams = {
+  /** Id of the request this belongs to. */
+  token: string;
+  text: string;
+  thinking?: string;
+  toolCalls: EventToolCall[];
+};
+
+/** `oauth/notify` */
+export type OAuthNotifyParams = {
+  /** Id of the request this belongs to. */
+  token: string;
+  kind: "info" | "auth_url" | "device_code" | "progress";
+  message?: string;
+  url?: string;
+  userCode?: string;
+  verificationUri?: string;
+};
+
+// --- Dispatch tables ---------------------------------------------------
+
+/** Requests the shell sends us, by method name. */
+export const ClientRequests = {
+  "ping": PingParams,
+  "complete": CompleteParams,
+  "chat": ChatParams,
+  "providers/list": ProvidersListParams,
+  "credentials/set": CredentialsSetParams,
+  "credentials/get": CredentialsGetParams,
+  "credentials/delete": CredentialsDeleteParams,
+  "oauth/login": OAuthLoginParams,
+  "config/setBaseUrl": ConfigSetBaseUrlParams,
+  "config/setLocalUrl": ConfigSetLocalUrlParams,
+  "models/refresh": ModelsRefreshParams,
+} as const;
+
+/** Notifications the shell sends us. */
+export const ClientNotifications = {
+  "$/cancelRequest": CancelRequestParams,
+} as const;
+
+export type ClientRequestMethod = keyof typeof ClientRequests;
+export type ClientNotificationMethod = keyof typeof ClientNotifications;
+/** Maps each client request method to its result type. */
+export interface ClientRequestResults {
+  "ping": PingResult;
+  "complete": CompleteResult;
+  "chat": ChatResult;
+  "providers/list": ProvidersListResult;
+  "credentials/set": CredentialsSetResult;
+  "credentials/get": CredentialsGetResult;
+  "credentials/delete": CredentialsDeleteResult;
+  "oauth/login": OAuthLoginResult;
+  "config/setBaseUrl": ConfigSetBaseUrlResult;
+  "config/setLocalUrl": ConfigSetLocalUrlResult;
+  "models/refresh": ModelsRefreshResult;
+}
+
+/** Requests we send to the shell. */
+export type ServerRequestMethod =
+  | "tool/execute"
+  | "oauth/prompt"
+  ;
+
+/** Notifications we send to the shell. */
+export type ServerNotificationMethod =
+  | "chat/delta"
+  | "chat/thinking"
+  | "chat/assistant"
+  | "oauth/notify"
+  ;

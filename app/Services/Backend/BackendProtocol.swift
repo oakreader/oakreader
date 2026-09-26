@@ -13,7 +13,7 @@ import Foundation
 /// overrides, and the agentic chat loop. Swift sends provider/model ids and
 /// executes tools when the backend asks (`tool_exec` → `tool_result`).
 enum BackendProtocol {
-    static let version = GeneratedProtocol.version
+    static let version = RPC.version
 }
 
 // MARK: - Wire messages (Turn history → backend)

@@ -287,47 +287,42 @@ private struct ProviderDetailView: View {
 
         oauthState.task = Task { @MainActor in
             do {
-                let id = await NodeBackend.shared.makeRequestId(prefix: "oauth")
-                oauthState.requestId = id
-                let command = BackendCommand(id: id, type: "oauth_login", providerId: provider.id)
-                for try await event in await NodeBackend.shared.events(for: command) {
-                    switch event.type {
-                    case "oauth_notify":
-                        switch event.kind {
+                for try await streamEvent in await NodeBackend.shared.stream(
+                    RPC.Method.oAuthLogin, params: RPC.OAuthLoginParams(providerId: provider.id)
+                ) {
+                    switch streamEvent {
+                    case .notification(let method, let raw):
+                        guard method == RPC.Method.oAuthNotify,
+                              let p = try? RPCCoding.decode(RPC.OAuthNotifyParams.self, from: raw)
+                        else { break }
+                        switch p.kind {
                         case "auth_url":
-                            if let raw = event.url, let url = URL(string: raw) {
+                            if let raw = p.url, let url = URL(string: raw) {
                                 oauthState.authURL = url
                                 NSWorkspace.shared.open(url)
                             }
                         case "device_code":
-                            if let code = event.userCode, let uri = event.verificationUri {
+                            if let code = p.userCode, let uri = p.verificationUri {
                                 oauthState.deviceCode = (code, uri)
                                 if let url = URL(string: uri) { NSWorkspace.shared.open(url) }
                             }
                         default:
                             break
                         }
-                    case "oauth_prompt":
-                        if let promptId = event.promptId {
-                            oauthState.pendingPrompt = (
-                                promptId, event.promptType ?? "text",
-                                event.message ?? "Enter the code:"
-                            )
-                            oauthState.promptInput = ""
-                        }
-                    case "response":
-                        if event.success == true {
-                            oauthState.reset()
-                            await catalog.refresh()
-                        } else {
-                            let message = event.message ?? "Sign-in failed"
-                            oauthState.reset()
-                            oauthState.error = message
-                        }
-                    default:
-                        break
+
+                    // The prompt is a reverse call: the sidecar is blocked on our
+                    // answer, so the rpc id IS the thing to reply to.
+                    case .request(let rpcId, let method, let raw):
+                        guard method == RPC.Method.oAuthPrompt,
+                              let p = try? RPCCoding.decode(RPC.OAuthPromptParams.self, from: raw)
+                        else { break }
+                        oauthState.pendingPrompt = (rpcId, p.promptType, p.message)
+                        oauthState.promptInput = ""
                     }
                 }
+                // The stream finishing without throwing means the login succeeded.
+                oauthState.reset()
+                await catalog.refresh()
             } catch {
                 if !(error is CancellationError) {
                     let message = error.localizedDescription
@@ -339,17 +334,14 @@ private struct ProviderDetailView: View {
     }
 
     private func submitPromptInput() {
-        guard let requestId = oauthState.requestId,
-              let prompt = oauthState.pendingPrompt else { return }
+        guard let prompt = oauthState.pendingPrompt else { return }
         let value = oauthState.promptInput.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty else { return }
         oauthState.pendingPrompt = nil
         oauthState.promptInput = ""
         Task {
-            await NodeBackend.shared.send(BackendCommand(
-                id: requestId, type: "oauth_prompt_result",
-                promptId: prompt.promptId, value: value
-            ))
+            await NodeBackend.shared.respond(
+                to: prompt.promptId, with: RPC.OAuthPromptResult(value: value))
         }
     }
 

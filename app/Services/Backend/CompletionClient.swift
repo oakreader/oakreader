@@ -46,10 +46,7 @@ struct NodeCompletionClient: CompletionStreaming {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    let id = await NodeBackend.shared.makeRequestId(prefix: "c")
-                    let command = BackendCommand(
-                        id: id,
-                        type: "complete",
+                    let params = RPC.CompleteParams(
                         providerId: request.providerId,
                         model: request.model,
                         system: request.system,
@@ -58,10 +55,14 @@ struct NodeCompletionClient: CompletionStreaming {
                         apiKey: request.overrideCredential,
                         baseUrl: request.overrideBaseUrl
                     )
-                    for try await event in await NodeBackend.shared.events(for: command) {
-                        if event.type == "delta", let text = event.text {
-                            continuation.yield(text)
-                        }
+                    for try await event in await NodeBackend.shared.stream(
+                        RPC.Method.complete, params: params
+                    ) {
+                        guard case .notification(let method, let raw) = event,
+                              method == RPC.Method.chatDelta,
+                              let p = try? RPCCoding.decode(RPC.ChatDeltaParams.self, from: raw)
+                        else { continue }
+                        continuation.yield(p.text)
                     }
                     continuation.finish()
                 } catch {

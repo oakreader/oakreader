@@ -74,15 +74,13 @@ actor BackendChatEngine {
                     }
 
                     // 5. Run the backend loop, executing tools as it asks.
-                    let requestId = await NodeBackend.shared.makeRequestId(prefix: "chat")
-                    let command = BackendCommand(
-                        id: requestId,
-                        type: "chat",
+                    let params = RPC.ChatParams(
                         providerId: config.providerId,
                         model: config.model,
                         system: finalPrompt,
                         messages: wireMessages,
-                        tools: toolDefs.isEmpty ? nil : toolDefs,
+                        tools: toolDefs,
+                        maxTokens: nil,
                         reasoning: config.reasoningEffort,
                         maxIterations: maxIterations
                     )
@@ -102,33 +100,48 @@ actor BackendChatEngine {
                     }
 
                     do {
-                    for try await event in await NodeBackend.shared.events(for: command) {
+                    for try await streamEvent in await NodeBackend.shared.stream(
+                        RPC.Method.chat, params: params
+                    ) {
                         try Task.checkCancellation()
-                        switch event.type {
-                        case "delta":
-                            if let text = event.text {
-                                assistantTurn.content += text
-                                continuation.yield(.delta(text))
-                            }
 
-                        case "thinking":
-                            if let text = event.text {
-                                assistantTurn.thinking = (assistantTurn.thinking ?? "") + text
-                                continuation.yield(.thinkingDelta(text))
-                            }
+                        // Progress notifications shape the turn as it streams.
+                        if case .notification(let method, let raw) = streamEvent {
+                            switch method {
+                            case RPC.Method.chatDelta:
+                                guard let p = try? RPCCoding.decode(RPC.ChatDeltaParams.self, from: raw) else { break }
+                                assistantTurn.content += p.text
+                                continuation.yield(.delta(p.text))
 
-                        case "assistant":
-                            // Authoritative snapshot of this iteration.
-                            assistantTurn.content = event.text ?? assistantTurn.content
-                            if let thinking = event.thinking { assistantTurn.thinking = thinking }
-                            expectedToolCalls = event.toolCalls?.count ?? 0
-                            if expectedToolCalls == 0 {
-                                try await finishIteration()
-                            }
+                            case RPC.Method.chatThinking:
+                                guard let p = try? RPCCoding.decode(RPC.ChatThinkingParams.self, from: raw) else { break }
+                                assistantTurn.thinking = (assistantTurn.thinking ?? "") + p.text
+                                continuation.yield(.thinkingDelta(p.text))
 
-                        case "tool_exec":
-                            guard let callId = event.callId, let name = event.name else { break }
-                            let input = ToolInput(jsonObject: (event.args ?? [:]).mapValues(\.anyValue))
+                            case RPC.Method.chatAssistant:
+                                // Authoritative snapshot of this iteration.
+                                guard let p = try? RPCCoding.decode(RPC.ChatAssistantParams.self, from: raw) else { break }
+                                assistantTurn.content = p.text
+                                if let thinking = p.thinking { assistantTurn.thinking = thinking }
+                                expectedToolCalls = p.toolCalls.count
+                                if expectedToolCalls == 0 { try await finishIteration() }
+
+                            default:
+                                break
+                            }
+                            continue
+                        }
+
+                        // The only reverse call this request makes is tool execution.
+                        guard case .request(let rpcId, let method, let raw) = streamEvent,
+                              method == RPC.Method.toolExecute,
+                              let p = try? RPCCoding.decode(RPC.ToolExecuteParams.self, from: raw)
+                        else { continue }
+
+                        do {
+                            let callId = rpcId
+                            let name = p.name
+                            let input = ToolInput(jsonObject: p.args.mapValues(\.anyValue))
                             let call = ToolCall(id: callId, name: name, input: input)
                             var record = ToolUseRecord(from: call)
 
@@ -175,23 +188,14 @@ actor BackendChatEngine {
                             iterationRecords.append(record)
                             continuation.yield(.toolUseCompleted(record))
 
-                            await NodeBackend.shared.send(BackendCommand(
-                                id: requestId, type: "tool_result",
-                                callId: callId, content: resultContent, isError: resultIsError
-                            ))
+                            await NodeBackend.shared.respond(
+                                to: rpcId,
+                                with: RPC.ToolExecuteResult(content: resultContent, isError: resultIsError))
 
                             // Last tool of the iteration settles the turn.
                             if iterationRecords.count == expectedToolCalls {
                                 try await finishIteration()
                             }
-
-                        case "done":
-                            // Normal completion — the final iteration already settled
-                            // on its `assistant` snapshot.
-                            break
-
-                        default:
-                            break
                         }
                     }
                     } catch let streamError where !(streamError is CancellationError) {

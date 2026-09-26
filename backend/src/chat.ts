@@ -15,7 +15,7 @@ import type {
   AgentTool,
   AgentToolResult,
 } from "@earendil-works/pi-agent-core";
-import type { Event, WireMessage } from "./protocol.js";
+import type { WireMessage } from "./protocol.js";
 
 /** Convert Swift wire history into pi-ai Context messages. */
 export function toPiMessages(wire: WireMessage[], model: Model<Api>): Message[] {
@@ -87,9 +87,14 @@ export interface ChatRun {
 }
 
 export interface ChatCallbacks {
-  emit(event: Event): void;
-  /** Ask the client to execute one tool call; resolves with its result. */
-  executeTool(callId: string, name: string, args: Record<string, unknown>): Promise<{ content: string; isError: boolean }>;
+  /** Emit a progress notification tagged with this run's request id. */
+  notify(method: string, params: Record<string, unknown>): void;
+  /**
+   * Ask the shell to execute one tool call and wait for its answer. This is a
+   * reverse JSON-RPC request, so correlation is the envelope's own id -- the
+   * caller does not thread a callId through.
+   */
+  executeTool(name: string, args: Record<string, unknown>): Promise<{ content: string; isError: boolean }>;
 }
 
 /**
@@ -101,17 +106,19 @@ export interface ChatCallbacks {
  * tools read local app state (GRDB, the live WebView DOM, the open PDF).
  * pi never runs them itself.
  *
- * The emitted event stream is unchanged, so `BackendChatEngine` and
- * `ChatViewModel` need no changes: delta / thinking while streaming, one
- * authoritative `assistant` snapshot per turn, `done` with a stop reason.
+ * Progress is notifications (chat/delta, chat/thinking, chat/assistant) tagged
+ * with this run's request id. The stop reason is the RETURN VALUE, not an
+ * event: it is the answer to the request that started the loop, and a provider
+ * failure throws so it becomes a JSON-RPC error with a code the shell can act on.
  */
 export async function runChat(
   models: Models,
   run: ChatRun,
   signal: AbortSignal,
   callbacks: ChatCallbacks,
-): Promise<void> {
-  const { emit } = callbacks;
+): Promise<string> {
+  const { notify } = callbacks;
+  const token = run.id;
 
   const tools: AgentTool[] = run.tools.map((t) => ({
     name: t.name,
@@ -120,9 +127,10 @@ export async function runChat(
     parameters: t.inputSchema as AgentTool["parameters"],
     // Sequential so the shell's confirmation UX still sees one call at a time.
     executionMode: "sequential",
-    execute: async (toolCallId, params) => {
+    execute: async (_toolCallId, params) => {
+      // No callId threaded through: the reverse request's own envelope id
+      // correlates the answer.
       const result = await callbacks.executeTool(
-        toolCallId,
         t.name,
         (params ?? {}) as Record<string, unknown>,
       );
@@ -143,7 +151,6 @@ export async function runChat(
   };
 
   let lastStopReason = "stop";
-  let sawError = false;
 
   const stream = agentLoop(
     [],
@@ -163,17 +170,15 @@ export async function runChat(
     switch (event.type) {
       case "message_update": {
         const inner = event.assistantMessageEvent;
-        if (inner.type === "text_delta") emit({ id: run.id, type: "delta", text: inner.delta });
-        else if (inner.type === "thinking_delta") emit({ id: run.id, type: "thinking", text: inner.delta });
+        if (inner.type === "text_delta") notify("chat/delta", { token, text: inner.delta });
+        else if (inner.type === "thinking_delta") notify("chat/thinking", { token, text: inner.delta });
         break;
       }
       case "message_end": {
         const message = event.message as AssistantMessage;
         if (message.role !== "assistant") break;
         if (message.stopReason === "error") {
-          sawError = true;
-          emit({ id: run.id, type: "error", message: message.errorMessage ?? "provider error" });
-          return;
+          throw new Error(message.errorMessage ?? "provider error");
         }
         lastStopReason = message.stopReason ?? "stop";
         const text = message.content
@@ -185,9 +190,8 @@ export async function runChat(
           .map((b) => b.thinking)
           .join("");
         const toolCalls = message.content.filter((b): b is ToolCall => b.type === "toolCall");
-        emit({
-          id: run.id,
-          type: "assistant",
+        notify("chat/assistant", {
+          token,
           text,
           ...(thinking ? { thinking } : {}),
           toolCalls: toolCalls.map((c) => ({ id: c.id, name: c.name, args: c.arguments })),
@@ -199,6 +203,5 @@ export async function runChat(
     }
   }
 
-  if (sawError) return;
-  emit({ id: run.id, type: "done", stopReason: signal.aborted ? "aborted" : lastStopReason });
+  return signal.aborted ? "aborted" : lastStopReason;
 }

@@ -10,7 +10,16 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import type { AuthEvent, AuthPrompt, ThinkingLevel } from "@earendil-works/pi-ai";
-import { Command, PROTOCOL_VERSION, type Event, type ProviderSummary } from "./protocol.js";
+import {
+  PROTOCOL_VERSION, RpcError,
+  PingParams, ProvidersListParams,
+  CompleteParams, ChatParams, OAuthLoginParams,
+  CredentialsSetParams, CredentialsGetParams, CredentialsDeleteParams,
+  ConfigSetBaseUrlParams, ConfigSetLocalUrlParams, ModelsRefreshParams, CancelRequestParams,
+  type CompleteResult, type ChatResult, type ProvidersListResult, type OAuthLoginResult,
+  type ProviderSummary,
+} from "./protocol.js";
+import { RpcPeer, RpcFailure } from "./rpc.js";
 import { ConfigStore, FileCredentialStore, dataPaths } from "./store.js";
 import { ProviderRegistry, toPiId } from "./providers.js";
 import { runChat, toPiMessages } from "./chat.js";
@@ -55,46 +64,27 @@ for (const method of ["log", "info", "warn", "debug", "trace", "dir"] as const) 
   };
 }
 
+function log(message: string): void {
+  process.stderr.write(`[oak-backend] ${message}\n`);
+}
+
 /**
- * Emit one protocol event on stdout.
+ * The JSON-RPC peer.
  *
  * stdio is the only transport: the shell owns this process, so the channel
  * needs no port, no authentication and no lifecycle of its own, and it is the
  * same on every platform the shell is eventually written for.
  */
-function emit(event: Event): void {
-  process.stdout.write(JSON.stringify(event) + "\n");
-}
+const peer = new RpcPeer((line) => process.stdout.write(line), log);
 
-function log(message: string): void {
-  process.stderr.write(`[oak-backend] ${message}\n`);
-}
-
-function respond(id: string, command: string, success: boolean, extra: Partial<Extract<Event, { type: "response" }>> = {}): void {
-  emit({ id, type: "response", command, success, ...extra });
-}
-
-// --- Request state --------------------------------------------------------
-
+/** In-flight long-running requests, so $/cancelRequest can stop them. */
 const aborts = new Map<string, AbortController>();
-
-interface ToolWaiter {
-  resolve(result: { content: string; isError: boolean }): void;
-}
-/** chatId:callId → waiter for the client's tool_result. */
-const toolWaiters = new Map<string, ToolWaiter>();
-
-interface PromptWaiter {
-  resolve(value: string | undefined): void;
-}
-/** loginId:promptId → waiter for the client's oauth_prompt_result. */
-const promptWaiters = new Map<string, PromptWaiter>();
 
 // --- Handlers -------------------------------------------------------------
 
-async function handleComplete(cmd: Extract<Command, { type: "complete" }>): Promise<void> {
+async function handleComplete(cmd: CompleteParams, id: string): Promise<CompleteResult> {
   const controller = new AbortController();
-  aborts.set(cmd.id, controller);
+  aborts.set(id, controller);
   try {
     let model = registry.resolveModel(cmd.providerId, cmd.model);
     if (cmd.baseUrl) {
@@ -111,30 +101,27 @@ async function handleComplete(cmd: Extract<Command, { type: "complete" }>): Prom
       ...(cmd.apiKey ? { apiKey: cmd.apiKey } : {}),
     });
     for await (const event of stream) {
-      if (event.type === "text_delta") emit({ id: cmd.id, type: "delta", text: event.delta });
+      if (event.type === "text_delta") peer.notify("chat/delta", { token: id, text: event.delta });
     }
     const result = await stream.result();
     if (result.stopReason === "error") {
-      emit({ id: cmd.id, type: "error", message: result.errorMessage ?? "provider error" });
-    } else {
-      emit({ id: cmd.id, type: "done", stopReason: result.stopReason });
+      throw new RpcFailure(classifyProviderError(result.errorMessage), result.errorMessage ?? "provider error");
     }
-  } catch (err) {
-    emit({ id: cmd.id, type: "error", message: errorMessage(err) });
+    return { stopReason: result.stopReason };
   } finally {
-    aborts.delete(cmd.id);
+    aborts.delete(id);
   }
 }
 
-async function handleChat(cmd: Extract<Command, { type: "chat" }>): Promise<void> {
+async function handleChat(cmd: ChatParams, id: string): Promise<ChatResult> {
   const controller = new AbortController();
-  aborts.set(cmd.id, controller);
+  aborts.set(id, controller);
   try {
     const model = registry.resolveModel(cmd.providerId, cmd.model);
-    await runChat(
+    const stopReason = await runChat(
       registry.models,
       {
-        id: cmd.id,
+        id,
         model,
         system: cmd.system,
         messages: cmd.messages,
@@ -145,30 +132,25 @@ async function handleChat(cmd: Extract<Command, { type: "chat" }>): Promise<void
       },
       controller.signal,
       {
-        emit,
-        executeTool: (callId, name, args) =>
-          new Promise((resolve) => {
-            toolWaiters.set(`${cmd.id}:${callId}`, { resolve });
-            emit({ id: cmd.id, type: "tool_exec", callId, name, args });
-            controller.signal.addEventListener("abort", () => {
-              if (toolWaiters.delete(`${cmd.id}:${callId}`)) {
-                resolve({ content: "aborted", isError: true });
-              }
-            });
-          }),
+        notify: (method, params) => peer.notify(method, params),
+        // A reverse request. Correlation is the envelope id, so there is no
+        // waiter table to build here and none to scan on the way out.
+        executeTool: async (name, args) => {
+          const result = await peer.callClient<{ content: string; isError: boolean }>(
+            "tool/execute", { token: id, name, args });
+          return result;
+        },
       },
     );
-  } catch (err) {
-    emit({ id: cmd.id, type: "error", message: errorMessage(err) });
+    return { stopReason };
   } finally {
-    aborts.delete(cmd.id);
-    for (const key of toolWaiters.keys()) {
-      if (key.startsWith(`${cmd.id}:`)) toolWaiters.delete(key);
-    }
+    aborts.delete(id);
+    // Anything still outstanding for this request dies with it.
+    peer.failPending(() => false, new Error("request finished"));
   }
 }
 
-async function handleListProviders(id: string): Promise<void> {
+async function handleListProviders(): Promise<ProvidersListResult> {
   const providers: ProviderSummary[] = [];
   for (const oakId of registry.oakProviderIds()) {
     const provider = registry.provider(oakId);
@@ -210,148 +192,120 @@ async function handleListProviders(id: string): Promise<void> {
       localUrl: isLocal ? (config.get().localProviders[oakId] ?? provider.baseUrl) : undefined,
     });
   }
-  respond(id, "list_providers", true, { providers });
+  return { providers };
 }
 
-async function handleOAuthLogin(cmd: Extract<Command, { type: "oauth_login" }>): Promise<void> {
+async function handleOAuthLogin(cmd: OAuthLoginParams, id: string): Promise<OAuthLoginResult> {
   const controller = new AbortController();
-  aborts.set(cmd.id, controller);
-  let promptCounter = 0;
+  aborts.set(id, controller);
   try {
     await registry.models.login(toPiId(cmd.providerId), "oauth", {
       signal: controller.signal,
       notify: (event: AuthEvent) => {
         if (event.type === "info" || event.type === "progress") {
-          emit({ id: cmd.id, type: "oauth_notify", kind: event.type, message: event.message });
+          peer.notify("oauth/notify", { token: id, kind: event.type, message: event.message });
         } else if (event.type === "auth_url") {
-          emit({ id: cmd.id, type: "oauth_notify", kind: "auth_url", url: event.url });
+          peer.notify("oauth/notify", { token: id, kind: "auth_url", url: event.url });
         } else {
-          emit({
-            id: cmd.id, type: "oauth_notify", kind: "device_code",
+          peer.notify("oauth/notify", {
+            token: id, kind: "device_code",
             userCode: event.userCode, verificationUri: event.verificationUri,
           });
         }
       },
-      prompt: (prompt: AuthPrompt) =>
-        new Promise<string>((resolve, reject) => {
-          const promptId = `p${++promptCounter}`;
-          promptWaiters.set(`${cmd.id}:${promptId}`, {
-            resolve: (value) => {
-              if (value === undefined) reject(new Error("cancelled"));
-              else resolve(value);
-            },
-          });
-          emit({
-            id: cmd.id, type: "oauth_prompt", promptId,
-            promptType: prompt.type, message: prompt.message,
-            ...("placeholder" in prompt && prompt.placeholder ? { placeholder: prompt.placeholder } : {}),
-            ...(prompt.type === "select"
-              ? { options: prompt.options.map((o) => ({ id: o.id, label: o.label })) }
-              : {}),
-          });
-          prompt.signal?.addEventListener("abort", () => {
-            if (promptWaiters.delete(`${cmd.id}:${promptId}`)) reject(new Error("superseded"));
-          });
-        }),
+      // Another reverse request. Same machinery as tool/execute -- the whole
+      // point of doing this over JSON-RPC is that the second one costs nothing.
+      prompt: async (prompt: AuthPrompt) => {
+        const answer = await peer.callClient<{ value?: string }>("oauth/prompt", {
+          token: id,
+          promptType: prompt.type,
+          message: prompt.message,
+          ...("placeholder" in prompt && prompt.placeholder ? { placeholder: prompt.placeholder } : {}),
+          ...(prompt.type === "select"
+            ? { options: prompt.options.map((o) => ({ id: o.id, label: o.label })) }
+            : {}),
+        });
+        if (answer.value === undefined) throw new Error("cancelled");
+        return answer.value;
+      },
     });
-    respond(cmd.id, "oauth_login", true);
-  } catch (err) {
-    respond(cmd.id, "oauth_login", false, { message: errorMessage(err) });
+    return {};
   } finally {
-    aborts.delete(cmd.id);
-    for (const key of promptWaiters.keys()) {
-      if (key.startsWith(`${cmd.id}:`)) promptWaiters.delete(key);
-    }
+    aborts.delete(id);
   }
 }
 
-async function dispatch(cmd: Command): Promise<void> {
-  switch (cmd.type) {
-    case "ping":
-      respond(cmd.id, "ping", true, { protocol: PROTOCOL_VERSION, backend: BACKEND_ID });
-      return;
+/**
+ * Register every method. A request handler returns its result or throws; the
+ * peer turns either into the response, so there is no per-handler `respond`
+ * plumbing and no `success: false` convention.
+ */
+function registerMethods(): void {
+  peer.onRequest("ping", PingParams, () => ({ protocol: PROTOCOL_VERSION, backend: BACKEND_ID }));
 
-    case "abort":
-      aborts.get(cmd.id)?.abort();
-      return;
+  peer.onRequest("complete", CompleteParams, (params, id) => handleComplete(params, id));
+  peer.onRequest("chat", ChatParams, (params, id) => handleChat(params, id));
+  peer.onRequest("providers/list", ProvidersListParams, () => handleListProviders());
+  peer.onRequest("oauth/login", OAuthLoginParams, (params, id) => handleOAuthLogin(params, id));
 
-    case "complete":
-      void handleComplete(cmd);
-      return;
+  peer.onRequest("credentials/set", CredentialsSetParams, async (p) => {
+    await credentials.modify(toPiId(p.providerId), async () => ({ type: "api_key", key: p.key }));
+    return {};
+  });
 
-    case "chat":
-      void handleChat(cmd);
-      return;
+  peer.onRequest("credentials/get", CredentialsGetParams, async (p) => {
+    const auth = await registry.models.getAuth(toPiId(p.providerId));
+    return { apiKey: auth?.auth.apiKey ?? null };
+  });
 
-    case "tool_result": {
-      const waiter = toolWaiters.get(`${cmd.id}:${cmd.callId}`);
-      toolWaiters.delete(`${cmd.id}:${cmd.callId}`);
-      waiter?.resolve({ content: cmd.content, isError: cmd.isError });
-      return;
-    }
+  peer.onRequest("credentials/delete", CredentialsDeleteParams, async (p) => {
+    await credentials.delete(toPiId(p.providerId));
+    return {};
+  });
 
-    case "list_providers":
-      await handleListProviders(cmd.id);
-      return;
+  peer.onRequest("config/setBaseUrl", ConfigSetBaseUrlParams, (p) => {
+    config.update((c) => {
+      if (p.baseUrl && p.baseUrl.trim() !== "") c.baseUrlOverrides[p.providerId] = p.baseUrl.trim();
+      else delete c.baseUrlOverrides[p.providerId];
+    });
+    return {};
+  });
 
-    case "set_api_key":
-      await credentials.modify(toPiId(cmd.providerId), async () => ({ type: "api_key", key: cmd.key }));
-      respond(cmd.id, "set_api_key", true);
-      return;
+  peer.onRequest("config/setLocalUrl", ConfigSetLocalUrlParams, (p) => {
+    config.update((c) => {
+      c.localProviders[p.providerId] = p.baseUrl.trim().replace(/\/+$/, "");
+    });
+    registry.registerLocalProviders();
+    return {};
+  });
 
-    case "get_api_key": {
-      try {
-        const auth = await registry.models.getAuth(toPiId(cmd.providerId));
-        respond(cmd.id, "get_api_key", true, { apiKey: auth?.auth.apiKey ?? null });
-      } catch (err) {
-        respond(cmd.id, "get_api_key", false, { message: errorMessage(err) });
-      }
-      return;
-    }
+  peer.onRequest("models/refresh", ModelsRefreshParams, async (p) => {
+    const result = await registry.models.refresh(
+      p.providerId ? { providers: [toPiId(p.providerId)] } : undefined,
+    );
+    const errors = [...result.errors.entries()].map(([prov, e]) => `${prov}: ${errorMessage(e)}`);
+    if (errors.length > 0) throw new RpcFailure(RpcError.providerUnavailable, errors.join("; "));
+    return {};
+  });
 
-    case "delete_credential":
-      await credentials.delete(toPiId(cmd.providerId));
-      respond(cmd.id, "delete_credential", true);
-      return;
+  // LSP's spelling, and the only cancellation mechanism: the abort controller
+  // fails the request, which fails anything it spawned.
+  peer.onNotification("$/cancelRequest", CancelRequestParams, (p) => {
+    aborts.get(p.id)?.abort();
+  });
+}
 
-    case "oauth_login":
-      void handleOAuthLogin(cmd);
-      return;
-
-    case "oauth_prompt_result": {
-      const waiter = promptWaiters.get(`${cmd.id}:${cmd.promptId}`);
-      promptWaiters.delete(`${cmd.id}:${cmd.promptId}`);
-      waiter?.resolve(cmd.value);
-      return;
-    }
-
-    case "set_base_url":
-      config.update((c) => {
-        if (cmd.baseUrl && cmd.baseUrl.trim() !== "") c.baseUrlOverrides[cmd.providerId] = cmd.baseUrl.trim();
-        else delete c.baseUrlOverrides[cmd.providerId];
-      });
-      respond(cmd.id, "set_base_url", true);
-      return;
-
-    case "set_local_url":
-      config.update((c) => {
-        c.localProviders[cmd.providerId] = cmd.baseUrl.trim().replace(/\/+$/, "");
-      });
-      registry.registerLocalProviders();
-      respond(cmd.id, "set_local_url", true);
-      return;
-
-    case "refresh_models": {
-      const result = await registry.models.refresh(
-        cmd.providerId ? { providers: [toPiId(cmd.providerId)] } : undefined,
-      );
-      const errors = [...result.errors.entries()].map(([p, e]) => `${p}: ${errorMessage(e)}`);
-      respond(cmd.id, "refresh_models", errors.length === 0, {
-        message: errors.length > 0 ? errors.join("; ") : undefined,
-      });
-      return;
-    }
-  }
+/**
+ * Map a provider failure onto a code the shell can act on. The old protocol
+ * had one error shape carrying only a string, so "re-authenticate" and "retry
+ * later" were indistinguishable at the UI layer.
+ */
+function classifyProviderError(message: string | undefined): number {
+  const m = (message ?? "").toLowerCase();
+  if (/\b(401|403|unauthor|invalid api key|authentication)\b/.test(m)) return RpcError.providerAuth;
+  if (/\b(429|rate.?limit|quota|overloaded)\b/.test(m)) return RpcError.providerRateLimit;
+  if (/\b(5\d\d|timeout|econn|network|unavailable)\b/.test(m)) return RpcError.providerUnavailable;
+  return RpcError.internalError;
 }
 
 function errorMessage(err: unknown): string {
@@ -361,22 +315,7 @@ function errorMessage(err: unknown): string {
 function handleLine(line: string): void {
   const trimmed = line.endsWith("\r") ? line.slice(0, -1) : line;
   if (trimmed === "") return;
-  let raw: unknown;
-  try {
-    raw = JSON.parse(trimmed);
-  } catch {
-    log(`unparseable line: ${trimmed.slice(0, 200)}`);
-    return;
-  }
-  const parsed = Command.safeParse(raw);
-  if (!parsed.success) {
-    const id = typeof (raw as { id?: unknown })?.id === "string" ? (raw as { id: string }).id : "";
-    emit({ id, type: "error", message: `invalid command: ${parsed.error.message}` });
-    return;
-  }
-  void dispatch(parsed.data).catch((err) => {
-    emit({ id: parsed.data.id, type: "error", message: errorMessage(err) });
-  });
+  void peer.handleLine(trimmed);
 }
 
 // Strict JSONL framing: split on LF bytes only. Node's readline also splits on
@@ -396,6 +335,8 @@ process.stdin.on("end", () => {
   for (const controller of aborts.values()) controller.abort();
   process.exit(0);
 });
+
+registerMethods();
 
 // Restore any persisted dynamic model lists / warm local discovery, best-effort.
 void registry.models.refresh({ allowNetwork: true }).catch(() => {});

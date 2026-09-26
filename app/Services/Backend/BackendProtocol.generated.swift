@@ -3,96 +3,243 @@
 
 import Foundation
 
-enum GeneratedProtocol {
-    static let version = 2
-}
+/// The sidecar protocol: JSON-RPC 2.0 over newline-delimited stdio.
+///
+/// Per-method params and results, rather than one flat struct of optionals.
+/// Reverse calls (tool/execute, oauth/prompt) are ordinary requests in the
+/// other direction, so they need no separate machinery.
+enum RPC {
+    static let version = 3
 
-/// Every command the shell can send. One flat struct: `type` selects which
-/// fields are meaningful, and JSONEncoder omits the nils.
-struct BackendCommand: Encodable {
-    var id: String
-    var type: String
-    /// complete, chat, set_api_key, get_api_key, delete_credential, oauth_login, set_base_url, set_local_url, refresh_models
-    var providerId: String?
-    /// complete, chat
-    var model: String?
-    /// complete, chat
-    var system: String?
-    /// complete, chat
-    var messages: [WireMessage]?
-    /// complete, chat
-    var maxTokens: Int?
-    /// complete
-    var apiKey: String?
-    /// complete, set_base_url, set_local_url
-    var baseUrl: String?
-    /// chat
-    var tools: [WireToolDef]?
-    /// chat
-    var reasoning: String?
-    /// chat
-    var maxIterations: Int?
-    /// tool_result
-    var callId: String?
-    /// tool_result
-    var content: String?
-    /// tool_result
-    var isError: Bool?
-    /// set_api_key
-    var key: String?
-    /// oauth_prompt_result
-    var promptId: String?
-    /// oauth_prompt_result
-    var value: String?
-}
+    /// JSON-RPC error codes. The shell branches on these: re-authenticate
+    /// is a different affordance from retry, and the old single error string
+    /// could not distinguish them.
+    enum ErrorCode {
+        /// Malformed JSON (spec).
+        static let parseError = -32700
+        /// Not a valid Request object (spec).
+        static let invalidRequest = -32600
+        /// Unknown method (spec).
+        static let methodNotFound = -32601
+        /// Params failed validation (spec).
+        static let invalidParams = -32602
+        /// Unhandled failure (spec).
+        static let internalError = -32603
+        /// Rejected credentials; offer re-authentication.
+        static let providerAuth = -31001
+        /// Throttled; offer retry, `data.retryAfter` when known.
+        static let providerRateLimit = -31002
+        /// Unreachable or failing; offer another provider.
+        static let providerUnavailable = -31003
+        /// Ended by $/cancelRequest.
+        static let cancelled = -31004
+        /// The shell could not run the tool.
+        static let toolFailed = -31005
+        /// No credential or model configured for the provider.
+        static let notConfigured = -31006
+    }
 
-/// Every event the backend can emit. Decoding is lenient by design: an
-/// unknown field is ignored, and a field belonging to another event type is nil.
-struct BackendEvent: Decodable {
-    var id: String
-    var type: String  // response | delta | thinking | tool_exec | assistant | oauth_notify | oauth_prompt | done | error
-    /// response
-    var command: String?
-    /// response
-    var success: Bool?
-    /// response
-    var `protocol`: Int?
-    /// response
-    var backend: String?
-    /// response, oauth_notify, oauth_prompt, error
-    var message: String?
-    /// response
-    var providers: [BackendProviderSummary]?
-    /// response
-    var apiKey: String?
-    /// delta, thinking, assistant
-    var text: String?
-    /// tool_exec
-    var callId: String?
-    /// tool_exec
-    var name: String?
-    /// tool_exec
-    var args: [String: JSONFragment]?
-    /// assistant
-    var thinking: String?
-    /// assistant
-    var toolCalls: [BackendToolCall]?
-    /// oauth_notify
-    var kind: String?
-    /// oauth_notify
-    var url: String?
-    /// oauth_notify
-    var userCode: String?
-    /// oauth_notify
-    var verificationUri: String?
-    /// oauth_prompt
-    var promptId: String?
-    /// oauth_prompt
-    var promptType: String?
-    /// oauth_prompt
-    var placeholder: String?
-    /// oauth_prompt
-    var options: [BackendPromptOption]?
-    /// done
-    var stopReason: String?
+    /// Method names, so call sites never spell one by hand.
+    enum Method {
+        static let ping = "ping"
+        static let complete = "complete"
+        static let chat = "chat"
+        static let providersList = "providers/list"
+        static let credentialsSet = "credentials/set"
+        static let credentialsGet = "credentials/get"
+        static let credentialsDelete = "credentials/delete"
+        static let oAuthLogin = "oauth/login"
+        static let configSetBaseUrl = "config/setBaseUrl"
+        static let configSetLocalUrl = "config/setLocalUrl"
+        static let modelsRefresh = "models/refresh"
+        static let cancelRequest = "$/cancelRequest"
+        static let toolExecute = "tool/execute"
+        static let oAuthPrompt = "oauth/prompt"
+        static let chatDelta = "chat/delta"
+        static let chatThinking = "chat/thinking"
+        static let chatAssistant = "chat/assistant"
+        static let oAuthNotify = "oauth/notify"
+    }
+
+    // MARK: ping
+    /// Handshake. The shell refuses to proceed on a protocol mismatch.
+    struct PingParams: Encodable {
+        init() {}
+    }
+    struct PingResult: Decodable {
+        var `protocol`: Int
+        var backend: String
+    }
+
+    // MARK: complete
+    /// One-shot completion. Streams chat/delta, resolves when finished.
+    struct CompleteParams: Encodable {
+        var providerId: String
+        var model: String
+        var system: String?
+        var messages: [WireMessage]
+        var maxTokens: Int?
+        /// Explicit key for Test Connection, before anything is saved.
+        var apiKey: String?
+        var baseUrl: String?
+    }
+    struct CompleteResult: Decodable {
+        var stopReason: String
+    }
+
+    // MARK: chat
+    /// The agentic loop. Streams chat/* notifications and calls tool/execute back.
+    struct ChatParams: Encodable {
+        var providerId: String
+        var model: String
+        var system: String?
+        var messages: [WireMessage]
+        var tools: [WireToolDef]?
+        var maxTokens: Int?
+        var reasoning: String?
+        var maxIterations: Int?
+    }
+    struct ChatResult: Decodable {
+        var stopReason: String
+    }
+
+    // MARK: providers/list
+    struct ProvidersListParams: Encodable {
+        init() {}
+    }
+    struct ProvidersListResult: Decodable {
+        var providers: [BackendProviderSummary]
+    }
+
+    // MARK: credentials/set
+    struct CredentialsSetParams: Encodable {
+        var providerId: String
+        var key: String
+    }
+    struct CredentialsSetResult: Decodable {
+        init() {}
+    }
+
+    // MARK: credentials/get
+    struct CredentialsGetParams: Encodable {
+        var providerId: String
+    }
+    struct CredentialsGetResult: Decodable {
+        /// null when the provider has no key stored.
+        var apiKey: String?
+    }
+
+    // MARK: credentials/delete
+    struct CredentialsDeleteParams: Encodable {
+        var providerId: String
+    }
+    struct CredentialsDeleteResult: Decodable {
+        init() {}
+    }
+
+    // MARK: oauth/login
+    /// Streams oauth/notify and calls oauth/prompt back for user input.
+    struct OAuthLoginParams: Encodable {
+        var providerId: String
+    }
+    struct OAuthLoginResult: Decodable {
+        init() {}
+    }
+
+    // MARK: config/setBaseUrl
+    struct ConfigSetBaseUrlParams: Encodable {
+        var providerId: String
+        /// Absent clears the override.
+        var baseUrl: String?
+    }
+    struct ConfigSetBaseUrlResult: Decodable {
+        init() {}
+    }
+
+    // MARK: config/setLocalUrl
+    struct ConfigSetLocalUrlParams: Encodable {
+        var providerId: String
+        var baseUrl: String
+    }
+    struct ConfigSetLocalUrlResult: Decodable {
+        init() {}
+    }
+
+    // MARK: models/refresh
+    struct ModelsRefreshParams: Encodable {
+        var providerId: String?
+    }
+    struct ModelsRefreshResult: Decodable {
+        var message: String?
+    }
+
+    // MARK: $/cancelRequest
+    /// LSP's spelling. The peer fails the named request and anything it spawned.
+    struct CancelRequestParams: Encodable {
+        var `id`: String
+    }
+
+    // MARK: tool/execute
+    /// The shell runs the tool and answers. Tools read local app state, so they cannot run in the sidecar.
+    struct ToolExecuteParams: Decodable {
+        /// Id of the request this belongs to.
+        var token: String
+        var name: String
+        var args: [String: JSONFragment]
+    }
+    struct ToolExecuteResult: Encodable {
+        var content: String
+        var isError: Bool?
+    }
+
+    // MARK: oauth/prompt
+    /// Asks the shell for one piece of user input during a login.
+    struct OAuthPromptParams: Decodable {
+        /// Id of the request this belongs to.
+        var token: String
+        var promptType: String
+        var message: String
+        var placeholder: String?
+        var options: [BackendPromptOption]?
+    }
+    struct OAuthPromptResult: Encodable {
+        /// Absent means cancelled.
+        var value: String?
+    }
+
+    // MARK: chat/delta
+    struct ChatDeltaParams: Decodable {
+        /// Id of the request this belongs to.
+        var token: String
+        var text: String
+    }
+
+    // MARK: chat/thinking
+    struct ChatThinkingParams: Decodable {
+        /// Id of the request this belongs to.
+        var token: String
+        var text: String
+    }
+
+    // MARK: chat/assistant
+    /// Authoritative snapshot of one iteration's assistant message.
+    struct ChatAssistantParams: Decodable {
+        /// Id of the request this belongs to.
+        var token: String
+        var text: String
+        var thinking: String?
+        var toolCalls: [BackendToolCall]
+    }
+
+    // MARK: oauth/notify
+    struct OAuthNotifyParams: Decodable {
+        /// Id of the request this belongs to.
+        var token: String
+        var kind: String
+        var message: String?
+        var url: String?
+        var userCode: String?
+        var verificationUri: String?
+    }
+
 }

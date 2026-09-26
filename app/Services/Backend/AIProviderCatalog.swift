@@ -71,20 +71,16 @@ final class AIProviderCatalog {
         isLoading = true
         defer { isLoading = false }
         do {
-            let id = await NodeBackend.shared.makeRequestId(prefix: "cat")
-            let response = try await NodeBackend.shared.request(
-                BackendCommand(id: id, type: "list_providers"))
-            if let list = response.providers {
-                providers = list
-                backendError = nil
-                var keys: [String: String] = [:]
-                for pid in ["openai", "google"] where provider(for: pid)?.auth.configured == true {
-                    keys[pid] = await Self.apiKey(for: pid)
-                }
-                sharedVoiceKeys = keys.compactMapValues { $0 }
-            } else {
-                backendError = response.message ?? "Failed to load providers"
+            let result = try await NodeBackend.shared.call(
+                RPC.Method.providersList, params: RPC.ProvidersListParams(),
+                as: RPC.ProvidersListResult.self)
+            providers = result.providers ?? []
+            backendError = nil
+            var keys: [String: String] = [:]
+            for pid in ["openai", "google"] where provider(for: pid)?.auth.configured == true {
+                keys[pid] = await Self.apiKey(for: pid)
             }
+            sharedVoiceKeys = keys.compactMapValues { $0 }
         } catch {
             backendError = error.localizedDescription
         }
@@ -92,17 +88,14 @@ final class AIProviderCatalog {
 
     // MARK: - Mutations (proxy to backend, then refresh)
 
+    /// Every mutation is the same shape: call, refresh on success, surface the
+    /// error message on failure. The error is an `RPCErrorObject` now, so a
+    /// caller that wants to branch on `.isAuthFailure` can.
     @discardableResult
     @MainActor
-    private func perform(_ type: String, _ configure: (inout BackendCommand) -> Void) async -> String? {
+    private func mutate<P: Encodable>(_ method: String, _ params: P) async -> String? {
         do {
-            var command = BackendCommand(
-                id: await NodeBackend.shared.makeRequestId(prefix: "m"), type: type)
-            configure(&command)
-            let response = try await NodeBackend.shared.request(command)
-            if response.success != true {
-                return response.message ?? "\(type) failed"
-            }
+            try await NodeBackend.shared.call(method, params: params)
             await refresh()
             return nil
         } catch {
@@ -113,23 +106,27 @@ final class AIProviderCatalog {
     /// Returns an error message, or nil on success.
     @MainActor
     func setAPIKey(_ key: String, providerId: String) async -> String? {
-        await perform("set_api_key") { $0.providerId = providerId; $0.key = key }
+        await mutate(RPC.Method.credentialsSet,
+                     RPC.CredentialsSetParams(providerId: providerId, key: key))
     }
 
     @MainActor
     func deleteCredential(providerId: String) async -> String? {
-        await perform("delete_credential") { $0.providerId = providerId }
+        await mutate(RPC.Method.credentialsDelete,
+                     RPC.CredentialsDeleteParams(providerId: providerId))
     }
 
     /// Empty/nil clears the override.
     @MainActor
     func setBaseUrl(_ baseUrl: String?, providerId: String) async -> String? {
-        await perform("set_base_url") { $0.providerId = providerId; $0.baseUrl = baseUrl }
+        await mutate(RPC.Method.configSetBaseUrl,
+                     RPC.ConfigSetBaseUrlParams(providerId: providerId, baseUrl: baseUrl))
     }
 
     @MainActor
     func setLocalUrl(_ baseUrl: String, providerId: String) async -> String? {
-        if let error = await perform("set_local_url", { $0.providerId = providerId; $0.baseUrl = baseUrl }) {
+        if let error = await mutate(RPC.Method.configSetLocalUrl,
+                                    RPC.ConfigSetLocalUrlParams(providerId: providerId, baseUrl: baseUrl)) {
             return error
         }
         return await refreshModels(providerId: providerId)
@@ -137,15 +134,16 @@ final class AIProviderCatalog {
 
     @MainActor
     func refreshModels(providerId: String? = nil) async -> String? {
-        await perform("refresh_models") { $0.providerId = providerId }
+        await mutate(RPC.Method.modelsRefresh,
+                     RPC.ModelsRefreshParams(providerId: providerId))
     }
 
     /// Raw stored/resolved API key (used by voice providers that share chat keys).
     static func apiKey(for providerId: String) async -> String? {
-        let id = await NodeBackend.shared.makeRequestId(prefix: "gk")
-        let response = try? await NodeBackend.shared.request(
-            BackendCommand(id: id, type: "get_api_key", providerId: providerId))
-        guard let key = response?.apiKey, !key.isEmpty, key != "local" else { return nil }
+        let result = try? await NodeBackend.shared.call(
+            RPC.Method.credentialsGet, params: RPC.CredentialsGetParams(providerId: providerId),
+            as: RPC.CredentialsGetResult.self)
+        guard let key = result?.apiKey, !key.isEmpty, key != "local" else { return nil }
         return key
     }
 }
