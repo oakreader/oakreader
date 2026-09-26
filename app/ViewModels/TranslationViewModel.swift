@@ -314,38 +314,38 @@ class TranslationViewModel {
 
     // MARK: - Lookup history (per document)
 
-    private var lookupStore: WordLookupStore? {
-        guard let db = parent?.database else { return nil }
-        return WordLookupStore(database: db)
-    }
-
     /// Load this document's saved lookups. Call when the panel appears.
-    func loadLookups() {
-        guard let store = lookupStore, let itemId = parent?.itemId else { lookups = []; return }
-        lookups = store.fetch(itemId: itemId)
+    ///
+    /// Async since the catalog moved to the sidecar: the shell asks for rows
+    /// rather than reading them, so this can no longer return synchronously.
+    func loadLookups() async {
+        guard let itemId = parent?.itemId else { lookups = []; return }
+        lookups = await WordLookupCatalog.list(itemId: itemId)
     }
 
     private func saveLookup(word: String, sentence: String, explanation: String) {
-        guard let store = lookupStore else { return }
         let title = parent?.libraryItem?.title ?? parent?.fileName ?? ""
         let lookup = WordLookup(
             id: UUID().uuidString, itemId: parent?.itemId, itemTitle: title,
             word: word, sentence: sentence, explanation: explanation, createdAt: Date()
         )
-        store.save(lookup)
         // Reflect immediately: drop any prior entry for the same word, prepend.
+        // The write is fire-and-forget so the panel does not wait on a round
+        // trip to show a card the user just created.
         lookups.removeAll { $0.word.lowercased() == word.lowercased() }
         lookups.insert(lookup, at: 0)
+        Task { await WordLookupCatalog.save(lookup) }
     }
 
     func deleteLookup(_ lookup: WordLookup) {
-        lookupStore?.delete(id: lookup.id)
         lookups.removeAll { $0.id == lookup.id }
+        Task { await WordLookupCatalog.delete(id: lookup.id) }
     }
 
     func clearLookups() {
-        lookupStore?.clear(itemId: parent?.itemId)
+        let itemId = parent?.itemId
         lookups = []
+        Task { await WordLookupCatalog.clear(itemId: itemId) }
     }
 
     /// True when the selection is a single word (no internal whitespace).

@@ -10,7 +10,7 @@
  * fails if the committed output is stale.
  */
 
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 
 export type FieldType =
   | { k: "string" }
@@ -150,6 +150,32 @@ export const METHODS: Method[] = [
     name: "models/refresh", type: "ModelsRefresh", kind: "request", from: "client",
     params: [{ name: "providerId", type: str, optional: true }],
     result: [{ name: "message", type: str, optional: true }],
+  },
+
+  // --- catalog (phase 1) --------------------------------------------------
+  {
+    name: "catalog/wordLookups/list", type: "WordLookupsList", kind: "request", from: "client",
+    doc: "One document's lookups, or every one when itemId is absent. Newest first.",
+    params: [{ name: "itemId", type: str, optional: true }],
+    result: [{ name: "lookups",
+      type: { k: "array", of: { k: "ref", ts: "WordLookup", swift: "CatalogWordLookup" } } }],
+  },
+  {
+    name: "catalog/wordLookups/save", type: "WordLookupsSave", kind: "request", from: "client",
+    doc: "Insert, replacing any prior lookup of the same word in the same document.",
+    params: [{ name: "lookup", type: { k: "ref", ts: "WordLookup", swift: "CatalogWordLookup" } }],
+    result: [],
+  },
+  {
+    name: "catalog/wordLookups/delete", type: "WordLookupsDelete", kind: "request", from: "client",
+    params: [{ name: "id", type: str }],
+    result: [],
+  },
+  {
+    name: "catalog/wordLookups/clear", type: "WordLookupsClear", kind: "request", from: "client",
+    doc: "Clear one document's history, or all of it when itemId is absent.",
+    params: [{ name: "itemId", type: str, optional: true }],
+    result: [],
   },
 
   // --- client -> server notifications ------------------------------------

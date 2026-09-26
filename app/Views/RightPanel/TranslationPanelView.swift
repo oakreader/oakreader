@@ -33,7 +33,7 @@ struct TranslationPanelView: View {
             }
             .scrollContentBackground(.hidden)
         }
-        .task { translationVM.loadLookups() }
+        .task { await translationVM.loadLookups() }
         .onChange(of: voiceVM?.isSpeaking) { _, speaking in
             if speaking == false { playingSection = nil }
         }

@@ -136,6 +136,24 @@ indirect enum JSONFragment: Codable {
     }
 }
 
+/// A saved word lookup on the wire.
+///
+/// `Codable` both ways because it travels in both directions — out on save,
+/// back on list. Dates are ISO 8601 strings, matching both the column and the
+/// core's view of it; the conversion to `Date` happens at the call site, so
+/// this stays a transport type with no Foundation date semantics baked in.
+struct CatalogWordLookup: Codable {
+    var id: String
+    /// Null once the document is deleted: the column is ON DELETE SET NULL.
+    var itemId: String?
+    /// Denormalised, so a global list needs no join.
+    var itemTitle: String
+    var word: String
+    var sentence: String
+    var explanation: String
+    var createdAt: String
+}
+
 // MARK: - Event payloads
 
 struct BackendToolCall: Decodable {

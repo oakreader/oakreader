@@ -276,7 +276,13 @@ actor NodeBackend {
         let proc = Process()
         proc.executableURL = binary
         proc.arguments = [
+            // Provider config and credentials.
             "--data-dir", CatalogDatabase.dataDirectory.appendingPathComponent("backend").path,
+            // The user's library. A separate flag because these are separate
+            // things: one is the sidecar's own state, the other is the
+            // documents, and phase 1 made the sidecar the only process that
+            // opens the second one.
+            "--library", CatalogDatabase.dataDirectory.appendingPathComponent("library.sqlite").path,
         ]
         let stdin = Pipe(), stdout = Pipe(), stderr = Pipe()
         proc.standardInput = stdin

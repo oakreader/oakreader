@@ -135,8 +135,8 @@ struct TranslationSettingsView: View {
                 DatePicker("Since", selection: $sinceDate, displayedComponents: .date)
             }
             Menu("Export Word Lookups…") {
-                Button("As CSV (.csv)") { export(format: .csv) }
-                Button("As JSON (.json)") { export(format: .json) }
+                Button("As CSV (.csv)") { Task { await export(format: .csv) } }
+                Button("As JSON (.json)") { Task { await export(format: .json) } }
             }
             if let exportStatus {
                 Text(exportStatus)
@@ -173,8 +173,8 @@ struct TranslationSettingsView: View {
         }
     }
 
-    private func export(format: ExportFormat) {
-        var lookups = WordLookupStore(database: store.database).fetchAll()
+    private func export(format: ExportFormat) async {
+        var lookups = await WordLookupCatalog.listAll()
         if let lowerBound = rangeLowerBound {
             lookups = lookups.filter { $0.createdAt >= lowerBound }
         }

@@ -13,6 +13,9 @@ import type { AuthEvent, AuthPrompt, ThinkingLevel } from "@earendil-works/pi-ai
 import {
   PROTOCOL_VERSION, RpcError,
   PingParams, ProvidersListParams,
+  WordLookupsListParams, WordLookupsSaveParams,
+  WordLookupsDeleteParams, WordLookupsClearParams,
+  type WordLookupsListResult,
   CompleteParams, ChatParams, OAuthLoginParams,
   CredentialsSetParams, CredentialsGetParams, CredentialsDeleteParams,
   ConfigSetBaseUrlParams, ConfigSetLocalUrlParams, ModelsRefreshParams, CancelRequestParams,
@@ -23,6 +26,8 @@ import { RpcPeer, RpcFailure } from "./rpc.js";
 import { ConfigStore, FileCredentialStore, dataPaths } from "./store.js";
 import { ProviderRegistry, toPiId } from "./providers.js";
 import { runChat, toPiMessages } from "./chat.js";
+import { Catalog } from "./catalog/db.js";
+import { WordLookupStore } from "./catalog/wordLookups.js";
 
 const BACKEND_ID = "oak-backend 0.2.0";
 
@@ -40,6 +45,31 @@ const paths = dataPaths(dataDir);
 const credentials = new FileCredentialStore(paths.auth);
 const config = new ConfigStore(paths.config);
 const registry = new ProviderRegistry(credentials, config);
+
+/**
+ * The catalog, opened lazily.
+ *
+ * `--library` is where the shell's library lives, which is NOT the sidecar's
+ * own data dir: one holds the user's documents, the other holds provider
+ * config. Lazy because a shell that never touches the catalog should not pay
+ * for opening it, and because a bad path should fail the first catalog call
+ * rather than the whole process at startup.
+ */
+const libraryFlag = process.argv.indexOf("--library");
+const libraryPath = libraryFlag !== -1 ? process.argv[libraryFlag + 1] : undefined;
+let catalogHandle: Catalog | undefined;
+
+function catalog(): Catalog {
+  if (catalogHandle) return catalogHandle;
+  if (!libraryPath) {
+    throw new RpcFailure(RpcError.notConfigured, "no --library path was given to the sidecar");
+  }
+  catalogHandle = Catalog.open(libraryPath, { log });
+  return catalogHandle;
+}
+
+/** `user_id` on every row the Swift app wrote. Kept for wire compatibility. */
+const LOCAL_USER = "local";
 
 // --- IO -------------------------------------------------------------------
 
@@ -285,6 +315,30 @@ function registerMethods(): void {
     );
     const errors = [...result.errors.entries()].map(([prov, e]) => `${prov}: ${errorMessage(e)}`);
     if (errors.length > 0) throw new RpcFailure(RpcError.providerUnavailable, errors.join("; "));
+    return {};
+  });
+
+  // --- catalog ----------------------------------------------------------
+  // Phase 1: the shell stops opening library.sqlite and asks instead. Exactly
+  // one process owns the schema, and it is this one.
+
+  peer.onRequest("catalog/wordLookups/list", WordLookupsListParams, (p): WordLookupsListResult => {
+    const store = new WordLookupStore(catalog().db, LOCAL_USER);
+    return { lookups: p.itemId === undefined ? store.listAll() : store.list(p.itemId) };
+  });
+
+  peer.onRequest("catalog/wordLookups/save", WordLookupsSaveParams, (p) => {
+    new WordLookupStore(catalog().db, LOCAL_USER).save(p.lookup);
+    return {};
+  });
+
+  peer.onRequest("catalog/wordLookups/delete", WordLookupsDeleteParams, (p) => {
+    new WordLookupStore(catalog().db, LOCAL_USER).delete(p.id);
+    return {};
+  });
+
+  peer.onRequest("catalog/wordLookups/clear", WordLookupsClearParams, (p) => {
+    new WordLookupStore(catalog().db, LOCAL_USER).clear(p.itemId ?? null);
     return {};
   });
 

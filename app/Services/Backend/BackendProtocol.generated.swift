@@ -9,7 +9,7 @@ import Foundation
 /// Reverse calls (tool/execute, oauth/prompt) are ordinary requests in the
 /// other direction, so they need no separate machinery.
 enum RPC {
-    static let version = 3
+    static let version = 4
 
     /// JSON-RPC error codes. The shell branches on these: re-authenticate
     /// is a different affordance from retry, and the old single error string
@@ -52,6 +52,10 @@ enum RPC {
         static let configSetBaseUrl = "config/setBaseUrl"
         static let configSetLocalUrl = "config/setLocalUrl"
         static let modelsRefresh = "models/refresh"
+        static let wordLookupsList = "catalog/wordLookups/list"
+        static let wordLookupsSave = "catalog/wordLookups/save"
+        static let wordLookupsDelete = "catalog/wordLookups/delete"
+        static let wordLookupsClear = "catalog/wordLookups/clear"
         static let cancelRequest = "$/cancelRequest"
         static let toolExecute = "tool/execute"
         static let oAuthPrompt = "oauth/prompt"
@@ -171,6 +175,41 @@ enum RPC {
     }
     struct ModelsRefreshResult: Decodable {
         var message: String?
+    }
+
+    // MARK: catalog/wordLookups/list
+    /// One document's lookups, or every one when itemId is absent. Newest first.
+    struct WordLookupsListParams: Encodable {
+        var itemId: String?
+    }
+    struct WordLookupsListResult: Decodable {
+        var lookups: [CatalogWordLookup]
+    }
+
+    // MARK: catalog/wordLookups/save
+    /// Insert, replacing any prior lookup of the same word in the same document.
+    struct WordLookupsSaveParams: Encodable {
+        var lookup: CatalogWordLookup
+    }
+    struct WordLookupsSaveResult: Decodable {
+        init() {}
+    }
+
+    // MARK: catalog/wordLookups/delete
+    struct WordLookupsDeleteParams: Encodable {
+        var `id`: String
+    }
+    struct WordLookupsDeleteResult: Decodable {
+        init() {}
+    }
+
+    // MARK: catalog/wordLookups/clear
+    /// Clear one document's history, or all of it when itemId is absent.
+    struct WordLookupsClearParams: Encodable {
+        var itemId: String?
+    }
+    struct WordLookupsClearResult: Decodable {
+        init() {}
     }
 
     // MARK: $/cancelRequest

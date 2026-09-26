@@ -2,10 +2,10 @@
 // Run `pnpm protocol:generate` after changing the schema.
 
 import { z } from "zod";
-import { WireMessage, WireToolDef, type ProviderSummary, type EventToolCall, type PromptOption } from "./protocol.base.js";
+import { WireMessage, WireToolDef, WordLookup, type ProviderSummary, type EventToolCall, type PromptOption } from "./protocol.base.js";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- refs used by generated shapes
 
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 
 /** JSON-RPC 2.0 error codes. Below -32000 is ours; the rest is the spec's. */
 export const RpcError = {
@@ -147,6 +147,36 @@ export type ModelsRefreshResult = {
   message?: string;
 };
 
+/** `catalog/wordLookups/list` — One document's lookups, or every one when itemId is absent. Newest first. */
+export const WordLookupsListParams = z.object({
+  itemId: z.string().optional(),
+});
+export type WordLookupsListParams = z.infer<typeof WordLookupsListParams>;
+export type WordLookupsListResult = {
+  lookups: WordLookup[];
+};
+
+/** `catalog/wordLookups/save` — Insert, replacing any prior lookup of the same word in the same document. */
+export const WordLookupsSaveParams = z.object({
+  lookup: WordLookup,
+});
+export type WordLookupsSaveParams = z.infer<typeof WordLookupsSaveParams>;
+export type WordLookupsSaveResult = Record<string, never>;
+
+/** `catalog/wordLookups/delete` */
+export const WordLookupsDeleteParams = z.object({
+  id: z.string(),
+});
+export type WordLookupsDeleteParams = z.infer<typeof WordLookupsDeleteParams>;
+export type WordLookupsDeleteResult = Record<string, never>;
+
+/** `catalog/wordLookups/clear` — Clear one document's history, or all of it when itemId is absent. */
+export const WordLookupsClearParams = z.object({
+  itemId: z.string().optional(),
+});
+export type WordLookupsClearParams = z.infer<typeof WordLookupsClearParams>;
+export type WordLookupsClearResult = Record<string, never>;
+
 /** `$/cancelRequest` — LSP's spelling. The peer fails the named request and anything it spawned. */
 export const CancelRequestParams = z.object({
   id: z.string(),
@@ -228,6 +258,10 @@ export const ClientRequests = {
   "config/setBaseUrl": ConfigSetBaseUrlParams,
   "config/setLocalUrl": ConfigSetLocalUrlParams,
   "models/refresh": ModelsRefreshParams,
+  "catalog/wordLookups/list": WordLookupsListParams,
+  "catalog/wordLookups/save": WordLookupsSaveParams,
+  "catalog/wordLookups/delete": WordLookupsDeleteParams,
+  "catalog/wordLookups/clear": WordLookupsClearParams,
 } as const;
 
 /** Notifications the shell sends us. */
@@ -250,6 +284,10 @@ export interface ClientRequestResults {
   "config/setBaseUrl": ConfigSetBaseUrlResult;
   "config/setLocalUrl": ConfigSetLocalUrlResult;
   "models/refresh": ModelsRefreshResult;
+  "catalog/wordLookups/list": WordLookupsListResult;
+  "catalog/wordLookups/save": WordLookupsSaveResult;
+  "catalog/wordLookups/delete": WordLookupsDeleteResult;
+  "catalog/wordLookups/clear": WordLookupsClearResult;
 }
 
 /** Requests we send to the shell. */

@@ -1,5 +1,4 @@
 import Foundation
-import GRDB
 
 /// A single saved word lookup — the simple, per-document history behind the
 /// Translation panel and the global "Words" view. No spaced repetition: it's
@@ -24,31 +23,5 @@ struct WordLookup: Identifiable, Hashable {
             return base
         }
         return base.replacingCharacters(in: range, with: "**\(base[range])**")
-    }
-}
-
-/// GRDB row for `word_lookups`. `dedupe_key` = `"<item|global>|<lowercased word>"`
-/// so re-looking up the same word in the same document updates one row instead of
-/// piling up duplicates.
-struct WordLookupRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable {
-    static let databaseTableName = "word_lookups"
-
-    var id: String
-    var userId: String
-    var itemId: String?
-    var itemTitle: String
-    var word: String
-    var sentence: String
-    var explanation: String
-    var dedupeKey: String
-    var createdAt: String
-
-    enum CodingKeys: String, CodingKey, ColumnExpression {
-        case id, word, sentence, explanation
-        case userId = "user_id"
-        case itemId = "item_id"
-        case itemTitle = "item_title"
-        case dedupeKey = "dedupe_key"
-        case createdAt = "created_at"
     }
 }

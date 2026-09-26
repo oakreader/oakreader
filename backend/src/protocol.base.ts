@@ -90,3 +90,26 @@ export interface PromptOption {
   id: string;
   label: string;
 }
+
+/**
+ * A saved word lookup, as it crosses the protocol.
+ *
+ * A zod schema rather than a bare type because this one travels BOTH ways --
+ * inbound on `catalog/wordLookups/save`, outbound on `.../list` -- and
+ * anything we receive gets validated.
+ *
+ * Dates stay ISO 8601 strings: formatting is the shell's business, storage is
+ * ours, and the rows already hold them in that form.
+ */
+export const WordLookup = z.object({
+  id: z.string(),
+  /** Null once the document is deleted: the column is ON DELETE SET NULL. */
+  itemId: z.string().nullable(),
+  /** Denormalised, so a global list needs no join. */
+  itemTitle: z.string(),
+  word: z.string(),
+  sentence: z.string(),
+  explanation: z.string(),
+  createdAt: z.string(),
+});
+export type WordLookup = z.infer<typeof WordLookup>;
