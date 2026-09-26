@@ -237,3 +237,26 @@ export const Item = z.object({
   propertyValues: z.array(PropertyValue),
 });
 export type Item = z.infer<typeof Item>;
+
+/** One allowed value of a select-type property. */
+export const PropertyOption = z.object({
+  id: z.string(),
+  propertyId: z.string(),
+  name: z.string(),
+  colorHex: z.string(),
+  position: z.number().int(),
+});
+export type PropertyOption = z.infer<typeof PropertyOption>;
+
+/** A tag or status column. `type` is "select" or "text". */
+export const Property = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: z.string(),
+  icon: z.string(),
+  position: z.number().int(),
+  /** Built in; the UI refuses to delete these. */
+  isSystem: z.boolean(),
+  options: z.array(PropertyOption),
+});
+export type Property = z.infer<typeof Property>;

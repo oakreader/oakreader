@@ -9,7 +9,7 @@ import Foundation
 /// Reverse calls (tool/execute, oauth/prompt) are ordinary requests in the
 /// other direction, so they need no separate machinery.
 enum RPC {
-    static let version = 9
+    static let version = 10
 
     /// JSON-RPC error codes. The shell branches on these: re-authenticate
     /// is a different affordance from retry, and the old single error string
@@ -72,6 +72,14 @@ enum RPC {
         static let itemsUpdateField = "catalog/items/updateField"
         static let itemsSetTrashed = "catalog/items/setTrashed"
         static let itemsRemove = "catalog/items/remove"
+        static let propertiesList = "catalog/properties/list"
+        static let propertiesUpsert = "catalog/properties/upsert"
+        static let propertiesDelete = "catalog/properties/delete"
+        static let propertiesUpsertOption = "catalog/properties/upsertOption"
+        static let propertiesDeleteOption = "catalog/properties/deleteOption"
+        static let propertiesAddSelectValue = "catalog/properties/addSelectValue"
+        static let propertiesRemoveSelectValue = "catalog/properties/removeSelectValue"
+        static let propertiesSetTextValue = "catalog/properties/setTextValue"
         static let promptsCompose = "prompts/compose"
         static let wordLookupsList = "catalog/wordLookups/list"
         static let wordLookupsSave = "catalog/wordLookups/save"
@@ -398,6 +406,85 @@ enum RPC {
         var ids: [String]
     }
     struct ItemsRemoveResult: Decodable {
+        init() {}
+    }
+
+    // MARK: catalog/properties/list
+    /// Every property with its options, both in display order.
+    struct PropertiesListParams: Encodable {
+        init() {}
+    }
+    struct PropertiesListResult: Decodable {
+        var properties: [CatalogProperty]
+    }
+
+    // MARK: catalog/properties/upsert
+    struct PropertiesUpsertParams: Encodable {
+        var property: CatalogProperty
+    }
+    struct PropertiesUpsertResult: Decodable {
+        init() {}
+    }
+
+    // MARK: catalog/properties/delete
+    /// Cascades to the property's options and every value using them.
+    struct PropertiesDeleteParams: Encodable {
+        var `id`: String
+    }
+    struct PropertiesDeleteResult: Decodable {
+        init() {}
+    }
+
+    // MARK: catalog/properties/upsertOption
+    struct PropertiesUpsertOptionParams: Encodable {
+        var option: CatalogPropertyOption
+    }
+    struct PropertiesUpsertOptionResult: Decodable {
+        init() {}
+    }
+
+    // MARK: catalog/properties/deleteOption
+    /// Cascades to every item value that pointed at it.
+    struct PropertiesDeleteOptionParams: Encodable {
+        var `id`: String
+    }
+    struct PropertiesDeleteOptionResult: Decodable {
+        init() {}
+    }
+
+    // MARK: catalog/properties/addSelectValue
+    /// Add a chosen option. Replaces the previous value for a single-select property and appends
+    /// for a multi-select; the core reads the type.
+    struct PropertiesAddSelectValueParams: Encodable {
+        var valueId: String
+        var itemId: String
+        var propertyId: String
+        var optionId: String
+    }
+    struct PropertiesAddSelectValueResult: Decodable {
+        init() {}
+    }
+
+    // MARK: catalog/properties/removeSelectValue
+    /// Remove one chosen option, leaving the item's other values alone.
+    struct PropertiesRemoveSelectValueParams: Encodable {
+        var itemId: String
+        var propertyId: String
+        var optionId: String
+    }
+    struct PropertiesRemoveSelectValueResult: Decodable {
+        init() {}
+    }
+
+    // MARK: catalog/properties/setTextValue
+    /// Set a text or number value, replacing any previous one. Empty clears it.
+    struct PropertiesSetTextValueParams: Encodable {
+        var valueId: String
+        var itemId: String
+        var propertyId: String
+        var value: String
+    }
+    struct PropertiesSetTextValueResult: Decodable {
         init() {}
     }
 

@@ -148,6 +148,7 @@
 		7CC45E7173DEB28171A00212 /* BackendProtocol.generated.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABD251D2CFC1F3E2851DD4B5 /* BackendProtocol.generated.swift */; };
 		7CC75E1AF107C6CE5853DE19 /* ViewerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15AFF30B33D00CFE356594F1 /* ViewerViewModel.swift */; };
 		7CD7B12462D12E8B04AABBDA /* OakVoice in Frameworks */ = {isa = PBXBuildFile; productRef = 700CFFFFF234759D7CB6C385 /* OakVoice */; };
+		7D89AA07405BD79B79055C41 /* PropertyCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = B18FF99351C7A5628644354D /* PropertyCatalog.swift */; };
 		7DF391D5B211658AD80125CD /* LibraryEnums.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9344BD2E439D6540945DDA78 /* LibraryEnums.swift */; };
 		7EBCAC596EE1DBEFA8F49737 /* NotesSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D801E8CB2046BEE7F171F6D /* NotesSupport.swift */; };
 		7F3207A758BDBFD5AF659665 /* TextExtractionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83175491F319BBEB6184EF9F /* TextExtractionService.swift */; };
@@ -488,6 +489,7 @@
 		AD0DADED13546C414DFD6984 /* SharingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharingService.swift; sourceTree = "<group>"; };
 		AD1BA0EB74DE9B32341F08B8 /* SymbolStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SymbolStyle.swift; sourceTree = "<group>"; };
 		B108A2CA820564EAD4B4AF7C /* LibraryItemStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryItemStore.swift; sourceTree = "<group>"; };
+		B18FF99351C7A5628644354D /* PropertyCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertyCatalog.swift; sourceTree = "<group>"; };
 		B4B76F3EDA83525220BC0FDC /* OakLabel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OakLabel.swift; sourceTree = "<group>"; };
 		B5E260B62C924AF5C1395CAB /* SerperSearchProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SerperSearchProvider.swift; sourceTree = "<group>"; };
 		B6F1E9FF6205017386AE255E /* LookupCardRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LookupCardRow.swift; sourceTree = "<group>"; };
@@ -812,6 +814,7 @@
 				AB161803654383723D0C5EC6 /* CatalogWireMapping.swift */,
 				A8E5A3FBC7CC4C65B1D49130 /* LibraryCatalog.swift */,
 				EF2387B271A13F8720377194 /* PromptCatalog.swift */,
+				B18FF99351C7A5628644354D /* PropertyCatalog.swift */,
 				F1549879703EE0C34737AD8E /* WordLookupCatalog.swift */,
 			);
 			path = Catalog;
@@ -1599,6 +1602,7 @@
 				B37BEE2584AB24AB3E6726D5 /* PresentationOverlayView.swift in Sources */,
 				DEBA5B93F86D0CE70FF5A4F9 /* ProgressOverlay.swift in Sources */,
 				BEF86F819A939C91AC38B47F /* PromptCatalog.swift in Sources */,
+				7D89AA07405BD79B79055C41 /* PropertyCatalog.swift in Sources */,
 				05B851675F41FA534DC6588E /* ProviderIconView.swift in Sources */,
 				818B3867EE13F14CD0F64A16 /* RPCTransport.swift in Sources */,
 				B1B0C174E22F08B0F06EE22A /* RecordingTranscriptionService.swift in Sources */,

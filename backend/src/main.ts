@@ -14,6 +14,11 @@ import {
   PROTOCOL_VERSION, RpcError,
   PingParams, ProvidersListParams,
   PromptsComposeParams, type PromptsComposeResult,
+  PropertiesListParams, PropertiesUpsertParams, PropertiesDeleteParams,
+  PropertiesUpsertOptionParams, PropertiesDeleteOptionParams,
+  PropertiesAddSelectValueParams, PropertiesRemoveSelectValueParams,
+  PropertiesSetTextValueParams,
+  type PropertiesListResult,
   ItemsListParams, ItemsFindParams, ItemsInsertParams,
   ItemsUpdateFieldParams, ItemsSetTrashedParams, ItemsRemoveParams,
   type ItemsListResult, type ItemsFindResult,
@@ -46,6 +51,7 @@ import { AnnotationStore } from "./catalog/annotations.js";
 import { ConversationStore } from "./catalog/conversations.js";
 import { CollectionStore } from "./catalog/collections.js";
 import { ItemStore } from "./catalog/items.js";
+import { PropertyStore } from "./catalog/properties.js";
 
 const BACKEND_ID = "oak-backend 0.2.0";
 
@@ -347,6 +353,54 @@ function registerMethods(): void {
   // --- catalog ----------------------------------------------------------
   // Phase 1: the shell stops opening library.sqlite and asks instead. Exactly
   // one process owns the schema, and it is this one.
+
+  peer.onRequest("catalog/properties/list", PropertiesListParams,
+    (): PropertiesListResult => ({
+      properties: new PropertyStore(catalog().db).list(),
+    }));
+
+  peer.onRequest("catalog/properties/upsert", PropertiesUpsertParams, (p) => {
+    const { options, ...definition } = p.property;
+    const store = new PropertyStore(catalog().db);
+    store.upsertProperty(definition);
+    // Options travel with the property so a caller can create both at once.
+    for (const option of options) store.upsertOption(option);
+    return {};
+  });
+
+  peer.onRequest("catalog/properties/delete", PropertiesDeleteParams, (p) => {
+    new PropertyStore(catalog().db).deleteProperty(p.id);
+    return {};
+  });
+
+  peer.onRequest("catalog/properties/upsertOption", PropertiesUpsertOptionParams, (p) => {
+    new PropertyStore(catalog().db).upsertOption(p.option);
+    return {};
+  });
+
+  peer.onRequest("catalog/properties/deleteOption", PropertiesDeleteOptionParams, (p) => {
+    new PropertyStore(catalog().db).deleteOption(p.id);
+    return {};
+  });
+
+  peer.onRequest("catalog/properties/addSelectValue", PropertiesAddSelectValueParams, (p) => {
+    new PropertyStore(catalog().db)
+      .addSelectValue(p.valueId, p.itemId, p.propertyId, p.optionId);
+    return {};
+  });
+
+  peer.onRequest("catalog/properties/removeSelectValue",
+    PropertiesRemoveSelectValueParams, (p) => {
+      new PropertyStore(catalog().db)
+        .removeSelectValue(p.itemId, p.propertyId, p.optionId);
+      return {};
+    });
+
+  peer.onRequest("catalog/properties/setTextValue", PropertiesSetTextValueParams, (p) => {
+    new PropertyStore(catalog().db)
+      .setTextValue(p.valueId, p.itemId, p.propertyId, p.value);
+    return {};
+  });
 
   peer.onRequest("catalog/items/list", ItemsListParams, (p): ItemsListResult => {
     const store = new ItemStore(catalog().db, LOCAL_USER);

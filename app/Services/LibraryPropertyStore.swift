@@ -1,213 +1,111 @@
 import Foundation
-import GRDB
 
 extension LibraryStore {
     // MARK: - Properties
 
-    var properties: [PropertyDefinition] {
-        _ = revision
-        if let cached = propertiesCache, cached.revision == revision {
-            return cached.properties
-        }
-        let result = (try? fetchAllProperties()) ?? []
-        propertiesCache = (revision: revision, properties: result)
-        return result
-    }
+    /// The property definitions, filled by `refresh()` alongside the items.
+    /// Synchronous for the same reason `items` is: view bodies read it.
+    var properties: [PropertyDefinition] { loadedProperties }
 
-    func fetchAllProperties() throws -> [PropertyDefinition] {
-        try database.dbQueue.read { db in
-            let propRecords = try PropertyRecord.order(PropertyRecord.CodingKeys.position).fetchAll(db)
-            let optionRecords = try PropertyOptionRecord.order(PropertyOptionRecord.CodingKeys.position).fetchAll(db)
-
-            var optionsByProperty: [String: [PropertyOption]] = [:]
-            for opt in optionRecords {
-                optionsByProperty[opt.propertyId, default: []].append(PropertyOption(record: opt))
-            }
-
-            return propRecords.map { prop in
-                PropertyDefinition(record: prop, options: optionsByProperty[prop.id] ?? [])
-            }
-        }
-    }
-
+    /// Create a property and return it optimistically.
+    ///
+    /// The write is fired rather than awaited, as everywhere else in this store:
+    /// call sites are menu actions that cannot await, and `invalidate()` reloads
+    /// behind them. The returned definition is what was sent, so a caller can
+    /// select it immediately instead of waiting for the round trip.
     @discardableResult
     func createProperty(name: String, type: PropertyType, icon: String = "tag") -> PropertyDefinition? {
-        let id = UUID().uuidString
-        let record = PropertyRecord(
-            id: id,
-            name: name,
-            type: type.rawValue,
-            icon: icon,
-            position: properties.count,
-            isSystem: false
+        let property = PropertyDefinition(
+            record: PropertyRecord(
+                id: UUID().uuidString,
+                name: name,
+                type: type.rawValue,
+                icon: icon,
+                position: properties.count,
+                isSystem: false
+            )
         )
-        do {
-            try database.dbQueue.write { db in
-                var r = record
-                try r.insert(db)
-            }
-            invalidate()
-            return PropertyDefinition(record: record)
-        } catch {
-            Log.error(Log.store, "createProperty failed: \(error)")
-            return nil
-        }
+        write { await PropertyCatalog.upsert(property.wire) }
+        return property
     }
 
     func deleteProperty(_ property: PropertyDefinition) {
         guard !property.isSystem else { return }
-        do {
-            try database.dbQueue.write { db in
-                try db.execute(sql: "DELETE FROM properties WHERE id = ?", arguments: [property.id.uuidString])
-            }
-            invalidate()
-        } catch {
-            Log.error(Log.store, "deleteProperty failed: \(error)")
-        }
+        write { await PropertyCatalog.delete(id: property.id.uuidString) }
     }
 
+    /// Append an option to a property. Position is the current count, which is
+    /// where the old `MAX(position) + 1` query landed for a list with no gaps.
     @discardableResult
     func addPropertyOption(propertyId: UUID, name: String, colorHex: String) -> PropertyOption? {
-        let optId = UUID().uuidString
-        let record = PropertyOptionRecord(
-            id: optId,
+        let position = properties.first { $0.id == propertyId }?.options.count ?? 0
+        let option = PropertyOption(record: PropertyOptionRecord(
+            id: UUID().uuidString,
             propertyId: propertyId.uuidString,
             name: name,
             colorHex: colorHex,
-            position: 0  // Will be appended at end
-        )
-        do {
-            try database.dbQueue.write { db in
-                // Get next position
-                let maxPos = try Int.fetchOne(db, sql: """
-                    SELECT MAX(position) FROM property_options WHERE property_id = ?
-                """, arguments: [propertyId.uuidString]) ?? -1
-                var r = record
-                r.position = maxPos + 1
-                try r.insert(db)
-            }
-            invalidate()
-            return PropertyOption(record: record)
-        } catch {
-            Log.error(Log.store, "addPropertyOption failed: \(error)")
-            return nil
-        }
+            position: position
+        ))
+        write { await PropertyCatalog.upsertOption(option.wire) }
+        return option
     }
 
     func removePropertyOption(_ option: PropertyOption) {
-        do {
-            try database.dbQueue.write { db in
-                try db.execute(sql: "DELETE FROM property_options WHERE id = ?", arguments: [option.id.uuidString])
-            }
-            invalidate()
-        } catch {
-            Log.error(Log.store, "removePropertyOption failed: \(error)")
-        }
+        write { await PropertyCatalog.deleteOption(id: option.id.uuidString) }
     }
 
     func renamePropertyOption(_ option: PropertyOption, to newName: String) {
-        do {
-            try database.dbQueue.write { db in
-                try db.execute(
-                    sql: "UPDATE property_options SET name = ? WHERE id = ?",
-                    arguments: [newName, option.id.uuidString]
-                )
-            }
-            invalidate()
-        } catch {
-            Log.error(Log.store, "renamePropertyOption failed: \(error)")
-        }
+        var updated = option
+        updated.name = newName
+        write { await PropertyCatalog.upsertOption(updated.wire) }
     }
 
     func updatePropertyOptionColor(_ option: PropertyOption, colorHex: String) {
-        do {
-            try database.dbQueue.write { db in
-                try db.execute(
-                    sql: "UPDATE property_options SET color_hex = ? WHERE id = ?",
-                    arguments: [colorHex, option.id.uuidString]
-                )
-            }
-            invalidate()
-        } catch {
-            Log.error(Log.store, "updatePropertyOptionColor failed: \(error)")
-        }
+        var updated = option
+        updated.colorHex = colorHex
+        write { await PropertyCatalog.upsertOption(updated.wire) }
     }
 
-    /// Set a select-type property value (adds option_id to item_property_values).
-    /// For multi_select: adds if not already present.
-    /// For single_select: replaces existing value.
+    // MARK: - Item values
+
+    /// Give an item one of a select property's options.
+    ///
+    /// Whether that replaces the item's previous choice or joins it is decided
+    /// by the property's type, and the core decides it — a multi-select keeps
+    /// both, a single-select keeps the latest.
     func setItemSelectValue(item: LibraryItem, property: PropertyDefinition, option: PropertyOption) {
-        do {
-            try database.dbQueue.write { db in
-                if property.type == .singleSelect {
-                    // Remove existing value for this property
-                    try db.execute(
-                        sql: "DELETE FROM item_property_values WHERE item_id = ? AND property_id = ?",
-                        arguments: [item.id.uuidString, property.id.uuidString]
-                    )
-                } else {
-                    // multi_select: check if already assigned
-                    let exists = try Int.fetchOne(db, sql: """
-                        SELECT COUNT(*) FROM item_property_values
-                        WHERE item_id = ? AND property_id = ? AND option_id = ?
-                    """, arguments: [item.id.uuidString, property.id.uuidString, option.id.uuidString]) ?? 0
-                    if exists > 0 { return }
-                }
-
-                var record = ItemPropertyValueRecord(
-                    id: UUID().uuidString,
-                    itemId: item.id.uuidString,
-                    propertyId: property.id.uuidString,
-                    optionId: option.id.uuidString,
-                    textValue: nil
-                )
-                try record.insert(db)
-            }
-            invalidate()
-        } catch {
-            Log.error(Log.store, "setItemSelectValue failed: \(error)")
+        write {
+            await PropertyCatalog.addSelectValue(
+                itemId: item.id.uuidString,
+                propertyId: property.id.uuidString,
+                optionId: option.id.uuidString)
         }
     }
 
-    /// Remove a select-type property value (removes the option from the item).
     func removeItemSelectValue(item: LibraryItem, property: PropertyDefinition, option: PropertyOption) {
-        do {
-            try database.dbQueue.write { db in
-                try db.execute(
-                    sql: "DELETE FROM item_property_values WHERE item_id = ? AND property_id = ? AND option_id = ?",
-                    arguments: [item.id.uuidString, property.id.uuidString, option.id.uuidString]
-                )
-            }
-            invalidate()
-        } catch {
-            Log.error(Log.store, "removeItemSelectValue failed: \(error)")
+        write {
+            await PropertyCatalog.removeSelectValue(
+                itemId: item.id.uuidString,
+                propertyId: property.id.uuidString,
+                optionId: option.id.uuidString)
         }
     }
 
-    /// Set a text/number property value.
+    /// Set a text or number value. An empty string clears it.
     func setItemTextValue(item: LibraryItem, property: PropertyDefinition, value: String) {
-        do {
-            try database.dbQueue.write { db in
-                // Remove existing
-                try db.execute(
-                    sql: "DELETE FROM item_property_values WHERE item_id = ? AND property_id = ?",
-                    arguments: [item.id.uuidString, property.id.uuidString]
-                )
-                if !value.isEmpty {
-                    var record = ItemPropertyValueRecord(
-                        id: UUID().uuidString,
-                        itemId: item.id.uuidString,
-                        propertyId: property.id.uuidString,
-                        optionId: nil,
-                        textValue: value
-                    )
-                    try record.insert(db)
-                }
-            }
-            invalidate()
-        } catch {
-            Log.error(Log.store, "setItemTextValue failed: \(error)")
+        write {
+            await PropertyCatalog.setTextValue(
+                itemId: item.id.uuidString,
+                propertyId: property.id.uuidString,
+                value: value)
         }
     }
 
+    /// Fire a write and reload once it lands, so the refresh sees it.
+    private func write(_ body: @escaping () async -> Void) {
+        Task { @MainActor in
+            await body()
+            invalidate()
+        }
+    }
 }

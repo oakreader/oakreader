@@ -281,6 +281,27 @@ struct CatalogPropertyValue: Codable {
     var textValue: String?
 }
 
+/// One allowed value of a select-type property.
+struct CatalogPropertyOption: Codable {
+    var id: String
+    var propertyId: String
+    var name: String
+    var colorHex: String
+    var position: Int
+}
+
+/// A tag or status column. `type` is one of the `PropertyType` raw values.
+struct CatalogProperty: Codable {
+    var id: String
+    var name: String
+    var type: String
+    var icon: String
+    var position: Int
+    /// Built in; the UI refuses to delete these.
+    var isSystem: Bool
+    var options: [CatalogPropertyOption]
+}
+
 /// A library item with everything hanging off it.
 ///
 /// Covers are absent by design — at ten thousand items, carrying image data

@@ -10,7 +10,7 @@
  * fails if the committed output is stale.
  */
 
-export const PROTOCOL_VERSION = 9;
+export const PROTOCOL_VERSION = 10;
 
 export type FieldType =
   | { k: "string" }
@@ -321,6 +321,73 @@ export const METHODS: Method[] = [
     name: "catalog/items/remove", type: "ItemsRemove", kind: "request", from: "client",
     doc: "Permanent. Cascades to attachments, annotations, memberships and citations.",
     params: [{ name: "ids", type: { k: "array", of: str } }],
+    result: [],
+  },
+
+  {
+    name: "catalog/properties/list", type: "PropertiesList", kind: "request", from: "client",
+    doc: "Every property with its options, both in display order.",
+    params: [],
+    result: [{ name: "properties", type: { k: "array", of: { k: "ref", ts: "Property", swift: "CatalogProperty" } } }],
+  },
+  {
+    name: "catalog/properties/upsert", type: "PropertiesUpsert", kind: "request", from: "client",
+    params: [{ name: "property", type: { k: "ref", ts: "Property", swift: "CatalogProperty" } }],
+    result: [],
+  },
+  {
+    name: "catalog/properties/delete", type: "PropertiesDelete", kind: "request", from: "client",
+    doc: "Cascades to the property's options and every value using them.",
+    params: [{ name: "id", type: str }],
+    result: [],
+  },
+  {
+    name: "catalog/properties/upsertOption", type: "PropertiesUpsertOption",
+    kind: "request", from: "client",
+    params: [{ name: "option", type: { k: "ref", ts: "PropertyOption", swift: "CatalogPropertyOption" } }],
+    result: [],
+  },
+  {
+    name: "catalog/properties/deleteOption", type: "PropertiesDeleteOption",
+    kind: "request", from: "client",
+    doc: "Cascades to every item value that pointed at it.",
+    params: [{ name: "id", type: str }],
+    result: [],
+  },
+  {
+    name: "catalog/properties/addSelectValue", type: "PropertiesAddSelectValue",
+    kind: "request", from: "client",
+    doc: "Add a chosen option. Replaces the previous value for a single-select " +
+         "property and appends for a multi-select; the core reads the type.",
+    params: [
+      { name: "valueId", type: str },
+      { name: "itemId", type: str },
+      { name: "propertyId", type: str },
+      { name: "optionId", type: str },
+    ],
+    result: [],
+  },
+  {
+    name: "catalog/properties/removeSelectValue", type: "PropertiesRemoveSelectValue",
+    kind: "request", from: "client",
+    doc: "Remove one chosen option, leaving the item's other values alone.",
+    params: [
+      { name: "itemId", type: str },
+      { name: "propertyId", type: str },
+      { name: "optionId", type: str },
+    ],
+    result: [],
+  },
+  {
+    name: "catalog/properties/setTextValue", type: "PropertiesSetTextValue",
+    kind: "request", from: "client",
+    doc: "Set a text or number value, replacing any previous one. Empty clears it.",
+    params: [
+      { name: "valueId", type: str },
+      { name: "itemId", type: str },
+      { name: "propertyId", type: str },
+      { name: "value", type: str },
+    ],
     result: [],
   },
 

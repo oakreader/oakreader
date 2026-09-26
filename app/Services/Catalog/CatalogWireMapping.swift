@@ -135,3 +135,55 @@ extension LibraryItem {
         return copy
     }
 }
+
+// MARK: - Properties
+
+extension PropertyOption {
+    init(wire: CatalogPropertyOption) {
+        self.init(record: PropertyOptionRecord(
+            id: wire.id,
+            propertyId: wire.propertyId,
+            name: wire.name,
+            colorHex: wire.colorHex,
+            position: wire.position
+        ))
+    }
+
+    var wire: CatalogPropertyOption {
+        CatalogPropertyOption(
+            id: id.uuidString,
+            propertyId: propertyId.uuidString,
+            name: name,
+            colorHex: colorHex,
+            position: position
+        )
+    }
+}
+
+extension PropertyDefinition {
+    init(wire: CatalogProperty) {
+        self.init(
+            record: PropertyRecord(
+                id: wire.id,
+                name: wire.name,
+                type: wire.type,
+                icon: wire.icon,
+                position: wire.position,
+                isSystem: wire.isSystem
+            ),
+            options: wire.options.map(PropertyOption.init(wire:))
+        )
+    }
+
+    var wire: CatalogProperty {
+        CatalogProperty(
+            id: id.uuidString,
+            name: name,
+            type: type.rawValue,
+            icon: icon,
+            position: position,
+            isSystem: isSystem,
+            options: options.map(\.wire)
+        )
+    }
+}

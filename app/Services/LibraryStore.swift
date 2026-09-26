@@ -63,34 +63,25 @@ final class LibraryStore {
         properties.first { $0.name == "Tags" && $0.isSystem }
     }
 
-    /// Returns tag options with their item counts, sorted by count descending.
+    /// Tag options with how many items carry each, most used first.
+    ///
+    /// Counted over `items` rather than by querying the catalog: that array is
+    /// already the live, untrashed library the sidebar is describing, so the
+    /// count and the list it labels can never disagree.
     func tagOptionsWithCounts() -> [(option: PropertyOption, count: Int)] {
         guard let tagsProp = tagsProperty else { return [] }
 
-        // Single SQL query: count items per option, excluding trashed items
-        let countsMap: [String: Int] = (try? database.dbQueue.read { db in
-            let rows = try Row.fetchAll(db, sql: """
-                SELECT ipv.option_id, COUNT(DISTINCT ipv.item_id) AS cnt
-                FROM item_property_values ipv
-                JOIN items i ON i.id = ipv.item_id
-                WHERE ipv.property_id = ?
-                  AND ipv.option_id IS NOT NULL
-                  AND i.deleted_at IS NULL
-                GROUP BY ipv.option_id
-            """, arguments: [tagsProp.id.uuidString])
-            var map: [String: Int] = [:]
-            for row in rows {
-                let optionId: String = row["option_id"]
-                let cnt: Int = row["cnt"]
-                map[optionId] = cnt
+        var counts: [UUID: Int] = [:]
+        for item in items {
+            for value in item.propertyValues where value.propertyId == tagsProp.id {
+                guard let optionId = value.option?.id else { continue }
+                counts[optionId, default: 0] += 1
             }
-            return map
-        }) ?? [:]
+        }
 
-        return tagsProp.options.map { option in
-            let count = countsMap[option.id.uuidString] ?? 0
-            return (option: option, count: count)
-        }.sorted { $0.count > $1.count }
+        return tagsProp.options
+            .map { (option: $0, count: counts[$0.id] ?? 0) }
+            .sorted { $0.count > $1.count }
     }
 
     /// Which system smart collections are hidden in the sidebar (synced to Preferences).
@@ -110,9 +101,9 @@ final class LibraryStore {
     private(set) var loadedItems: [LibraryItem] = []
     private(set) var loadedTrashedItems: [LibraryItem] = []
     private(set) var loadedCollections: [PDFCollection] = []
+    private(set) var loadedProperties: [PropertyDefinition] = []
 
-    /// Derived, so still worth memoising per revision.
-    @ObservationIgnored var propertiesCache: (revision: Int, properties: [PropertyDefinition])?
+    /// Derived from the loaded items, so still worth memoising per revision.
     @ObservationIgnored var duplicateGroupsCache: (revision: Int, groups: [[LibraryItem]])?
 
     /// True until the first load finishes, so a view can tell "empty library"
@@ -129,7 +120,6 @@ final class LibraryStore {
     /// mutation, and making them all await would spread `async` across the
     /// entire library UI for no benefit. The reload happens behind this.
     func invalidate() {
-        propertiesCache = nil
         duplicateGroupsCache = nil
         revision += 1
         scheduleRefresh()
@@ -148,8 +138,9 @@ final class LibraryStore {
         async let items = LibraryCatalog.items()
         async let trashed = LibraryCatalog.trashedItems()
         async let collections = LibraryCatalog.collections()
+        async let properties = PropertyCatalog.list()
 
-        let (i, t, c) = await (items, trashed, collections)
+        let (i, t, c, p) = await (items, trashed, collections, properties)
         guard !Task.isCancelled else { return }
 
         let resolved = c.map(PDFCollection.init(wire:))
@@ -159,7 +150,7 @@ final class LibraryStore {
         loadedItems = i.map { LibraryItem(wire: $0).resolvingCollections($0.collectionIds, from: byId) }
         loadedTrashedItems = t.map { LibraryItem(wire: $0).resolvingCollections($0.collectionIds, from: byId) }
         loadedCollections = resolved
-        propertiesCache = nil
+        loadedProperties = p.map(PropertyDefinition.init(wire:))
         duplicateGroupsCache = nil
         isLoading = false
     }

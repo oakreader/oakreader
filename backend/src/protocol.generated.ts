@@ -2,10 +2,10 @@
 // Run `pnpm protocol:generate` after changing the schema.
 
 import { z } from "zod";
-import { WireMessage, WireToolDef, WordLookup, Annotation, Conversation, Collection, Item, type ProviderSummary, type EventToolCall, type PromptOption } from "./protocol.base.js";
+import { WireMessage, WireToolDef, WordLookup, Annotation, Conversation, Collection, Item, Property, PropertyOption, type ProviderSummary, type EventToolCall, type PromptOption } from "./protocol.base.js";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- refs used by generated shapes
 
-export const PROTOCOL_VERSION = 9;
+export const PROTOCOL_VERSION = 10;
 
 /** JSON-RPC 2.0 error codes. Below -32000 is ours; the rest is the spec's. */
 export const RpcError = {
@@ -322,6 +322,71 @@ export const ItemsRemoveParams = z.object({
 export type ItemsRemoveParams = z.infer<typeof ItemsRemoveParams>;
 export type ItemsRemoveResult = Record<string, never>;
 
+/** `catalog/properties/list` — Every property with its options, both in display order. */
+export const PropertiesListParams = z.object({
+});
+export type PropertiesListParams = z.infer<typeof PropertiesListParams>;
+export type PropertiesListResult = {
+  properties: Property[];
+};
+
+/** `catalog/properties/upsert` */
+export const PropertiesUpsertParams = z.object({
+  property: Property,
+});
+export type PropertiesUpsertParams = z.infer<typeof PropertiesUpsertParams>;
+export type PropertiesUpsertResult = Record<string, never>;
+
+/** `catalog/properties/delete` — Cascades to the property's options and every value using them. */
+export const PropertiesDeleteParams = z.object({
+  id: z.string(),
+});
+export type PropertiesDeleteParams = z.infer<typeof PropertiesDeleteParams>;
+export type PropertiesDeleteResult = Record<string, never>;
+
+/** `catalog/properties/upsertOption` */
+export const PropertiesUpsertOptionParams = z.object({
+  option: PropertyOption,
+});
+export type PropertiesUpsertOptionParams = z.infer<typeof PropertiesUpsertOptionParams>;
+export type PropertiesUpsertOptionResult = Record<string, never>;
+
+/** `catalog/properties/deleteOption` — Cascades to every item value that pointed at it. */
+export const PropertiesDeleteOptionParams = z.object({
+  id: z.string(),
+});
+export type PropertiesDeleteOptionParams = z.infer<typeof PropertiesDeleteOptionParams>;
+export type PropertiesDeleteOptionResult = Record<string, never>;
+
+/** `catalog/properties/addSelectValue` — Add a chosen option. Replaces the previous value for a single-select property and appends for a multi-select; the core reads the type. */
+export const PropertiesAddSelectValueParams = z.object({
+  valueId: z.string(),
+  itemId: z.string(),
+  propertyId: z.string(),
+  optionId: z.string(),
+});
+export type PropertiesAddSelectValueParams = z.infer<typeof PropertiesAddSelectValueParams>;
+export type PropertiesAddSelectValueResult = Record<string, never>;
+
+/** `catalog/properties/removeSelectValue` — Remove one chosen option, leaving the item's other values alone. */
+export const PropertiesRemoveSelectValueParams = z.object({
+  itemId: z.string(),
+  propertyId: z.string(),
+  optionId: z.string(),
+});
+export type PropertiesRemoveSelectValueParams = z.infer<typeof PropertiesRemoveSelectValueParams>;
+export type PropertiesRemoveSelectValueResult = Record<string, never>;
+
+/** `catalog/properties/setTextValue` — Set a text or number value, replacing any previous one. Empty clears it. */
+export const PropertiesSetTextValueParams = z.object({
+  valueId: z.string(),
+  itemId: z.string(),
+  propertyId: z.string(),
+  value: z.string(),
+});
+export type PropertiesSetTextValueParams = z.infer<typeof PropertiesSetTextValueParams>;
+export type PropertiesSetTextValueResult = Record<string, never>;
+
 /** `prompts/compose` — The static half of the system prompt: base.md plus the named mixins. The shell appends live context afterwards -- that half cannot be a file. */
 export const PromptsComposeParams = z.object({
   /** Mixin names, without .md, in the order they should appear. */
@@ -468,6 +533,14 @@ export const ClientRequests = {
   "catalog/items/updateField": ItemsUpdateFieldParams,
   "catalog/items/setTrashed": ItemsSetTrashedParams,
   "catalog/items/remove": ItemsRemoveParams,
+  "catalog/properties/list": PropertiesListParams,
+  "catalog/properties/upsert": PropertiesUpsertParams,
+  "catalog/properties/delete": PropertiesDeleteParams,
+  "catalog/properties/upsertOption": PropertiesUpsertOptionParams,
+  "catalog/properties/deleteOption": PropertiesDeleteOptionParams,
+  "catalog/properties/addSelectValue": PropertiesAddSelectValueParams,
+  "catalog/properties/removeSelectValue": PropertiesRemoveSelectValueParams,
+  "catalog/properties/setTextValue": PropertiesSetTextValueParams,
   "prompts/compose": PromptsComposeParams,
   "catalog/wordLookups/list": WordLookupsListParams,
   "catalog/wordLookups/save": WordLookupsSaveParams,
@@ -515,6 +588,14 @@ export interface ClientRequestResults {
   "catalog/items/updateField": ItemsUpdateFieldResult;
   "catalog/items/setTrashed": ItemsSetTrashedResult;
   "catalog/items/remove": ItemsRemoveResult;
+  "catalog/properties/list": PropertiesListResult;
+  "catalog/properties/upsert": PropertiesUpsertResult;
+  "catalog/properties/delete": PropertiesDeleteResult;
+  "catalog/properties/upsertOption": PropertiesUpsertOptionResult;
+  "catalog/properties/deleteOption": PropertiesDeleteOptionResult;
+  "catalog/properties/addSelectValue": PropertiesAddSelectValueResult;
+  "catalog/properties/removeSelectValue": PropertiesRemoveSelectValueResult;
+  "catalog/properties/setTextValue": PropertiesSetTextValueResult;
   "prompts/compose": PromptsComposeResult;
   "catalog/wordLookups/list": WordLookupsListResult;
   "catalog/wordLookups/save": WordLookupsSaveResult;
