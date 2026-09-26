@@ -90,6 +90,13 @@ struct PDFViewerRepresentable: NSViewRepresentable {
         // Install/remove global event monitors when tab becomes active/inactive
         context.coordinator.setActive(isTabActive)
 
+        // Tab isolation, AppKit side — see HTMLViewerRepresentable for the full
+        // rationale. SwiftUI's `.opacity(0)` / `.allowsHitTesting(false)` leave
+        // this view fully live to AppKit, so a background tab's PDFView would
+        // still own the `addCursorRect` / `cursorUpdate` cursor above whatever
+        // is actually on screen. Only `isHidden` makes it inert.
+        pdfView.isHidden = !isTabActive
+
         // Suppress native markup toolbar
         pdfView.isInMarkupMode = false
 

@@ -409,6 +409,19 @@ struct HTMLViewerRepresentable: NSViewRepresentable {
         // Install/remove global event monitors when tab becomes active/inactive
         context.coordinator.setActive(isTabActive)
 
+        // Tab isolation, AppKit side. `RootView` keeps every tab's hierarchy
+        // alive and switches tabs with `.opacity` + `.allowsHitTesting`, but
+        // both are SwiftUI-only concepts: the hosted NSView stays
+        // `isHidden == false` with `alphaValue == 1`, so a background tab's
+        // WKWebView keeps its tracking areas live and keeps *setting the
+        // cursor* — WebKit drives the cursor from its own mouse tracking
+        // rather than from hit-tested cursor rects, so SwiftUI's hit-test
+        // opt-out does not stop it. That is the I-beam that appears while
+        // hovering Library cards whenever a web tab is open in the background.
+        // `isHidden` is the one flag AppKit honours for tracking areas and
+        // cursor rects, and it leaves the page loaded and its state intact.
+        webView.isHidden = !isTabActive
+
         // Sync zoom level from toolbar controls
         let targetZoom = viewModel.state.zoomLevel
         if abs(webView.pageZoom - targetZoom) > 0.001 {
