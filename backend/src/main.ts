@@ -14,6 +14,9 @@ import {
   PROTOCOL_VERSION, RpcError,
   PingParams, ProvidersListParams,
   PromptsComposeParams, type PromptsComposeResult,
+  CollectionsListParams, CollectionsFindBySourceParams, CollectionsUpsertParams,
+  CollectionsDeleteParams, CollectionsSetMembershipParams, CollectionsItemsParams,
+  type CollectionsListResult, type CollectionsFindBySourceResult, type CollectionsItemsResult,
   ConversationsListParams, ConversationsCreateParams,
   ConversationsUpdateParams, ConversationsDeleteParams,
   type ConversationsListResult,
@@ -38,6 +41,7 @@ import { Catalog } from "./catalog/db.js";
 import { WordLookupStore } from "./catalog/wordLookups.js";
 import { AnnotationStore } from "./catalog/annotations.js";
 import { ConversationStore } from "./catalog/conversations.js";
+import { CollectionStore } from "./catalog/collections.js";
 
 const BACKEND_ID = "oak-backend 0.2.0";
 
@@ -339,6 +343,42 @@ function registerMethods(): void {
   // --- catalog ----------------------------------------------------------
   // Phase 1: the shell stops opening library.sqlite and asks instead. Exactly
   // one process owns the schema, and it is this one.
+
+  peer.onRequest("catalog/collections/list", CollectionsListParams,
+    (): CollectionsListResult => ({
+      collections: new CollectionStore(catalog().db, LOCAL_USER).list(),
+    }));
+
+  peer.onRequest("catalog/collections/findBySource", CollectionsFindBySourceParams,
+    (p): CollectionsFindBySourceResult => {
+      const found = new CollectionStore(catalog().db, LOCAL_USER)
+        .findBySource(p.source, p.sourceKey);
+      return found ? { collection: found } : {};
+    });
+
+  peer.onRequest("catalog/collections/upsert", CollectionsUpsertParams, (p) => {
+    new CollectionStore(catalog().db, LOCAL_USER).upsert(p.collection);
+    return {};
+  });
+
+  peer.onRequest("catalog/collections/delete", CollectionsDeleteParams, (p) => {
+    new CollectionStore(catalog().db, LOCAL_USER).delete(p.id);
+    return {};
+  });
+
+  peer.onRequest("catalog/collections/setMembership", CollectionsSetMembershipParams, (p) => {
+    const store = new CollectionStore(catalog().db, LOCAL_USER);
+    if (p.member) store.addItem(p.itemId, p.collectionId, p.at ?? new Date().toISOString());
+    else store.removeItem(p.itemId, p.collectionId);
+    return {};
+  });
+
+  peer.onRequest("catalog/collections/items", CollectionsItemsParams,
+    (p): CollectionsItemsResult => {
+      const store = new CollectionStore(catalog().db, LOCAL_USER);
+      const itemIds = store.itemIds(p.collectionId);
+      return { itemIds, count: itemIds.length };
+    });
 
   peer.onRequest("catalog/conversations/list", ConversationsListParams,
     (p): ConversationsListResult => {

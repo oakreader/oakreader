@@ -2,10 +2,10 @@
 // Run `pnpm protocol:generate` after changing the schema.
 
 import { z } from "zod";
-import { WireMessage, WireToolDef, WordLookup, Annotation, Conversation, type ProviderSummary, type EventToolCall, type PromptOption } from "./protocol.base.js";
+import { WireMessage, WireToolDef, WordLookup, Annotation, Conversation, Collection, type ProviderSummary, type EventToolCall, type PromptOption } from "./protocol.base.js";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- refs used by generated shapes
 
-export const PROTOCOL_VERSION = 7;
+export const PROTOCOL_VERSION = 8;
 
 /** JSON-RPC 2.0 error codes. Below -32000 is ours; the rest is the spec's. */
 export const RpcError = {
@@ -215,6 +215,58 @@ export const ConversationsDeleteParams = z.object({
 export type ConversationsDeleteParams = z.infer<typeof ConversationsDeleteParams>;
 export type ConversationsDeleteResult = Record<string, never>;
 
+/** `catalog/collections/list` — Every collection, ordered for display. */
+export const CollectionsListParams = z.object({
+});
+export type CollectionsListParams = z.infer<typeof CollectionsListParams>;
+export type CollectionsListResult = {
+  collections: Collection[];
+};
+
+/** `catalog/collections/findBySource` — Look one up by provenance, so an import can be run twice safely. */
+export const CollectionsFindBySourceParams = z.object({
+  source: z.string(),
+  sourceKey: z.string(),
+});
+export type CollectionsFindBySourceParams = z.infer<typeof CollectionsFindBySourceParams>;
+export type CollectionsFindBySourceResult = {
+  collection?: Collection;
+};
+
+/** `catalog/collections/upsert` */
+export const CollectionsUpsertParams = z.object({
+  collection: Collection,
+});
+export type CollectionsUpsertParams = z.infer<typeof CollectionsUpsertParams>;
+export type CollectionsUpsertResult = Record<string, never>;
+
+/** `catalog/collections/delete` — Cascades to the subtree and to memberships, never to the documents. */
+export const CollectionsDeleteParams = z.object({
+  id: z.string(),
+});
+export type CollectionsDeleteParams = z.infer<typeof CollectionsDeleteParams>;
+export type CollectionsDeleteResult = Record<string, never>;
+
+/** `catalog/collections/setMembership` — Add or remove one item. Adding twice is a no-op, not an error. */
+export const CollectionsSetMembershipParams = z.object({
+  itemId: z.string(),
+  collectionId: z.string(),
+  member: z.boolean(),
+  at: z.string().optional(),
+});
+export type CollectionsSetMembershipParams = z.infer<typeof CollectionsSetMembershipParams>;
+export type CollectionsSetMembershipResult = Record<string, never>;
+
+/** `catalog/collections/items` — Item ids in a plain collection. A smart one is a query, not a list. */
+export const CollectionsItemsParams = z.object({
+  collectionId: z.string(),
+});
+export type CollectionsItemsParams = z.infer<typeof CollectionsItemsParams>;
+export type CollectionsItemsResult = {
+  itemIds: string[];
+  count: number;
+};
+
 /** `prompts/compose` — The static half of the system prompt: base.md plus the named mixins. The shell appends live context afterwards -- that half cannot be a file. */
 export const PromptsComposeParams = z.object({
   /** Mixin names, without .md, in the order they should appear. */
@@ -349,6 +401,12 @@ export const ClientRequests = {
   "catalog/conversations/create": ConversationsCreateParams,
   "catalog/conversations/update": ConversationsUpdateParams,
   "catalog/conversations/delete": ConversationsDeleteParams,
+  "catalog/collections/list": CollectionsListParams,
+  "catalog/collections/findBySource": CollectionsFindBySourceParams,
+  "catalog/collections/upsert": CollectionsUpsertParams,
+  "catalog/collections/delete": CollectionsDeleteParams,
+  "catalog/collections/setMembership": CollectionsSetMembershipParams,
+  "catalog/collections/items": CollectionsItemsParams,
   "prompts/compose": PromptsComposeParams,
   "catalog/wordLookups/list": WordLookupsListParams,
   "catalog/wordLookups/save": WordLookupsSaveParams,
@@ -384,6 +442,12 @@ export interface ClientRequestResults {
   "catalog/conversations/create": ConversationsCreateResult;
   "catalog/conversations/update": ConversationsUpdateResult;
   "catalog/conversations/delete": ConversationsDeleteResult;
+  "catalog/collections/list": CollectionsListResult;
+  "catalog/collections/findBySource": CollectionsFindBySourceResult;
+  "catalog/collections/upsert": CollectionsUpsertResult;
+  "catalog/collections/delete": CollectionsDeleteResult;
+  "catalog/collections/setMembership": CollectionsSetMembershipResult;
+  "catalog/collections/items": CollectionsItemsResult;
   "prompts/compose": PromptsComposeResult;
   "catalog/wordLookups/list": WordLookupsListResult;
   "catalog/wordLookups/save": WordLookupsSaveResult;

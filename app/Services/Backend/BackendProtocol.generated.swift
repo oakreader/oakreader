@@ -9,7 +9,7 @@ import Foundation
 /// Reverse calls (tool/execute, oauth/prompt) are ordinary requests in the
 /// other direction, so they need no separate machinery.
 enum RPC {
-    static let version = 7
+    static let version = 8
 
     /// JSON-RPC error codes. The shell branches on these: re-authenticate
     /// is a different affordance from retry, and the old single error string
@@ -60,6 +60,12 @@ enum RPC {
         static let conversationsCreate = "catalog/conversations/create"
         static let conversationsUpdate = "catalog/conversations/update"
         static let conversationsDelete = "catalog/conversations/delete"
+        static let collectionsList = "catalog/collections/list"
+        static let collectionsFindBySource = "catalog/collections/findBySource"
+        static let collectionsUpsert = "catalog/collections/upsert"
+        static let collectionsDelete = "catalog/collections/delete"
+        static let collectionsSetMembership = "catalog/collections/setMembership"
+        static let collectionsItems = "catalog/collections/items"
         static let promptsCompose = "prompts/compose"
         static let wordLookupsList = "catalog/wordLookups/list"
         static let wordLookupsSave = "catalog/wordLookups/save"
@@ -261,6 +267,64 @@ enum RPC {
     }
     struct ConversationsDeleteResult: Decodable {
         init() {}
+    }
+
+    // MARK: catalog/collections/list
+    /// Every collection, ordered for display.
+    struct CollectionsListParams: Encodable {
+        init() {}
+    }
+    struct CollectionsListResult: Decodable {
+        var collections: [CatalogCollection]
+    }
+
+    // MARK: catalog/collections/findBySource
+    /// Look one up by provenance, so an import can be run twice safely.
+    struct CollectionsFindBySourceParams: Encodable {
+        var source: String
+        var sourceKey: String
+    }
+    struct CollectionsFindBySourceResult: Decodable {
+        var collection: CatalogCollection?
+    }
+
+    // MARK: catalog/collections/upsert
+    struct CollectionsUpsertParams: Encodable {
+        var collection: CatalogCollection
+    }
+    struct CollectionsUpsertResult: Decodable {
+        init() {}
+    }
+
+    // MARK: catalog/collections/delete
+    /// Cascades to the subtree and to memberships, never to the documents.
+    struct CollectionsDeleteParams: Encodable {
+        var `id`: String
+    }
+    struct CollectionsDeleteResult: Decodable {
+        init() {}
+    }
+
+    // MARK: catalog/collections/setMembership
+    /// Add or remove one item. Adding twice is a no-op, not an error.
+    struct CollectionsSetMembershipParams: Encodable {
+        var itemId: String
+        var collectionId: String
+        var member: Bool
+        var at: String?
+    }
+    struct CollectionsSetMembershipResult: Decodable {
+        init() {}
+    }
+
+    // MARK: catalog/collections/items
+    /// Item ids in a plain collection. A smart one is a query, not a list.
+    struct CollectionsItemsParams: Encodable {
+        var collectionId: String
+    }
+    struct CollectionsItemsResult: Decodable {
+        var itemIds: [String]
+        var count: Int
     }
 
     // MARK: prompts/compose

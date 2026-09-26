@@ -156,3 +156,27 @@ export const Conversation = z.object({
   updatedAt: z.string(),
 });
 export type Conversation = z.infer<typeof Conversation>;
+
+/**
+ * A collection on the wire.
+ *
+ * `filterRules` stays an opaque string: the rule language belongs to whoever
+ * evaluates it, and a half-modelled schema would only let the two sides
+ * disagree about what a rule means.
+ */
+export const Collection = z.object({
+  id: z.string(),
+  name: z.string(),
+  icon: z.string(),
+  sortOrder: z.number().int(),
+  /** Null at the top level. */
+  parentId: z.string().nullable(),
+  isSmart: z.boolean(),
+  isSystem: z.boolean(),
+  filterRules: z.string().nullable(),
+  source: z.string().nullable(),
+  sourceKey: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type Collection = z.infer<typeof Collection>;

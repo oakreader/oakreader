@@ -10,7 +10,7 @@
  * fails if the committed output is stale.
  */
 
-export const PROTOCOL_VERSION = 7;
+export const PROTOCOL_VERSION = 8;
 
 export type FieldType =
   | { k: "string" }
@@ -215,6 +215,55 @@ export const METHODS: Method[] = [
     doc: "Removes the index row. The JSONL transcript is the shell's to delete.",
     params: [{ name: "id", type: str }],
     result: [],
+  },
+
+  {
+    name: "catalog/collections/list", type: "CollectionsList", kind: "request", from: "client",
+    doc: "Every collection, ordered for display.",
+    params: [],
+    result: [{ name: "collections",
+      type: { k: "array", of: { k: "ref", ts: "Collection", swift: "CatalogCollection" } } }],
+  },
+  {
+    name: "catalog/collections/findBySource", type: "CollectionsFindBySource",
+    kind: "request", from: "client",
+    doc: "Look one up by provenance, so an import can be run twice safely.",
+    params: [{ name: "source", type: str }, { name: "sourceKey", type: str }],
+    result: [{ name: "collection",
+      type: { k: "ref", ts: "Collection", swift: "CatalogCollection" }, optional: true }],
+  },
+  {
+    name: "catalog/collections/upsert", type: "CollectionsUpsert", kind: "request", from: "client",
+    params: [{ name: "collection",
+      type: { k: "ref", ts: "Collection", swift: "CatalogCollection" } }],
+    result: [],
+  },
+  {
+    name: "catalog/collections/delete", type: "CollectionsDelete", kind: "request", from: "client",
+    doc: "Cascades to the subtree and to memberships, never to the documents.",
+    params: [{ name: "id", type: str }],
+    result: [],
+  },
+  {
+    name: "catalog/collections/setMembership", type: "CollectionsSetMembership",
+    kind: "request", from: "client",
+    doc: "Add or remove one item. Adding twice is a no-op, not an error.",
+    params: [
+      { name: "itemId", type: str },
+      { name: "collectionId", type: str },
+      { name: "member", type: bool },
+      { name: "at", type: str, optional: true },
+    ],
+    result: [],
+  },
+  {
+    name: "catalog/collections/items", type: "CollectionsItems", kind: "request", from: "client",
+    doc: "Item ids in a plain collection. A smart one is a query, not a list.",
+    params: [{ name: "collectionId", type: str }],
+    result: [
+      { name: "itemIds", type: { k: "array", of: str } },
+      { name: "count", type: int },
+    ],
   },
 
   {
