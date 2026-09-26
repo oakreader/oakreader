@@ -9,7 +9,7 @@ import Foundation
 /// Reverse calls (tool/execute, oauth/prompt) are ordinary requests in the
 /// other direction, so they need no separate machinery.
 enum RPC {
-    static let version = 5
+    static let version = 6
 
     /// JSON-RPC error codes. The shell branches on these: re-authenticate
     /// is a different affordance from retry, and the old single error string
@@ -52,6 +52,10 @@ enum RPC {
         static let configSetBaseUrl = "config/setBaseUrl"
         static let configSetLocalUrl = "config/setLocalUrl"
         static let modelsRefresh = "models/refresh"
+        static let annotationsList = "catalog/annotations/list"
+        static let annotationsGet = "catalog/annotations/get"
+        static let annotationsUpsert = "catalog/annotations/upsert"
+        static let annotationsDelete = "catalog/annotations/delete"
         static let promptsCompose = "prompts/compose"
         static let wordLookupsList = "catalog/wordLookups/list"
         static let wordLookupsSave = "catalog/wordLookups/save"
@@ -176,6 +180,45 @@ enum RPC {
     }
     struct ModelsRefreshResult: Decodable {
         var message: String?
+    }
+
+    // MARK: catalog/annotations/list
+    /// Live annotations on one attachment, in sort-index order. Tombstones excluded.
+    struct AnnotationsListParams: Encodable {
+        var attachmentId: String
+    }
+    struct AnnotationsListResult: Decodable {
+        var annotations: [CatalogAnnotation]
+    }
+
+    // MARK: catalog/annotations/get
+    /// One annotation by id, tombstoned or not.
+    struct AnnotationsGetParams: Encodable {
+        var `id`: String
+    }
+    struct AnnotationsGetResult: Decodable {
+        var annotation: CatalogAnnotation?
+    }
+
+    // MARK: catalog/annotations/upsert
+    /// Insert or replace. sortIndex arrives already computed -- it encodes PDF geometry, which stays in the shell.
+    struct AnnotationsUpsertParams: Encodable {
+        var annotation: CatalogAnnotation
+    }
+    struct AnnotationsUpsertResult: Decodable {
+        init() {}
+    }
+
+    // MARK: catalog/annotations/delete
+    /// Soft by default: the row stays as a tombstone so a later sync can tell deleted from never-existed. `hard` removes it outright.
+    struct AnnotationsDeleteParams: Encodable {
+        var `id`: String
+        var hard: Bool?
+        /// Tombstone timestamp; required unless hard.
+        var at: String?
+    }
+    struct AnnotationsDeleteResult: Decodable {
+        init() {}
     }
 
     // MARK: prompts/compose

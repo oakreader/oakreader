@@ -10,7 +10,7 @@
  * fails if the committed output is stale.
  */
 
-export const PROTOCOL_VERSION = 5;
+export const PROTOCOL_VERSION = 6;
 
 export type FieldType =
   | { k: "string" }
@@ -150,6 +150,39 @@ export const METHODS: Method[] = [
     name: "models/refresh", type: "ModelsRefresh", kind: "request", from: "client",
     params: [{ name: "providerId", type: str, optional: true }],
     result: [{ name: "message", type: str, optional: true }],
+  },
+
+  {
+    name: "catalog/annotations/list", type: "AnnotationsList", kind: "request", from: "client",
+    doc: "Live annotations on one attachment, in sort-index order. Tombstones excluded.",
+    params: [{ name: "attachmentId", type: str }],
+    result: [{ name: "annotations",
+      type: { k: "array", of: { k: "ref", ts: "Annotation", swift: "CatalogAnnotation" } } }],
+  },
+  {
+    name: "catalog/annotations/get", type: "AnnotationsGet", kind: "request", from: "client",
+    doc: "One annotation by id, tombstoned or not.",
+    params: [{ name: "id", type: str }],
+    result: [{ name: "annotation",
+      type: { k: "ref", ts: "Annotation", swift: "CatalogAnnotation" }, optional: true }],
+  },
+  {
+    name: "catalog/annotations/upsert", type: "AnnotationsUpsert", kind: "request", from: "client",
+    doc: "Insert or replace. sortIndex arrives already computed -- it encodes PDF " +
+         "geometry, which stays in the shell.",
+    params: [{ name: "annotation", type: { k: "ref", ts: "Annotation", swift: "CatalogAnnotation" } }],
+    result: [],
+  },
+  {
+    name: "catalog/annotations/delete", type: "AnnotationsDelete", kind: "request", from: "client",
+    doc: "Soft by default: the row stays as a tombstone so a later sync can tell " +
+         "deleted from never-existed. `hard` removes it outright.",
+    params: [
+      { name: "id", type: str },
+      { name: "hard", type: bool, default: "false" },
+      { name: "at", type: str, optional: true, doc: "Tombstone timestamp; required unless hard." },
+    ],
+    result: [],
   },
 
   {

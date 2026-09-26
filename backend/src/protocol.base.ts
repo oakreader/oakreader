@@ -113,3 +113,34 @@ export const WordLookup = z.object({
   createdAt: z.string(),
 });
 export type WordLookup = z.infer<typeof WordLookup>;
+
+/**
+ * An annotation on the wire. Two-way, so a zod schema.
+ *
+ * `sortIndex` is opaque here on purpose: the shell computes it from PDF
+ * geometry (`PPPPP|YYYYYY|XXXXXX`) and the core only orders by the string.
+ * Page layout is PDFKit's business, not the catalog's.
+ */
+export const Annotation = z.object({
+  id: z.string(),
+  itemId: z.string(),
+  attachmentId: z.string(),
+  key: z.string(),
+  type: z.string(),
+  authorName: z.string().nullable(),
+  text: z.string().nullable(),
+  comment: z.string().nullable(),
+  color: z.string(),
+  pageLabel: z.string().nullable(),
+  sortIndex: z.string(),
+  positionKind: z.string(),
+  positionJson: z.string(),
+  styleJson: z.string().nullable(),
+  source: z.string(),
+  sourceKey: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  /** Tombstone marker; null while live. */
+  deletedAt: z.string().nullable(),
+});
+export type Annotation = z.infer<typeof Annotation>;

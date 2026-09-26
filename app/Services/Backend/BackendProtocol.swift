@@ -154,6 +154,35 @@ struct CatalogWordLookup: Codable {
     var createdAt: String
 }
 
+/// An annotation on the wire.
+///
+/// `Codable` both ways: read on list, written on upsert. `sortIndex` is
+/// computed in this process from PDF geometry and is opaque to the core,
+/// which only orders by it — page layout stays PDFKit's.
+struct CatalogAnnotation: Codable {
+    var id: String
+    var itemId: String
+    var attachmentId: String
+    var key: String
+    var type: String
+    var authorName: String?
+    var text: String?
+    var comment: String?
+    var color: String
+    var pageLabel: String?
+    /// `PPPPP|YYYYYY|XXXXXX`, from `AnnotationStore.makeSortIndex`.
+    var sortIndex: String
+    var positionKind: String
+    var positionJson: String
+    var styleJson: String?
+    var source: String
+    var sourceKey: String?
+    var createdAt: String
+    var updatedAt: String
+    /// Tombstone marker; nil while live.
+    var deletedAt: String?
+}
+
 // MARK: - Event payloads
 
 struct BackendToolCall: Decodable {

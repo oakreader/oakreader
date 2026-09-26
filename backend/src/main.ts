@@ -14,6 +14,9 @@ import {
   PROTOCOL_VERSION, RpcError,
   PingParams, ProvidersListParams,
   PromptsComposeParams, type PromptsComposeResult,
+  AnnotationsListParams, AnnotationsGetParams,
+  AnnotationsUpsertParams, AnnotationsDeleteParams,
+  type AnnotationsListResult, type AnnotationsGetResult,
   WordLookupsListParams, WordLookupsSaveParams,
   WordLookupsDeleteParams, WordLookupsClearParams,
   type WordLookupsListResult,
@@ -30,6 +33,7 @@ import { runChat, toPiMessages } from "./chat.js";
 import { PromptLibrary } from "./prompts.js";
 import { Catalog } from "./catalog/db.js";
 import { WordLookupStore } from "./catalog/wordLookups.js";
+import { AnnotationStore } from "./catalog/annotations.js";
 
 const BACKEND_ID = "oak-backend 0.2.0";
 
@@ -331,6 +335,29 @@ function registerMethods(): void {
   // --- catalog ----------------------------------------------------------
   // Phase 1: the shell stops opening library.sqlite and asks instead. Exactly
   // one process owns the schema, and it is this one.
+
+  peer.onRequest("catalog/annotations/list", AnnotationsListParams, (p): AnnotationsListResult => {
+    const store = new AnnotationStore(catalog().db, LOCAL_USER);
+    return { annotations: store.listForAttachment(p.attachmentId) };
+  });
+
+  peer.onRequest("catalog/annotations/get", AnnotationsGetParams, (p): AnnotationsGetResult => {
+    const found = new AnnotationStore(catalog().db, LOCAL_USER).get(p.id);
+    return found ? { annotation: found } : {};
+  });
+
+  peer.onRequest("catalog/annotations/upsert", AnnotationsUpsertParams, (p) => {
+    new AnnotationStore(catalog().db, LOCAL_USER).upsert(p.annotation);
+    return {};
+  });
+
+  peer.onRequest("catalog/annotations/delete", AnnotationsDeleteParams, (p) => {
+    const store = new AnnotationStore(catalog().db, LOCAL_USER);
+    if (p.hard) store.hardDelete(p.id);
+    else if (p.at) store.softDelete(p.id, p.at);
+    else throw new RpcFailure(RpcError.invalidParams, "a soft delete needs `at`");
+    return {};
+  });
 
   peer.onRequest("catalog/wordLookups/list", WordLookupsListParams, (p): WordLookupsListResult => {
     const store = new WordLookupStore(catalog().db, LOCAL_USER);

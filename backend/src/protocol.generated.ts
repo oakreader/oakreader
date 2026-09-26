@@ -2,10 +2,10 @@
 // Run `pnpm protocol:generate` after changing the schema.
 
 import { z } from "zod";
-import { WireMessage, WireToolDef, WordLookup, type ProviderSummary, type EventToolCall, type PromptOption } from "./protocol.base.js";
+import { WireMessage, WireToolDef, WordLookup, Annotation, type ProviderSummary, type EventToolCall, type PromptOption } from "./protocol.base.js";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- refs used by generated shapes
 
-export const PROTOCOL_VERSION = 5;
+export const PROTOCOL_VERSION = 6;
 
 /** JSON-RPC 2.0 error codes. Below -32000 is ours; the rest is the spec's. */
 export const RpcError = {
@@ -147,6 +147,41 @@ export type ModelsRefreshResult = {
   message?: string;
 };
 
+/** `catalog/annotations/list` — Live annotations on one attachment, in sort-index order. Tombstones excluded. */
+export const AnnotationsListParams = z.object({
+  attachmentId: z.string(),
+});
+export type AnnotationsListParams = z.infer<typeof AnnotationsListParams>;
+export type AnnotationsListResult = {
+  annotations: Annotation[];
+};
+
+/** `catalog/annotations/get` — One annotation by id, tombstoned or not. */
+export const AnnotationsGetParams = z.object({
+  id: z.string(),
+});
+export type AnnotationsGetParams = z.infer<typeof AnnotationsGetParams>;
+export type AnnotationsGetResult = {
+  annotation?: Annotation;
+};
+
+/** `catalog/annotations/upsert` — Insert or replace. sortIndex arrives already computed -- it encodes PDF geometry, which stays in the shell. */
+export const AnnotationsUpsertParams = z.object({
+  annotation: Annotation,
+});
+export type AnnotationsUpsertParams = z.infer<typeof AnnotationsUpsertParams>;
+export type AnnotationsUpsertResult = Record<string, never>;
+
+/** `catalog/annotations/delete` — Soft by default: the row stays as a tombstone so a later sync can tell deleted from never-existed. `hard` removes it outright. */
+export const AnnotationsDeleteParams = z.object({
+  id: z.string(),
+  hard: z.boolean().default(false),
+  /** Tombstone timestamp; required unless hard. */
+  at: z.string().optional(),
+});
+export type AnnotationsDeleteParams = z.infer<typeof AnnotationsDeleteParams>;
+export type AnnotationsDeleteResult = Record<string, never>;
+
 /** `prompts/compose` — The static half of the system prompt: base.md plus the named mixins. The shell appends live context afterwards -- that half cannot be a file. */
 export const PromptsComposeParams = z.object({
   /** Mixin names, without .md, in the order they should appear. */
@@ -273,6 +308,10 @@ export const ClientRequests = {
   "config/setBaseUrl": ConfigSetBaseUrlParams,
   "config/setLocalUrl": ConfigSetLocalUrlParams,
   "models/refresh": ModelsRefreshParams,
+  "catalog/annotations/list": AnnotationsListParams,
+  "catalog/annotations/get": AnnotationsGetParams,
+  "catalog/annotations/upsert": AnnotationsUpsertParams,
+  "catalog/annotations/delete": AnnotationsDeleteParams,
   "prompts/compose": PromptsComposeParams,
   "catalog/wordLookups/list": WordLookupsListParams,
   "catalog/wordLookups/save": WordLookupsSaveParams,
@@ -300,6 +339,10 @@ export interface ClientRequestResults {
   "config/setBaseUrl": ConfigSetBaseUrlResult;
   "config/setLocalUrl": ConfigSetLocalUrlResult;
   "models/refresh": ModelsRefreshResult;
+  "catalog/annotations/list": AnnotationsListResult;
+  "catalog/annotations/get": AnnotationsGetResult;
+  "catalog/annotations/upsert": AnnotationsUpsertResult;
+  "catalog/annotations/delete": AnnotationsDeleteResult;
   "prompts/compose": PromptsComposeResult;
   "catalog/wordLookups/list": WordLookupsListResult;
   "catalog/wordLookups/save": WordLookupsSaveResult;
