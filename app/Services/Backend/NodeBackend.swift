@@ -61,10 +61,30 @@ actor NodeBackend {
     /// Recorded in a backup so an older build can refuse a newer library.
     private(set) var schemaVersion: Int = 0
 
+    /// One start at a time, however many callers ask at once.
+    ///
+    /// `refresh()` asks for items, trashed items, collections and properties
+    /// concurrently, and every one of them calls `ensureRunning`. Without this
+    /// they each spawn — and since `spawn()` terminates whatever is already
+    /// running, the second kills the first's process out from under its
+    /// handshake, the third kills the second's, and the library comes up empty
+    /// with "backend is not running" three times in the same second.
+    private var starting: Task<Bool, Never>?
+
     /// True when the sidecar is running and answered the ping handshake.
     func ensureRunning() async -> Bool {
         if handshaken, process?.isRunning == true { return true }
+        if let starting { return await starting.value }
+
         guard spawnAttempts < Self.maxSpawnAttempts else { return false }
+        let task = Task { await self.start() }
+        starting = task
+        let started = await task.value
+        starting = nil
+        return started
+    }
+
+    private func start() async -> Bool {
         spawnAttempts += 1
         do {
             try spawn()
