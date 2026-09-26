@@ -13,6 +13,7 @@ import type { AuthEvent, AuthPrompt, ThinkingLevel } from "@earendil-works/pi-ai
 import {
   PROTOCOL_VERSION, RpcError,
   PingParams, ProvidersListParams,
+  PromptsComposeParams, type PromptsComposeResult,
   WordLookupsListParams, WordLookupsSaveParams,
   WordLookupsDeleteParams, WordLookupsClearParams,
   type WordLookupsListResult,
@@ -26,6 +27,7 @@ import { RpcPeer, RpcFailure } from "./rpc.js";
 import { ConfigStore, FileCredentialStore, dataPaths } from "./store.js";
 import { ProviderRegistry, toPiId } from "./providers.js";
 import { runChat, toPiMessages } from "./chat.js";
+import { PromptLibrary } from "./prompts.js";
 import { Catalog } from "./catalog/db.js";
 import { WordLookupStore } from "./catalog/wordLookups.js";
 
@@ -70,6 +72,9 @@ function catalog(): Catalog {
 
 /** `user_id` on every row the Swift app wrote. Kept for wire compatibility. */
 const LOCAL_USER = "local";
+
+/** Prompt files, resolved once at startup. */
+const prompts = PromptLibrary.load();
 
 // --- IO -------------------------------------------------------------------
 
@@ -316,6 +321,11 @@ function registerMethods(): void {
     const errors = [...result.errors.entries()].map(([prov, e]) => `${prov}: ${errorMessage(e)}`);
     if (errors.length > 0) throw new RpcFailure(RpcError.providerUnavailable, errors.join("; "));
     return {};
+  });
+
+  peer.onRequest("prompts/compose", PromptsComposeParams, (p): PromptsComposeResult => {
+    const { text, used } = prompts.compose(p.mixins);
+    return { text, used, available: prompts.list() };
   });
 
   // --- catalog ----------------------------------------------------------

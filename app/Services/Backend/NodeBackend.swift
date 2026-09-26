@@ -284,6 +284,11 @@ actor NodeBackend {
             // opens the second one.
             "--library", CatalogDatabase.dataDirectory.appendingPathComponent("library.sqlite").path,
         ]
+        // Prompt files, when the bundle carries them. Absent in a checkout
+        // build, where the sidecar finds them by walking up from its source.
+        if let prompts = Bundle.main.url(forResource: "prompts", withExtension: nil) {
+            proc.arguments? += ["--prompts", prompts.path]
+        }
         let stdin = Pipe(), stdout = Pipe(), stderr = Pipe()
         proc.standardInput = stdin
         proc.standardOutput = stdout

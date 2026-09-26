@@ -11,6 +11,11 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
+
+/** PROTOCOL_VERSION as declared in protocol/schema.ts, the single source. */
+const SCHEMA_PROTOCOL_VERSION = Number(
+  readFileSync(join(root, "..", "protocol", "schema.ts"), "utf8")
+    .match(/PROTOCOL_VERSION\s*=\s*(\d+)/)?.[1] ?? NaN);
 const dataDir = mkdtempSync(join(tmpdir(), "oak-backend-test-"));
 let failures = 0;
 
@@ -121,7 +126,11 @@ function waitFor(pred, label, timeoutMs = 15000) {
 try {
   // 1. ping → the handshake is a request/response pair, not an event
   const pong = await (call("p1", "ping", {}), resultOf("p1", "ping"));
-  assert(pong.protocol === 3, `ping → protocol ${pong.protocol}`);
+  // Pinned to the schema rather than a literal. This is a .mjs harness driving
+  // the compiled binary, so it cannot import the TypeScript source; reading the
+  // constant keeps one source of truth without adding a build step here.
+  assert(pong.protocol === SCHEMA_PROTOCOL_VERSION,
+    `ping → protocol ${pong.protocol} (schema says ${SCHEMA_PROTOCOL_VERSION})`);
   assert(typeof pong.backend === "string", "ping → backend id");
 
   // 2. credentials: set → providers/list reflects configured; 0600 on disk
@@ -225,5 +234,5 @@ try {
 
 await new Promise((r) => child.on("exit", r));
 assert(true, "backend exits cleanly on stdin close");
-console.log(failures === 0 ? "\nAll protocol v3 (JSON-RPC) tests passed." : `\n${failures} failure(s).`);
+console.log(failures === 0 ? "\nAll protocol tests passed." : `\n${failures} failure(s).`);
 process.exit(failures === 0 ? 0 : 1);

@@ -10,7 +10,7 @@
  * fails if the committed output is stale.
  */
 
-export const PROTOCOL_VERSION = 4;
+export const PROTOCOL_VERSION = 5;
 
 export type FieldType =
   | { k: "string" }
@@ -150,6 +150,21 @@ export const METHODS: Method[] = [
     name: "models/refresh", type: "ModelsRefresh", kind: "request", from: "client",
     params: [{ name: "providerId", type: str, optional: true }],
     result: [{ name: "message", type: str, optional: true }],
+  },
+
+  {
+    name: "prompts/compose", type: "PromptsCompose", kind: "request", from: "client",
+    doc: "The static half of the system prompt: base.md plus the named mixins. " +
+         "The shell appends live context afterwards -- that half cannot be a file.",
+    params: [{ name: "mixins",
+      type: { k: "array", of: str },
+      default: "[]",
+      doc: "Mixin names, without .md, in the order they should appear." }],
+    result: [
+      { name: "text", type: str, doc: "Empty when no prompt files were found." },
+      { name: "used", type: { k: "array", of: str }, doc: "Mixins that existed and were included." },
+      { name: "available", type: { k: "array", of: str }, doc: "Every mixin this build carries." },
+    ],
   },
 
   // --- catalog (phase 1) --------------------------------------------------

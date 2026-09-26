@@ -9,7 +9,7 @@ import Foundation
 /// Reverse calls (tool/execute, oauth/prompt) are ordinary requests in the
 /// other direction, so they need no separate machinery.
 enum RPC {
-    static let version = 4
+    static let version = 5
 
     /// JSON-RPC error codes. The shell branches on these: re-authenticate
     /// is a different affordance from retry, and the old single error string
@@ -52,6 +52,7 @@ enum RPC {
         static let configSetBaseUrl = "config/setBaseUrl"
         static let configSetLocalUrl = "config/setLocalUrl"
         static let modelsRefresh = "models/refresh"
+        static let promptsCompose = "prompts/compose"
         static let wordLookupsList = "catalog/wordLookups/list"
         static let wordLookupsSave = "catalog/wordLookups/save"
         static let wordLookupsDelete = "catalog/wordLookups/delete"
@@ -175,6 +176,21 @@ enum RPC {
     }
     struct ModelsRefreshResult: Decodable {
         var message: String?
+    }
+
+    // MARK: prompts/compose
+    /// The static half of the system prompt: base.md plus the named mixins. The shell appends live context afterwards -- that half cannot be a file.
+    struct PromptsComposeParams: Encodable {
+        /// Mixin names, without .md, in the order they should appear.
+        var mixins: [String]?
+    }
+    struct PromptsComposeResult: Decodable {
+        /// Empty when no prompt files were found.
+        var text: String
+        /// Mixins that existed and were included.
+        var used: [String]
+        /// Every mixin this build carries.
+        var available: [String]
     }
 
     // MARK: catalog/wordLookups/list

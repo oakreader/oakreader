@@ -219,6 +219,7 @@
 		BD3D4520CA1E09A364FF6688 /* CSLTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EBCAA37DA38470D7A6F199F /* CSLTypes.swift */; };
 		BDB7B43E932EA1F2C44DE7AD /* SecuritySettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 396CA60ACCE7275E2A854565 /* SecuritySettings.swift */; };
 		BE4194731097CEDB15625B74 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22C82B7004BDBD9581179C2A /* AppDelegate.swift */; };
+		BEF86F819A939C91AC38B47F /* PromptCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF2387B271A13F8720377194 /* PromptCatalog.swift */; };
 		C0D1E23B6D649F29EA168A74 /* AnnotationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1492996C1330F0358D6FAE8D /* AnnotationViewModel.swift */; };
 		C0E9B834FB46FD68529B3E19 /* ThumbnailSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EEBB298928AE96F4E23FD4D /* ThumbnailSidebarView.swift */; };
 		C103BD9537167E674467D583 /* SnapshotHitTestNSView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56715A65334AE76915133B0B /* SnapshotHitTestNSView.swift */; };
@@ -545,6 +546,7 @@
 		EBB116D7B09204C4FBBF95DA /* TavilySearchProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TavilySearchProvider.swift; sourceTree = "<group>"; };
 		EC54D2D51E821B0BC461F5A8 /* NotePresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotePresentation.swift; sourceTree = "<group>"; };
 		EE6FEC15A1EFB20C836F5DFA /* ErrorTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorTypes.swift; sourceTree = "<group>"; };
+		EF2387B271A13F8720377194 /* PromptCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptCatalog.swift; sourceTree = "<group>"; };
 		EFD1EFD90892517FA0711664 /* CitationSourceRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CitationSourceRegistry.swift; sourceTree = "<group>"; };
 		F1549879703EE0C34737AD8E /* WordLookupCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WordLookupCatalog.swift; sourceTree = "<group>"; };
 		F18EF0CAF7BAF41BC63A2026 /* CommentsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommentsViewModel.swift; sourceTree = "<group>"; };
@@ -803,6 +805,7 @@
 		5C2B670D55143EDDBC6DF6D1 /* Catalog */ = {
 			isa = PBXGroup;
 			children = (
+				EF2387B271A13F8720377194 /* PromptCatalog.swift */,
 				F1549879703EE0C34737AD8E /* WordLookupCatalog.swift */,
 			);
 			path = Catalog;
@@ -1185,6 +1188,7 @@
 				5CA8C06B341F452D65421825 /* Sources */,
 				FAC8682D3503EF53F2D18813 /* SwiftLint */,
 				268AB549AE9096152DA86C5E /* Embed oak CLI */,
+				F60520C499ED9DBE506997CF /* Embed prompts */,
 				F10046E9AF3F95B0BC8D2E7C /* Build & embed AI sidecar (bun --compile) */,
 				F9CC889C03A7ACCE2AEC7526 /* Resources */,
 				A02FDAF25B969EA882935FC0 /* Frameworks */,
@@ -1334,6 +1338,24 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "set -e\nBACKEND=\"${SRCROOT}/backend\"\nexport PATH=\"$PATH:$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin\"\nif ! command -v bun >/dev/null 2>&1; then\n  echo \"error: bun not found — install from https://bun.sh; the AI sidecar is compiled with it\" >&2\n  exit 1\nfi\nif [ \"${CONFIGURATION}\" = \"Release\" ]; then\n  OAK_UNIVERSAL=1 bash \"$BACKEND/scripts/build-binary.sh\"\nelse\n  bash \"$BACKEND/scripts/build-binary.sh\"\nfi\n# CONTENTS_FOLDER_PATH, not a hardcoded OakReader.app: the Debug\n# config overrides PRODUCT_NAME, so its wrapper is OakReader-Dev.app.\nDEST=\"${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Resources/oak-backend\"\ncp \"$BACKEND/dist/oak-backend\" \"$DEST\"\nchmod +x \"$DEST\"\nif [ -n \"${EXPANDED_CODE_SIGN_IDENTITY:-}\" ] && [ \"${EXPANDED_CODE_SIGN_IDENTITY}\" != \"-\" ]; then\n  codesign --force --options runtime --timestamp=none \\\n           --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" \"$DEST\"\nelse\n  codesign --force --sign - \"$DEST\"\nfi\n";
+		};
+		F60520C499ED9DBE506997CF /* Embed prompts */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Embed prompts";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\nDEST=\"${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Resources/prompts\"\nrm -rf \"$DEST\"\nmkdir -p \"$(dirname \"$DEST\")\"\ncp -R \"${SRCROOT}/prompts\" \"$DEST\"\n";
 		};
 		FAC8682D3503EF53F2D18813 /* SwiftLint */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -1568,6 +1590,7 @@
 				8396C10D8A735659639CA172 /* Preferences.swift in Sources */,
 				B37BEE2584AB24AB3E6726D5 /* PresentationOverlayView.swift in Sources */,
 				DEBA5B93F86D0CE70FF5A4F9 /* ProgressOverlay.swift in Sources */,
+				BEF86F819A939C91AC38B47F /* PromptCatalog.swift in Sources */,
 				05B851675F41FA534DC6588E /* ProviderIconView.swift in Sources */,
 				818B3867EE13F14CD0F64A16 /* RPCTransport.swift in Sources */,
 				B1B0C174E22F08B0F06EE22A /* RecordingTranscriptionService.swift in Sources */,

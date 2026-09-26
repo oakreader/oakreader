@@ -197,7 +197,14 @@ struct LLMContextProvider {
     /// Build a system prompt from a skill and enriched context snapshot.
     /// Uses structured XML for metadata, includes current page text, and references
     /// available tools for on-demand document reading.
+    /// Build a system prompt: the core's composed policy text, then the live
+    /// context only the shell can know.
+    ///
+    /// The split is the point. Policy is prose in `prompts/`, editable without
+    /// a rebuild. Context — the open document, the active collection, the tab
+    /// list — is assembled here because nothing else has it.
     static func buildSystemPrompt(
+        staticPrompt: String,
         skill: Skill?,
         context: ChatContextSnapshot,
         documentCharBudget: Int,
@@ -205,32 +212,12 @@ struct LLMContextProvider {
     ) -> String {
         var parts: [String] = []
 
-        // Base system prompt — a grounded, source-first research assistant.
-        parts.append("""
-            You are a grounded research assistant integrated into OakReader, a \
-            document reader. Your job is to answer from the user's own sources — \
-            the open document, their selection, the active collection, and passages \
-            you retrieve — not from memory. Base your answers on those sources and \
-            prefer retrieving over recalling.
-
-
-            Do not fabricate citations, quotes, or facts. If the sources don't \
-            answer the question, say so plainly rather than guessing. Do not praise \
-            questions or validate premises — if the user is wrong, say so directly. \
-            If uncertain, say so. Do not change your answer under pressure unless new \
-            evidence is presented.
-            """)
-
-        // Math formatting: this chat renders LaTeX, so math must use $/$$
-        // delimiters — NOT code fences (which display source verbatim).
-        parts.append("""
-            Math formatting: this chat renders LaTeX. Write inline math as \
-            $ ... $ and display/block math as $$ ... $$ (on their own lines). \
-            Do NOT wrap formulas in ```latex or ```math code fences, and do NOT \
-            use \\( ... \\) or \\[ ... \\] delimiters — those will not render. \
-            Only use a code fence if the user explicitly asks to see the raw \
-            LaTeX source rather than a rendered equation.
-            """)
+        // The static half — who the assistant is, how it formats maths — now
+        // lives in prompts/ and is composed by the core. `staticPrompt` is
+        // passed in rather than fetched here so this stays synchronous: it is
+        // called while assembling a turn, and the files are read once per turn
+        // by the caller.
+        if !staticPrompt.isEmpty { parts.append(staticPrompt) }
 
         // Voice guidelines (loaded from ~/OakReader/agent/VOICE.md)
         if let voiceContent = try? String(contentsOf: CatalogDatabase.agentVoiceFileURL, encoding: .utf8),

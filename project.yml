@@ -94,6 +94,18 @@ targets:
           # config overrides PRODUCT_NAME, so its wrapper is OakReader-Dev.app.
           cp "${BUILT_PRODUCTS_DIR}/oak" "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Resources/oak"
         name: "Embed oak CLI"
+      # Prompt files travel with the app so the sidecar can read them. They are
+      # data, not code: editing one changes what the assistant is told without
+      # a rebuild. (project.yml's `resources:` key is invalid XcodeGen and is
+      # silently ignored, which is why this is a script phase.)
+      - script: |
+          set -e
+          DEST="${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Resources/prompts"
+          rm -rf "$DEST"
+          mkdir -p "$(dirname "$DEST")"
+          cp -R "${SRCROOT}/prompts" "$DEST"
+        name: "Embed prompts"
+
       # The AI sidecar is a self-contained executable from `bun build --compile`
       # (the Bun runtime is inside it), so the app never looks for `node` and
       # there is no minimum runtime version. Too large to commit -- 63 MB arm64,

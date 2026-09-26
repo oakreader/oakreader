@@ -5,7 +5,7 @@ import { z } from "zod";
 import { WireMessage, WireToolDef, WordLookup, type ProviderSummary, type EventToolCall, type PromptOption } from "./protocol.base.js";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- refs used by generated shapes
 
-export const PROTOCOL_VERSION = 4;
+export const PROTOCOL_VERSION = 5;
 
 /** JSON-RPC 2.0 error codes. Below -32000 is ours; the rest is the spec's. */
 export const RpcError = {
@@ -147,6 +147,21 @@ export type ModelsRefreshResult = {
   message?: string;
 };
 
+/** `prompts/compose` — The static half of the system prompt: base.md plus the named mixins. The shell appends live context afterwards -- that half cannot be a file. */
+export const PromptsComposeParams = z.object({
+  /** Mixin names, without .md, in the order they should appear. */
+  mixins: z.array(z.string()).default([]),
+});
+export type PromptsComposeParams = z.infer<typeof PromptsComposeParams>;
+export type PromptsComposeResult = {
+  /** Empty when no prompt files were found. */
+  text: string;
+  /** Mixins that existed and were included. */
+  used: string[];
+  /** Every mixin this build carries. */
+  available: string[];
+};
+
 /** `catalog/wordLookups/list` — One document's lookups, or every one when itemId is absent. Newest first. */
 export const WordLookupsListParams = z.object({
   itemId: z.string().optional(),
@@ -258,6 +273,7 @@ export const ClientRequests = {
   "config/setBaseUrl": ConfigSetBaseUrlParams,
   "config/setLocalUrl": ConfigSetLocalUrlParams,
   "models/refresh": ModelsRefreshParams,
+  "prompts/compose": PromptsComposeParams,
   "catalog/wordLookups/list": WordLookupsListParams,
   "catalog/wordLookups/save": WordLookupsSaveParams,
   "catalog/wordLookups/delete": WordLookupsDeleteParams,
@@ -284,6 +300,7 @@ export interface ClientRequestResults {
   "config/setBaseUrl": ConfigSetBaseUrlResult;
   "config/setLocalUrl": ConfigSetLocalUrlResult;
   "models/refresh": ModelsRefreshResult;
+  "prompts/compose": PromptsComposeResult;
   "catalog/wordLookups/list": WordLookupsListResult;
   "catalog/wordLookups/save": WordLookupsSaveResult;
   "catalog/wordLookups/delete": WordLookupsDeleteResult;

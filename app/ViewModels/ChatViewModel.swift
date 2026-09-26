@@ -362,7 +362,13 @@ class ChatViewModel {
 
         streamTask = Task { @MainActor [weak self] in
             do {
+                // Policy text comes from the core's prompt files; context is
+                // assembled below from state only this process has.
+                let staticPrompt = await PromptCatalog.compose(
+                    mixins: PromptCatalog.chatMixins)
+
                 let systemPrompt = LLMContextProvider.buildSystemPrompt(
+                    staticPrompt: staticPrompt,
                     skill: currentSkill,
                     context: snapshot,
                     documentCharBudget: docCharBudget,
