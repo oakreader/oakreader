@@ -47,27 +47,6 @@ class ViewerViewModel {
         set { state?.displayMode = newValue }
     }
 
-    var pageCount: Int {
-        pdfDocument?.pageCount ?? 0
-    }
-
-    var canGoToPreviousPage: Bool {
-        currentPageIndex > 0
-    }
-
-    var canGoToNextPage: Bool {
-        currentPageIndex < pageCount - 1
-    }
-
-    var currentPageLabel: String {
-        guard let doc = pdfDocument,
-              let page = doc.page(at: currentPageIndex) else {
-            return "Page 0 of 0"
-        }
-        let label = page.label ?? "\(currentPageIndex + 1)"
-        return "Page \(label) of \(pageCount)"
-    }
-
     var hasSearchResults: Bool {
         !searchResults.isEmpty
     }
@@ -97,26 +76,6 @@ class ViewerViewModel {
         currentPageIndex = prev
     }
 
-    func goToFirstPage() {
-        goToPage(0)
-    }
-
-    func goToLastPage() {
-        goToPage(pageCount - 1)
-    }
-
-    func nextPage() {
-        if canGoToNextPage {
-            goToPage(currentPageIndex + 1)
-        }
-    }
-
-    func previousPage() {
-        if canGoToPreviousPage {
-            goToPage(currentPageIndex - 1)
-        }
-    }
-
     // MARK: - Zoom
 
     func setZoom(_ level: CGFloat) {
@@ -139,16 +98,6 @@ class ViewerViewModel {
 
     func zoomToActualSize() {
         setZoom(1.0)
-    }
-
-    func zoomToWidth() {
-        // Signal the view to auto-scale to width
-        // The view layer reads this and adjusts PDFView.autoScales
-        setZoom(1.0)
-    }
-
-    var zoomPercentage: String {
-        "\(Int(zoomLevel * 100))%"
     }
 
     // MARK: - Display Mode

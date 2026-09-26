@@ -15,7 +15,6 @@ class AnnotationViewModel {
     var opacity: CGFloat = 1.0
     // MARK: - Annotations List
 
-    var annotationModels: [AnnotationModel] = []
 
     // MARK: - DB Persistence
 
@@ -47,16 +46,6 @@ class AnnotationViewModel {
 
     private func removeMapping(_ annotation: PDFAnnotation) {
         annotationIdMap.removeValue(forKey: ObjectIdentifier(annotation))
-    }
-
-    // MARK: - Tool Selection
-
-    func selectTool(_ tool: AnnotationTool) {
-        currentTool = tool
-    }
-
-    func deselectTool() {
-        currentTool = .none
     }
 
     // MARK: - Highlight / Underline / Strikethrough
@@ -126,45 +115,13 @@ class AnnotationViewModel {
             )
             lastId = id
         }
-        refreshAnnotationModels()
         return lastId
-    }
-
-    /// Switch a markup's style (highlight ↔ underline) from the note editor.
-    func updateOverlayMarkupKind(id: String, kind: PDFMarkupKind) {
-        // Overlay first: it is what the view renders, so the change is visible
-        // before the write leaves this process.
-        parent?.markupOverlay.updateKind(id: id, kind: kind)
-        refreshAnnotationModels()
-        Task {
-            guard var updated = await AnnotationCatalog.get(id: id) else { return }
-            updated.type = kind.rawValue
-            updated.updatedAt = Date().iso8601String
-            AnnotationCatalog.save(updated)
-        }
-    }
-
-    /// Save (or clear) a note's comment. An empty/whitespace comment turns the
-    /// note back into a plain highlight (marker disappears).
-    func updateOverlayMarkupComment(id: String, comment: String) {
-        let trimmed = comment.trimmingCharacters(in: .whitespacesAndNewlines)
-        let stored: String? = trimmed.isEmpty ? nil : comment
-        parent?.markupOverlay.updateComment(id: id, comment: stored)
-        refreshAnnotationModels()
-        NotificationCenter.default.post(name: .commentsDidChange, object: parent)
-        Task {
-            guard var updated = await AnnotationCatalog.get(id: id) else { return }
-            updated.comment = stored
-            updated.updatedAt = Date().iso8601String
-            AnnotationCatalog.save(updated)
-        }
     }
 
     /// Delete an overlay markup by its DB id.
     func deleteOverlayMarkup(id: String) {
         AnnotationCatalog.delete(id: id)
         parent?.markupOverlay.remove(id: id)
-        refreshAnnotationModels()
         NotificationCenter.default.post(name: .commentsDidChange, object: parent)
     }
 
@@ -185,7 +142,6 @@ class AnnotationViewModel {
         updated.updatedAt = Date().iso8601String
         AnnotationCatalog.save(updated)
         parent?.markupOverlay.updateColor(id: id, color: newColor)
-        refreshAnnotationModels()
     }
 
     /// Load all `pdf-overlay` markups for this attachment from the DB and hand
@@ -220,7 +176,6 @@ class AnnotationViewModel {
             byPage[position.pageIndex, default: []].append(markup)
         }
         overlay.load(byPage)
-        refreshAnnotationModels()
     }
 
     /// Remove any text-markup annotations baked into the PDF file so they don't
@@ -267,31 +222,10 @@ class AnnotationViewModel {
         }
         parent?.state.selectedAnnotation = nil
         parent?.markDocumentEdited()
-        refreshAnnotationModels()
         // The note lives on the same annotation row (the `comment` column), so the
         // soft-delete above already removed it — tell the Notes panel to drop the
         // now-stale card live, matching the overlay-delete path.
         NotificationCenter.default.post(name: .commentsDidChange, object: parent)
-    }
-
-    func updateAnnotation(_ annotation: PDFAnnotation, properties: AnnotationModel) {
-        properties.apply(to: annotation)
-        // Persist update to DB
-        if let page = annotation.page, let doc = pdfDocument {
-            let pageIndex = doc.index(for: page)
-            persistToStore(
-                pdfAnnotation: annotation,
-                pageIndex: pageIndex,
-                selectedText: nil,
-                existingId: persistentId(for: annotation)
-            )
-        }
-        parent?.markDocumentEdited()
-        refreshAnnotationModels()
-    }
-
-    func selectAnnotation(_ annotation: PDFAnnotation?) {
-        parent?.state.selectedAnnotation = annotation
     }
 
     // MARK: - Centralized Mutation Methods (for bypass path fix)
@@ -301,7 +235,6 @@ class AnnotationViewModel {
         annotation.color = color.withAlphaComponent(alpha)
         persistUpdate(for: annotation)
         parent?.markDocumentEdited()
-        refreshAnnotationModels()
     }
 
     func updateAnnotationLineWidth(_ annotation: PDFAnnotation, lineWidth: CGFloat) {
@@ -310,21 +243,18 @@ class AnnotationViewModel {
         annotation.border = border
         persistUpdate(for: annotation)
         parent?.markDocumentEdited()
-        refreshAnnotationModels()
     }
 
     func updateAnnotationOpacity(_ annotation: PDFAnnotation, opacity: CGFloat) {
         annotation.color = annotation.color.withAlphaComponent(opacity)
         persistUpdate(for: annotation)
         parent?.markDocumentEdited()
-        refreshAnnotationModels()
     }
 
     func updateAnnotationContents(_ annotation: PDFAnnotation, contents: String) {
         annotation.contents = contents
         persistUpdate(for: annotation)
         parent?.markDocumentEdited()
-        refreshAnnotationModels()
     }
 
     func addAreaAnnotation(bounds: CGRect, page: PDFPage, pageIndex: Int, color: NSColor) {
@@ -342,50 +272,9 @@ class AnnotationViewModel {
             existingId: nil
         )
         parent?.markDocumentEdited()
-        refreshAnnotationModels()
     }
 
     // MARK: - Annotations Model List
-
-    func refreshAnnotationModels() {
-        var models: [AnnotationModel] = []
-
-        // Native annotations still baked into the PDF (shapes, ink, notes, …).
-        if let doc = pdfDocument {
-            for i in 0..<doc.pageCount {
-                guard let page = doc.page(at: i) else { continue }
-                for annotation in page.annotations {
-                    // Skip widget (form field) annotations
-                    if annotation.type == "Widget" { continue }
-                    models.append(AnnotationModel(from: annotation, pageIndex: i))
-                }
-            }
-        }
-
-        // DB-backed text-markup highlights (not present in page.annotations).
-        if let overlay = parent?.markupOverlay {
-            for entry in overlay.allMarkups() {
-                models.append(AnnotationModel(overlayMarkup: entry.markup, pageIndex: entry.pageIndex))
-            }
-        }
-
-        annotationModels = models
-    }
-
-    func annotation(at pageIndex: Int, bounds: CGRect) -> PDFAnnotation? {
-        guard let doc = pdfDocument,
-              let page = doc.page(at: pageIndex) else { return nil }
-        return page.annotation(at: CGPoint(x: bounds.midX, y: bounds.midY))
-    }
-
-    // MARK: - Flatten All Annotations
-
-    func flattenAll() {
-        guard let doc = pdfDocument else { return }
-        doc.flattenAnnotations()
-        parent?.markDocumentEdited()
-        refreshAnnotationModels()
-    }
 
     // MARK: - Persistence Helpers
 

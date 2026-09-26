@@ -12,10 +12,6 @@ import Foundation
 /// v2: the backend owns the provider catalog, credentials, OAuth, endpoint
 /// overrides, and the agentic chat loop. Swift sends provider/model ids and
 /// executes tools when the backend asks (`tool_exec` → `tool_result`).
-enum BackendProtocol {
-    static let version = RPC.version
-}
-
 // MARK: - Wire messages (Turn history → backend)
 
 enum WirePart: Encodable {

@@ -9,10 +9,9 @@ import Foundation
 /// receives a `sortIndex` it never has to understand.
 ///
 /// Latency shapes the API. Creating a highlight has to feel instant, and the
-/// markup overlay already renders from memory — `refreshAnnotationModels`
-/// reads the overlay, not the database. So callers update the overlay
-/// synchronously and let the write follow: `save` and `delete` return
-/// immediately, and only the reads await.
+/// markup overlay renders from memory rather than from the database. So
+/// callers update the overlay synchronously and let the write follow: `save`
+/// and `delete` return immediately, and only the reads await.
 enum AnnotationCatalog {
     /// Live annotations on an attachment, in reading order. Tombstones excluded.
     static func list(attachmentId: String) async -> [CatalogAnnotation] {

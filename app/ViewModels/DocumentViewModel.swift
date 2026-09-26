@@ -64,14 +64,6 @@ class DocumentViewModel {
         return vm
     }
 
-    private var _security: SecurityViewModel?
-    var security: SecurityViewModel {
-        if let vm = _security { return vm }
-        let vm = SecurityViewModel(parent: self)
-        _security = vm
-        return vm
-    }
-
     private var _chat: ChatViewModel?
     var chat: ChatViewModel {
         if let vm = _chat { return vm }

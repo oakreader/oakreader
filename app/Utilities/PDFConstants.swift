@@ -245,15 +245,6 @@ enum CompressionQuality: String, CaseIterable, Identifiable {
 }
 
 struct PDFDefaults {
-    static let pageWidth: CGFloat = 612  // US Letter
-    static let pageHeight: CGFloat = 792
-    static let defaultPageSize = CGSize(width: pageWidth, height: pageHeight)
-    static let defaultMargin: CGFloat = 36 // 0.5 inch
-    static let thumbnailSize = CGSize(width: 110, height: 142)
-    static let highlightColor = NSColor.yellow.withAlphaComponent(0.5)
-    static let watermarkOpacity: CGFloat = 0.3
-    static let watermarkFontSize: CGFloat = 72
-    static let batesNumberFormat = "%06d"
     static let searchHighlightColor = NSColor.systemYellow.withAlphaComponent(0.4)
     // Yellow is the conventional highlight default (Preview, Acrobat, Zotero) and
     // is the first swatch in every color picker — keep the default in sync with it

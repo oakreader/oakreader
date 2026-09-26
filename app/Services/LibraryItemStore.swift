@@ -7,10 +7,6 @@ extension LibraryStore {
         loadedItems.first { $0.id == id }
     }
 
-    func findItem(byCiteKey citeKey: String) -> LibraryItem? {
-        loadedItems.first { $0.citeKey == citeKey }
-    }
-
     func findItem(byStorageKey key: String) -> LibraryItem? {
         loadedItems.first { $0.storageKey == key }
     }
