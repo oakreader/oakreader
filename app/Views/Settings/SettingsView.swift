@@ -37,12 +37,12 @@ struct SettingsView: View {
             switch self {
             case .general: return "gearshape"
             case .library: return "books.vertical"
-            case .ai: return "cpu"
-            case .agent: return "wrench.and.screwdriver"
+            case .ai: return "sparkles"
+            case .agent: return "point.3.connected.trianglepath.dotted"
             case .audio: return "speaker.wave.2"
             case .extensions: return "puzzlepiece.extension"
             case .skills: return "hammer"
-            case .webSearch: return "magnifyingglass.circle"
+            case .webSearch: return "globe"
             case .extensionTranslation: return AppExtension.translation.systemImage
             }
         }
