@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import type { PageMeta } from "@/src/lib/types";
 import { detectContentKind, contentKindToPageType } from "@/src/lib/translators";
+import { resolveServerBase } from "@/src/lib/server";
 
 interface PopupData {
   pageMeta: PageMeta | null;
   tabId: number | null;
   appRunning: boolean;
+  /** Base URL of the app that answered, carried through the save so it cannot change mid-capture. */
+  serverBase: string | null;
   loading: boolean;
   error: string | null;
 }
@@ -25,6 +28,7 @@ export function usePopupData(): PopupData {
   const [pageMeta, setPageMeta] = useState<PageMeta | null>(null);
   const [tabId, setTabId] = useState<number | null>(null);
   const [appRunning, setAppRunning] = useState(true);
+  const [serverBase, setServerBase] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -55,11 +59,8 @@ export function usePopupData(): PopupData {
           pdfCheck = { isPDF: false };
         }
 
-        // Ping the server to check if app is running
-        const pingPromise = fetch("http://127.0.0.1:23119/clip", {
-          method: "HEAD",
-          signal: AbortSignal.timeout(5000),
-        });
+        // Find a running app: release port first, then the dev build's port.
+        const pingPromise = resolveServerBase();
 
         const pageMetaPromise = pdfCheck?.isPDF
           ? Promise.resolve({
@@ -80,13 +81,15 @@ export function usePopupData(): PopupData {
           pageMetaPromise,
         ]);
 
-        // If server ping failed, the app is not running
-        if (pingResult.status === "rejected") {
+        // No port answered → the app is not running
+        const base = pingResult.status === "fulfilled" ? pingResult.value : null;
+        if (!base) {
           setAppRunning(false);
           setError("OakReader is not running.");
           setLoading(false);
           return;
         }
+        setServerBase(base);
 
         if (metaResult.status === "fulfilled" && metaResult.value) {
           setPageMeta(metaResult.value as PageMeta);
@@ -112,5 +115,5 @@ export function usePopupData(): PopupData {
     load();
   }, []);
 
-  return { pageMeta, tabId, appRunning, loading, error };
+  return { pageMeta, tabId, appRunning, serverBase, loading, error };
 }
