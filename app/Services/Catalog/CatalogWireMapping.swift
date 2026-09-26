@@ -187,3 +187,52 @@ extension PropertyDefinition {
         )
     }
 }
+
+// MARK: - Domain → wire
+
+extension CatalogAttachment {
+    init(record: AttachmentRecord) {
+        self.init(
+            id: record.id,
+            itemId: record.itemId,
+            storageKey: record.storageKey,
+            fileName: record.fileName,
+            contentType: record.contentType,
+            linkMode: record.linkMode,
+            sourceUrl: record.sourceURL,
+            fileSize: Int(record.fileSize),
+            pageCount: record.pageCount,
+            isPrimary: record.isPrimary
+        )
+    }
+}
+
+extension CatalogItem {
+    /// The wire form of a brand-new item, for insertion.
+    ///
+    /// Collections, citation and property values are empty by construction: an
+    /// item acquires those afterwards, and the insert only writes the item and
+    /// its attachments.
+    init(record: ItemRecord, attachments: [AttachmentRecord]) {
+        self.init(
+            id: record.id,
+            storageKey: record.storageKey,
+            title: record.title,
+            author: record.author,
+            lastOpenedAt: record.lastOpenedAt,
+            lastPosition: record.lastPosition,
+            citeKey: record.citeKey,
+            source: record.source,
+            sourceKey: record.sourceKey,
+            extra: record.extra,
+            processingStatus: record.processingStatus,
+            deletedAt: record.deletedAt,
+            createdAt: record.createdAt,
+            updatedAt: record.updatedAt,
+            attachments: attachments.map(CatalogAttachment.init(record:)),
+            collectionIds: [],
+            citationJson: nil,
+            propertyValues: []
+        )
+    }
+}

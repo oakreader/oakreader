@@ -72,8 +72,6 @@ targets:
     dependencies:
       - package: OakAgent
       - package: OakMarkdownUI
-      - package: GRDB
-        product: GRDB
       - package: Highlightr
       - package: CMarkGFM
       - package: Sparkle

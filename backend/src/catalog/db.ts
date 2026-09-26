@@ -15,6 +15,7 @@ import { Database } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { MIGRATIONS, SCHEMA_SQL } from "./schema.js";
+import { ensureSystemData } from "./system.js";
 
 export interface OpenOptions {
   /** Refuse to write. Used by the verification harness. */
@@ -42,7 +43,12 @@ export class Catalog {
     if (!options.readonly) db.exec("PRAGMA journal_mode = WAL");
 
     const catalog = new Catalog(db);
-    if (!options.readonly) catalog.migrate(log);
+    if (!options.readonly) {
+      catalog.migrate(log);
+      // Every open, not just creation: a library from an older build gains a
+      // system collection added since, rather than showing an empty slot.
+      ensureSystemData(db, new Date().toISOString());
+    }
     return catalog;
   }
 

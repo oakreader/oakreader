@@ -369,10 +369,13 @@ final class ZoteroMigrationService {
             prog.currentItemTitle = title
             progress(prog)
 
-            // Skip items that were already imported from Zotero
-            if itemExistsForSource("zotero", key: zItem.key) {
+            // Skip items that were already imported from Zotero. The loaded
+            // library is the check as well as the answer — it was a separate
+            // COUNT query and the lookup right below it, asking the same thing
+            // twice.
+            if let existingItem = store.findItem(bySource: "zotero", sourceKey: zItem.key) {
                 result.skippedDuplicates += 1
-                if let existingItem = store.findItem(bySource: "zotero", sourceKey: zItem.key) {
+                do {
                     itemMap[zItem.itemID] = existingItem.id.uuidString
                     libraryItemMap[zItem.itemID] = existingItem
                 }
@@ -563,7 +566,7 @@ final class ZoteroMigrationService {
                 updatedAt: now
             )
 
-            guard let libraryItem = store.insertItem(itemRecord, attachment: attRecord) else {
+            guard let libraryItem = await store.insertItem(itemRecord, attachment: attRecord) else {
                 Log.error(Log.zotero, "Failed to insert item '\(title)' into database")
                 result.errors.append("DB insert failed: \(title)")
                 try? FileManager.default.removeItem(at: docDir)
@@ -726,16 +729,6 @@ final class ZoteroMigrationService {
             "\(result.htmlCount) web pages, \(result.collectionCount) collections, " +
             "\(result.tagCount) tags, \(result.errors.count) errors")
         return result
-    }
-
-    /// Check whether an item with the given source and key already exists in the database.
-    private func itemExistsForSource(_ source: String, key: String) -> Bool {
-        let count = try? store.database.dbQueue.read { db in
-            try Int.fetchOne(db, sql: """
-                SELECT COUNT(*) FROM items WHERE source = ? AND source_key = ?
-            """, arguments: [source, key])
-        }
-        return (count ?? 0) ?? 0 > 0
     }
 
     /// Determine the OakReader item type from a Zotero attachment content type.

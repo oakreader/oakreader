@@ -1,9 +1,15 @@
 import Foundation
-import GRDB
 
-// MARK: - GRDB Records (internal, map directly to DB columns)
+// MARK: - Column shapes
+//
+// One struct per table, with exactly its columns. These were GRDB records; the
+// core owns the queries now, so what is left is the shape — still the layer the
+// domain models are built from, because their `init(record:)` carries the real
+// parsing (filter rule sets, CSL JSON, enum mapping) and there should be only
+// one copy of it. The `CodingKeys` stay: they are the column names, which the
+// wire mapping and the JSON encoding both need.
 
-struct ItemRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable {
+struct ItemRecord: Codable, Hashable {
     static let databaseTableName = "items"
 
     var id: String
@@ -23,7 +29,7 @@ struct ItemRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable 
     var processingStatus: String = "none"
     var deletedAt: String?
 
-    enum CodingKeys: String, CodingKey, ColumnExpression {
+    enum CodingKeys: String, CodingKey {
         case id
         case userId = "user_id"
         case storageKey = "storage_key"
@@ -42,7 +48,7 @@ struct ItemRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable 
     }
 }
 
-struct AttachmentRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable {
+struct AttachmentRecord: Codable, Hashable {
     static let databaseTableName = "attachments"
 
     var id: String
@@ -58,7 +64,7 @@ struct AttachmentRecord: Codable, FetchableRecord, MutablePersistableRecord, Has
     var createdAt: String
     var updatedAt: String
 
-    enum CodingKeys: String, CodingKey, ColumnExpression {
+    enum CodingKeys: String, CodingKey {
         case id
         case itemId = "item_id"
         case storageKey = "storage_key"
@@ -74,7 +80,7 @@ struct AttachmentRecord: Codable, FetchableRecord, MutablePersistableRecord, Has
     }
 }
 
-struct CollectionRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable {
+struct CollectionRecord: Codable, Hashable {
     static let databaseTableName = "collections"
 
     var id: String
@@ -91,7 +97,7 @@ struct CollectionRecord: Codable, FetchableRecord, MutablePersistableRecord, Has
     var source: String?
     var sourceKey: String?
 
-    enum CodingKeys: String, CodingKey, ColumnExpression {
+    enum CodingKeys: String, CodingKey {
         case id
         case userId = "user_id"
         case name, icon
@@ -107,14 +113,14 @@ struct CollectionRecord: Codable, FetchableRecord, MutablePersistableRecord, Has
     }
 }
 
-struct CollectionItemRecord: Codable, FetchableRecord, PersistableRecord, Hashable {
+struct CollectionItemRecord: Codable, Hashable {
     static let databaseTableName = "collection_items"
 
     var itemId: String
     var collectionId: String
     var createdAt: String
 
-    enum CodingKeys: String, CodingKey, ColumnExpression {
+    enum CodingKeys: String, CodingKey {
         case itemId = "item_id"
         case collectionId = "collection_id"
         case createdAt = "created_at"
@@ -123,7 +129,7 @@ struct CollectionItemRecord: Codable, FetchableRecord, PersistableRecord, Hashab
 
 // MARK: - Property System
 
-struct PropertyRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable {
+struct PropertyRecord: Codable, Hashable {
     static let databaseTableName = "properties"
 
     var id: String
@@ -133,13 +139,13 @@ struct PropertyRecord: Codable, FetchableRecord, MutablePersistableRecord, Hasha
     var position: Int
     var isSystem: Bool
 
-    enum CodingKeys: String, CodingKey, ColumnExpression {
+    enum CodingKeys: String, CodingKey {
         case id, name, type, icon, position
         case isSystem = "is_system"
     }
 }
 
-struct PropertyOptionRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable {
+struct PropertyOptionRecord: Codable, Hashable {
     static let databaseTableName = "property_options"
 
     var id: String
@@ -148,7 +154,7 @@ struct PropertyOptionRecord: Codable, FetchableRecord, MutablePersistableRecord,
     var colorHex: String
     var position: Int
 
-    enum CodingKeys: String, CodingKey, ColumnExpression {
+    enum CodingKeys: String, CodingKey {
         case id
         case propertyId = "property_id"
         case name
@@ -157,7 +163,7 @@ struct PropertyOptionRecord: Codable, FetchableRecord, MutablePersistableRecord,
     }
 }
 
-struct ItemPropertyValueRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable {
+struct ItemPropertyValueRecord: Codable, Hashable {
     static let databaseTableName = "item_property_values"
 
     var id: String
@@ -166,7 +172,7 @@ struct ItemPropertyValueRecord: Codable, FetchableRecord, MutablePersistableReco
     var optionId: String?
     var textValue: String?
 
-    enum CodingKeys: String, CodingKey, ColumnExpression {
+    enum CodingKeys: String, CodingKey {
         case id
         case itemId = "item_id"
         case propertyId = "property_id"
@@ -180,7 +186,7 @@ struct ItemPropertyValueRecord: Codable, FetchableRecord, MutablePersistableReco
 
 // MARK: - Citations
 
-struct CitationRecord: Codable, FetchableRecord, MutablePersistableRecord, Hashable {
+struct CitationRecord: Codable, Hashable {
     static let databaseTableName = "citations"
 
     var itemId: String          // PK, FK → items.id
@@ -197,7 +203,7 @@ struct CitationRecord: Codable, FetchableRecord, MutablePersistableRecord, Hasha
     var createdAt: String
     var updatedAt: String
 
-    enum CodingKeys: String, CodingKey, ColumnExpression {
+    enum CodingKeys: String, CodingKey {
         case itemId = "item_id"
         case cslJson = "csl_json"
         case cslType = "csl_type"

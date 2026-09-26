@@ -22,7 +22,7 @@ final class MigrationService {
 
     /// Run migration if needed. Returns the number of items migrated.
     @discardableResult
-    func migrateIfNeeded() -> Int {
+    func migrateIfNeeded() async -> Int {
         guard !Self.isMigrationDone else { return 0 }
         defer { UserDefaults.standard.set(true, forKey: Self.migrationDoneKey) }
 
@@ -33,7 +33,7 @@ final class MigrationService {
         }
 
         Log.info(Log.migration, "Found old database at: \(oldDBURL.path)")
-        return migrateFromOldDB(at: oldDBURL)
+        return await migrateFromOldDB(at: oldDBURL)
     }
 
     // MARK: - Private
@@ -54,7 +54,7 @@ final class MigrationService {
         return candidates.first { FileManager.default.fileExists(atPath: $0.path) }
     }
 
-    private func migrateFromOldDB(at dbURL: URL) -> Int {
+    private func migrateFromOldDB(at dbURL: URL) async -> Int {
         // The old SwiftData database is a SQLite file. We'll read it directly
         // to extract library items and their file paths/bookmark data.
         // This avoids depending on SwiftData for the migration.
@@ -69,7 +69,7 @@ final class MigrationService {
 
         var migrated = 0
         for item in items {
-            if migrateItem(item) {
+            if await migrateItem(item) {
                 migrated += 1
             }
         }
@@ -78,7 +78,7 @@ final class MigrationService {
         return migrated
     }
 
-    private func migrateItem(_ item: OldLibraryItem) -> Bool {
+    private func migrateItem(_ item: OldLibraryItem) async -> Bool {
         // Resolve the file URL from old data
         guard let sourceURL = resolveOldFileURL(item) else {
             Log.error(Log.migration, "Cannot resolve URL for: \(item.title)")
@@ -143,7 +143,7 @@ final class MigrationService {
             updatedAt: now
         )
 
-        store.insertItem(itemRecord, attachment: attRecord)
+        await store.insertItem(itemRecord, attachment: attRecord)
         return true
     }
 

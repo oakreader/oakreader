@@ -35,7 +35,7 @@ function withCatalog<T>(body: (s: PropertyStore, c: Catalog) => T): T {
 function seedTags(store: PropertyStore) {
   store.upsertProperty({
     id: "prop-tags", name: "Tags", type: "multi_select", icon: "tag",
-    position: 0, isSystem: true,
+    position: 0, isSystem: false,
   });
   store.upsertOption({
     id: "opt-urgent", propertyId: "prop-tags", name: "Urgent",
@@ -51,7 +51,7 @@ function seedTags(store: PropertyStore) {
 function seedStatus(store: PropertyStore) {
   store.upsertProperty({
     id: "prop-status", name: "Status", type: "single_select", icon: "circle",
-    position: 1, isSystem: true,
+    position: 1, isSystem: false,
   });
   store.upsertOption({
     id: "opt-reading", propertyId: "prop-status", name: "Reading",
@@ -68,13 +68,16 @@ const valuesOf = (c: Catalog, itemId: string, propertyId: string) =>
     `SELECT option_id, text_value FROM item_property_values
       WHERE item_id = ? AND property_id = ? ORDER BY option_id`).all(itemId, propertyId);
 
+/** Only what the test created: every library also carries its system rows. */
+const mine = (store: PropertyStore) => store.list().filter((p) => !p.isSystem);
+
 describe("properties", () => {
   test("round-trips with its options in order", () => {
     withCatalog((store) => {
       seedTags(store);
-      const [tags] = store.list();
+      const [tags] = mine(store);
       expect(tags!.name).toBe("Tags");
-      expect(tags!.isSystem).toBe(true);
+      expect(tags!.name).toBe("Tags");
       expect(tags!.options.map((o) => o.name)).toEqual(["Urgent", "Later"]);
     });
   });
@@ -196,9 +199,10 @@ describe("properties", () => {
 
       store.deleteProperty("prop-tags");
 
-      expect(store.list()).toHaveLength(0);
+      expect(mine(store)).toHaveLength(0);
       expect(catalog.db.query<{ n: number }, []>(
-        "SELECT count(*) AS n FROM property_options").get()!.n).toBe(0);
+        "SELECT count(*) AS n FROM property_options WHERE property_id = 'prop-tags'",
+      ).get()!.n).toBe(0);
       expect(catalog.db.query<{ n: number }, []>(
         "SELECT count(*) AS n FROM item_property_values").get()!.n).toBe(0);
     });
@@ -214,7 +218,7 @@ describe("properties", () => {
         colorHex: "ff0000", position: 0,
       });
 
-      expect(store.list()[0]!.options.find((o) => o.id === "opt-urgent")!.name)
+      expect(mine(store)[0]!.options.find((o) => o.id === "opt-urgent")!.name)
         .toBe("Critical");
     });
   });

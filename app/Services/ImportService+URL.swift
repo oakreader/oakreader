@@ -40,15 +40,15 @@ extension ImportService {
     // MARK: - Local Files
 
     @discardableResult
-    func importFile(from sourceURL: URL) -> LibraryItem? {
+    func importFile(from sourceURL: URL) async -> LibraryItem? {
         let ext = sourceURL.pathExtension.lowercased()
         if ext == "html" || ext == "htm" {
-            return importHTML(from: sourceURL)
+            return await importHTML(from: sourceURL)
         } else if ext == "md" || ext == "markdown" || ext == "txt" || ext == "text" {
             // Plain text renders fine through the markdown pipeline.
-            return importMarkdown(from: sourceURL)
+            return await importMarkdown(from: sourceURL)
         } else if ext == "pdf" {
-            return importPDF(from: sourceURL)
+            return await importPDF(from: sourceURL)
         }
         return nil
     }
@@ -61,7 +61,7 @@ extension ImportService {
         if Self.audioExtensions.contains(ext) {
             item = await importAudioFile(from: sourceURL)
         } else {
-            item = await MainActor.run { importFile(from: sourceURL) }
+            item = await importFile(from: sourceURL)
         }
         if item != nil {
             Analytics.capture("content_imported", properties: ["source": "file"])
@@ -146,18 +146,15 @@ extension ImportService {
 
         let markdown = liveMarkdown?.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        return await MainActor.run {
-            importEmbed(.init(
-                title: title,
-                author: author,
-                sourceURL: sourceURL,
-                duration: nil,
-                thumbnailData: thumbnailData,
-                metadata: metadata,
-                embedType: "link",
-                contentMarkdown: (markdown?.isEmpty == false) ? markdown : nil
-            ))
-        }
+        return await importEmbed(.init(
+            title: title,
+            author: author,
+            sourceURL: sourceURL,
+            duration: nil,
+            thumbnailData: thumbnailData,
+            metadata: metadata,
+            embedType: "link",
+            contentMarkdown: (markdown?.isEmpty == false) ? markdown : nil))
     }
 
     /// Bookmark a remote page without archiving it: stores the link plus a
@@ -214,7 +211,7 @@ extension ImportService {
         try data.write(to: tempURL, options: .atomic)
         defer { try? FileManager.default.removeItem(at: tempURL) }
 
-        let item = await MainActor.run { importPDF(from: tempURL) }
+        let item = await importPDF(from: tempURL)
         guard let item else { throw URLImportError.importFailed }
         return item
     }
@@ -248,14 +245,11 @@ extension ImportService {
 
         let markdown = await markdownFromHTML(htmlURL: htmlURL)
 
-        let item = await MainActor.run {
-            importHTML(
-                from: htmlURL,
-                originalPageURL: sourceURL,
-                title: title,
-                contentMarkdown: markdown
-            )
-        }
+        let item = await importHTML(
+            from: htmlURL,
+            originalPageURL: sourceURL,
+            title: title,
+            contentMarkdown: markdown)
         guard let item else { throw URLImportError.importFailed }
         return item
     }

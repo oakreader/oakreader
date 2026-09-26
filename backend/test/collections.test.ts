@@ -45,6 +45,9 @@ const collection = (over: Partial<Collection> = {}): Collection => ({
   ...over,
 });
 
+/** Only what the test created: every library also carries its system rows. */
+const mine = (store: CollectionStore) => store.list().filter((c) => !c.isSystem);
+
 describe("collections", () => {
   test("round-trips every field, booleans included", () => {
     // SQLite has no boolean type, so is_smart/is_system are INTEGER 0/1 and
@@ -55,7 +58,7 @@ describe("collections", () => {
         filterRules: '{"all":[{"field":"read","is":false}]}',
       });
       store.upsert(smart);
-      const [back] = store.list();
+      const back = store.list().find((c) => c.id === smart.id);
       expect(back).toEqual(smart);
       expect(back!.isSmart).toBe(true);
       expect(back!.isSystem).toBe(true);
@@ -66,7 +69,7 @@ describe("collections", () => {
     withCatalog([], (store) => {
       const nonsense = "{{ not json at all";
       store.upsert(collection({ isSmart: true, filterRules: nonsense }));
-      expect(store.list()[0]!.filterRules).toBe(nonsense);
+      expect(mine(store)[0]!.filterRules).toBe(nonsense);
     });
   });
 
@@ -76,7 +79,7 @@ describe("collections", () => {
       store.upsert(one);
       store.upsert({ ...one, name: "After", updatedAt: "2026-06-01T00:00:00Z" });
 
-      const all = store.list();
+      const all = mine(store);
       expect(all).toHaveLength(1);
       expect(all[0]!.name).toBe("After");
     });
@@ -98,10 +101,10 @@ describe("collections", () => {
       store.upsert(parent);
       store.upsert(child);
       store.upsert(grandchild);
-      expect(store.list()).toHaveLength(3);
+      expect(mine(store)).toHaveLength(3);
 
       store.delete(parent.id);
-      expect(store.list()).toHaveLength(0);
+      expect(mine(store)).toHaveLength(0);
     });
   });
 
@@ -157,7 +160,7 @@ describe("collections", () => {
 
       seed(catalog.db, "DELETE FROM items WHERE id = 'doc-1'");
       expect(store.itemCount(c.id)).toBe(0);
-      expect(store.list()).toHaveLength(1);   // the collection survives
+      expect(mine(store)).toHaveLength(1);   // the collection survives
     });
   });
 });

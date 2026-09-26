@@ -109,6 +109,9 @@ enum RPC {
     struct PingResult: Decodable {
         var `protocol`: Int
         var backend: String
+        /// How many catalog migrations this build knows. A backup records it so an older build can
+        /// refuse a newer library outright.
+        var schemaVersion: Int
     }
 
     // MARK: complete

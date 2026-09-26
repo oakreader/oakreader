@@ -45,9 +45,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             LogFileWriter.shared.write(level: level, category: category, message: message)
         }
 
-        // Run one-time migration from old SwiftData storage
+        // Run one-time migration from old SwiftData storage. It writes through
+        // the core now, so it runs in a task rather than blocking launch.
         let migration = MigrationService(store: appState.libraryStore, coverService: appState.coverService)
-        migration.migrateIfNeeded()
+        Task { @MainActor in await migration.migrateIfNeeded() }
 
         installExternalLibraryChangeObserver()
 
@@ -384,7 +385,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         panel.begin { [weak self] response in
             guard response == .OK else { return }
             for url in panel.urls {
-                self?.appState.openDocument(url: url)
+                Task { @MainActor in await self?.appState.openDocument(url: url) }
             }
         }
     }

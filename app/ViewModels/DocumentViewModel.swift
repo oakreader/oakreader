@@ -19,7 +19,6 @@ class DocumentViewModel {
     var contentType: ContentType
     var state: DocumentState
     /// Database reference, set by AppState when the tab is created.
-    var database: CatalogDatabase?
     /// Reference service, set by AppState when the tab is created.
     var referenceService: ReferenceService?
     /// Library store, set by AppState when the tab is created.
@@ -79,9 +78,7 @@ class DocumentViewModel {
         // Derive document storage path from file URL if it's in managed storage
         let storagePath = documentStoragePath
         let vm = ChatViewModel(parent: self, documentStoragePath: storagePath)
-        if let db = database {
-            vm.sessionService = ConversationService()
-        }
+        vm.sessionService = ConversationService()
         if let item = libraryItem {
             vm.itemId = item.id.uuidString
         }

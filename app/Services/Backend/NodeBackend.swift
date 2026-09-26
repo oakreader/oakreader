@@ -57,6 +57,10 @@ actor NodeBackend {
         handlers[method] = handler
     }
 
+    /// How many catalog migrations the sidecar knows, from the handshake.
+    /// Recorded in a backup so an older build can refuse a newer library.
+    private(set) var schemaVersion: Int = 0
+
     /// True when the sidecar is running and answered the ping handshake.
     func ensureRunning() async -> Bool {
         if handshaken, process?.isRunning == true { return true }
@@ -200,6 +204,7 @@ actor NodeBackend {
                 Self.log.error("protocol mismatch: sidecar \(result.protocol), shell \(RPC.version)")
                 return false
             }
+            schemaVersion = result.schemaVersion
             Self.log.info("sidecar \(result.backend)")
             return true
         } catch {

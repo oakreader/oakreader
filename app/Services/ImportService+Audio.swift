@@ -35,7 +35,7 @@ extension ImportService {
         }
 
         let title = fileURL.deletingPathExtension().lastPathComponent
-        return importAudioRecording(from: tempURL, duration: duration, title: title)
+        return await importAudioRecording(from: tempURL, duration: duration, title: title)
     }
 
     /// Import an audio recording into managed storage.
@@ -45,7 +45,7 @@ extension ImportService {
     ///   - title: Optional title; defaults to "Recording YYYY-MM-DD HH:mm".
     /// - Returns: The created library item, or an existing item if duplicate detected.
     @discardableResult
-    func importAudioRecording(from sourceURL: URL, duration: Int, title: String? = nil) -> LibraryItem? {
+    func importAudioRecording(from sourceURL: URL, duration: Int, title: String? = nil) async -> LibraryItem? {
         // Duplicate detection
         if let hash = hashPrefix(of: sourceURL),
            let existing = findByHash(hash) {
@@ -126,7 +126,7 @@ extension ImportService {
             updatedAt: now
         )
 
-        guard let item = store.insertItem(itemRecord, attachment: attRecord) else {
+        guard let item = await store.insertItem(itemRecord, attachment: attRecord) else {
             try? FileManager.default.removeItem(at: docDir)
             return nil
         }

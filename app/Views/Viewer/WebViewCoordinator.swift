@@ -759,8 +759,7 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
 
     /// Persist a new highlight created via OakHighlighter to the annotation store.
     private func persistWebHighlight(_ body: [String: Any]) {
-        guard let db = viewModel.database,
-              let attId = viewModel.attachmentId,
+        guard let attId = viewModel.attachmentId,
               let itmId = viewModel.itemId else { return }
 
         guard let highlightId = body["id"] as? String,
@@ -802,8 +801,7 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
 
     /// Restore all saved web highlights from the annotation store.
     private func restoreSavedHighlights() async {
-        guard let db = viewModel.database,
-              let attId = viewModel.attachmentId else { return }
+        guard let attId = viewModel.attachmentId else { return }
 
         // Tombstones are already excluded by the core; the kind filter is ours.
         let records = await AnnotationCatalog.list(attachmentId: attId)

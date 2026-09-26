@@ -16,7 +16,7 @@ extension ImportService {
 
     /// Import an embed (YouTube or generic link) from Chrome extension payload.
     @discardableResult
-    func importEmbed(_ input: EmbedImportInput) -> LibraryItem? {
+    func importEmbed(_ input: EmbedImportInput) async -> LibraryItem? {
         // Duplicate detection by source URL
         if let existing = store.findItem(bySourceURL: input.sourceURL) {
             return existing
@@ -91,7 +91,7 @@ extension ImportService {
             updatedAt: now
         )
 
-        guard let item = store.insertItem(itemRecord, attachment: attRecord) else {
+        guard let item = await store.insertItem(itemRecord, attachment: attRecord) else {
             try? FileManager.default.removeItem(at: docDir)
             return nil
         }

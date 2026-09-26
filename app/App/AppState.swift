@@ -237,11 +237,11 @@ final class AppState {
     // MARK: - Tab Operations
 
     /// Open a document from a URL. Dispatches to PDF, HTML, or markdown based on file extension.
-    func openDocument(url: URL) {
+    func openDocument(url: URL) async {
         let ext = url.pathExtension.lowercased()
         if ext == "html" || ext == "htm" {
             Analytics.capture("document_opened", properties: ["type": "html"])
-            openHTMLDocument(url: url)
+            await openHTMLDocument(url: url)
             return
         }
         if ext == "md" || ext == "markdown" {
@@ -256,7 +256,7 @@ final class AppState {
         }
 
         // Import into managed storage (or find existing)
-        let item = importService.importPDF(from: url)
+        let item = await importService.importPDF(from: url)
         let pdfURL = item?.fileURL ?? url
         let storageKey = item?.storageKey
 
@@ -286,7 +286,6 @@ final class AppState {
         }
 
         let tab = DocumentTab(document: doc, storageKey: storageKey)
-        tab.viewModel.database = libraryStore.database
         tab.viewModel.referenceService = referenceService
         tab.viewModel.libraryStore = libraryStore
         tab.viewModel.appState = self
@@ -337,7 +336,6 @@ final class AppState {
     /// Nothing is imported into the library; the page loads directly in the web viewer.
     func openWebTab(url: URL) {
         let tab = DocumentTab(webURL: url)
-        tab.viewModel.database = libraryStore.database
         tab.viewModel.referenceService = referenceService
         tab.viewModel.libraryStore = libraryStore
         tab.viewModel.appState = self
@@ -347,15 +345,14 @@ final class AppState {
     }
 
     /// Open an HTML document.
-    private func openHTMLDocument(url: URL) {
-        let item = importService.importHTML(from: url)
+    private func openHTMLDocument(url: URL) async {
+        let item = await importService.importHTML(from: url)
         let htmlURL = item?.fileURL ?? url
         let storageKey = item?.storageKey
 
         do {
             let snapshot = try HTMLDocument(htmlURL: htmlURL, sourceURL: item?.sourceURL)
             let tab = DocumentTab(html: snapshot, storageKey: storageKey)
-            tab.viewModel.database = libraryStore.database
             tab.viewModel.referenceService = referenceService
             tab.viewModel.libraryStore = libraryStore
             tab.viewModel.appState = self
@@ -436,7 +433,6 @@ final class AppState {
         NSDocumentController.shared.noteNewRecentDocumentURL(pdfURL)
 
         let tab = DocumentTab(document: doc, storageKey: item.storageKey)
-        tab.viewModel.database = libraryStore.database
         tab.viewModel.referenceService = referenceService
         tab.viewModel.libraryStore = libraryStore
         tab.viewModel.appState = self
@@ -473,7 +469,6 @@ final class AppState {
             let snapshot = try HTMLDocument(htmlURL: htmlURL, sourceURL: item.sourceURL)
 
             let tab = DocumentTab(html: snapshot, storageKey: item.storageKey)
-            tab.viewModel.database = libraryStore.database
             tab.viewModel.referenceService = referenceService
             tab.viewModel.libraryStore = libraryStore
             tab.viewModel.appState = self
@@ -515,7 +510,6 @@ final class AppState {
             let media = try MediaDocument(storageDirectory: attDir)
 
             let tab = DocumentTab(media: media, storageKey: item.storageKey)
-            tab.viewModel.database = libraryStore.database
             tab.viewModel.referenceService = referenceService
             tab.viewModel.libraryStore = libraryStore
             tab.viewModel.appState = self
@@ -558,7 +552,6 @@ final class AppState {
             let mdDoc = try MarkdownDocument(fileURL: mdURL)
 
             let tab = DocumentTab(markdown: mdDoc, storageKey: item.storageKey)
-            tab.viewModel.database = libraryStore.database
             tab.viewModel.referenceService = referenceService
             tab.viewModel.libraryStore = libraryStore
             tab.viewModel.appState = self
@@ -639,7 +632,6 @@ final class AppState {
     /// a "New Tab" chip appears in the strip and becomes active).
     func openNewTab() {
         let tab = DocumentTab(newTab: true)
-        tab.viewModel.database = libraryStore.database
         tab.viewModel.referenceService = referenceService
         tab.viewModel.libraryStore = libraryStore
         tab.viewModel.appState = self

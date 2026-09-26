@@ -33,7 +33,7 @@ class PDFDocumentController: NSDocumentController {
                 completionHandler(existing, false, nil)
                 return
             }
-            appState.openDocument(url: url)
+            Task { @MainActor in await appState.openDocument(url: url) }
             let doc = documents.last
             completionHandler(doc, false, nil)
         } else {

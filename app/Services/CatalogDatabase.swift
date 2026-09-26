@@ -1,13 +1,14 @@
 import Foundation
-import GRDB
 
-/// GRDB wrapper: manages the SQLite database at ~/OakReader/library.sqlite.
-/// Handles schema creation, migrations, and provides the database queue for all queries.
+/// Where the library lives on disk.
+///
+/// This was the GRDB wrapper: schema, migrations, seeding and the queue every
+/// query ran through. All four moved to the core, which is the one process that
+/// owns the schema now. What a shell still needs is the layout — which
+/// directory holds the database, where a document's files go — and that is
+/// filesystem knowledge, not catalog knowledge.
 final class CatalogDatabase {
-    let dbQueue: DatabaseQueue
-
     init() throws {
-        // Tier 2 — Bootstrap: ensure filesystem directories exist
         try Self.createBaseDirectories()
 
         // Reclaim the chunk/FTS5 index left by older builds. The app no longer
@@ -16,24 +17,6 @@ final class CatalogDatabase {
         // reached hundreds of MB on large libraries). Best-effort; never blocks
         // opening the catalog.
         Self.removeLegacySearchIndex()
-
-        let dbPath = Self.dataDirectory.appendingPathComponent("library.sqlite").path
-        var config = Configuration()
-        config.foreignKeysEnabled = true
-        // WAL lets the UI read while imports write, instead of blocking on the
-        // default rollback journal. busy_timeout absorbs brief lock contention.
-        // (Do not place ~/OakReader in a cloud-synced folder — WAL + sync corrupts SQLite.)
-        config.prepareDatabase { db in
-            try db.execute(sql: "PRAGMA journal_mode = WAL")
-            try db.execute(sql: "PRAGMA busy_timeout = 5000")
-        }
-        dbQueue = try DatabaseQueue(path: dbPath, configuration: config)
-
-        // Tier 1 — Schema: run DDL migrations
-        try Self.migrator.migrate(dbQueue)
-
-        // Tier 3 — Seeding: ensure system rows exist
-        try Self.ensureSystemData(dbQueue)
     }
 
     /// Deletes the regenerable full-text chunk index (and its WAL/SHM siblings)
@@ -42,83 +25,6 @@ final class CatalogDatabase {
         let dir = Self.dataDirectory
         for name in ["search.sqlite", "search.sqlite-wal", "search.sqlite-shm"] {
             try? FileManager.default.removeItem(at: dir.appendingPathComponent(name))
-        }
-    }
-
-    /// Idempotently seeds system collections, properties, and status options.
-    static func ensureSystemData(_ dbQueue: DatabaseQueue) throws {
-        try dbQueue.write { db in
-            let now = Date().iso8601String
-
-            // ── System Collections ──
-            // swiftlint:disable:next large_tuple
-            let systemCollections: [(id: String, name: String, icon: String, order: Int, rules: String?)] = [
-                (SystemCollectionID.readingList.uuidString, "Reading List", "bookmark", -1, nil),
-                (SystemCollectionID.allItems.uuidString, "All Items", "books.vertical", 0,
-                 #"{"match":"all","conditions":[]}"#),
-                (SystemCollectionID.recentlyRead.uuidString, "Recently Read", "book", 1,
-                 #"{"match":"all","conditions":[{"field":"last_opened_at","op":"within_days","value":"14"}]}"#),
-                (SystemCollectionID.pdfs.uuidString, "PDFs", "doc.fill", 2,
-                 #"{"match":"all","conditions":[{"field":"content_type","op":"eq","value":"pdf"}]}"#),
-                (SystemCollectionID.html.uuidString, "Web", "globe", 3,
-                 #"{"match":"any","conditions":[{"field":"content_type","op":"eq","value":"html"},"#
-                     + #"{"field":"content_type","op":"eq","value":"link"}]}"#),
-                (SystemCollectionID.duplicates.uuidString, "Duplicates", "square.on.square", 5, nil),
-                (SystemCollectionID.bin.uuidString, "Bin", "trash", 7, nil),
-            ]
-            for sc in systemCollections {
-                try db.execute(
-                    sql: """
-                        INSERT OR IGNORE INTO collections
-                        (id, user_id, name, icon, sort_order, parent_id, is_smart, is_system, filter_rules, created_at, updated_at)
-                        VALUES (?, ?, ?, ?, ?, NULL, 1, 1, ?, ?, ?)
-                    """,
-                    arguments: [sc.id, localUserId, sc.name, sc.icon, sc.order, sc.rules, now, now]
-                )
-            }
-
-            // ── Remove obsolete system collections ──
-            // "Quiz Cards" was a seeded smart collection before quiz cards moved into the
-            // per-item right panel; databases seeded by older builds still carry the row.
-            // Scoped to the exact system UUID + is_system so user collections are never touched.
-            try db.execute(
-                sql: "DELETE FROM collections WHERE id = ? AND is_system = 1",
-                arguments: ["00000000-0000-0000-0000-00000000000D"]
-            )
-
-            // ── System Properties ──
-            // swiftlint:disable:next large_tuple
-            let systemProperties: [(id: String, name: String, type: String, icon: String, position: Int)] = [
-                (SystemPropertyID.tags.uuidString, "Tags", "multi_select", "tag", 0),
-                (SystemPropertyID.status.uuidString, "Status", "single_select", "circle.dotted", 1),
-                (SystemPropertyID.rating.uuidString, "Rating", "number", "star", 2),
-            ]
-            for prop in systemProperties {
-                try db.execute(
-                    sql: """
-                        INSERT OR IGNORE INTO properties (id, name, type, icon, position, is_system)
-                        VALUES (?, ?, ?, ?, ?, 1)
-                    """,
-                    arguments: [prop.id, prop.name, prop.type, prop.icon, prop.position]
-                )
-            }
-
-            // ── Status Options ──
-            // swiftlint:disable:next large_tuple
-            let statusOptions: [(id: String, name: String, color: String, position: Int)] = [
-                (SystemStatusOptionID.toRead.uuidString, "To Read", "2EA8E5", 0),
-                (SystemStatusOptionID.reading.uuidString, "Reading", "FF8C19", 1),
-                (SystemStatusOptionID.finished.uuidString, "Finished", "5FB236", 2),
-            ]
-            for opt in statusOptions {
-                try db.execute(
-                    sql: """
-                        INSERT OR IGNORE INTO property_options (id, property_id, name, color_hex, position)
-                        VALUES (?, ?, ?, ?, ?)
-                    """,
-                    arguments: [opt.id, SystemPropertyID.status.uuidString, opt.name, opt.color, opt.position]
-                )
-            }
         }
     }
 

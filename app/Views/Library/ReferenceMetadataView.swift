@@ -585,16 +585,11 @@ struct ReferenceMetadataView: View {
 
     private func saveExtra() {
         let trimmed = extraText.trimmingCharacters(in: .whitespacesAndNewlines)
-        do {
-            try store.database.dbQueue.write { db in
-                try db.execute(
-                    sql: "UPDATE items SET extra = ?, updated_at = ? WHERE id = ?",
-                    arguments: [trimmed.isEmpty ? nil : trimmed, Date().iso8601String, item.id.uuidString]
-                )
-            }
+        let itemId = item.id.uuidString
+        Task { @MainActor in
+            await LibraryCatalog.update(
+                id: itemId, field: "extra", string: trimmed.isEmpty ? nil : trimmed)
             store.invalidate()
-        } catch {
-            Log.error(Log.store, "Failed to save extra field: \(error)")
         }
     }
 

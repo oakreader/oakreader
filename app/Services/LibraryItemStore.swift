@@ -1,5 +1,4 @@
 import Foundation
-import GRDB
 
 extension LibraryStore {
     // MARK: - Fetch
@@ -33,36 +32,25 @@ extension LibraryStore {
         loadedTrashedItems.first { $0.id == id }
     }
 
-    /// Insert an item with its first attachment.
+    /// Insert an item with its first attachment, and give it a cite key.
     ///
-    /// Still a direct write, and the last one in this store. The import
-    /// pipeline that calls it is synchronous from the drop handler down, so
-    /// routing this through the core means making seven entry points async —
-    /// that is its own step, not a rider on this one.
+    /// Awaited rather than fired, unlike the other writes here. An import's
+    /// next move is usually to save the item's metadata, and a citation row
+    /// referencing an item that has not been written yet is a foreign-key
+    /// failure — so the caller genuinely needs this one to have landed.
     ///
-    /// The cite key is assigned by the core afterwards rather than inline. The
-    /// returned item therefore has no key yet; the reload that `invalidate()`
-    /// triggers brings it back with one.
-    func insertItem(_ record: ItemRecord, attachment: AttachmentRecord) -> LibraryItem? {
-        do {
-            var rec = record
-            var attRec = attachment
-            try database.dbQueue.write { db in
-                try rec.insert(db)
-                try attRec.insert(db)
-            }
-            Task { @MainActor in
-                await ReferenceCatalog.assignCiteKey(forItemId: rec.id)
-                self.invalidate()
-            }
-            invalidate()
-            let att = Attachment(record: attRec, itemStorageKey: rec.storageKey)
-            let coverData = Self.loadCoverData(attachment: att)
-            return LibraryItem(record: rec, attachments: [att], coverImageData: coverData)
-        } catch {
-            Log.error(Log.store, "insertItem failed: \(error)")
-            return nil
-        }
+    /// The returned item carries the cite key the core assigned, which is why
+    /// the insert answers with it rather than the caller re-reading.
+    func insertItem(_ record: ItemRecord, attachment: AttachmentRecord) async -> LibraryItem? {
+        var rec = record
+        let att = Attachment(record: attachment, itemStorageKey: rec.storageKey)
+        await LibraryCatalog.insert(CatalogItem(record: rec, attachments: [attachment]))
+        rec.citeKey = await ReferenceCatalog.assignCiteKey(forItemId: rec.id)
+        invalidate()
+        return LibraryItem(
+            record: rec,
+            attachments: [att],
+            coverImageData: Self.loadCoverData(attachment: att))
     }
 
     /// Delete an item permanently: its rows, and the files they pointed at.

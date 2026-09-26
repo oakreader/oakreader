@@ -47,6 +47,8 @@ export type PingParams = z.infer<typeof PingParams>;
 export type PingResult = {
   protocol: number;
   backend: string;
+  /** How many catalog migrations this build knows. A backup records it so an older build can refuse a newer library outright. */
+  schemaVersion: number;
 };
 
 /** `complete` — One-shot completion. Streams chat/delta, resolves when finished. */
@@ -297,7 +299,7 @@ export type ItemsInsertResult = Record<string, never>;
 /** `catalog/items/updateField` — One scalar field. The column set is fixed so a name cannot reach SQL from the wire. */
 export const ItemsUpdateFieldParams = z.object({
   id: z.string(),
-  field: z.enum(["title", "processingStatus", "lastPosition", "lastOpenedAt", "citeKey"]),
+  field: z.enum(["title", "processingStatus", "lastPosition", "lastOpenedAt", "citeKey", "extra"]),
   stringValue: z.string().nullable().optional(),
   /** Used for lastPosition; the other fields travel in stringValue. */
   numberValue: z.number().nullable().optional(),

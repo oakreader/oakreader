@@ -8,7 +8,7 @@ extension ImportService {
     /// Import a PDF from any URL into managed storage.
     /// Returns the library item if successful, or the existing item if already imported.
     @discardableResult
-    func importPDF(from sourceURL: URL) -> LibraryItem? {
+    func importPDF(from sourceURL: URL) async -> LibraryItem? {
         // Duplicate detection: hash first 64KB
         if let hash = hashPrefix(of: sourceURL),
            let existing = findByHash(hash) {
@@ -101,7 +101,7 @@ extension ImportService {
             updatedAt: now
         )
 
-        guard let item = store.insertItem(itemRecord, attachment: attRecord) else {
+        guard let item = await store.insertItem(itemRecord, attachment: attRecord) else {
             try? FileManager.default.removeItem(at: docDir)
             return nil
         }

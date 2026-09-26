@@ -5,7 +5,7 @@ extension ImportService {
 
     /// Import a markdown file into managed storage.
     @discardableResult
-    func importMarkdown(from sourceURL: URL) -> LibraryItem? {
+    func importMarkdown(from sourceURL: URL) async -> LibraryItem? {
         // Duplicate detection: hash first 64KB
         if let hash = hashPrefix(of: sourceURL),
            let existing = findByHash(hash) {
@@ -92,7 +92,7 @@ extension ImportService {
             updatedAt: now
         )
 
-        guard let item = store.insertItem(itemRecord, attachment: attRecord) else {
+        guard let item = await store.insertItem(itemRecord, attachment: attRecord) else {
             try? FileManager.default.removeItem(at: docDir)
             return nil
         }

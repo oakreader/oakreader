@@ -191,7 +191,7 @@ export class ItemStore {
    */
   updateField(
     id: string,
-    field: "title" | "processingStatus" | "lastPosition" | "lastOpenedAt" | "citeKey",
+    field: "title" | "processingStatus" | "lastPosition" | "lastOpenedAt" | "citeKey" | "extra",
     value: string | number | null,
     at: string,
   ): void {
@@ -201,6 +201,7 @@ export class ItemStore {
       lastPosition: "last_position",
       lastOpenedAt: "last_opened_at",
       citeKey: "cite_key",
+      extra: "extra",
     }[field];
     this.db.prepare(`UPDATE items SET ${column} = ?, updated_at = ? WHERE id = ?`)
       .run(value, at, id);

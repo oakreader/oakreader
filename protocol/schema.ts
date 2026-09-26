@@ -72,6 +72,9 @@ export const METHODS: Method[] = [
     result: [
       { name: "protocol", type: int },
       { name: "backend", type: str },
+      { name: "schemaVersion", type: int,
+        doc: "How many catalog migrations this build knows. A backup records " +
+             "it so an older build can refuse a newer library outright." },
     ],
   },
   {
@@ -299,7 +302,7 @@ export const METHODS: Method[] = [
     doc: "One scalar field. The column set is fixed so a name cannot reach SQL from the wire.",
     params: [
       { name: "id", type: str },
-      { name: "field", type: { k: "enum", values: ["title", "processingStatus", "lastPosition", "lastOpenedAt", "citeKey"] } },
+      { name: "field", type: { k: "enum", values: ["title", "processingStatus", "lastPosition", "lastOpenedAt", "citeKey", "extra"] } },
       { name: "stringValue", type: str, optional: true, nullable: true },
       { name: "numberValue", type: double, optional: true, nullable: true,
         doc: "Used for lastPosition; the other fields travel in stringValue." },

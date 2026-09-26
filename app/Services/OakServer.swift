@@ -400,9 +400,9 @@ final class OakServer {
         // Download the thumbnail the extension read from the live page (og:image), so the cover
         // comes from the browser-rendered DOM rather than a server-side re-fetch the site may block.
         downloadData(from: payload.thumbnailURL) { [weak self] thumbnailData in
-        DispatchQueue.main.async { [weak self] in
+        Task { @MainActor [weak self] in
             guard let self else { return }
-            let item = self.importService.importHTML(
+            let item = await self.importService.importHTML(
                 from: tempURL,
                 originalPageURL: originalURL,
                 title: payload.title,
@@ -505,9 +505,9 @@ final class OakServer {
         )
 
         let finish: (Data?) -> Void = { thumbnailData in
-            DispatchQueue.main.async { [weak self] in
+            Task { @MainActor [weak self] in
                 guard let self else { return }
-                let item = self.importService.importEmbed(.init(
+                let item = await self.importService.importEmbed(.init(
                     title: payload.title ?? "Untitled",
                     author: payload.author ?? "",
                     sourceURL: sourceURL,
@@ -604,8 +604,8 @@ final class OakServer {
                 return
             }
 
-            DispatchQueue.main.async {
-                let item = self.importService.importPDF(from: tempURL)
+            Task { @MainActor in
+                let item = await self.importService.importPDF(from: tempURL)
                 try? FileManager.default.removeItem(at: tempURL)
                 if let item {
                     self.assignToCollection(item: item, collectionId: payload.collectionId)
@@ -637,9 +637,9 @@ final class OakServer {
             return
         }
 
-        DispatchQueue.main.async { [weak self] in
+        Task { @MainActor [weak self] in
             guard let self else { return }
-            let item = self.importService.importPDF(from: tempURL)
+            let item = await self.importService.importPDF(from: tempURL)
             try? FileManager.default.removeItem(at: tempURL)
             if let item {
                 if let markdown = payload.markdown, !markdown.isEmpty {

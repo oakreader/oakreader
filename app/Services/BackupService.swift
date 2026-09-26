@@ -164,7 +164,7 @@ final class BackupService {
             format: "oakreader-backup-v1",
             appVersion: appVersion,
             exportDate: ISO8601DateFormatter().string(from: Date()),
-            schemaVersion: "v\(CatalogDatabase.currentSchemaVersion)",
+            schemaVersion: "v\(await NodeBackend.shared.schemaVersion)",
             itemCount: countItems(dataDir: dataDir)
         )
 
@@ -267,7 +267,7 @@ final class BackupService {
             }
 
             // Check schema version compatibility
-            let currentVersion = CatalogDatabase.currentSchemaVersion
+            let currentVersion = await NodeBackend.shared.schemaVersion
             if let backupVersion = extractVersion(manifest.schemaVersion),
                backupVersion > currentVersion {
                 result.errors.append("This backup was created with a newer version of OakReader (schema \(manifest.schemaVersion)). Please update OakReader before restoring.")

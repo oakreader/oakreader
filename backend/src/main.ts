@@ -50,6 +50,7 @@ import { ProviderRegistry, toPiId } from "./providers.js";
 import { runChat, toPiMessages } from "./chat.js";
 import { PromptLibrary } from "./prompts.js";
 import { Catalog } from "./catalog/db.js";
+import { MIGRATIONS } from "./catalog/schema.js";
 import { WordLookupStore } from "./catalog/wordLookups.js";
 import { AnnotationStore } from "./catalog/annotations.js";
 import { ConversationStore } from "./catalog/conversations.js";
@@ -304,7 +305,10 @@ async function handleOAuthLogin(cmd: OAuthLoginParams, id: string): Promise<OAut
  * plumbing and no `success: false` convention.
  */
 function registerMethods(): void {
-  peer.onRequest("ping", PingParams, () => ({ protocol: PROTOCOL_VERSION, backend: BACKEND_ID }));
+  peer.onRequest("ping", PingParams, () => ({
+    protocol: PROTOCOL_VERSION, backend: BACKEND_ID,
+    schemaVersion: MIGRATIONS.length,
+  }));
 
   peer.onRequest("complete", CompleteParams, (params, id) => handleComplete(params, id));
   peer.onRequest("chat", ChatParams, (params, id) => handleChat(params, id));
