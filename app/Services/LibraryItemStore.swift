@@ -104,154 +104,48 @@ extension LibraryStore {
         }
     }
 
-    // MARK: - Single-Item Lookup (cache-first, SQL fallback)
+    // MARK: - Single-Item Lookup
+
+    /// These search the in-memory library rather than the database.
+    ///
+    /// They used to be cache-first with a SQL fallback, because the cache held
+    /// only whatever a previous fetch had loaded. `loadedItems` is the whole
+    /// live library, so the fallback had nothing left to find — a miss here is
+    /// a genuine absence, and going to the core for a second opinion would only
+    /// add a round trip to say so.
+    ///
+    /// The one case that is NOT covered is a trashed item, which is why
+    /// `findTrashedItem` exists separately.
 
     func findItem(byId id: UUID) -> LibraryItem? {
-        if let cached = itemsCache, cached.revision == revision {
-            if let found = cached.items.first(where: { $0.id == id }) { return found }
-        }
-        return fetchItem(whereSQL: "id = ?", arguments: [id.uuidString])
+        loadedItems.first { $0.id == id }
     }
 
     func findItem(byCiteKey citeKey: String) -> LibraryItem? {
-        if let cached = itemsCache, cached.revision == revision {
-            if let found = cached.items.first(where: { $0.citeKey == citeKey }) { return found }
-        }
-        return fetchItem(whereSQL: "cite_key = ?", arguments: [citeKey])
+        loadedItems.first { $0.citeKey == citeKey }
     }
 
     func findItem(byStorageKey key: String) -> LibraryItem? {
-        if let cached = itemsCache, cached.revision == revision {
-            if let found = cached.items.first(where: { $0.storageKey == key }) { return found }
-        }
-        return fetchItem(whereSQL: "storage_key = ?", arguments: [key])
+        loadedItems.first { $0.storageKey == key }
     }
 
     func findItem(bySource source: String, sourceKey: String) -> LibraryItem? {
-        if let cached = itemsCache, cached.revision == revision {
-            if let found = cached.items.first(where: { $0.source == source && $0.sourceKey == sourceKey }) { return found }
-        }
-        return fetchItem(whereSQL: "source = ? AND source_key = ?", arguments: [source, sourceKey])
+        loadedItems.first { $0.source == source && $0.sourceKey == sourceKey }
     }
 
     func findItem(byFileName fileName: String) -> LibraryItem? {
-        if let cached = itemsCache, cached.revision == revision {
-            if let found = cached.items.first(where: { $0.attachments.contains { $0.fileName == fileName } }) { return found }
-        }
-        return fetchItem(
-            whereSQL: "id IN (SELECT item_id FROM attachments WHERE file_name = ?)",
-            arguments: [fileName]
-        )
+        loadedItems.first { item in item.attachments.contains { $0.fileName == fileName } }
     }
 
     func findItem(bySourceURL url: URL) -> LibraryItem? {
-        let urlString = url.absoluteString
-        if let cached = itemsCache, cached.revision == revision {
-            if let found = cached.items.first(where: { $0.sourceURL == url }) { return found }
-        }
-        return fetchItem(
-            whereSQL: "id IN (SELECT item_id FROM attachments WHERE source_url = ?)",
-            arguments: [urlString]
-        )
+        loadedItems.first { $0.sourceURL == url }
     }
 
-    /// Fetch a single item by an arbitrary WHERE clause, fully hydrated with attachments,
-    /// collections, property values, citation, and cover.
-    private func fetchItem(whereSQL: String, arguments: StatementArguments) -> LibraryItem? {
-        do {
-            return try database.dbQueue.read { db in
-            guard let record = try ItemRecord.fetchOne(
-                db,
-                sql: "SELECT * FROM items WHERE \(whereSQL) AND deleted_at IS NULL LIMIT 1",
-                arguments: arguments
-            ) else { return nil }
-
-            let attRecords = try AttachmentRecord
-                .filter(AttachmentRecord.CodingKeys.itemId == record.id)
-                .fetchAll(db)
-
-            let collectionItems = try CollectionItemRecord
-                .filter(CollectionItemRecord.CodingKeys.itemId == record.id)
-                .fetchAll(db)
-            let collectionIds = collectionItems.map(\.collectionId)
-            let collectionRecords: [CollectionRecord]
-            if collectionIds.isEmpty {
-                collectionRecords = []
-            } else {
-                collectionRecords = try CollectionRecord
-                    .filter(collectionIds.contains(CollectionRecord.CodingKeys.id))
-                    .fetchAll(db)
-            }
-
-            let valueRows = try Row.fetchAll(db, sql: """
-                SELECT
-                    ipv.id AS value_id,
-                    ipv.property_id,
-                    ipv.option_id,
-                    ipv.text_value,
-                    p.name AS property_name,
-                    p.type AS property_type,
-                    po.id AS po_id,
-                    po.name AS option_name,
-                    po.color_hex AS option_color_hex,
-                    po.position AS option_position
-                FROM item_property_values ipv
-                JOIN properties p ON p.id = ipv.property_id
-                LEFT JOIN property_options po ON po.id = ipv.option_id
-                WHERE ipv.item_id = ?
-            """, arguments: [record.id])
-
-            let citation = try CitationRecord.fetchOne(db, key: record.id)
-
-            let attachments = attRecords.map { Attachment(record: $0, itemStorageKey: record.storageKey) }
-            let collections = collectionRecords.map { PDFCollection(record: $0) }
-
-            var propValues: [PropertyValue] = []
-            for row in valueRows {
-                let option: PropertyOption?
-                if let poId: String = row["po_id"] {
-                    option = PropertyOption(
-                        id: UUID(uuidString: poId) ?? UUID(),
-                        propertyId: UUID(uuidString: row["property_id"]) ?? UUID(),
-                        name: row["option_name"],
-                        colorHex: row["option_color_hex"],
-                        position: row["option_position"]
-                    )
-                } else {
-                    option = nil
-                }
-                propValues.append(PropertyValue(
-                    id: UUID(uuidString: row["value_id"]) ?? UUID(),
-                    propertyId: UUID(uuidString: row["property_id"]) ?? UUID(),
-                    propertyName: row["property_name"],
-                    propertyType: PropertyType(rawValue: row["property_type"]) ?? .text,
-                    option: option,
-                    textValue: row["text_value"]
-                ))
-            }
-
-            let primary = attachments.first { $0.isPrimary } ?? attachments.first
-            let coverData = primary.flatMap { Self.loadCoverData(attachment: $0) }
-            let refMeta = citation.flatMap { ReferenceMetadata(jsonString: $0.cslJson) }
-
-            return LibraryItem(
-                record: record,
-                attachments: attachments,
-                propertyValues: propValues,
-                collections: collections,
-                coverImageData: coverData,
-                referenceMetadata: refMeta
-            )
-            }
-        } catch {
-            Log.error(Log.store, "fetchItem(\(whereSQL)) failed: \(error)")
-            return nil
-        }
+    /// Look in the bin. Separate because `findItem` deliberately does not.
+    func findTrashedItem(byId id: UUID) -> LibraryItem? {
+        loadedTrashedItems.first { $0.id == id }
     }
 
-    // MARK: - CRUD
-
-    @discardableResult
     func insertItem(_ record: ItemRecord, attachment: AttachmentRecord) -> LibraryItem? {
         do {
             var rec = record

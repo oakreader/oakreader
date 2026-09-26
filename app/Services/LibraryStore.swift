@@ -101,20 +101,67 @@ final class LibraryStore {
     // Observation trigger — bump this to force computed properties to re-evaluate
     private(set) var revision: Int = 0
 
-    // Caches keyed on revision — avoids redundant DB fetches within the same revision cycle.
-    // Marked @ObservationIgnored so writes inside computed getters don't trigger extra observations.
-    @ObservationIgnored var itemsCache: (revision: Int, items: [LibraryItem])?
-    @ObservationIgnored var collectionsCache: (revision: Int, collections: [PDFCollection])?
+    /// The library, held in memory.
+    ///
+    /// Observed rather than `@ObservationIgnored`: the catalog lives in the
+    /// sidecar now, so filling these is a round trip and cannot happen inside a
+    /// getter. Views read the array synchronously — a SwiftUI body cannot await
+    /// — and a refresh replaces it, which is what drives the redraw.
+    private(set) var loadedItems: [LibraryItem] = []
+    private(set) var loadedTrashedItems: [LibraryItem] = []
+    private(set) var loadedCollections: [PDFCollection] = []
+
+    /// Derived, so still worth memoising per revision.
     @ObservationIgnored var propertiesCache: (revision: Int, properties: [PropertyDefinition])?
     @ObservationIgnored var duplicateGroupsCache: (revision: Int, groups: [[LibraryItem]])?
 
-    /// Notify the store that data has changed externally.
+    /// True until the first load finishes, so a view can tell "empty library"
+    /// from "not read yet" — a distinction that did not exist when the fetch
+    /// was synchronous.
+    private(set) var isLoading: Bool = true
+
+    /// Coalesces refreshes: several mutations in a row should cost one reload.
+    @ObservationIgnored private var refreshTask: Task<Void, Never>?
+
+    /// Notify the store that data has changed.
+    ///
+    /// Still synchronous, deliberately: 29 call sites invalidate after a
+    /// mutation, and making them all await would spread `async` across the
+    /// entire library UI for no benefit. The reload happens behind this.
     func invalidate() {
-        itemsCache = nil
-        collectionsCache = nil
         propertiesCache = nil
         duplicateGroupsCache = nil
         revision += 1
+        scheduleRefresh()
+    }
+
+    private func scheduleRefresh() {
+        refreshTask?.cancel()
+        refreshTask = Task { @MainActor [weak self] in
+            await self?.refresh()
+        }
+    }
+
+    /// Read the library from the core. Safe to call repeatedly.
+    @MainActor
+    func refresh() async {
+        async let items = LibraryCatalog.items()
+        async let trashed = LibraryCatalog.trashedItems()
+        async let collections = LibraryCatalog.collections()
+
+        let (i, t, c) = await (items, trashed, collections)
+        guard !Task.isCancelled else { return }
+
+        let resolved = c.map(PDFCollection.init(wire:))
+        // Collection ids are resolved here rather than on the wire: sending
+        // whole collections per item would repeat 142 of them across 644 items.
+        let byId = Dictionary(uniqueKeysWithValues: resolved.map { ($0.id, $0) })
+        loadedItems = i.map { LibraryItem(wire: $0).resolvingCollections($0.collectionIds, from: byId) }
+        loadedTrashedItems = t.map { LibraryItem(wire: $0).resolvingCollections($0.collectionIds, from: byId) }
+        loadedCollections = resolved
+        propertiesCache = nil
+        duplicateGroupsCache = nil
+        isLoading = false
     }
 
     init(database: CatalogDatabase) {
@@ -123,21 +170,10 @@ final class LibraryStore {
 
     // MARK: - Library Items
 
-    var items: [LibraryItem] {
-        _ = revision
-        if let cached = itemsCache, cached.revision == revision {
-            return cached.items
-        }
-        let result: [LibraryItem]
-        do {
-            result = try fetchAllItems()
-        } catch {
-            Log.error(Log.store, "fetchAllItems failed: \(error)")
-            result = []
-        }
-        itemsCache = (revision: revision, items: result)
-        return result
-    }
+    /// The live library. Synchronous by necessity — view bodies read it — and
+    /// filled by `refresh()`. Empty before the first load completes; check
+    /// `isLoading` to tell that from a genuinely empty library.
+    var items: [LibraryItem] { loadedItems }
 
     // MARK: - Duplicate Detection
 
@@ -408,10 +444,7 @@ final class LibraryStore {
 
     // MARK: - Bin (Trashed Items)
 
-    var trashedItems: [LibraryItem] {
-        _ = revision
-        return (try? fetchTrashedItems()) ?? []
-    }
+    var trashedItems: [LibraryItem] { loadedTrashedItems }
 
     /// Trashed items filtered by search text.
     private var binFilteredItems: [LibraryItem] {

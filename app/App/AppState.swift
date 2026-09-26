@@ -173,6 +173,14 @@ final class AppState {
         self.referenceService = ReferenceService(database: database)
         self.importService = ImportService(store: libraryStore, coverService: coverService, referenceService: referenceService)
         startAutosaveTimer()
+
+        // Warm the library before any view asks for it. The catalog lives in
+        // the sidecar now, so the first read is a round trip rather than a
+        // local query — without this the library view paints empty and fills
+        // in a moment later, which reads as data loss rather than loading.
+        Task { @MainActor [libraryStore] in
+            await libraryStore.refresh()
+        }
     }
 
     /// The catalog *is* the app, so a database we can't open is still fatal — but it

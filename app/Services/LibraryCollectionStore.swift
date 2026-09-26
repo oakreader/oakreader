@@ -4,15 +4,8 @@ import GRDB
 extension LibraryStore {
     // MARK: - Collections
 
-    var collections: [PDFCollection] {
-        _ = revision
-        if let cached = collectionsCache, cached.revision == revision {
-            return cached.collections
-        }
-        let result = (try? fetchAllCollections()) ?? []
-        collectionsCache = (revision: revision, collections: result)
-        return result
-    }
+    /// Filled by `LibraryStore.refresh()`; read synchronously from view bodies.
+    var collections: [PDFCollection] { loadedCollections }
 
     func findCollection(bySource source: String, sourceKey: String) -> PDFCollection? {
         collections.first { $0.source == source && $0.sourceKey == sourceKey }
