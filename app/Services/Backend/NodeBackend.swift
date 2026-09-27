@@ -30,7 +30,6 @@ actor NodeBackend {
 
     private var process: Process?
     private var stdinHandle: FileHandle?
-    private var stdoutBuffer = Data()
     private var nextId = 0
     private var spawnAttempts = 0
     private var handshaken = false
@@ -301,10 +300,21 @@ actor NodeBackend {
         proc.standardOutput = stdout
         proc.standardError = stderr
 
+        // Split into lines HERE, on the reader's own serial queue, and hand the
+        // actor whole messages.
+        //
+        // The obvious version — `Task { await self.receive(chunk) }` per read —
+        // is wrong, and was wrong quietly for months: tasks enqueued on an actor
+        // do not run in the order they were created, so two chunks of one
+        // response can be appended back to front. It never showed while the
+        // largest thing crossing this pipe was a chat delta. The library moved
+        // into the sidecar and `items/list` became a megabyte — 65 chunks, and
+        // losing the order of any one of them corrupts the whole message.
+        let assembler = LineAssembler()
         stdout.fileHandleForReading.readabilityHandler = { [weak self] handle in
-            let data = handle.availableData
-            guard let self else { return }
-            Task { await self.receive(data) }
+            let lines = assembler.take(handle.availableData)
+            guard let self, !lines.isEmpty else { return }
+            Task { await self.receive(lines) }
         }
         stderr.fileHandleForReading.readabilityHandler = { handle in
             if let line = String(data: handle.availableData, encoding: .utf8), !line.isEmpty {
@@ -319,7 +329,6 @@ actor NodeBackend {
         try proc.run()
         process = proc
         stdinHandle = stdin.fileHandleForWriting
-        stdoutBuffer = Data()
         Self.log.info("sidecar spawned: \(binary.path)")
     }
 
@@ -352,14 +361,10 @@ actor NodeBackend {
 
     // MARK: - Framing
 
-    private func receive(_ data: Data) {
-        guard !data.isEmpty else { return }
-        stdoutBuffer.append(data)
-        // Strict JSONL: split on LF bytes only, never on U+2028/U+2029.
-        while let newline = stdoutBuffer.firstIndex(of: 0x0A) {
-            let line = stdoutBuffer.subdata(in: stdoutBuffer.startIndex..<newline)
-            stdoutBuffer.removeSubrange(stdoutBuffer.startIndex...newline)
-            guard !line.isEmpty else { continue }
+    /// Decode and dispatch whole messages. Order between them does not matter:
+    /// a JSON-RPC answer is correlated by its id, not by when it arrived.
+    private func receive(_ lines: [Data]) {
+        for line in lines {
             guard let envelope = try? JSONDecoder().decode(RPCEnvelope.self, from: line) else {
                 Self.log.error("undecodable envelope: \(String(data: line, encoding: .utf8) ?? "?")")
                 continue
@@ -407,5 +412,30 @@ enum NodeBackendError: LocalizedError {
         case .timedOut: return "AI backend stopped responding"
         case .commandFailed(let message): return message
         }
+    }
+}
+
+/// Reassembles newline-delimited messages from arbitrary pipe reads.
+///
+/// Owned by one `FileHandle.readabilityHandler`, which macOS serialises per
+/// handle, so the buffer needs no lock — and, more to the point, the bytes
+/// cannot be reordered. That is the whole job: a 16 KB read is not a message,
+/// and a message is not a read.
+private final class LineAssembler {
+    private var buffer = Data()
+
+    /// Append a read and return whatever complete lines it completed.
+    /// Strict JSONL: split on LF only, never on U+2028/U+2029.
+    func take(_ data: Data) -> [Data] {
+        guard !data.isEmpty else { return [] }
+        buffer.append(data)
+
+        var lines: [Data] = []
+        while let newline = buffer.firstIndex(of: 0x0A) {
+            let line = buffer.subdata(in: buffer.startIndex..<newline)
+            buffer.removeSubrange(buffer.startIndex...newline)
+            if !line.isEmpty { lines.append(line) }
+        }
+        return lines
     }
 }

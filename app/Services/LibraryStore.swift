@@ -152,6 +152,13 @@ final class LibraryStore {
         loadedProperties = p.map(PropertyDefinition.init(wire:))
         duplicateGroupsCache = nil
         isLoading = false
+
+        // Worth a line: an empty library and a failed read look identical on
+        // screen, and the difference was invisible in the log the day a
+        // megabyte response stopped reassembling.
+        Log.info(Log.store, "library loaded: \(loadedItems.count) items, "
+            + "\(loadedCollections.count) collections, \(loadedProperties.count) properties, "
+            + "\(loadedTrashedItems.count) in the bin")
     }
 
     init(database: CatalogDatabase) {
