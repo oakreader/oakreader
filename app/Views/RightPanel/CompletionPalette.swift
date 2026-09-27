@@ -8,8 +8,9 @@ import SwiftUI
 /// Every value was reverse-engineered pixel-by-pixel from Dia 1.36's command-bar
 /// suggestion panel (`Attachments.AttachmentSuggestionsViewController` inside an
 /// `ARCUI.PopoverBackgroundView`):
-///   • Card: white `#FFFFFF` / dark `#161617`, 14pt continuous corners, hairline
-///     border, soft drop shadow.
+///   • Card: white `#FFFFFF` / dark `#161617`, 14pt continuous corners, soft
+///     drop shadow. The edge comes from the app's shared `PopupRimView` — two
+///     strokes, dark outside and light inside — rather than a colour here.
 ///   • Row: 26pt tall, 13.5pt glyph shown directly (NO grey tile), 6pt icon leading,
 ///     7pt icon→title gap, 13pt title.
 ///   • Selection: accent-blue pill (`#6A9FF9` / `#2B57B7`) with WHITE text/icon,
@@ -35,11 +36,6 @@ struct CompletionPalette {
                : .white
     }
 
-    /// Hairline card border — barely-there in light, a soft top-edge highlight in dark.
-    var border: NSColor {
-        isDark ? NSColor.white.withAlphaComponent(0.06)
-               : NSColor.black.withAlphaComponent(0.04)
-    }
 
     /// Selected-row fill. Measured pixel mode: `#6A9FF9` (light) / `#2B57B7` (dark).
     var selectionFill: NSColor {
@@ -69,7 +65,6 @@ struct CompletionPalette {
     // MARK: - Colours (SwiftUI accessors)
 
     var panelBackgroundColor: Color { Color(nsColor: panelBackground) }
-    var borderColor: Color { Color(nsColor: border) }
     var selectionFillColor: Color { Color(nsColor: selectionFill) }
     var titleColor: Color { Color(nsColor: title) }
     var secondaryColor: Color { Color(nsColor: secondary) }

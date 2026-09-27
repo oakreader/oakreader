@@ -131,12 +131,22 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
         container.wantsLayer = true
         container.layer?.backgroundColor = palette.panelBackground.cgColor
         container.layer?.cornerRadius = Self.cornerRadius
-        container.layer?.borderWidth = 0.5
-        container.layer?.borderColor = palette.border.cgColor
         container.layer?.cornerCurve = .continuous
         container.layer?.masksToBounds = true
 
         container.addSubview(scrollView)
+
+        // The edge is two strokes, not one: a dark outer hairline and a light
+        // inner highlight, which is what reads as a physical edge. A single
+        // `layer.borderWidth` hairline — what this drew before — is invisible
+        // at 4% black on a white card, and being drawn on the clip boundary it
+        // softens along the curve. `PopupRimView` is the same rim the app's
+        // other popups use, so this panel and the native menu beside it in the
+        // composer finally belong to one family.
+        let rim = PopupRimView(cornerRadius: Self.cornerRadius)
+        rim.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(rim)
+
         contentView = container
 
         let heightConstraint = documentView.heightAnchor.constraint(equalToConstant: 10)
@@ -146,6 +156,11 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
             scrollView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
             scrollView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+
+            rim.topAnchor.constraint(equalTo: container.topAnchor),
+            rim.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            rim.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            rim.trailingAnchor.constraint(equalTo: container.trailingAnchor),
 
             documentView.topAnchor.constraint(equalTo: scrollView.contentView.topAnchor),
             documentView.leadingAnchor.constraint(equalTo: scrollView.contentView.leadingAnchor),
