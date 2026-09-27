@@ -1,5 +1,4 @@
 import Foundation
-import OakAgent
 
 /// Unified data model for `/` slash commands shown in the chat completion panel.
 struct ChatCompletionItem: Identifiable, Equatable {

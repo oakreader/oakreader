@@ -1,5 +1,4 @@
 import SwiftUI
-import OakAgent
 
 struct FannedAttachmentStack: View {
     let attachments: [TurnAttachment]

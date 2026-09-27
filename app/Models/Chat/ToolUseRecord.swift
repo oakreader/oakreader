@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Tool Use Status
 
-public enum ToolUseStatus: String, Codable, Sendable {
+enum ToolUseStatus: String, Codable, Sendable {
     case pending = "awaitingConfirmation"
     case executing
     case completed
@@ -11,15 +11,15 @@ public enum ToolUseStatus: String, Codable, Sendable {
 
 // MARK: - Tool Use Record (persisted in JSONL and rendered in UI)
 
-public struct ToolUseRecord: Identifiable, Codable, Equatable, Sendable {
-    public let id: String
-    public let name: String
-    public let input: ToolInput
-    public var result: String?
-    public var isError: Bool
-    public var status: ToolUseStatus
+struct ToolUseRecord: Identifiable, Codable, Equatable, Sendable {
+    let id: String
+    let name: String
+    let input: ToolInput
+    var result: String?
+    var isError: Bool
+    var status: ToolUseStatus
 
-    public init(id: String, name: String, input: ToolInput, result: String? = nil, isError: Bool = false, status: ToolUseStatus = .executing) {
+    init(id: String, name: String, input: ToolInput, result: String? = nil, isError: Bool = false, status: ToolUseStatus = .executing) {
         self.id = id
         self.name = name
         self.input = input
@@ -28,7 +28,7 @@ public struct ToolUseRecord: Identifiable, Codable, Equatable, Sendable {
         self.status = status
     }
 
-    public init(from toolCall: ToolCall) {
+    init(from toolCall: ToolCall) {
         self.id = toolCall.id
         self.name = toolCall.name
         self.input = toolCall.input
@@ -38,7 +38,7 @@ public struct ToolUseRecord: Identifiable, Codable, Equatable, Sendable {
     }
 
     // Custom Decodable for backward compatibility with old JSONL files without status field
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(String.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)
@@ -48,12 +48,12 @@ public struct ToolUseRecord: Identifiable, Codable, Equatable, Sendable {
         status = try container.decodeIfPresent(ToolUseStatus.self, forKey: .status) ?? (result != nil ? .completed : .executing)
     }
 
-    public var isExecuting: Bool {
+    var isExecuting: Bool {
         status == .executing
     }
 
     /// Convenience: extract file path from input for display.
-    public var filePath: String? {
+    var filePath: String? {
         input["path"]
     }
 }

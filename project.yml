@@ -25,8 +25,6 @@ knownRegions:
   - es
 
 packages:
-  OakAgent:
-    path: packages/OakAgent
   OakMarkdownUI:
     path: packages/OakMarkdownUI
   Highlightr:
@@ -67,7 +65,6 @@ targets:
           - "**/Info.plist"
           - "**/*.entitlements"
     dependencies:
-      - package: OakAgent
       - package: OakMarkdownUI
       - package: Highlightr
       - package: CMarkGFM

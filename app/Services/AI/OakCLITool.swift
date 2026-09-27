@@ -1,5 +1,4 @@
 import Foundation
-import OakAgent
 
 /// Executes `oak` CLI commands so the AI agent can list collections, tags,
 /// search items, manage the library, and more.  Always appends `--json`

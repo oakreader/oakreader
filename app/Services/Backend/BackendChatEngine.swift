@@ -1,5 +1,4 @@
 import Foundation
-import OakAgent
 
 /// Drop-in replacement for OakAgent's old in-process `AgentSession`: same
 /// `send(...)` surface, same `SessionEvent` semantics, same JSONL persistence —

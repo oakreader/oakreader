@@ -1,7 +1,6 @@
 import Foundation
 import AppKit
 import PDFKit
-import OakAgent
 
 /// Where a citation points inside a document. Produced by resolving an `oak:N` link
 /// against the conversation's ``CitationSourceRegistry`` — never parsed out of the URL,

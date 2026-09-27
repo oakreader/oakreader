@@ -7,7 +7,6 @@ let package = Package(
         .macOS(.v15)
     ],
     dependencies: [
-        .package(path: "packages/OakAgent"),
         .package(path: "packages/OakVoice"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
         .package(url: "https://github.com/gonzalezreal/textual", from: "0.1.0"),
@@ -20,7 +19,6 @@ let package = Package(
         .executableTarget(
             name: "OakReader",
             dependencies: [
-                "OakAgent",
                 "OakVoice",
                 .product(name: "Textual", package: "textual"),
                 .product(name: "GRDB", package: "GRDB.swift"),
@@ -42,7 +40,6 @@ let package = Package(
         .executableTarget(
             name: "oak",
             dependencies: [
-                "OakAgent",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "GRDB", package: "GRDB.swift"),
             ],

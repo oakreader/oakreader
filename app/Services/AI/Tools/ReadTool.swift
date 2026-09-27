@@ -1,11 +1,15 @@
 import Foundation
 
 /// Read file contents with optional offset/limit and truncation.
-public struct ReadTool: AgentTool {
-    public let name = "read"
-    public let description = "Read the contents of a file at the given path. Optionally specify offset (line number to start from, 1-based) and limit (number of lines to read). Returns the file text with line numbers."
+struct ReadTool: AgentTool {
+    let name = "read"
+    let description = """
+        Read the contents of a file at the given path. Optionally specify offset \
+        (line number to start from, 1-based) and limit (number of lines to read). \
+        Returns the file text with line numbers.
+        """
 
-    public var inputSchema: [String: Any] {
+    var inputSchema: [String: Any] {
         [
             "type": "object",
             "properties": [
@@ -26,9 +30,9 @@ public struct ReadTool: AgentTool {
         ]
     }
 
-    public init() {}
+    init() {}
 
-    public func execute(input: ToolInput, context: ToolExecutionContext) async throws -> ToolOutput {
+    func execute(input: ToolInput, context: ToolExecutionContext) async throws -> ToolOutput {
         guard let rawPath = input["path"] else {
             return .error("Missing required parameter: path")
         }

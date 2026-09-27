@@ -1,18 +1,18 @@
 import Foundation
 
 /// Context passed to each tool's ``AgentTool/execute(input:context:)`` method.
-public struct ToolExecutionContext: Sendable {
+struct ToolExecutionContext: Sendable {
     /// Current working directory for relative path resolution.
-    public let workingDirectory: URL
+    let workingDirectory: URL
 
     /// Path sandbox — tool should validate paths against these allowed roots.
-    public let allowedPaths: [URL]
+    let allowedPaths: [URL]
 
     /// Operations backends (pluggable for testing).
-    public let fileOperations: FileOperations
-    public let bashOperations: BashOperations
+    let fileOperations: FileOperations
+    let bashOperations: BashOperations
 
-    public init(
+    init(
         workingDirectory: URL,
         allowedPaths: [URL] = [],
         fileOperations: FileOperations = LocalFileOperations(),

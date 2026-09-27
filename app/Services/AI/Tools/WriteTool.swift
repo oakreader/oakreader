@@ -1,12 +1,12 @@
 import Foundation
 
 /// Write content to a file, creating parent directories if needed.
-public struct WriteTool: AgentTool {
-    public let name = "write"
-    public let category: ToolCategory = .write
-    public let description = "Write content to a file at the given path. Creates parent directories if needed. Overwrites the file if it already exists."
+struct WriteTool: AgentTool {
+    let name = "write"
+    let category: ToolCategory = .write
+    let description = "Write content to a file at the given path. Creates parent directories if needed. Overwrites the file if it already exists."
 
-    public var inputSchema: [String: Any] {
+    var inputSchema: [String: Any] {
         [
             "type": "object",
             "properties": [
@@ -23,9 +23,9 @@ public struct WriteTool: AgentTool {
         ]
     }
 
-    public init() {}
+    init() {}
 
-    public func execute(input: ToolInput, context: ToolExecutionContext) async throws -> ToolOutput {
+    func execute(input: ToolInput, context: ToolExecutionContext) async throws -> ToolOutput {
         guard let rawPath = input["path"] else {
             return .error("Missing required parameter: path")
         }

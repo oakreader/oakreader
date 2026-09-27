@@ -1,7 +1,7 @@
 import Foundation
 
 /// Protocol for subprocess execution (pluggable for testing).
-public protocol BashOperations: Sendable {
+protocol BashOperations: Sendable {
     /// Run an executable directly with an argument vector. Arguments are passed
     /// literally to the process — no shell is involved — so they are immune to
     /// shell injection and quoting issues.
@@ -10,7 +10,7 @@ public protocol BashOperations: Sendable {
     ) async throws -> BashResult
 }
 
-public extension BashOperations {
+extension BashOperations {
     /// Convenience: run a command string through `/bin/bash -c`. Subject to shell
     /// parsing — only use with trusted/escaped input.
     func execute(command: String, workingDirectory: URL, timeout: TimeInterval) async throws -> BashResult {
@@ -22,19 +22,19 @@ public extension BashOperations {
 }
 
 /// Result of a shell command execution.
-public struct BashResult: Sendable {
-    public let stdout: String
-    public let stderr: String
-    public let exitCode: Int32
+struct BashResult: Sendable {
+    let stdout: String
+    let stderr: String
+    let exitCode: Int32
 
-    public init(stdout: String, stderr: String, exitCode: Int32) {
+    init(stdout: String, stderr: String, exitCode: Int32) {
         self.stdout = stdout
         self.stderr = stderr
         self.exitCode = exitCode
     }
 
     /// Combined output (stdout + stderr) for display.
-    public var combinedOutput: String {
+    var combinedOutput: String {
         var parts: [String] = []
         if !stdout.isEmpty { parts.append(stdout) }
         if !stderr.isEmpty { parts.append(stderr) }
@@ -43,10 +43,10 @@ public struct BashResult: Sendable {
 }
 
 /// Default local shell implementation using Process.
-public struct LocalBashOperations: BashOperations, Sendable {
-    public init() {}
+struct LocalBashOperations: BashOperations, Sendable {
+    init() {}
 
-    public func execute(
+    func execute(
         executable: String, arguments: [String], workingDirectory: URL, timeout: TimeInterval
     ) async throws -> BashResult {
         let process = Process()

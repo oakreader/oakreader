@@ -3,7 +3,6 @@ import PDFKit
 import AppKit
 import Combine
 import WebKit
-import OakAgent
 
 @Observable
 class DocumentViewModel {

@@ -1,5 +1,4 @@
 import Foundation
-import OakAgent
 
 /// Searches the web using the user's configured search provider.
 /// Falls back to DuckDuckGo when no API key is configured.

@@ -1,12 +1,12 @@
 import Foundation
 import Security
 
-public enum KeychainService: Sendable {
+enum KeychainService: Sendable {
     private static let servicePrefix = "com.oakreader.apikey"
 
     // MARK: - String-based API (primary)
 
-    public static func apiKey(forProviderId providerId: String) -> String? {
+    static func apiKey(forProviderId providerId: String) -> String? {
         let service = "\(servicePrefix).\(providerId)"
         let query = KeychainConfig.scoped([
             kSecClass as String: kSecClassGenericPassword,
@@ -21,7 +21,7 @@ public enum KeychainService: Sendable {
     }
 
     @discardableResult
-    public static func setAPIKey(_ key: String, forProviderId providerId: String) -> Bool {
+    static func setAPIKey(_ key: String, forProviderId providerId: String) -> Bool {
         let service = "\(servicePrefix).\(providerId)"
         let baseQuery = KeychainConfig.scoped([
             kSecClass as String: kSecClassGenericPassword,
@@ -41,7 +41,7 @@ public enum KeychainService: Sendable {
         return SecItemAdd(addQuery as CFDictionary, nil) == errSecSuccess
     }
 
-    public static func deleteAPIKey(forProviderId providerId: String) {
+    static func deleteAPIKey(forProviderId providerId: String) {
         let service = "\(servicePrefix).\(providerId)"
         let query = KeychainConfig.scoped([
             kSecClass as String: kSecClassGenericPassword,
@@ -55,7 +55,7 @@ public enum KeychainService: Sendable {
     private static let skillEnvPrefix = "com.oakreader.skill.env"
 
     /// Read a skill environment variable from Keychain.
-    public static func skillEnvValue(skill: String, envName: String) -> String? {
+    static func skillEnvValue(skill: String, envName: String) -> String? {
         let service = "\(skillEnvPrefix).\(skill).\(envName)"
         let query = KeychainConfig.scoped([
             kSecClass as String: kSecClassGenericPassword,
@@ -71,7 +71,7 @@ public enum KeychainService: Sendable {
 
     /// Store a skill environment variable in Keychain.
     @discardableResult
-    public static func setSkillEnvValue(_ value: String, skill: String, envName: String) -> Bool {
+    static func setSkillEnvValue(_ value: String, skill: String, envName: String) -> Bool {
         let service = "\(skillEnvPrefix).\(skill).\(envName)"
         let baseQuery = KeychainConfig.scoped([
             kSecClass as String: kSecClassGenericPassword,
@@ -92,7 +92,7 @@ public enum KeychainService: Sendable {
     }
 
     /// Remove a skill environment variable from Keychain.
-    public static func deleteSkillEnvValue(skill: String, envName: String) {
+    static func deleteSkillEnvValue(skill: String, envName: String) {
         let service = "\(skillEnvPrefix).\(skill).\(envName)"
         let query = KeychainConfig.scoped([
             kSecClass as String: kSecClassGenericPassword,

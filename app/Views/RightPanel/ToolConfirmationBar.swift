@@ -1,5 +1,4 @@
 import SwiftUI
-import OakAgent
 
 /// Compact sticky bar shown between messages and input when a tool call
 /// is awaiting user confirmation. Replaces inline Approve/Deny buttons

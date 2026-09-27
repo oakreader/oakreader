@@ -2,24 +2,24 @@ import Foundation
 
 // MARK: - Turn
 
-public struct Turn: Identifiable, Codable, Equatable, Sendable {
-    public let id: UUID
-    public let role: Role
-    public var content: String
-    public let timestamp: Date
-    public var isStreaming: Bool
-    public var metadata: [String: String]
-    public var error: String?
-    public var attachments: [TurnAttachment]
-    public var toolUses: [ToolUseRecord]
+struct Turn: Identifiable, Codable, Equatable, Sendable {
+    let id: UUID
+    let role: Role
+    var content: String
+    let timestamp: Date
+    var isStreaming: Bool
+    var metadata: [String: String]
+    var error: String?
+    var attachments: [TurnAttachment]
+    var toolUses: [ToolUseRecord]
     /// Extended thinking content from reasoning models.
-    public var thinking: String?
+    var thinking: String?
 
-    public enum Role: String, Codable, Sendable {
+    enum Role: String, Codable, Sendable {
         case user, assistant, system
     }
 
-    public init(
+    init(
         id: UUID = UUID(),
         role: Role,
         content: String,
@@ -45,7 +45,7 @@ public struct Turn: Identifiable, Codable, Equatable, Sendable {
 
     // Custom Decodable for backward compatibility with old JSONL files
     // that may have `skill` instead of `metadata`, or missing fields.
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
         role = try container.decode(Role.self, forKey: .role)
@@ -73,7 +73,7 @@ public struct Turn: Identifiable, Codable, Equatable, Sendable {
     }
 
     // Custom encode to only write `metadata` (not the legacy `skill` key)
-    public func encode(to encoder: Encoder) throws {
+    func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)
         try container.encode(role, forKey: .role)
@@ -90,24 +90,24 @@ public struct Turn: Identifiable, Codable, Equatable, Sendable {
 
 // MARK: - Turn Attachment
 
-public struct TurnAttachment: Identifiable, Codable, Equatable, Sendable {
-    public let id: UUID
-    public let type: AttachmentType
-    public let label: String
-    public let textContent: String?
+struct TurnAttachment: Identifiable, Codable, Equatable, Sendable {
+    let id: UUID
+    let type: AttachmentType
+    let label: String
+    let textContent: String?
     /// Relative file path for image attachments (stored on disk, not inline).
     /// Path is relative to `chats/attachments/{sessionId}/`.
-    public let filePath: String?
+    let filePath: String?
     /// Inline image data — used only for in-memory/pending attachments, not persisted in JSONL.
-    public let imageData: Data?
-    public let pageIndex: Int?
+    let imageData: Data?
+    let pageIndex: Int?
 
-    public enum AttachmentType: String, Codable, Sendable {
+    enum AttachmentType: String, Codable, Sendable {
         case textSelection
         case imageCapture
     }
 
-    public init(
+    init(
         id: UUID = UUID(),
         type: AttachmentType,
         label: String,

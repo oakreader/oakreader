@@ -4,7 +4,7 @@ import Foundation
 /// model. Codable is *transparent*: `.string("x")` encodes as `"x"`, `.object`
 /// as `{...}`, etc. — so persisted tool inputs stay plain JSON and old records
 /// that stored `[String: String]` decode unchanged.
-public enum JSONValue: Codable, Sendable, Hashable {
+enum JSONValue: Codable, Sendable, Hashable {
     case string(String)
     case int(Int)
     case double(Double)
@@ -13,7 +13,7 @@ public enum JSONValue: Codable, Sendable, Hashable {
     case object([String: JSONValue])
     case null
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         let c = try decoder.singleValueContainer()
         if c.decodeNil() {
             self = .null
@@ -36,7 +36,7 @@ public enum JSONValue: Codable, Sendable, Hashable {
         }
     }
 
-    public func encode(to encoder: Encoder) throws {
+    func encode(to encoder: Encoder) throws {
         var c = encoder.singleValueContainer()
         switch self {
         case .string(let s): try c.encode(s)
@@ -52,7 +52,7 @@ public enum JSONValue: Codable, Sendable, Hashable {
     // MARK: - Bridging to/from Foundation JSON objects
 
     /// Wrap a Foundation JSON object (`Any` from `JSONSerialization`).
-    public init(any value: Any) {
+    init(any value: Any) {
         switch value {
         case let v as String: self = .string(v)
         case let v as Bool: self = .bool(v)
@@ -75,7 +75,7 @@ public enum JSONValue: Codable, Sendable, Hashable {
     }
 
     /// Convert back to a Foundation JSON object suitable for `JSONSerialization`.
-    public var anyValue: Any {
+    var anyValue: Any {
         switch self {
         case .string(let s): return s
         case .int(let i): return i
@@ -89,7 +89,7 @@ public enum JSONValue: Codable, Sendable, Hashable {
 
     /// Scalar rendered as a plain string; objects/arrays as their JSON text.
     /// `nil` only for explicit `null`. Used for back-compat string access.
-    public var scalarString: String? {
+    var scalarString: String? {
         switch self {
         case .string(let s): return s
         case .int(let i): return String(i)
@@ -102,7 +102,7 @@ public enum JSONValue: Codable, Sendable, Hashable {
     }
 
     /// Compact JSON-text encoding of this value.
-    public var jsonString: String {
+    var jsonString: String {
         guard JSONSerialization.isValidJSONObject(anyValue) || !(anyValue is NSNull) else {
             return ""
         }

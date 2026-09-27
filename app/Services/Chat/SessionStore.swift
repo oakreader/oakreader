@@ -2,13 +2,13 @@ import Foundation
 
 /// Persists chat turns as JSONL files (one JSON object per line).
 /// All sessions are stored in the provided base directory.
-public actor SessionStore {
+actor SessionStore {
     private let baseDirectory: URL
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
     /// Initialize with a base directory for session files.
-    public init(baseDirectory: URL) {
+    init(baseDirectory: URL) {
         self.baseDirectory = baseDirectory
         try? FileManager.default.createDirectory(at: baseDirectory, withIntermediateDirectories: true)
     }
@@ -27,7 +27,7 @@ public actor SessionStore {
 
     // MARK: - Write
 
-    public func appendTurn(_ turn: Turn, sessionId: UUID) throws {
+    func appendTurn(_ turn: Turn, sessionId: UUID) throws {
         let url = fileURL(for: sessionId)
         let data = try encoder.encode(persistedTurn(turn, sessionId: sessionId))
         guard var line = String(data: data, encoding: .utf8) else { return }
@@ -44,7 +44,7 @@ public actor SessionStore {
     }
 
     /// Replaces the last turn (used to finalize a streaming assistant message).
-    public func replaceLastTurn(_ turn: Turn, sessionId: UUID) throws {
+    func replaceLastTurn(_ turn: Turn, sessionId: UUID) throws {
         var turns = try loadTurns(sessionId: sessionId)
         if let idx = turns.lastIndex(where: { $0.id == turn.id }) {
             turns[idx] = turn
@@ -56,7 +56,7 @@ public actor SessionStore {
 
     // MARK: - Read
 
-    public func loadTurns(sessionId: UUID) throws -> [Turn] {
+    func loadTurns(sessionId: UUID) throws -> [Turn] {
         let url = fileURL(for: sessionId)
         guard FileManager.default.fileExists(atPath: url.path) else { return [] }
         let content = try String(contentsOf: url, encoding: .utf8)
@@ -71,7 +71,7 @@ public actor SessionStore {
 
     // MARK: - Delete
 
-    public func deleteSession(_ sessionId: UUID) {
+    func deleteSession(_ sessionId: UUID) {
         let url = fileURL(for: sessionId)
         try? FileManager.default.removeItem(at: url)
         try? FileManager.default.removeItem(at: attachmentDirectory(for: sessionId))

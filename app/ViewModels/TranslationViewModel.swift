@@ -1,5 +1,4 @@
 import Foundation
-import OakAgent
 
 @Observable
 class TranslationViewModel {

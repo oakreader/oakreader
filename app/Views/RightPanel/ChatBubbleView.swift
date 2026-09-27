@@ -1,6 +1,5 @@
 import SwiftUI
 import AppKit
-import OakAgent
 import OakMarkdownUI
 
 struct ChatBubbleView: View, Equatable {

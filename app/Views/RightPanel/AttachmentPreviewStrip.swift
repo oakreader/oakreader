@@ -1,5 +1,4 @@
 import SwiftUI
-import OakAgent
 
 struct AttachmentPreviewStrip: View {
     let attachments: [TurnAttachment]

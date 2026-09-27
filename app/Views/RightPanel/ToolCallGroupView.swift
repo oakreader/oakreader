@@ -1,5 +1,4 @@
 import SwiftUI
-import OakAgent
 
 /// Collapses multiple tool calls into a single summary line with optional expansion.
 /// Mirrors the disclosure style of `ThinkingDisclosureView`.

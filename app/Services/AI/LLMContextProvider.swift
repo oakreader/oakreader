@@ -1,6 +1,5 @@
 import Foundation
 import PDFKit
-import OakAgent
 
 /// Builds context snapshots and system prompts for the AI chat session.
 struct LLMContextProvider {

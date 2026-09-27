@@ -1,6 +1,5 @@
 import SwiftUI
 import UniformTypeIdentifiers
-import OakAgent
 import OakMarkdownUI
 
 /// How the chat surface presents itself.

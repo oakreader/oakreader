@@ -6,13 +6,13 @@ import Foundation
 /// Finding a tool moved to the core with the skill manifests that declare it —
 /// see `SkillStore.binPath(named:)`. These two stayed because they are actions
 /// on this machine rather than readings of a file.
-public enum ToolResolver {
+enum ToolResolver {
 
     /// Resolve a tool binary by name.
     ///
     /// If `searchPaths` is provided, checks each path for an executable.
     /// Always falls back to `which` if no search path matches.
-    public static func resolve(name: String, searchPaths: [String]? = nil) -> String? {
+    static func resolve(name: String, searchPaths: [String]? = nil) -> String? {
         let fm = FileManager.default
 
         if let paths = searchPaths {
@@ -28,7 +28,7 @@ public enum ToolResolver {
     }
 
     /// Run a binary with version arguments and return the first line of output.
-    public static func version(at path: String, versionArgs: [String]) -> String? {
+    static func version(at path: String, versionArgs: [String]) -> String? {
         guard !versionArgs.isEmpty else { return nil }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: path)
@@ -51,12 +51,12 @@ public enum ToolResolver {
 
     // MARK: - Install
 
-    public enum InstallError: LocalizedError {
+    enum InstallError: LocalizedError {
         case noInstallMethod(String)
         case brewFailed(String, Int32)
         case downloadFailed(String)
 
-        public var errorDescription: String? {
+        var errorDescription: String? {
             switch self {
             case .noInstallMethod(let name):
                 return "No install method defined for '\(name)'."
@@ -74,7 +74,7 @@ public enum ToolResolver {
     /// Takes the coordinates rather than a manifest type: the manifest is read
     /// by the core now, and this side is handed what it needs to run — which
     /// is what installing is, and the one part of this that has to happen here.
-    public static func install(name: String, install method: [String: String]) throws {
+    static func install(name: String, install method: [String: String]) throws {
         let brew = method["brew"]
         let url = method["url"]
         guard brew != nil || url != nil else { throw InstallError.noInstallMethod(name) }

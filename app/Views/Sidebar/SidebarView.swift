@@ -1,5 +1,4 @@
 import SwiftUI
-import OakAgent
 
 struct SidebarView: View {
     let viewModel: DocumentViewModel

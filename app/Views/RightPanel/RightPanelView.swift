@@ -1,5 +1,4 @@
 import SwiftUI
-import OakAgent
 
 /// Resizable right panel content shown inside HSplitView.
 struct RightPanelContentView: View {
