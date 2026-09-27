@@ -27,11 +27,16 @@ final class SkillStore {
     private init() {}
 
     func reload() async {
-        let (skills, _) = await SkillCatalog.list()
+        let (skills, advisories) = await SkillCatalog.list()
         all = skills
         installed = skills
             .filter { !$0.isBundled && $0.enabled }
             .sorted { ($0.order, $0.title) < ($1.order, $1.title) }
+
+        // Worth a line for the same reason the library gets one: an empty `/`
+        // menu and a failed read look identical on screen.
+        Log.info(Log.store, "skills loaded: \(installed.count) installed, "
+            + "\(skills.count - installed.count) other, \(advisories.count) advisories")
     }
 
     /// Where a tool some skill declares actually is, or nil when it is missing.
@@ -89,9 +94,14 @@ extension SkillCatalog {
 }
 
 extension BackendSkill: Identifiable {
-    /// A skill's name is its identity, which is why two with the same one are
-    /// an advisory rather than a silent pick.
-    var id: String { "\(source)/\(name)" }
+    /// A skill's name is its identity — it is what a transcript records when a
+    /// skill was used, and what `[[skill:…]]` refers to. Qualifying it by
+    /// source would be a different id from the one already written into every
+    /// stored conversation.
+    ///
+    /// Two skills with the same name are an advisory from the loader rather
+    /// than a silent pick; the settings list shows one row per name.
+    var id: String { name }
 
     var isBundled: Bool { source == "bundled" }
 

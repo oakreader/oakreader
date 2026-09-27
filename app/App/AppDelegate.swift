@@ -61,6 +61,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         Task.detached(priority: .utility) {
             await BackendCredentialMigrator.runIfNeeded()
             await AIProviderCatalog.shared.refresh()
+            // The chat's `/` menu reads this. It used to be a synchronous disk
+            // read done in an initialiser; reading skills from the core cannot
+            // be, so it is filled here instead — before anything asks.
+            await SkillStore.shared.reload()
         }
 
         createMainWindow()
