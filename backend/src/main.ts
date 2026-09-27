@@ -21,17 +21,14 @@ import {
   ReferencesGetParams, ReferencesSaveParams, type ReferencesGetResult,
   CiteKeysProposeParams, CiteKeysSaveParams, CiteKeysAssignParams,
   type CiteKeysProposeResult, type CiteKeysAssignResult,
-  PropertiesListParams, PropertiesUpsertParams, PropertiesDeleteParams,
-  PropertiesUpsertOptionParams, PropertiesDeleteOptionParams,
+  PropertiesListParams, PropertiesUpsertOptionParams, PropertiesDeleteOptionParams,
   PropertiesAddSelectValueParams, PropertiesRemoveSelectValueParams,
-  PropertiesSetTextValueParams,
   type PropertiesListResult,
-  ItemsListParams, ItemsMergeParams, ItemsFindParams, ItemsInsertParams,
+  ItemsListParams, ItemsMergeParams, ItemsInsertParams,
   ItemsUpdateFieldParams, ItemsSetTrashedParams, ItemsRemoveParams,
-  type ItemsListResult, type ItemsFindResult,
-  CollectionsListParams, CollectionsFindBySourceParams, CollectionsUpsertParams,
-  CollectionsDeleteParams, CollectionsSetMembershipParams, CollectionsItemsParams,
-  type CollectionsListResult, type CollectionsFindBySourceResult, type CollectionsItemsResult,
+  type ItemsListResult, CollectionsListParams, CollectionsFindBySourceParams, CollectionsUpsertParams,
+  CollectionsDeleteParams, CollectionsSetMembershipParams,
+  type CollectionsListResult, type CollectionsFindBySourceResult,
   ConversationsListParams, ConversationsCreateParams,
   ConversationsUpdateParams, ConversationsDeleteParams,
   type ConversationsListResult,
@@ -490,20 +487,6 @@ function registerMethods(): void {
       properties: new PropertyStore(catalog().db).list(),
     }));
 
-  peer.onRequest("catalog/properties/upsert", PropertiesUpsertParams, (p) => {
-    const { options, ...definition } = p.property;
-    const store = new PropertyStore(catalog().db);
-    store.upsertProperty(definition);
-    // Options travel with the property so a caller can create both at once.
-    for (const option of options) store.upsertOption(option);
-    return {};
-  });
-
-  peer.onRequest("catalog/properties/delete", PropertiesDeleteParams, (p) => {
-    new PropertyStore(catalog().db).deleteProperty(p.id);
-    return {};
-  });
-
   peer.onRequest("catalog/properties/upsertOption", PropertiesUpsertOptionParams, (p) => {
     new PropertyStore(catalog().db).upsertOption(p.option);
     return {};
@@ -527,23 +510,9 @@ function registerMethods(): void {
       return {};
     });
 
-  peer.onRequest("catalog/properties/setTextValue", PropertiesSetTextValueParams, (p) => {
-    new PropertyStore(catalog().db)
-      .setTextValue(p.valueId, p.itemId, p.propertyId, p.value);
-    return {};
-  });
-
   peer.onRequest("catalog/items/list", ItemsListParams, (p): ItemsListResult => {
     const store = new ItemStore(catalog().db, LOCAL_USER);
     return { items: p.trashed ? store.listTrashed() : store.list() };
-  });
-
-  peer.onRequest("catalog/items/find", ItemsFindParams, (p): ItemsFindResult => {
-    const store = new ItemStore(catalog().db, LOCAL_USER);
-    const found = p.by === "source"
-      ? store.findBySource(p.value, p.sourceKey ?? "")
-      : store.find(p.by, p.value);
-    return found ? { item: found } : {};
   });
 
   peer.onRequest("catalog/items/insert", ItemsInsertParams, (p) => {
@@ -599,13 +568,6 @@ function registerMethods(): void {
     else store.removeItem(p.itemId, p.collectionId);
     return {};
   });
-
-  peer.onRequest("catalog/collections/items", CollectionsItemsParams,
-    (p): CollectionsItemsResult => {
-      const store = new CollectionStore(catalog().db, LOCAL_USER);
-      const itemIds = store.itemIds(p.collectionId);
-      return { itemIds, count: itemIds.length };
-    });
 
   peer.onRequest("catalog/conversations/list", ConversationsListParams,
     (p): ConversationsListResult => {

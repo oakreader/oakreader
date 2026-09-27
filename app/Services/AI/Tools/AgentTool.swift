@@ -32,11 +32,6 @@ protocol AgentTool: Sendable {
 }
 
 extension AgentTool {
-    /// Convert this tool to a ``ToolDefinition`` for sending to an LLM.
-    var definition: ToolDefinition {
-        ToolDefinition(name: name, description: description, inputSchema: inputSchema)
-    }
-
     /// Default category — most tools are read-only.
     var category: ToolCategory { .readOnly }
 }

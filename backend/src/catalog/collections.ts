@@ -116,13 +116,6 @@ export class CollectionStore {
   }
 
   /** Item ids in a collection. Plain folders only — a smart one is a query. */
-  itemIds(collectionId: string): string[] {
-    return this.db.query<{ item_id: string }, [string]>(
-      "SELECT item_id FROM collection_items WHERE collection_id = ?",
-    ).all(collectionId).map((r) => r.item_id);
-  }
-
-  /** How many items a plain collection holds. */
   itemCount(collectionId: string): number {
     return this.db.query<{ n: number }, [string]>(
       "SELECT count(*) AS n FROM collection_items WHERE collection_id = ?",

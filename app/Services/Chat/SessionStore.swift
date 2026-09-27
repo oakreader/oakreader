@@ -43,16 +43,6 @@ actor SessionStore {
         }
     }
 
-    /// Replaces the last turn (used to finalize a streaming assistant message).
-    func replaceLastTurn(_ turn: Turn, sessionId: UUID) throws {
-        var turns = try loadTurns(sessionId: sessionId)
-        if let idx = turns.lastIndex(where: { $0.id == turn.id }) {
-            turns[idx] = turn
-        } else {
-            turns.append(turn)
-        }
-        try writeAll(turns, sessionId: sessionId)
-    }
 
     // MARK: - Read
 
@@ -80,15 +70,6 @@ actor SessionStore {
 
     // MARK: - Internal
 
-    private func writeAll(_ turns: [Turn], sessionId: UUID) throws {
-        let url = fileURL(for: sessionId)
-        let lines = try turns.map { turn -> String in
-            let data = try encoder.encode(persistedTurn(turn, sessionId: sessionId))
-            return String(data: data, encoding: .utf8) ?? ""
-        }
-        let content = lines.joined(separator: "\n") + (lines.isEmpty ? "" : "\n")
-        try content.write(to: url, atomically: true, encoding: .utf8)
-    }
 
     private func persistedTurn(_ turn: Turn, sessionId: UUID) throws -> Turn {
         let attachments = try turn.attachments.map { attachment -> TurnAttachment in

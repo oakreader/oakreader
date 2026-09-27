@@ -118,7 +118,6 @@ describe("collections", () => {
       store.addItem("doc-1", c.id, "2026-02-01T00:00:00Z");
 
       expect(store.itemCount(c.id)).toBe(1);
-      expect(store.itemIds(c.id)).toEqual(["doc-1"]);
     });
   });
 

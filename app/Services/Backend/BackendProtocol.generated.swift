@@ -65,9 +65,7 @@ enum RPC {
         static let collectionsUpsert = "catalog/collections/upsert"
         static let collectionsDelete = "catalog/collections/delete"
         static let collectionsSetMembership = "catalog/collections/setMembership"
-        static let collectionsItems = "catalog/collections/items"
         static let itemsList = "catalog/items/list"
-        static let itemsFind = "catalog/items/find"
         static let itemsInsert = "catalog/items/insert"
         static let itemsUpdateField = "catalog/items/updateField"
         static let itemsSetTrashed = "catalog/items/setTrashed"
@@ -80,13 +78,10 @@ enum RPC {
         static let citeKeysAssign = "catalog/citeKeys/assign"
         static let citeKeysSave = "catalog/citeKeys/save"
         static let propertiesList = "catalog/properties/list"
-        static let propertiesUpsert = "catalog/properties/upsert"
-        static let propertiesDelete = "catalog/properties/delete"
         static let propertiesUpsertOption = "catalog/properties/upsertOption"
         static let propertiesDeleteOption = "catalog/properties/deleteOption"
         static let propertiesAddSelectValue = "catalog/properties/addSelectValue"
         static let propertiesRemoveSelectValue = "catalog/properties/removeSelectValue"
-        static let propertiesSetTextValue = "catalog/properties/setTextValue"
         static let promptsCompose = "prompts/compose"
         static let skillsList = "skills/list"
         static let toolsList = "tools/list"
@@ -348,16 +343,6 @@ enum RPC {
         init() {}
     }
 
-    // MARK: catalog/collections/items
-    /// Item ids in a plain collection. A smart one is a query, not a list.
-    struct CollectionsItemsParams: Encodable {
-        var collectionId: String
-    }
-    struct CollectionsItemsResult: Decodable {
-        var itemIds: [String]
-        var count: Int
-    }
-
     // MARK: catalog/items/list
     /// The whole library as one graph: items with attachments, memberships, citations and property
     /// values. Covers are NOT included -- at ten thousand items that would pin hundreds of MB;
@@ -367,17 +352,6 @@ enum RPC {
     }
     struct ItemsListResult: Decodable {
         var items: [CatalogItem]
-    }
-
-    // MARK: catalog/items/find
-    /// One item by a unique handle. `source` needs `sourceKey` too.
-    struct ItemsFindParams: Encodable {
-        var by: String
-        var value: String
-        var sourceKey: String?
-    }
-    struct ItemsFindResult: Decodable {
-        var item: CatalogItem?
     }
 
     // MARK: catalog/items/insert
@@ -510,23 +484,6 @@ enum RPC {
         var properties: [CatalogProperty]
     }
 
-    // MARK: catalog/properties/upsert
-    struct PropertiesUpsertParams: Encodable {
-        var property: CatalogProperty
-    }
-    struct PropertiesUpsertResult: Decodable {
-        init() {}
-    }
-
-    // MARK: catalog/properties/delete
-    /// Cascades to the property's options and every value using them.
-    struct PropertiesDeleteParams: Encodable {
-        var `id`: String
-    }
-    struct PropertiesDeleteResult: Decodable {
-        init() {}
-    }
-
     // MARK: catalog/properties/upsertOption
     struct PropertiesUpsertOptionParams: Encodable {
         var option: CatalogPropertyOption
@@ -565,18 +522,6 @@ enum RPC {
         var optionId: String
     }
     struct PropertiesRemoveSelectValueResult: Decodable {
-        init() {}
-    }
-
-    // MARK: catalog/properties/setTextValue
-    /// Set a text or number value, replacing any previous one. Empty clears it.
-    struct PropertiesSetTextValueParams: Encodable {
-        var valueId: String
-        var itemId: String
-        var propertyId: String
-        var value: String
-    }
-    struct PropertiesSetTextValueResult: Decodable {
         init() {}
     }
 

@@ -195,7 +195,6 @@
 		A65586B293C98776387D12D1 /* DuplicatesMergeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09F0C7466371B7073E67794B /* DuplicatesMergeView.swift */; };
 		A8A74AA420C9B8D9EC2A8E66 /* PDFOCRService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39EE1618C698DDFC82B45605 /* PDFOCRService.swift */; };
 		A98D630E6EDB6B94A5FB29E2 /* NoteComposerBox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 118EE7D90D75173B11F6F924 /* NoteComposerBox.swift */; };
-		A9D1492E60393479D6BF79BB /* ToolDefinition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 134D560809274F5DC4458484 /* ToolDefinition.swift */; };
 		AB7285E49F501686D05D6539 /* PageRange.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8834779411CC74E2C3EE62A1 /* PageRange.swift */; };
 		AC2411EC567FC6B32F942436 /* ImportService+Embed.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF02291EA8D867E88CC18A27 /* ImportService+Embed.swift */; };
 		AD4B51F72EDA617F929B7A5B /* NotePresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC54D2D51E821B0BC461F5A8 /* NotePresentation.swift */; };
@@ -213,7 +212,6 @@
 		BAC31BE436456855B115CAFD /* AIChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CA025FB4DB9E7B91B032A38 /* AIChatView.swift */; };
 		BAF71CFD5D2ACEFB9A46741D /* ChatContextSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C1F2473E6868DDEE3F4AD42 /* ChatContextSnapshot.swift */; };
 		BCB20CCAEAE4E5D6BD7CCA21 /* PDFRenderingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B385FFCAA6F36331DF44350 /* PDFRenderingService.swift */; };
-		BCD8CC17E2E8C79CBA486900 /* OutputTruncation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1850ABAE3D46C10DDCD51FD /* OutputTruncation.swift */; };
 		BD08E16ACDE90DD598288B65 /* NoteDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD41B19DC75913F5FA159DF4 /* NoteDetailSheet.swift */; };
 		BD2D044899A234766672F20D /* FlowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FD52693B1CA64E17174EC68 /* FlowLayout.swift */; };
 		BD3D4520CA1E09A364FF6688 /* CSLTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EBCAA37DA38470D7A6F199F /* CSLTypes.swift */; };
@@ -248,7 +246,6 @@
 		DCA96A31EC70D23FD269C9D5 /* ToolConfirmationBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94EDA6358C9F832CBDBD8EF6 /* ToolConfirmationBar.swift */; };
 		DCC406FD1421A962CC1CD2C5 /* DownloadToast.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FB9C4C05337D336E38279F5 /* DownloadToast.swift */; };
 		DD1A055C3F534738650486A1 /* LibraryModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F86D6BF94023D30E9414ADCA /* LibraryModels.swift */; };
-		DDA46000F8CA63E8290EB9D6 /* MigrationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 196BF591540781BC57096902 /* MigrationService.swift */; };
 		DEBA5B93F86D0CE70FF5A4F9 /* ProgressOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C87D55780FD181F969DE318 /* ProgressOverlay.swift */; };
 		E04634C73162A2CC68FC96C6 /* SystemSettingsLauncher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 374B81B7F1D29E1987D06BDD /* SystemSettingsLauncher.swift */; };
 		E0EDE1268DE0B0A00953C114 /* TextSelectionPopupPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71119BFCCF18330511C6CB5A /* TextSelectionPopupPanel.swift */; };
@@ -297,13 +294,11 @@
 		1092B663E555B223F151A2C6 /* PDFDocumentController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFDocumentController.swift; sourceTree = "<group>"; };
 		11259074249DFD840115FB51 /* DuplicateService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuplicateService.swift; sourceTree = "<group>"; };
 		118EE7D90D75173B11F6F924 /* NoteComposerBox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteComposerBox.swift; sourceTree = "<group>"; };
-		134D560809274F5DC4458484 /* ToolDefinition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolDefinition.swift; sourceTree = "<group>"; };
 		1492996C1330F0358D6FAE8D /* AnnotationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationViewModel.swift; sourceTree = "<group>"; };
 		15AFF30B33D00CFE356594F1 /* ViewerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewerViewModel.swift; sourceTree = "<group>"; };
 		166A5AD13537E60218059C3E /* OakCLITool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OakCLITool.swift; sourceTree = "<group>"; };
 		179FBB2D6079BC574E6102FC /* CompletionClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionClient.swift; sourceTree = "<group>"; };
 		17BE0FCAA6079A51258F25C7 /* DOIExtractorService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DOIExtractorService.swift; sourceTree = "<group>"; };
-		196BF591540781BC57096902 /* MigrationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MigrationService.swift; sourceTree = "<group>"; };
 		19F2340729A85D5B298436E5 /* NoteEditorModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteEditorModel.swift; sourceTree = "<group>"; };
 		1A63D86443ACAE5AC839FCAA /* OakReader-release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "OakReader-release.xcconfig"; sourceTree = "<group>"; };
 		1B25501CAFBB49C0E9A9E6EC /* ToolUseRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolUseRecord.swift; sourceTree = "<group>"; };
@@ -509,7 +504,6 @@
 		CEF3D8FC404EE46B6C9FA6A3 /* NoteTagLayoutManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteTagLayoutManager.swift; sourceTree = "<group>"; };
 		D086AB60C416945D1DE86B83 /* OakStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OakStyle.swift; sourceTree = "<group>"; };
 		D0C7A8B0A6EDB82A72CD1B9E /* DocumentViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentViewModel.swift; sourceTree = "<group>"; };
-		D1850ABAE3D46C10DDCD51FD /* OutputTruncation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutputTruncation.swift; sourceTree = "<group>"; };
 		D4269BAEE5AF9C0D3C46B5B7 /* ToolCallGroupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolCallGroupView.swift; sourceTree = "<group>"; };
 		D43EB7C93B82A6070B58E4F8 /* CitationHoverCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CitationHoverCard.swift; sourceTree = "<group>"; };
 		D65E7434D35D60436822FA4F /* OakAppIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OakAppIcon.swift; sourceTree = "<group>"; };
@@ -701,7 +695,6 @@
 				B108A2CA820564EAD4B4AF7C /* LibraryItemStore.swift */,
 				2A2A6A4D88229137627AB296 /* LibraryPropertyStore.swift */,
 				691F0A1DDDBC38FF28DD47C4 /* LibraryStore.swift */,
-				196BF591540781BC57096902 /* MigrationService.swift */,
 				E1B515A45A232EFEC64D780E /* NoteImageStore.swift */,
 				5D436A6C3E3B1E4F589FC577 /* OakNoteImageURL.swift */,
 				01EC224994FA0B180A3066C7 /* OakServer.swift */,
@@ -932,7 +925,6 @@
 				E61FA25C1770E4A7C778F863 /* JSONValue.swift */,
 				881D3BBB01B2EBE6796C884B /* SessionEvent.swift */,
 				66D79C8EE8BA7DCF944E3EF8 /* ToolCall.swift */,
-				134D560809274F5DC4458484 /* ToolDefinition.swift */,
 				3D47756C27092298BCBEA6C1 /* ToolInput.swift */,
 				1B25501CAFBB49C0E9A9E6EC /* ToolUseRecord.swift */,
 				6A5E78525F91B2314E949603 /* Turn.swift */,
@@ -1026,7 +1018,6 @@
 			isa = PBXGroup;
 			children = (
 				4C9B7776153FCB8BEE915F06 /* AgentTool.swift */,
-				D1850ABAE3D46C10DDCD51FD /* OutputTruncation.swift */,
 				C6625044439D9BC2AC49661C /* PortableTool.swift */,
 				538D8A9E6EE8BE1756101E28 /* ToolExecutionContext.swift */,
 				03A8D7D8FCBA0FBA22E805A4 /* ToolOutput.swift */,
@@ -1521,7 +1512,6 @@
 				F3421A024BBFD1643223FAB4 /* MemoryManagerView.swift in Sources */,
 				0A20336239EE54AF6DA55973 /* MemoryStore.swift in Sources */,
 				2242344EB8CEB3219197F7B7 /* MemoryTools.swift in Sources */,
-				DDA46000F8CA63E8290EB9D6 /* MigrationService.swift in Sources */,
 				CC64711C9E9D455CAC9DC6D0 /* NSImage+Extensions.swift in Sources */,
 				2CF922BD9E4B3514968661BD /* NativeNoteEditorView.swift in Sources */,
 				B7F69146D24C49AF21D04D6C /* NewTabView.swift in Sources */,
@@ -1547,7 +1537,6 @@
 				90EF453A367B740EC72F9A16 /* OakServer.swift in Sources */,
 				20C386DBF0C1ED58E63BDA4E /* OakStyle.swift in Sources */,
 				52007E7D3E2B4159A21BC904 /* OakToolButton.swift in Sources */,
-				BCD8CC17E2E8C79CBA486900 /* OutputTruncation.swift in Sources */,
 				24A9AE0ADB051D309B804D80 /* PDFAnnotation+Extensions.swift in Sources */,
 				0C2805E219EAC413E9A9663A /* PDFConstants.swift in Sources */,
 				062A74CC7482A3FD3E0F6001 /* PDFDocument+Extensions.swift in Sources */,
@@ -1606,7 +1595,6 @@
 				F98E56F96F482C4955000940 /* ToolCall.swift in Sources */,
 				382C58A589A5B07FE565E864 /* ToolCallGroupView.swift in Sources */,
 				DCA96A31EC70D23FD269C9D5 /* ToolConfirmationBar.swift in Sources */,
-				A9D1492E60393479D6BF79BB /* ToolDefinition.swift in Sources */,
 				7E87200C385A2B017EC72A6C /* ToolExecutionContext.swift in Sources */,
 				3254D45FBC04AEC52A533561 /* ToolInput.swift in Sources */,
 				7E05F12D2586E596A1053E6C /* ToolOutput.swift in Sources */,
@@ -1752,7 +1740,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.10.1;
+				MARKETING_VERSION = 0.11.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.oakreader.OakReader.dev;
 				PRODUCT_MODULE_NAME = OakReader;
 				PRODUCT_NAME = "OakReader-Dev";
@@ -1843,7 +1831,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.10.1;
+				MARKETING_VERSION = 0.11.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.oakreader.OakReader;
 				PRODUCT_MODULE_NAME = OakReader;
 				PRODUCT_NAME = OakReader;

@@ -22,7 +22,6 @@ import { Importer, type ImportResult } from "./import.ts";
 import { Output } from "./output.ts";
 import { libraryPath } from "./paths.ts";
 import { Queries } from "./queries.ts";
-import * as wire from "./wire.ts";
 import { OakError, Resolver, notFound } from "./resolve.ts";
 import { readDocument } from "./extract.ts";
 import * as format from "./format.ts";
@@ -126,7 +125,7 @@ function itemsList({ parsed, q, out }: Context): void {
   });
 
   if (out.json) {
-    out.results("items.list", entries.map(wire.itemResult), { count: entries.length });
+    out.results("items.list", entries, { count: entries.length });
     return;
   }
   console.log(format.itemList(entries));
@@ -143,14 +142,7 @@ function itemsShow({ parsed, q, resolver, out }: Context): void {
   const collections = q.itemCollections(resolved.id);
 
   if (out.json) {
-    // `status` is omitted rather than null when an item has none, matching
-    // how the struct this replaces encoded an absent optional.
-    out.success("items.show", {
-      ...wire.itemResult(found),
-      tags: tags.map(wire.option),
-      ...(status === null ? {} : { status: wire.option(status) }),
-      collections: collections.map(wire.collection),
-    });
+    out.success("items.show", { ...found, tags, status, collections });
     return;
   }
   console.log(format.itemDetail(found.item, found.attachments, tags, status, collections));
@@ -200,7 +192,7 @@ function collectionsList({ q, out }: Context): void {
 
   if (out.json) {
     out.results("collections.list",
-      collections.map((c) => ({ collection: wire.collection(c), count: counts.get(c.id) ?? 0 })),
+      collections.map((c) => ({ collection: c, count: counts.get(c.id) ?? 0 })),
       { count: collections.length });
     return;
   }
@@ -281,7 +273,7 @@ function tagsList({ q, out }: Context): void {
   const tags = q.listTags();
   if (out.json) {
     out.results("tags.list",
-      tags.map(({ tag, count }) => ({ tag: wire.option(tag), count })),
+      tags,
       { count: tags.length });
     return;
   }
@@ -454,7 +446,7 @@ function search({ parsed, q, out }: Context): void {
 
   const results = q.search(query, integer(parsed, "limit") ?? 20);
   if (out.json) {
-    out.results("search", results.map(wire.searchResult), { count: results.length });
+    out.results("search", results, { count: results.length });
     return;
   }
   console.log(format.searchResults(results, query, "keyword"));
@@ -489,7 +481,7 @@ function words({ parsed, q, out }: Context): void {
   const lookups = q.wordLookups(resolveSince(parsed), integer(parsed, "limit") ?? 100);
 
   if (out.json) {
-    out.results("words.list", lookups.map(wire.wordLookup), { count: lookups.length });
+    out.results("words.list", lookups, { count: lookups.length });
     return;
   }
   if (flag(parsed, "csv")) {
@@ -536,7 +528,7 @@ function notes({ parsed, q, resolver, out }: Context): void {
     return;
   }
   if (out.json) {
-    out.results("notes.list", found.map(wire.note), { count: found.length });
+    out.results("notes.list", found, { count: found.length });
     return;
   }
   if (found.length === 0) {

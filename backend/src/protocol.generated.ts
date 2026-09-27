@@ -259,16 +259,6 @@ export const CollectionsSetMembershipParams = z.object({
 export type CollectionsSetMembershipParams = z.infer<typeof CollectionsSetMembershipParams>;
 export type CollectionsSetMembershipResult = Record<string, never>;
 
-/** `catalog/collections/items` — Item ids in a plain collection. A smart one is a query, not a list. */
-export const CollectionsItemsParams = z.object({
-  collectionId: z.string(),
-});
-export type CollectionsItemsParams = z.infer<typeof CollectionsItemsParams>;
-export type CollectionsItemsResult = {
-  itemIds: string[];
-  count: number;
-};
-
 /** `catalog/items/list` — The whole library as one graph: items with attachments, memberships, citations and property values. Covers are NOT included -- at ten thousand items that would pin hundreds of MB; views load them lazily by storage key. */
 export const ItemsListParams = z.object({
   trashed: z.boolean().default(false),
@@ -276,17 +266,6 @@ export const ItemsListParams = z.object({
 export type ItemsListParams = z.infer<typeof ItemsListParams>;
 export type ItemsListResult = {
   items: Item[];
-};
-
-/** `catalog/items/find` — One item by a unique handle. `source` needs `sourceKey` too. */
-export const ItemsFindParams = z.object({
-  by: z.enum(["id", "citeKey", "storageKey", "fileName", "sourceUrl", "source"]),
-  value: z.string(),
-  sourceKey: z.string().optional(),
-});
-export type ItemsFindParams = z.infer<typeof ItemsFindParams>;
-export type ItemsFindResult = {
-  item?: Item;
 };
 
 /** `catalog/items/insert` — Item and its attachments, in one transaction. */
@@ -398,20 +377,6 @@ export type PropertiesListResult = {
   properties: Property[];
 };
 
-/** `catalog/properties/upsert` */
-export const PropertiesUpsertParams = z.object({
-  property: Property,
-});
-export type PropertiesUpsertParams = z.infer<typeof PropertiesUpsertParams>;
-export type PropertiesUpsertResult = Record<string, never>;
-
-/** `catalog/properties/delete` — Cascades to the property's options and every value using them. */
-export const PropertiesDeleteParams = z.object({
-  id: z.string(),
-});
-export type PropertiesDeleteParams = z.infer<typeof PropertiesDeleteParams>;
-export type PropertiesDeleteResult = Record<string, never>;
-
 /** `catalog/properties/upsertOption` */
 export const PropertiesUpsertOptionParams = z.object({
   option: PropertyOption,
@@ -444,16 +409,6 @@ export const PropertiesRemoveSelectValueParams = z.object({
 });
 export type PropertiesRemoveSelectValueParams = z.infer<typeof PropertiesRemoveSelectValueParams>;
 export type PropertiesRemoveSelectValueResult = Record<string, never>;
-
-/** `catalog/properties/setTextValue` — Set a text or number value, replacing any previous one. Empty clears it. */
-export const PropertiesSetTextValueParams = z.object({
-  valueId: z.string(),
-  itemId: z.string(),
-  propertyId: z.string(),
-  value: z.string(),
-});
-export type PropertiesSetTextValueParams = z.infer<typeof PropertiesSetTextValueParams>;
-export type PropertiesSetTextValueResult = Record<string, never>;
 
 /** `prompts/compose` — The static half of the system prompt: base.md, the named mixins, and the skills listing. The shell appends live context afterwards -- that half cannot be a file. */
 export const PromptsComposeParams = z.object({
@@ -639,9 +594,7 @@ export const ClientRequests = {
   "catalog/collections/upsert": CollectionsUpsertParams,
   "catalog/collections/delete": CollectionsDeleteParams,
   "catalog/collections/setMembership": CollectionsSetMembershipParams,
-  "catalog/collections/items": CollectionsItemsParams,
   "catalog/items/list": ItemsListParams,
-  "catalog/items/find": ItemsFindParams,
   "catalog/items/insert": ItemsInsertParams,
   "catalog/items/updateField": ItemsUpdateFieldParams,
   "catalog/items/setTrashed": ItemsSetTrashedParams,
@@ -654,13 +607,10 @@ export const ClientRequests = {
   "catalog/citeKeys/assign": CiteKeysAssignParams,
   "catalog/citeKeys/save": CiteKeysSaveParams,
   "catalog/properties/list": PropertiesListParams,
-  "catalog/properties/upsert": PropertiesUpsertParams,
-  "catalog/properties/delete": PropertiesDeleteParams,
   "catalog/properties/upsertOption": PropertiesUpsertOptionParams,
   "catalog/properties/deleteOption": PropertiesDeleteOptionParams,
   "catalog/properties/addSelectValue": PropertiesAddSelectValueParams,
   "catalog/properties/removeSelectValue": PropertiesRemoveSelectValueParams,
-  "catalog/properties/setTextValue": PropertiesSetTextValueParams,
   "prompts/compose": PromptsComposeParams,
   "skills/list": SkillsListParams,
   "tools/list": ToolsListParams,
@@ -705,9 +655,7 @@ export interface ClientRequestResults {
   "catalog/collections/upsert": CollectionsUpsertResult;
   "catalog/collections/delete": CollectionsDeleteResult;
   "catalog/collections/setMembership": CollectionsSetMembershipResult;
-  "catalog/collections/items": CollectionsItemsResult;
   "catalog/items/list": ItemsListResult;
-  "catalog/items/find": ItemsFindResult;
   "catalog/items/insert": ItemsInsertResult;
   "catalog/items/updateField": ItemsUpdateFieldResult;
   "catalog/items/setTrashed": ItemsSetTrashedResult;
@@ -720,13 +668,10 @@ export interface ClientRequestResults {
   "catalog/citeKeys/assign": CiteKeysAssignResult;
   "catalog/citeKeys/save": CiteKeysSaveResult;
   "catalog/properties/list": PropertiesListResult;
-  "catalog/properties/upsert": PropertiesUpsertResult;
-  "catalog/properties/delete": PropertiesDeleteResult;
   "catalog/properties/upsertOption": PropertiesUpsertOptionResult;
   "catalog/properties/deleteOption": PropertiesDeleteOptionResult;
   "catalog/properties/addSelectValue": PropertiesAddSelectValueResult;
   "catalog/properties/removeSelectValue": PropertiesRemoveSelectValueResult;
-  "catalog/properties/setTextValue": PropertiesSetTextValueResult;
   "prompts/compose": PromptsComposeResult;
   "skills/list": SkillsListResult;
   "tools/list": ToolsListResult;

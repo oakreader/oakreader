@@ -7,33 +7,6 @@ extension LibraryStore {
     /// Synchronous for the same reason `items` is: view bodies read it.
     var properties: [PropertyDefinition] { loadedProperties }
 
-    /// Create a property and return it optimistically.
-    ///
-    /// The write is fired rather than awaited, as everywhere else in this store:
-    /// call sites are menu actions that cannot await, and `invalidate()` reloads
-    /// behind them. The returned definition is what was sent, so a caller can
-    /// select it immediately instead of waiting for the round trip.
-    @discardableResult
-    func createProperty(name: String, type: PropertyType, icon: String = "tag") -> PropertyDefinition? {
-        let property = PropertyDefinition(
-            record: PropertyRecord(
-                id: UUID().uuidString,
-                name: name,
-                type: type.rawValue,
-                icon: icon,
-                position: properties.count,
-                isSystem: false
-            )
-        )
-        write { await PropertyCatalog.upsert(property.wire) }
-        return property
-    }
-
-    func deleteProperty(_ property: PropertyDefinition) {
-        guard !property.isSystem else { return }
-        write { await PropertyCatalog.delete(id: property.id.uuidString) }
-    }
-
     /// Append an option to a property. Position is the current count, which is
     /// where the old `MAX(position) + 1` query landed for a list with no gaps.
     @discardableResult
@@ -88,16 +61,6 @@ extension LibraryStore {
                 itemId: item.id.uuidString,
                 propertyId: property.id.uuidString,
                 optionId: option.id.uuidString)
-        }
-    }
-
-    /// Set a text or number value. An empty string clears it.
-    func setItemTextValue(item: LibraryItem, property: PropertyDefinition, value: String) {
-        write {
-            await PropertyCatalog.setTextValue(
-                itemId: item.id.uuidString,
-                propertyId: property.id.uuidString,
-                value: value)
         }
     }
 

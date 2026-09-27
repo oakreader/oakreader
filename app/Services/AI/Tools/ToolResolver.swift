@@ -8,25 +8,6 @@ import Foundation
 /// on this machine rather than readings of a file.
 enum ToolResolver {
 
-    /// Resolve a tool binary by name.
-    ///
-    /// If `searchPaths` is provided, checks each path for an executable.
-    /// Always falls back to `which` if no search path matches.
-    static func resolve(name: String, searchPaths: [String]? = nil) -> String? {
-        let fm = FileManager.default
-
-        if let paths = searchPaths {
-            for searchPath in paths {
-                let expanded = (searchPath as NSString).expandingTildeInPath
-                if fm.isExecutableFile(atPath: expanded) {
-                    return expanded
-                }
-            }
-        }
-
-        return whichFallback(name)
-    }
-
     /// Run a binary with version arguments and return the first line of output.
     static func version(at path: String, versionArgs: [String]) -> String? {
         guard !versionArgs.isEmpty else { return nil }

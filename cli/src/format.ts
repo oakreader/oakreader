@@ -21,27 +21,6 @@ export function plural(count: number, word: string): string {
   return `${count} ${word}${count === 1 ? "" : "s"}`;
 }
 
-/**
- * Which locale dates are written in.
- *
- * From `LC_ALL` / `LC_TIME` / `LANG`, the POSIX variables that work on every
- * platform, rather than the runtime default — which on a Mac is `en-US` no
- * matter what the system is set to, because Bun does not read macOS's own
- * preferences. The Swift version used those preferences, so a machine set to
- * British English with a `LANG=en_US` terminal will see dates change; setting
- * `LC_TIME` puts them back, and now does so identically everywhere.
- */
-function locale(): string | undefined {
-  const raw = process.env.LC_ALL ?? process.env.LC_TIME ?? process.env.LANG;
-  if (raw === undefined || raw === "" || raw === "C" || raw === "POSIX") return undefined;
-  const tag = raw.split(".")[0]!.replace("_", "-");
-  try {
-    return Intl.DateTimeFormat.supportedLocalesOf([tag]).length > 0 ? tag : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
 export function fileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   const kb = bytes / 1024;
@@ -51,46 +30,33 @@ export function fileSize(bytes: number): string {
   return `${(mb / 1024).toFixed(1)} GB`;
 }
 
-/**
- * A stored timestamp as a medium local date, or unchanged if it will not parse.
- *
- * `dateStyle`/`timeStyle` rather than a field-by-field recipe, because that is
- * what the DateFormatter this replaces used (`.medium` and `.short`) — the two
- * render the same string for the same locale, where spelling the fields out
- * does not.
- */
+/** A stored timestamp as `2026-05-15 11:35` in local time. */
 export function date(iso: string): string {
-  const parsed = new Date(iso);
-  if (Number.isNaN(parsed.getTime())) return iso;
-  return parsed.toLocaleString(locale(), { dateStyle: "medium", timeStyle: "short" });
-}
-
-/**
- * "Jul 10, 14:42" — built by hand rather than from a locale.
- *
- * `toLocaleString` renders this as "Jul 10 at 14:42" on a Mac and differently
- * again elsewhere, which would make the same library print differently on two
- * machines. The word-list format is fixed, so the format is fixed here too.
- */
-export function shortDate(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  const month = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][d.getMonth()]!;
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${month} ${d.getDate()}, ${p(d.getHours())}:${p(d.getMinutes())}`;
+  return `${isoDay(d)} ${clock(d)}`;
 }
 
+function isoDay(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+function clock(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/** The same timestamp, for the denser word and note listings. */
+export const shortDate = date;
+
 /**
- * A note's timestamp as the panel's `yyyy-MM-dd HH:mm` in local time, so the
- * CLI and the app agree about when a note was written.
+ * A note's timestamp, which must match the app's `NoteTime.absolute` — the two
+ * appear in the same exported Markdown document.
  */
 export function noteTimestamp(iso: string): string {
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} `
-    + `${p(d.getHours())}:${p(d.getMinutes())}`;
+  return Number.isNaN(d.getTime()) ? "" : `${isoDay(d)} ${clock(d)}`;
 }
 
 export function itemList(entries: Array<{ item: Item; attachments: Attachment[] }>): string {

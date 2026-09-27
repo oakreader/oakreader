@@ -264,32 +264,12 @@ export const METHODS: Method[] = [
     result: [],
   },
   {
-    name: "catalog/collections/items", type: "CollectionsItems", kind: "request", from: "client",
-    doc: "Item ids in a plain collection. A smart one is a query, not a list.",
-    params: [{ name: "collectionId", type: str }],
-    result: [
-      { name: "itemIds", type: { k: "array", of: str } },
-      { name: "count", type: int },
-    ],
-  },
-
-  {
     name: "catalog/items/list", type: "ItemsList", kind: "request", from: "client",
     doc: "The whole library as one graph: items with attachments, memberships, " +
          "citations and property values. Covers are NOT included -- at ten thousand " +
          "items that would pin hundreds of MB; views load them lazily by storage key.",
     params: [{ name: "trashed", type: bool, default: "false" }],
     result: [{ name: "items", type: { k: "array", of: { k: "ref", ts: "Item", swift: "CatalogItem" } } }],
-  },
-  {
-    name: "catalog/items/find", type: "ItemsFind", kind: "request", from: "client",
-    doc: "One item by a unique handle. `source` needs `sourceKey` too.",
-    params: [
-      { name: "by", type: { k: "enum", values: ["id", "citeKey", "storageKey", "fileName", "sourceUrl", "source"] } },
-      { name: "value", type: str },
-      { name: "sourceKey", type: str, optional: true },
-    ],
-    result: [{ name: "item", type: { k: "ref", ts: "Item", swift: "CatalogItem" }, optional: true }],
   },
   {
     name: "catalog/items/insert", type: "ItemsInsert", kind: "request", from: "client",
@@ -401,17 +381,6 @@ export const METHODS: Method[] = [
     result: [{ name: "properties", type: { k: "array", of: { k: "ref", ts: "Property", swift: "CatalogProperty" } } }],
   },
   {
-    name: "catalog/properties/upsert", type: "PropertiesUpsert", kind: "request", from: "client",
-    params: [{ name: "property", type: { k: "ref", ts: "Property", swift: "CatalogProperty" } }],
-    result: [],
-  },
-  {
-    name: "catalog/properties/delete", type: "PropertiesDelete", kind: "request", from: "client",
-    doc: "Cascades to the property's options and every value using them.",
-    params: [{ name: "id", type: str }],
-    result: [],
-  },
-  {
     name: "catalog/properties/upsertOption", type: "PropertiesUpsertOption",
     kind: "request", from: "client",
     params: [{ name: "option", type: { k: "ref", ts: "PropertyOption", swift: "CatalogPropertyOption" } }],
@@ -445,18 +414,6 @@ export const METHODS: Method[] = [
       { name: "itemId", type: str },
       { name: "propertyId", type: str },
       { name: "optionId", type: str },
-    ],
-    result: [],
-  },
-  {
-    name: "catalog/properties/setTextValue", type: "PropertiesSetTextValue",
-    kind: "request", from: "client",
-    doc: "Set a text or number value, replacing any previous one. Empty clears it.",
-    params: [
-      { name: "valueId", type: str },
-      { name: "itemId", type: str },
-      { name: "propertyId", type: str },
-      { name: "value", type: str },
     ],
     result: [],
   },

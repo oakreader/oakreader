@@ -90,7 +90,10 @@ struct OakCLITool: AgentTool, Sendable {
                 workingDirectory: context.workingDirectory)
 
             var output = annotateWithCiteHandles(result.output)
-            output = OutputTruncation.truncate(output, maxLength: Self.maxOutputLength)
+            if output.count > Self.maxOutputLength {
+                output = String(output.prefix(Self.maxOutputLength))
+                    + "\n\n[output truncated at \(Self.maxOutputLength) characters]"
+            }
 
             if result.exitCode != 0 {
                 return ToolOutput(

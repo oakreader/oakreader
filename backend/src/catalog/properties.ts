@@ -66,21 +66,6 @@ export class PropertyStore {
     }));
   }
 
-  upsertProperty(p: Omit<Property, "options">): void {
-    this.db.prepare(
-      `INSERT INTO properties (id, name, type, icon, position, is_system)
-       VALUES (?, ?, ?, ?, ?, ?)
-       ON CONFLICT(id) DO UPDATE SET
-         name = excluded.name, type = excluded.type, icon = excluded.icon,
-         position = excluded.position`,
-    ).run(p.id, p.name, p.type, p.icon, p.position, p.isSystem ? 1 : 0);
-  }
-
-  /** Removes the property, and by cascade its options and every value using them. */
-  deleteProperty(id: string): void {
-    this.db.prepare("DELETE FROM properties WHERE id = ?").run(id);
-  }
-
   upsertOption(o: PropertyOption): void {
     this.db.prepare(
       `INSERT INTO property_options (id, property_id, name, color_hex, position)
@@ -132,20 +117,5 @@ export class PropertyStore {
       `DELETE FROM item_property_values
         WHERE item_id = ? AND property_id = ? AND option_id = ?`,
     ).run(itemId, propertyId, optionId);
-  }
-
-  /** Set a text or number value, replacing any previous one. Empty clears it. */
-  setTextValue(valueId: string, itemId: string, propertyId: string, value: string): void {
-    this.db.transaction(() => {
-      this.db.prepare(
-        "DELETE FROM item_property_values WHERE item_id = ? AND property_id = ?",
-      ).run(itemId, propertyId);
-      if (value !== "") {
-        this.db.prepare(
-          `INSERT INTO item_property_values (id, item_id, property_id, option_id, text_value)
-           VALUES (?, ?, ?, NULL, ?)`,
-        ).run(valueId, itemId, propertyId, value);
-      }
-    })();
   }
 }

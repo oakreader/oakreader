@@ -175,17 +175,6 @@ extension PropertyDefinition {
         )
     }
 
-    var wire: CatalogProperty {
-        CatalogProperty(
-            id: id.uuidString,
-            name: name,
-            type: type.rawValue,
-            icon: icon,
-            position: position,
-            isSystem: isSystem,
-            options: options.map(\.wire)
-        )
-    }
 }
 
 // MARK: - Domain → wire

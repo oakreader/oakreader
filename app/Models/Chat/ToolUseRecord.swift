@@ -19,14 +19,6 @@ struct ToolUseRecord: Identifiable, Codable, Equatable, Sendable {
     var isError: Bool
     var status: ToolUseStatus
 
-    init(id: String, name: String, input: ToolInput, result: String? = nil, isError: Bool = false, status: ToolUseStatus = .executing) {
-        self.id = id
-        self.name = name
-        self.input = input
-        self.result = result
-        self.isError = isError
-        self.status = status
-    }
 
     init(from toolCall: ToolCall) {
         self.id = toolCall.id
@@ -48,9 +40,6 @@ struct ToolUseRecord: Identifiable, Codable, Equatable, Sendable {
         status = try container.decodeIfPresent(ToolUseStatus.self, forKey: .status) ?? (result != nil ? .completed : .executing)
     }
 
-    var isExecuting: Bool {
-        status == .executing
-    }
 
     /// Convenience: extract file path from input for display.
     var filePath: String? {

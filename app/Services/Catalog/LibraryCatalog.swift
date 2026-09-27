@@ -27,39 +27,6 @@ enum LibraryCatalog {
         await fetch(trashed: true)
     }
 
-    static func find(by handle: Handle) async -> CatalogItem? {
-        do {
-            let result = try await NodeBackend.shared.call(
-                RPC.Method.itemsFind, params: handle.params, as: RPC.ItemsFindResult.self)
-            return result.item
-        } catch {
-            Log.error(Log.store, "items/find failed: \(error.localizedDescription)")
-            return nil
-        }
-    }
-
-    /// How an item can be looked up. Modelled as a type so a call site cannot
-    /// pass a `source` without its key.
-    enum Handle {
-        case id(String)
-        case citeKey(String)
-        case storageKey(String)
-        case fileName(String)
-        case sourceURL(String)
-        case source(String, key: String)
-
-        var params: RPC.ItemsFindParams {
-            switch self {
-            case .id(let v):          return .init(by: "id", value: v, sourceKey: nil)
-            case .citeKey(let v):     return .init(by: "citeKey", value: v, sourceKey: nil)
-            case .storageKey(let v):  return .init(by: "storageKey", value: v, sourceKey: nil)
-            case .fileName(let v):    return .init(by: "fileName", value: v, sourceKey: nil)
-            case .sourceURL(let v):   return .init(by: "sourceUrl", value: v, sourceKey: nil)
-            case .source(let v, let key): return .init(by: "source", value: v, sourceKey: key)
-            }
-        }
-    }
-
     // MARK: - Mutations
 
     static func insert(_ item: CatalogItem) async {

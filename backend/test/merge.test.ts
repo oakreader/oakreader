@@ -95,10 +95,9 @@ describe("merge", () => {
   test("a tag the keeper already wears is not added twice", () => {
     withCatalog((store, catalog) => {
       const props = new PropertyStore(catalog.db);
-      props.upsertProperty({
-        id: "p-tags", name: "Tags", type: "multi_select", icon: "tag",
-        position: 0, isSystem: true,
-      });
+      seed(catalog.db,
+        `INSERT INTO properties (id, name, type, icon, position, is_system)
+         VALUES ('p-tags', 'Tags', 'multi_select', 'tag', 0, 1)`);
       props.upsertOption({
         id: "o-shared", propertyId: "p-tags", name: "Shared", colorHex: "ff0000", position: 0,
       });

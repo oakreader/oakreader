@@ -31,12 +31,17 @@ function withCatalog<T>(body: (s: PropertyStore, c: Catalog) => T): T {
   }
 }
 
-/** Tags: the multi-select shape, with two options. */
-function seedTags(store: PropertyStore) {
-  store.upsertProperty({
-    id: "prop-tags", name: "Tags", type: "multi_select", icon: "tag",
-    position: 0, isSystem: false,
-  });
+/**
+ * Tags: the multi-select shape, with two options.
+ *
+ * The property row is seeded with SQL, the way items are: nothing in the app
+ * creates a property, so the store has no method for it — the three that exist
+ * are seeded when a library is opened.
+ */
+function seedTags(store: PropertyStore, catalog: Catalog) {
+  seed(catalog.db,
+    `INSERT INTO properties (id, name, type, icon, position, is_system)
+     VALUES ('prop-tags', 'Tags', 'multi_select', 'tag', 0, 0)`);
   store.upsertOption({
     id: "opt-urgent", propertyId: "prop-tags", name: "Urgent",
     colorHex: "ff0000", position: 0,
@@ -48,11 +53,10 @@ function seedTags(store: PropertyStore) {
 }
 
 /** Status: the single-select shape, with two options. */
-function seedStatus(store: PropertyStore) {
-  store.upsertProperty({
-    id: "prop-status", name: "Status", type: "single_select", icon: "circle",
-    position: 1, isSystem: false,
-  });
+function seedStatus(store: PropertyStore, catalog: Catalog) {
+  seed(catalog.db,
+    `INSERT INTO properties (id, name, type, icon, position, is_system)
+     VALUES ('prop-status', 'Status', 'single_select', 'circle', 1, 0)`);
   store.upsertOption({
     id: "opt-reading", propertyId: "prop-status", name: "Reading",
     colorHex: "00ff00", position: 0,
@@ -73,8 +77,8 @@ const mine = (store: PropertyStore) => store.list().filter((p) => !p.isSystem);
 
 describe("properties", () => {
   test("round-trips with its options in order", () => {
-    withCatalog((store) => {
-      seedTags(store);
+    withCatalog((store, catalog) => {
+      seedTags(store, catalog);
       const [tags] = mine(store);
       expect(tags!.name).toBe("Tags");
       expect(tags!.name).toBe("Tags");
@@ -84,7 +88,7 @@ describe("properties", () => {
 
   test("a multi-select item keeps every option it was given", () => {
     withCatalog((store, catalog) => {
-      seedTags(store);
+      seedTags(store, catalog);
       store.addSelectValue("v1", "doc-1", "prop-tags", "opt-urgent");
       store.addSelectValue("v2", "doc-1", "prop-tags", "opt-later");
 
@@ -95,7 +99,7 @@ describe("properties", () => {
 
   test("adding the same option twice changes nothing", () => {
     withCatalog((store, catalog) => {
-      seedTags(store);
+      seedTags(store, catalog);
       store.addSelectValue("v1", "doc-1", "prop-tags", "opt-urgent");
       store.addSelectValue("v2", "doc-1", "prop-tags", "opt-urgent");
 
@@ -105,7 +109,7 @@ describe("properties", () => {
 
   test("a single-select item holds only the latest option", () => {
     withCatalog((store, catalog) => {
-      seedStatus(store);
+      seedStatus(store, catalog);
       store.addSelectValue("v1", "doc-1", "prop-status", "opt-reading");
       store.addSelectValue("v2", "doc-1", "prop-status", "opt-done");
 
@@ -117,7 +121,7 @@ describe("properties", () => {
 
   test("removing one option leaves the item's others alone", () => {
     withCatalog((store, catalog) => {
-      seedTags(store);
+      seedTags(store, catalog);
       store.addSelectValue("v1", "doc-1", "prop-tags", "opt-urgent");
       store.addSelectValue("v2", "doc-1", "prop-tags", "opt-later");
 
@@ -130,41 +134,12 @@ describe("properties", () => {
 
   test("different items keep their own values", () => {
     withCatalog((store, catalog) => {
-      seedTags(store);
+      seedTags(store, catalog);
       store.addSelectValue("v1", "doc-1", "prop-tags", "opt-urgent");
       store.addSelectValue("v2", "doc-2", "prop-tags", "opt-later");
 
       expect(valuesOf(catalog, "doc-1", "prop-tags")).toHaveLength(1);
       expect(valuesOf(catalog, "doc-2", "prop-tags")).toHaveLength(1);
-    });
-  });
-
-  test("a text value replaces the previous one and carries no option", () => {
-    withCatalog((store, catalog) => {
-      store.upsertProperty({
-        id: "prop-notes", name: "Notes", type: "text", icon: "note",
-        position: 1, isSystem: false,
-      });
-      store.setTextValue("v1", "doc-1", "prop-notes", "read once");
-      store.setTextValue("v2", "doc-1", "prop-notes", "read twice");
-
-      const rows = valuesOf(catalog, "doc-1", "prop-notes");
-      expect(rows).toHaveLength(1);
-      expect(rows[0]!.option_id).toBeNull();
-      expect(rows[0]!.text_value).toBe("read twice");
-    });
-  });
-
-  test("an empty text value clears rather than storing nothing", () => {
-    withCatalog((store, catalog) => {
-      store.upsertProperty({
-        id: "prop-notes", name: "Notes", type: "text", icon: "note",
-        position: 1, isSystem: false,
-      });
-      store.setTextValue("v1", "doc-1", "prop-notes", "read once");
-      store.setTextValue("v2", "doc-1", "prop-notes", "");
-
-      expect(valuesOf(catalog, "doc-1", "prop-notes")).toHaveLength(0);
     });
   });
 
@@ -180,7 +155,7 @@ describe("properties", () => {
 
   test("deleting an option takes the values that used it", () => {
     withCatalog((store, catalog) => {
-      seedTags(store);
+      seedTags(store, catalog);
       store.addSelectValue("v1", "doc-1", "prop-tags", "opt-urgent");
       store.addSelectValue("v2", "doc-2", "prop-tags", "opt-later");
 
@@ -192,12 +167,14 @@ describe("properties", () => {
     });
   });
 
-  test("deleting a property takes its options and values with it", () => {
+  test("removing a property cascades to its options and values", () => {
     withCatalog((store, catalog) => {
-      seedTags(store);
+      seedTags(store, catalog);
       store.addSelectValue("v1", "doc-1", "prop-tags", "opt-urgent");
 
-      store.deleteProperty("prop-tags");
+      // No caller deletes a property — the three are seeded — but the schema
+      // promises this cascade, and the promise is what the test holds.
+      seed(catalog.db, "DELETE FROM properties WHERE id = 'prop-tags'");
 
       expect(mine(store)).toHaveLength(0);
       expect(catalog.db.query<{ n: number }, []>(
@@ -209,8 +186,8 @@ describe("properties", () => {
   });
 
   test("renaming an option keeps the values pointing at it", () => {
-    withCatalog((store) => {
-      seedTags(store);
+    withCatalog((store, catalog) => {
+      seedTags(store, catalog);
       store.addSelectValue("v1", "doc-1", "prop-tags", "opt-urgent");
 
       store.upsertOption({

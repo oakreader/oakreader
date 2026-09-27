@@ -3,7 +3,7 @@
  *
  * A person reads the human form; an agent reads `--json`, where every answer
  * is the same envelope — `success`, the operation that produced it, and either
- * a result or an error. That shape is a contract: something is parsing it.
+ * a result or an error.
  */
 export class Output {
   constructor(readonly json: boolean, readonly quiet: boolean) {}
@@ -30,19 +30,7 @@ export class Output {
     else process.stderr.write(`Error: ${message}\n`);
   }
 
-  /** Keys sorted, so a diff of two runs is about the values. */
   private print(value: unknown): void {
-    console.log(JSON.stringify(value, sortedKeys(value), 2));
+    console.log(JSON.stringify(value, null, 2));
   }
-}
-
-function sortedKeys(_root: unknown) {
-  return function (this: unknown, _key: string, value: unknown): unknown {
-    if (value === null || typeof value !== "object" || Array.isArray(value)) return value;
-    const sorted: Record<string, unknown> = {};
-    for (const key of Object.keys(value as object).sort()) {
-      sorted[key] = (value as Record<string, unknown>)[key];
-    }
-    return sorted;
-  };
 }

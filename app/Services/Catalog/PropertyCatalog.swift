@@ -19,15 +19,6 @@ enum PropertyCatalog {
         }
     }
 
-    static func upsert(_ property: CatalogProperty) async {
-        await perform(RPC.Method.propertiesUpsert,
-                      RPC.PropertiesUpsertParams(property: property))
-    }
-
-    static func delete(id: String) async {
-        await perform(RPC.Method.propertiesDelete, RPC.PropertiesDeleteParams(id: id))
-    }
-
     static func upsertOption(_ option: CatalogPropertyOption) async {
         await perform(RPC.Method.propertiesUpsertOption,
                       RPC.PropertiesUpsertOptionParams(option: option))
@@ -49,13 +40,6 @@ enum PropertyCatalog {
         await perform(RPC.Method.propertiesRemoveSelectValue,
                       RPC.PropertiesRemoveSelectValueParams(
                         itemId: itemId, propertyId: propertyId, optionId: optionId))
-    }
-
-    static func setTextValue(itemId: String, propertyId: String, value: String) async {
-        await perform(RPC.Method.propertiesSetTextValue,
-                      RPC.PropertiesSetTextValueParams(
-                        valueId: UUID().uuidString, itemId: itemId,
-                        propertyId: propertyId, value: value))
     }
 
     private static func perform<P: Encodable>(_ method: String, _ params: P) async {

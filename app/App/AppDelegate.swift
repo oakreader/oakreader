@@ -45,11 +45,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             LogFileWriter.shared.write(level: level, category: category, message: message)
         }
 
-        // Run one-time migration from old SwiftData storage. It writes through
-        // the core now, so it runs in a task rather than blocking launch.
-        let migration = MigrationService(store: appState.libraryStore, coverService: appState.coverService)
-        Task { @MainActor in await migration.migrateIfNeeded() }
-
         installExternalLibraryChangeObserver()
 
         // Start the local server that bridges the browser extension
