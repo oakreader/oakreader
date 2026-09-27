@@ -40,7 +40,7 @@ class ChatViewModel {
     var turns: [Turn] = []
     var inputText: String = ""
     var isStreaming: Bool = false
-    var selectedSkill: Skill? = nil
+    var selectedSkill: BackendSkill?
     var activeTokens: [ChatCompletionItem] = []
     var pendingAttachments: [TurnAttachment] = []
     var inputResetToken: Int = 0
@@ -158,7 +158,7 @@ class ChatViewModel {
     @MainActor
     var chatSlashItems: [ChatCompletionItem] {
         ChatCompletionItem.slashItems(
-            installed: SkillManager.shared.installedSkills
+            installed: SkillStore.shared.installed
         )
     }
 
@@ -202,22 +202,19 @@ class ChatViewModel {
         errorMessage = nil
 
         // Extract skill from tokens (overrides typed tags and selectedSkill)
-        let tokenSkill: Skill? = tokens.lazy.compactMap { item -> Skill? in
+        let tokenSkill: BackendSkill? = tokens.lazy.compactMap { item -> BackendSkill? in
             if case .installedSkill(let skill) = item.kind { return skill }
             return nil
         }.first
 
         // Also support an explicit leading markdown tag: [[skill:skill-id]].
-        let taggedSkill: Skill? = parsedInput.skillIds.lazy.compactMap { skillId in
-            SkillManager.shared.installedSkills.first {
-                $0.id.caseInsensitiveCompare(skillId) == .orderedSame
-                    || $0.name.caseInsensitiveCompare(skillId) == .orderedSame
-            }
+        let taggedSkill: BackendSkill? = parsedInput.skillIds.lazy.compactMap { skillId in
+            SkillStore.shared.skill(matching: skillId)
         }.first
 
         let effectiveSkill = tokenSkill ?? taggedSkill ?? selectedSkill
-        let sendText = text.isEmpty ? (effectiveSkill?.name ?? "Go") : text
-        var userContent = effectiveSkill.map { Self.contentWithSkillTag(skillId: $0.id, text: text) } ?? sendText
+        let sendText = text.isEmpty ? (effectiveSkill?.title ?? "Go") : text
+        var userContent = effectiveSkill.map { Self.contentWithSkillTag(skillId: $0.name, text: text) } ?? sendText
 
         // Extract library reference tokens and append XML block
         let libraryRefs = tokens.compactMap { token -> ChatCompletionItem.LibraryRefPayload? in
@@ -253,14 +250,14 @@ class ChatViewModel {
     /// runloop (painting the cleared input + streaming indicator) before this work.
     @MainActor
     private func startStream(
-        effectiveSkill: Skill?,
+        effectiveSkill: BackendSkill?,
         userContent: String,
         attachments: [TurnAttachment]
     ) {
         // Build enriched context snapshot. The document-text budget scales with the
         // active model's context window (replaces the old fixed 4 000-char cap), so a
         // whole short document loads in full on a large window.
-        let contextMode = effectiveSkill?.contextMode ?? .currentPage
+        let contextMode = effectiveSkill?.documentContextMode ?? .currentPage
         let currentConfig = config
         let docCharBudget = LLMContextProvider.documentCharBudget(
             contextWindow: AIProviderCatalog.shared.modelInfo(
@@ -357,19 +354,24 @@ class ChatViewModel {
 
         let permissionLevel = prefs.agentPermissionLevel
 
-        // Load file-based agent skills from standard directories
-        let agentSkills = Self.loadAgentSkills()
-
         streamTask = Task { @MainActor [weak self] in
             do {
                 // Policy text comes from the core's prompt files; context is
                 // assembled below from state only this process has.
+                // The skills listing comes with the prompt; it is only useful
+                // when the model can read a skill's file.
+                let hasReadTool = (currentTools ?? []).contains { $0.name == "read" }
                 let staticPrompt = await PromptCatalog.compose(
-                    mixins: PromptCatalog.chatMixins)
+                    mixins: PromptCatalog.chatMixins, hasReadTool: hasReadTool)
+
+                // Only the active skill's body is ever needed, so it is fetched
+                // rather than carried with the listing.
+                let skillBody = currentSkill == nil
+                    ? "" : await SkillCatalog.body(of: currentSkill!.name)
 
                 let systemPrompt = LLMContextProvider.buildSystemPrompt(
                     staticPrompt: staticPrompt,
-                    skill: currentSkill,
+                    skillBody: skillBody,
                     context: snapshot,
                     documentCharBudget: docCharBudget,
                     sources: self?.citationSources ?? CitationSourceRegistry(
@@ -386,7 +388,6 @@ class ChatViewModel {
                     turnMetadata: turnMetadata,
                     tools: currentTools,
                     toolContext: effectiveToolContext,
-                    agentSkills: agentSkills,
                     toolConfirmation: self?.makeToolConfirmation(level: permissionLevel)
                 )
 
@@ -1044,13 +1045,6 @@ class ChatViewModel {
             .replacingOccurrences(of: "<", with: "&lt;")
             .replacingOccurrences(of: ">", with: "&gt;")
             .replacingOccurrences(of: "\"", with: "&quot;")
-    }
-
-    // MARK: - Agent Skills
-
-    private static func loadAgentSkills() -> [AgentSkill] {
-        // Only load installed skills from the shared SkillManager directory.
-        SkillLoader.loadSkills(from: [SkillManager.installedDir], source: .user).skills
     }
 
     // MARK: - Private — Session Persistence

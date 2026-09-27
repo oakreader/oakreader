@@ -13,7 +13,8 @@ import type { AuthEvent, AuthPrompt, ThinkingLevel } from "@earendil-works/pi-ai
 import {
   PROTOCOL_VERSION, RpcError,
   PingParams, ProvidersListParams,
-  PromptsComposeParams, type PromptsComposeResult,
+  PromptsComposeParams, SkillsListParams, type SkillsListResult,
+  SkillsBodyParams, type SkillsBodyResult, type PromptsComposeResult,
   CatalogValidateParams, type CatalogValidateResult,
   ReferencesGetParams, ReferencesSaveParams, type ReferencesGetResult,
   CiteKeysProposeParams, CiteKeysSaveParams, CiteKeysAssignParams,
@@ -49,6 +50,9 @@ import { ConfigStore, FileCredentialStore, dataPaths } from "./store.js";
 import { ProviderRegistry, toPiId } from "./providers.js";
 import { runChat, toPiMessages } from "./chat.js";
 import { PromptLibrary } from "./prompts.js";
+import {
+  loadSkills, locateBin, promptSection, readBody, skillDirectories, userSkillDirectory,
+} from "./skills.js";
 import { Catalog } from "./catalog/db.js";
 import { MIGRATIONS } from "./catalog/schema.js";
 import { WordLookupStore } from "./catalog/wordLookups.js";
@@ -362,9 +366,60 @@ function registerMethods(): void {
     return {};
   });
 
+  peer.onRequest("skills/body", SkillsBodyParams, (p): SkillsBodyResult => {
+    const { skills } = loadSkills(skillDirectories(libraryPath ?? join(dataDir, "library.sqlite")));
+    return { body: readBody(skills, p.name) };
+  });
+
+  peer.onRequest("skills/list", SkillsListParams, (): SkillsListResult => {
+    const { skills, advisories } = loadSkills(skillDirectories(libraryPath ?? join(dataDir, "library.sqlite")));
+    return {
+      skills: skills.map((s) => ({
+        name: s.name, title: s.title, description: s.description,
+        // The default matches what the loader this replaces assumed when a
+        // skill did not say: the whole document.
+        contextMode: s.contextMode ?? "fullDocument",
+        order: s.order, filePath: s.filePath,
+        baseDir: s.baseDir, source: s.source, enabled: s.enabled,
+        disableModelInvocation: s.disableModelInvocation,
+        version: s.version ?? null,
+        iconType: s.icon?.type ?? null,
+        iconValue: s.icon?.value ?? null,
+        authorName: s.author?.name ?? null,
+        // Resolved here rather than by the caller: whether a tool is installed
+        // is a fact about this machine, and the settings row and the agent
+        // should not be able to disagree about it.
+        bins: (s.requirements?.bins ?? []).map((b) => ({
+          name: b.name,
+          ...(b.description === undefined ? {} : { description: b.description }),
+          path: locateBin(b),
+          ...(b.install === undefined ? {} : { install: b.install }),
+        })),
+        envs: (s.requirements?.env ?? []).map((e) => ({
+          name: e.name,
+          ...(e.description === undefined ? {} : { description: e.description }),
+          // Absent means required, which is the safer reading of a manifest
+          // that did not say.
+          required: e.required ?? true,
+        })),
+      })),
+      advisories,
+    };
+  });
+
   peer.onRequest("prompts/compose", PromptsComposeParams, (p): PromptsComposeResult => {
     const { text, used } = prompts.compose(p.mixins);
-    return { text, used, available: prompts.list() };
+    // The skills listing is part of the prompt, so it is composed with it. It
+    // used to be appended by the shell, which meant one prompt assembled on two
+    // sides of a pipe from two different readings of the same directory.
+    //
+    // Installed skills only, which is what the shell listed: the bundled
+    // catalog is a place to install *from*, and its entries are marked
+    // `disable-model-invocation` precisely because they are user-invoked.
+    const { skills } = loadSkills([
+      { path: userSkillDirectory(libraryPath ?? join(dataDir, "library.sqlite")), source: "user" },
+    ]);
+    return { text: text + promptSection(skills, p.hasReadTool), used, available: prompts.list() };
   });
 
   // --- catalog ----------------------------------------------------------

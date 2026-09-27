@@ -125,6 +125,18 @@ targets:
           cp -R "${SRCROOT}/prompts" "$DEST"
         name: "Embed prompts"
 
+      # Skills travel the same way, and for the same reason: a skill is a
+      # SKILL.md someone can edit. They were never copied in, so the bundled
+      # catalog the settings pane offers to install from has always been empty
+      # in a built app -- only skills already in ~/OakReader/skills showed up.
+      - script: |
+          set -e
+          DEST="${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Resources/skills"
+          rm -rf "$DEST"
+          mkdir -p "$(dirname "$DEST")"
+          cp -R "${SRCROOT}/skills" "$DEST"
+        name: "Embed skills"
+
       # The AI sidecar is a self-contained executable from `bun build --compile`
       # (the Bun runtime is inside it), so the app never looks for `node` and
       # there is no minimum runtime version. Too large to commit -- 63 MB arm64,

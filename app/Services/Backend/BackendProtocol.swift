@@ -324,3 +324,56 @@ struct CatalogItem: Codable {
     var citationJson: String?
     var propertyValues: [CatalogPropertyValue]
 }
+
+/// A tool a skill needs, and whether this machine has it.
+struct BackendSkillBin: Codable {
+    var name: String
+    var description: String?
+    /// Absolute path, or nil when the tool is not installed.
+    var path: String?
+    /// Package-manager coordinates, keyed by manager ("brew", "cargo", …).
+    var install: [String: String]?
+}
+
+/// An environment variable a skill needs, held in this machine's keychain.
+struct BackendSkillEnv: Codable {
+    var name: String
+    var description: String?
+    var required: Bool
+}
+
+/// A skill as the settings UI shows it.
+///
+/// Resolved by the core, including whether each required tool is present: the
+/// row a person reads and the listing the model gets come from one reading of
+/// the same directories, so they cannot disagree.
+struct BackendSkill: Codable {
+    var name: String
+    /// Display name from the frontmatter's `title`, falling back to `name`.
+    var title: String
+    var description: String
+    /// How much of the document to attach while this skill is active.
+    var contextMode: String
+    /// Sort position in the chat picker; 99 when unstated.
+    var order: Int
+    var filePath: String
+    var baseDir: String
+    /// "bundled" or "user".
+    var source: String
+    var enabled: Bool
+    /// Invoked only on request; kept out of the model's listing.
+    var disableModelInvocation: Bool
+    var version: String?
+    /// "symbol" (an SF Symbol) or "url".
+    var iconType: String?
+    var iconValue: String?
+    var authorName: String?
+    var bins: [BackendSkillBin]
+    var envs: [BackendSkillEnv]
+}
+
+/// A malformed or duplicate skill, reported rather than silently dropped.
+struct BackendSkillAdvisory: Codable {
+    var path: String
+    var message: String
+}

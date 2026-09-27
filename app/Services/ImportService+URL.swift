@@ -255,7 +255,7 @@ extension ImportService {
     }
 
     private func archiveWithMonolith(_ sourceURL: URL, outputURL: URL) async throws {
-        guard let monolithPath = ToolResolver.resolveFromInstalledSkills(name: "monolith") else {
+        guard let monolithPath = await SkillStore.shared.binPath(named: "monolith") else {
             throw URLImportError.archiverUnavailable
         }
         let monolith = URL(fileURLWithPath: monolithPath)
@@ -279,7 +279,7 @@ extension ImportService {
     }
 
     private func markdownFromHTML(htmlURL: URL) async -> String? {
-        if let toolPath = ToolResolver.resolveFromInstalledSkills(name: "html-to-markdown") {
+        if let toolPath = await SkillStore.shared.binPath(named: "html-to-markdown") {
             if let result = try? await Self.runProcess(
                 executableURL: URL(fileURLWithPath: toolPath),
                 arguments: [htmlURL.path]

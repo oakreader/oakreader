@@ -2,7 +2,7 @@
 // Run `pnpm protocol:generate` after changing the schema.
 
 import { z } from "zod";
-import { WireMessage, WireToolDef, WordLookup, Annotation, Conversation, Collection, Item, Property, PropertyOption, type ProviderSummary, type EventToolCall, type PromptOption } from "./protocol.base.js";
+import { WireMessage, WireToolDef, WordLookup, Annotation, Conversation, Collection, Item, Property, PropertyOption, Skill, SkillAdvisory, SkillBin, SkillEnv, type ProviderSummary, type EventToolCall, type PromptOption } from "./protocol.base.js";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- refs used by generated shapes
 
 export const PROTOCOL_VERSION = 10;
@@ -455,10 +455,12 @@ export const PropertiesSetTextValueParams = z.object({
 export type PropertiesSetTextValueParams = z.infer<typeof PropertiesSetTextValueParams>;
 export type PropertiesSetTextValueResult = Record<string, never>;
 
-/** `prompts/compose` — The static half of the system prompt: base.md plus the named mixins. The shell appends live context afterwards -- that half cannot be a file. */
+/** `prompts/compose` — The static half of the system prompt: base.md, the named mixins, and the skills listing. The shell appends live context afterwards -- that half cannot be a file. */
 export const PromptsComposeParams = z.object({
   /** Mixin names, without .md, in the order they should appear. */
   mixins: z.array(z.string()).default([]),
+  /** Whether the model has a read tool. The skills listing tells it to read a skill's file, so without one the listing is omitted. */
+  hasReadTool: z.boolean().default(false),
 });
 export type PromptsComposeParams = z.infer<typeof PromptsComposeParams>;
 export type PromptsComposeResult = {
@@ -468,6 +470,26 @@ export type PromptsComposeResult = {
   used: string[];
   /** Every mixin this build carries. */
   available: string[];
+};
+
+/** `skills/list` — Every skill the core can see, bundled and installed. The listing the model gets is composed here too -- see prompts/compose. */
+export const SkillsListParams = z.object({
+});
+export type SkillsListParams = z.infer<typeof SkillsListParams>;
+export type SkillsListResult = {
+  skills: Skill[];
+  /** Malformed or duplicate skills, so one can be fixed rather than vanish. */
+  advisories: SkillAdvisory[];
+};
+
+/** `skills/body` — One skill's SKILL.md body, without its frontmatter. Read on demand rather than listed: the bodies are long prose, and only the active skill's is ever used. The shell places it after the live context, which is why it is not part of prompts/compose. */
+export const SkillsBodyParams = z.object({
+  name: z.string(),
+});
+export type SkillsBodyParams = z.infer<typeof SkillsBodyParams>;
+export type SkillsBodyResult = {
+  /** Empty when there is no such skill. */
+  body: string;
 };
 
 /** `catalog/wordLookups/list` — One document's lookups, or every one when itemId is absent. Newest first. */
@@ -617,6 +639,8 @@ export const ClientRequests = {
   "catalog/properties/removeSelectValue": PropertiesRemoveSelectValueParams,
   "catalog/properties/setTextValue": PropertiesSetTextValueParams,
   "prompts/compose": PromptsComposeParams,
+  "skills/list": SkillsListParams,
+  "skills/body": SkillsBodyParams,
   "catalog/wordLookups/list": WordLookupsListParams,
   "catalog/wordLookups/save": WordLookupsSaveParams,
   "catalog/wordLookups/delete": WordLookupsDeleteParams,
@@ -679,6 +703,8 @@ export interface ClientRequestResults {
   "catalog/properties/removeSelectValue": PropertiesRemoveSelectValueResult;
   "catalog/properties/setTextValue": PropertiesSetTextValueResult;
   "prompts/compose": PromptsComposeResult;
+  "skills/list": SkillsListResult;
+  "skills/body": SkillsBodyResult;
   "catalog/wordLookups/list": WordLookupsListResult;
   "catalog/wordLookups/save": WordLookupsSaveResult;
   "catalog/wordLookups/delete": WordLookupsDeleteResult;

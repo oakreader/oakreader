@@ -163,12 +163,14 @@
 		958385276A316A8A565A44A5 /* BrowserSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 532F03FA8904BC484DF777A1 /* BrowserSession.swift */; };
 		95F9B35D715F32065B3BD0C5 /* LibrarySidebarPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AB5E7E5F131F35E94E0CB8C /* LibrarySidebarPanel.swift */; };
 		962BF73643C03032285AD713 /* TranslationSourceTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1077D5FE2FD0CCBB9A0F9D20 /* TranslationSourceTextView.swift */; };
+		963B67BF4C71C3D6DC8318A1 /* ContextMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1D261FC4B06E4D1B46761F2 /* ContextMode.swift */; };
 		97083C1ADBF4E809AEAC7D9E /* OakReaderDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13FA82615DF1237FE57AF1C /* OakReaderDocument.swift */; };
 		97962B1C2D80161DB104F952 /* CommandRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B8B44ADCA55D210EB1195CD /* CommandRegistry.swift */; };
 		9859C0EE417B2B5D08A607DA /* VoiceProviderFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DF9DB24F42638B1C38024F0 /* VoiceProviderFactory.swift */; };
 		98CE27A13DEF996301B31A66 /* AudioSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58A3472399A3307B1E23F970 /* AudioSettingsView.swift */; };
 		992AFFA838731F1CC508FCA6 /* ImportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C4D70585CDC2D73740E7CA8 /* ImportSheet.swift */; };
 		994E44A215C4B53F79109D03 /* TranslationPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 587C372D1527AAC633871262 /* TranslationPanelView.swift */; };
+		99E96D99C5F5DF7989591BF9 /* SkillCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F554C52E086725B0D01BD8B /* SkillCatalog.swift */; };
 		9DF20B491BEE646415F966F7 /* SymbolStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD1BA0EB74DE9B32341F08B8 /* SymbolStyle.swift */; };
 		9E50E5EDB41CCB2E6A1BD0D2 /* UninstallService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5A32DC9380A6E208109FDBA /* UninstallService.swift */; };
 		9F9175690B0C59395CBD9D51 /* ImportService+Markdown.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B69C837BC0CC217B119C44E /* ImportService+Markdown.swift */; };
@@ -418,6 +420,7 @@
 		8D59308F91A2D872B18AF26F /* ImportService+PDF.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ImportService+PDF.swift"; sourceTree = "<group>"; };
 		8DD2009541907CEB1D9B2859 /* AccessibilityIssue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityIssue.swift; sourceTree = "<group>"; };
 		8DDC24F911ECB0C8E7E53BBE /* ReferenceMetadataView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReferenceMetadataView.swift; sourceTree = "<group>"; };
+		8F554C52E086725B0D01BD8B /* SkillCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkillCatalog.swift; sourceTree = "<group>"; };
 		90A369B6734012DBEF943D79 /* CollectionEditorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionEditorSheet.swift; sourceTree = "<group>"; };
 		90D3F25731C282A7CD153D3D /* TsangerJinKai02-W04.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "TsangerJinKai02-W04.ttf"; sourceTree = "<group>"; };
 		923E4B814BC4C83624EB49DF /* LibraryCardGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryCardGridView.swift; sourceTree = "<group>"; };
@@ -491,6 +494,7 @@
 		E0DDCB648FF554FD8BA84463 /* HTMLSelectionPopupPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTMLSelectionPopupPanel.swift; sourceTree = "<group>"; };
 		E19B843C097DDEEB8D3D9925 /* TableHorizontalScrollerDisabler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TableHorizontalScrollerDisabler.swift; sourceTree = "<group>"; };
 		E1B515A45A232EFEC64D780E /* NoteImageStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteImageStore.swift; sourceTree = "<group>"; };
+		E1D261FC4B06E4D1B46761F2 /* ContextMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContextMode.swift; sourceTree = "<group>"; };
 		E4849A18B8929D414D36B924 /* ChatHistoryDrawer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatHistoryDrawer.swift; sourceTree = "<group>"; };
 		E5A32DC9380A6E208109FDBA /* UninstallService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UninstallService.swift; sourceTree = "<group>"; };
 		E5F51769F0F2907C06833C49 /* SkillManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkillManagementView.swift; sourceTree = "<group>"; };
@@ -753,6 +757,7 @@
 				EF2387B271A13F8720377194 /* PromptCatalog.swift */,
 				B18FF99351C7A5628644354D /* PropertyCatalog.swift */,
 				099B3862EC96ED16684C0BF1 /* ReferenceCatalog.swift */,
+				8F554C52E086725B0D01BD8B /* SkillCatalog.swift */,
 				F1549879703EE0C34737AD8E /* WordLookupCatalog.swift */,
 			);
 			path = Catalog;
@@ -1016,6 +1021,7 @@
 				8DD2009541907CEB1D9B2859 /* AccessibilityIssue.swift */,
 				4E4CD3618201DD98D5D11435 /* AnnotationPosition.swift */,
 				32EC3C8A287D8B1608066587 /* BookmarkModel.swift */,
+				E1D261FC4B06E4D1B46761F2 /* ContextMode.swift */,
 				70A569130186B698235146E2 /* ConversationMeta.swift */,
 				FC9E41C801BDA197566BB8FD /* CSLTypeFieldSpec.swift */,
 				5EBCAA37DA38470D7A6F199F /* CSLTypes.swift */,
@@ -1093,6 +1099,7 @@
 				FAC8682D3503EF53F2D18813 /* SwiftLint */,
 				268AB549AE9096152DA86C5E /* Embed oak CLI */,
 				F60520C499ED9DBE506997CF /* Embed prompts */,
+				80D9E75C7BC71FE34055BB35 /* Embed skills */,
 				F10046E9AF3F95B0BC8D2E7C /* Build & embed AI sidecar (bun --compile) */,
 				F9CC889C03A7ACCE2AEC7526 /* Resources */,
 				A02FDAF25B969EA882935FC0 /* Frameworks */,
@@ -1219,6 +1226,24 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "set -e\nCLI=\"${SRCROOT}/cli\"\nexport PATH=\"$PATH:$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin\"\nif ! command -v bun >/dev/null 2>&1; then\n  echo \"error: bun not found — install from https://bun.sh; the oak CLI is compiled with it\" >&2\n  exit 1\nfi\n# OAK_CHANNEL is this CLI's `#if DEBUG`: a dev build's `oak` must\n# read ~/OakReader-Dev, not the release library.\nif [ \"${CONFIGURATION}\" = \"Release\" ]; then\n  OAK_UNIVERSAL=1 bash \"$CLI/scripts/build-binary.sh\"\nelse\n  OAK_CHANNEL=dev bash \"$CLI/scripts/build-binary.sh\"\nfi\n# CONTENTS_FOLDER_PATH, not a hardcoded OakReader.app: the Debug\n# config overrides PRODUCT_NAME, so its wrapper is OakReader-Dev.app.\nDEST=\"${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Resources/oak\"\ncp \"$CLI/dist/oak\" \"$DEST\"\nchmod +x \"$DEST\"\nif [ -n \"${EXPANDED_CODE_SIGN_IDENTITY:-}\" ] && [ \"${EXPANDED_CODE_SIGN_IDENTITY}\" != \"-\" ]; then\n  codesign --force --options runtime --timestamp=none \\\n           --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" \"$DEST\"\nelse\n  codesign --force --sign - \"$DEST\"\nfi\n";
+		};
+		80D9E75C7BC71FE34055BB35 /* Embed skills */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Embed skills";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\nDEST=\"${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Resources/skills\"\nrm -rf \"$DEST\"\nmkdir -p \"$(dirname \"$DEST\")\"\ncp -R \"${SRCROOT}/skills\" \"$DEST\"\n";
 		};
 		F10046E9AF3F95B0BC8D2E7C /* Build & embed AI sidecar (bun --compile) */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -1355,6 +1380,7 @@
 				6E69E44FEDE77FA312675035 /* CompletionClient.swift in Sources */,
 				C8EE7FC40F139582AB5C1327 /* CompletionPalette.swift in Sources */,
 				CD34903E7BEF2A0EB4523F1B /* ContentView.swift in Sources */,
+				963B67BF4C71C3D6DC8318A1 /* ContextMode.swift in Sources */,
 				3C62AC3907C2E346A0940F3F /* ConversationMeta.swift in Sources */,
 				24DBFDAD5E31E3498A282996 /* ConversationService.swift in Sources */,
 				FF8B03B21A3F8F2CE85233F6 /* CrossRefService.swift in Sources */,
@@ -1486,6 +1512,7 @@
 				0CF9F961D8DD5DB257B2D4A5 /* SettingsView.swift in Sources */,
 				1C5D42E2D98AC58929981F29 /* SharingService.swift in Sources */,
 				5B17A5915BA3761D882A5765 /* SidebarView.swift in Sources */,
+				99E96D99C5F5DF7989591BF9 /* SkillCatalog.swift in Sources */,
 				2FD30C0FB1C008E2B15C3910 /* SkillManagementView.swift in Sources */,
 				6B39A07DE5849AC658FC1F77 /* SmartCollectionEditorSheet.swift in Sources */,
 				C103BD9537167E674467D583 /* SnapshotHitTestNSView.swift in Sources */,
@@ -1643,7 +1670,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.10.0;
+				MARKETING_VERSION = 0.10.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.oakreader.OakReader.dev;
 				PRODUCT_MODULE_NAME = OakReader;
 				PRODUCT_NAME = "OakReader-Dev";
@@ -1734,7 +1761,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.10.0;
+				MARKETING_VERSION = 0.10.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.oakreader.OakReader;
 				PRODUCT_MODULE_NAME = OakReader;
 				PRODUCT_NAME = OakReader;

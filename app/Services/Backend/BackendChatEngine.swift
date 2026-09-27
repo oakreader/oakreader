@@ -26,7 +26,6 @@ actor BackendChatEngine {
         additionalUserTurns: [Turn] = [],
         tools: [any AgentTool]? = nil,
         toolContext: ToolExecutionContext? = nil,
-        agentSkills: [AgentSkill] = [],
         maxIterations: Int = 10,
         toolConfirmation: (@Sendable (ToolCall, ToolCategory) async -> Bool)? = nil
     ) -> AsyncThrowingStream<SessionEvent, Error> {
@@ -48,12 +47,9 @@ actor BackendChatEngine {
                         continuation.yield(.finished(additionalTurn))
                     }
 
-                    // 2. Final system prompt (append agent-skills listing)
-                    var finalPrompt = systemPrompt
-                    finalPrompt += SkillPromptFormatter.promptSection(
-                        skills: agentSkills,
-                        hasReadTool: (tools ?? []).contains { $0.name == "read" }
-                    )
+                    // 2. The system prompt arrives complete: the core composes
+                    //    policy, mixins and the skills listing together.
+                    let finalPrompt = systemPrompt
 
                     // 3. Wire history
                     let wireMessages = Self.buildWireMessages(

@@ -67,7 +67,7 @@ function tsShape(fields: Field[], indent = "  "): string {
 
 function emitTypeScript(): string {
   const o: string[] = [BANNER, 'import { z } from "zod";',
-    'import { WireMessage, WireToolDef, WordLookup, Annotation, Conversation, Collection, Item, Property, PropertyOption, type ProviderSummary, type EventToolCall, type PromptOption } from "./protocol.base.js";',
+    'import { WireMessage, WireToolDef, WordLookup, Annotation, Conversation, Collection, Item, Property, PropertyOption, Skill, SkillAdvisory, SkillBin, SkillEnv, type ProviderSummary, type EventToolCall, type PromptOption } from "./protocol.base.js";',
     '// eslint-disable-next-line @typescript-eslint/no-unused-vars -- refs used by generated shapes',
     "", `export const PROTOCOL_VERSION = ${PROTOCOL_VERSION};`, ""];
 

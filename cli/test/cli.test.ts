@@ -8,7 +8,7 @@
 import { test, expect, describe } from "bun:test";
 import { flag, integer, option, parse } from "../src/args.ts";
 import { htmlToText, parsePageRange } from "../src/extract.ts";
-import { parseFrontmatter } from "../src/skills.ts";
+
 import * as format from "../src/format.ts";
 
 const BOOLEANS = new Set(["json", "quiet", "today", "csv", "markdown"]);
@@ -141,35 +141,5 @@ describe("formatting", () => {
       { ...base, id: "b", name: "Child", parentId: "a" },
     ], new Map([["a", 3], ["b", 1]]));
     expect(tree).toBe("Collections:\n└── Parent (3)\n    └── Child (1)");
-  });
-});
-
-describe("skill frontmatter", () => {
-  test("scalars are read, the body is not", () => {
-    const fields = parseFrontmatter(
-      "---\nname: critique\ndescription: Evaluate reasoning\norder: 7\n---\n\nname: not-a-field\n");
-    expect(fields.name).toBe("critique");
-    expect(fields.description).toBe("Evaluate reasoning");
-  });
-
-  test("required tools come through with their search paths", () => {
-    const fields = parseFrontmatter(`---
-name: archive
-requirements:
-  bins:
-    - name: monolith
-      description: Archives a page into one file
-      searchPaths: ["/opt/homebrew/bin", "/usr/local/bin"]
----
-body`);
-    expect(fields.bins).toEqual([{
-      name: "monolith",
-      description: "Archives a page into one file",
-      searchPaths: ["/opt/homebrew/bin", "/usr/local/bin"],
-    }]);
-  });
-
-  test("a file with no frontmatter yields nothing, not an error", () => {
-    expect(parseFrontmatter("# Just a heading\n")).toEqual({});
   });
 });

@@ -260,3 +260,51 @@ export const Property = z.object({
   options: z.array(PropertyOption),
 });
 export type Property = z.infer<typeof Property>;
+
+/** A required binary, and where it was found. */
+export const SkillBin = z.object({
+  name: z.string(),
+  description: z.string().optional(),
+  /** Absolute path, or null when the tool is not installed. */
+  path: z.string().nullable(),
+  install: z.record(z.string(), z.string()).optional(),
+});
+export type SkillBin = z.infer<typeof SkillBin>;
+
+/** An environment variable a skill needs, held in the shell's keychain. */
+export const SkillEnv = z.object({
+  name: z.string(),
+  description: z.string().optional(),
+  required: z.boolean(),
+});
+export type SkillEnv = z.infer<typeof SkillEnv>;
+
+/** A skill as the settings UI needs to show it. */
+export const Skill = z.object({
+  name: z.string(),
+  /** Display name from the frontmatter's `title`, falling back to `name`. */
+  title: z.string(),
+  description: z.string(),
+  /** How much of the document to attach while this skill is active. */
+  contextMode: z.string(),
+  /** Sort position in the chat picker; 99 when unstated. */
+  order: z.number().int(),
+  filePath: z.string(),
+  baseDir: z.string(),
+  /** "bundled" or "user". */
+  source: z.string(),
+  enabled: z.boolean(),
+  /** Invoked only on request; kept out of the model's listing. */
+  disableModelInvocation: z.boolean(),
+  version: z.string().nullable(),
+  /** "symbol" (an SF Symbol) or "url". */
+  iconType: z.string().nullable(),
+  iconValue: z.string().nullable(),
+  authorName: z.string().nullable(),
+  bins: z.array(SkillBin),
+  envs: z.array(SkillEnv),
+});
+export type Skill = z.infer<typeof Skill>;
+
+export const SkillAdvisory = z.object({ path: z.string(), message: z.string() });
+export type SkillAdvisory = z.infer<typeof SkillAdvisory>;

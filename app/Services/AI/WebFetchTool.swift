@@ -95,7 +95,7 @@ struct WebFetchTool: AgentTool, Sendable {
 
     private func convertToMarkdown(html: String, data: Data) async -> String? {
         // Tier 1: html-to-markdown binary via installed skills
-        if let toolPath = ToolResolver.resolveFromInstalledSkills(name: "html-to-markdown") {
+        if let toolPath = await SkillStore.shared.binPath(named: "html-to-markdown") {
             let tempFile = FileManager.default.temporaryDirectory
                 .appendingPathComponent(UUID().uuidString + ".html")
             do {

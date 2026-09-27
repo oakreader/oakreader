@@ -444,15 +444,12 @@ struct ChatBubbleView: View, Equatable {
     }
 
     private func skillBadge(_ skillId: String) -> some View {
-        let skill = SkillManager.shared.installedSkills.first {
-            $0.id.caseInsensitiveCompare(skillId) == .orderedSame
-                || $0.name.caseInsensitiveCompare(skillId) == .orderedSame
-        }
+        let skill = SkillStore.shared.skill(matching: skillId)
         // Mirror the input composer's token chip (ChatTokenAttachment): a soft
         // accent fill + muted accent text, no border. Shared token so both match exactly.
         let softAccent = OakStyle.Colors.skillTint
         return HStack(spacing: 3) {
-            Image(systemName: skill?.icon ?? "sparkles")
+            Image(systemName: skill?.symbolName ?? "sparkles")
                 .font(OakStyle.ChatFont.modelLabel)
             Text(skillId)
                 .font(OakStyle.ChatFont.modelLabel)

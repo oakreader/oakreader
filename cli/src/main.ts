@@ -10,7 +10,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { basename, resolve as resolvePath } from "node:path";
+import { basename, join as joinPath, resolve as resolvePath } from "node:path";
 import { homedir } from "node:os";
 import { Catalog } from "../../backend/src/catalog/db.ts";
 import { CollectionStore } from "../../backend/src/catalog/collections.ts";
@@ -26,7 +26,7 @@ import * as wire from "./wire.ts";
 import { OakError, Resolver, notFound } from "./resolve.ts";
 import { readDocument } from "./extract.ts";
 import * as format from "./format.ts";
-import * as skills from "./skills.ts";
+import * as skills from "../../backend/src/skills.ts";
 
 const VERSION = "1.0.0";
 
@@ -553,9 +553,44 @@ function notes({ parsed, q, resolver, out }: Context): void {
 
 // --- skills --------------------------------------------------------------
 
+/**
+ * Where this CLI looks for skills.
+ *
+ * The same two places the app uses, read by the same module — this used to be
+ * a third copy of the directory walk, after the app's and the core's.
+ */
+function skillDirectories(): Array<{ path: string; source: skills.SkillSource }> {
+  return skills.skillDirectories(libraryPath());
+}
+
+function installedSkills(): skills.Skill[] {
+  return skills.loadSkills(
+    [{ path: skills.userSkillDirectory(libraryPath()), source: "user" }]).skills;
+}
+
+/** Copy a skill into the user's directory, replacing any previous copy. */
+async function installSkill(skill: skills.Skill): Promise<string> {
+  const { cp, mkdir, rm } = await import("node:fs/promises");
+  const directory = skills.userSkillDirectory(libraryPath());
+  const destination = joinPath(directory, skill.name);
+  await mkdir(directory, { recursive: true });
+  await rm(destination, { recursive: true, force: true });
+  await cp(skill.baseDir, destination, { recursive: true });
+  return destination;
+}
+
+async function uninstallSkill(name: string): Promise<boolean> {
+  const { rm, stat } = await import("node:fs/promises");
+  const destination = joinPath(skills.userSkillDirectory(libraryPath()), name);
+  if (await stat(destination).catch(() => null) === null) return false;
+  await rm(destination, { recursive: true, force: true });
+  return true;
+}
+
+
 async function skillsList({ out }: Context): Promise<void> {
-  const catalog = await skills.loadCatalog();
-  const installed = await skills.installedNames();
+  const catalog = skills.loadSkills(skillDirectories()).skills;
+  const installed = new Set(installedSkills().map((s) => s.name));
 
   if (out.json) {
     out.results("skills.list", catalog.map((s) => ({
@@ -574,9 +609,11 @@ async function skillsList({ out }: Context): Promise<void> {
     + `${format.pad("DESCRIPTION", 32)}BINS`);
   console.log("─".repeat(80));
   for (const skill of catalog) {
-    const missing = skill.bins.filter((b) => skills.locateBin(b) === null).length;
-    const bins = skill.bins.length === 0
-      ? "—" : missing === 0 ? `${skill.bins.length} ok` : `${missing}/${skill.bins.length} missing`;
+    const required = skill.requirements?.bins ?? [];
+    const missing = required.filter((b) => skills.locateBin(b) === null).length;
+    const bins = required.length === 0 ? "—"
+      : missing === 0 ? `${required.length} ok`
+      : `${missing}/${required.length} missing`;
     console.log(
       `${format.pad(skill.name, 20)}`
       + `${format.pad(installed.has(skill.name) ? "installed" : "available", 12)}`
@@ -586,12 +623,12 @@ async function skillsList({ out }: Context): Promise<void> {
 
 async function skillsShow({ parsed, out }: Context): Promise<void> {
   const name = requireArgument(parsed, 0, "name");
-  const skill = (await skills.loadCatalog()).find((s) => s.name === name);
+  const skill = skills.loadSkills(skillDirectories()).skills.find((s) => s.name === name);
   if (skill === undefined) {
     throw new OakError(
       `Skill '${name}' not found. Run 'oak skills' to see available skills.`, "not_found");
   }
-  const installed = (await skills.installedNames()).has(name);
+  const installed = installedSkills().some((s) => s.name === name);
 
   if (out.json) {
     out.success("skills.show", {
@@ -606,10 +643,11 @@ async function skillsShow({ parsed, out }: Context): Promise<void> {
   if (skill.author !== null) console.log(`Author: ${skill.author}`);
   console.log("");
 
-  if (skill.bins.length > 0) {
+  const bins = skill.requirements?.bins ?? [];
+  if (bins.length > 0) {
     console.log("DEPENDENCIES");
     console.log("─".repeat(60));
-    for (const bin of skill.bins) {
+    for (const bin of bins) {
       const path = skills.locateBin(bin);
       console.log(`  ${path !== null ? "✓" : "✗"} ${bin.name}`);
       if (bin.description !== undefined) console.log(`    ${bin.description}`);
@@ -623,13 +661,13 @@ async function skillsShow({ parsed, out }: Context): Promise<void> {
 
 async function skillsInstall({ parsed, out }: Context): Promise<void> {
   const name = requireArgument(parsed, 0, "name");
-  const skill = (await skills.loadCatalog()).find((s) => s.name === name);
+  const skill = skills.loadSkills(skillDirectories()).skills.find((s) => s.name === name);
   if (skill === undefined) {
     throw new OakError(
       `Skill '${name}' not found. Run 'oak skills' to see available skills.`, "not_found");
   }
 
-  const destination = await skills.install(skill);
+  const destination = await installSkill(skill);
   const message = `Installed '${name}' to ${destination}`;
   if (out.json) out.success("skills.install", { id: null, message });
   else console.log(message);
@@ -637,7 +675,7 @@ async function skillsInstall({ parsed, out }: Context): Promise<void> {
 
 async function skillsUninstall({ parsed, out }: Context): Promise<void> {
   const name = requireArgument(parsed, 0, "name");
-  if (!await skills.uninstall(name)) {
+  if (!await uninstallSkill(name)) {
     throw new OakError(`Skill '${name}' is not installed.`, "not_found");
   }
 
@@ -647,7 +685,7 @@ async function skillsUninstall({ parsed, out }: Context): Promise<void> {
 }
 
 async function skillsCheck({ out }: Context): Promise<void> {
-  const installed = await skills.loadInstalled();
+  const installed = installedSkills();
   if (installed.length === 0) {
     const message = "No skills installed.";
     if (out.json) out.success("skills.check", { id: null, message });
@@ -656,7 +694,7 @@ async function skillsCheck({ out }: Context): Promise<void> {
   }
 
   const issues = installed.flatMap((skill) =>
-    skill.bins.filter((b) => skills.locateBin(b) === null)
+    (skill.requirements?.bins ?? []).filter((b) => skills.locateBin(b) === null)
       .map((b) => `${skill.name}: ${b.name} not found`));
 
   if (out.json) {

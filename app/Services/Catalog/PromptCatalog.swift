@@ -18,16 +18,21 @@ enum PromptCatalog {
     /// name their mixins instead of globbing.
     static let chatMixins = ["math-formatting"]
 
-    /// Compose `base.md` plus the named mixins.
+    /// Compose `base.md`, the named mixins, and the skills listing.
+    ///
+    /// The skills half used to be appended here, from a directory this side
+    /// walked itself — one prompt assembled on two sides of a pipe, from two
+    /// readings of the same files. The core reads them now; `hasReadTool` is
+    /// the only thing it cannot know, because the tool set is decided here.
     ///
     /// Returns empty when the core has no prompt files, which is survivable:
     /// the caller appends context regardless, and an empty policy section is
     /// better than refusing to answer.
-    static func compose(mixins: [String]) async -> String {
+    static func compose(mixins: [String], hasReadTool: Bool) async -> String {
         do {
             let result = try await NodeBackend.shared.call(
                 RPC.Method.promptsCompose,
-                params: RPC.PromptsComposeParams(mixins: mixins),
+                params: RPC.PromptsComposeParams(mixins: mixins, hasReadTool: hasReadTool),
                 as: RPC.PromptsComposeResult.self)
             return result.text ?? ""
         } catch {

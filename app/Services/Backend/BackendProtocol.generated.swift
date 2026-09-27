@@ -88,6 +88,8 @@ enum RPC {
         static let propertiesRemoveSelectValue = "catalog/properties/removeSelectValue"
         static let propertiesSetTextValue = "catalog/properties/setTextValue"
         static let promptsCompose = "prompts/compose"
+        static let skillsList = "skills/list"
+        static let skillsBody = "skills/body"
         static let wordLookupsList = "catalog/wordLookups/list"
         static let wordLookupsSave = "catalog/wordLookups/save"
         static let wordLookupsDelete = "catalog/wordLookups/delete"
@@ -577,11 +579,14 @@ enum RPC {
     }
 
     // MARK: prompts/compose
-    /// The static half of the system prompt: base.md plus the named mixins. The shell appends live
-    /// context afterwards -- that half cannot be a file.
+    /// The static half of the system prompt: base.md, the named mixins, and the skills listing. The
+    /// shell appends live context afterwards -- that half cannot be a file.
     struct PromptsComposeParams: Encodable {
         /// Mixin names, without .md, in the order they should appear.
         var mixins: [String]?
+        /// Whether the model has a read tool. The skills listing tells it to read a skill's file,
+        /// so without one the listing is omitted.
+        var hasReadTool: Bool?
     }
     struct PromptsComposeResult: Decodable {
         /// Empty when no prompt files were found.
@@ -590,6 +595,30 @@ enum RPC {
         var used: [String]
         /// Every mixin this build carries.
         var available: [String]
+    }
+
+    // MARK: skills/list
+    /// Every skill the core can see, bundled and installed. The listing the model gets is composed
+    /// here too -- see prompts/compose.
+    struct SkillsListParams: Encodable {
+        init() {}
+    }
+    struct SkillsListResult: Decodable {
+        var skills: [BackendSkill]
+        /// Malformed or duplicate skills, so one can be fixed rather than vanish.
+        var advisories: [BackendSkillAdvisory]
+    }
+
+    // MARK: skills/body
+    /// One skill's SKILL.md body, without its frontmatter. Read on demand rather than listed: the
+    /// bodies are long prose, and only the active skill's is ever used. The shell places it after
+    /// the live context, which is why it is not part of prompts/compose.
+    struct SkillsBodyParams: Encodable {
+        var name: String
+    }
+    struct SkillsBodyResult: Decodable {
+        /// Empty when there is no such skill.
+        var body: String
     }
 
     // MARK: catalog/wordLookups/list

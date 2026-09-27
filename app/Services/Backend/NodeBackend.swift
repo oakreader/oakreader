@@ -290,10 +290,14 @@ actor NodeBackend {
             // opens the second one.
             "--library", CatalogDatabase.dataDirectory.appendingPathComponent("library.sqlite").path,
         ]
-        // Prompt files, when the bundle carries them. Absent in a checkout
-        // build, where the sidecar finds them by walking up from its source.
+        // Prompt and skill files, when the bundle carries them. Absent in a
+        // checkout build, where the sidecar finds them by walking up from its
+        // own source path.
         if let prompts = Bundle.main.url(forResource: "prompts", withExtension: nil) {
             proc.arguments? += ["--prompts", prompts.path]
+        }
+        if let skills = Bundle.main.url(forResource: "skills", withExtension: nil) {
+            proc.arguments? += ["--skills", skills.path]
         }
         let stdin = Pipe(), stdout = Pipe(), stderr = Pipe()
         proc.standardInput = stdin

@@ -137,7 +137,7 @@ extension ImportService {
     /// If pdf-oxide is available, convert PDF to structured markdown and save as content.md.
     /// Silent no-op if pdf-oxide is not installed.
     private func extractPDFMarkdown(pdfURL: URL, attachmentDir: URL) async {
-        guard let toolPath = ToolResolver.resolveFromInstalledSkills(name: "pdf-oxide") else { return }
+        guard let toolPath = await SkillStore.shared.binPath(named: "pdf-oxide") else { return }
 
         let mdURL = attachmentDir.appendingPathComponent("content.md")
         guard let result = try? await Self.runProcess(

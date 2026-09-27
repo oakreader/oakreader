@@ -5,7 +5,7 @@ import OakAgent
 struct ChatCompletionItem: Identifiable, Equatable {
 
     enum Kind {
-        case installedSkill(Skill)
+        case installedSkill(BackendSkill)
         case libraryReference(LibraryRefPayload)
         /// A generic item that carries its own section title — used by the note
         /// composer to reuse this panel for `/` block commands, `#` tags and `@`
@@ -47,12 +47,12 @@ struct ChatCompletionItem: Identifiable, Equatable {
 
     // MARK: - Factory - Slash Items
 
-    static func slashItems(installed: [Skill]) -> [ChatCompletionItem] {
+    static func slashItems(installed: [BackendSkill]) -> [ChatCompletionItem] {
         installed.map { skill in
             ChatCompletionItem(
                 id: "skill:\(skill.id)",
-                icon: skill.icon,
-                label: skill.name,
+                icon: skill.symbolName,
+                label: skill.title,
                 description: skill.description,
                 kind: .installedSkill(skill),
                 trigger: "/"

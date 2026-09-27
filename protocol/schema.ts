@@ -463,17 +463,47 @@ export const METHODS: Method[] = [
 
   {
     name: "prompts/compose", type: "PromptsCompose", kind: "request", from: "client",
-    doc: "The static half of the system prompt: base.md plus the named mixins. " +
-         "The shell appends live context afterwards -- that half cannot be a file.",
-    params: [{ name: "mixins",
-      type: { k: "array", of: str },
-      default: "[]",
-      doc: "Mixin names, without .md, in the order they should appear." }],
+    doc: "The static half of the system prompt: base.md, the named mixins, and " +
+         "the skills listing. The shell appends live context afterwards -- that " +
+         "half cannot be a file.",
+    params: [
+      { name: "mixins",
+        type: { k: "array", of: str },
+        default: "[]",
+        doc: "Mixin names, without .md, in the order they should appear." },
+      { name: "hasReadTool", type: bool, default: "false",
+        doc: "Whether the model has a read tool. The skills listing tells it to " +
+             "read a skill's file, so without one the listing is omitted." },
+    ],
     result: [
       { name: "text", type: str, doc: "Empty when no prompt files were found." },
       { name: "used", type: { k: "array", of: str }, doc: "Mixins that existed and were included." },
       { name: "available", type: { k: "array", of: str }, doc: "Every mixin this build carries." },
     ],
+  },
+
+  {
+    name: "skills/list", type: "SkillsList", kind: "request", from: "client",
+    doc: "Every skill the core can see, bundled and installed. The listing the " +
+         "model gets is composed here too -- see prompts/compose.",
+    params: [],
+    result: [
+      { name: "skills",
+        type: { k: "array", of: { k: "ref", ts: "Skill", swift: "BackendSkill" } } },
+      { name: "advisories",
+        type: { k: "array", of: { k: "ref", ts: "SkillAdvisory", swift: "BackendSkillAdvisory" } },
+        doc: "Malformed or duplicate skills, so one can be fixed rather than vanish." },
+    ],
+  },
+
+  {
+    name: "skills/body", type: "SkillsBody", kind: "request", from: "client",
+    doc: "One skill's SKILL.md body, without its frontmatter. Read on demand " +
+         "rather than listed: the bodies are long prose, and only the active " +
+         "skill's is ever used. The shell places it after the live context, " +
+         "which is why it is not part of prompts/compose.",
+    params: [{ name: "name", type: str }],
+    result: [{ name: "body", type: str, doc: "Empty when there is no such skill." }],
   },
 
   // --- catalog (phase 1) --------------------------------------------------

@@ -205,7 +205,7 @@ struct LLMContextProvider {
     /// list — is assembled here because nothing else has it.
     static func buildSystemPrompt(
         staticPrompt: String,
-        skill: Skill?,
+        skillBody: String,
         context: ChatContextSnapshot,
         documentCharBudget: Int,
         sources: CitationSourceRegistry
@@ -438,9 +438,11 @@ struct LLMContextProvider {
             parts.append(memoryParts.joined(separator: "\n\n"))
         }
 
-        // Skill prompt (after context so the skill can reference it)
-        if let skill {
-            parts.append(skill.systemPrompt)
+        // The active skill's instructions, after the context so they can refer
+        // to it. The text is read by the core — this side decides where it goes,
+        // because only this side assembled what it sits after.
+        if !skillBody.isEmpty {
+            parts.append(skillBody)
         }
 
         return parts.joined(separator: "\n\n")

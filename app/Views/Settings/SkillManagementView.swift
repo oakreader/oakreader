@@ -8,7 +8,7 @@ import OakAgent
 /// The main page stays scannable (large search, category sections, icon-led rows),
 /// and tapping a skill swaps this settings pane into an in-place detail/manage page.
 struct SkillManagementView: View {
-    @State private var catalogSkills: [AgentSkill] = []
+    @State private var catalogSkills: [BackendSkill] = []
     @State private var bundledNames: Set<String> = []
     @State private var installedNames: Set<String> = []
     @State private var disabledNames: Set<String> = []
@@ -20,8 +20,11 @@ struct SkillManagementView: View {
     /// Incremented to force re-evaluation of resolved paths after install.
     @State private var refreshToken = 0
 
-    /// Installed skills directory — shared with `SkillManager`.
-    static var installedDir: URL { SkillManager.installedDir }
+    /// Where installing a skill puts it: beside the library, which is where
+    /// the core looks for them.
+    static var installedDir: URL {
+        CatalogDatabase.dataDirectory.appendingPathComponent("skills", isDirectory: true)
+    }
 
     private static let recommendedNames: Set<String> = [
         "summarize",
@@ -187,7 +190,7 @@ struct SkillManagementView: View {
         .padding(.top, 70)
     }
 
-    private var selectedSkill: AgentSkill? {
+    private var selectedSkill: BackendSkill? {
         guard let selectedSkillName else { return nil }
         return catalogSkills.first { $0.name == selectedSkillName }
     }
@@ -210,7 +213,7 @@ struct SkillManagementView: View {
         ].filter { !$0.skills.isEmpty }
     }
 
-    private func filtered(_ skills: [AgentSkill]) -> [AgentSkill] {
+    private func filtered(_ skills: [BackendSkill]) -> [BackendSkill] {
         skills
             .filter { skill in
                 switch filter {
@@ -230,24 +233,24 @@ struct SkillManagementView: View {
                 return skill.name.localizedCaseInsensitiveContains(query)
                     || Self.displayName(for: skill).localizedCaseInsensitiveContains(query)
                     || skill.description.localizedCaseInsensitiveContains(query)
-                    || (skill.author?.name.localizedCaseInsensitiveContains(query) ?? false)
+                    || (skill.authorName?.localizedCaseInsensitiveContains(query) ?? false)
             }
             .sorted { Self.displayName(for: $0) < Self.displayName(for: $1) }
     }
 
-    private func needsSetup(_ skill: AgentSkill) -> Bool {
-        let bins = skill.requirements?.bins ?? []
-        let hasMissingBins = bins.contains { ToolResolver.resolve(name: $0.name, searchPaths: $0.searchPaths) == nil }
-        let envs = skill.requirements?.env ?? []
+    private func needsSetup(_ skill: BackendSkill) -> Bool {
+        // The core already resolved each tool's path against this machine.
+        let hasMissingBins = !skill.missingBins.isEmpty
+        let envs = skill.envs
         let hasMissingRequiredEnv = envs.contains {
-            $0.isRequired && KeychainService.skillEnvValue(skill: skill.name, envName: $0.name) == nil
+            $0.required && KeychainService.skillEnvValue(skill: skill.name, envName: $0.name) == nil
         }
         return hasMissingBins || hasMissingRequiredEnv
     }
 
     // MARK: - Install / Uninstall
 
-    private func installSkill(_ skill: AgentSkill) {
+    private func installSkill(_ skill: BackendSkill) {
         let fm = FileManager.default
         let destDir = Self.installedDir.appendingPathComponent(skill.name)
 
@@ -257,17 +260,17 @@ struct SkillManagementView: View {
                 try fm.removeItem(at: destDir)
             }
             try fm.copyItem(at: URL(fileURLWithPath: skill.baseDir), to: destDir)
-            SkillManager.shared.reload()
+            Task { await SkillStore.shared.reload() }
             reload()
         } catch {
             // Could show alert
         }
     }
 
-    private func uninstallSkill(_ skill: AgentSkill) {
+    private func uninstallSkill(_ skill: BackendSkill) {
         let destDir = Self.installedDir.appendingPathComponent(skill.name)
         try? FileManager.default.removeItem(at: destDir)
-        SkillManager.shared.reload()
+        Task { await SkillStore.shared.reload() }
         reload()
         if !bundledNames.contains(skill.name) {
             selectedSkillName = nil
@@ -276,7 +279,7 @@ struct SkillManagementView: View {
 
     // MARK: - Toggle Enabled
 
-    private func toggleSkillEnabled(_ skill: AgentSkill) {
+    private func toggleSkillEnabled(_ skill: BackendSkill) {
         let skillDir = Self.installedDir.appendingPathComponent(skill.name)
         let jsonURL = skillDir.appendingPathComponent("skill.json")
         let fm = FileManager.default
@@ -295,41 +298,46 @@ struct SkillManagementView: View {
         ) else { return }
 
         fm.createFile(atPath: jsonURL.path, contents: outData)
-        SkillManager.shared.reload()
+        Task { await SkillStore.shared.reload() }
         reload()
     }
 
     // MARK: - Helpers
 
+    /// Re-read the skills from the core.
+    ///
+    /// Both directories arrive in one listing, duplicates included, which is
+    /// what makes the update check possible: a skill installed from the bundled
+    /// catalog appears twice, and comparing the two versions is how this knows
+    /// whether a newer one is available.
     private func reload() {
-        var catalogDirs: [URL] = []
-        if let bundled = Bundle.main.url(forResource: "skills", withExtension: nil) {
-            catalogDirs.append(bundled)
+        Task { @MainActor in
+            let (skills, _) = await SkillCatalog.list()
+
+            let bundled = skills.filter(\.isBundled)
+            bundledNames = Set(bundled.map(\.name))
+            bundledVersions = [:]
+            for skill in bundled where skill.version != nil {
+                bundledVersions[skill.name] = skill.version
+            }
+
+            let installed = skills.filter { !$0.isBundled }
+            installedVersions = [:]
+            for skill in installed where skill.version != nil {
+                installedVersions[skill.name] = skill.version
+            }
+
+            // A user's own skill that is not in the catalog still belongs in
+            // the list — it is theirs, and it is the only way to remove it.
+            let extra = installed.filter { !bundledNames.contains($0.name) }
+            catalogSkills = (bundled + extra)
+                .sorted { Self.displayName(for: $0) < Self.displayName(for: $1) }
+            installedNames = Set(installed.map(\.name))
+            disabledNames = Set(installed.filter { !$0.enabled }.map(\.name))
         }
-
-        let bundledSkills = SkillLoader.loadSkills(from: catalogDirs).skills
-        bundledNames = Set(bundledSkills.map(\.name))
-        bundledVersions = [:]
-        for skill in bundledSkills {
-            if let v = skill.version { bundledVersions[skill.name] = v }
-        }
-
-        // Include user skills from installed dir that aren't in catalog.
-        let installedResult = SkillLoader.loadSkills(from: [Self.installedDir], source: .user)
-        installedVersions = [:]
-        for skill in installedResult.skills {
-            if let v = skill.version { installedVersions[skill.name] = v }
-        }
-
-        let catalogNames = Set(bundledSkills.map(\.name))
-        let extra = installedResult.skills.filter { !catalogNames.contains($0.name) }
-
-        catalogSkills = (bundledSkills + extra).sorted { Self.displayName(for: $0) < Self.displayName(for: $1) }
-        installedNames = Self.scanInstalledNames()
-        disabledNames = Set(installedResult.skills.filter { !$0.isEnabled }.map(\.name))
     }
 
-    func hasUpdate(_ skill: AgentSkill) -> Bool {
+    func hasUpdate(_ skill: BackendSkill) -> Bool {
         guard installedNames.contains(skill.name),
               bundledNames.contains(skill.name) else { return false }
         guard let bundledVersion = bundledVersions[skill.name] else { return false }
@@ -366,7 +374,7 @@ struct SkillManagementView: View {
         return names
     }
 
-    static func displayName(for skill: AgentSkill) -> String {
+    static func displayName(for skill: BackendSkill) -> String {
         skill.name
             .split(separator: "-")
             .map { $0.capitalized }
@@ -402,7 +410,7 @@ private enum SkillListFilter: String, CaseIterable, Identifiable {
 
 private struct SkillSectionData: Identifiable {
     let title: String
-    let skills: [AgentSkill]
+    let skills: [BackendSkill]
 
     var id: String { title }
 }
@@ -411,14 +419,14 @@ private struct SkillSectionData: Identifiable {
 
 private struct SkillCatalogSection: View {
     let title: String
-    let skills: [AgentSkill]
+    let skills: [BackendSkill]
     let installedNames: Set<String>
     let disabledNames: Set<String>
-    let hasUpdate: (AgentSkill) -> Bool
+    let hasUpdate: (BackendSkill) -> Bool
     let refreshToken: Int
-    let onSelect: (AgentSkill) -> Void
-    let onInstall: (AgentSkill) -> Void
-    let onToggle: (AgentSkill) -> Void
+    let onSelect: (BackendSkill) -> Void
+    let onInstall: (BackendSkill) -> Void
+    let onToggle: (BackendSkill) -> Void
 
     private let columns = [
         GridItem(.flexible(minimum: 0), spacing: 30, alignment: .top),
@@ -456,7 +464,7 @@ private struct SkillCatalogSection: View {
 // MARK: - Skill Catalog Item
 
 private struct SkillCatalogItem: View {
-    let skill: AgentSkill
+    let skill: BackendSkill
     let isInstalled: Bool
     let isDisabled: Bool
     let hasUpdate: Bool
@@ -548,13 +556,9 @@ private struct SkillCatalogItem: View {
 
     private var hasMissingSetup: Bool {
         let _ = refreshToken
-        let bins = skill.requirements?.bins ?? []
-        if bins.contains(where: { ToolResolver.resolve(name: $0.name, searchPaths: $0.searchPaths) == nil }) {
-            return true
-        }
-        let envs = skill.requirements?.env ?? []
-        return envs.contains {
-            $0.isRequired && KeychainService.skillEnvValue(skill: skill.name, envName: $0.name) == nil
+        if !skill.missingBins.isEmpty { return true }
+        return skill.envs.contains {
+            $0.required && KeychainService.skillEnvValue(skill: skill.name, envName: $0.name) == nil
         }
     }
 }
@@ -587,7 +591,7 @@ private struct LiquidGlassButtonStyle: ButtonStyle {
 // MARK: - Skill Detail View
 
 private struct SkillDetailView: View {
-    let skill: AgentSkill
+    let skill: BackendSkill
     let isInstalled: Bool
     let isDisabled: Bool
     let hasUpdate: Bool
@@ -631,8 +635,8 @@ private struct SkillDetailView: View {
                             .foregroundStyle(OakStyle.Colors.textSecondary)
                     }
 
-                    if let author = skill.author {
-                        Text("by \(author.name)")
+                    if let authorName = skill.authorName {
+                        Text("by \(authorName)")
                             .font(OakStyle.Font.styledCaption)
                             .foregroundStyle(OakStyle.Colors.textTertiary)
                     }
@@ -675,8 +679,8 @@ private struct SkillDetailView: View {
 
     @ViewBuilder
     private var setupSection: some View {
-        let bins = skill.requirements?.bins ?? []
-        let envs = skill.requirements?.env ?? []
+        let bins = skill.bins
+        let envs = skill.envs
 
         VStack(alignment: .leading, spacing: 10) {
             Text("Setup")
@@ -735,7 +739,7 @@ private struct SkillDetailView: View {
 // MARK: - Skill Icon Tile
 
 private struct SkillIconTile: View {
-    let icon: SkillIcon?
+    let icon: SkillTileIcon?
     let skillName: String
     let baseDir: String
 
@@ -832,7 +836,7 @@ private struct SkillIconTile: View {
 // MARK: - Binary Row
 
 private struct BinRow: View {
-    let bin: BinRequirement
+    let bin: BackendSkillBin
     let refreshToken: Int
     let onInstalled: () -> Void
 
@@ -841,8 +845,10 @@ private struct BinRow: View {
 
     var body: some View {
         let _ = refreshToken
-        let path = ToolResolver.resolve(name: bin.name, searchPaths: bin.searchPaths)
-        let ver = path.flatMap { ToolResolver.version(at: $0, versionArgs: bin.versionArgs ?? []) }
+        // The path comes from the core, which resolved it while loading the
+        // skill; the version is probed here because it means running the tool.
+        let path = bin.path
+        let ver = path.flatMap { ToolResolver.version(at: $0, versionArgs: []) }
 
         HStack(spacing: 8) {
             Image(systemName: path != nil ? "checkmark.circle.fill" : "xmark.circle")
@@ -909,7 +915,7 @@ private struct BinRow: View {
 
         DispatchQueue.global(qos: .userInitiated).async {
             do {
-                try ToolResolver.install(bin: bin)
+                try ToolResolver.install(name: bin.name, install: bin.install ?? [:])
                 DispatchQueue.main.async {
                     isInstalling = false
                     onInstalled()
@@ -928,7 +934,7 @@ private struct BinRow: View {
 
 private struct EnvRow: View {
     let skillName: String
-    let env: EnvRequirement
+    let env: BackendSkillEnv
 
     @State private var value: String = ""
     @State private var isEditing = false
@@ -937,7 +943,7 @@ private struct EnvRow: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: hasValue ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(hasValue ? .green : (env.isRequired ? .orange : .secondary.opacity(0.4)))
+                .foregroundStyle(hasValue ? .green : (env.required ? .orange : .secondary.opacity(0.4)))
                 .font(.system(size: 14))
 
             VStack(alignment: .leading, spacing: 1) {
@@ -945,7 +951,7 @@ private struct EnvRow: View {
                     Text(env.name)
                         .font(.system(size: 12, weight: .medium))
 
-                    if !env.isRequired {
+                    if !env.required {
                         Text("optional")
                             .font(.system(size: 9))
                             .foregroundStyle(.secondary)

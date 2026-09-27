@@ -1,9 +1,11 @@
 import Foundation
 
-/// Standalone tool binary resolution, replacing the plugin-based resolver.
+/// What is left of tool resolution on this side: probing a binary's version and
+/// installing one.
 ///
-/// Resolves tool binaries by checking explicit search paths from `skill.json` first,
-/// then falling back to `which` via `/usr/bin/env`.
+/// Finding a tool moved to the core with the skill manifests that declare it —
+/// see `SkillStore.binPath(named:)`. These two stayed because they are actions
+/// on this machine rather than readings of a file.
 public enum ToolResolver {
 
     /// Resolve a tool binary by name.
@@ -22,38 +24,6 @@ public enum ToolResolver {
             }
         }
 
-        return whichFallback(name)
-    }
-
-    /// Resolve a tool binary from a `BinRequirement` (reads searchPaths from skill.json).
-    public static func resolve(bin: BinRequirement) -> String? {
-        resolve(name: bin.name, searchPaths: bin.searchPaths)
-    }
-
-    /// Look up a `BinRequirement` by name from installed skills, then resolve it.
-    ///
-    /// Scans `~/OakReader(-Dev)/skills/` for a skill whose `skill.json` declares
-    /// a bin with the given name, and resolves using its searchPaths.
-    public static func resolveFromInstalledSkills(name: String) -> String? {
-        #if DEBUG
-        let installedDir = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("OakReader-Dev/skills")
-        #else
-        let installedDir = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("OakReader/skills")
-        #endif
-        let skills = SkillLoader.loadSkills(from: [installedDir], source: .user).skills
-
-        for skill in skills {
-            guard let bins = skill.requirements?.bins else { continue }
-            if let bin = bins.first(where: { $0.name == name }) {
-                if let path = resolve(bin: bin) {
-                    return path
-                }
-            }
-        }
-
-        // Final fallback: which
         return whichFallback(name)
     }
 
@@ -99,30 +69,31 @@ public enum ToolResolver {
     }
 
     /// Install a binary using the method declared in `skill.json`.
-    public static func install(bin: BinRequirement) throws {
-        guard let method = bin.install else {
-            throw InstallError.noInstallMethod(bin.name)
-        }
+    /// Install a tool a skill needs.
+    ///
+    /// Takes the coordinates rather than a manifest type: the manifest is read
+    /// by the core now, and this side is handed what it needs to run — which
+    /// is what installing is, and the one part of this that has to happen here.
+    public static func install(name: String, install method: [String: String]) throws {
+        let brew = method["brew"]
+        let url = method["url"]
+        guard brew != nil || url != nil else { throw InstallError.noInstallMethod(name) }
 
-        // Try brew first; if brew is not installed or fails, fall back to URL download
-        if let brew = method.brew {
-            if brewAvailable() {
-                do {
-                    try installViaBrew(formula: brew)
-                    return
-                } catch {
-                    // brew failed — fall through to URL if available
-                }
+        // brew first, falling back to a download when it is absent or fails.
+        if let brew, brewAvailable() {
+            do {
+                try installViaBrew(formula: brew)
+                return
+            } catch {
+                if url == nil { throw error }
             }
         }
 
-        if let url = method.url {
-            try installViaDownload(url: url, toolName: bin.name)
-        } else if method.brew != nil {
-            // brew was the only method and it failed or wasn't available
-            try installViaBrew(formula: method.brew!)
-        } else {
-            throw InstallError.noInstallMethod(bin.name)
+        if let url {
+            try installViaDownload(url: url, toolName: name)
+        } else if let brew {
+            // brew was the only method and was not available.
+            try installViaBrew(formula: brew)
         }
     }
 
