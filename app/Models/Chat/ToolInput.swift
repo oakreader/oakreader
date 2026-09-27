@@ -79,6 +79,14 @@ struct ToolInput: Codable, Sendable, Hashable, ExpressibleByDictionaryLiteral {
         return nil
     }
 
+    /// Every argument as the string form the portable tools read.
+    ///
+    /// A model sometimes sends a number or a bool where the schema says string
+    /// ("limit": 20), so scalars are flattened rather than dropped.
+    var stringValues: [String: String] {
+        values.compactMapValues(\.scalarString)
+    }
+
     // MARK: - Serialization (for sending back to providers)
 
     var jsonObject: [String: Any] {

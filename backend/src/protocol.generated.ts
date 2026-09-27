@@ -2,7 +2,7 @@
 // Run `pnpm protocol:generate` after changing the schema.
 
 import { z } from "zod";
-import { WireMessage, WireToolDef, WordLookup, Annotation, Conversation, Collection, Item, Property, PropertyOption, Skill, SkillAdvisory, SkillBin, SkillEnv, type ProviderSummary, type EventToolCall, type PromptOption } from "./protocol.base.js";
+import { WireMessage, WireToolDef, WordLookup, Annotation, Conversation, Collection, Item, Property, PropertyOption, Skill, SkillAdvisory, SkillBin, SkillEnv, ToolDefinition, type ProviderSummary, type EventToolCall, type PromptOption } from "./protocol.base.js";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- refs used by generated shapes
 
 export const PROTOCOL_VERSION = 10;
@@ -482,6 +482,29 @@ export type SkillsListResult = {
   advisories: SkillAdvisory[];
 };
 
+/** `tools/list` — The tools the core implements: the ones that touch this machine rather than the app. The shell declares them to the model alongside its own and gates them the same way. */
+export const ToolsListParams = z.object({
+});
+export type ToolsListParams = z.infer<typeof ToolsListParams>;
+export type ToolsListResult = {
+  tools: ToolDefinition[];
+};
+
+/** `tools/run` — Run one of them. Called by the shell AFTER it has shown the call and taken the user's decision -- the side that approves is the side that runs, which is one fewer way for an unapproved command to happen. */
+export const ToolsRunParams = z.object({
+  name: z.string(),
+  /** The model's arguments, as strings. */
+  args: z.record(z.string(), z.any()),
+  workingDirectory: z.string(),
+  /** Roots a path must sit inside. Empty means unsandboxed. */
+  allowedPaths: z.array(z.string()).default([]),
+});
+export type ToolsRunParams = z.infer<typeof ToolsRunParams>;
+export type ToolsRunResult = {
+  content: string;
+  isError: boolean;
+};
+
 /** `skills/body` — One skill's SKILL.md body, without its frontmatter. Read on demand rather than listed: the bodies are long prose, and only the active skill's is ever used. The shell places it after the live context, which is why it is not part of prompts/compose. */
 export const SkillsBodyParams = z.object({
   name: z.string(),
@@ -640,6 +663,8 @@ export const ClientRequests = {
   "catalog/properties/setTextValue": PropertiesSetTextValueParams,
   "prompts/compose": PromptsComposeParams,
   "skills/list": SkillsListParams,
+  "tools/list": ToolsListParams,
+  "tools/run": ToolsRunParams,
   "skills/body": SkillsBodyParams,
   "catalog/wordLookups/list": WordLookupsListParams,
   "catalog/wordLookups/save": WordLookupsSaveParams,
@@ -704,6 +729,8 @@ export interface ClientRequestResults {
   "catalog/properties/setTextValue": PropertiesSetTextValueResult;
   "prompts/compose": PromptsComposeResult;
   "skills/list": SkillsListResult;
+  "tools/list": ToolsListResult;
+  "tools/run": ToolsRunResult;
   "skills/body": SkillsBodyResult;
   "catalog/wordLookups/list": WordLookupsListResult;
   "catalog/wordLookups/save": WordLookupsSaveResult;

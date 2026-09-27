@@ -89,6 +89,8 @@ enum RPC {
         static let propertiesSetTextValue = "catalog/properties/setTextValue"
         static let promptsCompose = "prompts/compose"
         static let skillsList = "skills/list"
+        static let toolsList = "tools/list"
+        static let toolsRun = "tools/run"
         static let skillsBody = "skills/body"
         static let wordLookupsList = "catalog/wordLookups/list"
         static let wordLookupsSave = "catalog/wordLookups/save"
@@ -607,6 +609,33 @@ enum RPC {
         var skills: [BackendSkill]
         /// Malformed or duplicate skills, so one can be fixed rather than vanish.
         var advisories: [BackendSkillAdvisory]
+    }
+
+    // MARK: tools/list
+    /// The tools the core implements: the ones that touch this machine rather than the app. The
+    /// shell declares them to the model alongside its own and gates them the same way.
+    struct ToolsListParams: Encodable {
+        init() {}
+    }
+    struct ToolsListResult: Decodable {
+        var tools: [BackendToolDefinition]
+    }
+
+    // MARK: tools/run
+    /// Run one of them. Called by the shell AFTER it has shown the call and taken the user's
+    /// decision -- the side that approves is the side that runs, which is one fewer way for an
+    /// unapproved command to happen.
+    struct ToolsRunParams: Encodable {
+        var name: String
+        /// The model's arguments, as strings.
+        var args: AnyJSONObject
+        var workingDirectory: String
+        /// Roots a path must sit inside. Empty means unsandboxed.
+        var allowedPaths: [String]?
+    }
+    struct ToolsRunResult: Decodable {
+        var content: String
+        var isError: Bool?
     }
 
     // MARK: skills/body

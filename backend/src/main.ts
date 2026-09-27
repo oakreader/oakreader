@@ -14,7 +14,9 @@ import {
   PROTOCOL_VERSION, RpcError,
   PingParams, ProvidersListParams,
   PromptsComposeParams, SkillsListParams, type SkillsListResult,
-  SkillsBodyParams, type SkillsBodyResult, type PromptsComposeResult,
+  SkillsBodyParams, type SkillsBodyResult,
+  ToolsListParams, ToolsRunParams,
+  type ToolsListResult, type ToolsRunResult, type PromptsComposeResult,
   CatalogValidateParams, type CatalogValidateResult,
   ReferencesGetParams, ReferencesSaveParams, type ReferencesGetResult,
   CiteKeysProposeParams, CiteKeysSaveParams, CiteKeysAssignParams,
@@ -50,6 +52,7 @@ import { ConfigStore, FileCredentialStore, dataPaths } from "./store.js";
 import { ProviderRegistry, toPiId } from "./providers.js";
 import { runChat, toPiMessages } from "./chat.js";
 import { PromptLibrary } from "./prompts.js";
+import { PORTABLE_TOOLS, runTool } from "./tools.js";
 import {
   loadSkills, locateBin, promptSection, readBody, skillDirectories, userSkillDirectory,
 } from "./skills.js";
@@ -364,6 +367,20 @@ function registerMethods(): void {
     const errors = [...result.errors.entries()].map(([prov, e]) => `${prov}: ${errorMessage(e)}`);
     if (errors.length > 0) throw new RpcFailure(RpcError.providerUnavailable, errors.join("; "));
     return {};
+  });
+
+  peer.onRequest("tools/list", ToolsListParams, (): ToolsListResult => ({
+    tools: PORTABLE_TOOLS,
+  }));
+
+  peer.onRequest("tools/run", ToolsRunParams, async (p): Promise<ToolsRunResult> => {
+    // Arguments arrive as the model wrote them; every portable tool reads
+    // strings, so anything else is stringified rather than refused.
+    const args: Record<string, string> = {};
+    for (const [key, value] of Object.entries(p.args)) {
+      args[key] = typeof value === "string" ? value : JSON.stringify(value);
+    }
+    return await runTool(p.name, args, p.workingDirectory, p.allowedPaths);
   });
 
   peer.onRequest("skills/body", SkillsBodyParams, (p): SkillsBodyResult => {

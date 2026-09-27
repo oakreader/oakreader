@@ -377,3 +377,13 @@ struct BackendSkillAdvisory: Codable {
     var path: String
     var message: String
 }
+
+/// A tool the core implements, as the shell must declare it to the model.
+struct BackendToolDefinition: Codable {
+    var name: String
+    var description: String
+    /// "readOnly", "write" or "dangerous" — what the permission level gates on.
+    var category: String
+    /// JSON Schema for the tool's arguments, passed through untouched.
+    var inputSchema: JSONValue
+}

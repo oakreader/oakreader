@@ -308,3 +308,14 @@ export type Skill = z.infer<typeof Skill>;
 
 export const SkillAdvisory = z.object({ path: z.string(), message: z.string() });
 export type SkillAdvisory = z.infer<typeof SkillAdvisory>;
+
+/** A tool the core implements, as the shell must declare it to the model. */
+export const ToolDefinition = z.object({
+  name: z.string(),
+  description: z.string(),
+  /** "readOnly", "write" or "dangerous" — what the permission level gates on. */
+  category: z.string(),
+  /** JSON Schema for the tool's arguments, passed through untouched. */
+  inputSchema: z.record(z.string(), z.unknown()),
+});
+export type ToolDefinition = z.infer<typeof ToolDefinition>;

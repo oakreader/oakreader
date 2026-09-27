@@ -284,6 +284,10 @@ class ChatViewModel {
         // Build tools list
         var tools: [any AgentTool] = []
 
+        // The core's tools are fetched inside the stream task, where awaiting
+        // is possible; this records which of them the preferences allow.
+        var portableToolNames: Set<String> = []
+
         // 1. Document tools (always when a document is open)
         if let doc = snapshot.document {
             tools.append(ReadDocumentTool(
@@ -326,12 +330,19 @@ class ChatViewModel {
         // 4. Filesystem tools (user preference gated). Available for a document's
         //    storage dir or the library agent's CoW workspace folder.
         if prefs.agentToolsEnabled, toolContext != nil || workspaceDirectory != nil {
-            if prefs.agentReadFileEnabled { tools.append(ReadTool()) }
-            if prefs.agentWriteFileEnabled { tools.append(WriteTool()) }
-            tools.append(BashTool())
+            // Implemented by the core — nothing in them is macOS — but run from
+            // here, after this side has shown the call and taken the user's
+            // decision. See `PortableTool`.
+            let enabled: Set<String> = {
+                var names: Set<String> = ["bash"]
+                if prefs.agentReadFileEnabled { names.insert("read") }
+                if prefs.agentWriteFileEnabled { names.insert("write") }
+                return names
+            }()
+            portableToolNames = enabled
         }
 
-        let currentTools: [any AgentTool]? = tools.isEmpty ? nil : tools
+        let toolsWithoutPortable = tools
 
         // Ensure a tool context exists when document tools are present
         let effectiveToolContext: ToolExecutionContext?
@@ -355,6 +366,10 @@ class ChatViewModel {
 
         streamTask = Task { @MainActor [weak self] in
             do {
+                let portable = portableToolNames.isEmpty ? []
+                    : await ToolCatalog.list().filter { portableToolNames.contains($0.name) }
+                let currentTools = (toolsWithoutPortable + portable).isEmpty
+                    ? nil : toolsWithoutPortable + portable
                 // Policy text comes from the core's prompt files; context is
                 // assembled below from state only this process has.
                 // The skills listing comes with the prompt; it is only useful

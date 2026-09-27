@@ -84,14 +84,12 @@ struct OakCLITool: AgentTool, Sendable {
         }
 
         do {
-            let result = try await context.bashOperations.execute(
+            let result = try await Self.run(
                 executable: Self.oakPath,
                 arguments: arguments,
-                workingDirectory: context.workingDirectory,
-                timeout: 30
-            )
+                workingDirectory: context.workingDirectory)
 
-            var output = annotateWithCiteHandles(result.combinedOutput)
+            var output = annotateWithCiteHandles(result.output)
             output = OutputTruncation.truncate(output, maxLength: Self.maxOutputLength)
 
             if result.exitCode != 0 {
@@ -113,6 +111,32 @@ struct OakCLITool: AgentTool, Sendable {
     /// Done by rewriting the CLI's JSON rather than by teaching the CLI about chat sessions:
     /// `oak` is a standalone binary that also runs outside the app, and citation handles are
     /// a property of a conversation, not of the library.
+    /// Run the embedded `oak` binary and collect what it said.
+    ///
+    /// Its own, rather than the agent's bash tool: this invokes one known
+    /// executable with a fixed argument list — no shell, so nothing the model
+    /// writes can become a second command.
+    private static func run(
+        executable: String, arguments: [String], workingDirectory: URL
+    ) async throws -> (output: String, exitCode: Int32) {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = arguments
+        process.currentDirectoryURL = workingDirectory
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+
+        try process.run()
+        // Read before waiting: a pipe fills at 64 KB and a writer blocked on a
+        // full pipe never exits.
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+
+        return (String(data: data, encoding: .utf8) ?? "", process.terminationStatus)
+    }
+
     private func annotateWithCiteHandles(_ output: String) -> String {
         guard let data = output.data(using: .utf8),
               var envelope = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],

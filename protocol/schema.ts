@@ -497,6 +497,33 @@ export const METHODS: Method[] = [
   },
 
   {
+    name: "tools/list", type: "ToolsList", kind: "request", from: "client",
+    doc: "The tools the core implements: the ones that touch this machine " +
+         "rather than the app. The shell declares them to the model alongside " +
+         "its own and gates them the same way.",
+    params: [],
+    result: [{ name: "tools",
+      type: { k: "array", of: { k: "ref", ts: "ToolDefinition", swift: "BackendToolDefinition" } } }],
+  },
+  {
+    name: "tools/run", type: "ToolsRun", kind: "request", from: "client",
+    doc: "Run one of them. Called by the shell AFTER it has shown the call and " +
+         "taken the user's decision -- the side that approves is the side that " +
+         "runs, which is one fewer way for an unapproved command to happen.",
+    params: [
+      { name: "name", type: str },
+      { name: "args", type: json, doc: "The model's arguments, as strings." },
+      { name: "workingDirectory", type: str },
+      { name: "allowedPaths", type: { k: "array", of: str }, default: "[]",
+        doc: "Roots a path must sit inside. Empty means unsandboxed." },
+    ],
+    result: [
+      { name: "content", type: str },
+      { name: "isError", type: bool, default: "false" },
+    ],
+  },
+
+  {
     name: "skills/body", type: "SkillsBody", kind: "request", from: "client",
     doc: "One skill's SKILL.md body, without its frontmatter. Read on demand " +
          "rather than listed: the bodies are long prose, and only the active " +
