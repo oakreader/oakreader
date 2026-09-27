@@ -53,12 +53,21 @@ const PROVIDER_ORDER = [
   "cerebras", "huggingface", "together", "minimax", "zai", "xiaomi",
 ];
 
-/** Preferred default model per provider (falls back to the catalog's first). */
+/**
+ * Preferred default model per provider — the strong general one, falling back
+ * to the catalog's first when the id is not there.
+ *
+ * That fallback makes a stale entry silent rather than broken, which is how
+ * `deepseek-chat` survived here after pi stopped carrying it: the picker just
+ * quietly chose something else. Check an id against
+ * `node_modules/@earendil-works/pi-ai/dist/providers/data/*.json` when
+ * changing one.
+ */
 const DEFAULT_MODELS: Record<string, string> = {
   anthropic: "claude-fable-5",
   openai: "gpt-5.5",
   google: "gemini-3.1-pro-preview",
-  deepseek: "deepseek-chat",
+  deepseek: "deepseek-v4-pro",
 };
 
 const LOCAL_DEFAULTS: Record<string, string> = {
