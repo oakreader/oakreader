@@ -19,6 +19,12 @@ excluded:
   - .build
   - build
   - Packages
+  # `excluded` entries only match from the repo root, so the bare `.build`
+  # above misses nested ones. Agent worktrees under `.claude/` carry their own
+  # `.build/index-build/checkouts`, and linting those vendored trees pinned the
+  # build phase for minutes while emitting thousands of violations for code we
+  # do not own.
+  - .claude
 
 identifier_name:
   min_length: 1
