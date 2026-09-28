@@ -68,20 +68,24 @@ enum OakStyle {
         static let noteAccentIcon = Color(hex: "5E6A78")
         static let noteAccentIconNS = NSColor(srgbRed: 0x5E / 255.0, green: 0x6A / 255.0, blue: 0x78 / 255.0, alpha: 1)
 
-        // Skill-pill tint — ONE muted-accent source for the `/skill` chip so the chat
-        // input attachment (ChatTokenAttachment) and the sent-message badge
-        // (ChatBubbleView.skillBadge) render identically. The muted look = accent blended
-        // 50% with the translucent tertiary label. `blended(withFraction:of:)` returns nil
-        // when a color can't flatten to calibrated RGB (which happened inconsistently
-        // between the SwiftUI and AppKit draw contexts → one side fell back to the
-        // full-saturation accent). Pre-converting both operands to sRGB makes the blend
-        // deterministic, so the chip and the badge always match.
+        // Skill-pill tint — one muted-accent source, still used by the notes
+        // filter. The chat chips moved to the neutral pair below; see there.
         static let skillTintNS: NSColor = NSColor(name: "OakSkillTint") { _ in
             let accent = NSColor.controlAccentColor.usingColorSpace(.sRGB) ?? .controlAccentColor
             let grey = NSColor.tertiaryLabelColor.usingColorSpace(.sRGB) ?? .gray
             return accent.blended(withFraction: 0.5, of: grey) ?? accent
         }
         static let skillTint = Color(nsColor: skillTintNS)
+
+        // A chat chip: the skill token in the composer, the badge on a sent
+        // message, and the selected row in the `/` panel. One neutral pair, so
+        // a skill and a library reference read as the same kind of object and
+        // only their glyph says which — grey sits quieter beside the composer's
+        // own chrome than the accent did.
+        static let chipForegroundNS = NSColor.labelColor.withAlphaComponent(0.60)
+        static let chipForeground = Color(nsColor: chipForegroundNS)
+        static let chipFillNS = NSColor.labelColor.withAlphaComponent(0.06)
+        static let chipFill = Color(nsColor: chipFillNS)
 
         // Text
         static let textPrimary = Color.primary.opacity(1.0)

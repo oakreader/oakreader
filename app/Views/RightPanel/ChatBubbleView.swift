@@ -444,21 +444,21 @@ struct ChatBubbleView: View, Equatable {
 
     private func skillBadge(_ skillId: String) -> some View {
         let skill = SkillStore.shared.skill(matching: skillId)
-        // Mirror the input composer's token chip (ChatTokenAttachment): a soft
-        // accent fill + muted accent text, no border. Shared token so both match exactly.
-        let softAccent = OakStyle.Colors.skillTint
+        // Mirrors the input composer's token chip (ChatTokenAttachment): the
+        // shared neutral pair, no border, so a skill reads the same wherever
+        // it appears.
         return HStack(spacing: 3) {
             Image(systemName: skill?.symbolName ?? "sparkles")
                 .font(OakStyle.ChatFont.modelLabel)
-            Text(skillId)
+            Text(skill?.title ?? skillId)
                 .font(OakStyle.ChatFont.modelLabel)
         }
-        .foregroundStyle(softAccent)
+        .foregroundStyle(OakStyle.Colors.chipForeground)
         .padding(.horizontal, 6)
         .padding(.vertical, 2)
         .background(
             RoundedRectangle(cornerRadius: 4)
-                .fill(softAccent.opacity(0.13))
+                .fill(OakStyle.Colors.chipFill)
         )
         .fixedSize()
     }
@@ -474,12 +474,12 @@ struct ChatBubbleView: View, Equatable {
                 .font(OakStyle.ChatFont.badge)
                 .lineLimit(1)
         }
-        .foregroundStyle(OakStyle.Colors.textSecondary)
+        .foregroundStyle(OakStyle.Colors.chipForeground)
         .padding(.horizontal, 6)
         .padding(.vertical, 2)
         .background(
             RoundedRectangle(cornerRadius: 4)
-                .fill(Color.primary.opacity(0.06))
+                .fill(OakStyle.Colors.chipFill)
         )
         .fixedSize()
     }

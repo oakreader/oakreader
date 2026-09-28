@@ -483,12 +483,10 @@ private final class ChatCompletionRowView: NSView {
 
     func setHighlighted(_ on: Bool) {
         isHighlighted = on
-        // Accent-blue pill with WHITE text/icon when selected (Dia parity); fully
-        // transparent otherwise so the card fill shows through.
+        // Only the band changes. A grey selection does not need the row to
+        // recolour itself the way the accent pill did — and text that stays
+        // put is easier to read while arrowing down a list.
         layer?.backgroundColor = on ? palette.selectionFill.cgColor : NSColor.clear.cgColor
-        titleLabel.textColor = on ? palette.onSelectionText : palette.title
-        descLabel.textColor = on ? palette.onSelectionSecondary : palette.secondary
-        iconView.contentTintColor = on ? palette.onSelectionText : item.completionTint
     }
 
     override func updateTrackingAreas() {
@@ -572,8 +570,8 @@ private final class CompletionDocumentView: NSView {
 }
 
 private extension ChatCompletionItem {
-    /// Neutral monochrome glyph for every row (skills and library refs alike). Tinting
-    /// each symbol its own accent/orange read as noisy; Dia keeps the icon column calm
-    /// and grey, letting the selection pill be the only colour. White when selected.
+    /// Neutral monochrome glyph for every row (skills and library refs alike).
+    /// Tinting each symbol its own accent read as noisy; the icon column stays
+    /// calm and grey.
     var completionTint: NSColor { .secondaryLabelColor }
 }

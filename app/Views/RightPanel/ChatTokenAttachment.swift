@@ -75,19 +75,15 @@ private final class ChatTokenCell: NSTextAttachmentCell {
     // MARK: - Drawing
 
     override func draw(withFrame cellFrame: NSRect, in controlView: NSView?) {
-        // A library reference is passive context → a neutral grey chip. A skill is a
-        // command → the soft accent. (The sent-message badges mirror this split.)
-        let isReference: Bool = { if case .libraryReference = item.kind { return true }; return false }()
-        // Mirror the sent-message badges exactly (ChatBubbleView): a reference is a neutral
-        // grey chip (label@0.60 text on a label@0.06 fill); a skill is the soft accent.
-        let tint: NSColor = isReference
-            ? .labelColor.withAlphaComponent(0.60)
-            : OakStyle.Colors.skillTintNS
+        // One chip for both kinds — a skill and a library reference are both
+        // things you attached, and the glyph already says which. Mirrors the
+        // sent-message badge exactly (ChatBubbleView).
+        let tint = OakStyle.Colors.chipForegroundNS
 
         // Borderless fill — a soft wash reads as a chip without the boxed-in look of a stroke.
         let bgRect = cellFrame.insetBy(dx: 0.5, dy: 0.5)
         let path = NSBezierPath(roundedRect: bgRect, xRadius: Self.cornerRadius, yRadius: Self.cornerRadius)
-        (isReference ? NSColor.labelColor.withAlphaComponent(0.06) : tint.withAlphaComponent(0.13)).setFill()
+        OakStyle.Colors.chipFillNS.setFill()
         path.fill()
 
         // Icon — tint to match label color
