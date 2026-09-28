@@ -393,23 +393,12 @@ struct LLMContextProvider {
                 """)
         }
 
-        // Citation format. The whole wire protocol is one number: passages arrive in
-        // context already numbered (see CitationSourceRegistry), and the model cites one
-        // by linking its number. It never reproduces a quote, a page, or a cite key, so
-        // the anchor cannot be paraphrased, mis-encoded, or invented — which is what the
-        // ~4 KB of "copy the anchor VERBATIM" rules this replaced were trying to prevent.
-        parts.append("""
-            Citations. Passages you are shown are numbered like [14]. Cite one by \
-            linking its number: [your own label](oak:14). Only ever cite a number you \
-            were actually shown — never invent one, and never write a bare page number \
-            like "p. 5" instead of a link.
-
-            Cite the load-bearing claim: a quotation, a statistic, a named finding, or \
-            the conclusion of a passage you are summarizing. Do not cite your own \
-            reasoning, generic background, or ordinary conversation. At most one \
-            citation per sentence, placed at the end — never make the whole sentence \
-            the link, and never end an answer with a list of citations.
-            """)
+        // Citation format is policy, so it lives in `prompts/mixins/citations.md`
+        // with the rest of what the assistant is told — see `PromptCatalog`. The
+        // wire protocol is one number: passages arrive in context already
+        // numbered (see CitationSourceRegistry), and the model cites one by
+        // linking its number, so the anchor cannot be paraphrased, mis-encoded
+        // or invented.
 
         // User memory (ChatGPT `bio`-style): one global profile of durable facts
         // about the user, injected into every conversation. The `manage_memory`
