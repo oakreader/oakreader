@@ -75,16 +75,22 @@ private final class ChatTokenCell: NSTextAttachmentCell {
     // MARK: - Drawing
 
     override func draw(withFrame cellFrame: NSRect, in controlView: NSView?) {
-        // One chip for both kinds — a skill and a library reference are both
-        // things you attached, and the glyph already says which. Mirrors the
-        // sent-message badge exactly (ChatBubbleView).
-        let tint = OakStyle.Colors.chipForegroundNS
+        // A skill is a command: blue words and glyph, no fill. A library
+        // reference is passive context, so it keeps a quiet grey chip — the
+        // difference in weight is the difference in what they do. Both mirror
+        // the sent-message badges exactly (ChatBubbleView).
+        let isReference: Bool = { if case .libraryReference = item.kind { return true }; return false }()
+        let tint = isReference ? OakStyle.Colors.chipForegroundNS : OakStyle.Colors.skillChipNS
 
-        // Borderless fill — a soft wash reads as a chip without the boxed-in look of a stroke.
-        let bgRect = cellFrame.insetBy(dx: 0.5, dy: 0.5)
-        let path = NSBezierPath(roundedRect: bgRect, xRadius: Self.cornerRadius, yRadius: Self.cornerRadius)
-        OakStyle.Colors.chipFillNS.setFill()
-        path.fill()
+        if isReference {
+            // Borderless fill — a soft wash reads as a chip without the boxed-in
+            // look of a stroke.
+            let bgRect = cellFrame.insetBy(dx: 0.5, dy: 0.5)
+            let path = NSBezierPath(
+                roundedRect: bgRect, xRadius: Self.cornerRadius, yRadius: Self.cornerRadius)
+            OakStyle.Colors.chipFillNS.setFill()
+            path.fill()
+        }
 
         // Icon — tint to match label color
         let iconY = cellFrame.minY + (cellFrame.height - Self.iconSize) / 2

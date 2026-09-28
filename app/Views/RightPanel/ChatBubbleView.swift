@@ -444,22 +444,17 @@ struct ChatBubbleView: View, Equatable {
 
     private func skillBadge(_ skillId: String) -> some View {
         let skill = SkillStore.shared.skill(matching: skillId)
-        // Mirrors the input composer's token chip (ChatTokenAttachment): the
-        // shared neutral pair, no border, so a skill reads the same wherever
-        // it appears.
+        // Mirrors the input composer's token chip (ChatTokenAttachment): blue
+        // words and glyph on nothing, so a skill reads the same after it is
+        // sent as it did while you were typing it.
         return HStack(spacing: 3) {
             Image(systemName: skill?.symbolName ?? "sparkles")
                 .font(OakStyle.ChatFont.modelLabel)
             Text(skill?.title ?? skillId)
                 .font(OakStyle.ChatFont.modelLabel)
         }
-        .foregroundStyle(OakStyle.Colors.chipForeground)
-        .padding(.horizontal, 6)
+        .foregroundStyle(OakStyle.Colors.skillChip)
         .padding(.vertical, 2)
-        .background(
-            RoundedRectangle(cornerRadius: 4)
-                .fill(OakStyle.Colors.chipFill)
-        )
         .fixedSize()
     }
 

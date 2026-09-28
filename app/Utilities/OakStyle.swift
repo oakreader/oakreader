@@ -77,11 +77,16 @@ enum OakStyle {
         }
         static let skillTint = Color(nsColor: skillTintNS)
 
-        // A chat chip: the skill token in the composer, the badge on a sent
-        // message, and the selected row in the `/` panel. One neutral pair, so
-        // a skill and a library reference read as the same kind of object and
-        // only their glyph says which — grey sits quieter beside the composer's
-        // own chrome than the accent did.
+        // A skill, wherever it appears: the token in the composer and the badge
+        // on a sent message. Blue text and glyph on nothing — the words are the
+        // chip, so a fill behind them only boxes in something already legible.
+        // The system accent rather than a muted blend, because without a fill a
+        // dulled blue reads as disabled.
+        static let skillChipNS = NSColor.controlAccentColor
+        static let skillChip = Color(nsColor: skillChipNS)
+
+        // A library reference, which is passive context rather than a command:
+        // a quiet grey chip, fill and all, so the two do not look alike.
         static let chipForegroundNS = NSColor.labelColor.withAlphaComponent(0.60)
         static let chipForeground = Color(nsColor: chipForegroundNS)
         static let chipFillNS = NSColor.labelColor.withAlphaComponent(0.06)
