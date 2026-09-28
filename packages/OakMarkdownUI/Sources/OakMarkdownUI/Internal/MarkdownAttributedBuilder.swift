@@ -256,7 +256,6 @@ private final class Renderer {
     /// restores a normal single-space gap. Skip newline neighbors.
     private func addInlineCodeSpacing(_ m: NSMutableAttributedString) {
         addPillSpacing(m, key: .inlineCodePill, gap: MarkdownInlineCodePill.horizontalPadding)
-        addPillSpacing(m, key: .citationPill, gap: MarkdownCitationPill.horizontalPadding)
     }
 
     private func addPillSpacing(_ m: NSMutableAttributedString,
@@ -379,15 +378,12 @@ private final class Renderer {
         }
 
         // An internal reference (`oak:14`) is a jump-to-source marker, not a web
-        // link, so it gets Dia's treatment: a tinted capsule with no underline. Underlining
-        // them striped every cited paragraph and made a citation look like a destination
-        // the reader was leaving the app for.
+        // link. It is the accent colour and a little heavier, and nothing else:
+        // no underline, because the reader is not leaving the app, and no
+        // capsule, because a paragraph with six citations in it became a row of
+        // buttons rather than a sentence.
         if destination.hasPrefix(StreamingMarkdownSanitizer.internalScheme) {
             m.addAttribute(.foregroundColor, value: theme.citationForeground, range: full)
-            // `.backgroundColor` is what routes the run through the layout manager's
-            // fill hook; `.citationPill` tells it to draw a capsule instead of a rect.
-            m.addAttribute(.backgroundColor, value: theme.citationBackground, range: full)
-            m.addAttribute(.citationPill, value: true, range: full)
             return addWeight(.medium, to: m)
         }
 

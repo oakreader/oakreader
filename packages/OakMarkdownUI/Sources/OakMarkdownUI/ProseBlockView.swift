@@ -76,6 +76,12 @@ struct ProseBlockView: NSViewRepresentable {
         // no longer leak into the rendered view and clip the settled bubble. Set AFTER
         // `isHorizontallyResizable`, whose setter can flip tracking off.
         container.widthTracksTextView = true
+        // Style links from the attributed string alone. NSTextView otherwise
+        // layers its own `linkTextAttributes` — blue and underlined — over every
+        // `.link` run, which is why citations came out underlined despite the
+        // builder deliberately not underlining them: they were getting a capsule
+        // AND a link's underline, two treatments at once.
+        tv.linkTextAttributes = [.cursor: NSCursor.pointingHand]
         tv.setContentHuggingPriority(.defaultHigh, for: .vertical)
         tv.delegate = context.coordinator
         return tv

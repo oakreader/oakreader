@@ -9,9 +9,6 @@ extension NSAttributedString.Key {
     static let blockquoteFill = NSAttributedString.Key("OakMarkdownBlockquoteFill")
     /// Bar color (`NSColor`) for a block-quote range — drawn as a left vertical accent.
     static let blockquoteBar = NSAttributedString.Key("OakMarkdownBlockquoteBar")
-    /// Marks an internal-reference run (`oak:14`) so `HuggingLayoutManager` draws it
-    /// as a tinted capsule — a jump-to-source chip rather than an underlined web link.
-    static let citationPill = NSAttributedString.Key("OakMarkdownCitationPill")
 }
 
 enum MarkdownInlineCodePill {
@@ -19,12 +16,6 @@ enum MarkdownInlineCodePill {
     /// builder kerns the neighboring characters by the same amount so the overshoot
     /// no longer eats the space between a code span and its surrounding words.
     static let horizontalPadding: CGFloat = 4.5
-}
-
-enum MarkdownCitationPill {
-    /// Points the capsule extends past the label glyphs on each side. Wider than the
-    /// code pill so a two-character label ("p. 2") still reads as a tappable chip.
-    static let horizontalPadding: CGFloat = 5.5
 }
 
 /// Draws inline-code spans as rounded pills that hug the glyph height, while leaving
@@ -116,7 +107,7 @@ final class HuggingLayoutManager: NSLayoutManager {
         }
     }
 
-    /// Geometry for a pill-drawn run — inline code or a citation chip. `nil` when
+    /// Geometry for a pill-drawn run — inline code. `nil` when
     /// `charRange` is an ordinary `.backgroundColor` run (or the selection), which must
     /// keep AppKit's default square fill so multi-line selection stays continuous.
     private struct PillStyle {
@@ -131,12 +122,6 @@ final class HuggingLayoutManager: NSLayoutManager {
         let index = min(max(charRange.location, 0), storage.length - 1)
         func font(_ fallback: NSFont) -> NSFont {
             (storage.attribute(.font, at: index, effectiveRange: nil) as? NSFont) ?? fallback
-        }
-        if storage.attribute(.citationPill, at: index, effectiveRange: nil) != nil {
-            return PillStyle(font: font(.systemFont(ofSize: 13)),
-                             expand: MarkdownCitationPill.horizontalPadding,
-                             verticalPadding: 1.0,
-                             cornerRadius: nil)
         }
         if storage.attribute(.inlineCodePill, at: index, effectiveRange: nil) != nil {
             return PillStyle(font: font(.monospacedSystemFont(ofSize: 13, weight: .regular)),

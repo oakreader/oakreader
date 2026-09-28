@@ -17,11 +17,10 @@ public struct MarkdownTheme {
     public var secondaryTextColor: NSColor
     public var linkColor: NSColor
     /// Text color of an internal-reference chip (`oak:14`). Citations are styled as
-    /// a tinted capsule rather than an underlined web link, so a jump-to-source marker
-    /// reads as a distinct affordance and a run of them doesn't stripe the paragraph.
+    /// the accent colour and a little heavier — no underline, because the reader
+    /// is not leaving the app, and no capsule, because a paragraph with six
+    /// citations became a row of buttons rather than a sentence.
     public var citationForeground: NSColor
-    /// Capsule fill behind a citation chip, painted by `HuggingLayoutManager`.
-    public var citationBackground: NSColor
     public var inlineCodeBackground: NSColor
     public var codeBlockBackground: NSColor
     public var codeBlockBorder: NSColor
@@ -44,7 +43,6 @@ public struct MarkdownTheme {
         secondaryTextColor: NSColor,
         linkColor: NSColor,
         citationForeground: NSColor = .controlAccentColor,
-        citationBackground: NSColor = NSColor.controlAccentColor.withAlphaComponent(0.12),
         inlineCodeBackground: NSColor,
         codeBlockBackground: NSColor,
         codeBlockBorder: NSColor,
@@ -63,7 +61,6 @@ public struct MarkdownTheme {
         self.secondaryTextColor = secondaryTextColor
         self.linkColor = linkColor
         self.citationForeground = citationForeground
-        self.citationBackground = citationBackground
         self.inlineCodeBackground = inlineCodeBackground
         self.codeBlockBackground = codeBlockBackground
         self.codeBlockBorder = codeBlockBorder
