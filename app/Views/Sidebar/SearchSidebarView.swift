@@ -152,7 +152,7 @@ struct SearchSidebarView: View {
         guard let page = selection.pages.first,
               let doc = viewModel.pdfDocument else { return }
         let pageIndex = doc.index(for: page)
-        viewModel.viewer.goToPage(pageIndex)
+        viewModel.viewer.goToPage(pageIndex, kind: .jump)
     }
 }
 

@@ -21,7 +21,7 @@ struct BookmarkSidebarView: View {
                                 selectedItemId: $selectedItemId,
                                 onTap: { tapped in
                                     selectedItemId = tapped.id
-                                    viewModel.viewer.goToPage(tapped.pageIndex)
+                                    viewModel.viewer.goToPage(tapped.pageIndex, kind: .jump)
                                 }
                             )
                         }

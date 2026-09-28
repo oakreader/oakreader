@@ -25,6 +25,11 @@ struct ThumbnailSidebarView: View {
                             )
                             .id(index)
                             .onTapGesture {
+                                // `.reading`, not `.jump`: thumbnails are a
+                                // scrubbing surface that stays open, so getting
+                                // back is one more click in the same list. A
+                                // return point per scrub would bury the one the
+                                // reader actually wants (a citation's origin).
                                 viewModel.viewer.goToPage(index)
                             }
                             .onDrag {

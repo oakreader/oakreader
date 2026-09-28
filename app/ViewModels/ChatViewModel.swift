@@ -735,7 +735,7 @@ class ChatViewModel {
         switch vm.contentType {
         case .pdf:
             if let page = anchor.page {
-                vm.viewer.goToPage(page)
+                vm.viewer.goToPage(page, kind: .jump)
             }
             if let text = anchor.text {
                 // Tolerant search: the model's text= is often a paraphrase, so exact

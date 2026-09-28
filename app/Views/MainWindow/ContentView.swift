@@ -194,11 +194,16 @@ struct ContentView: View {
     private var mainContentView: some View {
         switch viewModel.contentType {
         case .pdf:
-            ZStack {
+            ZStack(alignment: .bottom) {
                 PDFViewerRepresentable(viewModel: viewModel)
 
                 if viewModel.state.editorMode == .snapshot {
                     SnapshotOverlayView(viewModel: viewModel)
+                } else {
+                    // Stands down during an area capture — the reader is
+                    // dragging a rectangle and a floating pill in the corner is
+                    // both a target to miss and a thing to crop by accident.
+                    PageLocationOverlay(viewModel: viewModel)
                 }
             }
         case .html:

@@ -15,6 +15,7 @@ enum DocumentAction: String {
     case navigateBack
     case previousPage, nextPage
     case firstPage, lastPage
+    case goToPage
     case toggleZenMode
     case togglePresentationMode
 
@@ -49,4 +50,14 @@ extension Notification.Name {
     /// Open the note/comment editor for an existing overlay markup.
     /// `object` is the DocumentViewModel; userInfo["id"] is the markup's DB id.
     static let openNoteEditor           = Notification.Name("OakReaderOpenNoteEditor")
+
+    /// Reveal the PDF page overlay and put the caret in its page field — the one
+    /// command behind Go ▸ Go to Page… (⌥⌘G) and the PDF context menu, so both
+    /// land on the same editor instead of the old modal sheet.
+    /// `object` is the DocumentViewModel.
+    static let pdfEditPageNumber        = Notification.Name("OakReaderPDFEditPageNumber")
+
+    /// Hand first responder back to the PDF view after the page field commits or
+    /// cancels, so ↑/↓ resume paging instead of moving a caret.
+    static let pdfFocusReader           = Notification.Name("OakReaderPDFFocusReader")
 }

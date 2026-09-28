@@ -170,7 +170,7 @@ private extension AccessibilityCheckerView {
                     .contentShape(Rectangle())
                     .onTapGesture {
                         if let pageIndex = issue.pageIndex {
-                            viewModel.viewer.goToPage(pageIndex)
+                            viewModel.viewer.goToPage(pageIndex, kind: .jump)
                         }
                     }
             }

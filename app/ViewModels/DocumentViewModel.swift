@@ -298,7 +298,9 @@ class DocumentViewModel {
         case .snapshot:
             state.editorMode = .snapshot
         case .navigateBack:
-            viewer.goBack()
+            viewer.jumpBack()
+        case .goToPage:
+            NotificationCenter.default.post(name: .pdfEditPageNumber, object: self)
         case .previousPage:
             viewer.goToPage(state.currentPageIndex - 1)
         case .nextPage:

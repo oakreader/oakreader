@@ -15,7 +15,29 @@ class ViewerViewModel {
 
     // MARK: - Navigation History
 
-    private var pageHistory: [Int] = []
+    /// Why a page change happened.
+    ///
+    /// Ordinary reading must **not** record a return point. Before this split,
+    /// every page change went through `goToPage` and pushed onto the history —
+    /// so stepping ↓ ten times left ten entries and ⌥⌘ Back walked the reader
+    /// backwards one page at a time instead of returning to where they jumped
+    /// from. Only deliberate jumps (a chat citation, an outline entry, a search
+    /// hit, a note's source) leave a return point worth offering.
+    enum PageChangeKind {
+        /// ↑/↓, Home/End, thumbnail scrubbing, presentation advance. No return point.
+        case reading
+        /// A jump from elsewhere in the app — records where the reader came from.
+        case jump
+    }
+
+    /// Origins of deliberate jumps, most recent last. Page-level only: restoring
+    /// the exact scroll offset needs the `PDFDestination` the view layer owns, so
+    /// returning lands at the top of the origin page.
+    private var jumpOrigins: [Int] = []
+
+    /// The page `jumpBack()` would return to, or `nil` when the reader hasn't
+    /// jumped. Drives the "Back to p. N" affordance.
+    var returnPage: Int? { jumpOrigins.last }
 
     // MARK: - Zoom Constants
 
@@ -58,23 +80,82 @@ class ViewerViewModel {
 
     // MARK: - Navigation
 
-    func goToPage(_ index: Int) {
+    /// Move to `index` (0-based). `kind` decides whether the departure point is
+    /// remembered — see `PageChangeKind`. Defaults to `.reading` so a call site
+    /// that forgets to classify itself fails safe (a missing return point is a
+    /// minor loss; a polluted history is the bug this split exists to fix).
+    func goToPage(_ index: Int, kind: PageChangeKind = .reading) {
         guard let doc = pdfDocument,
               index >= 0, index < doc.pageCount else { return }
         let old = currentPageIndex
         currentPageIndex = index
-        if old != index {
-            pageHistory.append(old)
-            if pageHistory.count > 50 { pageHistory.removeFirst() }
-        }
+        guard kind == .jump, old != index else { return }
+        jumpOrigins.append(old)
+        if jumpOrigins.count > 50 { jumpOrigins.removeFirst() }
     }
 
-    func goBack() {
-        guard let prev = pageHistory.popLast() else { return }
+    /// Return to the page the most recent jump departed from, consuming it.
+    func jumpBack() {
+        guard let prev = jumpOrigins.popLast() else { return }
         guard let doc = pdfDocument,
               prev >= 0, prev < doc.pageCount else { return }
         currentPageIndex = prev
     }
+
+    /// Legacy spelling kept for the Go ▸ Back menu item and its ⌥⌘[ shortcut.
+    func goBack() { jumpBack() }
+
+    // MARK: - Section (outline enrichment)
+
+    /// The outline heading covering `currentPageIndex`, or `nil` when the document
+    /// has no usable outline.
+    ///
+    /// Walked from `outlineRoot` rather than `BookmarkModel`, which substitutes
+    /// page 0 for entries that carry no destination — those would otherwise match
+    /// every page and mislabel the whole document. Entries without a real
+    /// destination are skipped here instead. When several headings start on the
+    /// current page the last one wins, which is what a reader scrolling down sees.
+    var currentSectionLabel: String? {
+        let entries = sectionIndex()
+        // A single-entry outline tells the reader nothing they don't already know.
+        guard entries.count > 1 else { return nil }
+        let page = currentPageIndex
+        var best: String?
+        for entry in entries where entry.page <= page {
+            best = entry.label
+        }
+        return best
+    }
+
+    /// Flattened outline, sorted by page, built once per document. Page changes
+    /// fire continuously while scrolling, so this must not re-walk the outline
+    /// on every one.
+    private func sectionIndex() -> [(page: Int, label: String)] {
+        guard let doc = pdfDocument else { return [] }
+        if let cached = cachedSectionIndex, cachedSectionIndexDocument === doc { return cached }
+
+        var entries: [(page: Int, label: String)] = []
+        if let root = doc.outlineRoot {
+            var stack: [PDFOutline] = (0..<root.numberOfChildren).compactMap { root.child(at: $0) }
+            while let node = stack.popLast() {
+                if let destinationPage = node.destination?.page,
+                   let label = node.label?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !label.isEmpty {
+                    entries.append((doc.index(for: destinationPage), label))
+                }
+                for i in 0..<node.numberOfChildren {
+                    if let child = node.child(at: i) { stack.append(child) }
+                }
+            }
+            entries.sort { $0.page < $1.page }
+        }
+        cachedSectionIndex = entries
+        cachedSectionIndexDocument = doc
+        return entries
+    }
+
+    @ObservationIgnored private var cachedSectionIndex: [(page: Int, label: String)]?
+    @ObservationIgnored private weak var cachedSectionIndexDocument: PDFDocument?
 
     // MARK: - Zoom
 
@@ -139,7 +220,7 @@ class ViewerViewModel {
 
             if let firstResult = results.first, let page = firstResult.pages.first {
                 let pageIndex = doc.index(for: page)
-                goToPage(pageIndex)
+                goToPage(pageIndex, kind: .jump)
             }
         }
     }
@@ -159,7 +240,7 @@ class ViewerViewModel {
 
         await MainActor.run {
             guard let selection = results.first, let firstPage = selection.pages.first else { return }
-            goToPage(doc.index(for: firstPage))
+            goToPage(doc.index(for: firstPage), kind: .jump)
             flashCitationHighlight(selection)
         }
     }
@@ -254,7 +335,7 @@ class ViewerViewModel {
         let selection = searchResults[currentSearchIndex]
         if let page = selection.pages.first {
             let pageIndex = doc.index(for: page)
-            goToPage(pageIndex)
+            goToPage(pageIndex, kind: .jump)
         }
     }
 

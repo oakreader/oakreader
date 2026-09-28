@@ -172,6 +172,16 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
             self.openNoteInPanel(markupId: id)
         }
         selectionInstrumentObservers.append(noteToken)
+
+        // The page field hands the keyboard back when it commits or cancels,
+        // otherwise ↑/↓ would keep moving a caret that is no longer on screen.
+        let focusToken = center.addObserver(forName: .pdfFocusReader, object: nil, queue: .main) { [weak self] note in
+            guard let self,
+                  (note.object as AnyObject) === self.viewModel,
+                  let pdfView = self.pdfView else { return }
+            pdfView.window?.makeFirstResponder(pdfView)
+        }
+        selectionInstrumentObservers.append(focusToken)
     }
 
     // MARK: - Note → right-panel Notes stream
@@ -485,10 +495,13 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
 
         // Page navigation
         menu.addItem(makeItem("Go to Page\u{2026}", action: #selector(menuGoToPage), key: "", icon: "doc.text.magnifyingglass"))
-        let prevItem = makeItem("Previous Page", action: #selector(menuPreviousPage), key: "", icon: "chevron.left")
+        // chevron.up / chevron.down, matching the Go menu and the page pill's
+        // steppers. These were left/right, which made the same two actions speak
+        // a different direction in two places.
+        let prevItem = makeItem("Previous Page", action: #selector(menuPreviousPage), key: "", icon: "chevron.up")
         if viewModel.state.currentPageIndex <= 0 { prevItem.isEnabled = false }
         menu.addItem(prevItem)
-        let nextItem = makeItem("Next Page", action: #selector(menuNextPage), key: "", icon: "chevron.right")
+        let nextItem = makeItem("Next Page", action: #selector(menuNextPage), key: "", icon: "chevron.down")
         if viewModel.state.currentPageIndex >= viewModel.pageCount - 1 { nextItem.isEnabled = false }
         menu.addItem(nextItem)
 
@@ -626,28 +639,13 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
 
     // MARK: - Menu Actions: Page Navigation
 
+    /// Routes to the page field in `PageLocationOverlay` rather than opening a
+    /// sheet. A modal alert to reach page 42 blocked the document you were
+    /// reading in order to ask which part of it you wanted — and it was a third
+    /// implementation of "go to page" alongside the menu and the keyboard. One
+    /// editor now serves all three entry points.
     @objc private func menuGoToPage() {
-        guard let window = pdfView?.window else { return }
-
-        let alert = NSAlert()
-        alert.messageText = "Go to Page"
-        alert.informativeText = "Enter a page number (1–\(viewModel.pageCount)):"
-        alert.addButton(withTitle: "Go")
-        alert.addButton(withTitle: "Cancel")
-
-        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 80, height: 24))
-        field.stringValue = "\(viewModel.state.currentPageIndex + 1)"
-        field.alignment = .center
-        alert.accessoryView = field
-
-        alert.beginSheetModal(for: window) { [weak self] response in
-            guard let self, response == .alertFirstButtonReturn else { return }
-            if let page = Int(field.stringValue) {
-                self.viewModel.viewer.goToPage(page - 1)
-            }
-        }
-        // Focus the text field after sheet appears
-        DispatchQueue.main.async { field.selectText(nil) }
+        NotificationCenter.default.post(name: .pdfEditPageNumber, object: viewModel)
     }
 
     @objc private func menuPreviousPage() {

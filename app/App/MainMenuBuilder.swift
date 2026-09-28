@@ -456,11 +456,20 @@ enum MainMenuBuilder {
         let homeKey = String(UnicodeScalar(NSHomeFunctionKey)!)
         let endKey = String(UnicodeScalar(NSEndFunctionKey)!)
 
+        // "Back" returns to where the last deliberate jump departed from (a chat
+        // citation, an outline entry, a search hit) — not one page up. Ordinary
+        // page stepping no longer files a return point; see
+        // `ViewerViewModel.PageChangeKind`.
         goMenu.addItem(actionItem(
             "Back", action: .navigateBack,
             key: "[", modifiers: [.command, .option], icon: "chevron.backward", target: target
         ))
         goMenu.addItem(.separator())
+        goMenu.addItem(actionItem(
+            "Go to Page\u{2026}", action: .goToPage,
+            key: "g", modifiers: [.command, .option],
+            icon: "doc.text.magnifyingglass", target: target
+        ))
         goMenu.addItem(actionItem(
             "Previous Page", action: .previousPage,
             key: upKey, icon: "chevron.up", target: target
