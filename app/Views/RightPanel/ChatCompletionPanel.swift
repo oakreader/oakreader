@@ -131,6 +131,13 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
         container.wantsLayer = true
         container.layer?.backgroundColor = palette.panelBackground.cgColor
         container.layer?.cornerRadius = Self.cornerRadius
+        // The stroke and the window shadow were both trying to define the card's edge.
+        // In light mode that hairline was too faint to read as an edge yet strong enough
+        // to muddy the shadow's falloff, so `palette.border` is now CLEAR there and the
+        // shadow does the job alone — which is exactly how a real `NSMenu` separates
+        // itself. Dark still needs the hairline: a near-black card on a dark pane has no
+        // shadow contrast to fall back on. `borderWidth` stays 0.5 either way; a clear
+        // colour costs nothing to draw and keeps this a one-line appearance switch.
         container.layer?.borderWidth = 0.5
         container.layer?.borderColor = palette.border.cgColor
         container.layer?.cornerCurve = .continuous
@@ -405,8 +412,12 @@ private final class ChatCompletionRowView: NSView {
         toolTip = item.description
 
         // Glyph shown directly — no grey tile (matches Dia's favicons/SF symbols).
-        if let img = SymbolStyle.filled(item.icon, accessibilityDescription: item.label) {
-            iconView.image = img.withSymbolConfiguration(.init(pointSize: CompletionPalette.Metrics.iconPointSize, weight: .medium))
+        // OUTLINE, not `.fill`, at regular weight: a filled glyph at `.medium` carries
+        // far more visual weight than the 13pt regular title beside it, so the icon
+        // column shouted and a selected row's glyph read as a white blob on the pill.
+        // macOS menus draw their symbols at the label's own weight; so do we.
+        if let img = SymbolStyle.outline(item.icon, accessibilityDescription: item.label) {
+            iconView.image = img.withSymbolConfiguration(.init(pointSize: CompletionPalette.Metrics.iconPointSize, weight: .regular))
             iconView.contentTintColor = item.completionTint
         }
         iconView.translatesAutoresizingMaskIntoConstraints = false
@@ -431,21 +442,39 @@ private final class ChatCompletionRowView: NSView {
         let titlePriority: Float = item.pinnedDescription ? 249 : 251
         let descPriority: Float = item.pinnedDescription ? 251 : 249
         titleLabel.setContentCompressionResistancePriority(.init(titlePriority), for: .horizontal)
-        titleLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        // Inline rows hug at intrinsic width so the title never stretches and shoves the
+        // description rightward; the pinned (right-aligned) layout pins the description
+        // itself, so there the title is free to take the slack.
+        titleLabel.setContentHuggingPriority(
+            item.pinnedDescription ? .defaultLow : .defaultHigh,
+            for: .horizontal
+        )
 
         descLabel.font = .systemFont(ofSize: CompletionPalette.Metrics.secondarySize)
         descLabel.textColor = palette.secondary
-        descLabel.alignment = .right
+        // Right-alignment ONLY for a pinned description — a short fixed-width date, which
+        // genuinely forms a column. For everything else (skill descriptions, a library
+        // item's author) it flows inline after the title instead. Right-aligning a
+        // sentence-length description promised a column it could not keep: the
+        // description's left edge landed at a different x on every row (title widths
+        // differ), the title-to-description gap swung from ~90pt to ~4pt down the list,
+        // and most rows truncated mid-word — a menu that looks like it is overflowing.
+        descLabel.alignment = item.pinnedDescription ? .right : .left
         descLabel.lineBreakMode = .byTruncatingTail
         descLabel.translatesAutoresizingMaskIntoConstraints = false
         descLabel.setContentCompressionResistancePriority(.init(descPriority), for: .horizontal)
-        descLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        descLabel.setContentHuggingPriority(
+            item.pinnedDescription ? .defaultLow : .defaultHigh,
+            for: .horizontal
+        )
 
         addSubview(iconView)
         addSubview(titleLabel)
         addSubview(descLabel)
 
-        NSLayoutConstraint.activate([
+        let trailingInset = CompletionPalette.Metrics.rowTrailingInset
+
+        var constraints: [NSLayoutConstraint] = [
             iconView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Self.iconLeading),
             iconView.centerYAnchor.constraint(equalTo: centerYAnchor),
             iconView.widthAnchor.constraint(equalToConstant: Self.iconSize),
@@ -453,14 +482,39 @@ private final class ChatCompletionRowView: NSView {
 
             titleLabel.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: Self.iconToTitle),
             titleLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
-
-            // Bound the title's trailing edge so a long @-mention label (which often has
-            // no right-aligned description to pin against) truncates instead of spilling
-            // past the row/panel edge.
-            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: descLabel.leadingAnchor, constant: -10),
-            descLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
             descLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
-        ])
+        ]
+
+        if item.pinnedDescription {
+            // A short fixed-width date really is a column: pin it to the row's trailing
+            // edge and let the title truncate against it.
+            constraints += [
+                titleLabel.trailingAnchor.constraint(
+                    lessThanOrEqualTo: descLabel.leadingAnchor,
+                    constant: -CompletionPalette.Metrics.titleToDescription
+                ),
+                descLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -trailingInset),
+            ]
+        } else {
+            // Sentence-length description: flow it inline right after the title at a
+            // FIXED gap, and let it truncate at the row's trailing edge. Both labels hug
+            // at their intrinsic width (hugging raised above) so neither stretches into
+            // the slack — the gap then reads the same on every row, which the old
+            // right-aligned layout could never do.
+            constraints += [
+                descLabel.leadingAnchor.constraint(
+                    equalTo: titleLabel.trailingAnchor,
+                    constant: CompletionPalette.Metrics.titleToDescription
+                ),
+                descLabel.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -trailingInset),
+                // Still bound the TITLE independently: a long @-mention label with an
+                // empty description has nothing to truncate against otherwise, and would
+                // spill past the row edge.
+                titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -trailingInset),
+            ]
+        }
+
+        NSLayoutConstraint.activate(constraints)
     }
 
     @available(*, unavailable)
@@ -505,7 +559,8 @@ private final class ChatCompletionSectionHeaderView: NSView {
         heightAnchor.constraint(equalToConstant: ChatCompletionPanel.headerHeight).isActive = true
 
         // UPPERCASE, 11pt semibold, tracked ~0.5, grey — left-aligned to the icon column
-        // (12pt from the card edge: 6pt card inset + 6pt to match the row's icon leading).
+        // (12pt from the card edge: the card inset plus the row's own icon leading, both
+        // read from `Metrics` so the header can't drift off the icons).
         let label = NSTextField(labelWithString: title.uppercased())
         label.attributedStringValue = NSAttributedString(
             string: title.uppercased(),
@@ -519,7 +574,10 @@ private final class ChatCompletionSectionHeaderView: NSView {
         addSubview(label)
 
         NSLayoutConstraint.activate([
-            label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 6),
+            label.leadingAnchor.constraint(
+                equalTo: leadingAnchor,
+                constant: CompletionPalette.Metrics.iconLeading
+            ),
             label.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor),
             label.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -4),
         ])
@@ -542,7 +600,10 @@ private final class ChatCompletionEmptyView: NSView {
         addSubview(label)
 
         NSLayoutConstraint.activate([
-            label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
+            label.leadingAnchor.constraint(
+                equalTo: leadingAnchor,
+                constant: CompletionPalette.Metrics.iconLeading
+            ),
             label.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor),
             label.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])

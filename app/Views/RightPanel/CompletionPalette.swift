@@ -5,16 +5,19 @@ import SwiftUI
 /// the chat composer's `ChatCompletionPanel` (AppKit) and the note composer's `@`/`#`
 /// pickers (SwiftUI) so the two stay pixel-identical instead of drifting apart.
 ///
-/// Every value was reverse-engineered pixel-by-pixel from Dia 1.36's command-bar
+/// The shape started as a pixel-by-pixel reproduction of Dia 1.36's command-bar
 /// suggestion panel (`Attachments.AttachmentSuggestionsViewController` inside an
-/// `ARCUI.PopoverBackgroundView`):
-///   • Card: white `#FFFFFF` / dark `#161617`, 14pt continuous corners, hairline
-///     border, soft drop shadow.
-///   • Row: 26pt tall, 13.5pt glyph shown directly (NO grey tile), 6pt icon leading,
-///     7pt icon→title gap, 13pt title.
-///   • Selection: accent-blue pill (`#6A9FF9` / `#2B57B7`) with WHITE text/icon,
-///     8pt corners, 6pt horizontal inset from the card edge.
-///   • Header: UPPERCASE 11pt semibold grey (`#BEBEBE`) tracked ~0.5.
+/// `ARCUI.PopoverBackgroundView`), then moved toward macOS's own menu conventions
+/// where Dia's numbers didn't survive OUR content — long sentence-length skill
+/// descriptions, which Dia's short right-aligned source labels never had to hold:
+///   • Card: white `#FFFFFF` / dark `#161617`, 10pt continuous corners, drop shadow,
+///     and NO stroke in light (an `NSMenu` has none either).
+///   • Row: 26pt tall, 13.5pt outline glyph shown directly (NO grey tile, and NOT the
+///     `.fill` variant — filled glyphs outweigh 13pt regular text), 7pt icon leading,
+///     7pt icon→title gap, 13pt title, 11pt description inline after it.
+///   • Selection: `controlAccentColor` pill, `alternateSelectedControlTextColor` ink,
+///     corners concentric with the card, 5pt horizontal inset from the card edge.
+///   • Header: UPPERCASE 11pt semibold grey tracked ~0.5.
 ///
 /// NSColor is the canonical form (the AppKit panel renders with `CALayer`s); the
 /// `…Color` accessors derive the SwiftUI equivalents losslessly via `Color(nsColor:)`.
@@ -35,16 +38,27 @@ struct CompletionPalette {
                : .white
     }
 
-    /// Hairline card border — barely-there in light, a soft top-edge highlight in dark.
+    /// Card border. A real `NSMenu` draws NO stroke — its drop shadow alone separates
+    /// the card from what's behind it — and a 4%-black hairline was too faint to define
+    /// an edge yet strong enough to muddy the shadow's falloff. So: none in light.
+    /// Dark keeps a hairline, which it genuinely needs: a near-black card on a dark pane
+    /// has no shadow contrast to fall back on.
     var border: NSColor {
-        isDark ? NSColor.white.withAlphaComponent(0.06)
-               : NSColor.black.withAlphaComponent(0.04)
+        isDark ? NSColor.white.withAlphaComponent(0.08) : .clear
     }
 
-    /// Selected-row fill. Measured pixel mode: `#6A9FF9` (light) / `#2B57B7` (dark).
+    /// Selected-row fill. Follows the user's chosen accent colour, the way every native
+    /// menu highlight does. This was previously Dia's measured `#6A9FF9` / `#2B57B7`,
+    /// hard-coded — which ignored the accent the user actually picked in System Settings
+    /// and stayed fully saturated regardless. To go back to Dia's exact blue, restore
+    /// those two literals here; nothing else depends on the source of this colour.
     var selectionFill: NSColor {
-        isDark ? NSColor(srgbRed: 0x2B / 255, green: 0x57 / 255, blue: 0xB7 / 255, alpha: 1)
-               : NSColor(srgbRed: 0x6A / 255, green: 0x9F / 255, blue: 0xF9 / 255, alpha: 1)
+        // `controlAccentColor` is DYNAMIC. The panel paints through `CALayer`s, and
+        // `.cgColor` on a dynamic colour resolves against whatever drawing appearance
+        // happens to be current — not necessarily this palette's. Resolve it explicitly
+        // against the appearance the palette was built for, and flatten to sRGB so the
+        // `.cgColor` the layer stores is a plain, unambiguous colour.
+        resolved { NSColor.controlAccentColor }
     }
 
     /// Title text. `#1A1A1A` / `#E6E7E7` — i.e. ~labelColor.
@@ -62,9 +76,22 @@ struct CompletionPalette {
         isDark ? NSColor(white: 0.50, alpha: 1) : NSColor(white: 0.72, alpha: 1)
     }
 
-    /// Text/icon colour on the accent selection pill.
-    var onSelectionText: NSColor { .white }
-    var onSelectionSecondary: NSColor { NSColor.white.withAlphaComponent(0.82) }
+    /// Text/icon colour on the accent selection pill. Semantic rather than hard white:
+    /// the accent is now the user's own, and AppKit knows which foreground stays legible
+    /// on it (a light accent flips this to a dark ink; hard white would not).
+    var onSelectionText: NSColor { resolved { NSColor.alternateSelectedControlTextColor } }
+    var onSelectionSecondary: NSColor { onSelectionText.withAlphaComponent(0.82) }
+
+    /// Resolve a dynamic system colour against THIS palette's appearance and flatten it
+    /// to sRGB, so a `CALayer` can store the result as a static `.cgColor`.
+    private func resolved(_ make: () -> NSColor) -> NSColor {
+        let appearance = NSAppearance(named: isDark ? .darkAqua : .aqua) ?? NSApp.effectiveAppearance
+        var out = make()
+        appearance.performAsCurrentDrawingAppearance {
+            out = make().usingColorSpace(.sRGB) ?? make()
+        }
+        return out
+    }
 
     // MARK: - Colours (SwiftUI accessors)
 
@@ -84,16 +111,29 @@ struct CompletionPalette {
     enum Metrics {
         static let rowHeight: CGFloat = 26
         static let headerHeight: CGFloat = 22
-        static let cornerRadius: CGFloat = 14
-        static let horizontalInset: CGFloat = 6
+        /// Card corner. Was Dia's measured 14, which is a LARGER arc than the 5-6pt
+        /// content inset below it — so the section header and the first/last rows sat
+        /// *inside* the curve instead of clear of it. A real `NSMenu` uses ~10 here,
+        /// which clears the inset and reads calmer at this size.
+        static let cornerRadius: CGFloat = 10
+        static let horizontalInset: CGFloat = 5
         static let verticalInset: CGFloat = 5
         /// Glyph point size shown directly (no tile).
         static let iconPointSize: CGFloat = 13.5
         /// Square the glyph is centred in.
         static let iconFrame: CGFloat = 15
-        static let iconLeading: CGFloat = 6
+        /// Icon's leading pad inside the row. With `horizontalInset` this puts the icon
+        /// column 12pt from the card edge — keep the two summing to 12 if either moves.
+        static let iconLeading: CGFloat = 7
         static let iconToTitle: CGFloat = 7
-        static let selectionRadius: CGFloat = 8
+        /// Concentric with the card: `cornerRadius - horizontalInset`. Keep it that way
+        /// when either of those changes, or the pill's corner stops tracking the card's.
+        static let selectionRadius: CGFloat = cornerRadius - horizontalInset
+        /// Gap between a row's title and its inline description.
+        static let titleToDescription: CGFloat = 8
+        /// Row's own trailing padding, inside the card inset — mirrors `iconLeading`
+        /// so the row's content is optically centred at 12pt from either card edge.
+        static let rowTrailingInset: CGFloat = 7
         static let titleSize: CGFloat = 13
         static let secondarySize: CGFloat = 11
     }
