@@ -10,8 +10,8 @@ import SwiftUI
 /// `ARCUI.PopoverBackgroundView`), then moved toward macOS's own menu conventions
 /// where Dia's numbers didn't survive OUR content — long sentence-length skill
 /// descriptions, which Dia's short right-aligned source labels never had to hold:
-///   • Card: white `#FFFFFF` / dark `#161617`, 10pt continuous corners, drop shadow,
-///     and NO stroke in light (an `NSMenu` has none either).
+///   • Card: white `#FFFFFF` / dark `#161617`, 10pt continuous corners, a hairline
+///     stroke, and NO drop shadow — the stroke is the whole edge.
 ///   • Row: 26pt tall, 13.5pt outline glyph shown directly (NO grey tile, and NOT the
 ///     `.fill` variant — filled glyphs outweigh 13pt regular text), 7pt icon leading,
 ///     7pt icon→title gap, 13pt title, 11pt description inline after it.
@@ -38,13 +38,16 @@ struct CompletionPalette {
                : .white
     }
 
-    /// Card border. A real `NSMenu` draws NO stroke — its drop shadow alone separates
-    /// the card from what's behind it — and a 4%-black hairline was too faint to define
-    /// an edge yet strong enough to muddy the shadow's falloff. So: none in light.
-    /// Dark keeps a hairline, which it genuinely needs: a near-black card on a dark pane
-    /// has no shadow contrast to fall back on.
+    /// Card border — the card's ONLY edge, since the panel draws no drop shadow.
+    ///
+    /// That is why light is 12% and not the 4% it was: at 4% the hairline only read as
+    /// an edge because the shadow was separating the card for it, and with the shadow
+    /// gone it disappears on a white card over a near-white pane. 12% matches the outer
+    /// stroke `PopupRimView` draws on the app's other popups, so every popup edge in
+    /// the app weighs the same. Dark needs less — the card is already near-black.
     var border: NSColor {
-        isDark ? NSColor.white.withAlphaComponent(0.08) : .clear
+        isDark ? NSColor.white.withAlphaComponent(0.08)
+               : NSColor.black.withAlphaComponent(0.12)
     }
 
     /// Selected-row fill.

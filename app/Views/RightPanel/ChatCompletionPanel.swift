@@ -99,9 +99,12 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
         isOpaque = false
         backgroundColor = .clear
         level = .floating
-        // A soft, rounded drop shadow (matched to the corner radius below) lifts the
-        // popup off the composer the way Dia's suggestion panel does.
-        hasShadow = true
+        // No drop shadow. The panel opens directly above the composer rather than over
+        // open content, so it has nothing to be lifted off — and at this size the
+        // shadow read as a halo around the card instead of depth beneath it. The
+        // stroke below is the card's edge now, and with the shadow gone it is the only
+        // thing drawing one, which is why it carries real weight in both appearances.
+        hasShadow = false
         collectionBehavior = [.transient, .ignoresCycle]
 
         stackView.orientation = .vertical
@@ -131,13 +134,10 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
         container.wantsLayer = true
         container.layer?.backgroundColor = palette.panelBackground.cgColor
         container.layer?.cornerRadius = Self.cornerRadius
-        // The stroke and the window shadow were both trying to define the card's edge.
-        // In light mode that hairline was too faint to read as an edge yet strong enough
-        // to muddy the shadow's falloff, so `palette.border` is now CLEAR there and the
-        // shadow does the job alone — which is exactly how a real `NSMenu` separates
-        // itself. Dark still needs the hairline: a near-black card on a dark pane has no
-        // shadow contrast to fall back on. `borderWidth` stays 0.5 either way; a clear
-        // colour costs nothing to draw and keeps this a one-line appearance switch.
+        // The stroke is the whole edge — see `hasShadow` above. It used to share the
+        // job with the window shadow, which is the only reason 4% black ever passed
+        // for one; alone on a white card over a near-white pane that is invisible.
+        // `palette.border` carries the weight now.
         container.layer?.borderWidth = 0.5
         container.layer?.borderColor = palette.border.cgColor
         container.layer?.cornerCurve = .continuous
