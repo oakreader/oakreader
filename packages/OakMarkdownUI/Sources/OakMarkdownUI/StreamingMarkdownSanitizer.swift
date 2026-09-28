@@ -19,6 +19,14 @@ enum StreamingMarkdownSanitizer {
     /// Destinations that are internal references rather than web links.
     static let internalScheme = "oak:"
 
+    /// What the model writes where a citation's label goes.
+    ///
+    /// A fixed token rather than words of its own: the host resolves the handle
+    /// to the passage's location and renders that instead. Deliberately
+    /// unmistakable, so a citation that failed to resolve is visible as a bug
+    /// rather than passing for prose.
+    static let citationPlaceholder = "${OAK-SOURCE}"
+
     /// If `text` ends with an unclosed inline link/image (`…](destination-with-no-closing-paren`),
     /// append the `)` so it renders as a link (label only) instead of flashing the raw
     /// destination. Returns `text` unchanged when there's nothing to close. Append-only safe:

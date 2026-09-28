@@ -21,6 +21,19 @@ public struct MarkdownTheme {
     /// is not leaving the app, and no capsule, because a paragraph with six
     /// citations became a row of buttons rather than a sentence.
     public var citationForeground: NSColor
+
+    /// Resolves an internal reference (`oak:14`) to the words shown in its place.
+    ///
+    /// The model never writes a citation's label: it writes a fixed placeholder,
+    /// because a label it chose is either the handle — a number that means
+    /// nothing to a reader with no list to look it up in — or a rephrasing of
+    /// the sentence the citation already sits in. The host resolves the handle
+    /// to where the passage actually is, which is the one thing the reader
+    /// wants and the model cannot know. Dia does the same with `${DIA-SOURCE}`,
+    /// resolving its handle to a site name and favicon.
+    ///
+    /// `nil`, or a `nil` return, leaves the written label alone.
+    public var citationLabel: (@Sendable (String) -> String?)?
     public var inlineCodeBackground: NSColor
     public var codeBlockBackground: NSColor
     public var codeBlockBorder: NSColor
@@ -43,6 +56,7 @@ public struct MarkdownTheme {
         secondaryTextColor: NSColor,
         linkColor: NSColor,
         citationForeground: NSColor = .controlAccentColor,
+        citationLabel: (@Sendable (String) -> String?)? = nil,
         inlineCodeBackground: NSColor,
         codeBlockBackground: NSColor,
         codeBlockBorder: NSColor,
@@ -61,6 +75,7 @@ public struct MarkdownTheme {
         self.secondaryTextColor = secondaryTextColor
         self.linkColor = linkColor
         self.citationForeground = citationForeground
+        self.citationLabel = citationLabel
         self.inlineCodeBackground = inlineCodeBackground
         self.codeBlockBackground = codeBlockBackground
         self.codeBlockBorder = codeBlockBorder

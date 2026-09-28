@@ -47,10 +47,17 @@ struct CitationHoverCard: View {
         .foregroundStyle(.secondary)
     }
 
-    private var locationLabel: String {
+    private var locationLabel: String { Self.locationLabel(for: anchor) }
+
+    /// Where a cited passage is, in the fewest words that locate it.
+    ///
+    /// Shared with the inline citation text, which renders this in place of the
+    /// label the model was told not to write — so what the sentence says and
+    /// what the hover card says are the same string.
+    static func locationLabel(for anchor: CitationAnchor) -> String {
         if let page = anchor.page { return "Page \(page + 1)" }       // page is 0-based
         if let heading = anchor.heading, !heading.isEmpty { return heading }
-        if let time = anchor.time { return Self.timestamp(time) }
+        if let time = anchor.time { return timestamp(time) }
         return "Source"
     }
 

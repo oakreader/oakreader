@@ -383,7 +383,20 @@ private final class Renderer {
         // capsule, because a paragraph with six citations in it became a row of
         // buttons rather than a sentence.
         if destination.hasPrefix(StreamingMarkdownSanitizer.internalScheme) {
-            m.addAttribute(.foregroundColor, value: theme.citationForeground, range: full)
+            // The label is the host's to supply, not the model's — see
+            // `MarkdownTheme.citationLabel`. Substituted here, while building,
+            // so a streamed citation never flashes the placeholder.
+            //
+            // The characters are swapped in place rather than a new string
+            // built: the run already carries the body font and the link, and
+            // rebuilding it would mean restating both.
+            if m.string == StreamingMarkdownSanitizer.citationPlaceholder,
+               let resolved = theme.citationLabel?(destination) {
+                m.mutableString.setString(resolved)
+            }
+            let range = NSRange(location: 0, length: m.length)
+            m.addAttribute(.foregroundColor, value: theme.citationForeground, range: range)
+            if let url = URL(string: destination) { m.addAttribute(.link, value: url, range: range) }
             return addWeight(.medium, to: m)
         }
 

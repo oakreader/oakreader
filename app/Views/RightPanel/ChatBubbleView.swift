@@ -245,7 +245,7 @@ struct ChatBubbleView: View, Equatable {
         // the same native stack Dia uses. This is the app's sole markdown renderer.
         StreamingMarkdownView(
             markdown: markdown,
-            theme: markdownTheme ?? .oak(),
+            theme: citationAware(markdownTheme ?? .oak()),
             isStreaming: streaming,
             fadesAppendedText: fadesAppendedText,
             onOpenURL: { url in
@@ -264,6 +264,24 @@ struct ChatBubbleView: View, Equatable {
                 return AnyView(CitationHoverCard(anchor: anchor))
             }
         )
+    }
+
+    /// Teach a theme how to name a citation.
+    ///
+    /// The model writes a placeholder where the label goes, and this turns the
+    /// handle behind it into the passage's location — "Page 15", a heading, a
+    /// timestamp. That is the one thing about a citation the reader wants and
+    /// the model cannot know, and it is the same string the hover card leads
+    /// with, so the inline text and the card agree.
+    private func citationAware(_ theme: MarkdownTheme) -> MarkdownTheme {
+        guard let resolveCitation else { return theme }
+        var theme = theme
+        theme.citationLabel = { destination in
+            guard let url = URL(string: destination),
+                  let (_, anchor) = resolveCitation(url) else { return nil }
+            return CitationHoverCard.locationLabel(for: anchor)
+        }
+        return theme
     }
 
     @ViewBuilder
