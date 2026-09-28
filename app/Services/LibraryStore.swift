@@ -142,13 +142,13 @@ final class LibraryStore {
         let (i, t, c, p) = await (items, trashed, collections, properties)
         guard !Task.isCancelled else { return }
 
-        let resolved = c.map(PDFCollection.init(wire:))
+        let flat = c.map(PDFCollection.init(wire:))
         // Collection ids are resolved here rather than on the wire: sending
         // whole collections per item would repeat 142 of them across 644 items.
-        let byId = Dictionary(uniqueKeysWithValues: resolved.map { ($0.id, $0) })
+        let byId = Dictionary(uniqueKeysWithValues: flat.map { ($0.id, $0) })
         loadedItems = i.map { LibraryItem(wire: $0).resolvingCollections($0.collectionIds, from: byId) }
         loadedTrashedItems = t.map { LibraryItem(wire: $0).resolvingCollections($0.collectionIds, from: byId) }
-        loadedCollections = resolved
+        loadedCollections = Self.assembleCollectionTree(flat, itemCounts: Self.itemCounts(in: i))
         loadedProperties = p.map(PropertyDefinition.init(wire:))
         duplicateGroupsCache = nil
         isLoading = false
@@ -159,6 +159,66 @@ final class LibraryStore {
         Log.info(Log.store, "library loaded: \(loadedItems.count) items, "
             + "\(loadedCollections.count) collections, \(loadedProperties.count) properties, "
             + "\(loadedTrashedItems.count) in the bin")
+    }
+
+    /// Count each collection's members from the items just read.
+    ///
+    /// The wire has no per-collection count — an item carries its collection
+    /// ids, not the other way round — so the tally is assembled here. It used
+    /// to be `SELECT collection_id, COUNT(*) FROM collection_items GROUP BY …`,
+    /// which counted membership rows and so included items sitting in the bin;
+    /// counting the live items instead means trashing one now decrements the
+    /// sidebar, which is what the number claims to mean.
+    private static func itemCounts(in items: [CatalogItem]) -> [UUID: Int] {
+        var counts: [UUID: Int] = [:]
+        for item in items {
+            for raw in item.collectionIds {
+                guard let id = UUID(uuidString: raw) else { continue }
+                counts[id, default: 0] += 1
+            }
+        }
+        return counts
+    }
+
+    /// Rebuild the parent/child tree, and fill in each collection's item count.
+    ///
+    /// `catalog/collections/list` returns a FLAT array — every row carries its
+    /// `parentId` and nothing else — so `PDFCollection.subcollections` and
+    /// `itemCount` keep their empty defaults unless something assembles them.
+    /// `fetchAllCollections` used to, reading the tree straight out of GRDB;
+    /// it was deleted with the rest of the catalog and nothing replaced it, so
+    /// the sidebar drew only the top level and every count read zero.
+    ///
+    /// Every collection is returned, each carrying its own subtree — the same
+    /// shape the GRDB version produced, and what `rootCollections` and the
+    /// `CollectionRowView` recursion both expect.
+    private static func assembleCollectionTree(
+        _ flat: [PDFCollection],
+        itemCounts: [UUID: Int]
+    ) -> [PDFCollection] {
+        var childrenByParent: [UUID: [PDFCollection]] = [:]
+        for collection in flat {
+            guard let parent = collection.parentId else { continue }
+            childrenByParent[parent, default: []].append(collection)
+        }
+
+        // `seen` guards a parent cycle. Nothing in the schema forbids one —
+        // `parent_id` is a plain self-reference — and a cycle here would
+        // recurse until the stack gave out rather than draw a wrong tree.
+        func build(_ collection: PDFCollection, seen: Set<UUID>) -> PDFCollection {
+            var built = collection
+            built.itemCount = itemCounts[collection.id] ?? 0
+            guard !seen.contains(collection.id) else {
+                built.subcollections = []
+                return built
+            }
+            let seen = seen.union([collection.id])
+            built.subcollections = (childrenByParent[collection.id] ?? [])
+                .map { build($0, seen: seen) }
+            return built
+        }
+
+        return flat.map { build($0, seen: []) }
     }
 
     init(database: CatalogDatabase) {

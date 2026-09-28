@@ -81,13 +81,9 @@ func makePopupGlassContainer(content: NSView, cornerRadius: CGFloat? = nil) -> N
     return container
 }
 
-/// Dark outer hairline + light inner highlight around a popup's edge — the
-/// depth cue system popovers draw and a plain masked layer lacks.
-///
-/// Shared rather than private: any hand-built popup in the app wants the same
-/// edge, and the one that drew its own single hairline instead looked flat
-/// next to the native menu beside it.
-final class PopupRimView: NSView {
+/// Dark outer hairline + light inner highlight around the glass edge —
+/// the depth cue system popovers draw and a plain masked layer lacks.
+private final class PopupRimView: NSView {
     private let cornerRadius: CGFloat
 
     init(cornerRadius: CGFloat) {
