@@ -192,18 +192,23 @@ enum MetadataInspectorTab: String, CaseIterable, Identifiable {
 
 enum LibraryDetailTab: String, CaseIterable, Identifiable {
     case metadata
+    /// Chat scoped to the selected collection — the library's counterpart to a
+    /// document tab's `RightPanelMode.aiChat`.
+    case chat
 
     var id: String { rawValue }
 
     var systemImage: String {
         switch self {
         case .metadata: return "list.bullet.rectangle.portrait"
+        case .chat: return "bubble.left.and.bubble.right"
         }
     }
 
     var label: String {
         switch self {
         case .metadata: return "Metadata"
+        case .chat: return "Chat"
         }
     }
 }

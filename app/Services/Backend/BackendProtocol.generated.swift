@@ -9,7 +9,7 @@ import Foundation
 /// Reverse calls (tool/execute, oauth/prompt) are ordinary requests in the
 /// other direction, so they need no separate machinery.
 enum RPC {
-    static let version = 10
+    static let version = 11
 
     /// JSON-RPC error codes. The shell branches on these: re-authenticate
     /// is a different affordance from retry, and the old single error string
@@ -257,10 +257,12 @@ enum RPC {
     }
 
     // MARK: catalog/conversations/list
-    /// Sessions for one document, or the library-wide ones when itemId is absent. Most recently
-    /// updated first.
+    /// Sessions in one scope, most recently updated first: a document's when itemId is given, a
+    /// collection's when collectionId is, and the ones about neither when both are absent. Passing
+    /// both is a client bug; itemId wins.
     struct ConversationsListParams: Encodable {
         var itemId: String?
+        var collectionId: String?
     }
     struct ConversationsListResult: Decodable {
         var conversations: [CatalogConversation]

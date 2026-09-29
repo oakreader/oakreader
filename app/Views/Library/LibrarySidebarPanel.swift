@@ -11,20 +11,20 @@ struct LibrarySidebarPanel: View {
     private var store: LibraryStore { appState.libraryStore }
 
     var body: some View {
+        // Which detail tab is showing is the caller's decision (`LibraryRootView`
+        // switches on it); this panel is only ever built for the metadata tab.
         VStack(alignment: .leading, spacing: 0) {
-            if appState.libraryDetailTab == .metadata {
-                metadataTabPicker
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 1) {
-                        switch metadataTab {
-                        case .info:
-                            infoTabContent
-                        case .reference:
-                            referenceTabContent
-                        }
+            metadataTabPicker
+            ScrollView {
+                VStack(alignment: .leading, spacing: 1) {
+                    switch metadataTab {
+                    case .info:
+                        infoTabContent
+                    case .reference:
+                        referenceTabContent
                     }
-                    .padding(OakStyle.Spacing.sm)
                 }
+                .padding(OakStyle.Spacing.sm)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)

@@ -225,8 +225,10 @@ struct BackendProviderSummary: Decodable, Identifiable, Hashable {
 /// shell owns; this row is the index over it.
 struct CatalogConversation: Codable {
     var id: String
-    /// Null for library-wide chats not about one document.
+    /// Null for chats not about one document.
     var itemId: String?
+    /// The collection a library chat is scoped to; nil for the whole library.
+    var collectionId: String?
     var title: String
     var messageCount: Int
     var createdAt: String

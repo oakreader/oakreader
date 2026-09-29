@@ -13,7 +13,7 @@
 /** Applied-migration identifiers, in order. The names are GRDB's and must not
  *  change: a database written by the Swift app already has these seven rows,
  *  and an app rolled back to the Swift catalog has to still recognise them. */
-export const MIGRATIONS = [
+export const BASELINE_MIGRATIONS = [
   "v1-items-attachments",
   "v2-collections",
   "v3-properties",
@@ -21,6 +21,46 @@ export const MIGRATIONS = [
   "v5-citations",
   "v6-annotations",
   "v7-word-lookups",
+] as const;
+
+/**
+ * Migrations added after the catalog moved here, each carrying its own DDL.
+ *
+ * The baseline above deliberately has none: those seven identifiers describe a
+ * schema `SCHEMA_SQL` already states in full, and a library written by the
+ * Swift app arrives with all seven applied and the tables already right. That
+ * is adoption, and it needs no DDL.
+ *
+ * Everything from here on is a real change to a schema that already exists, so
+ * it has to say how to get there. `SCHEMA_SQL` states the destination for a
+ * fresh database; `sql` moves an existing one. Keep the two saying the same
+ * thing — the pair is checked by `conversation scope: fresh and migrated agree`
+ * in catalog.test.ts.
+ */
+export interface Migration {
+  readonly id: string;
+  readonly sql: string;
+}
+
+export const POST_BASELINE_MIGRATIONS: readonly Migration[] = [
+  {
+    // `collection_id` is last in the conversations DDL above, not beside
+    // `item_id` where it reads better, because ALTER TABLE ADD COLUMN can only
+    // append — and a database that reached this schema by migrating has to end
+    // up byte-identical to one created fresh. The suite compares the two.
+    id: "v8-conversation-collection",
+    sql: `
+      ALTER TABLE "conversations" ADD COLUMN "collection_id" TEXT
+        REFERENCES "collections"("id") ON DELETE SET NULL;
+      CREATE INDEX "idx_conversations_collection_id" ON "conversations"("collection_id");
+    `,
+  },
+];
+
+/** Every identifier a database of this build should carry. */
+export const MIGRATIONS = [
+  ...BASELINE_MIGRATIONS,
+  ...POST_BASELINE_MIGRATIONS.map((m) => m.id),
 ] as const;
 
 /** Full schema for a fresh database, byte-compatible with what Swift created. */
@@ -45,7 +85,8 @@ CREATE INDEX "idx_property_options_property_id" ON "property_options"("property_
 CREATE TABLE IF NOT EXISTS "item_property_values" ("id" TEXT PRIMARY KEY, "item_id" TEXT NOT NULL REFERENCES "items"("id") ON DELETE CASCADE, "property_id" TEXT NOT NULL REFERENCES "properties"("id") ON DELETE CASCADE, "option_id" TEXT REFERENCES "property_options"("id") ON DELETE CASCADE, "text_value" TEXT);
 CREATE INDEX "idx_item_property_values_item" ON "item_property_values"("item_id");
 CREATE INDEX "idx_item_property_values_property" ON "item_property_values"("property_id");
-CREATE TABLE IF NOT EXISTS "conversations" ("id" TEXT PRIMARY KEY, "user_id" TEXT NOT NULL, "item_id" TEXT REFERENCES "items"("id") ON DELETE CASCADE, "title" TEXT NOT NULL, "message_count" INTEGER NOT NULL DEFAULT 0, "created_at" TEXT NOT NULL, "updated_at" TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS "conversations" ("id" TEXT PRIMARY KEY, "user_id" TEXT NOT NULL, "item_id" TEXT REFERENCES "items"("id") ON DELETE CASCADE, "title" TEXT NOT NULL, "message_count" INTEGER NOT NULL DEFAULT 0, "created_at" TEXT NOT NULL, "updated_at" TEXT NOT NULL, "collection_id" TEXT REFERENCES "collections"("id") ON DELETE SET NULL);
+CREATE INDEX "idx_conversations_collection_id" ON "conversations"("collection_id");
 CREATE TABLE IF NOT EXISTS "citations" ("item_id" TEXT PRIMARY KEY REFERENCES "items"("id") ON DELETE CASCADE, "csl_json" TEXT NOT NULL, "csl_type" TEXT NOT NULL DEFAULT 'document', "doi" TEXT, "year" INTEGER, "container_title" TEXT, "abstract" TEXT, "pmid" TEXT, "arxiv_id" TEXT, "isbn" TEXT, "issn" TEXT, "created_at" TEXT NOT NULL, "updated_at" TEXT NOT NULL);
 CREATE INDEX "idx_citations_doi" ON "citations"("doi");
 CREATE INDEX "idx_citations_year" ON "citations"("year");

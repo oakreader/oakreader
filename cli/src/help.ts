@@ -73,11 +73,12 @@ export const TREE: CommandSpec = {
     },
     {
       name: "import", summary: "Import PDF, HTML, Markdown, or URL.",
-      usage: "oak import <source> [--title <title>] [--collection <name>] [--tag <name>]",
+      usage: "oak import <source> [--title <title>] [--collection <name>] [--tag <name>] [--archive]",
       options: [
         ["--title <title>", "Override title."],
         ["--collection <name>", "Add to collection after import."],
         ["--tag <name>", "Tag after import."],
+        ["--archive", "Save a web page offline (needs monolith) instead of bookmarking it."],
       ],
     },
     {

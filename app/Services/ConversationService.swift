@@ -1,5 +1,16 @@
 import Foundation
 
+/// What a conversation is about.
+///
+/// Three cases rather than two optionals: a chat belongs to a document, or to
+/// a collection, or to the library at large, and they are mutually exclusive.
+/// Mirrors `ConversationScope` in the core.
+enum ConversationScope: Equatable {
+    case item(String)
+    case collection(String)
+    case library
+}
+
 /// Chat-session metadata, indexed by the core; transcripts are JSONL files here.
 ///
 /// The split is older than the migration and worth keeping: a transcript is an
@@ -9,21 +20,13 @@ import Foundation
 struct ConversationService {
     // MARK: - Fetch
 
-    /// Sessions for one document, newest first, each with its teaser line.
-    func fetchSessions(forItemId itemId: String) async -> [ConversationMeta] {
-        await fetch(itemId: itemId)
-    }
-
-    /// Library-wide sessions (no document), newest first.
-    func fetchLibrarySessions() async -> [ConversationMeta] {
-        await fetch(itemId: nil)
-    }
-
-    private func fetch(itemId: String?) async -> [ConversationMeta] {
+    /// Sessions in one scope, newest first, each with its teaser line.
+    func fetchSessions(in scope: ConversationScope) async -> [ConversationMeta] {
         do {
             let result = try await NodeBackend.shared.call(
                 RPC.Method.conversationsList,
-                params: RPC.ConversationsListParams(itemId: itemId),
+                params: RPC.ConversationsListParams(
+                    itemId: scope.itemId, collectionId: scope.collectionId),
                 as: RPC.ConversationsListResult.self)
             // The teaser comes from the transcript on disk, so it is filled in
             // here rather than travelling over the protocol.
@@ -88,11 +91,11 @@ struct ConversationService {
     // MARK: - Create
 
     @discardableResult
-    func createSession(id: UUID, title: String, itemId: String?) async -> ConversationMeta {
+    func createSession(id: UUID, title: String, scope: ConversationScope) async -> ConversationMeta {
         let now = Date().iso8601String
         let wire = CatalogConversation(
-            id: id.uuidString, itemId: itemId, title: title,
-            messageCount: 0, createdAt: now, updatedAt: now)
+            id: id.uuidString, itemId: scope.itemId, collectionId: scope.collectionId,
+            title: title, messageCount: 0, createdAt: now, updatedAt: now)
         do {
             try await NodeBackend.shared.call(
                 RPC.Method.conversationsCreate,
@@ -127,5 +130,21 @@ struct ConversationService {
         } catch {
             Log.error(Log.store, "conversations/delete failed: \(error.localizedDescription)")
         }
+    }
+}
+
+// MARK: - Scope → wire
+
+extension ConversationScope {
+    /// The document this scope names, if it names one.
+    var itemId: String? {
+        if case .item(let id) = self { return id }
+        return nil
+    }
+
+    /// The collection this scope names, if it names one.
+    var collectionId: String? {
+        if case .collection(let id) = self { return id }
+        return nil
     }
 }

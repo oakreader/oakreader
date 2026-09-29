@@ -370,7 +370,7 @@ async function importSource(context: Context): Promise<void> {
 
   let result: ImportResult;
   if (source.startsWith("http://") || source.startsWith("https://")) {
-    result = await importer.importURL(source, title);
+    result = await importer.importURL(source, title, { archive: flag(parsed, "archive") });
   } else {
     const path = resolvePath(source.replace(/^~/, homedir()));
     if (!existsSync(path)) throw notFound("file", source);
@@ -386,38 +386,58 @@ async function importSource(context: Context): Promise<void> {
     }
   }
 
-  if (result.isDuplicate) {
-    const message = `Already imported '${result.title}'`;
-    if (out.json) out.success("import", { id: result.itemId, message });
-    else console.log(`${message} [${result.itemId.slice(0, 8)}]`);
-    return;
-  }
-
   // --collection and --tag are conveniences on top of the import; a failure to
   // apply one is a warning, not a reason to disown the item just filed.
+  //
+  // But it has to be a *visible* warning. These used to go to stderr only,
+  // which is fine for a person watching a terminal and useless to the agent
+  // reading the JSON: it saw "Imported 'X'" and reported the paper filed into
+  // a collection that had refused it. The outcome is part of the result now.
+  let collection: string | null = null;
+  let tag: string | null = null;
+  const problems: string[] = [];
+
   const collectionName = option(parsed, "collection");
   if (collectionName !== null) {
     try {
-      const collection = resolver.collection(collectionName);
-      new CollectionStore(catalog.db, LOCAL_USER).addItem(result.itemId, collection.id, now);
+      const resolved = resolver.collection(collectionName);
+      new CollectionStore(catalog.db, LOCAL_USER).addItem(result.itemId, resolved.id, now);
+      collection = resolved.name;
     } catch (error) {
+      const message = `Failed to add to collection '${collectionName}': `
+        + (error instanceof Error ? error.message : String(error));
+      problems.push(message);
       warn(`Failed to add to collection '${collectionName}'`, error);
     }
   }
   const tagName = option(parsed, "tag");
   if (tagName !== null) {
     try {
-      const tag = resolver.tag(tagName);
+      const resolved = resolver.tag(tagName);
       new PropertyStore(catalog.db).addSelectValue(
-        randomUUID(), result.itemId, requireProperty(q, "Tags"), tag.id);
+        randomUUID(), result.itemId, requireProperty(q, "Tags"), resolved.id);
+      tag = resolved.name;
     } catch (error) {
-      warn(`Failed to add tag '${tagName}'`, error);
+      const message = `Failed to tag '${tagName}': `
+        + (error instanceof Error ? error.message : String(error));
+      problems.push(message);
+      warn(`Failed to tag '${tagName}'`, error);
     }
   }
 
-  const message = `Imported '${result.title}'`;
-  if (out.json) out.success("import", { id: result.itemId, message });
-  else console.log(`${message} [${result.itemId.slice(0, 8)}]`);
+  // A document already in the library is not an error, and not a reason to
+  // skip the filing: "add this one too, into X" is a reasonable thing to say
+  // about something already imported.
+  const message = (result.isDuplicate ? `Already imported '${result.title}'` : `Imported '${result.title}'`)
+    + (collection !== null ? ` into '${collection}'` : "");
+  if (out.json) {
+    out.success("import", {
+      id: result.itemId, title: result.title, message,
+      isDuplicate: result.isDuplicate, collection, tag, warnings: problems,
+    });
+  } else {
+    console.log(`${message} [${result.itemId.slice(0, 8)}]`);
+  }
 }
 
 function openFile({ parsed, out }: Context): void {

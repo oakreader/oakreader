@@ -201,7 +201,10 @@ struct AIChatView: View {
             if chatVM.showHistory {
                 Text("History")
                     .font(OakStyle.ChatFont.headerTitle)
-            } else if presentation == .canvas {
+            } else if presentation == .canvas || workspaceName != nil {
+                // The panel earns the chip only when the chat is scoped to
+                // something — a collection. Document chat passes no scope and
+                // keeps its bare header.
                 workspaceChip
             }
 
@@ -220,8 +223,8 @@ struct AIChatView: View {
         .padding(.vertical, 6)
     }
 
-    /// Pill in the canvas header showing the agent's current workspace (the
-    /// collection it is scoped to), with a clear affordance back to the whole library.
+    /// Pill in the header naming what the agent is scoped to (the selected
+    /// collection), with a clear affordance back to the whole library.
     private var workspaceChip: some View {
         HStack(spacing: 6) {
             Image(systemName: workspaceName == nil ? "books.vertical" : "folder")
@@ -253,21 +256,21 @@ struct AIChatView: View {
     @State private var emptyStateAppeared = false
 
     private var emptyStateTitle: String {
-        if presentation == .canvas {
-            return workspaceName.map { "Ask anything about \($0)" } ?? "Ask anything"
-        }
+        if let workspaceName { return "Ask anything about \(workspaceName)" }
+        if presentation == .canvas { return "Ask anything" }
         return chatVM.parent != nil ? "Ask about this Document" : "Ask anything"
     }
 
     private var emptyStateSubtitle: String {
+        if workspaceName != nil {
+            return "Ask across these sources, or have a paper found and filed here."
+        }
         if presentation == .canvas {
-            return workspaceName != nil
-                ? "Ask questions, search, or create content in this collection."
-                : "Ask questions, search your library, or chat with AI."
+            return "Ask questions, search your library, or chat with AI."
         }
         return chatVM.parent != nil
             ? "Ask questions, get summaries, or find information in your document."
-            : "Ask questions or chat with AI — no document needed."
+            : "Ask questions, search your library, or file something new in it."
     }
 
     @ViewBuilder
@@ -806,17 +809,21 @@ struct AIChatView: View {
                     .font(OakStyle.ChatFont.modelLabel)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                Image(systemName: "chevron.up.chevron.down")
+                // One chevron, pointing the way the menu opens. The up/down pair says
+                // "cycle through values", which is a stepper's promise — this opens a
+                // menu, and every value in it is visible at once.
+                Image(systemName: "chevron.down")
                     .font(.system(size: 8, weight: .semibold))
                     .foregroundStyle(.tertiary)
                     .accessibilityHidden(true)
             }
+            // The padding outlives the capsule it used to sit inside: it is the click
+            // target now, and a borderless label with none would be a smaller thing to
+            // hit than the bordered one was. `contentShape` makes the whole inset area
+            // clickable rather than just the glyphs.
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background(
-                Capsule()
-                    .stroke(Color.primary.opacity(0.15), lineWidth: 0.5)
-            )
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .help("Model & settings")

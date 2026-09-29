@@ -19,7 +19,9 @@ import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir, homedir } from "node:os";
 import { join } from "node:path";
 import { Catalog } from "../src/catalog/db.ts";
-import { MIGRATIONS } from "../src/catalog/schema.ts";
+import {
+  BASELINE_MIGRATIONS, MIGRATIONS, POST_BASELINE_MIGRATIONS, SCHEMA_SQL,
+} from "../src/catalog/schema.ts";
 import { WordLookupStore, type WordLookup } from "../src/catalog/wordLookups.ts";
 import { seed } from "./seed.ts";
 
@@ -109,20 +111,150 @@ describe("fresh database", () => {
   });
 });
 
+/**
+ * A schema change applied to a database that already exists.
+ *
+ * The real-library tests above only run on a machine that has one, so the
+ * behaviour is pinned here too, against a database built to the shape this
+ * build inherited.
+ */
+describe("migrating an existing database", () => {
+  /** SCHEMA_SQL as it stood before the conversation scope was added. */
+  const LEGACY_SCHEMA = SCHEMA_SQL
+    .replace(`, "collection_id" TEXT REFERENCES "collections"("id") ON DELETE SET NULL`, "")
+    .replace(`CREATE INDEX "idx_conversations_collection_id" ON "conversations"("collection_id");\n`, "");
+
+  /** A database carrying the baseline and nothing after it. */
+  function legacy(path: string): void {
+    const db = new Database(path, { create: true });
+    try {
+      db.exec("PRAGMA foreign_keys = ON");
+      db.exec("CREATE TABLE grdb_migrations (identifier TEXT NOT NULL PRIMARY KEY)");
+      db.exec(LEGACY_SCHEMA);
+      const record = db.prepare("INSERT INTO grdb_migrations (identifier) VALUES (?)");
+      for (const m of BASELINE_MIGRATIONS) record.run(m);
+      seed(db,
+        `INSERT INTO conversations (id, user_id, item_id, title, message_count, created_at, updated_at)
+         VALUES ('c1', 'local', NULL, 'an old chat', 3, '2026-01-01', '2026-01-01')`);
+    } finally {
+      db.close();
+    }
+  }
+
+  /** The conversations line of a schema, which is the only one that differs. */
+  const conversationsDDL = (sql: string) =>
+    sql.split("\n").find((line) => line.startsWith(`CREATE TABLE IF NOT EXISTS "conversations"`))!;
+
+  test("the legacy shape really is the old one", () => {
+    // If the DDL is edited without updating the two replacements above, this
+    // test stops testing anything — so it checks itself first. Scoped to the
+    // conversations line because `collection_items` has a `collection_id` of
+    // its own, which a whole-file search would find either way.
+    expect(conversationsDDL(LEGACY_SCHEMA)).not.toContain("collection_id");
+    expect(conversationsDDL(SCHEMA_SQL)).toContain("collection_id");
+    expect(LEGACY_SCHEMA).not.toContain("idx_conversations_collection_id");
+  });
+
+  test("conversation scope: fresh and migrated agree", () => {
+    const dir = scratch();
+    try {
+      const old = join(dir, "old.sqlite");
+      legacy(old);
+      Catalog.open(old).close();
+
+      const fresh = join(dir, "fresh.sqlite");
+      Catalog.open(fresh).close();
+
+      expect(schemaOf(old)).toEqual(schemaOf(fresh));
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("keeps the rows it already had", () => {
+    const dir = scratch();
+    try {
+      const path = join(dir, "old.sqlite");
+      legacy(path);
+
+      const catalog = Catalog.open(path);
+      const row = catalog.db.query<{ title: string; collection_id: string | null }, []>(
+        "SELECT title, collection_id FROM conversations").get()!;
+      expect(row.title).toBe("an old chat");
+      expect(row.collection_id).toBeNull();   // an existing chat is scoped to nothing
+      catalog.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("records the identifier, so the step runs once", () => {
+    const dir = scratch();
+    try {
+      const path = join(dir, "old.sqlite");
+      legacy(path);
+
+      Catalog.open(path).close();
+      const messages: string[] = [];
+      Catalog.open(path, { log: (m) => messages.push(m) }).close();   // would throw on a re-run ALTER
+
+      expect(messages.join(" ")).toContain("adopted existing database");
+      const db = new Database(path, { readonly: true });
+      const applied = db.query<{ identifier: string }, []>(
+        "SELECT identifier FROM grdb_migrations").all().map((r) => r.identifier);
+      db.close();
+      expect(applied.sort()).toEqual([...MIGRATIONS].sort());
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("a partly-applied baseline is still refused", () => {
+    // The guard that predates this: a database from a build we do not know
+    // must not be touched. Adding incremental steps must not weaken it.
+    const dir = scratch();
+    try {
+      const path = join(dir, "unknown.sqlite");
+      const db = new Database(path, { create: true });
+      db.exec("CREATE TABLE grdb_migrations (identifier TEXT NOT NULL PRIMARY KEY)");
+      db.exec(`INSERT INTO grdb_migrations (identifier) VALUES ('${BASELINE_MIGRATIONS[0]}')`);
+      db.close();
+
+      expect(() => Catalog.open(path)).toThrow(/unknown build/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("every post-baseline migration carries DDL", () => {
+    for (const migration of POST_BASELINE_MIGRATIONS) {
+      expect(migration.sql.trim()).not.toBe("");
+    }
+  });
+});
+
 describe.if(hasReal)("a real library", () => {
-  test("is adopted, not modified", () => {
+  test("gains the pending migrations and nothing else", () => {
+    // Adoption is still what happens to the baseline — a real library's seven
+    // identifiers run no DDL. What may change is the steps added since, and
+    // this pins that the open touches only those: the schema afterwards has to
+    // equal the schema a fresh database of this build gets.
     const dir = scratch();
     try {
       const copy = join(dir, "library.sqlite");
       snapshot(REAL_LIBRARY, copy);
-      const before = schemaOf(copy);
 
       const messages: string[] = [];
-      const catalog = Catalog.open(copy, { log: (m) => messages.push(m) });
-      catalog.close();
+      Catalog.open(copy, { log: (m) => messages.push(m) }).close();
 
-      expect(messages.join(" ")).toContain("adopted existing database");
-      expect(schemaOf(copy)).toEqual(before);
+      const fresh = join(dir, "fresh.sqlite");
+      Catalog.open(fresh).close();
+      expect(schemaOf(copy)).toEqual(schemaOf(fresh));
+
+      // And the second open has nothing left to do.
+      const second: string[] = [];
+      Catalog.open(copy, { log: (m) => second.push(m) }).close();
+      expect(second.join(" ")).toContain("adopted existing database");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -143,8 +275,16 @@ describe.if(hasReal)("a real library", () => {
       reference.close();
 
       const catalog = Catalog.open(copy);
-      expect(catalog.tableCounts()).toEqual(expected);
+      const counts = catalog.tableCounts();
       catalog.close();
+
+      // Opening applies the migrations added since the library was written, so
+      // the bookkeeping table gains a row per step. Everything else — the data —
+      // has to be untouched.
+      expect(counts.grdb_migrations).toBe(MIGRATIONS.length);
+      delete counts.grdb_migrations;
+      delete expected.grdb_migrations;
+      expect(counts).toEqual(expected);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -155,9 +295,17 @@ describe.if(hasReal)("a real library", () => {
     try {
       const fresh = join(dir, "fresh.sqlite");
       Catalog.open(fresh).close();
+
       // The real library carries data, not extra structure, so the DDL sets
-      // must be identical. A difference here is a downgrade that breaks.
-      expect(schemaOf(fresh)).toEqual(schemaOf(REAL_LIBRARY));
+      // must be identical once it has been brought up to this build. Compared
+      // against a migrated copy rather than the file itself: the difference
+      // between them is exactly POST_BASELINE_MIGRATIONS, which is the point
+      // of the test above, not of this one.
+      const migrated = join(dir, "migrated.sqlite");
+      snapshot(REAL_LIBRARY, migrated);
+      Catalog.open(migrated).close();
+
+      expect(schemaOf(fresh)).toEqual(schemaOf(migrated));
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -299,11 +447,16 @@ describe("validation", () => {
     // Partial migration state is the shape a backup from an unknown version
     // takes. Running DDL over tables we have not seen is the one thing worse
     // than refusing to open it.
+    //
+    // A *baseline* identifier is what has to be missing. A missing
+    // post-baseline one is not an unknown build — it is an ordinary pending
+    // migration, and gets applied (see "migrating an existing database").
     const dir = mkdtempSync(join(tmpdir(), "oak-validate-"));
     try {
       const path = join(dir, "library.sqlite");
       const catalog = Catalog.open(path);
-      catalog.db.exec("DELETE FROM grdb_migrations WHERE rowid = (SELECT max(rowid) FROM grdb_migrations)");
+      catalog.db.exec(
+        `DELETE FROM grdb_migrations WHERE identifier = '${BASELINE_MIGRATIONS[0]}'`);
       catalog.close();
 
       expect(() => Catalog.open(path)).toThrow(/unknown build/);

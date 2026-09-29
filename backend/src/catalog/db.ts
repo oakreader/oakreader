@@ -7,14 +7,18 @@
  * a migration step, it is two writers racing on a user's library.
  *
  * Adoption, not conversion: a database written by the Swift app already has
- * the seven identifiers in `grdb_migrations`, so opening it applies nothing.
- * A fresh database gets SCHEMA_SQL and the same seven rows, which keeps a
- * downgrade to the Swift catalog working.
+ * the seven baseline identifiers in `grdb_migrations`, so opening it applies
+ * none of them. A fresh database gets SCHEMA_SQL and the same seven rows,
+ * which keeps a downgrade to the Swift catalog working.
+ *
+ * Schema changes made *since* that move are a different thing and carry their
+ * own DDL — see POST_BASELINE_MIGRATIONS. Adoption is what happens once; those
+ * are ordinary migrations.
  */
 import { Database } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import { MIGRATIONS, SCHEMA_SQL } from "./schema.js";
+import { BASELINE_MIGRATIONS, MIGRATIONS, POST_BASELINE_MIGRATIONS, SCHEMA_SQL } from "./schema.js";
 import { ensureSystemData } from "./system.js";
 
 export interface OpenOptions {
@@ -53,9 +57,16 @@ export class Catalog {
   }
 
   /**
-   * Apply anything missing. On an existing library this is a no-op that only
-   * reads `grdb_migrations` — the schema is already exactly right, because
-   * Swift wrote it with the same DDL.
+   * Bring the database to this build's schema.
+   *
+   * Three cases, and the middle one is the reason this is not a loop over a
+   * single list. An empty database gets SCHEMA_SQL, which already states the
+   * destination, so every identifier is recorded without running any step. A
+   * database carrying the whole baseline is one the Swift app (or an earlier
+   * build of this one) wrote, and only needs the steps added since. A database
+   * carrying *part* of the baseline is from a build we do not know, and the
+   * only safe move is to refuse: the alternative is running DDL over tables
+   * whose shape we have not seen.
    */
   private migrate(log: (message: string) => void): void {
     this.db.exec("CREATE TABLE IF NOT EXISTS grdb_migrations (identifier TEXT NOT NULL PRIMARY KEY)");
@@ -63,28 +74,40 @@ export class Catalog {
       this.db.query<{ identifier: string }, []>("SELECT identifier FROM grdb_migrations").all()
         .map((r) => r.identifier),
     );
+    const record = this.db.prepare("INSERT INTO grdb_migrations (identifier) VALUES (?)");
 
-    const missing = MIGRATIONS.filter((m) => !applied.has(m));
-    if (missing.length === 0) {
-      log(`catalog: adopted existing database (${applied.size} migrations already applied)`);
+    if (applied.size === 0) {
+      log(`catalog: fresh database, creating schema`);
+      this.db.transaction(() => {
+        this.db.exec(SCHEMA_SQL);
+        for (const m of MIGRATIONS) record.run(m);
+      })();
       return;
     }
-    if (applied.size > 0) {
-      // Partial state means a database from a build we do not know about.
-      // Bailing is the only safe move: the alternative is running DDL over
-      // tables whose shape we have not seen.
+
+    const missingBaseline = BASELINE_MIGRATIONS.filter((m) => !applied.has(m));
+    if (missingBaseline.length > 0) {
       throw new Error(
         `catalog: database has ${applied.size} of ${MIGRATIONS.length} migrations ` +
-        `(missing: ${missing.join(", ")}). Refusing to modify a library from an unknown build.`,
+        `(missing: ${missingBaseline.join(", ")}). Refusing to modify a library from an unknown build.`,
       );
     }
 
-    log(`catalog: fresh database, creating schema`);
-    this.db.transaction(() => {
-      this.db.exec(SCHEMA_SQL);
-      const record = this.db.prepare("INSERT INTO grdb_migrations (identifier) VALUES (?)");
-      for (const m of MIGRATIONS) record.run(m);
-    })();
+    const pending = POST_BASELINE_MIGRATIONS.filter((m) => !applied.has(m.id));
+    if (pending.length === 0) {
+      log(`catalog: adopted existing database (${applied.size} migrations already applied)`);
+      return;
+    }
+
+    // One transaction per step, so a failure leaves the steps before it
+    // applied and recorded rather than replaying them on the next open.
+    for (const migration of pending) {
+      this.db.transaction(() => {
+        this.db.exec(migration.sql);
+        record.run(migration.id);
+      })();
+      log(`catalog: applied ${migration.id}`);
+    }
   }
 
   /** Row counts for every table, for reconciling against a known baseline. */

@@ -87,18 +87,58 @@ struct LibraryRootView: View {
             )
 
             VStack(spacing: 0) {
-                if store.isDuplicatesSelected {
-                    DuplicatesMergeView(appState: appState)
-                } else if let item = selectedItemInCurrentFilter {
-                    LibrarySidebarPanel(item: item, appState: appState)
-                } else {
-                    LibraryCollectionSidebarPanel(appState: appState)
+                // The tab decides what the panel is, then the selection decides
+                // what it is *about*. Chat is the exception: it is scoped to the
+                // collection, so a selected row does not change the surface —
+                // the row is something to `@`-mention, not something to replace it.
+                switch appState.libraryDetailTab {
+                case .chat:
+                    AIChatView(
+                        chatVM: appState.libraryChat,
+                        workspaceName: scopedCollectionName
+                    )
+                    // The chat follows the sidebar: its history and its `@`
+                    // completions are the selected collection's. The panel stays
+                    // mounted across a switch, so this cannot be left to onAppear.
+                    .onAppear { appState.libraryChat.rescope(toCollection: scopedCollectionId) }
+                    .onChange(of: scopedCollectionId) { _, id in
+                        appState.libraryChat.rescope(toCollection: id)
+                    }
+                case .metadata:
+                    if store.isDuplicatesSelected {
+                        DuplicatesMergeView(appState: appState)
+                    } else if let item = selectedItemInCurrentFilter {
+                        LibrarySidebarPanel(item: item, appState: appState)
+                    } else {
+                        LibraryCollectionSidebarPanel(appState: appState)
+                    }
+                case nil:
+                    EmptyView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(nsColor: .textBackgroundColor), in: paneShape)
             .clipShape(paneShape)
         }
+    }
+
+    /// The collection the chat is grounded in, or nil for the whole library.
+    /// Mirrors `LLMContextProvider`'s test for a scopable collection, so the chip
+    /// in the header names exactly what GROUNDED MODE scopes the model to.
+    private var scopedCollectionName: String? {
+        scopedCollection?.name
+    }
+
+    /// The same collection, as the id conversations are filed under.
+    private var scopedCollectionId: String? {
+        scopedCollection?.id.uuidString
+    }
+
+    private var scopedCollection: PDFCollection? {
+        guard let collection = store.selectedCollection,
+              !collection.isSmart,
+              collection.id != SystemCollectionID.allItems else { return nil }
+        return collection
     }
 
     private var selectedItemInCurrentFilter: LibraryItem? {
@@ -128,12 +168,7 @@ private struct LibraryCollectionSidebarPanel: View {
     }
 
     var body: some View {
-        switch appState.libraryDetailTab {
-        case .metadata:
-            CollectionMetadataPanelView(appState: appState, title: contextTitle, items: items)
-        case nil:
-            EmptyView()
-        }
+        CollectionMetadataPanelView(appState: appState, title: contextTitle, items: items)
     }
 }
 
@@ -254,4 +289,3 @@ private struct CollectionMetadataPanelView: View {
         return start == end ? start : "\(start) – \(end)"
     }
 }
-

@@ -67,6 +67,38 @@ class ChatViewModel {
     /// The item ID to associate sessions with (set externally for document-scoped chat).
     var itemId: String?
 
+    /// The collection this chat is scoped to, for the library surface. Set by
+    /// `rescope(toCollection:)` as the sidebar selection moves.
+    private(set) var collectionId: String?
+
+    /// What this chat's sessions are filed under. A document wins over a
+    /// collection: a document chat opened while a collection is selected is
+    /// still about the document.
+    var conversationScope: ConversationScope {
+        if let itemId { return .item(itemId) }
+        if let collectionId { return .collection(collectionId) }
+        return .library
+    }
+
+    /// Follow the library sidebar.
+    ///
+    /// A thread with messages in it belongs to the collection it was held
+    /// about, so moving to another collection starts a fresh one rather than
+    /// dragging the old conversation along; the old thread is already saved
+    /// and is one click away in History. An empty thread has nothing to
+    /// preserve, so it is simply re-scoped.
+    @MainActor
+    func rescope(toCollection newCollectionId: String?) {
+        guard newCollectionId != collectionId else { return }
+        // A session already on record belongs to the scope it was filed under,
+        // even with nothing on screen yet (a transcript still loading, say), so
+        // reusing its id here would try to file one conversation twice.
+        let isSpoken = !turns.isEmpty || sessionRecordCreated
+        collectionId = newCollectionId
+        if isSpoken { newSession() }
+        refreshAtMentionItems()
+    }
+
     /// Working directory for the library agent workspace — a CoW-mounted folder
     /// under `<dataDir>/workspace/`. When set, the agent's file tools are rooted
     /// here (set externally by `AppState` when the agent workspace is active).
@@ -317,7 +349,10 @@ class ChatViewModel {
         tools.append(WebSearchTool())
         tools.append(WebFetchTool())
 
-        // 3b. Oak CLI (library search, read items, list collections/tags, manage library)
+        // 3b. Oak CLI — the library's whole surface: search, read, collections,
+        //     tags, and importing a document from the web. One tool with
+        //     subcommands rather than a tool per capability, so a new library
+        //     feature is a new `oak` subcommand and nothing here changes.
         tools.append(OakCLITool(sources: citationSources))
 
         // 3c. Memory — ChatGPT `bio`-style: the model saves durable facts about the
@@ -930,11 +965,7 @@ class ChatViewModel {
 
     func loadSessionList() async {
         guard let service = sessionService else { return }
-        if let docId = itemId {
-            sessionList = await service.fetchSessions(forItemId: docId)
-        } else {
-            sessionList = await service.fetchLibrarySessions()
-        }
+        sessionList = await service.fetchSessions(in: conversationScope)
     }
 
     func deleteSessionFromList(_ id: UUID) {
@@ -1069,7 +1100,9 @@ class ChatViewModel {
         if !sessionRecordCreated {
             // First message in this session — create the DB record
             let title = String(firstUserMessage.prefix(50))
-            Task { await service.createSession(id: sessionId, title: title, itemId: itemId) }
+            Task { [scope = conversationScope] in
+                await service.createSession(id: sessionId, title: title, scope: scope)
+            }
             sessionRecordCreated = true
         } else {
             // Subsequent messages — update count and timestamp

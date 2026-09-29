@@ -15,15 +15,29 @@ import { getDocumentProxy } from "unpdf";
 import type { Database } from "bun:sqlite";
 import { ItemStore, type Attachment, type Item } from "../../backend/src/catalog/items.ts";
 import { CiteKeyStore } from "../../backend/src/catalog/citekeys.ts";
+import { htmlToMarkdown } from "../../backend/src/catalog/htmlToMarkdown.ts";
 import { Queries } from "./queries.ts";
 import { attachmentDirectory, attachmentFile } from "./paths.ts";
 import { OakError } from "./resolve.ts";
+import { downloadPDF, isLikelyPDF, pdfFileName, remoteInfo, type RemoteInfo } from "./remote.ts";
 
 export interface ImportResult {
   itemId: string;
   title: string;
   isDuplicate: boolean;
 }
+
+/**
+ * How an attachment relates to its bytes — the app's spellings, which are
+ * Swift enum case names and so camelCase.
+ *
+ * Worth a type rather than a string: this was written `imported_file` here and
+ * `importedFile` by the app, and since `LinkMode(rawValue:) ?? .importedFile`
+ * swallows an unknown value, every row the terminal imported quietly claimed
+ * to be a local file. Harmless for a PDF, wrong for a bookmark — a bookmark
+ * that is not `linkedURL` never opens its live URL.
+ */
+export type LinkMode = "importedFile" | "importedURL" | "linkedURL";
 
 /** Storage keys are 8 characters of the app's alphabet, not UUIDs. */
 function storageKey(): string {
@@ -77,7 +91,10 @@ export class Importer {
   /** Copy the file into storage and write the row. Shared by every type. */
   private async place(
     sourcePath: string, contentType: string,
-    metadata: { title: string; author: string; pageCount: number; sourceURL: string | null },
+    metadata: {
+      title: string; author: string; pageCount: number;
+      sourceURL: string | null; linkMode?: LinkMode;
+    },
   ): Promise<ImportResult> {
     const itemKey = storageKey();
     const attachmentKey = storageKey();
@@ -93,7 +110,7 @@ export class Importer {
     const itemId = randomUUID();
     const attachment: Attachment = {
       id: randomUUID(), itemId, storageKey: attachmentKey, fileName,
-      contentType, linkMode: "imported_file", sourceUrl: metadata.sourceURL,
+      contentType, linkMode: metadata.linkMode ?? "importedFile", sourceUrl: metadata.sourceURL,
       fileSize: size, pageCount: metadata.pageCount, isPrimary: true,
     };
     const item: Item = {
@@ -110,7 +127,9 @@ export class Importer {
     return { itemId, title: metadata.title, isDuplicate: false };
   }
 
-  async importPDF(sourcePath: string, titleOverride: string | null): Promise<ImportResult> {
+  async importPDF(
+    sourcePath: string, titleOverride: string | null, sourceURL: string | null = null,
+  ): Promise<ImportResult> {
     const duplicate = await this.findDuplicate(sourcePath);
     if (duplicate !== null) return { ...duplicate, itemId: duplicate.id, isDuplicate: true };
 
@@ -131,7 +150,7 @@ export class Importer {
       // nicety, the file is the point.
     }
 
-    return await this.place(sourcePath, "pdf", { title, author, pageCount, sourceURL: null });
+    return await this.place(sourcePath, "pdf", { title, author, pageCount, sourceURL });
   }
 
   async importHTML(
@@ -149,7 +168,11 @@ export class Importer {
     }
 
     const result = await this.place(
-      sourcePath, "html", { title, author: "", pageCount: 1, sourceURL: sourcePageURL });
+      sourcePath, "html",
+      {
+        title, author: "", pageCount: 1, sourceURL: sourcePageURL,
+        linkMode: sourcePageURL === null ? "importedFile" : "importedURL",
+      });
     await this.writeContentMarkdown(sourcePath, result.itemId);
     return result;
   }
@@ -175,68 +198,157 @@ export class Importer {
   }
 
   /**
-   * A downloadable PDF is fetched; anything else is archived with monolith,
-   * which inlines the page's own assets into one file.
+   * Bring a URL into the library, the way the app does.
+   *
+   * Three outcomes, decided by what the server actually serves rather than by
+   * what the URL looks like: a PDF is downloaded, a page is bookmarked, and a
+   * page is archived into a single self-contained file only when asked for and
+   * when monolith is installed. Bookmarking is the default because archives
+   * are what make a library enormous — the same reason the app defaults
+   * `archiveWebPages` off.
    */
-  async importURL(url: string, titleOverride: string | null): Promise<ImportResult> {
+  async importURL(
+    url: string, titleOverride: string | null, options: { archive?: boolean } = {},
+  ): Promise<ImportResult> {
     let parsed: URL;
     try {
       parsed = new URL(url);
     } catch {
       throw new OakError(`Invalid URL: ${url}`);
     }
+    if (!parsed.protocol.startsWith("http")) {
+      throw new OakError(`Only http(s) URLs can be imported: ${url}`);
+    }
 
-    const temporary = join(
-      process.env.TMPDIR ?? "/tmp", `oak-import-${randomUUID()}`);
+    // Before anything is fetched: a URL already in the library is not worth
+    // downloading again.
+    const existing = this.q.findItemBySourceURL(url);
+    if (existing !== null) {
+      return { itemId: existing.id, title: existing.title, isDuplicate: true };
+    }
+
+    const info = await remoteInfo(url);
+    const temporary = join(process.env.TMPDIR ?? "/tmp", `oak-import-${randomUUID()}`);
     await mkdir(temporary, { recursive: true });
 
-    if (url.toLowerCase().endsWith(".pdf")) {
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new OakError(`Download failed: ${response.status} ${response.statusText}`);
+    if (isLikelyPDF(url, info.contentType)) {
+      const path = join(temporary, pdfFileName(url, titleOverride ?? info.title));
+      try {
+        await downloadPDF(url, path);
+      } catch (error) {
+        throw new OakError(`Download failed: ${(error as Error).message}`);
       }
-      const name = basename(parsed.pathname) || "download.pdf";
-      const path = join(temporary, name);
-      await writeFile(path, new Uint8Array(await response.arrayBuffer()));
-      return await this.importPDF(path, titleOverride);
+      return await this.importPDF(path, titleOverride, url);
     }
 
-    const monolith = await resolveTool("monolith");
-    if (monolith === null) {
-      throw new OakError("monolith is not installed. Install with: brew install monolith");
+    if (options.archive === true) {
+      const monolith = await resolveTool("monolith");
+      if (monolith === null) {
+        throw new OakError(
+          "monolith is not installed, so the page cannot be archived. "
+          + "Install it with `brew install monolith`, or drop --archive to save a bookmark.");
+      }
+      const slug = parsed.hostname.replaceAll(".", "_");
+      const path = join(temporary, `${slug}.html`);
+      const run = Bun.spawnSync([monolith, url, "-o", path]);
+      if (run.exitCode !== 0) {
+        throw new OakError(`monolith failed: ${run.stderr.toString().trim()}`);
+      }
+      return await this.importHTML(path, titleOverride ?? info.title, url);
     }
 
-    const slug = parsed.hostname.replaceAll(".", "_");
-    const path = join(temporary, `${slug}.html`);
-    const run = Bun.spawnSync([monolith, url, "-o", path]);
-    if (run.exitCode !== 0) {
-      throw new OakError(`monolith failed: ${run.stderr.toString().trim()}`);
-    }
-
-    return await this.importHTML(path, titleOverride, url);
+    return await this.importBookmark(url, info, titleOverride);
   }
 
   /**
-   * Convert the archived page to `content.md`, when the tool for it is
-   * installed. Optional by design — a missing converter costs structure, not
-   * the import.
+   * Save a page as a bookmark: the link, what the page says about itself, and
+   * its readable text — but not the page.
+   *
+   * The shape is the app's (`ImportService+Embed.swift`): one attachment whose
+   * file is `metadata.json`, marked `linkedURL`, so opening it loads the live
+   * page rather than a stale copy. `content.md` beside it is what search and
+   * the chat tools read, and is the reason this is worth more than a URL in a
+   * text file.
+   */
+  private async importBookmark(
+    url: string, info: RemoteInfo, titleOverride: string | null,
+  ): Promise<ImportResult> {
+    const host = new URL(url).hostname;
+    const title = [titleOverride, info.title, host].find(
+      (candidate) => candidate !== null && candidate !== undefined && candidate.trim() !== "")!;
+    const author = info.author ?? host;
+
+    const itemKey = storageKey();
+    const attachmentKey = storageKey();
+    const directory = attachmentDirectory(itemKey, attachmentKey);
+    await mkdir(directory, { recursive: true });
+
+    // The app reads this file to render the bookmark, so the field names are
+    // its `MediaMetadata`, not a shape of our own.
+    await writeFile(join(directory, "metadata.json"), JSON.stringify({
+      title,
+      author,
+      sourceURL: url,
+      duration: null,
+      thumbnailURL: info.thumbnailURL,
+      publishedAt: null,
+      description: info.description,
+      embedType: "link",
+    }, null, 2));
+
+    if (info.html !== null) {
+      // Best effort: a page that Defuddle cannot read is still worth
+      // bookmarking, it just has nothing to search.
+      try {
+        const { markdown } = await htmlToMarkdown(info.html, url);
+        if (markdown.trim() !== "") {
+          await writeFile(join(directory, "content.md"), markdown);
+        }
+      } catch { /* the bookmark stands without it */ }
+    }
+
+    const now = new Date().toISOString();
+    const itemId = randomUUID();
+    const attachment: Attachment = {
+      id: randomUUID(), itemId, storageKey: attachmentKey, fileName: "metadata.json",
+      contentType: "link", linkMode: "linkedURL", sourceUrl: url,
+      fileSize: 0, pageCount: 0, isPrimary: true,
+    };
+    this.items.insert({
+      id: itemId, storageKey: itemKey, title, author,
+      lastOpenedAt: null, lastPosition: null, citeKey: null, source: null,
+      sourceKey: null, extra: null, processingStatus: "completed", deletedAt: null,
+      createdAt: now, updatedAt: now,
+      attachments: [attachment], collectionIds: [], citationJson: null, propertyValues: [],
+    });
+    this.citeKeys.assign(itemId, now);
+
+    return { itemId, title, isDuplicate: false };
+  }
+
+  /**
+   * Write the page's readable text beside it as `content.md`.
+   *
+   * Uses the core's own extractor (Defuddle → Turndown, the same pipeline the
+   * browser extension runs in-page) rather than shelling out to an
+   * `html-to-markdown` binary. That binary was optional, so in practice a
+   * terminal import usually produced no `content.md` at all — and an archived
+   * page with no readable text is invisible to search and to the chat tools,
+   * which is most of what filing it was for.
    */
   private async writeContentMarkdown(htmlPath: string, itemId: string): Promise<void> {
-    const tool = await resolveTool("html-to-markdown");
-    if (tool === null) return;
-
     const location = this.q.itemFilePath(itemId);
     if (location === null) return;
 
-    const run = Bun.spawnSync([tool, htmlPath], { stderr: "ignore" });
-    if (run.exitCode !== 0) return;
-    const markdown = run.stdout.toString();
-    if (markdown === "") return;
-
-    await writeFile(
-      join(attachmentDirectory(location.itemStorageKey, location.attachmentStorageKey),
-           "content.md"),
-      markdown);
+    try {
+      const html = await readFile(htmlPath, "utf8");
+      const { markdown } = await htmlToMarkdown(html);
+      if (markdown.trim() === "") return;
+      await writeFile(
+        join(attachmentDirectory(location.itemStorageKey, location.attachmentStorageKey),
+             "content.md"),
+        markdown);
+    } catch { /* structure lost, import kept */ }
   }
 }
 

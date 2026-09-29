@@ -68,7 +68,7 @@ extension LibraryStore {
             var transcripts: [UUID] = []
             for item in items {
                 let conversations = await ConversationService()
-                    .fetchSessions(forItemId: item.id.uuidString)
+                    .fetchSessions(in: .item(item.id.uuidString))
                 transcripts.append(contentsOf: conversations.map(\.id))
             }
 

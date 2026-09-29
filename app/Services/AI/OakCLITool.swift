@@ -17,13 +17,49 @@ struct OakCLITool: AgentTool, Sendable {
         items list [--collection <name>] [--tag <name>] [--search <q>] [--sort title|author|date] | \
         items show <item> | items read <item> [--pages 1-5] | \
         tags list | tags create <name> | tags add <tag> <item> | \
-        search <query> [--limit N] | status <item> [unread|reading|completed|archived]. \
+        search <query> [--limit N] | status <item> [unread|reading|completed|archived] | \
+        import <url-or-path> [--collection <name>] [--tag <name>] [--title <title>]. \
         Output is always JSON. The response includes a meta.count field with the total count. \
         For "search", use --limit (max 20) to control result size. \
-        Each result carries a `cite` handle (e.g. "oak:7") — link that to cite the document.
+        Each result carries a `cite` handle (e.g. "oak:7") — link that to cite the document. \
+        \
+        "import" downloads a document into the library: PDFs are fetched, other pages are \
+        saved as bookmarks with their readable text. Quote the URL. Check the response — \
+        `collection` names where it was filed, `warnings` says why it was not, and \
+        `isDuplicate` means it was already in the library.
         """
 
-    private static let oakPath = "/usr/local/bin/oak"
+    /// The `oak` binary.
+    ///
+    /// The app ships one in `Contents/Resources` (see `project.yml`), and that is
+    /// what this runs. `/usr/local/bin/oak` is only a symlink the user creates by
+    /// choosing *Install CLI* — pointing at it first meant this tool, and with it
+    /// every library question the agent could answer, was dead for anyone who
+    /// never opened that menu.
+    private static let oakPath: String = {
+        if let bundled = Bundle.main.resourceURL?.appendingPathComponent("oak").path,
+           FileManager.default.isExecutableFile(atPath: bundled) {
+            return bundled
+        }
+        return "/usr/local/bin/oak"
+    }()
+
+    /// Subcommands that change the library rather than read it. The permission
+    /// system asks about these; reads stay unprompted.
+    private static let mutatingCommands: Set<String> = [
+        "create", "rename", "delete", "add", "remove", "merge", "trash", "restore"
+    ]
+
+    /// Risk is per call here — see `AgentTool.category(for:)`.
+    func category(for input: ToolInput) -> ToolCategory {
+        let tokens = Self.tokenize(input["command"] ?? "")
+        guard let first = tokens.first else { return .readOnly }
+        // `import` and `status` mutate on their own; the rest are noun-verb pairs
+        // (`collections add`, `tags create`).
+        if first == "import" || first == "status" { return .write }
+        guard tokens.count > 1 else { return .readOnly }
+        return Self.mutatingCommands.contains(tokens[1]) ? .write : .readOnly
+    }
 
     /// The library database the running app uses. The `oak` CLI defaults to
     /// `~/OakReader/library.sqlite`, but Debug builds store data under
@@ -102,6 +138,13 @@ struct OakCLITool: AgentTool, Sendable {
                 )
             }
 
+            // The CLI writes the catalog from its own process, so the running
+            // app has no idea a row moved. Without this the agent reports a
+            // collection change the sidebar does not show until the next reload.
+            if category(for: input) == .write {
+                await LibraryAgentBridge.shared.refresh()
+            }
+
             return .success(output.isEmpty ? "Command completed successfully." : output)
         } catch {
             return .error("Failed to execute oak command: \(error.localizedDescription)")
@@ -142,8 +185,27 @@ struct OakCLITool: AgentTool, Sendable {
 
     private func annotateWithCiteHandles(_ output: String) -> String {
         guard let data = output.data(using: .utf8),
-              var envelope = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
-              var rows = envelope["results"] as? [[String: Any]], !rows.isEmpty
+              var envelope = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        else { return output }
+
+        // A command that names one item — `import`, most of it — answers with a
+        // single `result` object rather than a `results` array. It deserves a
+        // handle just as much: the model has just filed a document and should be
+        // able to link to it in the same breath.
+        if var single = envelope["result"] as? [String: Any],
+           let itemId = single["id"] as? String, !itemId.isEmpty {
+            let handle = sources.register(CitationSourceRegistry.Source(
+                itemId: itemId, page: nil, time: nil, heading: nil, text: nil))
+            single["cite"] = "oak:\(handle)"
+            envelope["result"] = single
+            guard let encoded = try? JSONSerialization.data(withJSONObject: envelope,
+                                                            options: [.sortedKeys]),
+                  let text = String(data: encoded, encoding: .utf8)
+            else { return output }
+            return text
+        }
+
+        guard var rows = envelope["results"] as? [[String: Any]], !rows.isEmpty
         else { return output }
 
         var annotated = false

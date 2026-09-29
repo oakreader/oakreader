@@ -8,6 +8,7 @@
 import { test, expect, describe } from "bun:test";
 import { flag, integer, option, parse } from "../src/args.ts";
 import { htmlToText, parsePageRange } from "../src/extract.ts";
+import { isLikelyPDF, pdfFileName } from "../src/remote.ts";
 
 import * as format from "../src/format.ts";
 
@@ -141,5 +142,65 @@ describe("formatting", () => {
       { ...base, id: "b", name: "Child", parentId: "a" },
     ], new Map([["a", 3], ["b", 1]]));
     expect(tree).toBe("Collections:\n└── Parent (3)\n    └── Child (1)");
+  });
+});
+
+/**
+ * What a URL actually serves.
+ *
+ * The rewrite these pin: `oak import` used to decide by `url.endsWith(".pdf")`
+ * alone, so `arxiv.org/pdf/2406.08929` — a PDF with no extension, and the most
+ * common paper link there is — went down the web-archive path and failed.
+ */
+describe("recognising a PDF", () => {
+  test("a .pdf path is one", () => {
+    expect(isLikelyPDF("https://example.com/paper.pdf", null)).toBe(true);
+    expect(isLikelyPDF("https://example.com/paper.PDF", null)).toBe(true);
+  });
+
+  test("a query string does not hide the extension", () => {
+    expect(isLikelyPDF("https://example.com/paper.pdf?download=1", null)).toBe(true);
+  });
+
+  test("an extensionless URL is one when the server says so", () => {
+    expect(isLikelyPDF("https://arxiv.org/pdf/2406.08929", null)).toBe(false);
+    expect(isLikelyPDF("https://arxiv.org/pdf/2406.08929", "application/pdf")).toBe(true);
+  });
+
+  test("the content type may carry a charset", () => {
+    expect(isLikelyPDF("https://example.com/x", "application/pdf; charset=binary")).toBe(true);
+  });
+
+  test("an abstract page is not one", () => {
+    expect(isLikelyPDF("https://arxiv.org/abs/2406.08929", "text/html; charset=utf-8")).toBe(false);
+  });
+
+  test("a malformed URL is not one, and does not throw", () => {
+    expect(isLikelyPDF("not a url", null)).toBe(false);
+  });
+});
+
+describe("naming a downloaded PDF", () => {
+  test("keeps the name the URL gives it", () => {
+    expect(pdfFileName("https://example.com/attention.pdf", null)).toBe("attention.pdf");
+  });
+
+  test("adds the extension when the URL has none", () => {
+    expect(pdfFileName("https://arxiv.org/pdf/2406.08929", null)).toBe("2406.08929.pdf");
+  });
+
+  test("falls back to the title for a bare host", () => {
+    expect(pdfFileName("https://example.com", "On Attention")).toBe("On Attention.pdf");
+  });
+
+  test("a percent-encoded path cannot escape the directory", () => {
+    // The name comes off the URL and is joined to a temp directory, so an
+    // encoded traversal is the one input that matters. Decoding happens first,
+    // sanitising second.
+    const name = pdfFileName("https://example.com/%2e%2e%2f%2e%2e%2fetc%2fpasswd", null);
+    expect(name).not.toContain("/");
+    expect(name).not.toContain("\\");
+    expect(name).not.toStartWith(".");
+    expect(name).toEndWith(".pdf");
   });
 });

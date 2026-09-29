@@ -10,7 +10,7 @@
  * fails if the committed output is stale.
  */
 
-export const PROTOCOL_VERSION = 10;
+export const PROTOCOL_VERSION = 11;
 
 export type FieldType =
   | { k: "string" }
@@ -194,9 +194,13 @@ export const METHODS: Method[] = [
 
   {
     name: "catalog/conversations/list", type: "ConversationsList", kind: "request", from: "client",
-    doc: "Sessions for one document, or the library-wide ones when itemId is absent. " +
-         "Most recently updated first.",
-    params: [{ name: "itemId", type: str, optional: true }],
+    doc: "Sessions in one scope, most recently updated first: a document's when itemId " +
+         "is given, a collection's when collectionId is, and the ones about neither when " +
+         "both are absent. Passing both is a client bug; itemId wins.",
+    params: [
+      { name: "itemId", type: str, optional: true },
+      { name: "collectionId", type: str, optional: true },
+    ],
     result: [{ name: "conversations",
       type: { k: "array", of: { k: "ref", ts: "Conversation", swift: "CatalogConversation" } } }],
   },

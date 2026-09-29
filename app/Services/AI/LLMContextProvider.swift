@@ -352,7 +352,9 @@ struct LLMContextProvider {
                 read any item's content (oak items read <citeKey> --pages 1-5), \
                 list collections (oak collections list), list tags (oak tags list), \
                 browse items (oak items list), and manage the library. \
-                Use search_academic to find papers on the web.
+                Use search_academic to find papers on the web, and \
+                `oak import <url> --collection "<name>"` to download one into \
+                the user's library.
 
                 """)
         }
@@ -390,6 +392,11 @@ struct LLMContextProvider {
                 Only then, and only prefixed with "Beyond your sources:", may you add \
                 general knowledge — never blend it in silently. Do not search the web \
                 or the wider library unless the user explicitly asks you to.
+
+                Adding to the library is the exception to the paragraph above: \
+                when the user asks you to find or save something, do it, and \
+                file it into "\(xmlEscape(name))" unless they name somewhere \
+                else. See <librarian> for how.
                 """)
         }
 

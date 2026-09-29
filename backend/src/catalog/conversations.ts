@@ -14,29 +14,48 @@ import type { Database } from "bun:sqlite";
 
 export interface Conversation {
   id: string;
-  /** Null for library-wide chats that are not about one document. */
+  /** Null for chats that are not about one document. */
   itemId: string | null;
+  /** The collection a library chat is scoped to; null for the whole library. */
+  collectionId: string | null;
   title: string;
   messageCount: number;
   createdAt: string;
   updatedAt: string;
 }
 
+/**
+ * What a listing is about.
+ *
+ * Three cases, not two booleans: a chat belongs to a document, or to a
+ * collection, or to the library at large. They are mutually exclusive, and
+ * saying so here keeps `list` from having to decide what a request for both
+ * at once would even mean.
+ */
+export type ConversationScope =
+  | { kind: "item"; itemId: string }
+  | { kind: "collection"; collectionId: string }
+  | { kind: "library" };
+
 interface Row {
   id: string;
   item_id: string | null;
+  collection_id: string | null;
   title: string;
   message_count: number;
   created_at: string;
   updated_at: string;
 }
 
-const SELECT = `SELECT id, item_id, title, message_count, created_at, updated_at FROM conversations`;
+const SELECT =
+  `SELECT id, item_id, collection_id, title, message_count, created_at, updated_at
+   FROM conversations`;
 
 function toDomain(r: Row): Conversation {
   return {
     id: r.id,
     itemId: r.item_id,
+    collectionId: r.collection_id,
     title: r.title,
     messageCount: r.message_count,
     createdAt: r.created_at,
@@ -48,27 +67,40 @@ export class ConversationStore {
   constructor(private readonly db: Database, private readonly userId: string) {}
 
   /**
-   * Sessions for one document, or the library-wide ones when `itemId` is null.
+   * Sessions in one scope, most recently updated first.
    *
-   * Two queries rather than one with a parameter, because `item_id = NULL`
-   * never matches in SQL — the library case genuinely needs `IS NULL`.
+   * The unscoped case needs its own SQL rather than a bound null, because
+   * `item_id = NULL` never matches in SQL — it genuinely needs `IS NULL`. The
+   * library scope also excludes collection chats: "not about a document" and
+   * "not about anything in particular" are different lists, and merging them
+   * would show every collection's chat in the library's history.
    */
-  list(itemId: string | null): Conversation[] {
-    const sql = itemId === null
-      ? `${SELECT} WHERE item_id IS NULL ORDER BY updated_at DESC`
-      : `${SELECT} WHERE item_id = ? ORDER BY updated_at DESC`;
-    const query = this.db.query<Row, any[]>(sql);
-    return (itemId === null ? query.all() : query.all(itemId)).map(toDomain);
+  list(scope: ConversationScope): Conversation[] {
+    switch (scope.kind) {
+      case "item":
+        return this.db.query<Row, [string]>(
+          `${SELECT} WHERE item_id = ? ORDER BY updated_at DESC`,
+        ).all(scope.itemId).map(toDomain);
+      case "collection":
+        return this.db.query<Row, [string]>(
+          `${SELECT} WHERE collection_id = ? ORDER BY updated_at DESC`,
+        ).all(scope.collectionId).map(toDomain);
+      case "library":
+        return this.db.query<Row, []>(
+          `${SELECT} WHERE item_id IS NULL AND collection_id IS NULL ORDER BY updated_at DESC`,
+        ).all().map(toDomain);
+    }
   }
 
   create(conversation: Conversation): void {
     this.db.prepare(
       `INSERT INTO conversations
-         (id, user_id, item_id, title, message_count, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+         (id, user_id, item_id, collection_id, title, message_count, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
-      conversation.id, this.userId, conversation.itemId, conversation.title,
-      conversation.messageCount, conversation.createdAt, conversation.updatedAt,
+      conversation.id, this.userId, conversation.itemId, conversation.collectionId,
+      conversation.title, conversation.messageCount,
+      conversation.createdAt, conversation.updatedAt,
     );
   }
 

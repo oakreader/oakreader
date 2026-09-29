@@ -16,7 +16,7 @@ enum PromptCatalog {
     /// A list rather than "everything in the directory" so that adding a file
     /// is inert until something asks for it — the same reason Dia's agents
     /// name their mixins instead of globbing.
-    static let chatMixins = ["math-formatting", "citations"]
+    static let chatMixins = ["math-formatting", "citations", "librarian"]
 
     /// Compose `base.md`, the named mixins, and the skills listing.
     ///

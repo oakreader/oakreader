@@ -5,7 +5,7 @@ import { z } from "zod";
 import { WireMessage, WireToolDef, WordLookup, Annotation, Conversation, Collection, Item, Property, PropertyOption, Skill, SkillAdvisory, SkillBin, SkillEnv, ToolDefinition, type ProviderSummary, type EventToolCall, type PromptOption } from "./protocol.base.js";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- refs used by generated shapes
 
-export const PROTOCOL_VERSION = 10;
+export const PROTOCOL_VERSION = 11;
 
 /** JSON-RPC 2.0 error codes. Below -32000 is ours; the rest is the spec's. */
 export const RpcError = {
@@ -184,9 +184,10 @@ export const AnnotationsDeleteParams = z.object({
 export type AnnotationsDeleteParams = z.infer<typeof AnnotationsDeleteParams>;
 export type AnnotationsDeleteResult = Record<string, never>;
 
-/** `catalog/conversations/list` — Sessions for one document, or the library-wide ones when itemId is absent. Most recently updated first. */
+/** `catalog/conversations/list` — Sessions in one scope, most recently updated first: a document's when itemId is given, a collection's when collectionId is, and the ones about neither when both are absent. Passing both is a client bug; itemId wins. */
 export const ConversationsListParams = z.object({
   itemId: z.string().optional(),
+  collectionId: z.string().optional(),
 });
 export type ConversationsListParams = z.infer<typeof ConversationsListParams>;
 export type ConversationsListResult = {

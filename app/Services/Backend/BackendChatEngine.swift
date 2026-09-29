@@ -142,7 +142,7 @@ actor BackendChatEngine {
 
                             var approved = true
                             if let confirm = toolConfirmation {
-                                let category = toolsByName[name]?.category ?? .readOnly
+                                let category = toolsByName[name]?.category(for: input) ?? .readOnly
                                 record.status = .pending
                                 continuation.yield(.toolUsePending(record))
                                 approved = await confirm(call, category)

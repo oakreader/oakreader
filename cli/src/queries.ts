@@ -211,6 +211,22 @@ export class Queries {
     });
   }
 
+  /**
+   * The item already imported from this URL, if there is one.
+   *
+   * Matched on the attachment, which is where the origin is recorded. The
+   * app's own duplicate test (`findItem(bySourceURL:)`), so the terminal and
+   * the app agree on what "already in the library" means.
+   */
+  findItemBySourceURL(url: string): Item | null {
+    const row = this.db.query<any, [string]>(
+      `SELECT ${ITEM_COLUMNS.split(", ").map((c) => `i.${c}`).join(", ")}
+         FROM items i JOIN attachments a ON a.item_id = i.id
+        WHERE a.source_url = ? AND i.deleted_at IS NULL
+        LIMIT 1`).get(url);
+    return row === null ? null : toItem(row);
+  }
+
   findItem(id: string): { item: Item; attachments: Attachment[] } | null {
     const row = this.db.query<any, [string]>(
       `SELECT ${ITEM_COLUMNS} FROM items WHERE id = ?`).get(id);

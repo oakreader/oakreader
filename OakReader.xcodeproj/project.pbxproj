@@ -132,6 +132,7 @@
 		6E008EBA3AA7B17CB02DAAC2 /* SessionEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 881D3BBB01B2EBE6796C884B /* SessionEvent.swift */; };
 		6E69E44FEDE77FA312675035 /* CompletionClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 179FBB2D6079BC574E6102FC /* CompletionClient.swift */; };
 		6EEA91AAAB4CC99AB416FA4E /* ZoteroFieldMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B3860FECEECF45E18A28FF7 /* ZoteroFieldMapping.swift */; };
+		6FF588800599A7B0BA27DE68 /* LibraryAgentBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 024A99A7355CC4C11FA440B5 /* LibraryAgentBridge.swift */; };
 		712A56EF5A5E258945F16E9E /* MarkdownPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C4ABDD95E69F9D5221AD9AD /* MarkdownPreviewView.swift */; };
 		717133D46AB694903CA70886 /* BookmarkSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7056004C8AF0FED1F69C4221 /* BookmarkSidebarView.swift */; };
 		71A8AD8ED3C4B994C6088F0B /* LibraryPropertyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A2A6A4D88229137627AB296 /* LibraryPropertyStore.swift */; };
@@ -282,6 +283,7 @@
 
 /* Begin PBXFileReference section */
 		01EC224994FA0B180A3066C7 /* OakServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OakServer.swift; sourceTree = "<group>"; };
+		024A99A7355CC4C11FA440B5 /* LibraryAgentBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryAgentBridge.swift; sourceTree = "<group>"; };
 		02858600656BB33124BD0DDC /* ToolResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolResolver.swift; sourceTree = "<group>"; };
 		02EB12B6BA4BBAF5526C5DBD /* NSImage+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSImage+Extensions.swift"; sourceTree = "<group>"; };
 		03A8D7D8FCBA0FBA22E805A4 /* ToolOutput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolOutput.swift; sourceTree = "<group>"; };
@@ -799,6 +801,7 @@
 				A15CEC695D0A0C7DDDA25CB4 /* ChatTitleService.swift */,
 				EFD1EFD90892517FA0711664 /* CitationSourceRegistry.swift */,
 				40C76935DE289E38B110EED0 /* DocumentTools.swift */,
+				024A99A7355CC4C11FA440B5 /* LibraryAgentBridge.swift */,
 				C61D1DB7DF2CC7F1E88CCA99 /* LivePageBridge.swift */,
 				988B8EF11ACF725EA0808B03 /* LLMContextProvider.swift */,
 				932D4C7D48177F01C735B01B /* MemoryStore.swift */,
@@ -1486,6 +1489,7 @@
 				48AE3E0938A01056407034B2 /* KeychainConfig.swift in Sources */,
 				CCDF807FCC4548EC1F0539B6 /* KeychainService.swift in Sources */,
 				1EFC0A7DCD0C4F4864F89FE2 /* LLMContextProvider.swift in Sources */,
+				6FF588800599A7B0BA27DE68 /* LibraryAgentBridge.swift in Sources */,
 				C1A9A61BF01A3F09E2CED769 /* LibraryCardGridView.swift in Sources */,
 				2CCEB68D56365FBB399DA707 /* LibraryCatalog.swift in Sources */,
 				EC6EA8398DE5DE427973321A /* LibraryCitationExport.swift in Sources */,
@@ -1744,7 +1748,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.11.0;
+				MARKETING_VERSION = 0.11.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.oakreader.OakReader.dev;
 				PRODUCT_MODULE_NAME = OakReader;
 				PRODUCT_NAME = "OakReader-Dev";
@@ -1835,7 +1839,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.11.0;
+				MARKETING_VERSION = 0.11.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.oakreader.OakReader;
 				PRODUCT_MODULE_NAME = OakReader;
 				PRODUCT_NAME = OakReader;

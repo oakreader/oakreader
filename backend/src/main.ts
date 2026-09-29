@@ -57,7 +57,7 @@ import { Catalog } from "./catalog/db.js";
 import { MIGRATIONS } from "./catalog/schema.js";
 import { WordLookupStore } from "./catalog/wordLookups.js";
 import { AnnotationStore } from "./catalog/annotations.js";
-import { ConversationStore } from "./catalog/conversations.js";
+import { ConversationStore, type ConversationScope } from "./catalog/conversations.js";
 import { CollectionStore } from "./catalog/collections.js";
 import { ItemStore } from "./catalog/items.js";
 import { PropertyStore } from "./catalog/properties.js";
@@ -572,7 +572,12 @@ function registerMethods(): void {
   peer.onRequest("catalog/conversations/list", ConversationsListParams,
     (p): ConversationsListResult => {
       const store = new ConversationStore(catalog().db, LOCAL_USER);
-      return { conversations: store.list(p.itemId ?? null) };
+      const scope: ConversationScope = p.itemId
+        ? { kind: "item", itemId: p.itemId }
+        : p.collectionId
+          ? { kind: "collection", collectionId: p.collectionId }
+          : { kind: "library" };
+      return { conversations: store.list(scope) };
     });
 
   peer.onRequest("catalog/conversations/create", ConversationsCreateParams, (p) => {

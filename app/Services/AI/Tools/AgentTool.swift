@@ -34,4 +34,13 @@ protocol AgentTool: Sendable {
 extension AgentTool {
     /// Default category — most tools are read-only.
     var category: ToolCategory { .readOnly }
+
+    /// The category of one specific call.
+    ///
+    /// A tool whose risk is uniform answers with `category` and never overrides
+    /// this. `oak` is the one that must: the same tool lists collections and
+    /// creates them, and declaring the whole thing `write` would put a
+    /// confirmation in front of every search the agent runs, while declaring it
+    /// `readOnly` — which it did — let it mutate the library unasked.
+    func category(for input: ToolInput) -> ToolCategory { category }
 }

@@ -126,6 +126,14 @@ final class AppState {
     let referenceService: ReferenceService
     let importService: ImportService
 
+    /// Chat for the library surface itself, shown in the detail panel's Chat tab.
+    ///
+    /// One instance for the whole surface rather than one per collection: the
+    /// scope is read from `libraryStore.selectedCollection` each time a message
+    /// is sent (see `LLMContextProvider`'s GROUNDED MODE block), so selecting a
+    /// different collection re-scopes the live thread with nothing to rebuild.
+    let libraryChat = ChatViewModel()
+
     var openTabs: [DocumentTab] = []
     var activeTabID: UUID?
     var window: NSWindow?
@@ -172,6 +180,11 @@ final class AppState {
         self.libraryStore = LibraryStore(database: database)
         self.referenceService = ReferenceService()
         self.importService = ImportService(store: libraryStore, coverService: coverService, referenceService: referenceService)
+        // The library chat has no `DocumentViewModel` parent; app state is how it
+        // reaches the selected collection, and the service is how its history is
+        // listed (`item_id IS NULL` — library-wide sessions).
+        libraryChat.appState = self
+        libraryChat.sessionService = ConversationService()
         startAutosaveTimer()
 
         // Warm the library before any view asks for it. The catalog lives in
@@ -180,6 +193,10 @@ final class AppState {
         // in a moment later, which reads as data loss rather than loading.
         Task { @MainActor [libraryStore] in
             await libraryStore.refresh()
+            // So the grid updates when the agent's `oak` commands write to the
+            // catalog from their own process. Weak, and set here rather than in
+            // the initializer because the bridge is main-actor isolated.
+            LibraryAgentBridge.shared.attach(store: libraryStore)
         }
     }
 
