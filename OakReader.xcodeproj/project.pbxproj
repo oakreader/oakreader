@@ -65,7 +65,6 @@
 		2FD30C0FB1C008E2B15C3910 /* SkillManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5F51769F0F2907C06833C49 /* SkillManagementView.swift */; };
 		3254D45FBC04AEC52A533561 /* ToolInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D47756C27092298BCBEA6C1 /* ToolInput.swift */; };
 		3281ADF51936301853268F66 /* NoteExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 536F369AF3FE91891E58F659 /* NoteExporter.swift */; };
-		35961484BF55F0636930C992 /* PageLocationOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31C1A58EEF5D291C8F4B41B5 /* PageLocationOverlay.swift */; };
 		35D7B2098BFF7E66D409D1A5 /* SessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B74C931779981C9A578E86F6 /* SessionStore.swift */; };
 		36E6CAD489F405C77C296B52 /* AnnotationCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = B87D7729365DE50DE6C6E33A /* AnnotationCatalog.swift */; };
 		37E1D7549A70847EA452C14B /* ReferenceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD1DAE24E40C0139F3FB1F2E /* ReferenceService.swift */; };
@@ -238,6 +237,7 @@
 		CCDF807FCC4548EC1F0539B6 /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EF4018BA73B605F18CE8165 /* KeychainService.swift */; };
 		CD34903E7BEF2A0EB4523F1B /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8683BE538AF9372D50BF57D /* ContentView.swift */; };
 		D09751FFCD0FBBB6D690DF4E /* Preview.bundle in Resources */ = {isa = PBXBuildFile; fileRef = 48282DDE8AD7AA32E128FE19 /* Preview.bundle */; };
+		D16E2E6F77C909C1D4F989F2 /* PDFToolbarContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7448C11A18F7DF79DAF690A2 /* PDFToolbarContent.swift */; };
 		D374A633329190B5FFF58678 /* ChatTokenAttachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50968AB643394776EE5003D9 /* ChatTokenAttachment.swift */; };
 		D5888FA3F880801ECC471832 /* TavilySearchProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBB116D7B09204C4FBBF95DA /* TavilySearchProvider.swift */; };
 		D72FCCE546CBA90267A8B370 /* ExportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5180811E78B858BC5D80477 /* ExportSheet.swift */; };
@@ -325,7 +325,6 @@
 		2F54DBF610E5042FF38F747F /* ColorPickerButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorPickerButton.swift; sourceTree = "<group>"; };
 		300D1B2ABCF6DDAFD2373F7E /* Preferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Preferences.swift; sourceTree = "<group>"; };
 		31AA86322A4D9F7512D829F1 /* ChatBubbleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatBubbleView.swift; sourceTree = "<group>"; };
-		31C1A58EEF5D291C8F4B41B5 /* PageLocationOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageLocationOverlay.swift; sourceTree = "<group>"; };
 		32C18D2584869D5511C17241 /* LibraryTableToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryTableToolbar.swift; sourceTree = "<group>"; };
 		32EC3C8A287D8B1608066587 /* BookmarkModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarkModel.swift; sourceTree = "<group>"; };
 		338377C049DCDAC12D3B1961 /* AreaSelectionPopupPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AreaSelectionPopupPanel.swift; sourceTree = "<group>"; };
@@ -412,6 +411,7 @@
 		71AB5E4862D7A4F6F38E2D0D /* VoiceViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceViewModel.swift; sourceTree = "<group>"; };
 		72859491D24BE5E4817E7DF8 /* MemoryTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryTools.swift; sourceTree = "<group>"; };
 		73C76D814F13ACA72E52803B /* AIProviderConfigView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIProviderConfigView.swift; sourceTree = "<group>"; };
+		7448C11A18F7DF79DAF690A2 /* PDFToolbarContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFToolbarContent.swift; sourceTree = "<group>"; };
 		7451262FB6A54AC13404EAE9 /* DocumentToolbarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentToolbarView.swift; sourceTree = "<group>"; };
 		750ACFCE92F080ABDCB9EE94 /* PDFConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFConstants.swift; sourceTree = "<group>"; };
 		7758CEAED2C9DB1C8AA302AE /* MediaDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaDocument.swift; sourceTree = "<group>"; };
@@ -831,8 +831,8 @@
 				F8712FA5D845583EAADB986A /* HTMLViewerRepresentable.swift */,
 				1C4ABDD95E69F9D5221AD9AD /* MarkdownPreviewView.swift */,
 				CA1B01C4620797C28807574D /* MediaSnapshotOverlayView.swift */,
-				31C1A58EEF5D291C8F4B41B5 /* PageLocationOverlay.swift */,
 				6B725184928265D959AD1A98 /* PDFMarkupOverlay.swift */,
+				7448C11A18F7DF79DAF690A2 /* PDFToolbarContent.swift */,
 				4D6FDF0F844A0664C4B541CC /* PDFViewCoordinator.swift */,
 				233AF801A2F13BA9D7760108 /* PDFViewerRepresentable.swift */,
 				1F4B495A6B1B03338A4570E4 /* PresentationOverlayView.swift */,
@@ -1548,9 +1548,9 @@
 				A8A74AA420C9B8D9EC2A8E66 /* PDFOCRService.swift in Sources */,
 				246C60EA6D8B8445917917DD /* PDFPage+Extensions.swift in Sources */,
 				BCB20CCAEAE4E5D6BD7CCA21 /* PDFRenderingService.swift in Sources */,
+				D16E2E6F77C909C1D4F989F2 /* PDFToolbarContent.swift in Sources */,
 				7BC57BCDA7DFD5A85E681760 /* PDFViewCoordinator.swift in Sources */,
 				0CB072E2C3B9A5CFB9E25EF3 /* PDFViewerRepresentable.swift in Sources */,
-				35961484BF55F0636930C992 /* PageLocationOverlay.swift in Sources */,
 				AB7285E49F501686D05D6539 /* PageRange.swift in Sources */,
 				495585B85BD2B44719BA2EEE /* PageRangeSelector.swift in Sources */,
 				D9A7BD4EAB942D21376249EA /* PaletteCommand.swift in Sources */,
@@ -1744,7 +1744,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.11.0;
+				MARKETING_VERSION = 0.11.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.oakreader.OakReader.dev;
 				PRODUCT_MODULE_NAME = OakReader;
 				PRODUCT_NAME = "OakReader-Dev";
@@ -1835,7 +1835,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.11.0;
+				MARKETING_VERSION = 0.11.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.oakreader.OakReader;
 				PRODUCT_MODULE_NAME = OakReader;
 				PRODUCT_NAME = OakReader;

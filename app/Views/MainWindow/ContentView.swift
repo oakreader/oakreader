@@ -128,10 +128,7 @@ struct ContentView: View {
         if viewModel.isNewTab { return false }
         if viewModel.state.isPresentationMode { return false }
         switch viewModel.contentType {
-        // PDF dropped its per-document toolbar — zoom/markup/area now live in
-        // menus, the selection popup, and the Command Palette. HTML still keeps
-        // its annotation cluster, and live web keeps the address bar.
-        case .pdf:        return false
+        case .pdf:        return viewModel.hasDocument
         case .html:       return viewModel.hasDocument
         case .link:       return viewModel.liveURL != nil
         case .markdown,
@@ -194,16 +191,11 @@ struct ContentView: View {
     private var mainContentView: some View {
         switch viewModel.contentType {
         case .pdf:
-            ZStack(alignment: .bottom) {
+            ZStack {
                 PDFViewerRepresentable(viewModel: viewModel)
 
                 if viewModel.state.editorMode == .snapshot {
                     SnapshotOverlayView(viewModel: viewModel)
-                } else {
-                    // Stands down during an area capture — the reader is
-                    // dragging a rectangle and a floating pill in the corner is
-                    // both a target to miss and a thing to crop by accident.
-                    PageLocationOverlay(viewModel: viewModel)
                 }
             }
         case .html:

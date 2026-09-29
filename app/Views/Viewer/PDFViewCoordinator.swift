@@ -639,7 +639,7 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
 
     // MARK: - Menu Actions: Page Navigation
 
-    /// Routes to the page field in `PageLocationOverlay` rather than opening a
+    /// Routes to the page field in `PDFToolbarContent` rather than opening a
     /// sheet. A modal alert to reach page 42 blocked the document you were
     /// reading in order to ask which part of it you wanted — and it was a third
     /// implementation of "go to page" alongside the menu and the keyboard. One

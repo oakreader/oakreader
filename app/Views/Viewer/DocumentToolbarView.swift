@@ -31,17 +31,14 @@ struct DocumentToolbarView: View {
     @ViewBuilder
     private var toolbarRow: some View {
         switch viewModel.contentType {
-        // PDF has no per-document toolbar: zoom → ⌘=/⌘-/⌘0 (+ Command Palette),
-        // highlight/underline → text-selection popup & ⌃⌘H/⌃⌘U, area capture →
-        // View ▸ Capture Area (⇧⌘A). The empty full-width bar wasn't earning
-        // its keep, so it's gone.
-        // PDF has no per-document toolbar. Zoom → ⌘=/⌘-/⌘0 (+ Command Palette),
-        // highlight/underline + color → text-selection popup & ⌃⌘H/⌃⌘U, area
-        // capture → View ▸ Capture Area (⇧⌘A). HTML snapshots get a read-only
-        // archive bar (badge + non-editable URL + "Open original"); live web
-        // gets the editable address-bar chrome. Same WKWebView underneath —
-        // only the chrome differs.
-        case .pdf:      EmptyView()
+        // Every viewer that has a location now shows it in the same row, in the
+        // same three zones: PDF gets page steppers + file name/section + page
+        // field + zoom + actions, HTML snapshots get a read-only archive bar
+        // (badge + non-editable URL + "Open original"), live web gets the
+        // editable address-bar chrome. Same WKWebView under the last two — only
+        // the chrome differs. The PDF row is a deliberate reversal of its
+        // earlier deletion; see `PDFToolbarContent` and ADR-051.
+        case .pdf:      PDFToolbarContent(viewModel: viewModel)
         case .html:     SnapshotToolbarContent(viewModel: viewModel)
         case .link:     linkToolbar
         case .markdown: EmptyView()  // nothing toolbar-worthy yet — tab-bar anchors suffice
