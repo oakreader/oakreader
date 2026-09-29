@@ -94,9 +94,15 @@ struct ChatCompletionItem: Identifiable, Equatable {
     }
 
     /// Returns the label shown inside the popup row without the trigger glyph.
+    ///
+    /// The empty-trigger check is load-bearing: every string has `""` as a prefix, so
+    /// without it `hasPrefix` passes for a trigger-less item and `dropFirst()` eats a
+    /// real character — the `+` attachment menu rendered "Upload File" as "pload File",
+    /// and drag-dropped library refs lost the first letter of their title the same way.
+    /// Both build their items with `trigger: ""`.
     var displayLabel: String {
         let trimmed = label.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.hasPrefix(trigger) else { return trimmed }
+        guard !trigger.isEmpty, trimmed.hasPrefix(trigger) else { return trimmed }
         return String(trimmed.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
