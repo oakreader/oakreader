@@ -78,13 +78,14 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
         items: [ChatCompletionItem],
         anchorRect: NSRect,
         screenVisibleFrame: NSRect,
+        matchesComposer: Bool = false,
         onSelect: @escaping (ChatCompletionItem) -> Void
     ) {
         self.allItems = items
         self.filtered = items
         self.anchorRect = anchorRect
         self.screenVisibleFrame = screenVisibleFrame
-        self.panelWidth = min(max(anchorRect.width, Self.minPanelWidth), Self.maxPanelWidth)
+        self.panelWidth = matchesComposer ? anchorRect.width : min(max(anchorRect.width, Self.minPanelWidth), Self.maxPanelWidth)
         self.onSelect = onSelect
         let isDark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
         self.palette = CompletionPalette(isDark: isDark)
@@ -133,13 +134,11 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
         let container = NSView()
         container.wantsLayer = true
         container.layer?.backgroundColor = palette.panelBackground.cgColor
-        container.layer?.cornerRadius = Self.cornerRadius
-        // The stroke is the whole edge — see `hasShadow` above. It used to share the
-        // job with the window shadow, which is the only reason 4% black ever passed
-        // for one; alone on a white card over a near-white pane that is invisible.
-        // `palette.border` carries the weight now.
-        container.layer?.borderWidth = 0.5
-        container.layer?.borderColor = palette.border.cgColor
+        container.layer?.cornerRadius = matchesComposer ? ChatComposerStyle.cornerRadius : Self.cornerRadius
+        container.layer?.borderWidth = matchesComposer ? ChatComposerStyle.borderWidth : 0.5
+        container.layer?.borderColor = matchesComposer
+            ? NSColor.labelColor.withAlphaComponent(ChatComposerStyle.borderOpacity).cgColor
+            : palette.border.cgColor
         container.layer?.cornerCurve = .continuous
         container.layer?.masksToBounds = true
 
@@ -230,6 +229,10 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
         updateSelection()
     }
 
+    func selectCurrentItem() {
+        if let selectedItem { onSelect(selectedItem) }
+    }
+
     func dismiss() {
         removeAppResignObserver()
         NSAnimationContext.runAnimationGroup(
@@ -276,8 +279,10 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
                 cachedHeaders[section.title] = h
                 return h
             }()
-            stackView.addArrangedSubview(header)
-            pin(header)
+            if !section.title.isEmpty {
+                stackView.addArrangedSubview(header)
+                pin(header)
+            }
 
             for item in section.items {
                 let row = cachedRows[item.id] ?? {
@@ -332,7 +337,7 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
         let sections = sectionedItems
         let rows = filtered.count
         return Self.verticalInset * 2
-            + CGFloat(sections.count) * Self.headerHeight
+            + CGFloat(sections.filter { !$0.title.isEmpty }.count) * Self.headerHeight
             + CGFloat(rows) * Self.rowHeight
     }
 

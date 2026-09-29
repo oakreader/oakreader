@@ -30,6 +30,7 @@ struct ChatInputTextView: NSViewRepresentable {
     /// Shared reference so the parent SwiftUI view can trigger focus.
     class FocusRef {
         weak var textView: ChatNSTextView?
+        weak var composerView: NSView?
         func focus() {
             guard let textView else { return }
             textView.window?.makeFirstResponder(textView)
@@ -71,6 +72,7 @@ struct ChatInputTextView: NSViewRepresentable {
         textView.textContainer?.lineFragmentPadding = 0
         textView.textContainer?.widthTracksTextView = true
 
+        textView.composerFocusRef = focusRef
         textView.slashItems = slashItems
         textView.atItems = atItems
         textView.onTokensChanged = { tokens in
@@ -134,6 +136,7 @@ struct ChatInputTextView: NSViewRepresentable {
 
         textView.onSend = onSend
         textView.onPasteImage = onPasteImage
+        textView.composerFocusRef = focusRef
         textView.slashItems = slashItems
         textView.atItems = atItems
         if textView.font?.pointSize != fontSize {
@@ -239,6 +242,7 @@ final class ChatNSTextView: NSTextView {
 
     // MARK: - Completion State
 
+    weak var composerFocusRef: ChatInputTextView.FocusRef?
     var slashItems: [ChatCompletionItem] = []
     var atItems: [ChatCompletionItem] = []
     var onTokensChanged: (([ChatCompletionItem]) -> Void)?
@@ -247,6 +251,12 @@ final class ChatNSTextView: NSTextView {
     var tokenFontSize: CGFloat = 16
 
     private var completionPanel: ChatCompletionPanel?
+    private var isAttachmentMenu = false
+    private var outsideClickMonitor: Any?
+
+    deinit {
+        if let outsideClickMonitor { NSEvent.removeMonitor(outsideClickMonitor) }
+    }
     private var triggerChar: String?
     private var triggerLocation: Int?
 
@@ -408,7 +418,8 @@ final class ChatNSTextView: NSTextView {
         completionPanel = ChatCompletionPanel(
             items: items,
             anchorRect: composerRect,
-            screenVisibleFrame: composerScreenVisibleFrame()
+            screenVisibleFrame: composerScreenVisibleFrame(),
+            matchesComposer: true
         ) { [weak self] item in
             self?.insertToken(item)
         }
@@ -419,7 +430,46 @@ final class ChatNSTextView: NSTextView {
         }
     }
 
+    func toggleAttachmentMenu(items: [CardMenuItem]) {
+        let wasShowing = isAttachmentMenu && completionPanel?.isVisible == true
+        dismissCompletionPanel()
+        guard !wasShowing, let rect = composerScreenRect(), let window else { return }
+        window.makeFirstResponder(self)
+        isAttachmentMenu = true
+        let commands = items.enumerated().map { index, item in
+            ChatCompletionItem(
+                id: String(index), icon: item.icon ?? "plus", label: item.title,
+                description: "", kind: .command(section: ""), trigger: ""
+            )
+        }
+        let panel = ChatCompletionPanel(
+            items: commands, anchorRect: rect,
+            screenVisibleFrame: composerScreenVisibleFrame(), matchesComposer: true
+        ) { [weak self] item in
+            self?.dismissCompletionPanel()
+            guard let index = Int(item.id), items.indices.contains(index) else { return }
+            items[index].action()
+        }
+        completionPanel = panel
+        window.addChildWindow(panel, ordered: .above)
+        outsideClickMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown]
+        ) { [weak self, weak panel] event in
+            if event.window !== panel {
+                // Let the + button toggle the existing panel before dismissing it.
+                DispatchQueue.main.async {
+                    guard let self, let panel, self.completionPanel === panel else { return }
+                    self.dismissCompletionPanel()
+                }
+            }
+            return event
+        }
+    }
+
     private func dismissCompletionPanel() {
+        if let outsideClickMonitor { NSEvent.removeMonitor(outsideClickMonitor) }
+        outsideClickMonitor = nil
+        isAttachmentMenu = false
         completionPanel?.dismiss()
         completionPanel = nil
         triggerChar = nil
@@ -432,15 +482,22 @@ final class ChatNSTextView: NSTextView {
     }
 
     private func handleCompletionKey(_ event: NSEvent) -> Bool {
-        guard completionPanel != nil, let startLoc = triggerLocation else { return false }
+        guard let panel = completionPanel, panel.isVisible else {
+            dismissCompletionPanel()
+            return false
+        }
+        if isAttachmentMenu && ![53, 36, 126, 125].contains(event.keyCode) {
+            dismissCompletionPanel()
+            return false
+        }
 
         switch event.keyCode {
         case 53:  // Escape
             dismissCompletionPanel()
             return true
         case 36:  // Enter
-            if let item = completionPanel?.selectedItem {
-                insertToken(item)
+            if panel.selectedItem != nil {
+                panel.selectCurrentItem()
             } else {
                 dismissCompletionPanel()
             }
@@ -452,6 +509,7 @@ final class ChatNSTextView: NSTextView {
             completionPanel?.moveSelection(by: 1)
             return true
         case 51:  // Backspace
+            guard let startLoc = triggerLocation else { return false }
             if selectedRange().location <= startLoc {
                 dismissCompletionPanel()
                 super.keyDown(with: event)
@@ -621,14 +679,10 @@ final class ChatNSTextView: NSTextView {
     /// scroll view) and let the panel clamp itself to the screen's visible frame.
     private func composerScreenRect() -> NSRect? {
         guard let window else { return nil }
-        // The input's own rect in screen coordinates. `convert(_:to:nil)` → `convertToScreen`
-        // is accurate here (the earlier "flying" was AppKit's `constrainFrameRect`, not a
-        // bad conversion). Anchoring to the input rect keeps the popup exactly as wide as
-        // the input and left-aligned to it, so it never overflows the chat pane.
-        let sourceView: NSView = enclosingScrollView ?? self
-        let onScreen = window.convertToScreen(sourceView.convert(sourceView.bounds, to: nil))
-        // Zero-height anchor line spanning the input width, sitting just above its top edge.
-        return NSRect(x: onScreen.minX, y: onScreen.maxY + 8, width: onScreen.width, height: 0)
+        // The background anchor measures the outer composer, including padding,
+        // attachments and toolbar, instead of the inset text/caret position.
+        guard let sourceView = composerFocusRef?.composerView else { return nil }
+        return window.convertToScreen(sourceView.convert(sourceView.bounds, to: nil))
     }
 
     /// The rect the popup must stay inside: the composer window's frame intersected with

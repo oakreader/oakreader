@@ -130,3 +130,10 @@ struct CompletionPalette {
         static let secondarySize: CGFloat = 11
     }
 }
+
+/// Shared outline for the chat input and its full-width menus.
+enum ChatComposerStyle {
+    static let cornerRadius: CGFloat = 16
+    static let borderWidth: CGFloat = 1
+    static let borderOpacity: CGFloat = 0.10
+}

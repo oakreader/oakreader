@@ -488,7 +488,7 @@ struct AIChatView: View {
     // MARK: - Input Bar
 
     @State private var inputContentHeight: CGFloat = ChatInputTextView.minContentHeight
-    private let inputFocusRef = ChatInputTextView.FocusRef()
+    @State private var inputFocusRef = ChatInputTextView.FocusRef()
 
     private var inputHasText: Bool {
         !chatVM.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -535,20 +535,8 @@ struct AIChatView: View {
             HStack(spacing: 6) {
                 // Single attachment entry point — mirrors Dia's command bar,
                 // where every attach type funnels through one borderless "+".
-                Menu {
-                    Button(action: { uploadFile() }) {
-                        OakLabel("Upload File", systemImage: "arrow.up.doc")
-                    }
-                    if chatVM.parent != nil {
-                        Button(action: { chatVM.addDocumentPageSnapshot() }) {
-                            OakLabel("Attach Page", systemImage: "doc.viewfinder")
-                        }
-                        // Was a standalone camera button — folded in here so the
-                        // toolbar stays a single calm "+" like Dia's.
-                        Button(action: { chatVM.parent?.beginAreaCaptureForChat() }) {
-                            OakLabel("Capture Region", systemImage: "viewfinder")
-                        }
-                    }
+                Button {
+                    inputFocusRef.textView?.toggleAttachmentMenu(items: attachmentMenuItems)
                 } label: {
                     Image(systemName: "plus")
                         .font(.system(size: 16, weight: .medium))
@@ -557,8 +545,6 @@ struct AIChatView: View {
                         .contentShape(Rectangle())
                         .accessibilityLabel(Text("Add attachment"))
                 }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
                 .buttonStyle(.plain)
                 .fixedSize()
                 .help("Add attachment")
@@ -600,17 +586,33 @@ struct AIChatView: View {
             .padding(.bottom, 8)
         }
         .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: ChatComposerStyle.cornerRadius, style: .continuous)
                 .fill(OakStyle.Colors.diaSurface)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.primary.opacity(0.10), lineWidth: 1)
+            RoundedRectangle(cornerRadius: ChatComposerStyle.cornerRadius, style: .continuous)
+                .stroke(Color.primary.opacity(ChatComposerStyle.borderOpacity), lineWidth: ChatComposerStyle.borderWidth)
         )
+        .background {
+            ChatComposerAnchor(focusRef: inputFocusRef)
+        }
         .shadow(color: Color.black.opacity(0.08), radius: 10, y: 3)
         .padding(.horizontal, presentation == .canvas ? 0 : OakStyle.Spacing.sm)
         .padding(.bottom, presentation == .canvas ? OakStyle.Spacing.md : OakStyle.Spacing.xs)
         .padding(.top, OakStyle.Spacing.xs)
+    }
+
+    private var attachmentMenuItems: [CardMenuItem] {
+        var items = [CardMenuItem(title: String(localized: "Upload File"), icon: "arrow.up.doc", action: uploadFile)]
+        if chatVM.parent != nil {
+            items.append(CardMenuItem(title: String(localized: "Attach Page"), icon: "doc.viewfinder") {
+                chatVM.addDocumentPageSnapshot()
+            })
+            items.append(CardMenuItem(title: String(localized: "Capture Region"), icon: "viewfinder") {
+                chatVM.parent?.beginAreaCaptureForChat()
+            })
+        }
+        return items
     }
 
     // MARK: - Audio Playback
@@ -927,3 +929,17 @@ private struct ChatScrollbar: View {
     }
 }
 
+/// Measures the composer's outer border for both input menus.
+private struct ChatComposerAnchor: NSViewRepresentable {
+    let focusRef: ChatInputTextView.FocusRef
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        focusRef.composerView = view
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        focusRef.composerView = nsView
+    }
+}
