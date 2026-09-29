@@ -51,13 +51,8 @@ extension Notification.Name {
     /// `object` is the DocumentViewModel; userInfo["id"] is the markup's DB id.
     static let openNoteEditor           = Notification.Name("OakReaderOpenNoteEditor")
 
-    /// Reveal the PDF page overlay and put the caret in its page field — the one
-    /// command behind Go ▸ Go to Page… (⌥⌘G) and the PDF context menu, so both
-    /// land on the same editor instead of the old modal sheet.
+    /// Ask the PDF coordinator to present its Go-to-Page sheet. Fired by
+    /// Go ▸ Go to Page… (⌥⌘G); the context menu calls the same handler directly.
     /// `object` is the DocumentViewModel.
-    static let pdfEditPageNumber        = Notification.Name("OakReaderPDFEditPageNumber")
-
-    /// Hand first responder back to the PDF view after the page field commits or
-    /// cancels, so ↑/↓ resume paging instead of moving a caret.
-    static let pdfFocusReader           = Notification.Name("OakReaderPDFFocusReader")
+    static let pdfGoToPagePrompt        = Notification.Name("OakReaderPDFGoToPagePrompt")
 }

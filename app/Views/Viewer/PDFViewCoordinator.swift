@@ -24,6 +24,7 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
     // Text selection popup
     private var selectionPopup: TextSelectionPopupPanel?
     private var selectionChangeObserver: Any?
+    private var goToPageObserver: Any?
     private var pendingPopupWork: DispatchWorkItem?
 
     // Annotation-edit popup — Shneiderman direct-manipulation entry for the
@@ -111,6 +112,20 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
         setupKeyMonitor()
         setupScrollMonitor(for: pdfView)
         setupSelectionInstrumentObservers()
+        setupGoToPageObserver()
+    }
+
+    /// Go ▸ Go to Page… fires a DocumentAction, which the view model turns into
+    /// this notification so the sheet is presented by the coordinator that owns
+    /// the window — the same sheet the context menu opens.
+    private func setupGoToPageObserver() {
+        goToPageObserver.map(NotificationCenter.default.removeObserver)
+        goToPageObserver = NotificationCenter.default.addObserver(
+            forName: .pdfGoToPagePrompt, object: nil, queue: .main
+        ) { [weak self] note in
+            guard let self, (note.object as AnyObject) === self.viewModel else { return }
+            self.menuGoToPage()
+        }
     }
 
     /// Listen for selection-anchored "instrument" notifications (highlight /
@@ -173,15 +188,6 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
         }
         selectionInstrumentObservers.append(noteToken)
 
-        // The page field hands the keyboard back when it commits or cancels,
-        // otherwise ↑/↓ would keep moving a caret that is no longer on screen.
-        let focusToken = center.addObserver(forName: .pdfFocusReader, object: nil, queue: .main) { [weak self] note in
-            guard let self,
-                  (note.object as AnyObject) === self.viewModel,
-                  let pdfView = self.pdfView else { return }
-            pdfView.window?.makeFirstResponder(pdfView)
-        }
-        selectionInstrumentObservers.append(focusToken)
     }
 
     // MARK: - Note → right-panel Notes stream
@@ -298,7 +304,7 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
 
             // Text markup tools: let PDFView handle text selection normally,
             // but apply annotation on mouse up
-            if tool == .highlight || tool == .underline {
+            if tool == .highlight || tool == .underline || tool == .strikethrough {
                 if event.type == .leftMouseUp {
                     // Delay slightly to let PDFView finish updating its selection
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -482,30 +488,49 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
 
     // MARK: - General Context Menu (empty area)
 
+    /// Right-clicking empty page space offers only what has no visible control
+    /// elsewhere.
+    ///
+    /// It used to carry Zoom In/Out/Fit and Previous/Next Page. Every one of
+    /// those is now a button in the PDF toolbar, and a context menu that repeats
+    /// the chrome teaches the reader nothing about where they are — it just
+    /// costs a scan. What is left is the pair with nowhere else to live: a typed
+    /// page destination (the toolbar's page readout is deliberately not
+    /// editable), true 100% zoom (the toolbar's percentage fits the page
+    /// instead), and the page-display modes, which have no control anywhere.
     private func buildGeneralContextMenu() -> NSMenu {
         let menu = NSMenu()
 
-        // Zoom section
-        menu.addItem(makeItem("Zoom In", action: #selector(menuZoomIn), key: "", icon: "plus.magnifyingglass"))
-        menu.addItem(makeItem("Zoom Out", action: #selector(menuZoomOut), key: "", icon: "minus.magnifyingglass"))
-        menu.addItem(makeItem("Zoom to Fit", action: #selector(menuZoomToFit), key: "", icon: "arrow.up.left.and.arrow.down.right.magnifyingglass"))
+        menu.addItem(makeItem("Go to Page\u{2026}", action: #selector(menuGoToPage), key: "", icon: "doc.text.magnifyingglass"))
         menu.addItem(makeItem("Actual Size", action: #selector(menuActualSize), key: "", icon: "1.magnifyingglass"))
 
         menu.addItem(.separator())
 
-        // Page navigation
-        menu.addItem(makeItem("Go to Page\u{2026}", action: #selector(menuGoToPage), key: "", icon: "doc.text.magnifyingglass"))
-        // chevron.up / chevron.down, matching the Go menu and the page pill's
-        // steppers. These were left/right, which made the same two actions speak
-        // a different direction in two places.
-        let prevItem = makeItem("Previous Page", action: #selector(menuPreviousPage), key: "", icon: "chevron.up")
-        if viewModel.state.currentPageIndex <= 0 { prevItem.isEnabled = false }
-        menu.addItem(prevItem)
-        let nextItem = makeItem("Next Page", action: #selector(menuNextPage), key: "", icon: "chevron.down")
-        if viewModel.state.currentPageIndex >= viewModel.pageCount - 1 { nextItem.isEnabled = false }
-        menu.addItem(nextItem)
+        let displayItem = NSMenuItem(title: "Page Display", action: nil, keyEquivalent: "")
+        displayItem.image = NSImage(systemSymbolName: "book.pages", accessibilityDescription: nil)
+        let displayMenu = NSMenu()
+        let modes: [(String, PDFDisplayMode, String)] = [
+            ("Single Page", .singlePage, "doc"),
+            ("Single Page Continuous", .singlePageContinuous, "doc.text"),
+            ("Two Pages", .twoUp, "book.closed"),
+            ("Two Pages Continuous", .twoUpContinuous, "book"),
+        ]
+        for (title, mode, symbol) in modes {
+            let item = makeItem(title, action: #selector(menuSetDisplayMode(_:)), key: "", icon: symbol)
+            item.representedObject = mode.rawValue
+            item.state = viewModel.viewer.displayMode == mode ? .on : .off
+            displayMenu.addItem(item)
+        }
+        displayItem.submenu = displayMenu
+        menu.addItem(displayItem)
 
         return menu
+    }
+
+    @objc private func menuSetDisplayMode(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? Int,
+              let mode = PDFDisplayMode(rawValue: raw) else { return }
+        viewModel.viewer.setDisplayMode(mode)
     }
 
     // MARK: - Annotation Context Menu (right-click on annotation)
@@ -621,39 +646,39 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
 
     // MARK: - Menu Actions: Zoom
 
-    @objc private func menuZoomIn() {
-        viewModel.viewer.zoomIn()
-    }
-
-    @objc private func menuZoomOut() {
-        viewModel.viewer.zoomOut()
-    }
-
-    @objc private func menuZoomToFit() {
-        viewModel.viewer.zoomToFit()
-    }
-
     @objc private func menuActualSize() {
         viewModel.viewer.zoomToActualSize()
     }
 
     // MARK: - Menu Actions: Page Navigation
 
-    /// Routes to the page field in `PDFToolbarContent` rather than opening a
-    /// sheet. A modal alert to reach page 42 blocked the document you were
-    /// reading in order to ask which part of it you wanted — and it was a third
-    /// implementation of "go to page" alongside the menu and the keyboard. One
-    /// editor now serves all three entry points.
+    /// Prompts for a destination page. The toolbar's page readout is deliberately
+    /// not editable — paging is the chevrons' job and ↑/↓'s — so this sheet is
+    /// the one place a reader types a number, reached from Go ▸ Go to Page…
+    /// (⌥⌘G) and the context menu.
     @objc private func menuGoToPage() {
-        NotificationCenter.default.post(name: .pdfEditPageNumber, object: viewModel)
-    }
+        guard let window = pdfView?.window else { return }
 
-    @objc private func menuPreviousPage() {
-        viewModel.viewer.goToPage(viewModel.state.currentPageIndex - 1)
-    }
+        let alert = NSAlert()
+        alert.messageText = "Go to Page"
+        alert.informativeText = "Enter a page number (1–\(viewModel.pageCount)):"
+        alert.addButton(withTitle: "Go")
+        alert.addButton(withTitle: "Cancel")
 
-    @objc private func menuNextPage() {
-        viewModel.viewer.goToPage(viewModel.state.currentPageIndex + 1)
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 80, height: 24))
+        field.stringValue = "\(viewModel.state.currentPageIndex + 1)"
+        field.alignment = .center
+        alert.accessoryView = field
+
+        alert.beginSheetModal(for: window) { [weak self] response in
+            guard let self, response == .alertFirstButtonReturn,
+                  let page = Int(field.stringValue.trimmingCharacters(in: .whitespaces)),
+                  page >= 1, page <= self.viewModel.pageCount else { return }
+            // A typed destination is a deliberate jump, so it files a return
+            // point — see ViewerViewModel.PageChangeKind.
+            self.viewModel.viewer.goToPage(page - 1, kind: .jump)
+        }
+        DispatchQueue.main.async { field.selectText(nil) }
     }
 
     // MARK: - Annotation Actions
@@ -763,6 +788,8 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
             viewModel.annotation.addHighlight(for: selection)
         case .underline:
             viewModel.annotation.addUnderline(for: selection)
+        case .strikethrough:
+            viewModel.annotation.addStrikethrough(for: selection)
         default:
             break
         }

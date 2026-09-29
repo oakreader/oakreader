@@ -58,6 +58,12 @@ class AnnotationViewModel {
         addTextMarkup(for: selection, kind: .underline)
     }
 
+    /// `PDFMarkupOverlay` has always been able to draw this kind; it simply had
+    /// no entry point until the toolbar's markup menu offered it.
+    func addStrikethrough(for selection: PDFSelection) {
+        addTextMarkup(for: selection, kind: .strikethrough)
+    }
+
     /// Create a note: a highlighted markup carrying an (initially empty) comment,
     /// so it draws a clickable marker. Returns the new markup's id so the caller
     /// can open the comment editor anchored to it.

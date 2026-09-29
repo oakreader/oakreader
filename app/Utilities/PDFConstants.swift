@@ -53,6 +53,7 @@ enum AnnotationTool: String, CaseIterable, Identifiable {
     case none
     case highlight
     case underline
+    case strikethrough
 
     var id: String { rawValue }
 
@@ -61,6 +62,7 @@ enum AnnotationTool: String, CaseIterable, Identifiable {
         case .none: return "Select"
         case .highlight: return "Highlight"
         case .underline: return "Underline"
+        case .strikethrough: return "Strikethrough"
         }
     }
 
@@ -69,6 +71,7 @@ enum AnnotationTool: String, CaseIterable, Identifiable {
         case .none: return "cursor.rays"
         case .highlight: return "highlighter"
         case .underline: return "underline"
+        case .strikethrough: return "strikethrough"
         }
     }
 }
