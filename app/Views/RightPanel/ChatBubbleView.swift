@@ -47,7 +47,8 @@ struct ChatBubbleView: View, Equatable {
                     if turn.role == .assistant, let thinking = turn.thinking, !thinking.isEmpty {
                         ThinkingDisclosureView(
                             thinking: thinking,
-                            isStreaming: turn.isStreaming && turn.content.isEmpty
+                            isStreaming: turn.isStreaming && turn.content.isEmpty,
+                            theme: markdownTheme ?? .oak()
                         )
                     }
 
@@ -569,6 +570,8 @@ private struct ThinkingDisclosureView: View {
     let thinking: String
     /// True while the model is still in the thinking phase (no text content yet).
     let isStreaming: Bool
+    /// The bubble's markdown theme, re-tinted for the muted thinking text.
+    let theme: MarkdownTheme
 
     @State private var isExpanded = false
     @State private var streamStartTime = Date()
@@ -612,18 +615,32 @@ private struct ThinkingDisclosureView: View {
                             .fontWeight(.medium)
                             .foregroundStyle(.secondary)
                     }
+
+                    // Claim the rest of the row so the whole strip toggles.
+                    Spacer(minLength: 0)
                 }
+                // The label used to size to its glyph and text, with the padding
+                // applied *outside* the Button — so only the words themselves
+                // toggled the section and the rest of the row was dead. Padding
+                // and hit shape now live inside the label.
+                .padding(.vertical, 4)
+                .padding(.horizontal, 4)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .padding(.vertical, 4)
-            .padding(.horizontal, 4)
 
             // Content
             if isExpanded {
-                Text(thinking)
-                    .font(OakStyle.ChatFont.messageBody)
-                    .foregroundStyle(.secondary.opacity(0.75))
-                    .textSelection(.enabled)
+                // Rendered through StreamingMarkdownView, the same NSTextView-backed
+                // engine as the message body, rather than a SwiftUI `Text` with
+                // `.textSelection(.enabled)` — which drew fine but would not let the
+                // reader select or copy a word of it. Reasoning is prose worth
+                // quoting, and this is the app's one markdown renderer anyway.
+                StreamingMarkdownView(
+                    markdown: thinking,
+                    theme: mutedTheme,
+                    isStreaming: false
+                )
                     .padding(.leading, 8)
                     .padding(.vertical, 4)
                     .overlay(alignment: .leading) {
@@ -660,6 +677,16 @@ private struct ThinkingDisclosureView: View {
         .onDisappear {
             stopTimer()
         }
+    }
+
+    /// The bubble's theme with its body colour dropped to the secondary tone the
+    /// thinking block has always used, so switching renderer changed how the text
+    /// selects, not how it looks.
+    private var mutedTheme: MarkdownTheme {
+        var t = theme
+        t.textColor = NSColor.secondaryLabelColor.withAlphaComponent(0.75)
+        t.secondaryTextColor = NSColor.secondaryLabelColor.withAlphaComponent(0.6)
+        return t
     }
 
     private func startTimer() {
