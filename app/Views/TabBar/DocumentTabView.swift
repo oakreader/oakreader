@@ -146,7 +146,12 @@ struct DocumentTabView: View {
 
             Spacer(minLength: 0)
 
-            // Close button — always reserves space, visible on hover/active
+            // Close button — reserves its space always, but only appears under the
+            // pointer, selected or not. Selection is said by the tab's own shape
+            // and fill; a persistent ✕ on the active tab adds a second mark for
+            // the same state and puts a destructive target permanently under the
+            // cursor's resting place. Safari behaves this way. ⌘W stays the
+            // pointer-free route, so nothing is unreachable.
             Button {
                 onClose()
             } label: {
@@ -165,7 +170,12 @@ struct DocumentTabView: View {
             }
             .buttonStyle(.plain)
             .onHover { isCloseHovering = $0 }
-            .opacity(isActive || isHovering ? 1 : 0)
+            .opacity(isHovering ? 1 : 0)
+            // Hidden means gone: without this the invisible button still takes
+            // clicks aimed at the tab's trailing edge.
+            .allowsHitTesting(isHovering)
+            .animation(.easeOut(duration: 0.12), value: isHovering)
+            .accessibilityHidden(!isHovering)
             .accessibilityLabel("Close \(tab.displayTitle)")
         }
         .padding(.leading, 10 + cr)
