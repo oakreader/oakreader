@@ -15,7 +15,7 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
 
     /// Returns true if the given window belongs to this popup or its color sub-panel.
     func ownsWindow(_ window: NSWindow) -> Bool {
-        return window === self || window === colorSubPanel
+        return window === self
     }
 
     private let anchorPage: PDFPage
@@ -23,14 +23,8 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
     private var scrollObserver: NSObjectProtocol?
     var resignObserver: NSObjectProtocol?
 
-    // Color sub-panel
-    private var colorSubPanel: NSPanel?
-
     // Speak button
     private weak var speakButton: PopupIconButton?
-
-    static let annotationColors: [(NSColor, String)] =
-        OakStyle.AnnotationColors.highlightColors.map { ($0.nsColor, $0.name) }
 
     init(at screenPoint: NSPoint, viewModel: DocumentViewModel, selection: PDFSelection, pdfView: PDFView, anchorPage: PDFPage, anchorPoint: NSPoint, onDismiss: @escaping () -> Void) {
         self.viewModel = viewModel
@@ -116,18 +110,14 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
         }
 
         self.setFrameOrigin(NSPoint(x: x, y: y))
-
-        // Reposition color sub-panel if visible
-        repositionColorSubPanel()
     }
 
     // MARK: - Content View (horizontal toolbar)
 
     private func buildContentView() -> NSView {
-        // Three logical groups separated by dividers: persistent marginalia
-        // (highlight/underline/color) | actions that send the selection
+        // Two logical groups separated by a divider: send the selection
         // elsewhere (chat/translate/note) | utility (speak/copy).
-        // Spacing is wider around the dividers than within groups so the
+        // Spacing is wider around the divider than within groups so the
         // grouping is visible at a glance — Gestalt proximity.
         let mainStack = NSStackView()
         mainStack.orientation = .horizontal
@@ -135,36 +125,20 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
         mainStack.edgeInsets = NSEdgeInsets(top: 8, left: 14, bottom: 8, right: 14)
         mainStack.alignment = .centerY
 
-        // Group 1: Markup (highlight + underline + color picker)
-        let highlightBtn = PopupIconButton(
-            systemImage: "highlighter",
-            accessibilityLabel: "Highlight"
-        ) { [weak self] in
-            self?.applyHighlight(
-                color: self?.viewModel.annotation.strokeColor
-                    ?? NSColor(red: 1.0, green: 0.83, blue: 0.0, alpha: 1.0)
-            )
-        }
-        mainStack.addArrangedSubview(highlightBtn)
-
-        let underlineBtn = PopupIconButton(
-            systemImage: "underline",
-            accessibilityLabel: "Underline"
-        ) { [weak self] in
-            self?.applyUnderline()
-        }
-        mainStack.addArrangedSubview(underlineBtn)
-
-        let colorBtn = PopupIconButton(
-            systemImage: "paintpalette",
-            accessibilityLabel: "Highlight Color"
-        ) { [weak self] in
-            self?.toggleColorSubPanel()
-        }
-        mainStack.addArrangedSubview(colorBtn)
-
-        // Separator 1
-        mainStack.addArrangedSubview(makeVerticalSeparator())
+        // Markup is no longer offered here. The PDF toolbar arms highlight /
+        // underline / strikethrough, so a reader marking up a document drags
+        // across text and the markup lands on mouse-up — no trip to a popup,
+        // once per passage. What was left in this popup was a slower second
+        // path to the same instruments, plus a colour palette that set the very
+        // same global `strokeColor` the toolbar's menu sets.
+        //
+        // Nothing is lost: ⌃⌘H / ⌃⌘U still apply to the current selection from
+        // the Edit menu, and Note below still creates a highlight carrying a
+        // comment. This popup is now one idea — do something *else* with the
+        // selection — while the toolbar owns marking it up. (See ADR-038, whose
+        // split-button markup group this supersedes for PDFs. The HTML popup
+        // keeps its markup group: the web viewer has no armed-markup toolbar,
+        // so removing it there would lose the capability outright.)
 
         // Group 2: Send selection elsewhere (chat + translate + note)
         let chatBtn = PopupIconButton(
@@ -224,43 +198,6 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
         makePopupVerticalSeparator()
     }
 
-    // MARK: - Color Sub-Panel
-
-    private func toggleColorSubPanel() {
-        if let panel = colorSubPanel {
-            panel.orderOut(nil)
-            colorSubPanel = nil
-            return
-        }
-        showColorSubPanel()
-    }
-
-    private func showColorSubPanel() {
-        let panel = makeColorSwatchPanel(swatches: Self.annotationColors) { [weak self] index in
-            self?.applyHighlight(color: Self.annotationColors[index].0)
-        }
-        colorSubPanel = panel
-        repositionColorSubPanel()
-        panel.orderFront(nil)
-
-        panel.alphaValue = 0
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.10
-            panel.animator().alphaValue = 1
-        }
-    }
-
-    private func repositionColorSubPanel() {
-        guard let panel = colorSubPanel else { return }
-        let mainFrame = self.frame
-        let panelSize = panel.frame.size
-
-        // Position below the main toolbar, left-aligned
-        let splitOffset: CGFloat = 6
-        let x = mainFrame.origin.x + splitOffset
-        let y = mainFrame.origin.y - panelSize.height - 2
-        panel.setFrameOrigin(NSPoint(x: x, y: y))
-    }
 
     // MARK: - Actions
 
@@ -310,19 +247,6 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
         }
     }
 
-    private func applyHighlight(color: NSColor) {
-        viewModel.annotation.strokeColor = color
-        viewModel.annotation.addHighlight(for: selection)
-        pdfView?.clearSelection()
-        dismissWithAction()
-    }
-
-    private func applyUnderline() {
-        viewModel.annotation.addUnderline(for: selection)
-        pdfView?.clearSelection()
-        dismissWithAction()
-    }
-
     /// Create a note on the selection and open the Markdown editor for it. The
     /// markup is created synchronously (so the editor can look it up by id);
     /// opening the editor is posted to the coordinator.
@@ -360,8 +284,6 @@ class TextSelectionPopupPanel: NSPanel, AppResignDismissable {
         viewModel.voice.stopSpeaking()
 
         // Dismiss color sub-panel
-        colorSubPanel?.orderOut(nil)
-        colorSubPanel = nil
 
         if autoHighlightOnDismiss {
             autoHighlightOnDismiss = false
