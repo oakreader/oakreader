@@ -189,10 +189,13 @@ private struct LiveWebToolbarContent: View {
             .font(.system(size: 13))
             .focused($addressFocused)
             .onSubmit(navigate)
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 12)
             .padding(.vertical, 5)
+            // Capsule, matching the nav and save pills either side of it and the
+            // PDF row's title plate. A 9pt corner on a ~26pt-tall control reads
+            // visibly squarer than the pills it sits between.
             .background {
-                RoundedRectangle(cornerRadius: OakStyle.Radius.standard)
+                Capsule(style: .continuous)
                     .fill(OakStyle.Colors.hoverBackground)
                     // Page-load progress fills the field from the leading edge
                     // (Safari/Arc-style) instead of a separate top bar.
@@ -206,10 +209,10 @@ private struct LiveWebToolbarContent: View {
                             }
                         }
                     }
-                    .clipShape(RoundedRectangle(cornerRadius: OakStyle.Radius.standard))
+                    .clipShape(Capsule(style: .continuous))
             }
             .overlay(
-                RoundedRectangle(cornerRadius: OakStyle.Radius.standard)
+                Capsule(style: .continuous)
                     .stroke(addressFocused ? Color.accentColor : .clear, lineWidth: 1)
             )
             .onExitCommand {
@@ -257,6 +260,15 @@ private struct SnapshotToolbarContent: View {
         HStack(spacing: 8) {
             URLLabel(url: displayURL)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 5)
+                // The same capsule plate the live address field and the PDF
+                // title sit on, so all three location zones read as one
+                // component. No stroke: a frozen page has nothing to focus.
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(OakStyle.Colors.hoverBackground)
+                )
 
             archiveBadge
 
