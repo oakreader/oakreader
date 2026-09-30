@@ -4,7 +4,8 @@ import WebKit
 // MARK: - Web Text Selection Popup Panel
 
 /// Horizontal toolbar popup for text selected in HTML document viewers.
-/// Matches the PDF text selection popup style with highlight, chat, note, translate, copy.
+/// Mirrors the PDF selection popup: chat, translate, note | speak, copy. Markup
+/// lives in the toolbar's armed control, not here — see `MarkupToolbarPill`.
 class HTMLSelectionPopupPanel: NSPanel, AppResignDismissable {
     private(set) static var current: HTMLSelectionPopupPanel?
 
@@ -21,14 +22,8 @@ class HTMLSelectionPopupPanel: NSPanel, AppResignDismissable {
     // Speak button (needs state tracking for icon toggle)
     private weak var speakButton: PopupIconButton?
 
-    // Color sub-panel
-    private var colorSubPanel: NSPanel?
     var resignObserver: NSObjectProtocol?
 
-    static let highlightColors: [(NSColor, String, String)] =
-        OakStyle.AnnotationColors.highlightColors.map {
-            ($0.nsColor, $0.name, OakStyle.AnnotationColors.cssRGBA($0.nsColor))
-        }
 
     static func show(
         atTop topScreenPoint: NSPoint,
@@ -57,7 +52,7 @@ class HTMLSelectionPopupPanel: NSPanel, AppResignDismissable {
 
     /// Returns true if the given window belongs to this popup or its color sub-panel.
     func ownsWindow(_ window: NSWindow) -> Bool {
-        return window === self || window === colorSubPanel
+        return window === self
     }
 
     /// The screen whose frame contains `point`, falling back to the web view's
@@ -85,15 +80,6 @@ class HTMLSelectionPopupPanel: NSPanel, AppResignDismissable {
         }
 
         self.setFrameOrigin(NSPoint(x: x, y: y))
-
-        // Reposition color sub-panel if visible
-        if let panel = colorSubPanel {
-            let mainFrame = self.frame
-            let cpSize = panel.frame.size
-            let cpX = mainFrame.origin.x + 6
-            let cpY = mainFrame.origin.y - cpSize.height - 2
-            panel.setFrameOrigin(NSPoint(x: cpX, y: cpY))
-        }
     }
 
     private init(
@@ -160,33 +146,12 @@ class HTMLSelectionPopupPanel: NSPanel, AppResignDismissable {
         mainStack.edgeInsets = NSEdgeInsets(top: 8, left: 14, bottom: 8, right: 14)
         mainStack.alignment = .centerY
 
-        // Group 1: Markup (highlight + underline + color picker)
-        let highlightBtn = PopupIconButton(
-            systemImage: "highlighter",
-            accessibilityLabel: "Highlight"
-        ) { [weak self] in
-            self?.applyHighlight(colorIndex: 0) // default yellow
-        }
-        mainStack.addArrangedSubview(highlightBtn)
-
-        let underlineBtn = PopupIconButton(
-            systemImage: "underline",
-            accessibilityLabel: "Underline"
-        ) { [weak self] in
-            self?.applyUnderline()
-        }
-        mainStack.addArrangedSubview(underlineBtn)
-
-        let colorBtn = PopupIconButton(
-            systemImage: "paintpalette",
-            accessibilityLabel: "Highlight Color"
-        ) { [weak self] in
-            self?.toggleColorSubPanel()
-        }
-        mainStack.addArrangedSubview(colorBtn)
-
-        // Separator 1
-        mainStack.addArrangedSubview(makeVerticalSeparator())
+        // Markup is no longer offered here, matching the PDF popup. The web
+        // toolbar arms highlight / underline, so a reader marking up a page
+        // drags across text and the markup lands when the selection settles —
+        // no trip to a popup, once per passage. ⌃⌘H / ⌃⌘U still mark the
+        // current selection from the Edit menu, and Note below still creates a
+        // highlight carrying a comment.
 
         // Group 2: Send selection elsewhere (chat + translate + note)
         let chatBtn = PopupIconButton(
@@ -248,59 +213,19 @@ class HTMLSelectionPopupPanel: NSPanel, AppResignDismissable {
 
     // MARK: - Color Sub-Panel
 
-    private func toggleColorSubPanel() {
-        if let panel = colorSubPanel {
-            panel.orderOut(nil)
-            colorSubPanel = nil
-            return
-        }
-        showColorSubPanel()
-    }
 
-    private func showColorSubPanel() {
-        let swatches = Self.highlightColors.map { ($0.0, $0.1) }
-        let panel = makeColorSwatchPanel(swatches: swatches, aqua: true) { [weak self] index in
-            self?.applyHighlight(colorIndex: index)
-        }
-
-        // Position below the main toolbar, left-aligned
-        let mainFrame = self.frame
-        let x = mainFrame.origin.x + 6
-        let y = mainFrame.origin.y - panel.frame.height - 2
-        panel.setFrameOrigin(NSPoint(x: x, y: y))
-
-        colorSubPanel = panel
-        panel.orderFront(nil)
-
-        panel.alphaValue = 0
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.10
-            panel.animator().alphaValue = 1
-        }
-    }
 
     // MARK: - Actions
 
-    private func applyHighlight(colorIndex: Int) {
-        guard let webView else {
-            dismiss()
-            return
-        }
-
-        let (_, _, cssColor) = Self.highlightColors[colorIndex]
-        webView.evaluateJavaScript(
-            "OakHighlighter.highlightSelection('\(cssColor)', 'highlight');",
-            completionHandler: nil
-        )
-        dismiss()
-    }
 
     /// Highlight the selection (default color) and immediately open the Milkdown
     /// note editor anchored to it. The highlight is persisted via the usual
     /// `highlightEvent` → `persistWebHighlight` path; the editor fills the comment.
     private func addNote() {
         guard let webView else { dismiss(); return }
-        let cssColor = Self.highlightColors[0].2  // default yellow, matches Highlight
+        // Follows the toolbar's armed colour, the same `strokeColor` the PDF
+        // side marks up with, rather than a hardcoded yellow.
+        let cssColor = viewModel.annotation.strokeColor.hexString
         let vm = viewModel
 
         webView.evaluateJavaScript(
@@ -318,19 +243,6 @@ class HTMLSelectionPopupPanel: NSPanel, AppResignDismissable {
         dismiss()
     }
 
-    private func applyUnderline() {
-        guard let webView else {
-            dismiss()
-            return
-        }
-
-        let (_, _, cssColor) = Self.highlightColors[0]
-        webView.evaluateJavaScript(
-            "OakHighlighter.highlightSelection('\(cssColor)', 'underline');",
-            completionHandler: nil
-        )
-        dismiss()
-    }
 
     private func addToChat() {
         viewModel.chat.addTextAttachment(selectedText, pageIndex: 0)
@@ -385,8 +297,6 @@ class HTMLSelectionPopupPanel: NSPanel, AppResignDismissable {
         // Stop TTS playback if active
         viewModel.voice.stopSpeaking()
 
-        colorSubPanel?.orderOut(nil)
-        colorSubPanel = nil
 
         let callback = onDismiss
         NSAnimationContext.runAnimationGroup({ ctx in

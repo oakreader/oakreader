@@ -83,6 +83,9 @@ private struct LiveWebToolbarContent: View {
         HStack(spacing: 8) {
             navPill
             addressField
+            // Web pages get the same armed markup control as PDFs — highlight and
+            // underline only, which is all the OakHighlighter CSS can draw.
+            MarkupToolbarPill(viewModel: viewModel, kinds: [.highlight, .underline])
             savePill
         }
         .padding(.horizontal, 10)
@@ -271,6 +274,8 @@ private struct SnapshotToolbarContent: View {
                 )
 
             archiveBadge
+
+            MarkupToolbarPill(viewModel: viewModel, kinds: [.highlight, .underline])
 
             if canOpenOriginal {
                 ToolbarPill {

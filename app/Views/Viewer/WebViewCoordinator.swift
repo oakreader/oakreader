@@ -10,6 +10,7 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
 
     private var mouseMonitor: Any?
     private var scrollMonitor: Any?
+    private var escapeMonitor: Any?
     private var headingObserver: NSObjectProtocol?
     private var findTextObserver: NSObjectProtocol?
     private var webSidebarObservers: [NSObjectProtocol] = []
@@ -28,6 +29,7 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
     deinit {
         removeMouseMonitor()
         removeScrollMonitor()
+        removeEscapeMonitor()
         removeNotificationObservers()
         progressObservation?.invalidate()
         navObservations.forEach { $0.invalidate() }
@@ -41,11 +43,36 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
     func setActive(_ active: Bool) {
         if active {
             if scrollMonitor == nil { setupScrollMonitor() }
+            if escapeMonitor == nil { setupEscapeMonitor() }
             // Expose this page to the chat agent's `read_current_page` tool while it's frontmost.
             if isLiveMode, let webView { LivePageBridge.shared.setActiveWebView(webView) }
         } else {
             removeScrollMonitor()
+            removeEscapeMonitor()
             if let webView { LivePageBridge.shared.clearWebView(webView) }
+        }
+    }
+
+    /// Escape disarms markup — Tesler's "every mode needs a fast exit", and the
+    /// same key that leaves annotate mode in the PDF reader. The event is only
+    /// consumed while armed, so Escape still reaches the page the rest of the
+    /// time (dismissing a site's own dialog, leaving a text field).
+    private func setupEscapeMonitor() {
+        removeEscapeMonitor()
+        escapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self, event.keyCode == 53,
+                  self.viewModel.state.editorMode == .annotate,
+                  self.viewModel.annotation.currentTool != .none else { return event }
+            self.viewModel.annotation.currentTool = .none
+            self.viewModel.setEditorMode(.viewer)
+            return nil
+        }
+    }
+
+    private func removeEscapeMonitor() {
+        if let monitor = escapeMonitor {
+            NSEvent.removeMonitor(monitor)
+            escapeMonitor = nil
         }
     }
 
@@ -682,6 +709,18 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
                 HTMLSelectionPopupPanel.dismissCurrent()
                 removeMouseMonitor()
             }
+            return
+        }
+
+        // Armed markup: the reader has chosen a tool in the toolbar, so a settled
+        // selection is an instruction, not a question. Mark it and clear it —
+        // offering the popup here would put a menu in front of an answer they
+        // already gave. Mirrors `PDFViewCoordinator` applying on mouse-up.
+        if viewModel.state.editorMode == .annotate,
+           viewModel.annotation.currentTool != .none {
+            applyWebMarkup(type: viewModel.annotation.currentTool.rawValue)
+            webView?.evaluateJavaScript("window.getSelection().removeAllRanges();", completionHandler: nil)
+            HTMLSelectionPopupPanel.dismissCurrent()
             return
         }
 
