@@ -31,7 +31,6 @@ struct PDFToolbarContent: View {
         HStack(spacing: 8) {
             pageNavPill
             locationLabel
-                .frame(maxWidth: .infinity, alignment: .leading)
             if let origin = viewer.returnPage {
                 returnChip(origin: origin)
             }
@@ -98,6 +97,18 @@ struct PDFToolbarContent: View {
             .foregroundStyle(.primary)
             .lineLimit(1)
             .truncationMode(.middle)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            // The same surface the live-web address field sits on, so the two
+            // rows read as one component with different contents rather than a
+            // field on one tab and a floating string on the other. No focus ring
+            // and no hover change: unlike a URL there is nowhere to navigate by
+            // typing a title, so this is a plate to sit on, not a field.
+            .background(
+                RoundedRectangle(cornerRadius: OakStyle.Radius.standard)
+                    .fill(OakStyle.Colors.hoverBackground)
+            )
             .help(documentTitle)
     }
 
@@ -150,13 +161,18 @@ struct PDFToolbarContent: View {
     /// the fast exit — it just had no control reaching it after the old toolbar
     /// was deleted.
     ///
-    /// This does not replace the selection popup's highlight button. That one
-    /// serves a different moment: text selected to read, copy or send to chat,
-    /// which the reader *then* decides to keep. Arming for that would mean
-    /// deselect → arm → re-drag the same words.
+    /// This is now the only pointer-driven way to mark up a PDF: the selection
+    /// popup's highlighter, underline and palette were removed once arming
+    /// existed, because they were a slower second path to these same
+    /// instruments. ⌃⌘H / ⌃⌘U still mark the current selection from the Edit
+    /// menu for the genuinely one-off case.
     private var markupPill: some View {
         ToolbarPill {
             HStack(spacing: 0) {
+                // No ink swatch under the glyph: the filled capsule already says
+                // armed, the menu checkmarks the colour, and the first mark shows
+                // it outright — three tells for one piece of state was two too
+                // many in a 28pt button.
                 Button(action: toggleMarkup) {
                     Image(systemName: armedTool.systemImage)
                         .font(.system(size: OakStyle.Font.icon))
@@ -168,16 +184,6 @@ struct PDFToolbarContent: View {
                             Capsule(style: .continuous)
                                 .fill(isArmed ? Color.primary.opacity(0.14) : .clear)
                         )
-                        .overlay(alignment: .bottom) {
-                            // The armed colour, shown under the glyph the way a
-                            // real highlighter shows its ink.
-                            if isArmed {
-                                Capsule()
-                                    .fill(Color(nsColor: annotation.strokeColor))
-                                    .frame(width: 14, height: 2.5)
-                                    .padding(.bottom, 4)
-                            }
-                        }
                         .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
