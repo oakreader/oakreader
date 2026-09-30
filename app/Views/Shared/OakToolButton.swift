@@ -27,13 +27,12 @@ struct OakToolButton: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(foreground)
-        .background {
-            if prominent {
-                Capsule().fill(backgroundColor)
-            } else {
-                RoundedRectangle(cornerRadius: OakStyle.Radius.standard).fill(backgroundColor)
-            }
-        }
+        // Circular, since the frame is always 28×28 and a capsule on a square is
+        // a circle. The non-prominent branch used a 9pt rounded rect, which read
+        // as a small square chip nested inside the capsule pills these buttons
+        // live in — two different corner languages in one control. `prominent`
+        // now only decides the fill, not the shape.
+        .background(Capsule(style: .continuous).fill(backgroundColor))
         .onHover { isHovering = $0 }
         .accessibilityLabel(tooltip)
         .background(
