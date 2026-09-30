@@ -3,10 +3,29 @@ import AppKit
 import CoreGraphics
 
 extension PDFPage {
-    /// Retina-aware thumbnail: renders at 2x pixel density for sharp display
+    /// Retina-aware thumbnail fitted inside a `maxDimension` square.
+    ///
+    /// Note this caps the page's **long** edge, so a portrait page comes back
+    /// much narrower than `maxDimension`. Anywhere the result is drawn to a
+    /// known width — a library cover in a card column — use
+    /// `thumbnail(fittingWidth:)` instead, or the render starves the dimension
+    /// that actually gets stretched.
     func thumbnail(maxDimension: CGFloat = 160) -> NSImage {
+        renderThumbnail(fitScale: {
+            let pageRect = bounds(for: .mediaBox)
+            return min(maxDimension / pageRect.width, maxDimension / pageRect.height)
+        }())
+    }
+
+    /// Retina-aware thumbnail rendered so its **width** lands on `width`,
+    /// whatever the page's aspect. PDFs are vector, so this re-renders at the
+    /// larger scale rather than upscaling pixels.
+    func thumbnail(fittingWidth width: CGFloat) -> NSImage {
+        renderThumbnail(fitScale: width / bounds(for: .mediaBox).width)
+    }
+
+    private func renderThumbnail(fitScale: CGFloat) -> NSImage {
         let pageRect = bounds(for: .mediaBox)
-        let fitScale = min(maxDimension / pageRect.width, maxDimension / pageRect.height)
         let displaySize = CGSize(
             width: pageRect.width * fitScale,
             height: pageRect.height * fitScale

@@ -156,6 +156,7 @@ final class LibraryCoverSweeper {
                     try? Data().write(to: renderMarkerURL, options: .atomic)
                 }
                 try? FileManager.default.removeItem(at: Self.legacyPaperMarkerURL(for: attachment))
+                try? FileManager.default.removeItem(at: Self.legacyRenderMarkerURL(for: attachment))
             }
             if let previewMarkerURL { try? Data().write(to: previewMarkerURL, options: .atomic) }
             return true
@@ -225,8 +226,22 @@ final class LibraryCoverSweeper {
         return host.contains("bilibili.com") && url.path.contains("/video/")
     }
 
-    /// Sidecar marker proving a PDF's cover is a real first-page render (not a synthetic cover).
+    /// Sidecar marker proving a PDF's cover is a real first-page render at the
+    /// current resolution.
+    ///
+    /// The extension carries the generation deliberately. Covers used to render
+    /// with the long edge capped at 320pt, which left a portrait page ~226pt
+    /// wide — well under the ~360pt a stretched card draws, so they looked soft.
+    /// Renders are now fitted to a 400pt width. Bumping `render` → `render2`
+    /// makes every existing cover fail `needsCover` exactly once and re-render
+    /// sharp, which is the same one-shot upgrade the `.paper` → `.render` move
+    /// used.
     nonisolated static func renderMarkerURL(for attachment: Attachment) -> URL {
+        attachment.coverURL.appendingPathExtension("render2")
+    }
+
+    /// Previous-generation render marker, cleaned up when a cover re-renders.
+    nonisolated private static func legacyRenderMarkerURL(for attachment: Attachment) -> URL {
         attachment.coverURL.appendingPathExtension("render")
     }
 

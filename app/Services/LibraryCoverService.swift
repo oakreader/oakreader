@@ -5,8 +5,18 @@ import ObjectiveC
 @preconcurrency import WebKit
 
 actor LibraryCoverService {
-    private let renderingService = PDFRenderingService()
     private let maxDimension: CGFloat = 320
+
+    /// Width a PDF cover is rendered to, in points, before the 2x Retina pass —
+    /// so 800 physical pixels.
+    ///
+    /// Cards target 220pt but *stretch* to fill their column, and on a wide
+    /// window they reach roughly 360pt. The old render capped the long edge at
+    /// 320, which for a portrait A4 left the width at 226pt (452px) — about 60%
+    /// of what a stretched card draws, hence visibly soft covers. Rendering to a
+    /// width instead fixes the dimension that is actually stretched, and 400pt
+    /// covers a card up to that wide at full density.
+    private let pdfCoverWidth: CGFloat = 400
 
     /// Safari-like UA so sites (incl. X/Cloudflare) serve real HTML + OG tags to the scrape.
     private static let browserUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -23,7 +33,7 @@ actor LibraryCoverService {
         guard let pdfDoc = PDFDocument(url: url),
               let firstPage = pdfDoc.page(at: 0) else { return nil }
 
-        let thumbnail = renderingService.renderThumbnail(firstPage, maxDimension: maxDimension)
+        let thumbnail = firstPage.thumbnail(fittingWidth: pdfCoverWidth)
         return thumbnail.tiffRepresentation.flatMap {
             NSBitmapImageRep(data: $0)?.representation(using: .jpeg, properties: [.compressionFactor: 0.8])
         }
