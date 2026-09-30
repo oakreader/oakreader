@@ -300,7 +300,7 @@ class DocumentViewModel {
         case .navigateBack:
             viewer.jumpBack()
         case .goToPage:
-            NotificationCenter.default.post(name: .pdfEditPageNumber, object: self)
+            NotificationCenter.default.post(name: .pdfGoToPagePrompt, object: self)
         case .previousPage:
             viewer.goToPage(state.currentPageIndex - 1)
         case .nextPage:
