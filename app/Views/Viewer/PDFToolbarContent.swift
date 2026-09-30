@@ -98,15 +98,19 @@ struct PDFToolbarContent: View {
             .lineLimit(1)
             .truncationMode(.middle)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 12)
             .padding(.vertical, 5)
-            // The same surface the live-web address field sits on, so the two
-            // rows read as one component with different contents rather than a
-            // field on one tab and a floating string on the other. No focus ring
-            // and no hover change: unlike a URL there is nowhere to navigate by
-            // typing a title, so this is a plate to sit on, not a field.
+            // A capsule, not the address field's 9pt rounded rect. The web row
+            // and this one are never on screen together — they are different
+            // tabs — but the title is always beside three capsules, and that is
+            // the comparison the eye actually makes. At ~26pt tall, 9pt reads
+            // visibly squarer than its neighbours.
+            //
+            // No focus ring and no hover change: unlike a URL there is nowhere
+            // to navigate by typing a title, so this is a plate to sit on rather
+            // than a field.
             .background(
-                RoundedRectangle(cornerRadius: OakStyle.Radius.standard)
+                Capsule(style: .continuous)
                     .fill(OakStyle.Colors.hoverBackground)
             )
             .help(documentTitle)
