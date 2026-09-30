@@ -127,11 +127,17 @@ struct TabBarView: View {
         return appState.isLibrarySidebarVisible
     }
 
-    // Mirror PillTabButton's quiet fill ramp: 0 / 0.07 hover / 0.12 active.
+    // Fill on hover only — no resting background for the "on" state.
+    //
+    // This deliberately diverges from `PillTabButton`, which does keep an active
+    // fill. Those are a segmented row: which one of several is selected can only
+    // be read from the row itself, so the fill is carrying information. This is a
+    // lone toggle whose state is visible in the world — the sidebar is either
+    // there or it is not — so a resting chip says a second time what the window
+    // already shows, and puts a permanent blob next to the traffic lights. The
+    // glyph still shifts label/secondary colour with the state.
     private var sidebarToggleFillOpacity: Double {
-        if sidebarToggleActive { return 0.12 }
-        if isSidebarToggleHovering { return 0.07 }
-        return 0
+        isSidebarToggleHovering ? 0.07 : 0
     }
 
     // MARK: - Panel Mode Tabs
