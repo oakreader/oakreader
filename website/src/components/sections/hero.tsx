@@ -53,15 +53,11 @@ export function Hero({ dict }: { dict: HeroDict }) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
       >
-        <p className="font-sans italic text-callout min-[800px]:text-subhead text-label-tertiary tracking-[0.01em] mb-[1.6rem]">
-          {dict.tagline}
-        </p>
-
-        <h1 className="flex flex-col items-center text-label leading-[1.1] tracking-[-0.02em] text-title1 min-[600px]:text-display min-[800px]:text-display-lg min-[1000px]:text-display-xl">
-          <span className="font-exposure font-semibold whitespace-nowrap">
+        <h1 className="flex flex-col items-center max-w-full text-label leading-[1.1] tracking-[-0.02em] text-title1 min-[600px]:text-display min-[800px]:text-display-lg min-[1000px]:text-display-xl">
+          <span className="font-exposure font-semibold text-balance min-[800px]:whitespace-nowrap">
             {dict.headline1}
           </span>
-          <span className="font-exposure font-semibold whitespace-nowrap">
+          <span className="font-exposure font-semibold text-balance min-[800px]:whitespace-nowrap">
             {dict.headline2}
           </span>
         </h1>
