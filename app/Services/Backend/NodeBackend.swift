@@ -282,8 +282,9 @@ actor NodeBackend {
         let proc = Process()
         proc.executableURL = binary
         proc.arguments = [
-            // Provider config and credentials.
-            "--data-dir", CatalogDatabase.dataDirectory.appendingPathComponent("backend").path,
+            // Agent state: credentials, provider settings, memory, persona. The
+            // sidecar migrates a pre-0.13 `backend/` dir into this one on boot.
+            "--data-dir", CatalogDatabase.agentDirectory.path,
             // The user's library. A separate flag because these are separate
             // things: one is the sidecar's own state, the other is the
             // documents, and phase 1 made the sidecar the only process that

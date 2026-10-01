@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type {
   AuthOperationOptions,
@@ -114,9 +114,56 @@ export class ConfigStore {
   }
 }
 
-export function dataPaths(dataDir: string): { auth: string; config: string } {
+export function dataPaths(dataDir: string): { credentials: string; settings: string } {
   return {
-    auth: join(dataDir, "auth.json"),
-    config: join(dataDir, "config.json"),
+    credentials: join(dataDir, "credentials.json"),
+    settings: join(dataDir, "settings.json"),
   };
+}
+
+/**
+ * Move a pre-0.13 install onto the current layout, in place.
+ *
+ * Two things changed at once, so there are two moves. The data dir itself used
+ * to be `<library>/backend` — named after the process that wrote it rather than
+ * what it held — and the files inside it were `auth.json` / `config.json`. The
+ * dir is now `<library>/agent`, alongside the memory and persona files that are
+ * the same concern, and the files say what they are: the credential one is the
+ * only secret in the tree and its name should stop a user deleting it by
+ * mistake.
+ *
+ * Rename rather than copy: it keeps the inode, so the credential file's 0600
+ * survives without us re-chmodding it. Never clobber an existing target — if
+ * both names are present the new one is authoritative and the old one is a
+ * leftover from a downgrade. Safe to run on every boot; a fresh install (and
+ * every Windows install, which has no legacy dir) matches nothing.
+ */
+export function migrateLegacyLayout(dataDir: string): void {
+  const legacyDir = join(dirname(dataDir), "backend");
+  const moves: ReadonlyArray<readonly [string, string]> = [
+    [join(dataDir, "auth.json"), join(dataDir, "credentials.json")],
+    [join(dataDir, "config.json"), join(dataDir, "settings.json")],
+    ...(legacyDir === dataDir
+      ? []
+      : ([
+          [join(legacyDir, "auth.json"), join(dataDir, "credentials.json")],
+          [join(legacyDir, "config.json"), join(dataDir, "settings.json")],
+        ] as const)),
+  ];
+  for (const [from, to] of moves) {
+    if (!existsSync(from) || existsSync(to)) continue;
+    try {
+      renameSync(from, to);
+    } catch {
+      // A cross-device dataDir or a locked file: leave the old copy alone and
+      // start from defaults rather than failing the boot over a tidy-up.
+    }
+  }
+  if (legacyDir !== dataDir) {
+    try {
+      rmdirSync(legacyDir); // only succeeds once it is empty
+    } catch {
+      // Still holds something we did not put there — leave it for the user.
+    }
+  }
 }

@@ -45,7 +45,7 @@ import {
   type ProviderSummary,
 } from "./protocol.js";
 import { RpcPeer, RpcFailure } from "./rpc.js";
-import { ConfigStore, FileCredentialStore, dataPaths } from "./store.js";
+import { ConfigStore, FileCredentialStore, dataPaths, migrateLegacyLayout } from "./store.js";
 import { ProviderRegistry, toPiId } from "./providers.js";
 import { runChat, toPiMessages } from "./chat.js";
 import { PromptLibrary } from "./prompts.js";
@@ -71,14 +71,15 @@ const BACKEND_ID = "oak-backend 0.2.0";
 function resolveDataDir(): string {
   const flag = process.argv.indexOf("--data-dir");
   if (flag !== -1 && process.argv[flag + 1]) return process.argv[flag + 1];
-  return join(homedir(), "OakReader", "backend");
+  return join(homedir(), "OakReader", "agent");
 }
 
 const dataDir = resolveDataDir();
 mkdirSync(dataDir, { recursive: true });
+migrateLegacyLayout(dataDir);
 const paths = dataPaths(dataDir);
-const credentials = new FileCredentialStore(paths.auth);
-const config = new ConfigStore(paths.config);
+const credentials = new FileCredentialStore(paths.credentials);
+const config = new ConfigStore(paths.settings);
 const registry = new ProviderRegistry(credentials, config);
 
 /**

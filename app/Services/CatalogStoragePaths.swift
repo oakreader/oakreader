@@ -22,9 +22,28 @@ extension CatalogDatabase {
         dataDirectory.appendingPathComponent("logs", isDirectory: true)
     }
 
-    /// ~/OakReader/agent/
+    /// ~/OakReader/agent/ — every piece of AI state, named for what it holds
+    /// rather than for the process that writes it.
+    ///
+    /// This is also the sidecar's `--data-dir`, so `credentials.json` (0600, the
+    /// only secret in the tree) and `settings.json` land here next to the memory
+    /// and persona files. Before 0.13 the sidecar wrote them to a sibling
+    /// `backend/` dir; it moves them here on boot.
     static var agentDirectory: URL {
         dataDirectory.appendingPathComponent("agent", isDirectory: true)
+    }
+
+    /// ~/OakReader/agent/credentials.json — provider keys and OAuth tokens, 0600.
+    /// Written by the sidecar, never by the shell; declared here so the uninstall
+    /// and backup paths can name it without guessing.
+    static var agentCredentialsURL: URL {
+        agentDirectory.appendingPathComponent("credentials.json")
+    }
+
+    /// ~/OakReader/backups/ — catalog snapshots taken before a risky migration.
+    /// Keeping them out of the library root stops them reading as live data.
+    static var backupsDirectory: URL {
+        dataDirectory.appendingPathComponent("backups", isDirectory: true)
     }
 
     /// ~/OakReader/agent/VOICE.md
