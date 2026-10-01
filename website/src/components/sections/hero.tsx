@@ -53,7 +53,7 @@ export function Hero({ dict }: { dict: HeroDict }) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
       >
-        <h1 className="flex flex-col items-center max-w-full text-label leading-[1.1] tracking-[-0.02em] text-title1 min-[600px]:text-display min-[800px]:text-display-lg min-[1000px]:text-display-xl">
+        <h1 className="flex flex-col items-center max-w-full text-label leading-[1.1] tracking-[-0.02em] text-title1 min-[600px]:text-display min-[900px]:text-display-lg min-[1000px]:text-display-xl">
           <span className="font-exposure font-semibold text-balance min-[800px]:whitespace-nowrap">
             {dict.headline1}
           </span>
