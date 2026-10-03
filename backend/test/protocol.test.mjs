@@ -136,10 +136,10 @@ try {
   // 2. credentials: set → providers/list reflects configured; 0600 on disk
   call("k1", "credentials/set", { providerId: "anthropic", key: "sk-test-123" });
   await resultOf("k1", "credentials/set");
-  const mode = statSync(join(dataDir, "auth.json")).mode & 0o777;
-  assert(mode === 0o600, `auth.json is 0600 (got ${mode.toString(8)})`);
-  const stored = JSON.parse(readFileSync(join(dataDir, "auth.json"), "utf8"));
-  assert(stored.anthropic?.key === "sk-test-123", "auth.json holds the key (pi format)");
+  const mode = statSync(join(dataDir, "credentials.json")).mode & 0o777;
+  assert(mode === 0o600, `credentials.json is 0600 (got ${mode.toString(8)})`);
+  const stored = JSON.parse(readFileSync(join(dataDir, "credentials.json"), "utf8"));
+  assert(stored.anthropic?.key === "sk-test-123", "credentials.json holds the key (pi format)");
 
   call("l1", "providers/list", {});
   const list = await resultOf("l1", "providers/list");
@@ -201,10 +201,10 @@ try {
   const answered = notificationsFor("c1", "chat/delta").map((p) => p.text).join("");
   assert(answered.includes("12:34 UTC"), `final answer streamed ("${answered}")`);
 
-  // 6. base-url override persists in config.json
+  // 6. base-url override persists in settings.json
   call("b1", "config/setBaseUrl", { providerId: "deepseek", baseUrl: "https://relay.example.com" });
   await resultOf("b1", "config/setBaseUrl");
-  const config = JSON.parse(readFileSync(join(dataDir, "config.json"), "utf8"));
+  const config = JSON.parse(readFileSync(join(dataDir, "settings.json"), "utf8"));
   assert(config.baseUrlOverrides.deepseek === "https://relay.example.com", "override persisted");
 
   // 7. errors carry a code, which is the reason for doing any of this
