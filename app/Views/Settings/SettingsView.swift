@@ -16,6 +16,7 @@ struct SettingsView: View {
         case webSearch
         // Extension tabs
         case extensionTranslation
+        case extensionQuickChatSkills
 
         var id: String { rawValue }
 
@@ -30,6 +31,7 @@ struct SettingsView: View {
             case .skills: return "Skills"
             case .webSearch: return "Web Search"
             case .extensionTranslation: return AppExtension.translation.label
+            case .extensionQuickChatSkills: return AppExtension.quickChat.label
             }
         }
 
@@ -44,6 +46,7 @@ struct SettingsView: View {
             case .skills: return "hammer"
             case .webSearch: return "globe"
             case .extensionTranslation: return AppExtension.translation.systemImage
+            case .extensionQuickChatSkills: return AppExtension.quickChat.systemImage
             }
         }
 
@@ -56,6 +59,7 @@ struct SettingsView: View {
         var appExtension: AppExtension? {
             switch self {
             case .extensionTranslation: return .translation
+            case .extensionQuickChatSkills: return .quickChat
             default: return nil
             }
         }
@@ -70,6 +74,7 @@ struct SettingsView: View {
             switch ext {
             case .translation: return .extensionTranslation
             case .notes: return nil
+            case .quickChat: return .extensionQuickChatSkills
             }
         }
     }
@@ -179,6 +184,8 @@ struct SettingsView: View {
             WebSearchSettingsView()
         case .extensionTranslation:
             TranslationSettingsView(store: store)
+        case .extensionQuickChatSkills:
+            QuickChatSettingsView()
         }
     }
 }

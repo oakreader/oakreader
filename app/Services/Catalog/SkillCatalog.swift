@@ -52,6 +52,27 @@ final class SkillStore {
         return nil
     }
 
+    /// Every enabled skill, bundled included, in picker order.
+    ///
+    /// `installed` deliberately hides bundled skills from the chat `/` menu —
+    /// those are reached through the surfaces built around them. The selection
+    /// panel is one of those surfaces and wants the whole set, so it reads here.
+    var allEnabled: [BackendSkill] {
+        // One row per name, first wins — the same rule as `dedupe()` in
+        // `backend/src/skills.ts`, and it has to be, because `skills/body`
+        // applies that rule server-side. Picking a different winner here would
+        // show one skill's title and run another's instructions.
+        //
+        // The core returns user directories before bundled ones, so an installed
+        // copy shadows the shipped one — that is what installing a skill means.
+        // Loading keeps both on purpose: Settings compares their versions to
+        // decide whether to offer an update.
+        var seen = Set<String>()
+        return all
+            .filter { $0.enabled && seen.insert($0.name).inserted }
+            .sorted { ($0.order, $0.title) < ($1.order, $1.title) }
+    }
+
     func skill(matching identifier: String) -> BackendSkill? {
         installed.first {
             $0.name.caseInsensitiveCompare(identifier) == .orderedSame

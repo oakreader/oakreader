@@ -37,6 +37,17 @@ enum TranslationLanguage: String, CaseIterable, Identifiable {
         }
     }
 
+    /// BCP-47 tag, for comparison against on-device language detection.
+    /// `rawValue` is already a valid tag for every real language here; Classical
+    /// Chinese is detected as plain Chinese, and `auto` names no language.
+    var bcp47: String {
+        switch self {
+        case .auto: return ""
+        case .lzh: return "zh"
+        default: return rawValue
+        }
+    }
+
     /// Native-script name for UI display.
     var nativeName: String {
         switch self {

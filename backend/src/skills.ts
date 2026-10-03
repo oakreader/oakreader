@@ -383,9 +383,13 @@ export function skillDirectories(libraryPath: string): Array<{ path: string; sou
     }
   }
 
+  // User first, bundled second, because `dedupe` keeps the first of a name.
+  // Installing a bundled skill copies it here to be edited; with bundled first
+  // that copy was inert — the menu listed the user's version while the model
+  // kept reading the shipped body. Shadowing is what installing means.
   const directories: Array<{ path: string; source: SkillSource }> = [];
-  if (bundled !== undefined) directories.push({ path: bundled, source: "bundled" });
   directories.push({ path: userSkillDirectory(libraryPath), source: "user" });
+  if (bundled !== undefined) directories.push({ path: bundled, source: "bundled" });
   return directories;
 }
 
