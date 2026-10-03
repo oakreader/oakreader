@@ -61,6 +61,8 @@ public enum MarkdownBlockSplitter {
         }
         if !current.isEmpty { groups.append(current) }
 
+        groups = mergeSplitTables(groups)
+
         let last = groups.count - 1
         return groups.enumerated().map { index, lines in
             let text = lines.joined(separator: "\n")
@@ -71,6 +73,49 @@ public enum MarkdownBlockSplitter {
                 isSettled: index != last
             )
         }
+    }
+
+    /// Rejoins a table that arrived with blank lines between its rows.
+    ///
+    /// Models routinely emit GFM tables as
+    /// `| a | b |` ⏎⏎ `|---|---|` ⏎⏎ `| 1 | 2 |`. That is malformed — a blank
+    /// line ends a table — but it is plainly meant as one, and splitting on
+    /// blank lines leaves every row its own prose block, pipes and all. A run of
+    /// consecutive pipe-prefixed groups is merged back together, and only kept
+    /// merged when the result actually validates as a table, so prose that
+    /// happens to start with a pipe is left alone.
+    private static func mergeSplitTables(_ groups: [[Substring]]) -> [[Substring]] {
+        guard groups.count >= 2 else { return groups }
+
+        func isPipeRow(_ line: Substring) -> Bool {
+            line.drop { $0 == " " || $0 == "\t" }.hasPrefix("|")
+        }
+        func isPipeGroup(_ group: [Substring]) -> Bool {
+            !group.isEmpty && group.allSatisfy(isPipeRow)
+        }
+
+        var merged: [[Substring]] = []
+        var index = 0
+        while index < groups.count {
+            guard isPipeGroup(groups[index]) else {
+                merged.append(groups[index])
+                index += 1
+                continue
+            }
+            var runEnd = index
+            while runEnd + 1 < groups.count, isPipeGroup(groups[runEnd + 1]) {
+                runEnd += 1
+            }
+            let run = Array(groups[index...runEnd])
+            let flattened = run.flatMap { $0 }
+            if run.count > 1, isPipeTable(lines: flattened) {
+                merged.append(flattened)
+            } else {
+                merged.append(contentsOf: run)
+            }
+            index = runEnd + 1
+        }
+        return merged
     }
 
     private static func classify(lines: [Substring], text: String) -> MarkdownBlockKind {

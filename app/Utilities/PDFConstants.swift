@@ -128,6 +128,7 @@ enum RightPanelMode: String, CaseIterable, Identifiable {
 enum AppExtension: String, CaseIterable, Identifiable {
     case translation
     case notes
+    case quickChat
 
     var id: String { rawValue }
 
@@ -135,6 +136,7 @@ enum AppExtension: String, CaseIterable, Identifiable {
         switch self {
         case .translation: return "Translation"
         case .notes: return "Notes"
+        case .quickChat: return "Quick Chat"
         }
     }
 
@@ -142,6 +144,7 @@ enum AppExtension: String, CaseIterable, Identifiable {
         switch self {
         case .translation: return "Translate selected text using AI-powered translation."
         case .notes: return "Capture highlights and notes in a side panel."
+        case .quickChat: return "Run a skill over the selection \u{2014} translate, explain, rewrite \u{2014} from one panel."
         }
     }
 
@@ -150,6 +153,7 @@ enum AppExtension: String, CaseIterable, Identifiable {
         switch self {
         case .translation: return "translate"
         case .notes: return "note.text"
+        case .quickChat: return "wand.and.stars"
         }
     }
 
@@ -162,6 +166,7 @@ enum AppExtension: String, CaseIterable, Identifiable {
         switch self {
         case .translation: return [.translation]
         case .notes: return [.comments]
+        case .quickChat: return []
         }
     }
 

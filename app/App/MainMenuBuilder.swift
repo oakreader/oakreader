@@ -4,6 +4,7 @@ import Sparkle
 // swiftlint:disable function_body_length
 
 enum MainMenuBuilder {
+    @MainActor
     static func build(target: AppDelegate) -> NSMenu {
         let mainMenu = NSMenu()
 
@@ -280,6 +281,7 @@ enum MainMenuBuilder {
 
     // MARK: - Edit Menu
 
+    @MainActor
     private static func buildEditMenu(target: AppDelegate) -> NSMenuItem {
         let editMenu = NSMenu(title: "Edit")
 
@@ -347,6 +349,19 @@ enum MainMenuBuilder {
             "Ask AI About Selection", action: .askAISelection,
             key: "k", modifiers: [.command, .control], icon: "sparkles", target: target
         ))
+
+        // Quick Chat: one entry, no key equivalent. The trigger is a held
+        // modifier watched globally (see QuickChatTrigger) and that monitor is
+        // local as well, so it fires in here too — a menu shortcut would be a
+        // second way to say the same thing, and a second thing to remember.
+        let quickChatItem = NSMenuItem(
+            title: "Quick Chat\u{2026}",
+            action: #selector(AppDelegate.showQuickChatPanel(_:)),
+            keyEquivalent: ""
+        )
+        quickChatItem.target = target
+        quickChatItem.image = icon("wand.and.stars")
+        editMenu.addItem(quickChatItem)
 
         let editMenuItem = NSMenuItem(title: "Edit", action: nil, keyEquivalent: "")
         editMenuItem.submenu = editMenu
