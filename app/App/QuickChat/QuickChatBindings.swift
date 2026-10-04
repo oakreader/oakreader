@@ -34,6 +34,33 @@ enum QuickChatBindings {
         }
     }
 
+    // MARK: - Visible skills
+
+    /// Skills kept out of Quick Chat, by name.
+    ///
+    /// Stored as the hidden set rather than the shown one, so a skill installed
+    /// later shows up instead of being invisible until someone finds this
+    /// screen.
+    private static let hiddenKey = "quickChatHiddenSkills"
+
+    static var hiddenSkills: Set<String> {
+        get { Set(UserDefaults.standard.stringArray(forKey: hiddenKey) ?? []) }
+        set {
+            UserDefaults.standard.set(Array(newValue).sorted(), forKey: hiddenKey)
+            NotificationCenter.default.post(name: .quickChatSkillsChanged, object: nil)
+        }
+    }
+
+    static func isVisible(_ name: String) -> Bool {
+        !hiddenSkills.contains(name)
+    }
+
+    static func setVisible(_ visible: Bool, for name: String) {
+        var hidden = hiddenSkills
+        if visible { hidden.remove(name) } else { hidden.insert(name) }
+        hiddenSkills = hidden
+    }
+
     static var display: String {
         isGlobalEnabled ? trigger.display : "off"
     }
@@ -42,7 +69,9 @@ enum QuickChatBindings {
 extension Notification.Name {
     /// Posted when the trigger or its on/off state changes, so the monitors are
     /// torn down and set up again.
-    static let quickChatTriggerChanged = Notification.Name("OakReaderQuickChatSkillsTriggerChanged")
+    static let quickChatTriggerChanged = Notification.Name("OakReaderQuickChatTriggerChanged")
     /// Posted with a trigger's display string when another app already holds it.
-    static let quickChatTriggerRejected = Notification.Name("OakReaderQuickChatSkillsTriggerRejected")
+    static let quickChatTriggerRejected = Notification.Name("OakReaderQuickChatTriggerRejected")
+    /// Posted when a skill is shown or hidden, so open views re-read the list.
+    static let quickChatSkillsChanged = Notification.Name("OakReaderQuickChatSkillsChanged")
 }

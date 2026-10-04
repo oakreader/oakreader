@@ -10,6 +10,7 @@ struct QuickChatSettingsView: View {
     @State private var globalEnabled: Bool = QuickChatBindings.isGlobalEnabled
     @State private var isTrusted: Bool = QuickChatAccessibility.isTrusted
     @State private var rejected: String?
+    @State private var hidden: Set<String> = QuickChatBindings.hiddenSkills
 
     var body: some View {
         Form {
@@ -21,7 +22,13 @@ struct QuickChatSettingsView: View {
         .onReceive(NotificationCenter.default.publisher(for: .quickChatTriggerRejected)) { note in
             rejected = note.object as? String
         }
-        .onAppear { isTrusted = QuickChatAccessibility.isTrusted }
+        .onReceive(NotificationCenter.default.publisher(for: .quickChatSkillsChanged)) { _ in
+            hidden = QuickChatBindings.hiddenSkills
+        }
+        .onAppear {
+            isTrusted = QuickChatAccessibility.isTrusted
+            hidden = QuickChatBindings.hiddenSkills
+        }
     }
 
     // MARK: - Trigger
@@ -108,7 +115,7 @@ struct QuickChatSettingsView: View {
 
     private var skillsSection: some View {
         Section {
-            ForEach(QuickChatSkill.available) { skill in
+            ForEach(QuickChatSkill.all) { skill in
                 skillRow(skill)
             }
         } header: {
@@ -116,9 +123,11 @@ struct QuickChatSettingsView: View {
         } footer: {
             Text(
                 "These are your skills — the same ones the chat and the oak command see, read "
-                + "from skills/<name>/SKILL.md. Edit one there and it changes everywhere. A skill "
-                + "is offered when it suits the text: rewriting needs somewhere editable to write "
-                + "back to, translating needs text that is not already your language."
+                + "from skills/<name>/SKILL.md. Edit one there and it changes everywhere. "
+                + "Switch one off to keep it out of Quick Chat without uninstalling it; it stays "
+                + "available everywhere else. A skill still only appears when it suits the text: "
+                + "rewriting needs somewhere editable to write back to, translating needs text "
+                + "that is not already your language."
             )
         }
     }
@@ -142,8 +151,18 @@ struct QuickChatSettingsView: View {
             Text(destinationText(skill))
                 .font(.system(size: 11))
                 .foregroundStyle(.tertiary)
+
+            Toggle("", isOn: Binding(
+                get: { !hidden.contains(skill.id) },
+                set: { QuickChatBindings.setVisible($0, for: skill.id) }
+            ))
+            .labelsHidden()
+            .toggleStyle(.switch)
+            .controlSize(.mini)
+            .accessibilityLabel("Show \(skill.name) in Quick Chat")
         }
         .padding(.vertical, 2)
+        .opacity(hidden.contains(skill.id) ? 0.5 : 1)
     }
 
     /// Names the `appliesWhen` rule in words, so a greyed row in the panel is

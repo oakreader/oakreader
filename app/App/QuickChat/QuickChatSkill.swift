@@ -186,6 +186,14 @@ extension QuickChatSkill {
     /// what exists.
     @MainActor
     static var available: [QuickChatSkill] {
+        all.filter { QuickChatBindings.isVisible($0.id) }
+    }
+
+    /// Every skill Quick Chat could offer, before the user's own hiding. The
+    /// settings list needs this one so a hidden skill still has a row to be
+    /// turned back on from.
+    @MainActor
+    static var all: [QuickChatSkill] {
         SkillStore.shared.allEnabled
             .filter { !QuickChatSkillMetadata.excluded.contains($0.name) }
             .map(QuickChatSkill.init(backend:))

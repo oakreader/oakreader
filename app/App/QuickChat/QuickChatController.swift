@@ -368,7 +368,10 @@ final class QuickChatController: NSObject, QuickChatPanelDelegate {
             isWritable: panel.model.capture.isWritable
         )
         Analytics.capture("quick_chat_refine")
-        quickChatPanel(panel, run: refined)
+        // Through the model, not straight to the delegate: `run` is what appends
+        // the turns and then calls back here. Calling the delegate directly ran
+        // the request and rendered nothing.
+        panel.model.run(refined)
     }
 
     func quickChatPanelStopRequested(_ panel: QuickChatPanel) {
