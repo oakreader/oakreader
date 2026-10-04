@@ -16,12 +16,17 @@ enum VoiceProviderFactory {
         case .fishAudio:  return "fishaudio"
         case .openAI:     return "openai"
         case .gemini:     return "google"
+        case .pocketTTS:  return ""   // runs on this Mac; there is no credential
         }
     }
 
     /// Resolve the API key for a voice provider, or nil if not configured.
+    ///
+    /// Always nil for an on-device provider, which is why callers must gate on
+    /// `type.requiresAPIKey` first rather than treating a missing key as "not configured".
     static func apiKey(for type: VoiceProviderType) -> String? {
-        AIProviderCatalog.shared.sharedVoiceKeys[credentialId(for: type)]
+        guard type.requiresAPIKey else { return nil }
+        return AIProviderCatalog.shared.sharedVoiceKeys[credentialId(for: type)]
     }
 
     // MARK: - TTS
@@ -32,10 +37,15 @@ enum VoiceProviderFactory {
     }
 
     /// Whether the selected TTS provider has everything it needs to run.
+    ///
+    /// On-device speech is ready once its models are installed; requiring a key here would
+    /// reject the one provider that deliberately has none.
     static var isTTSConfigured: Bool {
         let prefs = Preferences.shared
-        guard apiKey(for: ttsType) != nil else { return false }
-        if ttsType == .elevenLabs { return !prefs.elevenLabsVoiceId.isEmpty }
+        let type = ttsType
+        guard type.requiresAPIKey else { return PocketTTSAssetStore.shared.hasInstalledModels }
+        guard apiKey(for: type) != nil else { return false }
+        if type == .elevenLabs { return !prefs.elevenLabsVoiceId.isEmpty }
         return true
     }
 
@@ -44,6 +54,15 @@ enum VoiceProviderFactory {
     static func makeTTSProvider() -> (provider: any TTSService, cacheKey: String)? {
         let prefs = Preferences.shared
         let type = ttsType
+
+        // The on-device engine takes no key, and its voice is the whole cache key.
+        if type == .pocketTTS {
+            let voiceId = prefs.pocketTTSVoiceId.isEmpty
+                ? PocketTTSVoiceCatalog.defaultVoiceID
+                : prefs.pocketTTSVoiceId
+            return (PocketTTSEngine(), "pockettts:\(voiceId)")
+        }
+
         guard let key = apiKey(for: type) else { return nil }
 
         switch type {
@@ -65,14 +84,22 @@ enum VoiceProviderFactory {
         case .fishAudio:
             return (FishAudioTTSProvider(apiKey: key, referenceId: prefs.fishAudioReferenceId),
                     "fishaudio:\(prefs.fishAudioReferenceId)")
+        case .pocketTTS:
+            // Handled above, before the key check.
+            return nil
         }
     }
 
     // MARK: - STT
 
     /// The configured STT provider type.
+    ///
+    /// Falls back if the stored value names a provider that cannot transcribe, which the
+    /// on-device engine cannot; otherwise selecting it for speech would wedge dictation.
     static var sttType: VoiceProviderType {
-        VoiceProviderType(rawValue: Preferences.shared.voiceSTTProvider) ?? .elevenLabs
+        let stored = VoiceProviderType(rawValue: Preferences.shared.voiceSTTProvider)
+        guard let stored, stored.supportsSpeechToText else { return .elevenLabs }
+        return stored
     }
 
     /// Whether the selected STT provider has an API key configured.
@@ -89,6 +116,9 @@ enum VoiceProviderFactory {
         case .openAI: return OpenAISTTProvider(apiKey: key, endpoint: openAIEndpoint(path: "/audio/transcriptions"))
         case .gemini: return GeminiSTTProvider(apiKey: key, baseURL: geminiBase())
         case .fishAudio: return FishAudioSTTProvider(apiKey: key)
+        case .pocketTTS:
+            // Unreachable: `sttType` rejects providers that cannot transcribe.
+            return nil
         }
     }
 

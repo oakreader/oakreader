@@ -53,6 +53,19 @@ struct AudioSettingsView: View {
     @State private var openAITTSVoice: String = ""
     @State private var geminiTTSVoice: String = ""
     @State private var fishAudioReferenceId: String = ""
+    @State private var pocketTTSVoiceId: String = ""
+
+    /// Install state of the on-device models, refreshed when the pane appears.
+    private enum PocketTTSModelState: Equatable {
+        case notInstalled
+        case downloading(String, Double)
+        case installed
+        case failed(String)
+    }
+
+    @State private var pocketTTSModelState: PocketTTSModelState = .notInstalled
+    @State private var pocketTTSInstalledSize: String = ""
+    @State private var pocketTTSDownloadTask: Task<Void, Never>?
 
     // Inline API keys
     @State private var elevenLabsAPIKey: String = ""
@@ -99,6 +112,9 @@ struct AudioSettingsView: View {
         _openAITTSVoice = State(initialValue: prefs.openAITTSVoice)
         _geminiTTSVoice = State(initialValue: prefs.geminiTTSVoice)
         _fishAudioReferenceId = State(initialValue: prefs.fishAudioReferenceId)
+        _pocketTTSVoiceId = State(initialValue: prefs.pocketTTSVoiceId.isEmpty
+            ? PocketTTSVoiceCatalog.defaultVoiceID
+            : prefs.pocketTTSVoiceId)
 
         // Inline API keys
         let voiceKeys = AIProviderCatalog.shared.sharedVoiceKeys
@@ -264,7 +280,11 @@ struct AudioSettingsView: View {
             ttsSection
         }
         .formStyle(.grouped)
-        .onAppear { loadVolumes() }
+        .onAppear {
+            loadVolumes()
+            refreshPocketTTSState()
+        }
+        .onDisappear { pocketTTSDownloadTask?.cancel() }
         .onChange(of: outputDeviceUID) { _, _ in loadVolumes() }
         .onChange(of: inputDeviceUID) { _, _ in loadVolumes() }
         .onDisappear {
@@ -295,7 +315,7 @@ struct AudioSettingsView: View {
     private var transcribeSection: some View {
         Section("Transcribe") {
             Picker("Provider", selection: $sttProvider) {
-                ForEach(VoiceProviderType.allCases, id: \.rawValue) { type in
+                ForEach(VoiceProviderType.speechToTextProviders, id: \.rawValue) { type in
                     Text(type.displayName).tag(type.rawValue)
                 }
             }
@@ -309,7 +329,7 @@ struct AudioSettingsView: View {
     private var ttsSection: some View {
         Section("Text-to-Speech") {
             Picker("Provider", selection: $ttsProvider) {
-                ForEach(VoiceProviderType.allCases, id: \.rawValue) { type in
+                ForEach(VoiceProviderType.textToSpeechProviders, id: \.rawValue) { type in
                     Text(type.displayName).tag(type.rawValue)
                 }
             }
@@ -338,8 +358,122 @@ struct AudioSettingsView: View {
                 credentialFields(for: .gemini)
             case .fishAudio:
                 fishAudioFields
+            case .pocketTTS:
+                pocketTTSFields
             }
         }
+    }
+
+    // MARK: - On-device speech actions
+
+    private func refreshPocketTTSState() {
+        let store = PocketTTSAssetStore.shared
+        guard store.hasInstalledModels else {
+            if case .downloading = pocketTTSModelState { return }
+            pocketTTSModelState = .notInstalled
+            return
+        }
+        pocketTTSModelState = .installed
+        Task {
+            let bytes = await store.installedSize()
+            await MainActor.run {
+                pocketTTSInstalledSize = ByteCountFormatter.string(
+                    fromByteCount: bytes, countStyle: .file
+                )
+            }
+        }
+    }
+
+    private func downloadPocketTTSModels() {
+        pocketTTSDownloadTask?.cancel()
+        pocketTTSModelState = .downloading("Starting…", 0)
+        pocketTTSDownloadTask = Task {
+            do {
+                _ = try await PocketTTSAssetStore.shared.ensureInstalled { progress in
+                    Task { @MainActor in
+                        pocketTTSModelState = .downloading(
+                            "\(progress.artifact.displayName) — \(progress.step) of \(progress.totalSteps)",
+                            progress.fractionCompleted
+                        )
+                    }
+                }
+                await MainActor.run { refreshPocketTTSState() }
+            } catch is CancellationError {
+                await MainActor.run { refreshPocketTTSState() }
+            } catch {
+                await MainActor.run {
+                    pocketTTSModelState = .failed("\(error)")
+                }
+            }
+        }
+    }
+
+    private func removePocketTTSModels() {
+        pocketTTSDownloadTask?.cancel()
+        Task {
+            try? await PocketTTSAssetStore.shared.removeAll()
+            await MainActor.run {
+                pocketTTSInstalledSize = ""
+                refreshPocketTTSState()
+            }
+        }
+    }
+
+    // MARK: - On-device speech
+
+    /// Voice picker plus model management for the on-device engine.
+    ///
+    /// No API key field, which is the point of this provider. Two controls earn their place:
+    /// the voice, because nobody picks a voice from a bare name like "p244", and the model
+    /// download, because 292 MB has to arrive before anything can be spoken.
+    @ViewBuilder
+    private var pocketTTSFields: some View {
+        Picker("Voice", selection: $pocketTTSVoiceId) {
+            ForEach(PocketTTSVoiceCatalog.grouped, id: \.group) { section in
+                Section(section.group) {
+                    ForEach(section.voices) { voice in
+                        Text(voice.pickerTitle).tag(voice.id)
+                    }
+                }
+            }
+        }
+
+        switch pocketTTSModelState {
+        case .installed:
+            HStack {
+                Label("Models installed", systemImage: "checkmark.circle")
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(pocketTTSInstalledSize)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Button("Remove") { removePocketTTSModels() }
+            }
+        case .notInstalled:
+            HStack {
+                Text("Models not downloaded · about 292 MB")
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Download") { downloadPocketTTSModels() }
+            }
+        case let .downloading(label, fraction):
+            VStack(alignment: .leading, spacing: 4) {
+                ProgressView(value: fraction) {
+                    Text(label).font(.caption)
+                }
+            }
+        case let .failed(message):
+            VStack(alignment: .leading, spacing: 4) {
+                Label(message, systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                Button("Try Again") { downloadPocketTTSModels() }
+            }
+        }
+
+        Text("Runs entirely on this Mac. No API key, and no audio leaves the device.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
     }
 
     // MARK: - Credential helpers
@@ -376,6 +510,9 @@ struct AudioSettingsView: View {
                 .foregroundStyle(.secondary)
         case .fishAudio:
             fishAudioFields
+        case .pocketTTS:
+            // Nothing to enter. The provider runs locally.
+            EmptyView()
         }
     }
 
@@ -651,6 +788,7 @@ struct AudioSettingsView: View {
         prefs.voiceTTSProvider = ttsProvider
         prefs.voiceSTTProvider = sttProvider
         prefs.elevenLabsVoiceId = elevenLabsVoiceId
+        prefs.pocketTTSVoiceId = pocketTTSVoiceId
         prefs.elevenLabsTTSModelId = elevenLabsTTSModelId
         prefs.openAITTSVoice = openAITTSVoice
         prefs.geminiTTSVoice = geminiTTSVoice
