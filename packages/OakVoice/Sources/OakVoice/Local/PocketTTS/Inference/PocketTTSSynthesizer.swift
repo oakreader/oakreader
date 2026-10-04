@@ -1,3 +1,4 @@
+import Accelerate
 import CoreML
 import Foundation
 
@@ -196,8 +197,13 @@ struct PocketTTSSynthesizer {
 
     /// Write a voice's caches into the model's state buffers, zeroing the unused tail.
     ///
-    /// The buffers are `[1, 512, heads, dHead]` Float16 while a voice file holds Float32 over
-    /// ~125 positions, so this narrows and pads in a single pass.
+    /// The buffers are `[1, 512, heads, dHead]` half-precision while a voice file holds Float32
+    /// over ~125 positions, so this narrows and pads in a single pass.
+    ///
+    /// The conversion goes through Accelerate rather than Swift's `Float16`, which has no
+    /// `init(Float)` on x86_64. The release archive is a universal binary, so a scalar
+    /// `Float16(...)` loop compiles on Apple silicon and then fails the Intel slice.
+    /// `vImageConvert_PlanarFtoPlanar16F` exists on both and is vectorised besides.
     private func seed(_ state: MLState, from voice: PocketTTSVoiceState) throws {
         let used = voice.positions * voice.heads * voice.dHead
         for layer in 0..<Self.layerCount {
@@ -206,10 +212,30 @@ struct PocketTTSSynthesizer {
                 ("kv_v_\(layer)", voice.values[layer])
             ] {
                 state.withMultiArray(for: name) { (array: MLMultiArray) in
-                    array.withUnsafeMutableBufferPointer(ofType: Float16.self) { buffer, _ in
-                        let copyCount = min(used, buffer.count)
-                        for index in 0..<copyCount { buffer[index] = Float16(source[index]) }
-                        for index in copyCount..<buffer.count { buffer[index] = 0 }
+                    let capacity = array.count
+                    let copyCount = min(used, capacity)
+                    array.withUnsafeMutableBytes { raw, _ in
+                        guard let destination = raw.baseAddress else { return }
+                        // Half-precision: two bytes per element. Zero first so the tail beyond
+                        // the voice's valid positions is silent rather than stale.
+                        memset(destination, 0, capacity * 2)
+                        guard copyCount > 0 else { return }
+                        source.withUnsafeBufferPointer { input in
+                            guard let origin = input.baseAddress else { return }
+                            var sourceBuffer = vImage_Buffer(
+                                data: UnsafeMutableRawPointer(mutating: origin),
+                                height: 1,
+                                width: vImagePixelCount(copyCount),
+                                rowBytes: copyCount * MemoryLayout<Float>.size
+                            )
+                            var destinationBuffer = vImage_Buffer(
+                                data: destination,
+                                height: 1,
+                                width: vImagePixelCount(copyCount),
+                                rowBytes: copyCount * 2
+                            )
+                            vImageConvert_PlanarFtoPlanar16F(&sourceBuffer, &destinationBuffer, 0)
+                        }
                     }
                 }
             }
