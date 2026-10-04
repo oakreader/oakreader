@@ -93,6 +93,20 @@ public actor PocketTTSAssetStore {
 
     public func isInstalled() -> Bool { missingArtifacts().isEmpty }
 
+    /// Synchronous install check, for UI that cannot await.
+    ///
+    /// Reads only the immutable install directory and the file system, so it needs no actor
+    /// isolation. Racy against an install in flight by definition; callers use it to decide
+    /// whether to offer the provider, not to guard synthesis — ``PocketTTSEngine/prepare()``
+    /// installs anything missing anyway.
+    public nonisolated var hasInstalledModels: Bool {
+        PocketTTSArtifact.allCases.allSatisfy { artifact in
+            FileManager.default.fileExists(
+                atPath: installDirectory.appendingPathComponent(artifact.installedName).path
+            )
+        }
+    }
+
     /// Bytes on disk, models and cached voices together.
     public func installedSize() -> Int64 {
         guard let walker = fileManager.enumerator(

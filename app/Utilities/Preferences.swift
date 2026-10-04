@@ -115,6 +115,7 @@ final class Preferences {
         static let voiceSTTProvider = "voiceSTTProvider"
         static let voiceTTSProvider = "voiceTTSProvider"
         static let elevenLabsVoiceId = "elevenLabsVoiceId"
+        static let pocketTTSVoiceId = "pocketTTSVoiceId"
         static let elevenLabsTTSModelId = "elevenLabsTTSModelId"
         static let openAITTSVoice = "openAITTSVoice"
         static let geminiTTSVoice = "geminiTTSVoice"
@@ -481,6 +482,12 @@ final class Preferences {
     var elevenLabsVoiceId: String {
         get { defaults.string(forKey: Keys.elevenLabsVoiceId) ?? "" }
         set { defaults.set(newValue, forKey: Keys.elevenLabsVoiceId) }
+    }
+
+    /// Selected on-device voice. Empty means the catalog default.
+    var pocketTTSVoiceId: String {
+        get { defaults.string(forKey: Keys.pocketTTSVoiceId) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.pocketTTSVoiceId) }
     }
 
     /// ElevenLabs TTS model ID.
