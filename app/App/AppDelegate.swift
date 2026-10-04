@@ -23,15 +23,22 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private let externalLibraryChangeNotificationName = Notification.Name("com.oakreader.library.didChange")
     private let externalLibraryChangeSource = "oak-cli"
     private(set) lazy var commandPalette = CommandPaletteController(appDelegate: self)
+    private(set) lazy var quickChat = QuickChatController(appDelegate: self)
     func applicationWillFinishLaunching(_ notification: Notification) {
         documentController.appState = appState
         NSApp.mainMenu = MainMenuBuilder.build(target: self)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(quickChatTriggerChanged(_:)),
+            name: .quickChatTriggerChanged, object: nil
+        )
         // Let the markdown renderer resolve note images' relocatable oak://image URLs.
         OakMarkdownImage.urlResolver = { OakNoteImageURL.resolveToFile($0) }
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.servicesProvider = self
+
+        quickChat.syncGlobalShortcut()
 
         // Start product analytics (PostHog, EU). No-op if the user opted out.
         Analytics.start()
@@ -325,6 +332,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     @objc func showCommandPalette(_ sender: Any?) {
         commandPalette.show()
+    }
+
+    // MARK: - QuickChatSkill Panel
+
+    @MainActor
+    @objc func showQuickChatPanel(_ sender: Any?) {
+        quickChat.show()
+    }
+
+    /// The trigger is live event monitors, not a menu key equivalent, so a
+    /// change tears them down and sets them up again. Nothing in the menu
+    /// depends on it any more, so there is no menu to rebuild.
+    @MainActor
+    @objc private func quickChatTriggerChanged(_ note: Notification) {
+        quickChat.syncGlobalShortcut()
     }
 
     // MARK: - Settings Window
@@ -777,6 +799,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// never while the user is editing text, so the items are disabled otherwise; a
     /// disabled item's key equivalent is not consumed, letting the arrows through.
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        // QuickChatSkill is a selection instrument like the ones below, but it is bound to
+        // a direct selector rather than a DocumentAction, so it is gated here.
+        if menuItem.action == #selector(showQuickChatPanel(_:)) {
+            // Deliberately NOT gated on having a selection. A disabled item's key
+            // equivalent is ignored, which made the shortcut a silent no-op with
+            // no way to tell "nothing selected" from "shortcut is broken". The
+            // only gate is text editing, so an ⌥-letter binding still types its
+            // character in a focused field.
+            return !isEditingText || quickChat.hasSelection
+        }
         guard menuItem.action == #selector(menuAction(_:)),
               let actionName = menuItem.representedObject as? String,
               let action = DocumentAction(rawValue: actionName) else {
