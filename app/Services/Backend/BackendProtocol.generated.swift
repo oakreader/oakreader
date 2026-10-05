@@ -9,7 +9,7 @@ import Foundation
 /// Reverse calls (tool/execute, oauth/prompt) are ordinary requests in the
 /// other direction, so they need no separate machinery.
 enum RPC {
-    static let version = 11
+    static let version = 12
 
     /// JSON-RPC error codes. The shell branches on these: re-authenticate
     /// is a different affordance from retry, and the old single error string
@@ -74,6 +74,7 @@ enum RPC {
         static let catalogValidate = "catalog/validate"
         static let referencesGet = "catalog/references/get"
         static let referencesSave = "catalog/references/save"
+        static let metadataRecognize = "metadata/recognize"
         static let citeKeysPropose = "catalog/citeKeys/propose"
         static let citeKeysAssign = "catalog/citeKeys/assign"
         static let citeKeysSave = "catalog/citeKeys/save"
@@ -443,6 +444,38 @@ enum RPC {
     }
     struct ReferencesSaveResult: Decodable {
         init() {}
+    }
+
+    // MARK: metadata/recognize
+    /// Work out what a document is: read its embedded metadata and the identifiers printed on it,
+    /// resolve those against CrossRef, DataCite, arXiv, Open Library, Google Books or PubMed, and
+    /// fall back to a title search when it carries no identifier at all. Returns CSL JSON with the
+    /// method and confidence that produced it.
+    struct MetadataRecognizeParams: Encodable {
+        /// The document to read. Omit to recognise from title and author alone.
+        var filePath: String?
+        var fileName: String?
+        /// What the catalog already believes, used when the file says nothing.
+        var title: String?
+        var author: String?
+        /// Resolve this identifier instead of reading the file. A DOI, an arXiv id, an ISBN or a
+        /// PMID -- the kind is worked out from its shape.
+        var identifier: String?
+        /// Skip every lookup; read the file's own metadata only.
+        var offline: Bool?
+    }
+    struct MetadataRecognizeResult: Decodable {
+        var cslJson: String
+        var method: String
+        /// 0-1. Below 0.5 this is a description of the file, not an identification.
+        var confidence: Double
+        var provider: String?
+        var doi: String?
+        var arxiv: String?
+        var isbn: String?
+        var pmid: String?
+        /// Every step tried, in order, so a wrong answer can be explained.
+        var trail: [String]
     }
 
     // MARK: catalog/citeKeys/propose

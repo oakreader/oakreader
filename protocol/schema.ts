@@ -10,7 +10,7 @@
  * fails if the committed output is stale.
  */
 
-export const PROTOCOL_VERSION = 11;
+export const PROTOCOL_VERSION = 12;
 
 export type FieldType =
   | { k: "string" }
@@ -352,6 +352,42 @@ export const METHODS: Method[] = [
       { name: "at", type: str },
     ],
     result: [],
+  },
+  {
+    name: "metadata/recognize", type: "MetadataRecognize", kind: "request", from: "client",
+    doc: "Work out what a document is: read its embedded metadata and the " +
+         "identifiers printed on it, resolve those against CrossRef, DataCite, " +
+         "arXiv, Open Library, Google Books or PubMed, and fall back to a " +
+         "title search when it carries no identifier at all. Returns CSL JSON " +
+         "with the method and confidence that produced it.",
+    params: [
+      { name: "filePath", type: str, optional: true, nullable: true,
+        doc: "The document to read. Omit to recognise from title and author alone." },
+      { name: "fileName", type: str, optional: true, nullable: true },
+      { name: "title", type: str, optional: true, nullable: true,
+        doc: "What the catalog already believes, used when the file says nothing." },
+      { name: "author", type: str, optional: true, nullable: true },
+      { name: "identifier", type: str, optional: true, nullable: true,
+        doc: "Resolve this identifier instead of reading the file. A DOI, an " +
+             "arXiv id, an ISBN or a PMID -- the kind is worked out from its shape." },
+      { name: "offline", type: bool, optional: true,
+        doc: "Skip every lookup; read the file's own metadata only." },
+    ],
+    result: [
+      { name: "cslJson", type: str },
+      { name: "method", type: { k: "enum", values: [
+        "doi", "arxiv", "isbn", "pmid", "title-search", "embedded", "filename",
+      ] } },
+      { name: "confidence", type: double,
+        doc: "0-1. Below 0.5 this is a description of the file, not an identification." },
+      { name: "provider", type: str, optional: true, nullable: true },
+      { name: "doi", type: str, optional: true, nullable: true },
+      { name: "arxiv", type: str, optional: true, nullable: true },
+      { name: "isbn", type: str, optional: true, nullable: true },
+      { name: "pmid", type: str, optional: true, nullable: true },
+      { name: "trail", type: { k: "array", of: str },
+        doc: "Every step tried, in order, so a wrong answer can be explained." },
+    ],
   },
   {
     name: "catalog/citeKeys/propose", type: "CiteKeysPropose", kind: "request", from: "client",

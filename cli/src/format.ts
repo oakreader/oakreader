@@ -200,3 +200,90 @@ export function noteSection(note: Note): string {
 export function status(item: Item, value: PropertyOption | null): string {
   return `${item.title}: ${value?.name ?? "None"}`;
 }
+
+// --- metadata ------------------------------------------------------------
+
+/** How the recogniser arrived at an answer, in words rather than a slug. */
+function methodPhrase(method: string): string {
+  switch (method) {
+    case "doi": return "DOI";
+    case "arxiv": return "arXiv ID";
+    case "isbn": return "ISBN";
+    case "pmid": return "PubMed ID";
+    case "title-search": return "title search";
+    case "embedded": return "the document's own metadata";
+    default: return "the filename";
+  }
+}
+
+function year(csl: Record<string, unknown>): string {
+  const issued = csl.issued as { "date-parts"?: number[][] } | undefined;
+  const value = issued?.["date-parts"]?.[0]?.[0];
+  return value === undefined ? "" : String(value);
+}
+
+function authorList(csl: Record<string, unknown>): string {
+  const authors = csl.author as Array<{ family?: string; given?: string; literal?: string }> | undefined;
+  if (authors === undefined || authors.length === 0) return "";
+  const names = authors.slice(0, 4).map((a) => {
+    if (a.literal !== undefined) return a.literal;
+    return [a.given, a.family].filter((p) => p !== undefined && p !== "").join(" ");
+  });
+  return names.join(", ") + (authors.length > 4 ? ", et al." : "");
+}
+
+/** One line per item, for the sweep. */
+export function recognitionLine(
+  found: { csl: Record<string, unknown>; method: string; confidence: number; provider?: string },
+  currentTitle: string,
+): string {
+  const mark = found.confidence >= 0.5 ? "+" : "?";
+  const title = String(found.csl.title ?? currentTitle);
+  const via = found.provider ?? methodPhrase(found.method);
+  return `${mark} ${pad(title.slice(0, 58), 58)}  ${via}`;
+}
+
+/** The full report for one item. */
+export function recognition(
+  found: {
+    csl: Record<string, unknown>; method: string; confidence: number;
+    provider?: string; identifiers: Record<string, string | undefined>;
+  },
+  currentTitle: string,
+): string {
+  const csl = found.csl;
+  const lines: string[] = [];
+
+  const via = found.provider === undefined
+    ? `from ${methodPhrase(found.method)}`
+    : `from ${methodPhrase(found.method)}, via ${found.provider}`;
+  lines.push(found.confidence >= 0.5
+    ? `Identified ${via} (confidence ${found.confidence.toFixed(2)}).`
+    : `Not identified. Describing it ${via}.`);
+  lines.push("");
+
+  const row = (label: string, value: unknown): void => {
+    if (value === undefined || value === null || value === "") return;
+    lines.push(`  ${pad(label, 14)}${String(value)}`);
+  };
+  row("Current", currentTitle);
+  row("Title", csl.title);
+  row("Authors", authorList(csl));
+  row("Year", year(csl));
+  row("Type", csl.type);
+  row("Journal", csl["container-title"]);
+  row("Publisher", csl.publisher);
+  row("Volume", csl.volume);
+  row("Pages", csl.page ?? csl["number-of-pages"]);
+  row("DOI", csl.DOI);
+  row("ISBN", csl.ISBN);
+  row("URL", csl.URL);
+
+  const unresolved = Object.entries(found.identifiers)
+    .filter(([, value]) => value !== undefined)
+    .map(([key, value]) => `${key}=${String(value)}`);
+  if (unresolved.length > 0) {
+    lines.push("", `  ${pad("Found on page", 14)}${unresolved.join("  ")}`);
+  }
+  return lines.join("\n");
+}

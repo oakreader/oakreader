@@ -272,7 +272,6 @@
 		E7EFE99A799CA2ABAB1AE668 /* ChatInputTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A508F4FFB36333D8C6ACF7A1 /* ChatInputTextView.swift */; };
 		E85675863520B263E0D5B74B /* ImportService+Audio.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D185340B8694C3BC5B8BE6A /* ImportService+Audio.swift */; };
 		E8EEBECF9CD6C0ADF4D92BE9 /* WebSearchSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D87BFD65649B19E9FB711AB /* WebSearchSettingsView.swift */; };
-		E977E8F0BE1AF3C62128CB28 /* DOIExtractorService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17BE0FCAA6079A51258F25C7 /* DOIExtractorService.swift */; };
 		E9E200B92CAF5AA663BECBA1 /* QuickChatGlobalHotKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99D1353FABD23AD2DDCA5041 /* QuickChatGlobalHotKey.swift */; };
 		EC58E856845124B7B87F84C7 /* CommentsPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AD841895B0BC07F55E33A79 /* CommentsPanelView.swift */; };
 		EC6EA8398DE5DE427973321A /* LibraryCitationExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F7C8B7A45B11A47BA9ACB1D /* LibraryCitationExport.swift */; };
@@ -281,6 +280,7 @@
 		F06757F901BFB368D4125DD0 /* ExaSearchProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA7CD29B86F4383D95319210 /* ExaSearchProvider.swift */; };
 		F23C54C38806201DE2F0A138 /* MediaDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7758CEAED2C9DB1C8AA302AE /* MediaDocument.swift */; };
 		F3421A024BBFD1643223FAB4 /* MemoryManagerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA646E8315CCE95E44676F14 /* MemoryManagerView.swift */; };
+		F551487E1DC9AF6F01D0DCFE /* MetadataRecognizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A759098DDBB913A11D0521D1 /* MetadataRecognizer.swift */; };
 		F7D0BAFC5DEA652938A42248 /* ImageLightbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2AC38E3EEFEBF72D47FB3E9 /* ImageLightbox.swift */; };
 		F861CF36398233C55B5BF352 /* AccessibilityIssue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DD2009541907CEB1D9B2859 /* AccessibilityIssue.swift */; };
 		F906F8E5B7FF4CC9315881E9 /* QuickChatHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = A912DD68461CB80A9669BBB8 /* QuickChatHistory.swift */; };
@@ -293,7 +293,6 @@
 		FAF7EAE401EE1E602A685D11 /* NoteEditorTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57E07815C16447EAF02FDB30 /* NoteEditorTextView.swift */; };
 		FB5A4FEB8571CD06161A25D5 /* ChatTitleService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A15CEC695D0A0C7DDDA25CB4 /* ChatTitleService.swift */; };
 		FC893F57858FF6EA5A4A04B3 /* AddProviderSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33F855D5CACDD8FFF69B4F59 /* AddProviderSheet.swift */; };
-		FF8B03B21A3F8F2CE85233F6 /* CrossRefService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C0A42356CFF0FDE4D4C8562 /* CrossRefService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -319,7 +318,6 @@
 		15AFF30B33D00CFE356594F1 /* ViewerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewerViewModel.swift; sourceTree = "<group>"; };
 		166A5AD13537E60218059C3E /* OakCLITool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OakCLITool.swift; sourceTree = "<group>"; };
 		179FBB2D6079BC574E6102FC /* CompletionClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionClient.swift; sourceTree = "<group>"; };
-		17BE0FCAA6079A51258F25C7 /* DOIExtractorService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DOIExtractorService.swift; sourceTree = "<group>"; };
 		19F2340729A85D5B298436E5 /* NoteEditorModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteEditorModel.swift; sourceTree = "<group>"; };
 		1A63D86443ACAE5AC839FCAA /* OakReader-release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "OakReader-release.xcconfig"; sourceTree = "<group>"; };
 		1B25501CAFBB49C0E9A9E6EC /* ToolUseRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolUseRecord.swift; sourceTree = "<group>"; };
@@ -445,7 +443,6 @@
 		79951E482830D01F67D1BE3A /* ImportService+HTML.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ImportService+HTML.swift"; sourceTree = "<group>"; };
 		7A1E95911C6CA24DA125B374 /* PDFDocument+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PDFDocument+Extensions.swift"; sourceTree = "<group>"; };
 		7A4DAAB6CB24A3F4BDFACE37 /* MarkdownDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownDocument.swift; sourceTree = "<group>"; };
-		7C0A42356CFF0FDE4D4C8562 /* CrossRefService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrossRefService.swift; sourceTree = "<group>"; };
 		7D801E8CB2046BEE7F171F6D /* NotesSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesSupport.swift; sourceTree = "<group>"; };
 		7D87BFD65649B19E9FB711AB /* WebSearchSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSearchSettingsView.swift; sourceTree = "<group>"; };
 		7DF9DB24F42638B1C38024F0 /* VoiceProviderFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceProviderFactory.swift; sourceTree = "<group>"; };
@@ -488,6 +485,7 @@
 		A508F4FFB36333D8C6ACF7A1 /* ChatInputTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatInputTextView.swift; sourceTree = "<group>"; };
 		A5180811E78B858BC5D80477 /* ExportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSheet.swift; sourceTree = "<group>"; };
 		A56200DACCA2599783CEC7BA /* LibraryCoverService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryCoverService.swift; sourceTree = "<group>"; };
+		A759098DDBB913A11D0521D1 /* MetadataRecognizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetadataRecognizer.swift; sourceTree = "<group>"; };
 		A8E5A3FBC7CC4C65B1D49130 /* LibraryCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryCatalog.swift; sourceTree = "<group>"; };
 		A912DD68461CB80A9669BBB8 /* QuickChatHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickChatHistory.swift; sourceTree = "<group>"; };
 		A9D31EEB02BB2D679954AB42 /* CitationFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CitationFormatter.swift; sourceTree = "<group>"; };
@@ -714,8 +712,6 @@
 				3D9958F7FED1B50951F2D858 /* CatalogStoragePaths.swift */,
 				A9D31EEB02BB2D679954AB42 /* CitationFormatter.swift */,
 				F8F6FEED98569A7AB09BE0A5 /* ConversationService.swift */,
-				7C0A42356CFF0FDE4D4C8562 /* CrossRefService.swift */,
-				17BE0FCAA6079A51258F25C7 /* DOIExtractorService.swift */,
 				11259074249DFD840115FB51 /* DuplicateService.swift */,
 				BF905C68557A42CC81C85B36 /* ImportService.swift */,
 				6D185340B8694C3BC5B8BE6A /* ImportService+Audio.swift */,
@@ -731,6 +727,7 @@
 				B108A2CA820564EAD4B4AF7C /* LibraryItemStore.swift */,
 				2A2A6A4D88229137627AB296 /* LibraryPropertyStore.swift */,
 				691F0A1DDDBC38FF28DD47C4 /* LibraryStore.swift */,
+				A759098DDBB913A11D0521D1 /* MetadataRecognizer.swift */,
 				E1B515A45A232EFEC64D780E /* NoteImageStore.swift */,
 				5D436A6C3E3B1E4F589FC577 /* OakNoteImageURL.swift */,
 				01EC224994FA0B180A3066C7 /* OakServer.swift */,
@@ -1500,8 +1497,6 @@
 				963B67BF4C71C3D6DC8318A1 /* ContextMode.swift in Sources */,
 				3C62AC3907C2E346A0940F3F /* ConversationMeta.swift in Sources */,
 				24DBFDAD5E31E3498A282996 /* ConversationService.swift in Sources */,
-				FF8B03B21A3F8F2CE85233F6 /* CrossRefService.swift in Sources */,
-				E977E8F0BE1AF3C62128CB28 /* DOIExtractorService.swift in Sources */,
 				CAF0BF89227323E39D9D58CB /* DatabaseRecords.swift in Sources */,
 				C7528D6A8D505EBE4CC6F07C /* DocumentState.swift in Sources */,
 				8E01103C38BD3841FE711149 /* DocumentTabView.swift in Sources */,
@@ -1573,6 +1568,7 @@
 				F3421A024BBFD1643223FAB4 /* MemoryManagerView.swift in Sources */,
 				0A20336239EE54AF6DA55973 /* MemoryStore.swift in Sources */,
 				2242344EB8CEB3219197F7B7 /* MemoryTools.swift in Sources */,
+				F551487E1DC9AF6F01D0DCFE /* MetadataRecognizer.swift in Sources */,
 				CC64711C9E9D455CAC9DC6D0 /* NSImage+Extensions.swift in Sources */,
 				2CF922BD9E4B3514968661BD /* NativeNoteEditorView.swift in Sources */,
 				B7F69146D24C49AF21D04D6C /* NewTabView.swift in Sources */,
@@ -1816,7 +1812,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.16.0;
+				MARKETING_VERSION = 0.16.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.oakreader.OakReader.dev;
 				PRODUCT_MODULE_NAME = OakReader;
 				PRODUCT_NAME = "OakReader-Dev";
@@ -1907,7 +1903,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.16.0;
+				MARKETING_VERSION = 0.16.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.oakreader.OakReader;
 				PRODUCT_MODULE_NAME = OakReader;
 				PRODUCT_NAME = OakReader;

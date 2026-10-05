@@ -7,7 +7,8 @@
  * See src/protocol.ts and docs/architecture/node-backend-migration.md.
  */
 import { mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { readFile } from "node:fs/promises";
+import { basename, join } from "node:path";
 import { homedir } from "node:os";
 import type { AuthEvent, AuthPrompt, ThinkingLevel } from "@earendil-works/pi-ai";
 import {
@@ -19,6 +20,8 @@ import {
   type ToolsListResult, type ToolsRunResult, type PromptsComposeResult,
   CatalogValidateParams, type CatalogValidateResult,
   ReferencesGetParams, ReferencesSaveParams, type ReferencesGetResult,
+  MetadataRecognizeParams,
+  type MetadataRecognizeResult,
   CiteKeysProposeParams, CiteKeysSaveParams, CiteKeysAssignParams,
   type CiteKeysProposeResult, type CiteKeysAssignResult,
   PropertiesListParams, PropertiesUpsertOptionParams, PropertiesDeleteOptionParams,
@@ -53,6 +56,7 @@ import { PORTABLE_TOOLS, runTool } from "./tools.js";
 import {
   loadSkills, locateBin, promptSection, readBody, skillDirectories, userSkillDirectory,
 } from "./skills.js";
+import { recognize, type RecognizeInput } from "./metadata/recognize.js";
 import { Catalog } from "./catalog/db.js";
 import { MIGRATIONS } from "./catalog/schema.js";
 import { WordLookupStore } from "./catalog/wordLookups.js";
@@ -467,6 +471,47 @@ function registerMethods(): void {
     new ReferenceStore(catalog().db).save(p.itemId, p.cslJson, p.extra ?? null, p.at);
     return {};
   });
+
+  /**
+   * Recognise a document.
+   *
+   * The whole pipeline lives in the core rather than the Swift shell, for the
+   * same reason the catalog does: it has to run on Windows, and the shell's
+   * version could only ever be PDFKit. It also means the app, the `oak` CLI
+   * and the agent all recognise a document the same way instead of three
+   * slightly different ways.
+   */
+  peer.onRequest("metadata/recognize", MetadataRecognizeParams,
+    async (p): Promise<MetadataRecognizeResult> => {
+      const input: RecognizeInput = {
+        fileName: p.fileName ?? (p.filePath === undefined || p.filePath === null
+          ? undefined : basename(p.filePath)),
+        title: p.title ?? undefined,
+        author: p.author ?? undefined,
+        identifier: p.identifier ?? undefined,
+        offline: p.offline ?? false,
+      };
+      if (p.filePath !== undefined && p.filePath !== null) {
+        try {
+          input.data = new Uint8Array(await readFile(p.filePath));
+        } catch {
+          // A missing file is not a failed request: the title and author the
+          // catalog holds are still something to recognise from.
+        }
+      }
+      const found = await recognize(input);
+      return {
+        cslJson: JSON.stringify(found.csl),
+        method: found.method,
+        confidence: found.confidence,
+        provider: found.provider ?? null,
+        doi: found.identifiers.doi ?? null,
+        arxiv: found.identifiers.arxiv ?? null,
+        isbn: found.identifiers.isbn ?? null,
+        pmid: found.identifiers.pmid ?? null,
+        trail: found.trail,
+      };
+    });
 
   peer.onRequest("catalog/citeKeys/propose", CiteKeysProposeParams,
     (p): CiteKeysProposeResult => ({

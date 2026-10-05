@@ -28,6 +28,9 @@ importers:
       turndown:
         specifier: ^7.2.4
         version: 7.2.4
+      unpdf:
+        specifier: ^1.3.2
+        version: 1.8.1
       zod:
         specifier: ^4.1.12
         version: 4.4.3

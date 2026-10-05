@@ -5,7 +5,7 @@ import { z } from "zod";
 import { WireMessage, WireToolDef, WordLookup, Annotation, Conversation, Collection, Item, Property, PropertyOption, Skill, SkillAdvisory, SkillBin, SkillEnv, ToolDefinition, type ProviderSummary, type EventToolCall, type PromptOption } from "./protocol.base.js";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- refs used by generated shapes
 
-export const PROTOCOL_VERSION = 11;
+export const PROTOCOL_VERSION = 12;
 
 /** JSON-RPC 2.0 error codes. Below -32000 is ours; the rest is the spec's. */
 export const RpcError = {
@@ -342,6 +342,34 @@ export const ReferencesSaveParams = z.object({
 export type ReferencesSaveParams = z.infer<typeof ReferencesSaveParams>;
 export type ReferencesSaveResult = Record<string, never>;
 
+/** `metadata/recognize` — Work out what a document is: read its embedded metadata and the identifiers printed on it, resolve those against CrossRef, DataCite, arXiv, Open Library, Google Books or PubMed, and fall back to a title search when it carries no identifier at all. Returns CSL JSON with the method and confidence that produced it. */
+export const MetadataRecognizeParams = z.object({
+  /** The document to read. Omit to recognise from title and author alone. */
+  filePath: z.string().nullable().optional(),
+  fileName: z.string().nullable().optional(),
+  /** What the catalog already believes, used when the file says nothing. */
+  title: z.string().nullable().optional(),
+  author: z.string().nullable().optional(),
+  /** Resolve this identifier instead of reading the file. A DOI, an arXiv id, an ISBN or a PMID -- the kind is worked out from its shape. */
+  identifier: z.string().nullable().optional(),
+  /** Skip every lookup; read the file's own metadata only. */
+  offline: z.boolean().optional(),
+});
+export type MetadataRecognizeParams = z.infer<typeof MetadataRecognizeParams>;
+export type MetadataRecognizeResult = {
+  cslJson: string;
+  method: "doi" | "arxiv" | "isbn" | "pmid" | "title-search" | "embedded" | "filename";
+  /** 0-1. Below 0.5 this is a description of the file, not an identification. */
+  confidence: number;
+  provider?: string | null;
+  doi?: string | null;
+  arxiv?: string | null;
+  isbn?: string | null;
+  pmid?: string | null;
+  /** Every step tried, in order, so a wrong answer can be explained. */
+  trail: string[];
+};
+
 /** `catalog/citeKeys/propose` — The key this item's current metadata would produce, without writing it. Null when there is not enough metadata to form one. */
 export const CiteKeysProposeParams = z.object({
   itemId: z.string(),
@@ -604,6 +632,7 @@ export const ClientRequests = {
   "catalog/validate": CatalogValidateParams,
   "catalog/references/get": ReferencesGetParams,
   "catalog/references/save": ReferencesSaveParams,
+  "metadata/recognize": MetadataRecognizeParams,
   "catalog/citeKeys/propose": CiteKeysProposeParams,
   "catalog/citeKeys/assign": CiteKeysAssignParams,
   "catalog/citeKeys/save": CiteKeysSaveParams,
@@ -665,6 +694,7 @@ export interface ClientRequestResults {
   "catalog/validate": CatalogValidateResult;
   "catalog/references/get": ReferencesGetResult;
   "catalog/references/save": ReferencesSaveResult;
+  "metadata/recognize": MetadataRecognizeResult;
   "catalog/citeKeys/propose": CiteKeysProposeResult;
   "catalog/citeKeys/assign": CiteKeysAssignResult;
   "catalog/citeKeys/save": CiteKeysSaveResult;

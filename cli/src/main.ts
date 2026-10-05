@@ -10,6 +10,7 @@
  */
 import { newId } from "../../backend/src/catalog/ids.ts";
 import { existsSync, readFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { basename, join as joinPath, resolve as resolvePath } from "node:path";
 import { homedir } from "node:os";
 import { Catalog } from "../../backend/src/catalog/db.ts";
@@ -20,18 +21,21 @@ import { flag, integer, option, parse, type Parsed } from "./args.ts";
 import { childNames, findCommand, helpText } from "./help.ts";
 import { Importer, type ImportResult } from "./import.ts";
 import { Output } from "./output.ts";
-import { dataDirectory, libraryPath } from "./paths.ts";
+import { attachmentFile, dataDirectory, libraryPath } from "./paths.ts";
 import { Queries } from "./queries.ts";
 import { OakError, Resolver, notFound } from "./resolve.ts";
 import { readDocument } from "./extract.ts";
 import * as format from "./format.ts";
 import * as skills from "../../backend/src/skills.ts";
+import { recognize, type Recognized } from "../../backend/src/metadata/recognize.ts";
+import { ReferenceStore } from "../../backend/src/catalog/references.ts";
 
 const VERSION = "1.0.0";
 
 /** Long tokens that never take a value. Everything else expects one. */
 const BOOLEANS = new Set([
   "json", "quiet", "version", "help", "h", "today", "csv", "markdown",
+  "apply", "all", "explain", "offline", "force",
 ]);
 
 interface Context {
@@ -802,6 +806,136 @@ async function skillsCheck({ out }: Context): Promise<void> {
   else for (const issue of issues) console.log(`WARNING: ${issue}`);
 }
 
+
+// --- metadata ------------------------------------------------------------
+
+/**
+ * Work out what a document is, and optionally write it down.
+ *
+ * The same recogniser the app uses, which is the point: a library curated
+ * from the terminal and one curated in the window agree about what a document
+ * is, because there is one implementation of "what is this" and both call it.
+ *
+ * `--all` is the sweep. A library imported before the recogniser existed is
+ * full of items named after their files; this is how they get their real
+ * names without opening each one.
+ */
+async function metadata(ctx: Context): Promise<void> {
+  const { parsed, out } = ctx;
+  if (flag(parsed, "all")) return await metadataSweep(ctx);
+
+  const target = requireArgument(parsed, 0, "item");
+  const found = await recognizeItem(ctx, target);
+
+  if (flag(parsed, "apply")) await applyRecognition(ctx, found);
+
+  if (out.json) {
+    out.success("metadata", {
+      item: found.title, csl: found.recognized.csl,
+      method: found.recognized.method, confidence: found.recognized.confidence,
+      provider: found.recognized.provider ?? null,
+      identifiers: found.recognized.identifiers,
+      applied: flag(parsed, "apply"),
+      trail: flag(parsed, "explain") ? found.recognized.trail : undefined,
+    });
+    return;
+  }
+
+  console.log(format.recognition(found.recognized, found.title));
+  if (flag(parsed, "explain")) {
+    console.log("\nHow:");
+    for (const step of found.recognized.trail) console.log(`  ${step}`);
+  }
+  if (flag(parsed, "apply")) console.log("\nSaved.");
+  else console.log("\nRun again with --apply to save it.");
+}
+
+/** Every item the recogniser could improve, sweep. */
+async function metadataSweep(ctx: Context): Promise<void> {
+  const { parsed, catalog, out } = ctx;
+  const apply = flag(parsed, "apply");
+  const limit = Number(option(parsed, "limit") ?? "50");
+  const onlyMissing = !flag(parsed, "force");
+
+  const rows = catalog.db.query<{ id: string; title: string }, []>(
+    `SELECT i.id, i.title FROM items i
+      WHERE i.deleted_at IS NULL
+        ${onlyMissing ? "AND i.id NOT IN (SELECT item_id FROM citations)" : ""}
+      ORDER BY i.created_at DESC`).all().slice(0, Math.max(1, limit));
+
+  if (rows.length === 0) {
+    if (out.json) out.success("metadata.sweep", { considered: 0, resolved: 0, items: [] });
+    else console.log("Every item already has reference metadata.");
+    return;
+  }
+
+  const results: Array<Record<string, unknown>> = [];
+  let resolved = 0;
+  for (const row of rows) {
+    let found;
+    try {
+      found = await recognizeItem(ctx, row.id);
+    } catch (error) {
+      results.push({ item: row.title, error: error instanceof Error ? error.message : String(error) });
+      continue;
+    }
+    if (found.recognized.confidence >= 0.5) resolved++;
+    if (apply) await applyRecognition(ctx, found);
+    results.push({
+      item: row.title, title: found.recognized.csl.title,
+      method: found.recognized.method, confidence: found.recognized.confidence,
+      provider: found.recognized.provider ?? null,
+    });
+    if (!out.json) console.log(format.recognitionLine(found.recognized, row.title));
+  }
+
+  if (out.json) {
+    out.success("metadata.sweep", {
+      considered: rows.length, resolved, applied: apply, items: results });
+    return;
+  }
+  console.log(`\n${resolved}/${rows.length} identified.`
+    + (apply ? " Saved." : " Run again with --apply to save them."));
+}
+
+/** Recognise one item, by whatever the user named it with. */
+async function recognizeItem(
+  { parsed, q, resolver }: Context, target: string,
+): Promise<{ id: string; title: string; recognized: Recognized }> {
+  const item = resolver.item(target);
+  const identifier = option(parsed, "identifier");
+
+  let data: Uint8Array | undefined;
+  let fileName: string | undefined;
+  if (identifier === null) {
+    const location = q.itemFilePath(item.id);
+    if (location !== null && location.contentType === "pdf") {
+      const path = attachmentFile(
+        location.itemStorageKey, location.attachmentStorageKey, location.fileName);
+      fileName = location.fileName;
+      if (existsSync(path)) data = new Uint8Array(await readFile(path));
+    }
+  }
+
+  const recognized = await recognize({
+    data, fileName,
+    title: item.title === "" ? undefined : item.title,
+    author: item.author === "" ? undefined : item.author,
+    identifier: identifier ?? undefined,
+    offline: flag(parsed, "offline"),
+  });
+  return { id: item.id, title: item.title, recognized };
+}
+
+/** Write a recognition into the catalog, the way the app would. */
+async function applyRecognition(
+  { catalog, now }: Context,
+  found: { id: string; recognized: Recognized },
+): Promise<void> {
+  new ReferenceStore(catalog.db).save(
+    found.id, JSON.stringify(found.recognized.csl), null, now);
+}
+
 // --- plumbing ------------------------------------------------------------
 
 const OPERATIONS: Record<string, (c: Context) => void | Promise<void>> = {
@@ -831,6 +965,7 @@ const OPERATIONS: Record<string, (c: Context) => void | Promise<void>> = {
   "skills install": skillsInstall,
   "skills uninstall": skillsUninstall,
   "skills check": skillsCheck,
+  "metadata": metadata,
 };
 
 function requireArgument(parsed: Parsed, index: number, name: string): string {

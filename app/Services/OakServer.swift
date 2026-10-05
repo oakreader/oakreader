@@ -429,19 +429,24 @@ final class OakServer {
     // MARK: - Scholarly Metadata Processing
 
     /// Processes bibliographic metadata from the browser extension's scholarly translator.
-    /// If a DOI is present, attempts CrossRef lookup for full CSL; otherwise builds CSL from provided fields.
+    ///
+    /// The extension reads a page's own citation tags, which are often thin.
+    /// Any identifier among them goes to the core first, so a clipped landing
+    /// page files itself as the paper rather than as the page -- and an ISBN
+    /// or arXiv id now works there too, where only a DOI used to.
     private func processScholarlyMetadata(_ biblio: BiblioPayload, forItem item: LibraryItem) {
         let itemId = item.id.uuidString
 
         Task {
             var cslItem: CSLItem?
 
-            // If DOI present, try CrossRef for complete metadata
-            if let doi = biblio.doi, !doi.isEmpty {
+            for identifier in [biblio.doi, biblio.isbn].compactMap({ $0 }) where !identifier.isEmpty {
                 do {
-                    cslItem = try await CrossRefService.fetchMetadata(doi: doi)
+                    let found = try await MetadataRecognizer.recognize(
+                        fileURL: nil, identifier: identifier)
+                    if found.isResolved { cslItem = found.cslItem; break }
                 } catch {
-                    Log.error(Log.server, "CrossRef lookup failed for DOI \(doi): \(error)")
+                    Log.error(Log.server, "Lookup failed for \(identifier): \(error)")
                 }
             }
 

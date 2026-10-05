@@ -82,6 +82,20 @@ export const TREE: CommandSpec = {
       ],
     },
     {
+      name: "metadata",
+      summary: "Work out what a document is, and fill in its reference details.",
+      usage: "oak metadata <item> [--apply] [--explain]   ·   oak metadata --all [--apply]",
+      options: [
+        ["--apply", "Save what it found. Without this, nothing is written."],
+        ["--all", "Sweep the library instead of one item."],
+        ["--explain", "Print every step the recogniser tried, in order."],
+        ["--identifier <id>", "Resolve this DOI, arXiv ID, ISBN or PMID instead of reading the file."],
+        ["--offline", "Read the file's own metadata only; make no lookups."],
+        ["--force", "With --all, redo items that already have metadata."],
+        ["--limit <n>", "With --all, how many items to consider (default 50)."],
+      ],
+    },
+    {
       name: "search", summary: "Search library.", usage: "oak search <query> [--limit <n>]",
       options: [["--limit <n>", "Maximum results (default: 20)."]],
     },

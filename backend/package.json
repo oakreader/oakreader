@@ -22,6 +22,7 @@
     "defuddle": "^0.18.1",
     "linkedom": "^0.18.13",
     "turndown": "^7.2.4",
+    "unpdf": "^1.3.2",
     "zod": "^4.1.12"
   },
   "devDependencies": {

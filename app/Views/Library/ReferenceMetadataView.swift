@@ -30,6 +30,11 @@ struct ReferenceMetadataView: View {
     /// Why the first extraction failed, if it did. Nil while it is still
     /// running or once metadata exists.
     @State private var extractError: String?
+    /// How the core identified this document, kept so the panel can say so.
+    @State private var recognition: RecognizedMetadata?
+    /// The outcome of a hand-typed identifier lookup. Shown beside the
+    /// provenance line, not under the cite key, which is a different subject.
+    @State private var lookupMessage: String?
 
     @FocusState private var focusedField: Field?
 
@@ -109,39 +114,31 @@ struct ReferenceMetadataView: View {
 
     /// Fill in this item's metadata the first time the panel shows it.
     ///
-    /// A DOI on the opening pages is the one identifier worth a network call;
-    /// everything else falls back to what the document itself already says.
-    /// Either way a row is written, because the panel's only way out of the
-    /// spinner is metadata existing.
+    /// The work is the core's: it reads the file's embedded metadata, the
+    /// identifiers printed on the page, and the title its typography implies,
+    /// then resolves whichever of those it found. See
+    /// `backend/src/metadata/recognize.ts`.
+    ///
+    /// Whatever comes back is written, including the unresolved case, because
+    /// the panel's only way out of the spinner is metadata existing.
     private func autoExtract() async {
         guard !isExtracting else { return }
         isExtracting = true
         defer { isExtracting = false }
 
-        if item.contentType == .pdf, let foundDOI = await DOIExtractorService.extractDOI(from: item.fileURL) {
-            do {
-                let cslItem = try await CrossRefService.fetchMetadata(doi: foundDOI)
-                try await referenceService.saveMetadata(cslItem, forItemId: item.id.uuidString)
-                store.invalidate()
-                if let title = cslItem.title, !title.isEmpty { onTitleChange?(title) }
-                return
-            } catch {
-                // A DOI that CrossRef cannot resolve is not a failure of the
-                // panel. Fall through and write what the document says.
-                Log.error(Log.importer, "CrossRef lookup failed for DOI \(foundDOI): \(error)")
-            }
-        }
-
-        var csl = CSLItem(type: "document")
-        csl.title = item.title
-        if !item.author.isEmpty {
-            csl.author = [CSLName(family: item.author, given: nil)]
-        }
         do {
-            try await referenceService.saveMetadata(csl, forItemId: item.id.uuidString)
+            let found = try await MetadataRecognizer.recognize(
+                fileURL: item.contentType == .pdf ? item.fileURL : nil,
+                title: item.title.isEmpty ? nil : item.title,
+                author: item.author.isEmpty ? nil : item.author)
+            try await referenceService.saveMetadata(found.cslItem, forItemId: item.id.uuidString)
+            recognition = found
             store.invalidate()
+            if let title = found.cslItem.title, !title.isEmpty, found.isResolved {
+                onTitleChange?(title)
+            }
         } catch {
-            Log.error(Log.store, "Failed to create reference metadata: \(error)")
+            Log.error(Log.importer, "Recognising \(item.title) failed: \(error)")
             extractError = error.localizedDescription
         }
     }
@@ -153,6 +150,33 @@ struct ReferenceMetadataView: View {
         let spec = CSLTypeFieldRegistry.spec(for: cslType)
 
         VStack(alignment: .leading, spacing: 0) {
+            if let lookupMessage {
+                HStack(spacing: 6) {
+                    Image(systemName: "info.circle").font(.system(size: 11))
+                    Text(lookupMessage).font(.system(size: 11))
+                    Spacer()
+                }
+                .foregroundStyle(.secondary)
+                .padding(.bottom, 6)
+            } else if let recognition {
+                // Say where this came from. An item the core could not
+                // identify looks exactly like one it did unless the panel
+                // admits the difference, and a quiet guess is how a wrong
+                // citation ends up in a bibliography.
+                HStack(spacing: 6) {
+                    Image(systemName: recognition.isResolved
+                        ? "checkmark.seal" : "questionmark.circle")
+                        .font(.system(size: 11))
+                    Text(recognition.isResolved
+                        ? recognition.summary
+                        : "Not identified. \(recognition.summary) Add a DOI or ISBN to look it up.")
+                        .font(.system(size: 11))
+                    Spacer()
+                }
+                .foregroundStyle(.secondary)
+                .padding(.bottom, 6)
+            }
+
             // Item Type
             gridRow("Item Type") {
                 Picker("", selection: $cslType) {
@@ -208,6 +232,8 @@ struct ReferenceMetadataView: View {
             ForEach(spec.fields, id: \.self) { fieldSpec in
                 if fieldSpec.key == "DOI" {
                     doiRow(label: fieldSpec.label)
+                } else if fieldSpec.key == "ISBN" {
+                    identifierRow(fieldSpec)
                 } else if fieldSpec.key == "URL" {
                     urlRow(label: fieldSpec.label)
                 } else if fieldSpec.isMultiline {
@@ -329,6 +355,52 @@ struct ReferenceMetadataView: View {
         }
     }
 
+    /// Resolve whatever identifier sits in this row.
+    ///
+    /// One button for four registries. The core decides which from the shape
+    /// of the string, so a DOI, an arXiv id, an ISBN and a PMID all work where
+    /// this used to call CrossRef and only CrossRef.
+    @ViewBuilder
+    private func lookupButton(for value: String) -> some View {
+        if !value.trimmingCharacters(in: .whitespaces).isEmpty {
+            Button {
+                lookUp(identifier: value)
+            } label: {
+                if isLookingUp {
+                    ProgressView().controlSize(.mini)
+                } else {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Color.accentColor)
+                }
+            }
+            .buttonStyle(.borderless)
+            .disabled(isLookingUp)
+            .help("Fetch this document's details from the identifier")
+        }
+    }
+
+    /// A text row that can also be resolved.
+    private func identifierRow(_ spec: CSLFieldSpec) -> some View {
+        gridRow(spec.label) {
+            HStack(spacing: 4) {
+                underlinedField {
+                    TextField("", text: Binding(
+                        get: { fieldValues[spec.key] ?? "" },
+                        set: { fieldValues[spec.key] = $0 }
+                    ))
+                    .textFieldStyle(.plain)
+                    .focused($focusedField, equals: .field(spec.key))
+                    .onSubmit { saveDebounced() }
+                    .onChange(of: focusedField) { old, new in
+                        if old == .field(spec.key) && new != .field(spec.key) { saveDebounced() }
+                    }
+                }
+                lookupButton(for: fieldValues[spec.key] ?? "")
+            }
+        }
+    }
+
     private func doiRow(label: String) -> some View {
         gridRow(label) {
             HStack(spacing: 4) {
@@ -345,22 +417,7 @@ struct ReferenceMetadataView: View {
                         if old == .field("DOI") && new != .field("DOI") { saveDebounced() }
                     }
                 }
-                if !(fieldValues["DOI"] ?? "").isEmpty {
-                    Button {
-                        lookupDOI()
-                    } label: {
-                        if isLookingUp {
-                            ProgressView().controlSize(.mini)
-                        } else {
-                            Image(systemName: "arrow.clockwise")
-                                .font(.system(size: 10))
-                                .foregroundStyle(Color.accentColor)
-                        }
-                    }
-                    .buttonStyle(.borderless)
-                    .disabled(isLookingUp)
-                    .help("Refresh metadata from CrossRef")
-                }
+                lookupButton(for: fieldValues["DOI"] ?? "")
             }
         }
     }
@@ -692,22 +749,28 @@ struct ReferenceMetadataView: View {
         }
     }
 
-    private func lookupDOI() {
-        let doi = fieldValues["DOI"] ?? ""
-        guard !doi.isEmpty else { return }
+    private func lookUp(identifier: String) {
+        let typed = identifier.trimmingCharacters(in: .whitespaces)
+        guard !typed.isEmpty, !isLookingUp else { return }
         isLookingUp = true
+        lookupMessage = nil
         Task {
+            defer { isLookingUp = false }
             do {
-                let cslItem = try await CrossRefService.fetchMetadata(doi: doi)
-                try await referenceService.saveMetadata(cslItem, forItemId: item.id.uuidString)
-                await MainActor.run {
-                    store.invalidate()
-                    if let title = cslItem.title, !title.isEmpty { onTitleChange?(title) }
-                    isLookingUp = false
+                let found = try await MetadataRecognizer.recognize(
+                    fileURL: nil, identifier: typed)
+                guard found.isResolved else {
+                    lookupMessage = "No record found for \(typed)."
+                    return
                 }
+                try await referenceService.saveMetadata(
+                    found.cslItem, forItemId: item.id.uuidString)
+                recognition = found
+                store.invalidate()
+                if let title = found.cslItem.title, !title.isEmpty { onTitleChange?(title) }
             } catch {
-                await MainActor.run { isLookingUp = false }
-                Log.error(Log.store, "DOI lookup failed: \(error)")
+                lookupMessage = error.localizedDescription
+                Log.error(Log.store, "Identifier lookup failed for \(typed): \(error)")
             }
         }
     }

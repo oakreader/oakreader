@@ -152,35 +152,28 @@ extension ImportService {
 
     // MARK: - Reference Extraction
 
-    /// Extract DOI from PDF text and fetch metadata from CrossRef.
-    /// Always creates reference metadata — falls back to basic document info if no DOI found.
+    /// Recognise the PDF and store what comes back.
+    ///
+    /// The whole pipeline is the core's — embedded metadata, identifiers,
+    /// then a title search. Always writes something, because an item with no
+    /// citation row is an item the panel cannot finish loading.
     private func autoExtractReference(itemId: String, pdfURL: URL, title: String, author: String, webSourceURL: URL? = nil) async {
-        if let doi = await DOIExtractorService.extractDOI(from: pdfURL) {
-            do {
-                let cslItem = try await CrossRefService.fetchMetadata(doi: doi)
-                try await referenceService.saveMetadata(cslItem, forItemId: itemId)
-                await MainActor.run { store.invalidate() }
-                return
-            } catch {
-                Log.error(Log.importer, "CrossRef lookup failed for DOI \(doi): \(error)")
-            }
-        }
-
-        // Fallback: create metadata from document info
-        let isWebPrint = webSourceURL != nil
-        var csl = CSLItem(type: isWebPrint ? "webpage" : "document")
-        csl.title = title.isEmpty ? nil : title
-        if !author.isEmpty {
-            csl.author = [CSLName(family: author, given: nil)]
-        }
-        if let webSourceURL {
-            csl.URL = webSourceURL.absoluteString
-        }
         do {
+            let found = try await MetadataRecognizer.recognize(
+                fileURL: pdfURL,
+                title: title.isEmpty ? nil : title,
+                author: author.isEmpty ? nil : author)
+            var csl = found.cslItem
+            // A page saved from the web is a webpage whatever the lookup
+            // thought, and its address is worth keeping either way.
+            if let webSourceURL {
+                csl.URL = webSourceURL.absoluteString
+                if !found.isResolved { csl.type = "webpage" }
+            }
             try await referenceService.saveMetadata(csl, forItemId: itemId)
             await MainActor.run { store.invalidate() }
         } catch {
-            Log.error(Log.importer, "Failed to create fallback reference metadata: \(error)")
+            Log.error(Log.importer, "Recognising \(title) on import failed: \(error)")
         }
     }
 
