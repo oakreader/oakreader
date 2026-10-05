@@ -1,10 +1,7 @@
 import SwiftUI
-import PDFKit
 
 struct ItemPanelView: View {
     let viewModel: DocumentViewModel
-
-    @State private var hasTriggeredAutoExtract = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -34,9 +31,6 @@ struct ItemPanelView: View {
                 .padding(.top, OakStyle.Spacing.xs)
                 .padding(.bottom, OakStyle.Spacing.sm)
             }
-        }
-        .onAppear {
-            autoExtractIfNeeded()
         }
     }
 
@@ -77,49 +71,6 @@ struct ItemPanelView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 20)
-    }
-
-    // MARK: - Auto-Extract
-
-    /// Auto-extract reference metadata when opening a document that has none.
-    /// Tries DOI + CrossRef first, falls back to basic document info.
-    private func autoExtractIfNeeded() {
-        guard !hasTriggeredAutoExtract else { return }
-        hasTriggeredAutoExtract = true
-
-        guard let item = viewModel.libraryItem,
-              item.referenceMetadata == nil,
-              let refService = viewModel.referenceService,
-              let store = viewModel.libraryStore else { return }
-
-        Task {
-            // Try DOI extraction for PDFs
-            if item.contentType == .pdf {
-                if let doi = DOIExtractorService.extractDOI(from: item.fileURL) {
-                    do {
-                        let cslItem = try await CrossRefService.fetchMetadata(doi: doi)
-                        try await refService.saveMetadata(cslItem, forItemId: item.id.uuidString)
-                        await MainActor.run { store.invalidate() }
-                        return
-                    } catch {
-                        Log.error(Log.importer, "Auto-extract on open failed for DOI \(doi): \(error)")
-                    }
-                }
-            }
-
-            // Fallback: create metadata from document info
-            var csl = CSLItem(type: "document")
-            csl.title = item.title.isEmpty ? nil : item.title
-            if !item.author.isEmpty {
-                csl.author = [CSLName(family: item.author, given: nil)]
-            }
-            do {
-                try await refService.saveMetadata(csl, forItemId: item.id.uuidString)
-                await MainActor.run { store.invalidate() }
-            } catch {
-                Log.error(Log.importer, "Failed to create fallback reference metadata: \(error)")
-            }
-        }
     }
 
     // MARK: - Empty Annotation State

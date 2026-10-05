@@ -155,7 +155,7 @@ extension ImportService {
     /// Extract DOI from PDF text and fetch metadata from CrossRef.
     /// Always creates reference metadata — falls back to basic document info if no DOI found.
     private func autoExtractReference(itemId: String, pdfURL: URL, title: String, author: String, webSourceURL: URL? = nil) async {
-        if let doi = DOIExtractorService.extractDOI(from: pdfURL) {
+        if let doi = await DOIExtractorService.extractDOI(from: pdfURL) {
             do {
                 let cslItem = try await CrossRefService.fetchMetadata(doi: doi)
                 try await referenceService.saveMetadata(cslItem, forItemId: itemId)

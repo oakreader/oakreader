@@ -27,6 +27,9 @@ struct ReferenceMetadataView: View {
 
     @State private var isLookingUp = false
     @State private var isExtracting = false
+    /// Why the first extraction failed, if it did. Nil while it is still
+    /// running or once metadata exists.
+    @State private var extractError: String?
 
     @FocusState private var focusedField: Field?
 
@@ -54,50 +57,92 @@ struct ReferenceMetadataView: View {
                 }
         } else {
             extractingState
-                .onAppear { autoExtract() }
+                // Keyed on the item: @State survives a switch between two
+                // items that both lack metadata, so a failure on one would
+                // otherwise greet the next.
+                .task(id: item.id) {
+                    extractError = nil
+                    await autoExtract()
+                }
         }
     }
 
     // MARK: - Auto-Extracting State
 
+    @ViewBuilder
     private var extractingState: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 12) {
             Spacer().frame(height: 8)
-            ProgressView()
-                .controlSize(.regular)
-            Text("Extracting metadata…")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.secondary)
+            if let message = extractError {
+                // A failed save used to leave the spinner turning with nothing
+                // behind it, which reads as "still working" and never stops.
+                Image(systemName: "exclamationmark.triangle")
+                    .font(.system(size: 22))
+                    .foregroundStyle(.tertiary)
+                Text("Couldn’t read this document’s metadata.")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.secondary)
+                Text(message)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                    .multilineTextAlignment(.center)
+                    .textSelection(.enabled)
+                Button("Try Again") {
+                    Task {
+                        extractError = nil
+                        await autoExtract()
+                    }
+                }
+                .controlSize(.small)
+            } else {
+                ProgressView()
+                    .controlSize(.regular)
+                Text("Extracting metadata…")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
             Spacer().frame(height: 8)
         }
         .frame(maxWidth: .infinity)
+        .padding(.horizontal, 12)
     }
 
-    private func autoExtract() {
+    /// Fill in this item's metadata the first time the panel shows it.
+    ///
+    /// A DOI on the opening pages is the one identifier worth a network call;
+    /// everything else falls back to what the document itself already says.
+    /// Either way a row is written, because the panel's only way out of the
+    /// spinner is metadata existing.
+    private func autoExtract() async {
         guard !isExtracting else { return }
         isExtracting = true
-        Task {
-            if item.contentType == .pdf {
-                if let foundDOI = DOIExtractorService.extractDOI(from: item.fileURL) {
-                    do {
-                        let cslItem = try await CrossRefService.fetchMetadata(doi: foundDOI)
-                        try await referenceService.saveMetadata(cslItem, forItemId: item.id.uuidString)
-                        await MainActor.run {
-                            store.invalidate()
-                            if let title = cslItem.title, !title.isEmpty { onTitleChange?(title) }
-                            isExtracting = false
-                        }
-                        return
-                    } catch {
-                        Log.error(Log.importer, "CrossRef lookup failed: \(error)")
-                    }
-                }
+        defer { isExtracting = false }
+
+        if item.contentType == .pdf, let foundDOI = await DOIExtractorService.extractDOI(from: item.fileURL) {
+            do {
+                let cslItem = try await CrossRefService.fetchMetadata(doi: foundDOI)
+                try await referenceService.saveMetadata(cslItem, forItemId: item.id.uuidString)
+                store.invalidate()
+                if let title = cslItem.title, !title.isEmpty { onTitleChange?(title) }
+                return
+            } catch {
+                // A DOI that CrossRef cannot resolve is not a failure of the
+                // panel. Fall through and write what the document says.
+                Log.error(Log.importer, "CrossRef lookup failed for DOI \(foundDOI): \(error)")
             }
-            // Fallback: create metadata from document info
-            await MainActor.run {
-                createEmptyMetadata()
-                isExtracting = false
-            }
+        }
+
+        var csl = CSLItem(type: "document")
+        csl.title = item.title
+        if !item.author.isEmpty {
+            csl.author = [CSLName(family: item.author, given: nil)]
+        }
+        do {
+            try await referenceService.saveMetadata(csl, forItemId: item.id.uuidString)
+            store.invalidate()
+        } catch {
+            Log.error(Log.store, "Failed to create reference metadata: \(error)")
+            extractError = error.localizedDescription
         }
     }
 
@@ -663,22 +708,6 @@ struct ReferenceMetadataView: View {
             } catch {
                 await MainActor.run { isLookingUp = false }
                 Log.error(Log.store, "DOI lookup failed: \(error)")
-            }
-        }
-    }
-
-    private func createEmptyMetadata() {
-        var csl = CSLItem(type: "document")
-        csl.title = item.title
-        if !item.author.isEmpty {
-            csl.author = [CSLName(family: item.author, given: nil)]
-        }
-        Task { @MainActor in
-            do {
-                try await referenceService.saveMetadata(csl, forItemId: item.id.uuidString)
-                store.invalidate()
-            } catch {
-                Log.error(Log.store, "Failed to create empty reference metadata: \(error)")
             }
         }
     }

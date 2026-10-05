@@ -11,6 +11,7 @@
 import { copyFile, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
 import { randomUUID } from "node:crypto";
+import { newId } from "../../backend/src/catalog/ids.ts";
 import { getDocumentProxy } from "unpdf";
 import type { Database } from "bun:sqlite";
 import { ItemStore, type Attachment, type Item } from "../../backend/src/catalog/items.ts";
@@ -107,9 +108,9 @@ export class Importer {
     const size = (await stat(destination)).size;
 
     const now = new Date().toISOString();
-    const itemId = randomUUID();
+    const itemId = newId();
     const attachment: Attachment = {
-      id: randomUUID(), itemId, storageKey: attachmentKey, fileName,
+      id: newId(), itemId, storageKey: attachmentKey, fileName,
       contentType, linkMode: metadata.linkMode ?? "importedFile", sourceUrl: metadata.sourceURL,
       fileSize: size, pageCount: metadata.pageCount, isPrimary: true,
     };
@@ -308,9 +309,9 @@ export class Importer {
     }
 
     const now = new Date().toISOString();
-    const itemId = randomUUID();
+    const itemId = newId();
     const attachment: Attachment = {
-      id: randomUUID(), itemId, storageKey: attachmentKey, fileName: "metadata.json",
+      id: newId(), itemId, storageKey: attachmentKey, fileName: "metadata.json",
       contentType: "link", linkMode: "linkedURL", sourceUrl: url,
       fileSize: 0, pageCount: 0, isPrimary: true,
     };

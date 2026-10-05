@@ -8,7 +8,7 @@
  * catalog, so every rule with two copies — Tags is multi-select, Status is
  * single-select, a cite key must be unique — could drift between them.
  */
-import { randomUUID } from "node:crypto";
+import { newId } from "../../backend/src/catalog/ids.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { basename, join as joinPath, resolve as resolvePath } from "node:path";
 import { homedir } from "node:os";
@@ -204,7 +204,7 @@ function collectionsCreate({ parsed, catalog, q, resolver, out, now }: Context):
   const parentName = option(parsed, "parent");
   const parentId = parentName === null ? null : resolver.collection(parentName).id;
 
-  const id = randomUUID();
+  const id = newId();
   new CollectionStore(catalog.db, LOCAL_USER).upsert({
     id, name, icon: "folder", sortOrder: q.nextCollectionOrder(), parentId,
     isSmart: false, isSystem: false, filterRules: null, source: null, sourceKey: null,
@@ -284,7 +284,7 @@ function tagsCreate({ parsed, catalog, q, out }: Context): void {
   const name = requireArgument(parsed, 0, "name");
   const propertyId = requireProperty(q, "Tags");
 
-  const id = randomUUID();
+  const id = newId();
   new PropertyStore(catalog.db).upsertOption({
     id, propertyId, name, colorHex: option(parsed, "color") ?? "999999",
     position: q.nextOptionPosition(propertyId),
@@ -313,7 +313,7 @@ function tagsAdd({ parsed, catalog, q, resolver, out }: Context): void {
 
   // The core decides whether this appends or replaces, by reading the
   // property's type. Tags is multi-select, so it appends.
-  new PropertyStore(catalog.db).addSelectValue(randomUUID(), item.id, propertyId, tag.id);
+  new PropertyStore(catalog.db).addSelectValue(newId(), item.id, propertyId, tag.id);
 
   const message = `Tagged '${item.title}' with '${tag.name}'`;
   if (out.json) out.success("tags.add", { id: item.id, message });
@@ -353,7 +353,7 @@ function status({ parsed, catalog, q, resolver, out }: Context): void {
   const propertyId = requireProperty(q, "Status");
   // Status is single-select, so the core replaces rather than appends.
   new PropertyStore(catalog.db).addSelectValue(
-    randomUUID(), item.id, propertyId, option_.id);
+    newId(), item.id, propertyId, option_.id);
 
   const message = `Set status of '${item.title}' to '${option_.name}'`;
   if (out.json) out.success("status.set", { id: item.id, message });
@@ -415,7 +415,7 @@ async function importSource(context: Context): Promise<void> {
     try {
       const resolved = resolver.tag(tagName);
       new PropertyStore(catalog.db).addSelectValue(
-        randomUUID(), result.itemId, requireProperty(q, "Tags"), resolved.id);
+        newId(), result.itemId, requireProperty(q, "Tags"), resolved.id);
       tag = resolved.name;
     } catch (error) {
       const message = `Failed to tag '${tagName}': `

@@ -14,6 +14,7 @@
  * worth carrying over, because the omission looks like a bug otherwise.
  */
 import type { Database } from "bun:sqlite";
+import { newId } from "./ids.js";
 
 export interface Attachment {
   id: string;
@@ -298,7 +299,7 @@ export class ItemStore {
       this.db.prepare(
         `INSERT INTO item_property_values (id, item_id, property_id, option_id, text_value)
          VALUES (?, ?, ?, ?, ?)`,
-      ).run(crypto.randomUUID(), keeperId, row.property_id, row.option_id, row.text_value);
+      ).run(newId(), keeperId, row.property_id, row.option_id, row.text_value);
     }
   }
 

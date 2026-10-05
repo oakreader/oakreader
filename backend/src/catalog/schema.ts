@@ -9,6 +9,7 @@
  * GRDB artifact is `grdb_migrations`, a bookkeeping table of applied
  * identifiers, and MIGRATIONS below keeps its contract exactly.
  */
+import { canonicalizeIdsSql } from "./ids.js";
 
 /** Applied-migration identifiers, in order. The names are GRDB's and must not
  *  change: a database written by the Swift app already has these seven rows,
@@ -54,6 +55,13 @@ export const POST_BASELINE_MIGRATIONS: readonly Migration[] = [
         REFERENCES "collections"("id") ON DELETE SET NULL;
       CREATE INDEX "idx_conversations_collection_id" ON "conversations"("collection_id");
     `,
+  },
+  {
+    // Data only, no DDL: the schema always allowed either case, and the app
+    // only ever writes one. See ids.ts for why uppercase is the canonical
+    // form and what the mismatch broke.
+    id: "v9-canonical-id-case",
+    sql: canonicalizeIdsSql(),
   },
 ];
 
