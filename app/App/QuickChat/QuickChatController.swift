@@ -392,6 +392,9 @@ final class QuickChatController: NSObject, QuickChatPanelDelegate {
                 }
                 if panel.model.phase == .streaming {
                     panel.model.phase = .done
+                    QuickChatHistory.record(
+                        capture: capture, skill: skill, reply: panel.model.result
+                    )
                 }
             } catch {
                 if !(error is CancellationError) {

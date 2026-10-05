@@ -283,6 +283,7 @@
 		F3421A024BBFD1643223FAB4 /* MemoryManagerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA646E8315CCE95E44676F14 /* MemoryManagerView.swift */; };
 		F7D0BAFC5DEA652938A42248 /* ImageLightbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2AC38E3EEFEBF72D47FB3E9 /* ImageLightbox.swift */; };
 		F861CF36398233C55B5BF352 /* AccessibilityIssue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DD2009541907CEB1D9B2859 /* AccessibilityIssue.swift */; };
+		F906F8E5B7FF4CC9315881E9 /* QuickChatHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = A912DD68461CB80A9669BBB8 /* QuickChatHistory.swift */; };
 		F93B9950E9686AD33C2966EF /* CommandPaletteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8425BC1EE1F362FBEF310382 /* CommandPaletteView.swift */; };
 		F94F1A75E89777CF618A37C9 /* ImportService+PDF.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D59308F91A2D872B18AF26F /* ImportService+PDF.swift */; };
 		F98E56F96F482C4955000940 /* ToolCall.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66D79C8EE8BA7DCF944E3EF8 /* ToolCall.swift */; };
@@ -488,6 +489,7 @@
 		A5180811E78B858BC5D80477 /* ExportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSheet.swift; sourceTree = "<group>"; };
 		A56200DACCA2599783CEC7BA /* LibraryCoverService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryCoverService.swift; sourceTree = "<group>"; };
 		A8E5A3FBC7CC4C65B1D49130 /* LibraryCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryCatalog.swift; sourceTree = "<group>"; };
+		A912DD68461CB80A9669BBB8 /* QuickChatHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickChatHistory.swift; sourceTree = "<group>"; };
 		A9D31EEB02BB2D679954AB42 /* CitationFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CitationFormatter.swift; sourceTree = "<group>"; };
 		AA237E65AF0728789822FE10 /* FannedAttachmentStack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FannedAttachmentStack.swift; sourceTree = "<group>"; };
 		AA646E8315CCE95E44676F14 /* MemoryManagerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryManagerView.swift; sourceTree = "<group>"; };
@@ -948,6 +950,7 @@
 				66DFF9D34B519E7E298E144B /* QuickChatBindings.swift */,
 				D75AEBCE88E4D001475DFB2B /* QuickChatController.swift */,
 				99D1353FABD23AD2DDCA5041 /* QuickChatGlobalHotKey.swift */,
+				A912DD68461CB80A9669BBB8 /* QuickChatHistory.swift */,
 				FC69C77DD496382F2B4789FD /* QuickChatModel.swift */,
 				062312E08446675930CED8F3 /* QuickChatPanel.swift */,
 				358CDD36C499C2E816E3E3DA /* QuickChatPanelView.swift */,
@@ -1623,6 +1626,7 @@
 				E1C63D58623930287A716991 /* QuickChatBindings.swift in Sources */,
 				284B3278C458E58DC9419B0A /* QuickChatController.swift in Sources */,
 				E9E200B92CAF5AA663BECBA1 /* QuickChatGlobalHotKey.swift in Sources */,
+				F906F8E5B7FF4CC9315881E9 /* QuickChatHistory.swift in Sources */,
 				7F5CAB00E557999106B6FA07 /* QuickChatModel.swift in Sources */,
 				476F21954A790F65E1E4E0D9 /* QuickChatPanel.swift in Sources */,
 				8ADD33B9F9AD664A311E8723 /* QuickChatPanelView.swift in Sources */,
@@ -1812,7 +1816,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.14.1;
+				MARKETING_VERSION = 0.15.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.oakreader.OakReader.dev;
 				PRODUCT_MODULE_NAME = OakReader;
 				PRODUCT_NAME = "OakReader-Dev";
@@ -1903,7 +1907,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.14.1;
+				MARKETING_VERSION = 0.15.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.oakreader.OakReader;
 				PRODUCT_MODULE_NAME = OakReader;
 				PRODUCT_NAME = OakReader;

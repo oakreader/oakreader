@@ -16,7 +16,7 @@ enum QuickChatBindings {
     static var trigger: QuickChatTrigger.Kind {
         get {
             let raw = UserDefaults.standard.string(forKey: triggerKey) ?? ""
-            return QuickChatTrigger.Kind(rawValue: raw) ?? .optionA
+            return QuickChatTrigger.Kind(rawValue: raw) ?? .optionSpace
         }
         set {
             UserDefaults.standard.set(newValue.rawValue, forKey: triggerKey)
@@ -38,11 +38,15 @@ enum QuickChatBindings {
 
     private static let shotKey = "quickChatScreenshotTrigger"
 
-    /// Its own gesture, because it is a different act: you are not selecting
-    /// text first, you are framing a region. Nil turns it off.
+    /// The same key as the panel with ⇧ added, because it is the same act from a
+    /// different source — the way ⌘⇧3 and ⌘⇧4 are one idea with a variant, and
+    /// unlike two unrelated letters that happen to sit next to each other. Nil
+    /// turns it off.
     static var screenshotTrigger: QuickChatTrigger.Kind? {
         get {
-            guard let raw = UserDefaults.standard.string(forKey: shotKey) else { return .optionS }
+            guard let raw = UserDefaults.standard.string(forKey: shotKey) else {
+                return .optionShiftSpace
+            }
             return raw.isEmpty ? nil : QuickChatTrigger.Kind(rawValue: raw)
         }
         set {

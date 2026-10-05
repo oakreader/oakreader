@@ -16,9 +16,12 @@ import Carbon.HIToolbox
 final class QuickChatTrigger {
 
     enum Kind: String, CaseIterable, Identifiable {
+        case optionSpace
+        case optionShiftSpace
+        case commandSpace
+        case commandShiftSpace
         case optionA
         case optionS
-        case optionSpace
         case controlCommandA
         case holdRightOption
         case holdLeftOption
@@ -32,6 +35,9 @@ final class QuickChatTrigger {
             case .holdLeftOption: return "Hold left ⌥"
             case .holdRightCommand: return "Hold right ⌘"
             case .optionSpace: return "⌥Space"
+            case .commandSpace: return "⌘Space"
+            case .commandShiftSpace: return "⌘⇧Space"
+            case .optionShiftSpace: return "⌥⇧Space"
             case .optionA: return "⌥A"
             case .optionS: return "⌥S"
             case .controlCommandA: return "⌃⌘A"
@@ -42,8 +48,10 @@ final class QuickChatTrigger {
             switch self {
             case .holdRightOption, .holdLeftOption, .holdRightCommand:
                 return "nothing to collide with — a modifier alone types nothing"
-            case .optionSpace:
-                return "ChatGPT, Codex and Raycast also default to this"
+            case .commandSpace, .commandShiftSpace:
+                return "macOS gives this to Spotlight — free it first, or it will not fire"
+            case .optionSpace, .optionShiftSpace:
+                return "costs only a non-breaking space; ChatGPT and Codex want ⌥Space too"
             case .optionA: return "å is no longer typable while Quick Chat is on"
             case .optionS: return "ß is no longer typable while Quick Chat is on"
             case .controlCommandA: return nil
@@ -53,7 +61,10 @@ final class QuickChatTrigger {
         var isHold: Bool {
             switch self {
             case .holdRightOption, .holdLeftOption, .holdRightCommand: return true
-            case .optionSpace, .optionA, .optionS, .controlCommandA: return false
+            case .commandSpace, .commandShiftSpace,
+                 .optionSpace, .optionShiftSpace,
+                 .optionA, .optionS, .controlCommandA:
+                return false
             }
         }
 
@@ -78,7 +89,8 @@ final class QuickChatTrigger {
 
         var comboKey: String? {
             switch self {
-            case .optionSpace: return "space"
+            case .commandSpace, .commandShiftSpace,
+                 .optionSpace, .optionShiftSpace: return "space"
             case .optionA, .controlCommandA: return "a"
             case .optionS: return "s"
             default: return nil
@@ -88,10 +100,30 @@ final class QuickChatTrigger {
         var comboModifiers: NSEvent.ModifierFlags {
             switch self {
             case .optionSpace, .optionA, .optionS: return [.option]
+            case .optionShiftSpace: return [.option, .shift]
+            case .commandSpace: return [.command]
+            case .commandShiftSpace: return [.command, .shift]
             case .controlCommandA: return [.control, .command]
             default: return []
             }
         }
+    }
+
+    /// Whether macOS still has ⌘Space wired to Spotlight.
+    ///
+    /// Carbon can accept a registration for a combination the system claims at a
+    /// lower level and then never deliver it — a dead key that looks healthy,
+    /// which is the worst way for this to fail. Reading the system's own
+    /// shortcut table says so outright instead.
+    static var spotlightHoldsCommandSpace: Bool {
+        guard let hotKeys = UserDefaults(suiteName: "com.apple.symbolichotkeys")?
+            .dictionary(forKey: "AppleSymbolicHotKeys"),
+            let spotlight = hotKeys["64"] as? [String: Any]
+        else {
+            // No entry means the system default, and the default is Spotlight.
+            return true
+        }
+        return (spotlight["enabled"] as? Bool) ?? true
     }
 
     /// How long the modifier must be held. Long enough that an ordinary ⌥-click
@@ -104,7 +136,7 @@ final class QuickChatTrigger {
     private let hotKey = QuickChatGlobalHotKey()
     private var monitors: [Any] = []
     private var holdTimer: Timer?
-    private var kind: Kind = .optionA
+    private var kind: Kind = .optionSpace
     /// Set once a hold fires, so releasing the key does not fire it again.
     private var hasFired = false
 

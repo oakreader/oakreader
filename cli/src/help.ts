@@ -101,6 +101,16 @@ export const TREE: CommandSpec = {
       ],
     },
     {
+      name: "quickchat",
+      summary: "List what you asked through Quick Chat (newest first).",
+      options: [
+        ["--today", "Only today's exchanges."],
+        ["--since <date>", "Only exchanges on or after this date (YYYY-MM-DD)."],
+        ["--limit <n>", "Maximum number of exchanges (default 50)."],
+        ["--full", "Show the selected text and the whole reply, not a snippet."],
+      ],
+    },
+    {
       name: "words", summary: "List words you looked up while reading (newest first).",
       options: [
         ["--today", "Only words looked up today."],

@@ -9,7 +9,7 @@
  * single-select, a cite key must be unique — could drift between them.
  */
 import { randomUUID } from "node:crypto";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { basename, join as joinPath, resolve as resolvePath } from "node:path";
 import { homedir } from "node:os";
 import { Catalog } from "../../backend/src/catalog/db.ts";
@@ -20,7 +20,7 @@ import { flag, integer, option, parse, type Parsed } from "./args.ts";
 import { childNames, findCommand, helpText } from "./help.ts";
 import { Importer, type ImportResult } from "./import.ts";
 import { Output } from "./output.ts";
-import { libraryPath } from "./paths.ts";
+import { dataDirectory, libraryPath } from "./paths.ts";
 import { Queries } from "./queries.ts";
 import { OakError, Resolver, notFound } from "./resolve.ts";
 import { readDocument } from "./extract.ts";
@@ -497,6 +497,86 @@ function resolveSince(parsed: Parsed): string | null {
   return new Date(year, month - 1, day, 0, 0, 0, 0).toISOString();
 }
 
+/**
+ * What was asked through Quick Chat, newest first.
+ *
+ * Reads the app's own JSONL log rather than a database: the panel appends one
+ * line per answer, and the point of a log is that reading it needs no schema.
+ * A malformed line is skipped rather than fatal — a half-written final line is
+ * the normal state of a file something else is appending to.
+ */
+function quickchat({ parsed, out }: Context): void {
+  const path = joinPath(dataDirectory(), "agent", "quickchat.jsonl");
+  if (!existsSync(path)) {
+    console.log("No Quick Chat history yet.");
+    return;
+  }
+
+  const since = resolveSince(parsed);
+  const entries: QuickChatEntry[] = [];
+  for (const line of readFileSync(path, "utf8").split("\n")) {
+    if (line.trim() === "") continue;
+    try {
+      const entry = JSON.parse(line) as QuickChatEntry;
+      if (since !== null && entry.at < since) continue;
+      entries.push(entry);
+    } catch {
+      continue;
+    }
+  }
+  entries.reverse();
+
+  const limit = integer(parsed, "limit") ?? 50;
+  const shown = entries.slice(0, limit);
+
+  if (out.json) {
+    out.results("quickchat.list", shown, { count: shown.length });
+    return;
+  }
+  if (shown.length === 0) {
+    console.log(flag(parsed, "today")
+      ? "Nothing asked through Quick Chat today."
+      : "No Quick Chat history found.");
+    return;
+  }
+
+  for (const entry of shown) {
+    const where = entry.app === null || entry.app === undefined
+      ? entry.source
+      : entry.app;
+    const asked = entry.skill.replaceAll("\n", " ");
+    console.log(`${format.shortDate(entry.at)}  ${asked}  ·  ${where}`);
+    if (flag(parsed, "full")) {
+      if (entry.text !== "") console.log(indent(entry.text, "  > "));
+      console.log(indent(entry.reply, "    "));
+      console.log("");
+    } else {
+      console.log(indent(snippet(entry.reply, 160), "    "));
+    }
+  }
+  out.message(`\n${format.plural(shown.length, "exchange")}.`);
+}
+
+interface QuickChatEntry {
+  at: string;
+  source: string;
+  app?: string | null;
+  appId?: string | null;
+  skill: string;
+  typed: boolean;
+  text: string;
+  reply: string;
+}
+
+function snippet(text: string, max: number): string {
+  const flat = text.replaceAll("\n", " ").trim();
+  return flat.length > max ? `${flat.slice(0, max)}…` : flat;
+}
+
+function indent(text: string, prefix: string): string {
+  return text.split("\n").map((line) => `${prefix}${line}`).join("\n");
+}
+
 function words({ parsed, q, out }: Context): void {
   const lookups = q.wordLookups(resolveSince(parsed), integer(parsed, "limit") ?? 100);
 
@@ -744,6 +824,7 @@ const OPERATIONS: Record<string, (c: Context) => void | Promise<void>> = {
   "status": status,
   "open": openFile,
   "words": words,
+  "quickchat": quickchat,
   "notes": notes,
   "skills list": skillsList,
   "skills show": skillsShow,

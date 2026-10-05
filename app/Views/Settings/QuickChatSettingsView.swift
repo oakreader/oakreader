@@ -11,6 +11,7 @@ struct QuickChatSettingsView: View {
     @State private var isTrusted: Bool = QuickChatAccessibility.isTrusted
     @State private var rejected: String?
     @State private var hidden: Set<String> = QuickChatBindings.hiddenSkills
+    @State private var keepsHistory: Bool = QuickChatHistory.isEnabled
     @State private var shotTrigger: String = QuickChatBindings.screenshotTrigger?.rawValue ?? ""
 
     var body: some View {
@@ -18,6 +19,7 @@ struct QuickChatSettingsView: View {
             triggerSection
             otherAppsSection
             skillsSection
+            historySection
         }
         .formStyle(.grouped)
         .onReceive(NotificationCenter.default.publisher(for: .quickChatTriggerRejected)) { note in
@@ -33,6 +35,15 @@ struct QuickChatSettingsView: View {
     }
 
     // MARK: - Trigger
+
+    /// True when either chosen trigger needs ⌘Space, which the system claims.
+    private var usesCommandSpace: Bool {
+        let kinds: [QuickChatTrigger.Kind?] = [
+            QuickChatTrigger.Kind(rawValue: trigger.rawValue),
+            QuickChatBindings.screenshotTrigger,
+        ]
+        return kinds.contains { $0 == .commandSpace || $0 == .commandShiftSpace }
+    }
 
     private var triggerSection: some View {
         Section {
@@ -59,6 +70,25 @@ struct QuickChatSettingsView: View {
             .onChange(of: shotTrigger) { _, raw in
                 QuickChatBindings.screenshotTrigger =
                     raw.isEmpty ? nil : QuickChatTrigger.Kind(rawValue: raw)
+            }
+
+            if usesCommandSpace, QuickChatTrigger.spotlightHoldsCommandSpace {
+                Label(
+                    "macOS still gives ⌘Space to Spotlight, so this will not fire. "
+                    + "Change or turn off the Spotlight shortcut in System Settings ▸ "
+                    + "Keyboard ▸ Keyboard Shortcuts ▸ Spotlight.",
+                    systemImage: "exclamationmark.triangle"
+                )
+                .font(.system(size: 11))
+                .foregroundStyle(Color(nsColor: .systemOrange))
+
+                Button("Open Keyboard Shortcuts…") {
+                    if let url = URL(string:
+                        "x-apple.systempreferences:com.apple.preference.keyboard?Shortcuts") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+                .font(.system(size: 11))
             }
 
             if let rejected {
@@ -121,6 +151,35 @@ struct QuickChatSettingsView: View {
                 + "Accessibility permission to read the selection and to write a result back. "
                 + "macOS grants that per app signature, so a rebuilt development build has to be "
                 + "approved again."
+            )
+        }
+    }
+
+    // MARK: - History
+
+    private var historySection: some View {
+        Section {
+            Toggle("Keep a history", isOn: $keepsHistory)
+                .onChange(of: keepsHistory) { _, on in QuickChatHistory.isEnabled = on }
+
+            if keepsHistory {
+                LabeledContent("Stored at") {
+                    Text("~/OakReader/agent/quickchat.jsonl")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(.tertiary)
+                        .textSelection(.enabled)
+                }
+                Button("Clear History\u{2026}") { QuickChatHistory.clear() }
+                    .font(.system(size: 11))
+            }
+        } header: {
+            Text("History")
+        } footer: {
+            Text(
+                "Every answer is written to a local file, so you can look up what you asked "
+                + "later: `oak quickchat --today`, or `--since 2026-10-01`. It holds text "
+                + "lifted out of other apps' windows, so it never leaves this Mac and is "
+                + "readable only by you. Screenshots are noted but the pictures are not kept."
             )
         }
     }
