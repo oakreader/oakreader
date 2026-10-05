@@ -16,7 +16,7 @@ enum QuickChatBindings {
     static var trigger: QuickChatTrigger.Kind {
         get {
             let raw = UserDefaults.standard.string(forKey: triggerKey) ?? ""
-            return QuickChatTrigger.Kind(rawValue: raw) ?? .holdRightOption
+            return QuickChatTrigger.Kind(rawValue: raw) ?? .optionA
         }
         set {
             UserDefaults.standard.set(newValue.rawValue, forKey: triggerKey)
@@ -30,6 +30,23 @@ enum QuickChatBindings {
         get { UserDefaults.standard.bool(forKey: enabledKey) }
         set {
             UserDefaults.standard.set(newValue, forKey: enabledKey)
+            NotificationCenter.default.post(name: .quickChatTriggerChanged, object: nil)
+        }
+    }
+
+    // MARK: - Screenshot trigger
+
+    private static let shotKey = "quickChatScreenshotTrigger"
+
+    /// Its own gesture, because it is a different act: you are not selecting
+    /// text first, you are framing a region. Nil turns it off.
+    static var screenshotTrigger: QuickChatTrigger.Kind? {
+        get {
+            guard let raw = UserDefaults.standard.string(forKey: shotKey) else { return .optionS }
+            return raw.isEmpty ? nil : QuickChatTrigger.Kind(rawValue: raw)
+        }
+        set {
+            UserDefaults.standard.set(newValue?.rawValue ?? "", forKey: shotKey)
             NotificationCenter.default.post(name: .quickChatTriggerChanged, object: nil)
         }
     }

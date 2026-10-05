@@ -16,12 +16,13 @@ import Carbon.HIToolbox
 final class QuickChatTrigger {
 
     enum Kind: String, CaseIterable, Identifiable {
+        case optionA
+        case optionS
+        case optionSpace
+        case controlCommandA
         case holdRightOption
         case holdLeftOption
         case holdRightCommand
-        case optionSpace
-        case optionA
-        case controlCommandA
 
         var id: String { rawValue }
 
@@ -32,6 +33,7 @@ final class QuickChatTrigger {
             case .holdRightCommand: return "Hold right ⌘"
             case .optionSpace: return "⌥Space"
             case .optionA: return "⌥A"
+            case .optionS: return "⌥S"
             case .controlCommandA: return "⌃⌘A"
             }
         }
@@ -42,7 +44,8 @@ final class QuickChatTrigger {
                 return "nothing to collide with — a modifier alone types nothing"
             case .optionSpace:
                 return "ChatGPT, Codex and Raycast also default to this"
-            case .optionA: return "types å when pressed with a letter"
+            case .optionA: return "å is no longer typable while Quick Chat is on"
+            case .optionS: return "ß is no longer typable while Quick Chat is on"
             case .controlCommandA: return nil
             }
         }
@@ -50,7 +53,7 @@ final class QuickChatTrigger {
         var isHold: Bool {
             switch self {
             case .holdRightOption, .holdLeftOption, .holdRightCommand: return true
-            case .optionSpace, .optionA, .controlCommandA: return false
+            case .optionSpace, .optionA, .optionS, .controlCommandA: return false
             }
         }
 
@@ -77,13 +80,14 @@ final class QuickChatTrigger {
             switch self {
             case .optionSpace: return "space"
             case .optionA, .controlCommandA: return "a"
+            case .optionS: return "s"
             default: return nil
             }
         }
 
         var comboModifiers: NSEvent.ModifierFlags {
             switch self {
-            case .optionSpace, .optionA: return [.option]
+            case .optionSpace, .optionA, .optionS: return [.option]
             case .controlCommandA: return [.control, .command]
             default: return []
             }
@@ -100,7 +104,7 @@ final class QuickChatTrigger {
     private let hotKey = QuickChatGlobalHotKey()
     private var monitors: [Any] = []
     private var holdTimer: Timer?
-    private var kind: Kind = .holdRightOption
+    private var kind: Kind = .optionA
     /// Set once a hold fires, so releasing the key does not fire it again.
     private var hasFired = false
 

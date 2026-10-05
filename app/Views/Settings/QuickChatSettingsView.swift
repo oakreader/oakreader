@@ -11,6 +11,7 @@ struct QuickChatSettingsView: View {
     @State private var isTrusted: Bool = QuickChatAccessibility.isTrusted
     @State private var rejected: String?
     @State private var hidden: Set<String> = QuickChatBindings.hiddenSkills
+    @State private var shotTrigger: String = QuickChatBindings.screenshotTrigger?.rawValue ?? ""
 
     var body: some View {
         Form {
@@ -49,6 +50,17 @@ struct QuickChatSettingsView: View {
                 QuickChatBindings.trigger = kind
             }
 
+            Picker("Screenshot and ask", selection: $shotTrigger) {
+                Text("Off").tag("")
+                ForEach(QuickChatTrigger.Kind.allCases) { kind in
+                    Text(kind.display).tag(kind.rawValue)
+                }
+            }
+            .onChange(of: shotTrigger) { _, raw in
+                QuickChatBindings.screenshotTrigger =
+                    raw.isEmpty ? nil : QuickChatTrigger.Kind(rawValue: raw)
+            }
+
             if let rejected {
                 Label(
                     "\(rejected) is already taken by another app. Pick a different trigger.",
@@ -65,7 +77,9 @@ struct QuickChatSettingsView: View {
                 + "so there is nothing else to remember. Holding a modifier is the safest trigger: "
                 + "a modifier pressed on its own types nothing, so it cannot collide with typing, "
                 + "another app's shortcut, or an input method. Hold it for about a third of a "
-                + "second; using it as a modifier the usual way never fires it."
+                + "second; using it as a modifier the usual way never fires it. "
+                + "Screenshot and ask frames a region with the usual macOS crosshair and sends "
+                + "the picture itself, so you can ask about a chart or a layout, not only text."
             )
         }
     }

@@ -1,5 +1,6 @@
 import AppKit
 import Carbon.HIToolbox
+import os
 
 /// A system-wide hotkey, registered through Carbon's `RegisterEventHotKey`.
 ///
@@ -9,7 +10,7 @@ import Carbon.HIToolbox
 /// user is typing in.
 ///
 /// Option-only combinations are reliable here, unlike `NSMenuItem` key
-/// equivalents — which is why Cida uses ⌥A/⌥S/⌥D and why QuickChatSkill's global key can
+/// equivalents — which is why Cida uses ⌥A/⌥S/⌥D and why Quick Chat's global key can
 /// be ⌥A even where its in-app menu item uses ⌃⌘A.
 final class QuickChatGlobalHotKey {
 
@@ -21,7 +22,18 @@ final class QuickChatGlobalHotKey {
 
     /// 'OAKA' — the signature Carbon uses to tell registrations apart.
     private static let signature: OSType = 0x4F_41_4B_41
-    private static let hotKeyID: UInt32 = 1
+
+    /// Unique per instance. This was a shared constant, which worked only while
+    /// there was ever one combination registered: the moment a second one
+    /// existed, both claimed the same `EventHotKeyID`, Carbon refused the
+    /// duplicate, and neither handler could tell which key had fired.
+    private static let nextID = OSAllocatedUnfairLock(initialState: UInt32(0))
+    private let hotKeyID: UInt32 = {
+        nextID.withLock { id in
+            id += 1
+            return id
+        }
+    }()
 
     deinit {
         // `unregister()` touches only Carbon handles, which are not actor-bound.
@@ -45,16 +57,27 @@ final class QuickChatGlobalHotKey {
         let installStatus = InstallEventHandler(
             GetEventDispatcherTarget(),
             { _, event, userData -> OSStatus in
-                guard let event, let userData else { return noErr }
+                guard let event, let userData else { return OSStatus(eventNotHandledErr) }
                 var firedID = EventHotKeyID()
                 GetEventParameter(
                     event, EventParamName(kEventParamDirectObject),
                     EventParamType(typeEventHotKeyID), nil,
                     MemoryLayout<EventHotKeyID>.size, nil, &firedID
                 )
-                guard firedID.signature == QuickChatGlobalHotKey.signature else { return noErr }
                 let hotKey = Unmanaged<QuickChatGlobalHotKey>.fromOpaque(userData)
                     .takeUnretainedValue()
+                // Every instance installs a handler on the same dispatcher
+                // target, so each one sees every hot-key event and must ignore
+                // the ones that are not its own — by signature and by id.
+                //
+                // Returning `eventNotHandledErr` rather than `noErr` is the
+                // whole fix: noErr claims the event as handled, so the first
+                // handler to run swallowed every hot key, including other
+                // instances'. With two combinations registered, exactly one of
+                // them ever fired.
+                guard firedID.signature == QuickChatGlobalHotKey.signature,
+                      firedID.id == hotKey.hotKeyID
+                else { return OSStatus(eventNotHandledErr) }
                 DispatchQueue.main.async { hotKey.onFire?() }
                 return noErr
             },
@@ -62,7 +85,7 @@ final class QuickChatGlobalHotKey {
         )
         guard installStatus == noErr else { return false }
 
-        let id = EventHotKeyID(signature: Self.signature, id: Self.hotKeyID)
+        let id = EventHotKeyID(signature: Self.signature, id: hotKeyID)
         let registerStatus = RegisterEventHotKey(
             keyCode, carbonModifiers, id, GetEventDispatcherTarget(), 0, &hotKeyRef
         )
@@ -94,7 +117,7 @@ final class QuickChatGlobalHotKey {
         return carbon
     }
 
-    /// Virtual key codes for the keys QuickChatSkill offers globally. Carbon wants the
+    /// Virtual key codes for the keys Quick Chat offers globally. Carbon wants the
     /// hardware code, which is layout-independent — so ⌥A is the same physical
     /// key on QWERTY and Dvorak.
     static func keyCode(for key: String) -> UInt32? {

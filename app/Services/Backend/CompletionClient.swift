@@ -23,6 +23,11 @@ struct CompletionRequest: Sendable {
     var model: String
     var system: String?
     var user: String
+    /// PNG data sent alongside the text, for a model that can see.
+    ///
+    /// The wire already carried image parts for the agentic loop; only this
+    /// one-shot struct flattened everything to two strings.
+    var images: [Data] = []
     var maxTokens: Int = 4096
     /// Explicit credential (Test Connection verifies a key before it is saved).
     var overrideCredential: String? = nil
@@ -42,6 +47,17 @@ enum AIBackend {
 }
 
 struct NodeCompletionClient: CompletionStreaming {
+
+    /// Images first, then the text — the order every vision API expects, so the
+    /// words read as being about the picture rather than the other way round.
+    private static func parts(for request: CompletionRequest) -> [WirePart] {
+        var parts: [WirePart] = request.images.map {
+            .image(data: $0.base64EncodedString(), mimeType: "image/png")
+        }
+        parts.append(.text(request.user))
+        return parts
+    }
+
     func stream(_ request: CompletionRequest) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
@@ -50,7 +66,7 @@ struct NodeCompletionClient: CompletionStreaming {
                         providerId: request.providerId,
                         model: request.model,
                         system: request.system,
-                        messages: [.user(parts: [.text(request.user)])],
+                        messages: [.user(parts: Self.parts(for: request))],
                         maxTokens: request.maxTokens,
                         apiKey: request.overrideCredential,
                         baseUrl: request.overrideBaseUrl

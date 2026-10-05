@@ -30,6 +30,7 @@ final class QuickChatController: NSObject, QuickChatPanelDelegate {
     private var externalTarget: QuickChatSelectedText.Target?
 
     private let trigger = QuickChatTrigger()
+    private let screenshotTrigger = QuickChatTrigger()
     private(set) lazy var statusItem = QuickChatStatusItem(controller: self)
     /// What the last global summon captured. Re-summoning on the same selection
     /// reopens the panel without billing a new request (spec §2).
@@ -143,6 +144,7 @@ final class QuickChatController: NSObject, QuickChatPanelDelegate {
     func syncGlobalShortcut() {
         guard QuickChatBindings.isGlobalEnabled else {
             trigger.stop()
+            screenshotTrigger.stop()
             statusItem.remove()
             return
         }
@@ -151,6 +153,14 @@ final class QuickChatController: NSObject, QuickChatPanelDelegate {
         trigger.onFire = { [weak self] in
             MainActor.assumeIsolated { self?.showFromGlobalHotKey() }
         }
+        screenshotTrigger.stop()
+        if let shot = QuickChatBindings.screenshotTrigger, shot != QuickChatBindings.trigger {
+            screenshotTrigger.onFire = { [weak self] in
+                MainActor.assumeIsolated { self?.captureScreenshotAndAsk() }
+            }
+            screenshotTrigger.start(shot)
+        }
+
         let claimed = trigger.start(QuickChatBindings.trigger)
         isGlobalShortcutClaimed = claimed
         if !claimed {
@@ -189,6 +199,42 @@ final class QuickChatController: NSObject, QuickChatPanelDelegate {
 
         panel.model.loadSkills(targetLabel: Preferences.shared.translationTargetLang.nativeName)
         panel.presentStandalone(capture: capture)
+    }
+
+    /// Frames a region and opens the panel about the picture.
+    ///
+    /// The image is sent as-is, not read with OCR: the point is to ask about a
+    /// chart, a diagram or a UI, and recognised text would throw away the only
+    /// thing that distinguishes this from selecting words.
+    @MainActor
+    func captureScreenshotAndAsk() {
+        if panel.isVisible { panel.dismiss() }
+
+        Task { @MainActor in
+            guard let png = await QuickChatScreenshot.captureRegion() else { return }
+
+            writeBackView = nil
+            externalTarget = nil
+            sourceViewModel = appDelegate?.appState.activeTab?.viewModel
+
+            var capture = QuickChatCapture(
+                text: "",
+                isWritable: false,
+                sourceKind: .screenshot,
+                isMyLanguage: false
+            )
+            capture.imageData = png
+
+            panel.model.loadSkills(targetLabel: Preferences.shared.translationTargetLang.nativeName)
+            let isSelf = NSWorkspace.shared.frontmostApplication?.processIdentifier
+                == ProcessInfo.processInfo.processIdentifier
+            if isSelf, let window = appDelegate?.appState.window {
+                panel.present(relativeTo: window, capture: capture)
+            } else {
+                panel.presentStandalone(capture: capture)
+            }
+            Analytics.capture("quick_chat_screenshot")
+        }
     }
 
     /// Tier 1 + 2 context from another app: which app, what kind of element,
@@ -332,9 +378,12 @@ final class QuickChatController: NSObject, QuickChatPanelDelegate {
                 capture: capture,
                 targetLanguage: prefs.translationTargetLang.displayName
             )
-            let request = CompletionRequest(
+            var request = CompletionRequest(
                 providerId: pid, model: model, system: prompts.system, user: prompts.user
             )
+            if let png = capture.imageData {
+                request.images = [png]
+            }
 
             do {
                 for try await delta in AIBackend.completions.stream(request) {

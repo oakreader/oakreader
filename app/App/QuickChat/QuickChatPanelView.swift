@@ -1,4 +1,5 @@
 import AppKit
+import OakMarkdownUI
 import SwiftUI
 
 /// The QuickChatSkill panel's UI, hosted inside a borderless `NSPanel`.
@@ -21,6 +22,12 @@ struct QuickChatPanelView: View {
     /// Which answer the pointer is over, so only its actions show.
     @State private var hoveredTurn: Int?
 
+    /// Height of the rendered transcript. Measured rather than computed: the
+    /// TextKit estimate that sized the old plain-text pane cannot account for
+    /// headings, lists and code blocks. The content is `fixedSize` vertically,
+    /// so this reads its natural height rather than the scroll view's offer.
+    @State private var measuredTranscript: CGFloat = 0
+
 
     private static let cardWidth: CGFloat = 640
     private static let rowHeight: CGFloat = 40
@@ -35,6 +42,20 @@ struct QuickChatPanelView: View {
     // caption. The query is the one place that gets display size.
     private static let bodySize: CGFloat = 14.5
     private static let uiSize: CGFloat = 14
+
+    /// Explicit rather than `Color.primary` / `windowBackgroundColor`: semantic
+    /// colours resolve through the effective appearance and vibrancy, which is
+    /// what a floating glass panel changes out from under them.
+    private static let buttonInk = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            ? NSColor(white: 0.96, alpha: 1)
+            : NSColor(white: 0.10, alpha: 1)
+    })
+    private static let buttonGlyph = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            ? NSColor(white: 0.10, alpha: 1)
+            : NSColor(white: 1.0, alpha: 1)
+    })
     private static let captionSize: CGFloat = 12
     /// The captured text is the subject of the panel, not a caption about it.
     private static let sourceSize: CGFloat = 14
@@ -121,7 +142,52 @@ struct QuickChatPanelView: View {
 
     /// The captured text, plus a line naming what was captured. Sending context
     /// is never invisible (§4).
+    @ViewBuilder
     private var sourceRow: some View {
+        if let png = model.capture.imageData, let image = NSImage(data: png) {
+            captureRow(image)
+        } else {
+            quotedTextRow
+        }
+    }
+
+    /// A screenshot needs no quoting. The rule, the tint and the camera glyph
+    /// all exist to say "this came from somewhere else", which a picture says
+    /// by being a picture — so it gets the width instead, because the one thing
+    /// you actually need from it is to see whether you framed the right region.
+    private func captureRow(_ image: NSImage) -> some View {
+        let size = Self.displaySize(for: image)
+        return HStack(spacing: 0) {
+            Image(nsImage: image)
+                .resizable()
+                // An exact size, not `maxWidth`. A max-width frame is greedy: it
+                // takes the whole row, centres the image inside itself, and then
+                // the clip shape rounds the frame rather than the picture — which
+                // is why neither the alignment nor the corners appeared to work.
+                .frame(width: size.width, height: size.height)
+                .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, Self.gutter - 4)
+        .padding(.top, 12)
+        .padding(.bottom, 10)
+    }
+
+    /// The capture scaled to fit the card, keeping its aspect ratio.
+    private static func displaySize(for image: NSImage) -> CGSize {
+        let available = cardWidth - (gutter - 4) * 2
+        let natural = image.size
+        guard natural.width > 0, natural.height > 0 else {
+            return CGSize(width: available, height: 160)
+        }
+        let scale = min(available / natural.width, 210 / natural.height)
+        return CGSize(
+            width: floor(natural.width * scale),
+            height: floor(natural.height * scale)
+        )
+    }
+
+    private var quotedTextRow: some View {
         HStack(alignment: .top, spacing: 10) {
             Text(model.capture.text)
                 .font(.system(size: Self.sourceSize))
@@ -149,10 +215,6 @@ struct QuickChatPanelView: View {
             RoundedRectangle(cornerRadius: 9, style: .continuous)
                 .fill(Color.primary.opacity(0.045))
         )
-        // A quote rule, the way Mail and Notes mark text from somewhere else.
-        // As an overlay rather than an HStack sibling: a Shape fills every
-        // dimension it is not given, so as a sibling it stretched the row to
-        // whatever height was going spare and left a tall empty block.
         .overlay(alignment: .leading) {
             RoundedRectangle(cornerRadius: 1.5, style: .continuous)
                 .fill(Color.secondary.opacity(0.45))
@@ -181,16 +243,14 @@ struct QuickChatPanelView: View {
     /// shaped like the thing it is — a bordered capsule with a send button, the
     /// shape every chat input on the machine already uses.
     private var composer: some View {
-        // Read here rather than through a computed property: an @Observable
-        // read inside a Button's label closure is not reliably tracked, so the
-        // button kept the colour it was first drawn with.
         let hasText = !model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         return HStack(alignment: .center, spacing: 10) {
             QuickChatInputField(
-                text: $model.query,
                 model: model,
                 placeholder: model.turns.isEmpty
-                    ? "Ask anything, or / for a skill\u{2026}"
+                    ? (model.capture.imageData != nil
+                        ? "Ask about this screenshot\u{2026}"
+                        : "Ask anything, or / for a skill\u{2026}")
                     : "Reply, or \u{23CE} to \(model.primaryDestination.title.lowercased())"
             )
 
@@ -198,12 +258,13 @@ struct QuickChatPanelView: View {
                 Button { model.onStop?() } label: {
                     ZStack {
                         Circle()
-                            .fill(Color.primary)
+                            .fill(Self.buttonInk)
                             .frame(width: 28, height: 28)
                         RoundedRectangle(cornerRadius: 2.5)
-                            .fill(Color(nsColor: .windowBackgroundColor))
+                            .fill(Self.buttonGlyph)
                             .frame(width: 10, height: 10)
                     }
+                    .compositingGroup()
                 }
                 .buttonStyle(.plain)
                 .help("Stop generating")
@@ -211,12 +272,18 @@ struct QuickChatPanelView: View {
                 Button { model.activateSelection() } label: {
                     ZStack {
                         Circle()
-                            .fill(hasText ? Color.primary : Color.gray.opacity(0.3))
+                            .fill(hasText ? Self.buttonInk : Color.gray.opacity(0.3))
                             .frame(width: 28, height: 28)
                         Image(systemName: "arrow.up")
                             .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(Color(nsColor: .windowBackgroundColor))
+                            .foregroundStyle(Self.buttonGlyph)
                     }
+                    // Its own buffer, so the fill is composited before anything
+                    // layered above it gets a say: glass applies vibrancy to what
+                    // sits on it, and a non-activating panel can read as inactive
+                    // and dim control content. Either turns a solid fill into a
+                    // pale wash.
+                    .compositingGroup()
                 }
                 .buttonStyle(.plain)
                 .disabled(!hasText)
@@ -338,11 +405,19 @@ struct QuickChatPanelView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, Self.gutter)
                 .padding(.top, 14)
                 .padding(.bottom, 16)
+                .background(
+                    GeometryReader { geo in
+                        Color.clear.onChange(of: geo.size.height, initial: true) { _, height in
+                            measuredTranscript = height
+                        }
+                    }
+                )
             }
-            .frame(height: transcriptHeight)
+            .frame(height: min(max(measuredTranscript, 48), Self.maxResultHeight))
             .onChange(of: model.result) { _, _ in
                 guard let last = model.turns.last else { return }
                 withAnimation(reduceMotion ? nil : .easeOut(duration: 0.12)) {
@@ -375,13 +450,15 @@ struct QuickChatPanelView: View {
                 if turn.text.isEmpty && model.phase == .streaming {
                     StreamingCursor()
                 } else {
-                    Text(turn.text)
-                        .font(.system(size: Self.bodySize))
-                        .lineSpacing(4)
-                        .foregroundStyle(.primary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .textSelection(.enabled)
+                    // The app has one markdown renderer and this is it. Plain
+                    // Text left every heading and list marker on screen as
+                    // literal asterisks.
+                    StreamingMarkdownView(
+                        markdown: turn.text,
+                        isStreaming: model.phase == .streaming && turn.id == model.turns.last?.id,
+                        fadesAppendedText: !reduceMotion
+                    )
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 // Attached to the answer rather than to the window: in a
@@ -434,42 +511,10 @@ struct QuickChatPanelView: View {
         .help(destination.title)
     }
 
-    /// How tall the transcript should be.
-    ///
     /// Measured with TextKit rather than from inside the scroll view: a
     /// ScrollView claims whatever it is offered, so sizing it from its own
     /// content makes the two define each other, and under the card's
     /// `fixedSize` that loop settles on a collapsed pane.
-    private var transcriptHeight: CGFloat {
-        let userWidth = Self.cardWidth - Self.gutter * 2 - 48 - 24
-        let assistantWidth = Self.cardWidth - Self.gutter * 2
-
-        var total: CGFloat = 14 + 16
-        for (index, turn) in model.turns.enumerated() {
-            if index > 0 { total += 12 }
-            let isUser = turn.role == .user
-            let text = turn.text.isEmpty ? " " : turn.text
-            total += Self.textHeight(text, width: isUser ? userWidth : assistantWidth)
-            total += isUser ? 16 : 22
-        }
-        if model.phase != .done && model.phase != .choosing { total += 22 }
-        return min(max(total, 48), Self.maxResultHeight)
-    }
-
-    private static func textHeight(_ text: String, width: CGFloat) -> CGFloat {
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.lineSpacing = 4
-        let bounds = (text as NSString).boundingRect(
-            with: NSSize(width: width, height: .greatestFiniteMagnitude),
-            options: [.usesLineFragmentOrigin, .usesFontLeading],
-            attributes: [
-                .font: NSFont.systemFont(ofSize: bodySize),
-                .paragraphStyle: paragraph,
-            ]
-        )
-        return ceil(bounds.height)
-    }
-
 }
 
 // MARK: - Keycap
@@ -502,7 +547,11 @@ private struct KeycapHint: View {
 private struct QuickChatInputField: NSViewRepresentable {
     static let querySizeStatic: CGFloat = 14
 
-    @Binding var text: String
+    /// The model is the text's home. There was a `@Binding` here, written from
+    /// the coordinator's captured `parent` — a struct snapshot taken once at
+    /// `makeCoordinator()` and never refreshed, so the write went through a
+    /// binding from first layout. The model is a class and already in hand, so
+    /// the indirection bought nothing and could silently drop a keystroke.
     let model: QuickChatModel
 
     /// Matches the chat's framing — ask in words, `/` when you mean a skill
@@ -530,8 +579,11 @@ private struct QuickChatInputField: NSViewRepresentable {
     }
 
     func updateNSView(_ field: NSTextField, context: Context) {
-        if field.stringValue != text {
-            field.stringValue = text
+        // Keep the coordinator's snapshot current regardless; a stale parent is
+        // the trap this type is famous for.
+        context.coordinator.parent = self
+        if field.stringValue != model.query {
+            field.stringValue = model.query
         }
         if field.placeholderString != placeholder {
             field.placeholderString = placeholder
@@ -541,12 +593,12 @@ private struct QuickChatInputField: NSViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     final class Coordinator: NSObject, NSTextFieldDelegate {
-        private let parent: QuickChatInputField
+        var parent: QuickChatInputField
         init(_ parent: QuickChatInputField) { self.parent = parent }
 
         func controlTextDidChange(_ obj: Notification) {
             guard let field = obj.object as? NSTextField else { return }
-            parent.text = field.stringValue
+            parent.model.query = field.stringValue
             parent.model.selectedIndex = 0
         }
 
