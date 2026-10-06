@@ -5,7 +5,7 @@ import { z } from "zod";
 import { WireMessage, WireToolDef, WordLookup, Annotation, Conversation, Collection, Item, Property, PropertyOption, Skill, SkillAdvisory, SkillBin, SkillEnv, ToolDefinition, type ProviderSummary, type EventToolCall, type PromptOption } from "./protocol.base.js";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- refs used by generated shapes
 
-export const PROTOCOL_VERSION = 12;
+export const PROTOCOL_VERSION = 13;
 
 /** JSON-RPC 2.0 error codes. Below -32000 is ours; the rest is the spec's. */
 export const RpcError = {
@@ -139,6 +139,19 @@ export const ConfigSetLocalUrlParams = z.object({
 });
 export type ConfigSetLocalUrlParams = z.infer<typeof ConfigSetLocalUrlParams>;
 export type ConfigSetLocalUrlResult = Record<string, never>;
+
+/** `config/modelsFile` — Where the user's models.json lives, and what went wrong reading it. */
+export const ConfigModelsFileParams = z.object({
+  /** Write a commented template first when the file is not there yet. */
+  create: z.boolean().default(false),
+});
+export type ConfigModelsFileParams = z.infer<typeof ConfigModelsFileParams>;
+export type ConfigModelsFileResult = {
+  path: string;
+  exists: boolean;
+  /** Absent when the file loaded. A missing file is not an error. */
+  error?: string;
+};
 
 /** `models/refresh` */
 export const ModelsRefreshParams = z.object({
@@ -609,6 +622,7 @@ export const ClientRequests = {
   "oauth/login": OAuthLoginParams,
   "config/setBaseUrl": ConfigSetBaseUrlParams,
   "config/setLocalUrl": ConfigSetLocalUrlParams,
+  "config/modelsFile": ConfigModelsFileParams,
   "models/refresh": ModelsRefreshParams,
   "catalog/annotations/list": AnnotationsListParams,
   "catalog/annotations/get": AnnotationsGetParams,
@@ -671,6 +685,7 @@ export interface ClientRequestResults {
   "oauth/login": OAuthLoginResult;
   "config/setBaseUrl": ConfigSetBaseUrlResult;
   "config/setLocalUrl": ConfigSetLocalUrlResult;
+  "config/modelsFile": ConfigModelsFileResult;
   "models/refresh": ModelsRefreshResult;
   "catalog/annotations/list": AnnotationsListResult;
   "catalog/annotations/get": AnnotationsGetResult;

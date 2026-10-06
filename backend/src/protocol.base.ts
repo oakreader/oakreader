@@ -74,6 +74,8 @@ export interface ProviderSummary {
     source?: string;
   };
   isLocal: boolean;
+  /** Defined by the user's models.json rather than shipped with the build. */
+  custom: boolean;
   baseUrlOverride?: string;
   localUrl?: string;
 }

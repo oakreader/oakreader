@@ -139,6 +139,15 @@ final class AIProviderCatalog {
         return await refreshModels(providerId: providerId)
     }
 
+    /// Where the user's `models.json` lives, and why its last load fell short.
+    /// Pass `create` to have the sidecar write a commented template first.
+    @MainActor
+    func modelsFile(create: Bool = false) async -> RPC.ConfigModelsFileResult? {
+        try? await NodeBackend.shared.call(
+            RPC.Method.configModelsFile, params: RPC.ConfigModelsFileParams(create: create),
+            as: RPC.ConfigModelsFileResult.self)
+    }
+
     @MainActor
     func refreshModels(providerId: String? = nil) async -> String? {
         await mutate(RPC.Method.modelsRefresh,

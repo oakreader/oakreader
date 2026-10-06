@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct AISettingsView: View {
     // MARK: - State
@@ -6,6 +7,7 @@ struct AISettingsView: View {
     @State private var catalog = AIProviderCatalog.shared
     @State private var navigationPath = NavigationPath()
     @State private var showAddProviderSheet = false
+    @State private var modelsFile: RPC.ConfigModelsFileResult?
 
     // Chat LLM
     @State private var chatProviderId: String
@@ -35,6 +37,7 @@ struct AISettingsView: View {
                 }
                 providersSection
                 chatSection
+                customModelsSection
             }
             .formStyle(.grouped)
             .navigationTitle("LLM")
@@ -50,48 +53,76 @@ struct AISettingsView: View {
                 }
             }
         }
-        .task { await catalog.refresh() }
+        .task {
+            await catalog.refresh()
+            modelsFile = await catalog.modelsFile()
+        }
         .onDisappear { save() }
     }
 
     // MARK: - Providers Section
 
+    /// Each provider is a row that pushes its own configuration page, the way
+    /// System Settings lists applications.
     @ViewBuilder
     private var providersSection: some View {
         Section("Providers") {
             ForEach(catalog.configuredProviders) { provider in
                 NavigationLink(value: provider.id) {
-                    HStack(spacing: 10) {
-                        ProviderIconView(
-                            assetName: "provider-\(provider.id)",
-                            fallbackSymbol: provider.isLocal ? "desktopcomputer" : "cpu"
-                        )
-
-                        Text(provider.name)
-
-                        Spacer()
-
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.green)
-                    }
+                    ProviderRow(provider: provider)
                 }
             }
 
             Button {
                 showAddProviderSheet = true
             } label: {
-                HStack(spacing: 10) {
+                HStack(spacing: ProviderRow.iconGap) {
                     Image(systemName: "plus.circle")
                         .font(.system(size: 16))
                         .foregroundStyle(.tint)
-                        .frame(width: 24, height: 24)
+                        .frame(width: ProviderRow.iconSize, height: ProviderRow.iconSize)
 
                     Text("Add Provider...")
                         .foregroundStyle(.tint)
                 }
             }
             .buttonStyle(.plain)
+        }
+    }
+
+    // MARK: - Custom Models Section
+
+    /// `models.json` — the user's own endpoints, models and model facts. The
+    /// file is the same one pi reads, and the sidecar re-reads it whenever
+    /// this pane lists providers.
+    @ViewBuilder
+    private var customModelsSection: some View {
+        Section("Custom Models") {
+            LabeledContent("models.json") {
+                Button("Open") {
+                    Task { @MainActor in
+                        if let file = await catalog.modelsFile(create: true) {
+                            modelsFile = file
+                            NSWorkspace.shared.open(URL(fileURLWithPath: file.path))
+                        }
+                    }
+                }
+            }
+
+            Text("""
+                Point a provider at any OpenAI-, Anthropic- or Google-compatible endpoint, \
+                add models your build does not ship, and correct a model's context window, \
+                output limit, vision or reasoning. Saved edits apply the next time this pane opens.
+                """)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            if let error = modelsFile?.error {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .textSelection(.enabled)
+            }
         }
     }
 
@@ -143,5 +174,71 @@ struct AISettingsView: View {
         let prefs = Preferences.shared
         prefs.aiProviderId = chatProviderId
         prefs.aiModel = chatModel
+    }
+}
+
+// MARK: - Provider Row
+
+/// One provider in the list, in the shape System Settings uses for its own
+/// per-app rows: icon, name, and a second line summarising the setting so the
+/// state is readable without opening the page. The chevron comes from the
+/// enclosing `NavigationLink`.
+private struct ProviderRow: View {
+    let provider: BackendProviderSummary
+
+    static let iconSize: CGFloat = 28
+    static let iconGap: CGFloat = 10
+
+    var body: some View {
+        HStack(spacing: Self.iconGap) {
+            ProviderIconView(
+                assetName: "provider-\(provider.id)",
+                fallbackSymbol: provider.isLocal ? "desktopcomputer" : "cpu",
+                size: Self.iconSize
+            )
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(provider.name)
+                Text(provider.statusSummary)
+                    .font(.system(size: 11))
+                    .foregroundStyle(provider.needsAttention ? Color.orange : Color.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+        }
+        .padding(.vertical, 3)
+    }
+}
+
+// MARK: - Provider Status Wording
+
+extension BackendProviderSummary {
+    /// Where this provider's credential comes from, in one phrase. `source` is
+    /// the sidecar's own wording — see pi-ai's `resolve.ts` and
+    /// `handleListProviders` in backend/src/main.ts.
+    var statusLabel: String {
+        if isLocal { return localUrl ?? "Local server" }
+        switch auth.source {
+        case "OAuth": return "Signed in"
+        case "stored credential": return "API key"
+        case .some(let source) where source.hasPrefix("OAuth"): return "Sign in again"
+        case .some(let envVar): return "API key from \(envVar)"
+        case nil: return "Not configured"
+        }
+    }
+
+    /// True when the row should read as a problem rather than a state.
+    var needsAttention: Bool {
+        if isLocal { return false }
+        guard let source = auth.source else { return true }
+        return source.hasPrefix("OAuth") && source != "OAuth"
+    }
+
+    /// The list row's second line: credential, endpoint, model count.
+    var statusSummary: String {
+        var parts = [statusLabel]
+        if baseUrlOverride?.isEmpty == false { parts.append("custom endpoint") }
+        parts.append(models.count == 1 ? "1 model" : "\(models.count) models")
+        return parts.joined(separator: " · ")
     }
 }

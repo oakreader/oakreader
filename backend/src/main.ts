@@ -6,11 +6,17 @@
  *
  * See src/protocol.ts and docs/architecture/node-backend-migration.md.
  */
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { homedir } from "node:os";
 import type { AuthEvent, AuthPrompt, ThinkingLevel } from "@earendil-works/pi-ai";
+// pi-ai loads each OAuth flow through a variable import specifier, so that
+// bundlers cannot follow it into Node-only flow code. `bun build --compile`
+// then ships a binary without those modules, and a login dies with
+// "Cannot find module './openai-codex.js' from '/$bunfs/root/arm64'".
+// This registers the flows statically instead. It must run before any login.
+import { registerBunOAuthFlows } from "@earendil-works/pi-ai/bun-oauth";
 import {
   PROTOCOL_VERSION, RpcError,
   PingParams, ProvidersListParams,
@@ -43,13 +49,16 @@ import {
   type WordLookupsListResult,
   CompleteParams, ChatParams, OAuthLoginParams,
   CredentialsSetParams, CredentialsGetParams, CredentialsDeleteParams,
-  ConfigSetBaseUrlParams, ConfigSetLocalUrlParams, ModelsRefreshParams, CancelRequestParams,
+  ConfigSetBaseUrlParams, ConfigSetLocalUrlParams, ConfigModelsFileParams,
+  type ConfigModelsFileResult,
+  ModelsRefreshParams, CancelRequestParams,
   type CompleteResult, type ChatResult, type ProvidersListResult, type OAuthLoginResult,
   type ProviderSummary,
 } from "./protocol.js";
 import { RpcPeer, RpcFailure } from "./rpc.js";
 import { ConfigStore, FileCredentialStore, dataPaths, migrateLegacyLayout } from "./store.js";
 import { ProviderRegistry, toPiId } from "./providers.js";
+import { ModelsConfig, MODELS_JSON_TEMPLATE } from "./modelsConfig.js";
 import { runChat, toPiMessages } from "./chat.js";
 import { PromptLibrary } from "./prompts.js";
 import { PORTABLE_TOOLS, runTool } from "./tools.js";
@@ -68,6 +77,8 @@ import { PropertyStore } from "./catalog/properties.js";
 import { ReferenceStore } from "./catalog/references.js";
 import { CiteKeyStore } from "./catalog/citekeys.js";
 
+registerBunOAuthFlows();
+
 const BACKEND_ID = "oak-backend 0.2.0";
 
 // --- Data dir -------------------------------------------------------------
@@ -85,6 +96,21 @@ const paths = dataPaths(dataDir);
 const credentials = new FileCredentialStore(paths.credentials);
 const config = new ConfigStore(paths.settings);
 const registry = new ProviderRegistry(credentials, config);
+
+/**
+ * Re-read the user's models.json and apply it over the shipped providers.
+ *
+ * Called on every provider listing rather than only at startup, so editing
+ * the file and returning to Settings is enough — the same thing pi does when
+ * `/model` opens. Reading a small file on a user-driven action is cheaper
+ * than a file watcher and cannot go stale.
+ */
+function reloadModelsConfig(): void {
+  registry.applyModelsConfig(ModelsConfig.load(paths.models));
+  const error = registry.modelsConfigError;
+  if (error) log(error);
+}
+reloadModelsConfig();
 
 /**
  * The catalog, opened lazily.
@@ -224,6 +250,7 @@ async function handleChat(cmd: ChatParams, id: string): Promise<ChatResult> {
 }
 
 async function handleListProviders(): Promise<ProvidersListResult> {
+  reloadModelsConfig();
   const providers: ProviderSummary[] = [];
   for (const oakId of registry.oakProviderIds()) {
     const provider = registry.provider(oakId);
@@ -261,6 +288,7 @@ async function handleListProviders(): Promise<ProvidersListResult> {
         source,
       },
       isLocal,
+      custom: registry.isCustom(oakId),
       baseUrlOverride: config.get().baseUrlOverrides[oakId],
       localUrl: isLocal ? (config.get().localProviders[oakId] ?? provider.baseUrl) : undefined,
     });
@@ -360,6 +388,15 @@ function registerMethods(): void {
     });
     registry.registerLocalProviders();
     return {};
+  });
+
+  peer.onRequest("config/modelsFile", ConfigModelsFileParams, (p): ConfigModelsFileResult => {
+    if (p.create && !existsSync(paths.models)) {
+      mkdirSync(dataDir, { recursive: true });
+      writeFileSync(paths.models, MODELS_JSON_TEMPLATE);
+    }
+    reloadModelsConfig();
+    return { path: paths.models, exists: existsSync(paths.models), error: registry.modelsConfigError };
   });
 
   peer.onRequest("models/refresh", ModelsRefreshParams, async (p) => {

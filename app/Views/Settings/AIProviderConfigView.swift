@@ -13,6 +13,18 @@ struct AIProviderConfigView: View {
 
 // MARK: - OAuth Flow State
 
+/// One question the sidecar is blocked on. A prompt carries its own answer
+/// shape: `select` is answered with one of `options`, every other type with
+/// typed text.
+private struct OAuthPrompt {
+    /// The rpc id to reply to.
+    let id: String
+    let type: String
+    let message: String
+    let placeholder: String?
+    let options: [BackendPromptOption]
+}
+
 /// Live state of a backend-driven OAuth login (`oauth_login` events).
 @Observable
 private final class OAuthFlowState {
@@ -20,7 +32,7 @@ private final class OAuthFlowState {
     var error: String?
     var authURL: URL?
     var deviceCode: (userCode: String, verificationURI: String)?
-    var pendingPrompt: (promptId: String, type: String, message: String)?
+    var pendingPrompt: OAuthPrompt?
     var promptInput = ""
     var requestId: String?
     var task: Task<Void, Never>?
@@ -79,23 +91,28 @@ private struct ProviderDetailView: View {
     }
 
     var body: some View {
-        if let provider {
-            Form {
-                if isConfigured {
-                    configuredProviderContent(provider)
-                } else {
-                    unconfiguredProviderContent(provider)
-                }
-                if showsSharedActionRow(provider) {
-                    sharedActionRow(provider)
-                }
-            }
-            .formStyle(.grouped)
-            .navigationTitle(displayTitle)
-            .onAppear { loadState() }
-            .onChange(of: providerId) { _, _ in loadState() }
+        if provider != nil {
+            Form { sections }
+                .formStyle(.grouped)
+                .navigationTitle(displayTitle)
+                .onAppear { loadState() }
+                .onChange(of: providerId) { _, _ in loadState() }
         } else {
             ContentUnavailableView("Unknown Provider", systemImage: "questionmark.circle")
+        }
+    }
+
+    @ViewBuilder
+    private var sections: some View {
+        if let provider {
+            if isConfigured {
+                configuredProviderContent(provider)
+            } else {
+                unconfiguredProviderContent(provider)
+            }
+            if showsSharedActionRow(provider) {
+                sharedActionRow(provider)
+            }
         }
     }
 
@@ -245,14 +262,27 @@ private struct ProviderDetailView: View {
                 Text(prompt.message)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                HStack {
-                    TextField("", text: Bindable(oauthState).promptInput)
+                if prompt.options.isEmpty {
+                    HStack {
+                        TextField(
+                            "", text: Bindable(oauthState).promptInput,
+                            prompt: prompt.placeholder.map { Text($0) }
+                        )
                         .textFieldStyle(.roundedBorder)
                         .font(.caption)
                         .onSubmit { submitPromptInput() }
-                    Button("Submit") { submitPromptInput() }
-                        .controlSize(.small)
-                        .disabled(oauthState.promptInput.isEmpty)
+                        Button("Submit") { submitPromptInput() }
+                            .controlSize(.small)
+                            .disabled(oauthState.promptInput.isEmpty)
+                    }
+                } else {
+                    HStack(spacing: 6) {
+                        ForEach(prompt.options) { option in
+                            Button(option.label) { answerPrompt(with: option.id) }
+                                .controlSize(.small)
+                                .font(.caption)
+                        }
+                    }
                 }
             }
         }
@@ -316,7 +346,9 @@ private struct ProviderDetailView: View {
                         guard method == RPC.Method.oAuthPrompt,
                               let p = try? RPCCoding.decode(RPC.OAuthPromptParams.self, from: raw)
                         else { break }
-                        oauthState.pendingPrompt = (rpcId, p.promptType, p.message)
+                        oauthState.pendingPrompt = OAuthPrompt(
+                            id: rpcId, type: p.promptType, message: p.message,
+                            placeholder: p.placeholder, options: p.options ?? [])
                         oauthState.promptInput = ""
                     }
                 }
@@ -334,14 +366,20 @@ private struct ProviderDetailView: View {
     }
 
     private func submitPromptInput() {
-        guard let prompt = oauthState.pendingPrompt else { return }
         let value = oauthState.promptInput.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty else { return }
+        answerPrompt(with: value)
+    }
+
+    /// Answers the sidecar's blocked reverse call. The rpc id IS the thing to
+    /// reply to, so clear the prompt only after reading it.
+    private func answerPrompt(with value: String) {
+        guard let prompt = oauthState.pendingPrompt else { return }
         oauthState.pendingPrompt = nil
         oauthState.promptInput = ""
         Task {
             await NodeBackend.shared.respond(
-                to: prompt.promptId, with: RPC.OAuthPromptResult(value: value))
+                to: prompt.id, with: RPC.OAuthPromptResult(value: value))
         }
     }
 
@@ -351,9 +389,12 @@ private struct ProviderDetailView: View {
     private func configuredProviderContent(_ provider: BackendProviderSummary) -> some View {
         Section {
             LabeledContent("Status") {
-                Label(provider.auth.source ?? "Connected", systemImage: "checkmark.circle.fill")
-                    .font(.callout.weight(.medium))
-                    .foregroundStyle(.green)
+                HStack(spacing: 4) {
+                    Image(systemName: provider.needsAttention
+                          ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+                        .foregroundStyle(provider.needsAttention ? Color.orange : Color.green)
+                    Text(provider.statusSummary)
+                }
             }
         }
 
@@ -362,10 +403,8 @@ private struct ProviderDetailView: View {
                 localServerControls(provider, buttonTitle: "Refresh Models")
             }
         } else if !isOAuthProvider {
-            Section("API Key") {
-                SecureField("API Key", text: $apiKey, prompt: Text("API Key"))
-                    .textFieldStyle(.roundedBorder)
-                    .labelsHidden()
+            Section("Authentication") {
+                apiKeyAuthSection(provider)
             }
         }
 
@@ -474,14 +513,11 @@ private struct ProviderDetailView: View {
         return "\(count)"
     }
 
-    /// A titled input row: a persistent label on its own line with the field beneath it.
+    /// A labelled input row: the label sits in the form's leading column and the
+    /// field beside it, which is how System Settings lays out its own fields.
     @ViewBuilder
     private func titledField(_ title: String, @ViewBuilder content: () -> some View) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.subheadline.weight(.medium))
-            content()
-        }
+        LabeledContent(title) { content() }
     }
 
     // MARK: - Shared Action Row
@@ -489,18 +525,7 @@ private struct ProviderDetailView: View {
     @ViewBuilder
     private func sharedActionRow(_ provider: BackendProviderSummary) -> some View {
         Section {
-            HStack {
-                Button("Test") { testCredentials(provider) }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(isTestDisabled(provider))
-
-                Button("Save") { saveCredentials(provider) }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(isSaveDisabled(provider))
-
-                Button("Reset to Default") { resetEndpoint(provider) }
-                    .disabled(baseURLOverride.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-
+            HStack(spacing: 8) {
                 if isTesting {
                     ProgressView().controlSize(.small)
                 }
@@ -510,6 +535,18 @@ private struct ProviderDetailView: View {
                         .font(.caption)
                         .foregroundStyle(result.hasPrefix("Success") || result.hasPrefix("Saved") ? .green : .red)
                 }
+
+                Spacer()
+
+                Button("Reset to Default") { resetEndpoint(provider) }
+                    .disabled(baseURLOverride.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                Button("Test") { testCredentials(provider) }
+                    .disabled(isTestDisabled(provider))
+
+                Button("Save") { saveCredentials(provider) }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isSaveDisabled(provider))
             }
         }
     }

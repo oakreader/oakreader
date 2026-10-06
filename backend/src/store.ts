@@ -114,10 +114,15 @@ export class ConfigStore {
   }
 }
 
-export function dataPaths(dataDir: string): { credentials: string; settings: string } {
+export function dataPaths(
+  dataDir: string,
+): { credentials: string; settings: string; models: string } {
   return {
     credentials: join(dataDir, "credentials.json"),
     settings: join(dataDir, "settings.json"),
+    // The user's own endpoints and model facts. Same name and shape as pi's
+    // <agent-dir>/models.json; see src/modelsConfig.ts.
+    models: join(dataDir, "models.json"),
   };
 }
 

@@ -8,6 +8,16 @@ struct ProviderIconView: View {
     var size: CGFloat = 24
 
     var body: some View {
+        icon
+            // The provider's name is always next to this, so the icon adds
+            // nothing for a screen reader — and resolving an SF Symbol's
+            // localized accessibility description is the hot path that pegged
+            // a core once before. See the sfsymbol-a11y-locale-hang note.
+            .accessibilityHidden(true)
+    }
+
+    @ViewBuilder
+    private var icon: some View {
         if NSImage(named: assetName) != nil {
             Image(assetName)
                 .resizable()

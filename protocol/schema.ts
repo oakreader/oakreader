@@ -10,7 +10,7 @@
  * fails if the committed output is stale.
  */
 
-export const PROTOCOL_VERSION = 12;
+export const PROTOCOL_VERSION = 13;
 
 export type FieldType =
   | { k: "string" }
@@ -152,6 +152,20 @@ export const METHODS: Method[] = [
       { name: "baseUrl", type: str },
     ],
     result: [],
+  },
+  {
+    name: "config/modelsFile", type: "ConfigModelsFile", kind: "request", from: "client",
+    doc: "Where the user's models.json lives, and what went wrong reading it.",
+    params: [
+      { name: "create", type: bool, default: "false",
+        doc: "Write a commented template first when the file is not there yet." },
+    ],
+    result: [
+      { name: "path", type: str },
+      { name: "exists", type: bool },
+      { name: "error", type: str, optional: true,
+        doc: "Absent when the file loaded. A missing file is not an error." },
+    ],
   },
   {
     name: "models/refresh", type: "ModelsRefresh", kind: "request", from: "client",

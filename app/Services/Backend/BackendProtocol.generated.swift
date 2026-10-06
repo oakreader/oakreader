@@ -9,7 +9,7 @@ import Foundation
 /// Reverse calls (tool/execute, oauth/prompt) are ordinary requests in the
 /// other direction, so they need no separate machinery.
 enum RPC {
-    static let version = 12
+    static let version = 13
 
     /// JSON-RPC error codes. The shell branches on these: re-authenticate
     /// is a different affordance from retry, and the old single error string
@@ -51,6 +51,7 @@ enum RPC {
         static let oAuthLogin = "oauth/login"
         static let configSetBaseUrl = "config/setBaseUrl"
         static let configSetLocalUrl = "config/setLocalUrl"
+        static let configModelsFile = "config/modelsFile"
         static let modelsRefresh = "models/refresh"
         static let annotationsList = "catalog/annotations/list"
         static let annotationsGet = "catalog/annotations/get"
@@ -206,6 +207,19 @@ enum RPC {
     }
     struct ConfigSetLocalUrlResult: Decodable {
         init() {}
+    }
+
+    // MARK: config/modelsFile
+    /// Where the user's models.json lives, and what went wrong reading it.
+    struct ConfigModelsFileParams: Encodable {
+        /// Write a commented template first when the file is not there yet.
+        var create: Bool?
+    }
+    struct ConfigModelsFileResult: Decodable {
+        var path: String
+        var exists: Bool
+        /// Absent when the file loaded. A missing file is not an error.
+        var error: String?
     }
 
     // MARK: models/refresh

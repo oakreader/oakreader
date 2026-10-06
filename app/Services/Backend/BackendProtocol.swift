@@ -217,6 +217,8 @@ struct BackendProviderSummary: Decodable, Identifiable, Hashable {
     var defaultModel: String?
     var auth: BackendProviderAuth
     var isLocal: Bool
+    /// Defined by the user's models.json rather than shipped with the build.
+    var custom: Bool
     var baseUrlOverride: String?
     var localUrl: String?
 }
