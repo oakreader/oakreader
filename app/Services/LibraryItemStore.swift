@@ -106,13 +106,6 @@ extension LibraryStore {
         update(item, field: "processingStatus", string: status.rawValue)
     }
 
-    func updateLastPosition(_ item: LibraryItem, position: Double) {
-        // Deliberately no invalidate: scroll position changes constantly and
-        // reloading the library on every one would be absurd. Nothing displays
-        // it, so the in-memory copy going stale costs nothing.
-        Task { await LibraryCatalog.update(id: item.id.uuidString, field: "lastPosition", number: position) }
-    }
-
     private func update(_ item: LibraryItem, field: String, string: String) {
         Task {
             await LibraryCatalog.update(id: item.id.uuidString, field: field, string: string)

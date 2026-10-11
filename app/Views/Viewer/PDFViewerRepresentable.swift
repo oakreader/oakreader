@@ -65,10 +65,13 @@ struct PDFViewerRepresentable: NSViewRepresentable {
         pdfView.document = viewModel.pdfDocument
         pdfView.displayMode = viewModel.state.displayMode
 
-        // Scale to fit page width on initial load
+        // Scale to fit page width on initial load, then return to where the
+        // reader left off — the scale decides where a page offset lands.
+        let coordinator = context.coordinator
         DispatchQueue.main.async {
             pdfView.autoScales = true
             viewModel.state.zoomLevel = pdfView.scaleFactor
+            coordinator.restoreReadingPosition(in: pdfView)
         }
 
         // Wire the markup overlay to this view and load saved highlights from

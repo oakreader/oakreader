@@ -482,6 +482,36 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
         }
         autofillSavedCredentials()
         extractTableOfContents()
+        restoreReadingPosition()
+    }
+
+    /// Scroll a reopened snapshot to where the reader left off, once. Live pages
+    /// have no saved position: they change under the reader.
+    ///
+    /// The page keeps growing after `didFinish` as images and fonts arrive, which
+    /// moves the same fraction further down. So the target is applied again each
+    /// time the height changes, for up to 2 s, until the reader scrolls.
+    private func restoreReadingPosition() {
+        guard !isLiveMode, let webView else { return }
+        guard let fraction = viewModel.pendingRestorePosition else { return }
+        viewModel.pendingRestorePosition = nil
+        let clamped = min(max(fraction, 0), 1)
+        webView.evaluateJavaScript("""
+            (function(fraction) {
+                var el = document.scrollingElement || document.documentElement;
+                function apply() { window.scrollTo(0, fraction * (el.scrollHeight - window.innerHeight)); }
+                apply();
+                var height = el.scrollHeight, ticks = 0;
+                var timer = setInterval(function() {
+                    if (el.scrollHeight !== height) { height = el.scrollHeight; apply(); }
+                    if (++ticks >= 20) clearInterval(timer);
+                }, 100);
+                function stop() { clearInterval(timer); }
+                window.addEventListener('wheel', stop, { once: true, passive: true });
+                window.addEventListener('keydown', stop, { once: true });
+                window.addEventListener('mousedown', stop, { once: true });
+            })(\(clamped));
+            """)
     }
 
     // MARK: - Table of Contents
@@ -638,6 +668,11 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
         _ userContentController: WKUserContentController,
         didReceive message: WKScriptMessage
     ) {
+        if message.name == "readingPosition", let fraction = message.body as? Double {
+            viewModel.recordReadingPosition(fraction)
+            return
+        }
+
         // Handle highlight creation events from the bridge script
         if message.name == "highlightEvent",
            let body = message.body as? [String: Any],

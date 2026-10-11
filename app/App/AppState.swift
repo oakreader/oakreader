@@ -308,6 +308,7 @@ final class AppState {
         tab.viewModel.appState = self
         tab.viewModel.itemStorageKey = storageKey
         tab.viewModel.attachmentId = item?.primaryAttachment?.id.uuidString
+        if let item { tab.viewModel.prepareReadingPosition(for: item) }
 
         // Prefer the item's metadata title; fall back to the original filename
         // (not "document.pdf" from managed storage).
@@ -375,6 +376,7 @@ final class AppState {
             tab.viewModel.appState = self
             tab.viewModel.itemStorageKey = storageKey
             tab.viewModel.attachmentId = item?.primaryAttachment?.id.uuidString
+            if let item { tab.viewModel.prepareReadingPosition(for: item) }
 
             tab.title = item?.title ?? url.deletingPathExtension().lastPathComponent
             openTabs.append(tab)
@@ -455,6 +457,7 @@ final class AppState {
         tab.viewModel.appState = self
         tab.viewModel.itemStorageKey = item.storageKey
         tab.viewModel.attachmentId = item.primaryAttachment?.id.uuidString
+        tab.viewModel.prepareReadingPosition(for: item)
 
         // Prefer the item's metadata title; fall back to the original filename.
         tab.title = item.title.isEmpty ? item.fileName : item.title
@@ -491,6 +494,7 @@ final class AppState {
             tab.viewModel.appState = self
             tab.viewModel.itemStorageKey = item.storageKey
             tab.viewModel.attachmentId = item.primaryAttachment?.id.uuidString
+            tab.viewModel.prepareReadingPosition(for: item)
 
             tab.title = item.title
             openTabs.append(tab)
@@ -574,6 +578,7 @@ final class AppState {
             tab.viewModel.appState = self
             tab.viewModel.itemStorageKey = item.storageKey
             tab.viewModel.attachmentId = item.primaryAttachment?.id.uuidString
+            tab.viewModel.prepareReadingPosition(for: item)
 
             tab.title = item.title
             openTabs.append(tab)
@@ -611,6 +616,7 @@ final class AppState {
 
         tab.document?.close()
         openTabs.remove(at: index)
+        ReadingPositionStore.shared.flush()
 
         if activeTabID == tabID {
             let allTabs = combinedTabIDs

@@ -13,6 +13,7 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
     private var pageChangeObserver: Any?
     private var scaleChangeObserver: Any?
     private var annotationHitObserver: Any?
+    private var scrollBoundsObserver: Any?
 
     // Annotation interaction
     private var mouseMonitor: Any?
@@ -105,6 +106,21 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
             guard let self,
                   let pdfView = notification.object as? PDFView else { return }
             self.updateSelectionState(pdfView: pdfView)
+        }
+
+        // Every scroll, by wheel, keyboard or a jump, moves the clip view's
+        // bounds. Page-change notifications alone would miss scrolling within a page.
+        if let clipView = pdfView.documentView?.enclosingScrollView?.contentView {
+            clipView.postsBoundsChangedNotifications = true
+            scrollBoundsObserver = center.addObserver(
+                forName: NSView.boundsDidChangeNotification,
+                object: clipView,
+                queue: .main
+            ) { [weak self, weak pdfView] _ in
+                guard let self, let pdfView,
+                      let position = Self.readingPosition(in: pdfView) else { return }
+                self.viewModel.recordReadingPosition(position)
+            }
         }
 
         setupMouseMonitor(for: pdfView)
@@ -861,11 +877,13 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
         if let obs = scaleChangeObserver { center.removeObserver(obs) }
         if let obs = annotationHitObserver { center.removeObserver(obs) }
         if let obs = selectionChangeObserver { center.removeObserver(obs) }
+        if let obs = scrollBoundsObserver { center.removeObserver(obs) }
         removeSelectionInstrumentObservers()
         pageChangeObserver = nil
         scaleChangeObserver = nil
         annotationHitObserver = nil
         selectionChangeObserver = nil
+        scrollBoundsObserver = nil
         removeMouseMonitor()
         removeRightClickMonitor()
         removeKeyMonitor()
@@ -875,6 +893,35 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
 
     deinit {
         removeObservers()
+    }
+
+    // MARK: - Reading Position
+
+    /// The top of the visible area as page index + fraction down that page —
+    /// the PDF format `ReadingPositionStore` documents.
+    static func readingPosition(in pdfView: PDFView) -> Double? {
+        guard let destination = pdfView.currentDestination,
+              let page = destination.page,
+              let doc = pdfView.document else { return nil }
+        let box = page.bounds(for: pdfView.displayBox)
+        guard box.height > 0 else { return nil }
+        let fromTop = (box.maxY - destination.point.y) / box.height
+        return Double(doc.index(for: page)) + Double(min(max(fromTop, 0), 0.999))
+    }
+
+    /// Scroll to the saved position, once. Runs after the first layout: a
+    /// destination set before the view has a size lands on the wrong spot.
+    func restoreReadingPosition(in pdfView: PDFView) {
+        guard let position = viewModel.pendingRestorePosition else { return }
+        viewModel.pendingRestorePosition = nil
+        guard let doc = pdfView.document, doc.pageCount > 0 else { return }
+        let savedIndex = Int(position)
+        let index = min(savedIndex, doc.pageCount - 1)
+        guard let page = doc.page(at: index) else { return }
+        // The file has fewer pages than when it was read: go to the top of the last one.
+        let fraction = index == savedIndex ? CGFloat(position - Double(savedIndex)) : 0
+        let box = page.bounds(for: pdfView.displayBox)
+        pdfView.go(to: PDFDestination(page: page, at: NSPoint(x: box.minX, y: box.maxY - fraction * box.height)))
     }
 
     // MARK: - PDFViewDelegate

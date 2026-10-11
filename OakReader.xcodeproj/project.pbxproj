@@ -27,6 +27,7 @@
 		0CF9F961D8DD5DB257B2D4A5 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 537214EDB1CDA6D76E3AF0ED /* SettingsView.swift */; };
 		0D45CE0FEEABDFB4EE8E0826 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 3F8F65FB4DD4744B1A704AD8 /* AppIcon.icon */; };
 		0DC3A49D563A44F4ECE5D61C /* FannedAttachmentStack.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA237E65AF0728789822FE10 /* FannedAttachmentStack.swift */; };
+		10E122CEA530A02295C1779D /* ReadingPositionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F950FC37AE40C9EED71D8A68 /* ReadingPositionStore.swift */; };
 		11F9FFA5B28E93D145B9D0DE /* CatalogDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9F631481D70E6E3856F1EA5 /* CatalogDatabase.swift */; };
 		1333A5FB9975D7CDDFB40D29 /* AnnotationPropertyPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 868B33EDCCB1FBCAEE83A36A /* AnnotationPropertyPanel.swift */; };
 		138DD1BFCD7F94A2ECB71679 /* Log.swift in Sources */ = {isa = PBXBuildFile; fileRef = 339F20DA127315E9403ADD98 /* Log.swift */; };
@@ -576,6 +577,7 @@
 		F86D6BF94023D30E9414ADCA /* LibraryModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryModels.swift; sourceTree = "<group>"; };
 		F8712FA5D845583EAADB986A /* HTMLViewerRepresentable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTMLViewerRepresentable.swift; sourceTree = "<group>"; };
 		F8F6FEED98569A7AB09BE0A5 /* ConversationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationService.swift; sourceTree = "<group>"; };
+		F950FC37AE40C9EED71D8A68 /* ReadingPositionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingPositionStore.swift; sourceTree = "<group>"; };
 		FA75FD56A0F88FB7594CEE4F /* WebToolbarComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebToolbarComponents.swift; sourceTree = "<group>"; };
 		FC69C77DD496382F2B4789FD /* QuickChatModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickChatModel.swift; sourceTree = "<group>"; };
 		FC9E41C801BDA197566BB8FD /* CSLTypeFieldSpec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSLTypeFieldSpec.swift; sourceTree = "<group>"; };
@@ -734,6 +736,7 @@
 				FD7DCBF751E2E912547F2E95 /* PasswordStore.swift */,
 				39EE1618C698DDFC82B45605 /* PDFOCRService.swift */,
 				5B385FFCAA6F36331DF44350 /* PDFRenderingService.swift */,
+				F950FC37AE40C9EED71D8A68 /* ReadingPositionStore.swift */,
 				5977FDFEB8F507EAF0676D52 /* RecordingTranscriptionService.swift */,
 				BD1DAE24E40C0139F3FB1F2E /* ReferenceService.swift */,
 				AD0DADED13546C414DFD6984 /* SharingService.swift */,
@@ -1633,6 +1636,7 @@
 				7D2334DC4E114067BC2D04BB /* QuickChatStatusItem.swift in Sources */,
 				BFA83BCEFD27E15214F1CE3E /* QuickChatTrigger.swift in Sources */,
 				818B3867EE13F14CD0F64A16 /* RPCTransport.swift in Sources */,
+				10E122CEA530A02295C1779D /* ReadingPositionStore.swift in Sources */,
 				B1B0C174E22F08B0F06EE22A /* RecordingTranscriptionService.swift in Sources */,
 				7370FECBD7A5284EEEA7D158 /* ReferenceCatalog.swift in Sources */,
 				6DAB107D9D65A97E0FCCFE77 /* ReferenceMetadataView.swift in Sources */,
@@ -1812,7 +1816,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.16.1;
+				MARKETING_VERSION = 0.18.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.oakreader.OakReader.dev;
 				PRODUCT_MODULE_NAME = OakReader;
 				PRODUCT_NAME = "OakReader-Dev";
@@ -1903,7 +1907,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.16.1;
+				MARKETING_VERSION = 0.18.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.oakreader.OakReader;
 				PRODUCT_MODULE_NAME = OakReader;
 				PRODUCT_NAME = OakReader;

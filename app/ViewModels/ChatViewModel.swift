@@ -760,6 +760,9 @@ class ChatViewModel {
     }
 
     private func navigateInPlace(vm: DocumentViewModel, anchor: CitationAnchor) {
+        // The citation is where the reader asked to go; a saved position that
+        // has not been restored yet must not scroll away from it.
+        vm.pendingRestorePosition = nil
         // A live web page is `.link` with no timeline; it navigates like HTML
         // (find-text / scroll-to-heading) rather than opening a `?time=` source.
         let isTimelineMedia = vm.contentType == .audio

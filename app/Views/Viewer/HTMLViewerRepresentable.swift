@@ -337,6 +337,28 @@ struct HTMLViewerRepresentable: NSViewRepresentable {
                 forMainFrameOnly: true
             )
             config.userContentController.addUserScript(fluidCSS)
+
+            // Report the scroll fraction so reopening the clip lands where the
+            // reader left off. Throttled: scroll fires on every frame.
+            config.userContentController.addUserScript(WKUserScript(
+                source: """
+                (function() {
+                    var timer = null;
+                    window.addEventListener('scroll', function() {
+                        if (timer) return;
+                        timer = setTimeout(function() {
+                            timer = null;
+                            var el = document.scrollingElement || document.documentElement;
+                            var max = el.scrollHeight - window.innerHeight;
+                            window.webkit.messageHandlers.readingPosition.postMessage(max > 0 ? el.scrollTop / max : 0);
+                        }, 300);
+                    }, { passive: true });
+                })();
+                """,
+                injectionTime: .atDocumentEnd,
+                forMainFrameOnly: true
+            ))
+            config.userContentController.add(context.coordinator, name: "readingPosition")
         }
 
         // Password autofill — live web pages only. Detects login forms, captures

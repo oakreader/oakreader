@@ -79,6 +79,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             object: nil
         )
         oakServer?.stop()
+        ReadingPositionStore.shared.flush()
 
         let backend = NodeBackend.shared
         Task { await backend.shutdown() }

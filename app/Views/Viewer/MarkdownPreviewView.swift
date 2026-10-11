@@ -8,6 +8,14 @@ import OakMarkdownUI
 struct MarkdownPreviewView: View {
     let viewModel: DocumentViewModel
 
+    @State private var scrollPosition = ScrollPosition()
+
+    /// Where the column is scrolled to, and how far it can scroll.
+    private struct ScrollMetrics: Equatable {
+        var offset: CGFloat
+        var maxOffset: CGFloat
+    }
+
     var body: some View {
         ScrollView(.vertical) {
             StreamingMarkdownView(
@@ -24,6 +32,22 @@ struct MarkdownPreviewView: View {
             .padding(.horizontal, 48)
             .padding(.vertical, 32)
             .frame(maxWidth: .infinity)
+        }
+        .scrollPosition($scrollPosition)
+        .onScrollGeometryChange(for: ScrollMetrics.self) { geometry in
+            ScrollMetrics(
+                offset: geometry.contentOffset.y,
+                maxOffset: max(0, geometry.contentSize.height - geometry.containerSize.height)
+            )
+        } action: { _, metrics in
+            guard metrics.maxOffset > 0 else { return }
+            // The first time the column can scroll, return to where the reader left off.
+            if let fraction = viewModel.pendingRestorePosition {
+                viewModel.pendingRestorePosition = nil
+                scrollPosition.scrollTo(y: min(max(fraction, 0), 1) * metrics.maxOffset)
+                return
+            }
+            viewModel.recordReadingPosition(metrics.offset / metrics.maxOffset)
         }
         .background(Color(nsColor: .textBackgroundColor))
     }

@@ -170,6 +170,35 @@ class DocumentViewModel {
     /// The library item's ID as a string, for annotation persistence.
     var itemId: String? { libraryItem?.id.uuidString }
 
+    // MARK: - Reading Position
+
+    /// The item whose reading position this tab saves. `nil` for a file opened
+    /// outside the library, which has no row to save it on.
+    @ObservationIgnored private var readingPositionItemID: UUID?
+
+    /// The saved position the viewer still has to scroll to, in the format
+    /// `ReadingPositionStore` documents. The viewer consumes it once; an explicit
+    /// jump (a citation, a note) clears it so the jump wins.
+    @ObservationIgnored var pendingRestorePosition: Double?
+
+    /// Called by AppState when the tab is created, before the viewer exists.
+    func prepareReadingPosition(for item: LibraryItem) {
+        readingPositionItemID = item.id
+        guard let position = ReadingPositionStore.shared.position(for: item), position > 0.001 else { return }
+        pendingRestorePosition = position
+        // Start the PDF on the right page, so the first layout already shows it.
+        if contentType == .pdf, let pageCount = pdfDocument?.pageCount, pageCount > 0 {
+            state.currentPageIndex = min(Int(position), pageCount - 1)
+        }
+    }
+
+    /// The viewer reports where the reader is. Ignored until the saved position
+    /// has been restored, so the first layout at the top does not overwrite it.
+    func recordReadingPosition(_ position: Double) {
+        guard let id = readingPositionItemID, pendingRestorePosition == nil else { return }
+        ReadingPositionStore.shared.record(position, for: id)
+    }
+
     /// When this snapshot was captured — drives the snapshot toolbar's archive
     /// badge ("Snapshot · Saved Jun 3"). Bare file opens with no library item
     /// fall back to `nil` (badge shows without a date).
