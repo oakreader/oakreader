@@ -15,6 +15,11 @@ import { z } from "zod";
  * OakReader providerId + model id; keys, OAuth tokens, endpoint overrides and
  * the model catalog live here. The agentic `chat` loop also runs here, calling
  * back into the client for tool execution (`tool_exec` → `tool_result`).
+ *
+ * Every nullable field on a type the shell SENDS is `.nullable().default(null)`.
+ * Swift's synthesized Encodable omits a nil key rather than writing null, and a
+ * bare `.nullable()` rejects the missing key — which silently dropped every new
+ * item, library chat and loose word lookup.
  */
 
 // ---------------------------------------------------------------------------
@@ -106,7 +111,7 @@ export interface PromptOption {
 export const WordLookup = z.object({
   id: z.string(),
   /** Null once the document is deleted: the column is ON DELETE SET NULL. */
-  itemId: z.string().nullable(),
+  itemId: z.string().nullable().default(null),
   /** Denormalised, so a global list needs no join. */
   itemTitle: z.string(),
   word: z.string(),
@@ -129,21 +134,21 @@ export const Annotation = z.object({
   attachmentId: z.string(),
   key: z.string(),
   type: z.string(),
-  authorName: z.string().nullable(),
-  text: z.string().nullable(),
-  comment: z.string().nullable(),
+  authorName: z.string().nullable().default(null),
+  text: z.string().nullable().default(null),
+  comment: z.string().nullable().default(null),
   color: z.string(),
-  pageLabel: z.string().nullable(),
+  pageLabel: z.string().nullable().default(null),
   sortIndex: z.string(),
   positionKind: z.string(),
   positionJson: z.string(),
-  styleJson: z.string().nullable(),
+  styleJson: z.string().nullable().default(null),
   source: z.string(),
-  sourceKey: z.string().nullable(),
+  sourceKey: z.string().nullable().default(null),
   createdAt: z.string(),
   updatedAt: z.string(),
   /** Tombstone marker; null while live. */
-  deletedAt: z.string().nullable(),
+  deletedAt: z.string().nullable().default(null),
 });
 export type Annotation = z.infer<typeof Annotation>;
 
@@ -151,7 +156,7 @@ export type Annotation = z.infer<typeof Annotation>;
 export const Conversation = z.object({
   id: z.string(),
   /** Null for chats not about one document. */
-  itemId: z.string().nullable(),
+  itemId: z.string().nullable().default(null),
   /** The collection a library chat is scoped to; null for the whole library. */
   collectionId: z.string().nullable().default(null),
   title: z.string(),
@@ -174,12 +179,12 @@ export const Collection = z.object({
   icon: z.string(),
   sortOrder: z.number().int(),
   /** Null at the top level. */
-  parentId: z.string().nullable(),
+  parentId: z.string().nullable().default(null),
   isSmart: z.boolean(),
   isSystem: z.boolean(),
-  filterRules: z.string().nullable(),
-  source: z.string().nullable(),
-  sourceKey: z.string().nullable(),
+  filterRules: z.string().nullable().default(null),
+  source: z.string().nullable().default(null),
+  sourceKey: z.string().nullable().default(null),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -193,7 +198,7 @@ export const Attachment = z.object({
   fileName: z.string(),
   contentType: z.string(),
   linkMode: z.string(),
-  sourceUrl: z.string().nullable(),
+  sourceUrl: z.string().nullable().default(null),
   fileSize: z.number().int(),
   pageCount: z.number().int(),
   isPrimary: z.boolean(),
@@ -206,10 +211,10 @@ export const PropertyValue = z.object({
   propertyId: z.string(),
   propertyName: z.string(),
   propertyType: z.string(),
-  optionId: z.string().nullable(),
-  optionName: z.string().nullable(),
-  optionColorHex: z.string().nullable(),
-  textValue: z.string().nullable(),
+  optionId: z.string().nullable().default(null),
+  optionName: z.string().nullable().default(null),
+  optionColorHex: z.string().nullable().default(null),
+  textValue: z.string().nullable().default(null),
 });
 export type PropertyValue = z.infer<typeof PropertyValue>;
 
@@ -224,20 +229,20 @@ export const Item = z.object({
   storageKey: z.string(),
   title: z.string(),
   author: z.string(),
-  lastOpenedAt: z.string().nullable(),
-  lastPosition: z.number().nullable(),
-  citeKey: z.string().nullable(),
-  source: z.string().nullable(),
-  sourceKey: z.string().nullable(),
-  extra: z.string().nullable(),
+  lastOpenedAt: z.string().nullable().default(null),
+  lastPosition: z.number().nullable().default(null),
+  citeKey: z.string().nullable().default(null),
+  source: z.string().nullable().default(null),
+  sourceKey: z.string().nullable().default(null),
+  extra: z.string().nullable().default(null),
   processingStatus: z.string(),
   /** Tombstone while in the trash. */
-  deletedAt: z.string().nullable(),
+  deletedAt: z.string().nullable().default(null),
   createdAt: z.string(),
   updatedAt: z.string(),
   attachments: z.array(Attachment),
   collectionIds: z.array(z.string()),
-  citationJson: z.string().nullable(),
+  citationJson: z.string().nullable().default(null),
   propertyValues: z.array(PropertyValue),
 });
 export type Item = z.infer<typeof Item>;
