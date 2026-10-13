@@ -234,9 +234,9 @@ async function handleChat(cmd: ChatParams, id: string): Promise<ChatResult> {
         notify: (method, params) => peer.notify(method, params),
         // A reverse request. Correlation is the envelope id, so there is no
         // waiter table to build here and none to scan on the way out.
-        executeTool: async (name, args) => {
+        executeTool: async (name, args, callId) => {
           const result = await peer.callClient<{ content: string; isError: boolean }>(
-            "tool/execute", { token: id, name, args });
+            "tool/execute", { token: id, name, args, callId });
           return result;
         },
       },

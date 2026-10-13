@@ -1,282 +1,389 @@
 import SwiftUI
 
-/// Collapses multiple tool calls into a single summary line with optional expansion.
-/// Mirrors the disclosure style of `ThinkingDisclosureView`.
+/// The tool calls of one assistant step.
+///
+/// Two shapes, after Cursor 3.17's agent panel:
+///
+/// - **While any call is live** (the model is still writing its arguments, it
+///   waits for approval, or it runs) the steps are listed in a `TailWindow`
+///   that follows the newest one, under a shimmering label naming it. A call
+///   appears as soon as the model starts writing it, so a long argument shows
+///   as it forms instead of as a silent gap.
+/// - **When all have finished** the group collapses to one summary line
+///   ("Searched library, read 2 documents"). Opening it lists the steps; a
+///   step with a result opens to show it.
+///
+/// Every tool names its step with three verb forms — running, done, failed —
+/// so the row says what is happening and what happened in the same words.
 struct ToolCallGroupView: View {
     let records: [ToolUseRecord]
 
     @State private var isExpanded = false
-    @State private var shimmerPhase: CGFloat = -1
+    @State private var isHovered = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header — collapsed summary
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    isExpanded.toggle()
+        VStack(alignment: .leading, spacing: 2) {
+            header
+            if isLive {
+                TailWindow {
+                    stepList(showsResults: false)
                 }
-            } label: {
-                HStack(spacing: 4) {
-                    if !isExecuting {
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                            .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                            .animation(.easeInOut(duration: 0.2), value: isExpanded)
-                    }
-
-                    if isExecuting {
-                        shimmerLabel
-                    } else {
-                        Text(summaryText)
-                            .font(OakStyle.ChatFont.messageBody)
-                            .fontWeight(.medium)
-                            .foregroundStyle(.secondary)
-                    }
-                }
+                .transition(.opacity)
+            } else if isExpanded {
+                stepList(showsResults: true)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
-            .buttonStyle(.plain)
+        }
+        .animation(.chatDisclosure, value: isLive)
+        .animation(.chatDisclosure, value: isExpanded)
+    }
+
+    // MARK: - Header
+
+    private var header: some View {
+        Button {
+            guard !isLive else { return }
+            isExpanded.toggle()
+        } label: {
+            HStack(spacing: 4) {
+                if isLive {
+                    // Keyed on the call, not the text: a query that streams in
+                    // character by character must not re-run the transition.
+                    ShimmerText(text: liveLabel)
+                        .id(liveRecord?.id)
+                        .transition(.opacity)
+                } else {
+                    Text(summaryText)
+                        .font(OakStyle.ChatFont.messageBody)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                        // Cursor hides the chevron until hover or open.
+                        .opacity(isHovered || isExpanded ? 1 : 0)
+                }
+                Spacer(minLength: 0)
+            }
             .padding(.vertical, 4)
             .padding(.horizontal, 4)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+    }
 
-            // Expanded detail list
-            if isExpanded {
-                VStack(alignment: .leading, spacing: 2) {
-                    ForEach(records) { record in
-                        HStack(spacing: 4) {
-                            recordStatusIcon(record)
-                            Text(recordLabel(record))
-                                .font(OakStyle.ChatFont.messageBody)
-                                .foregroundStyle(.secondary.opacity(0.75))
-                                .lineLimit(1)
-                        }
-                        .padding(.leading, 8)
-                    }
-                }
-                .padding(.vertical, 4)
-                .overlay(alignment: .leading) {
-                    Rectangle()
-                        .fill(Color.secondary.opacity(0.2))
-                        .frame(width: 2)
-                }
-                .transition(.opacity.combined(with: .move(edge: .top)))
+    private func stepList(showsResults: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(records) { record in
+                ToolStepRow(record: record, showsResult: showsResults)
             }
         }
-        .onAppear {
-            if isExecuting { startShimmer() }
-        }
-        .onChange(of: isExecuting) { _, executing in
-            if executing { startShimmer() }
+        .padding(.leading, 10)
+        .padding(.vertical, 2)
+        .overlay(alignment: .leading) {
+            Rectangle()
+                .fill(Color.secondary.opacity(0.2))
+                .frame(width: 2)
+                .padding(.leading, 4)
         }
     }
 
     // MARK: - State
 
-    private var isExecuting: Bool {
-        records.contains { $0.status == .executing }
+    private var isLive: Bool { records.contains { $0.status.isLive } }
+
+    private var liveRecord: ToolUseRecord? { records.last { $0.status.isLive } }
+
+    private var liveLabel: String {
+        guard let record = liveRecord else { return "Working…" }
+        if record.status == .pending { return "Waiting for approval" }
+        let step = ToolStep(record)
+        return step.detail.isEmpty ? "\(step.running)…" : "\(step.running) \(step.detail)…"
     }
 
-    // MARK: - Summary Text
-
+    /// "Searched library for “agents”, read 3 documents". One phrase per kind
+    /// of step, in call order; failures are counted apart.
     private var summaryText: String {
-        let grouped = Dictionary(grouping: records, by: { toolCategory($0.name) })
-        let parts: [String] = grouped.keys.sorted().compactMap { category in
-            guard let items = grouped[category] else { return nil }
-            return completedDescription(category: category, count: items.count)
+        var order: [String] = []
+        var groups: [String: (step: ToolStep, failed: Bool, count: Int)] = [:]
+        for record in records {
+            let step = ToolStep(record)
+            let failed = record.isError
+            let key = "\(failed)|\(step.done)|\(step.plural)"
+            if groups[key] == nil {
+                order.append(key)
+                groups[key] = (step, failed, 0)
+            }
+            groups[key]!.count += 1
         }
-        return parts.joined(separator: ", ")
+        let parts = order.map { key -> String in
+            let g = groups[key]!
+            if g.failed {
+                return g.count == 1 ? "\(g.step.failed) attempted" : "\(g.count) \(g.step.plural) failed"
+            }
+            if g.count == 1 {
+                // A search names its query; a read names what it read.
+                let object = g.step.noun.isEmpty ? g.step.detail : g.step.noun
+                return object.isEmpty ? g.step.done : "\(g.step.done) \(object)"
+            }
+            return "\(g.step.summaryDone ?? g.step.done) \(g.count) \(g.step.plural)"
+        }
+        let joined = parts.joined(separator: ", ")
+        return joined.prefix(1).uppercased() + joined.dropFirst()
     }
+}
 
-    private var executingText: String {
-        // Show the executing tool's action, or a generic message
-        if let executing = records.last(where: { $0.status == .executing }) {
-            return executingDescription(toolName: executing.name)
-        }
-        return "Working..."
-    }
+private extension ToolUseStatus {
+    var isLive: Bool { self == .streaming || self == .pending || self == .executing }
+}
 
-    // MARK: - Tool Category Mapping
+// MARK: - One step
 
-    private enum ToolCategory: String, Comparable {
-        case searchDocument
-        case readDocument
-        case searchFiles
-        case readFiles
-        case writeFiles
-        case editFiles
-        case bash
-        case oak
-        case other
+private struct ToolStepRow: View {
+    let record: ToolUseRecord
+    let showsResult: Bool
 
-        static func < (lhs: ToolCategory, rhs: ToolCategory) -> Bool {
-            lhs.sortOrder < rhs.sortOrder
-        }
+    @State private var showsOutput = false
 
-        var sortOrder: Int {
-            switch self {
-            case .searchDocument: return 0
-            case .readDocument: return 1
-            case .searchFiles: return 2
-            case .readFiles: return 3
-            case .writeFiles: return 4
-            case .editFiles: return 5
-            case .bash: return 6
-            case .oak: return 7
-            case .other: return 8
+    var body: some View {
+        let step = ToolStep(record)
+        VStack(alignment: .leading, spacing: 3) {
+            Button {
+                if canOpen { showsOutput.toggle() }
+            } label: {
+                HStack(spacing: 4) {
+                    Text(verb(step))
+                        .fontWeight(record.status.isLive ? .medium : .regular)
+                        .foregroundStyle(record.isError ? AnyShapeStyle(Color.red.opacity(0.8))
+                                         : record.status.isLive ? AnyShapeStyle(.primary)
+                                         : AnyShapeStyle(.secondary))
+                    if !step.detail.isEmpty {
+                        Text(step.detail)
+                            .foregroundStyle(.secondary.opacity(0.8))
+                            .truncationMode(.middle)
+                    }
+                    if let outcome = outcome {
+                        Text(outcome)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .font(OakStyle.ChatFont.messageBody)
+                .lineLimit(1)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(!canOpen)
+
+            // The argument the model is still writing, newest lines in view.
+            if record.status == .streaming, let body = streamingBody {
+                TailWindow(maxHeight: 80) {
+                    Text(body)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+            }
+
+            if showsOutput, let result = record.result, !result.isEmpty {
+                ToolResultPreview(text: result)
+                    .transition(.opacity)
             }
         }
+        .animation(.chatDisclosure, value: showsOutput)
     }
 
-    private func toolCategory(_ name: String) -> ToolCategory {
-        switch name {
-        case "search_document": return .searchDocument
-        case "read_document": return .readDocument
-        case "search_files": return .searchFiles
-        case "read", "read_file": return .readFiles
-        case "write", "write_file": return .writeFiles
-        case "edit": return .editFiles
-        case "bash": return .bash
-        case "oak": return .oak
-        default: return .other
-        }
+    private var canOpen: Bool {
+        showsResult && !(record.result ?? "").isEmpty
     }
 
-    private func completedDescription(category: ToolCategory, count: Int) -> String {
-        switch category {
-        case .searchDocument:
-            return count == 1 ? "Searched 1 page" : "Searched \(count) pages"
-        case .readDocument:
-            return count == 1 ? "Read 1 page" : "Read \(count) pages"
-        case .searchFiles:
-            return "Searched files"
-        case .readFiles:
-            return count == 1 ? "Read 1 file" : "Read \(count) files"
-        case .writeFiles:
-            return count == 1 ? "Wrote 1 file" : "Wrote \(count) files"
-        case .editFiles:
-            return count == 1 ? "Edited 1 file" : "Edited \(count) files"
-        case .bash:
-            return count == 1 ? "Ran 1 command" : "Ran \(count) commands"
-        case .oak:
-            return "Queried library"
-        case .other:
-            return count == 1 ? "Used 1 tool" : "Used \(count) tools"
-        }
-    }
-
-    private func executingDescription(toolName: String) -> String {
-        switch toolName {
-        case "search_document": return "Searching documents..."
-        case "read_document": return "Reading document..."
-        case "search_files": return "Searching files..."
-        case "read", "read_file": return "Reading files..."
-        case "write", "write_file": return "Writing..."
-        case "edit": return "Editing..."
-        case "bash": return "Running command..."
-        case "oak": return "Querying library..."
-        default: return "Working..."
-        }
-    }
-
-    // MARK: - Record Detail
-
-    @ViewBuilder
-    private func recordStatusIcon(_ record: ToolUseRecord) -> some View {
+    private func verb(_ step: ToolStep) -> String {
         switch record.status {
-        case .executing:
-            ProgressView()
-                .controlSize(.mini)
-                .scaleEffect(0.6)
-                .frame(width: 10, height: 10)
-        case .completed:
-            Image(systemName: record.isError ? "xmark" : "checkmark")
-                .font(.system(size: 8, weight: .bold))
-                .foregroundStyle(record.isError ? .red : .green)
-                .frame(width: 10, height: 10)
-        case .denied:
-            Image(systemName: "hand.raised.fill")
-                .font(.system(size: 8))
-                .foregroundStyle(.red)
-                .frame(width: 10, height: 10)
-        case .pending:
-            Image(systemName: "clock")
-                .font(.system(size: 8))
-                .foregroundStyle(.orange)
-                .frame(width: 10, height: 10)
+        case .streaming, .executing: return step.running
+        case .pending: return step.running
+        case .denied: return "Skipped"
+        case .completed: return record.isError ? "\(step.failed) attempted" : step.done
         }
     }
 
-    private func recordLabel(_ record: ToolUseRecord) -> String {
-        let displayName: String
-        switch record.name {
-        case "search_document": displayName = "Search"
-        case "read_document": displayName = "Read"
-        case "search_files": displayName = "Search files"
-        case "read", "read_file": displayName = "Read"
-        case "write", "write_file": displayName = "Write"
-        case "edit": displayName = "Edit"
-        case "bash": displayName = "Bash"
-        case "oak": displayName = "Oak"
-        default: displayName = record.name
+    /// "12 results" from an `oak` JSON envelope, or an error's first line.
+    private var outcome: String? {
+        guard record.status == .completed, let result = record.result else { return nil }
+        if record.isError {
+            let line = result.split(separator: "\n").first.map(String.init) ?? ""
+            return line.count > 60 ? String(line.prefix(60)) + "…" : line
         }
-
-        if let path = record.filePath {
-            let abbreviated = abbreviatedPath(path)
-            return "\(displayName) \(abbreviated)"
+        if let start = result.firstIndex(of: "{"),
+           let data = String(result[start...]).data(using: .utf8),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let count = (json["meta"] as? [String: Any])?["count"] as? Int {
+            return count == 1 ? "1 result" : "\(count) results"
         }
-        if let query = record.input["query"] ?? record.input["command"] {
-            let truncated = query.count > 40 ? String(query.prefix(40)) + "..." : query
-            return "\(displayName) \"\(truncated)\""
-        }
-        return displayName
+        return nil
     }
 
-    private func abbreviatedPath(_ path: String) -> String {
-        let components = path.split(separator: "/")
-        if components.count <= 2 { return path }
-        return ".../" + components.suffix(2).joined(separator: "/")
+    /// The longest string argument, once it is long enough to be worth showing
+    /// as it forms: a note body, a command, a long query.
+    private var streamingBody: String? {
+        let longest = record.input.values.values
+            .compactMap(\.scalarString)
+            .max { $0.count < $1.count }
+        guard let text = longest, text.count > 80 else { return nil }
+        // Only the tail is visible, so do not lay out the whole body.
+        let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
+        return lines.suffix(10).joined(separator: "\n")
     }
+}
 
-    // MARK: - Shimmer
+/// A finished step's output: the first lines, in a box that scrolls past 96 pt.
+private struct ToolResultPreview: View {
+    let text: String
 
-    private var shimmerLabel: some View {
-        HStack(spacing: 6) {
-            // The same animated 3×3 "agent is working" indicator the chat uses
-            // elsewhere — replaces the static gear, which read as a Settings icon.
-            StreamingCursor()
-            Text(executingText)
-                .font(OakStyle.ChatFont.messageBody)
-                .fontWeight(.medium)
+    var body: some View {
+        ScrollView(.vertical) {
+            Text(preview)
+                .font(.system(size: 11, design: .monospaced))
                 .foregroundStyle(.secondary)
-                .overlay {
-                    shimmerGradient
-                        .mask {
-                            Text(executingText)
-                                .font(OakStyle.ChatFont.messageBody)
-                                .fontWeight(.medium)
-                        }
-                }
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(8)
+        }
+        .frame(maxHeight: 96)
+        .fixedSize(horizontal: false, vertical: true)
+        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 6))
+    }
+
+    /// Long results (a read document) are cut: the box is a glance, not a reader.
+    private var preview: String {
+        text.count > 2000 ? String(text.prefix(2000)) + "\n…" : text
+    }
+}
+
+// MARK: - Step naming
+
+/// How one tool call is named: three verb forms (Cursor's
+/// `tool-action-labels.js` pattern), the object it acts on, and the noun used
+/// when several calls collapse into one summary.
+private struct ToolStep {
+    var running: String
+    var done: String
+    var failed: String
+    var detail: String = ""
+    var noun: String = ""
+    var plural: String = ""
+    /// The verb for "N of these", when `done` reads wrong with a count:
+    /// "Ran 3 web searches", not "Searched the web for 3 web searches".
+    var summaryDone: String?
+
+    init(_ record: ToolUseRecord) {
+        let input = record.input
+        func quoted(_ key: String) -> String {
+            guard let value = input[key], !value.isEmpty else { return "" }
+            return "“\(value.count > 40 ? String(value.prefix(40)) + "…" : value)”"
+        }
+        switch record.name {
+        case "search_document":
+            self.init("Searching", "Searched", "Search", quoted("query"), "the document", "documents")
+        case "read_document":
+            let pages = input["pages"].map { "pages \($0)" } ?? ""
+            self.init("Reading", "Read", "Read", pages, "the document", "documents")
+        case "read_current_page":
+            self.init("Reading", "Read", "Read", "the page", "the page", "pages")
+        case "search_web":
+            self.init("Searching the web for", "Searched the web for", "Search the web for",
+                      quoted("query"), "", "queries")
+            summaryDone = "Ran"; plural = "web searches"
+        case "fetch_web":
+            self.init("Opening", "Opened", "Open", Self.host(input["url"]), "a page", "pages")
+        case "search_academic":
+            self.init("Searching papers for", "Searched papers for", "Search papers for",
+                      quoted("query"), "", "paper searches")
+            summaryDone = "Ran"
+        case "manage_memory":
+            let op = (input["operation"] ?? "").lowercased()
+            if op == "list" {
+                self.init("Reading", "Read", "Read", "memory", "memory", "memory")
+            } else {
+                self.init("Updating", "Updated", "Update", "memory", "memory", "memory")
+            }
+        case "bash":
+            self.init("Running", "Ran", "Run", Self.short(input["command"]), "a command", "commands")
+        case "read", "read_file":
+            self.init("Reading", "Read", "Read", Self.path(input["path"]), "a file", "files")
+        case "write", "write_file":
+            self.init("Writing", "Wrote", "Write", Self.path(input["path"]), "a file", "files")
+        case "edit":
+            self.init("Editing", "Edited", "Edit", Self.path(input["path"]), "a file", "files")
+        case "oak":
+            self.init(oakCommand: input["command"] ?? "")
+        default:
+            self.init("Running", "Ran", "Run", record.name, "a tool", "tools")
         }
     }
 
-    private var shimmerGradient: some View {
-        LinearGradient(
-            colors: [.clear, Color.primary.opacity(0.6), .clear],
-            startPoint: .leading,
-            endPoint: .trailing
-        )
-        .frame(width: 60)
-        .offset(x: shimmerPhase * 120)
-        .animation(
-            .easeInOut(duration: 1.5).repeatForever(autoreverses: false),
-            value: shimmerPhase
-        )
+    private init(_ running: String, _ done: String, _ failed: String,
+                 _ detail: String, _ noun: String, _ plural: String) {
+        self.running = running
+        self.done = done
+        self.failed = failed
+        self.detail = detail
+        self.noun = noun
+        self.plural = plural
     }
 
-    private func startShimmer() {
-        shimmerPhase = -1
-        withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: false)) {
-            shimmerPhase = 1
+    /// `items read <key>` → Reading / Read <key>; `search <q>` → Searching library for “q”.
+    private init(oakCommand command: String) {
+        let words = command.split(separator: " ").map(String.init)
+        func unquote(_ s: String) -> String {
+            s.trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
         }
+        // The object: words after the verb up to the first flag.
+        func object(after count: Int) -> String {
+            unquote(words.dropFirst(count).prefix { !$0.hasPrefix("--") }.joined(separator: " "))
+        }
+        func flag(_ name: String) -> String? {
+            guard let i = words.firstIndex(of: name), i + 1 < words.count else { return nil }
+            return unquote(words[i + 1])
+        }
+        switch (words.first, words.dropFirst().first) {
+        case ("items", "read"):
+            self.init("Reading", "Read", "Read", object(after: 2), "a document", "documents")
+        case ("items", "show"):
+            self.init("Looking up", "Looked up", "Look up", object(after: 2), "a document", "documents")
+        case ("items", "list"):
+            self.init("Listing", "Listed", "List", flag("--collection") ?? "items", "items", "lists")
+        case ("collections", "list"):
+            self.init("Listing", "Listed", "List", "collections", "collections", "lists")
+        case ("tags", "list"):
+            self.init("Listing", "Listed", "List", "tags", "tags", "lists")
+        case ("search", _):
+            let q = object(after: 1)
+            self.init("Searching library for", "Searched library for", "Search library for",
+                      q.isEmpty ? "" : "“\(q)”", "", "searches")
+            summaryDone = "Ran"; plural = "library searches"
+        case ("import", _):
+            self.init("Importing", "Imported", "Import", Self.host(object(after: 1)), "a document", "documents")
+        default:
+            self.init("Updating", "Updated", "Update", "library", "the library", "library changes")
+        }
+    }
+
+    private static func path(_ path: String?) -> String {
+        guard let path, !path.isEmpty else { return "" }
+        let parts = path.split(separator: "/")
+        return parts.count <= 2 ? path : parts.suffix(2).joined(separator: "/")
+    }
+
+    private static func host(_ url: String?) -> String {
+        guard let url, !url.isEmpty else { return "" }
+        return URL(string: url)?.host() ?? url
+    }
+
+    private static func short(_ text: String?) -> String {
+        guard let text, !text.isEmpty else { return "" }
+        let line = text.split(separator: "\n").first.map(String.init) ?? text
+        return line.count > 48 ? String(line.prefix(48)) + "…" : line
     }
 }

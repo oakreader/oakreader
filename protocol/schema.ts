@@ -586,6 +586,8 @@ export const METHODS: Method[] = [
       token,
       { name: "name", type: str },
       { name: "args", type: json },
+      { name: "callId", type: str, optional: true,
+        doc: "The model's id for this call, the same as on chat/toolcall." },
     ],
     result: [
       { name: "content", type: str },
@@ -615,6 +617,18 @@ export const METHODS: Method[] = [
   {
     name: "chat/thinking", type: "ChatThinking", kind: "notification", from: "server",
     params: [token, { name: "text", type: str }],
+  },
+  {
+    name: "chat/toolcall", type: "ChatToolCall", kind: "notification", from: "server",
+    doc: "A tool call while the model is still writing it. `args` is the partial " +
+         "JSON parsed so far; `done` marks the last update before tool/execute.",
+    params: [
+      token,
+      { name: "callId", type: str },
+      { name: "name", type: str },
+      { name: "args", type: json },
+      { name: "done", type: bool, default: "false" },
+    ],
   },
   {
     name: "chat/assistant", type: "ChatAssistant", kind: "notification", from: "server",

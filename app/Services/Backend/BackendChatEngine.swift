@@ -83,6 +83,16 @@ actor BackendChatEngine {
                     var assistantTurn = Turn(role: .assistant, content: "", isStreaming: true)
                     var iterationRecords: [ToolUseRecord] = []
                     var expectedToolCalls = 0
+                    // Uptime of this iteration's first thinking token, until the
+                    // first answer token or tool call ends the thinking.
+                    var thinkingStart: TimeInterval?
+                    func endThinking() {
+                        guard let start = thinkingStart else { return }
+                        thinkingStart = nil
+                        let seconds = ProcessInfo.processInfo.systemUptime - start
+                        assistantTurn.thinkingSeconds = seconds
+                        continuation.yield(.thinkingFinished(seconds: seconds))
+                    }
 
                     func finishIteration() async throws {
                         assistantTurn.isStreaming = false
@@ -92,6 +102,7 @@ actor BackendChatEngine {
                         assistantTurn = Turn(role: .assistant, content: "", isStreaming: true)
                         iterationRecords = []
                         expectedToolCalls = 0
+                        thinkingStart = nil
                     }
 
                     do {
@@ -105,17 +116,29 @@ actor BackendChatEngine {
                             switch method {
                             case RPC.Method.chatDelta:
                                 guard let p = try? RPCCoding.decode(RPC.ChatDeltaParams.self, from: raw) else { break }
+                                endThinking()
                                 assistantTurn.content += p.text
                                 continuation.yield(.delta(p.text))
 
                             case RPC.Method.chatThinking:
                                 guard let p = try? RPCCoding.decode(RPC.ChatThinkingParams.self, from: raw) else { break }
+                                if assistantTurn.thinking == nil {
+                                    thinkingStart = ProcessInfo.processInfo.systemUptime
+                                }
                                 assistantTurn.thinking = (assistantTurn.thinking ?? "") + p.text
                                 continuation.yield(.thinkingDelta(p.text))
+
+                            case RPC.Method.chatToolCall:
+                                guard let p = try? RPCCoding.decode(RPC.ChatToolCallParams.self, from: raw) else { break }
+                                endThinking()
+                                continuation.yield(.toolInputDelta(
+                                    id: p.callId, name: p.name,
+                                    input: ToolInput(jsonObject: p.args.mapValues(\.anyValue))))
 
                             case RPC.Method.chatAssistant:
                                 // Authoritative snapshot of this iteration.
                                 guard let p = try? RPCCoding.decode(RPC.ChatAssistantParams.self, from: raw) else { break }
+                                endThinking()
                                 assistantTurn.content = p.text
                                 if let thinking = p.thinking { assistantTurn.thinking = thinking }
                                 expectedToolCalls = p.toolCalls.count
@@ -134,7 +157,9 @@ actor BackendChatEngine {
                         else { continue }
 
                         do {
-                            let callId = rpcId
+                            // The model's id, so this record replaces the preview
+                            // drawn from chat/toolcall instead of adding a second row.
+                            let callId = p.callId ?? rpcId
                             let name = p.name
                             let input = ToolInput(jsonObject: p.args.mapValues(\.anyValue))
                             let call = ToolCall(id: callId, name: name, input: input)

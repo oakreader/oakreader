@@ -14,6 +14,10 @@ struct Turn: Identifiable, Codable, Equatable, Sendable {
     var toolUses: [ToolUseRecord]
     /// Extended thinking content from reasoning models.
     var thinking: String?
+    /// Measured time from the first thinking token to the first answer token or
+    /// tool call. Nil for turns saved before it was recorded: the header then
+    /// says "Thought", not a number made up from the text length.
+    var thinkingSeconds: Double?
 
     enum Role: String, Codable, Sendable {
         case user, assistant, system
@@ -56,6 +60,7 @@ struct Turn: Identifiable, Codable, Equatable, Sendable {
         attachments = try container.decodeIfPresent([TurnAttachment].self, forKey: .attachments) ?? []
         toolUses = try container.decodeIfPresent([ToolUseRecord].self, forKey: .toolUses) ?? []
         thinking = try container.decodeIfPresent(String.self, forKey: .thinking)
+        thinkingSeconds = try container.decodeIfPresent(Double.self, forKey: .thinkingSeconds)
 
         // Backward compat: decode `metadata` dict, or fall back to legacy `skill` string
         if let meta = try container.decodeIfPresent([String: String].self, forKey: .metadata) {
@@ -70,6 +75,7 @@ struct Turn: Identifiable, Codable, Equatable, Sendable {
     // Coding keys include legacy `skill` for backward-compatible decoding
     private enum CodingKeys: String, CodingKey {
         case id, role, content, timestamp, isStreaming, metadata, error, attachments, toolUses, skill, thinking
+        case thinkingSeconds
     }
 
     // Custom encode to only write `metadata` (not the legacy `skill` key)
@@ -85,6 +91,7 @@ struct Turn: Identifiable, Codable, Equatable, Sendable {
         try container.encode(attachments, forKey: .attachments)
         try container.encode(toolUses, forKey: .toolUses)
         try container.encodeIfPresent(thinking, forKey: .thinking)
+        try container.encodeIfPresent(thinkingSeconds, forKey: .thinkingSeconds)
     }
 }
 

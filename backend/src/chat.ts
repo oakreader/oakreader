@@ -94,7 +94,9 @@ export interface ChatCallbacks {
    * reverse JSON-RPC request, so correlation is the envelope's own id -- the
    * caller does not thread a callId through.
    */
-  executeTool(name: string, args: Record<string, unknown>): Promise<{ content: string; isError: boolean }>;
+  executeTool(
+    name: string, args: Record<string, unknown>, callId: string,
+  ): Promise<{ content: string; isError: boolean }>;
 }
 
 /**
@@ -127,12 +129,14 @@ export async function runChat(
     parameters: t.inputSchema as AgentTool["parameters"],
     // Sequential so the shell's confirmation UX still sees one call at a time.
     executionMode: "sequential",
-    execute: async (_toolCallId, params) => {
-      // No callId threaded through: the reverse request's own envelope id
-      // correlates the answer.
+    execute: async (toolCallId, params) => {
+      // The reverse request's envelope id correlates the answer. The model's
+      // call id goes along so the shell can match it to the chat/toolcall
+      // preview it has been drawing.
       const result = await callbacks.executeTool(
         t.name,
         (params ?? {}) as Record<string, unknown>,
+        toolCallId,
       );
       // pi wants a throw on failure; the shell reports errors in-band, and the
       // model is better served seeing the message than an opaque failure.
@@ -151,6 +155,21 @@ export async function runChat(
   };
 
   let lastStopReason = "stop";
+  // Partial-args updates, at most one per call per interval. pi re-parses the
+  // whole argument JSON on every delta, so sending each one would ship a
+  // long `write` body to the shell hundreds of times.
+  const toolcallInterval = 80;
+  const lastToolcallSent = new Map<string, number>();
+  const sendToolcall = (partial: AssistantMessage, index: number, done: boolean) => {
+    const block = partial.content[index];
+    if (!block || block.type !== "toolCall" || !block.id) return;
+    const now = Date.now();
+    if (!done && now - (lastToolcallSent.get(block.id) ?? 0) < toolcallInterval) return;
+    lastToolcallSent.set(block.id, now);
+    notify("chat/toolcall", {
+      token, callId: block.id, name: block.name, args: block.arguments ?? {}, done,
+    });
+  };
 
   const stream = agentLoop(
     [],
@@ -172,6 +191,11 @@ export async function runChat(
         const inner = event.assistantMessageEvent;
         if (inner.type === "text_delta") notify("chat/delta", { token, text: inner.delta });
         else if (inner.type === "thinking_delta") notify("chat/thinking", { token, text: inner.delta });
+        else if (inner.type === "toolcall_start" || inner.type === "toolcall_delta") {
+          sendToolcall(inner.partial, inner.contentIndex, false);
+        } else if (inner.type === "toolcall_end") {
+          sendToolcall(inner.partial, inner.contentIndex, true);
+        }
         break;
       }
       case "message_end": {

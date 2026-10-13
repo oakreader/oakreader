@@ -98,6 +98,7 @@ enum RPC {
         static let oAuthPrompt = "oauth/prompt"
         static let chatDelta = "chat/delta"
         static let chatThinking = "chat/thinking"
+        static let chatToolCall = "chat/toolcall"
         static let chatAssistant = "chat/assistant"
         static let oAuthNotify = "oauth/notify"
     }
@@ -693,6 +694,8 @@ enum RPC {
         var token: String
         var name: String
         var args: [String: JSONFragment]
+        /// The model's id for this call, the same as on chat/toolcall.
+        var callId: String?
     }
     struct ToolExecuteResult: Encodable {
         var content: String
@@ -726,6 +729,18 @@ enum RPC {
         /// Id of the request this belongs to.
         var token: String
         var text: String
+    }
+
+    // MARK: chat/toolcall
+    /// A tool call while the model is still writing it. `args` is the partial JSON parsed so far;
+    /// `done` marks the last update before tool/execute.
+    struct ChatToolCallParams: Decodable {
+        /// Id of the request this belongs to.
+        var token: String
+        var callId: String
+        var name: String
+        var args: [String: JSONFragment]
+        var done: Bool?
     }
 
     // MARK: chat/assistant

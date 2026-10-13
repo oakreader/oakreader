@@ -554,6 +554,8 @@ export type ToolExecuteParams = {
   token: string;
   name: string;
   args: Record<string, unknown>;
+  /** The model's id for this call, the same as on chat/toolcall. */
+  callId?: string;
 };
 export type ToolExecuteResult = {
   content: string;
@@ -586,6 +588,16 @@ export type ChatThinkingParams = {
   /** Id of the request this belongs to. */
   token: string;
   text: string;
+};
+
+/** `chat/toolcall` — A tool call while the model is still writing it. `args` is the partial JSON parsed so far; `done` marks the last update before tool/execute. */
+export type ChatToolCallParams = {
+  /** Id of the request this belongs to. */
+  token: string;
+  callId: string;
+  name: string;
+  args: Record<string, unknown>;
+  done: boolean;
 };
 
 /** `chat/assistant` — Authoritative snapshot of one iteration's assistant message. */
@@ -739,6 +751,7 @@ export type ServerRequestMethod =
 export type ServerNotificationMethod =
   | "chat/delta"
   | "chat/thinking"
+  | "chat/toolcall"
   | "chat/assistant"
   | "oauth/notify"
   ;

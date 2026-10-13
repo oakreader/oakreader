@@ -27,6 +27,7 @@
 		0CF9F961D8DD5DB257B2D4A5 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 537214EDB1CDA6D76E3AF0ED /* SettingsView.swift */; };
 		0D45CE0FEEABDFB4EE8E0826 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 3F8F65FB4DD4744B1A704AD8 /* AppIcon.icon */; };
 		0DC3A49D563A44F4ECE5D61C /* FannedAttachmentStack.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA237E65AF0728789822FE10 /* FannedAttachmentStack.swift */; };
+		0EE654F326D3C66231C78461 /* ChatStreamingChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0500389E63145F54BCC7DD6F /* ChatStreamingChrome.swift */; };
 		10E122CEA530A02295C1779D /* ReadingPositionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F950FC37AE40C9EED71D8A68 /* ReadingPositionStore.swift */; };
 		11F9FFA5B28E93D145B9D0DE /* CatalogDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9F631481D70E6E3856F1EA5 /* CatalogDatabase.swift */; };
 		1333A5FB9975D7CDDFB40D29 /* AnnotationPropertyPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 868B33EDCCB1FBCAEE83A36A /* AnnotationPropertyPanel.swift */; };
@@ -304,6 +305,7 @@
 		02858600656BB33124BD0DDC /* ToolResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolResolver.swift; sourceTree = "<group>"; };
 		02EB12B6BA4BBAF5526C5DBD /* NSImage+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSImage+Extensions.swift"; sourceTree = "<group>"; };
 		03A8D7D8FCBA0FBA22E805A4 /* ToolOutput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolOutput.swift; sourceTree = "<group>"; };
+		0500389E63145F54BCC7DD6F /* ChatStreamingChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatStreamingChrome.swift; sourceTree = "<group>"; };
 		062312E08446675930CED8F3 /* QuickChatPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickChatPanel.swift; sourceTree = "<group>"; };
 		0712E99809335B2548888ED2 /* CitationSourceRegistry+OakCLI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CitationSourceRegistry+OakCLI.swift"; sourceTree = "<group>"; };
 		0798061F20C695B4E7971E21 /* ChatCompletionItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatCompletionItem.swift; sourceTree = "<group>"; };
@@ -767,6 +769,7 @@
 				2781D3BACDC448CA4822441F /* ChatCompletionPanel.swift */,
 				E4849A18B8929D414D36B924 /* ChatHistoryDrawer.swift */,
 				A508F4FFB36333D8C6ACF7A1 /* ChatInputTextView.swift */,
+				0500389E63145F54BCC7DD6F /* ChatStreamingChrome.swift */,
 				50968AB643394776EE5003D9 /* ChatTokenAttachment.swift */,
 				D43EB7C93B82A6070B58E4F8 /* CitationHoverCard.swift */,
 				5E730EE409F4BFF66DE9946C /* CompletionPalette.swift */,
@@ -1483,6 +1486,7 @@
 				BAF71CFD5D2ACEFB9A46741D /* ChatContextSnapshot.swift in Sources */,
 				44FD44DCD9059A8E137F545F /* ChatHistoryDrawer.swift in Sources */,
 				E7EFE99A799CA2ABAB1AE668 /* ChatInputTextView.swift in Sources */,
+				0EE654F326D3C66231C78461 /* ChatStreamingChrome.swift in Sources */,
 				FB5A4FEB8571CD06161A25D5 /* ChatTitleService.swift in Sources */,
 				D374A633329190B5FFF58678 /* ChatTokenAttachment.swift in Sources */,
 				0B0A986E0815BA65EE34F36F /* ChatViewModel.swift in Sources */,

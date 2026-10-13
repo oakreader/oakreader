@@ -511,10 +511,39 @@ class ChatViewModel {
                             turns.append(newTurn)
                         }
 
-                    case .toolInputDelta:
-                        // No tool renders in-progress input anymore; the completed
-                        // tool-use record is surfaced via the generic summary.
-                        break
+                    case .toolInputDelta(let callId, let name, let input):
+                        // The model is still writing this call. Draw it now, so a
+                        // long argument (a whole note, a search) shows as it forms
+                        // instead of as a silent gap before the tool runs.
+                        commitPendingText()
+                        let idx: Int
+                        if let id = assistantTurnId,
+                           let existing = turns.lastIndex(where: { $0.id == id })
+                        {
+                            idx = existing
+                        } else {
+                            let newTurn = Turn(role: .assistant, content: "", isStreaming: true)
+                            assistantTurnId = newTurn.id
+                            turns.append(newTurn)
+                            idx = turns.count - 1
+                        }
+                        if let toolIdx = turns[idx].toolUses.firstIndex(where: { $0.id == callId }) {
+                            // Only a preview grows; a record that has started running
+                            // is the engine's and must not go back to `.streaming`.
+                            if turns[idx].toolUses[toolIdx].status == .streaming {
+                                turns[idx].toolUses[toolIdx] = ToolUseRecord(
+                                    streamingId: callId, name: name, input: input)
+                            }
+                        } else {
+                            turns[idx].toolUses.append(
+                                ToolUseRecord(streamingId: callId, name: name, input: input))
+                        }
+
+                    case .thinkingFinished(let seconds):
+                        if let id = assistantTurnId,
+                           let idx = turns.lastIndex(where: { $0.id == id }) {
+                            turns[idx].thinkingSeconds = seconds
+                        }
 
                     case .toolUseStarted(let record):
                         // A tool-only iteration emits no text/thinking delta before
@@ -585,6 +614,9 @@ class ChatViewModel {
                             turns[idx].toolUses = turn.toolUses
                             if let thinking = turn.thinking {
                                 turns[idx].thinking = thinking
+                            }
+                            if let seconds = turn.thinkingSeconds {
+                                turns[idx].thinkingSeconds = seconds
                             }
 
                             // If this turn had tool uses, reset assistantTurnId

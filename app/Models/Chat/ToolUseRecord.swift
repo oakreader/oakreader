@@ -3,6 +3,8 @@ import Foundation
 // MARK: - Tool Use Status
 
 enum ToolUseStatus: String, Codable, Sendable {
+    /// The model is still writing the arguments; nothing has run.
+    case streaming
     case pending = "awaitingConfirmation"
     case executing
     case completed
@@ -19,6 +21,16 @@ struct ToolUseRecord: Identifiable, Codable, Equatable, Sendable {
     var isError: Bool
     var status: ToolUseStatus
 
+
+    /// A call the model is still writing, drawn before it runs.
+    init(streamingId id: String, name: String, input: ToolInput) {
+        self.id = id
+        self.name = name
+        self.input = input
+        self.result = nil
+        self.isError = false
+        self.status = .streaming
+    }
 
     init(from toolCall: ToolCall) {
         self.id = toolCall.id

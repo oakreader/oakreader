@@ -43,7 +43,11 @@ struct ChatBubbleView: View, Equatable {
                     if turn.role == .assistant, let thinking = turn.thinking, !thinking.isEmpty {
                         ThinkingDisclosureView(
                             thinking: thinking,
-                            isStreaming: turn.isStreaming && turn.content.isEmpty,
+                            // A tool call also ends the thinking: before, the
+                            // header kept saying "Thinking..." while tools ran.
+                            isThinking: turn.isStreaming && turn.thinkingSeconds == nil
+                                && turn.content.isEmpty && turn.toolUses.isEmpty,
+                            seconds: turn.thinkingSeconds,
                             theme: markdownTheme ?? .oak()
                         )
                     }
@@ -550,79 +554,70 @@ private extension View {
 /// alongside a "Thinking..." label.
 private struct ThinkingDisclosureView: View {
     let thinking: String
-    /// True while the model is still in the thinking phase (no text content yet).
-    let isStreaming: Bool
+    /// True while the model is still thinking: no answer text, no tool call, and
+    /// no measured end yet.
+    let isThinking: Bool
+    /// Measured thinking time; nil for turns saved before it was recorded.
+    let seconds: Double?
     /// The bubble's markdown theme, re-tinted for the muted thinking text.
     let theme: MarkdownTheme
 
+    /// Open state once thinking is done. Cursor collapses the block when the
+    /// answer starts and keeps the reader's choice apart from the live state.
     @State private var isExpanded = false
-    @State private var streamStartTime = Date()
-    @State private var elapsedSeconds: Int = 0
-    @State private var timer: Timer?
+    /// The reader closed the live block; it stays closed until thinking ends.
+    @State private var liveCollapsed = false
+    @State private var isHovered = false
     @State private var oakStrokeProgress: CGFloat = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header
+        VStack(alignment: .leading, spacing: 2) {
             Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    isExpanded.toggle()
-                }
+                if isThinking { liveCollapsed.toggle() } else { isExpanded.toggle() }
             } label: {
-                HStack(spacing: 4) {
-                    if !isStreaming {
+                HStack(spacing: 6) {
+                    if isThinking {
+                        OakScriptShape()
+                            .trim(from: 0, to: oakStrokeProgress)
+                            .stroke(style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 36, height: 16)
+                        // A reasoning summary arrives in sections under bold
+                        // titles; the newest title says what the model is on.
+                        ShimmerText(text: liveTitle ?? "Thinking")
+                    } else {
+                        Text(doneLabel)
+                            .font(OakStyle.ChatFont.messageBody)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.secondary)
                         Image(systemName: "chevron.right")
                             .font(.system(size: 9, weight: .semibold))
                             .foregroundStyle(.secondary)
                             .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                            .animation(OakStyle.Motion.fade, value: isExpanded)
+                            .opacity(isHovered || isExpanded ? 1 : 0)
                     }
-
-                    if isStreaming {
-                        HStack(spacing: 6) {
-                            OakScriptShape()
-                                .trim(from: 0, to: oakStrokeProgress)
-                                .stroke(style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
-                                .foregroundStyle(.secondary)
-                                .frame(width: 36, height: 16)
-                            Text("Thinking...")
-                                .font(OakStyle.ChatFont.messageBody)
-                                .fontWeight(.medium)
-                                .foregroundStyle(.secondary)
-                        }
-                    } else {
-                        Text("Thought for \(elapsedSeconds)s")
-                            .font(OakStyle.ChatFont.messageBody)
-                            .fontWeight(.medium)
-                            .foregroundStyle(.secondary)
-                    }
-
                     // Claim the rest of the row so the whole strip toggles.
                     Spacer(minLength: 0)
                 }
-                // The label used to size to its glyph and text, with the padding
-                // applied *outside* the Button — so only the words themselves
-                // toggled the section and the rest of the row was dead. Padding
-                // and hit shape now live inside the label.
                 .padding(.vertical, 4)
                 .padding(.horizontal, 4)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .onHover { isHovered = $0 }
 
-            // Content
-            if isExpanded {
-                // Rendered through StreamingMarkdownView, the same NSTextView-backed
-                // engine as the message body, rather than a SwiftUI `Text` with
-                // `.textSelection(.enabled)` — which drew fine but would not let the
-                // reader select or copy a word of it. Reasoning is prose worth
-                // quoting, and this is the app's one markdown renderer anyway.
-                StreamingMarkdownView(
-                    markdown: thinking,
-                    theme: mutedTheme,
-                    isStreaming: false
-                )
+            if isThinking && !liveCollapsed {
+                // The live text, dimmed, in a window that follows the newest
+                // line. Without the cap a long chain of thought pushed the
+                // answer out of the panel before it began.
+                TailWindow {
+                    thinkingText(streaming: true)
+                }
+                .padding(.leading, 8)
+                .transition(.opacity)
+            } else if !isThinking && isExpanded {
+                thinkingText(streaming: false)
                     .padding(.leading, 8)
                     .padding(.vertical, 4)
                     .overlay(alignment: .leading) {
@@ -633,53 +628,65 @@ private struct ThinkingDisclosureView: View {
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .onAppear {
-            streamStartTime = Date()
-            if isStreaming {
-                startTimer()
-                if reduceMotion {
-                    // Reduce Motion: show the full stroke, no repeating draw-on.
-                    oakStrokeProgress = 1.0
-                } else {
-                    oakStrokeProgress = 0
-                    withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
-                        oakStrokeProgress = 1.0
-                    }
-                }
-            } else {
-                elapsedSeconds = max(1, thinking.count / 10)
+        .animation(.chatDisclosure, value: isThinking)
+        .animation(.chatDisclosure, value: isExpanded)
+        .animation(.chatDisclosure, value: liveCollapsed)
+        .onAppear { startStroke() }
+        .onChange(of: isThinking) { _, thinking in
+            // The answer started: fold the reasoning away.
+            if !thinking { isExpanded = false; liveCollapsed = false }
+        }
+    }
+
+    /// Rendered through StreamingMarkdownView, the same NSTextView-backed engine
+    /// as the message body, so the reasoning can be selected and copied.
+    private func thinkingText(streaming: Bool) -> some View {
+        StreamingMarkdownView(
+            markdown: thinking,
+            theme: mutedTheme,
+            isStreaming: streaming,
+            fadesAppendedText: streaming && !reduceMotion
+        )
+    }
+
+    private var doneLabel: String {
+        guard let seconds else { return "Thought" }
+        if seconds < 0.5 { return "Thought briefly" }
+        return "Thought for \(Int(seconds.rounded()))s"
+    }
+
+    /// The newest `**Title**` line of the reasoning, if there is one.
+    private var liveTitle: String? {
+        for line in thinking.suffix(4000).split(separator: "\n").reversed() {
+            let t = line.trimmingCharacters(in: .whitespaces)
+            if t.count > 4, t.hasPrefix("**"), t.hasSuffix("**") {
+                let title = t.dropFirst(2).dropLast(2).trimmingCharacters(in: .whitespaces)
+                if !title.isEmpty, !title.contains("**") { return title }
             }
         }
-        .onChange(of: isStreaming) { _, streaming in
-            if !streaming {
-                stopTimer()
-                elapsedSeconds = max(1, Int(Date().timeIntervalSince(streamStartTime)))
+        return nil
+    }
+
+    private func startStroke() {
+        guard isThinking else { return }
+        if reduceMotion {
+            // Reduce Motion: show the full stroke, no repeating draw-on.
+            oakStrokeProgress = 1.0
+        } else {
+            oakStrokeProgress = 0
+            withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
+                oakStrokeProgress = 1.0
             }
-        }
-        .onDisappear {
-            stopTimer()
         }
     }
 
     /// The bubble's theme with its body colour dropped to the secondary tone the
-    /// thinking block has always used, so switching renderer changed how the text
-    /// selects, not how it looks.
+    /// thinking block has always used.
     private var mutedTheme: MarkdownTheme {
         var t = theme
         t.textColor = NSColor.secondaryLabelColor.withAlphaComponent(0.75)
         t.secondaryTextColor = NSColor.secondaryLabelColor.withAlphaComponent(0.6)
         return t
-    }
-
-    private func startTimer() {
-        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
-            elapsedSeconds = Int(Date().timeIntervalSince(streamStartTime))
-        }
-    }
-
-    private func stopTimer() {
-        timer?.invalidate()
-        timer = nil
     }
 }
 
