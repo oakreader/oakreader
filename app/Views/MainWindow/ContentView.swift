@@ -19,6 +19,11 @@ struct ContentView: View {
     var body: some View {
         GeometryReader { geometry in
             let maxRightPanel = geometry.size.width * 0.6
+            // The document is a card only beside another region. Alone, it fills
+            // the window: a frame around the only thing on screen separates
+            // nothing, and a PDF page is already a sheet of its own.
+            let isCarded = viewModel.state.isSidebarVisible || viewModel.state.rightPanelMode != nil
+            let inset = isCarded ? OakStyle.Surface.gutter : 0
 
             HStack(spacing: 0) {
                 // Left sidebar — full height
@@ -33,7 +38,7 @@ struct ContentView: View {
                         sidebarWidth = min(max(effectiveSidebarWidth + delta, range.lowerBound), range.upperBound)
                     }
                 } else {
-                    Color.clear.frame(width: OakStyle.Surface.gutter)
+                    Color.clear.frame(width: inset)
                 }
 
                 // Main content column. The per-document toolbar sits at the
@@ -73,7 +78,7 @@ struct ContentView: View {
                     // the web view to stay inside the content column.
                     .clipped()
                 }
-                .surfaceCard()
+                .surfaceCard(raised: isCarded)
 
                 // Right panel — its own card; the gap before it is the resize handle.
                 if viewModel.state.rightPanelMode != nil {
@@ -87,8 +92,8 @@ struct ContentView: View {
                         .onHover { inside in if inside { NSCursor.arrow.set() } }
                 }
             }
-            .padding(.trailing, OakStyle.Surface.gutter)
-            .padding(.bottom, OakStyle.Surface.gutter)
+            .padding(.trailing, inset)
+            .padding(.bottom, inset)
         }
         .background(OakStyle.Surface.base)
         .alert("Error", isPresented: Binding(

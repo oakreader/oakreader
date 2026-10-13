@@ -148,7 +148,7 @@ private struct WebContentsView: View {
             .padding(.vertical, 4)
             .background(
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(selectedId == heading.id ? Color.accentColor.opacity(0.15) : .clear)
+                    .fill(selectedId == heading.id ? OakStyle.Colors.sidebarRowSelection : .clear)
             )
             .contentShape(Rectangle())
         }

@@ -30,7 +30,6 @@ struct BookmarkSidebarView: View {
                 }
             }
         }
-        .background(.white)
         .onAppear { loadOutline() }
     }
 
@@ -108,7 +107,7 @@ private struct OutlineTreeRow: View {
             .padding(.vertical, 3)
             .background(
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(selectedItemId == item.id ? Color.accentColor.opacity(0.15) : Color.clear)
+                    .fill(selectedItemId == item.id ? OakStyle.Colors.sidebarRowSelection : Color.clear)
                     .padding(.horizontal, 4)
             )
             .contentShape(Rectangle())

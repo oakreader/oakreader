@@ -129,7 +129,7 @@ struct LibrarySidebarView: View {
             .padding(.vertical, 5)
             .background(
                 RoundedRectangle(cornerRadius: 6)
-                    .fill(isSelected ? Color.primary.opacity(0.08) : Color.clear)
+                    .fill(isSelected ? OakStyle.Colors.sidebarRowSelection : Color.clear)
                     .padding(.horizontal, 12)
             )
             .contentShape(Rectangle())
@@ -665,7 +665,7 @@ private struct TagNodeRowView: View {
                 .padding(.vertical, 5)
                 .background(
                     RoundedRectangle(cornerRadius: 6)
-                        .fill(isSelected ? Color.primary.opacity(0.08) : Color.clear)
+                        .fill(isSelected ? OakStyle.Colors.sidebarRowSelection : Color.clear)
                         .padding(.horizontal, 12)
                 )
                 .contentShape(Rectangle())

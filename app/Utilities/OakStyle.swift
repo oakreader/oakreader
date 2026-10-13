@@ -79,6 +79,9 @@ enum OakStyle {
         static let hoverBackground = Color.primary.opacity(0.06)
         static let activeBackground = Color.primary.opacity(0.10)
         static let selectedBackground = Color.accentColor.opacity(0.12)
+        /// A selected row in a sidebar list. Neutral, not accent: sidebars sit on
+        /// the surface base, where a blue row is the loudest thing in the window.
+        static let sidebarRowSelection = Color.primary.opacity(0.08)
 
         // Borders & dividers
         static let divider = Color.primary.opacity(0.08)
@@ -278,8 +281,12 @@ enum OakStyle {
     }
 
     struct SurfaceCardModifier: ViewModifier {
+        /// False renders the same surface flush: no corners, no shadow. A region
+        /// alone in the window has nothing to be set apart from, so it fills it.
+        var raised = true
+
         func body(content: Content) -> some View {
-            let shape = RoundedRectangle(cornerRadius: Surface.radius, style: .continuous)
+            let shape = RoundedRectangle(cornerRadius: raised ? Surface.radius : 0, style: .continuous)
             // No stroke: the active document tab merges into the card's top edge
             // (BrowserTabShape), and a ring there draws a line under the tab. The
             // tonal step to `base` frames the card; the shadow sits below only
@@ -287,7 +294,7 @@ enum OakStyle {
             content
                 .background(Surface.card)
                 .clipShape(shape)
-                .background(shape.fill(Surface.card).shadow(color: .black.opacity(0.07), radius: 1, y: 1))
+                .background(shape.fill(Surface.card).shadow(color: .black.opacity(raised ? 0.07 : 0), radius: 1, y: 1))
         }
     }
 
@@ -356,8 +363,8 @@ enum OakStyle {
 
 extension View {
     /// A content region on the window's surface base. See `OakStyle.Surface`.
-    func surfaceCard() -> some View {
-        modifier(OakStyle.SurfaceCardModifier())
+    func surfaceCard(raised: Bool = true) -> some View {
+        modifier(OakStyle.SurfaceCardModifier(raised: raised))
     }
 
     func coverCard(shadow: Bool) -> some View {
