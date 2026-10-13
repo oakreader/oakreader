@@ -214,7 +214,7 @@ class DocumentViewModel {
         let prefs = Preferences.shared
         state.zoomLevel = prefs.defaultZoomLevel
         state.displayMode = prefs.displayMode
-        state.isSidebarVisible = prefs.showSidebar
+        state.isSidebarVisible = false
         state.sidebarMode = prefs.sidebarMode
     }
 
@@ -222,8 +222,6 @@ class DocumentViewModel {
         self.html = html
         self.contentType = .html
         self.state = DocumentState()
-
-        let prefs = Preferences.shared
         state.isSidebarVisible = false
     }
 

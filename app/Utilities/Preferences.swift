@@ -62,7 +62,6 @@ final class Preferences {
     private enum Keys {
         static let defaultZoomLevel = "defaultZoomLevel"
         static let displayMode = "displayMode"
-        static let showSidebar = "showSidebar"
         static let sidebarMode = "sidebarMode"
         static let autoSave = "autoSave"
         static let archiveWebPages = "archiveWebPages"
@@ -138,7 +137,6 @@ final class Preferences {
         defaults.register(defaults: [
             Keys.defaultZoomLevel: 1.0,
             Keys.displayMode: PDFDisplayMode.singlePageContinuous.rawValue,
-            Keys.showSidebar: true,
             Keys.sidebarMode: SidebarMode.thumbnails.rawValue,
             Keys.autoSave: true,
             Keys.archiveWebPages: false,
@@ -167,11 +165,6 @@ final class Preferences {
     var displayMode: PDFDisplayMode {
         get { PDFDisplayMode(rawValue: defaults.integer(forKey: Keys.displayMode)) ?? .singlePageContinuous }
         set { defaults.set(newValue.rawValue, forKey: Keys.displayMode) }
-    }
-
-    var showSidebar: Bool {
-        get { defaults.bool(forKey: Keys.showSidebar) }
-        set { defaults.set(newValue, forKey: Keys.showSidebar) }
     }
 
     var sidebarMode: SidebarMode {
