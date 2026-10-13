@@ -57,7 +57,7 @@ struct PDFViewerRepresentable: NSViewRepresentable {
         pdfView.displaysPageBreaks = true
         pdfView.displayDirection = .vertical
         pdfView.pageShadowsEnabled = true
-        pdfView.backgroundColor = NSColor.controlBackgroundColor
+        pdfView.backgroundColor = OakStyle.Surface.cardNS
         pdfView.delegate = context.coordinator
         pdfView.isInMarkupMode = false
         applyDarkAppearanceContent(to: pdfView)

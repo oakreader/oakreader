@@ -72,26 +72,18 @@ struct LibraryTableToolbar: View {
                 }
                 .accessibilityLabel("Library view mode")
 
-                // Filter menu
-                Menu {
+                // Filter, sort and add share one glyph spec with the view-mode
+                // pills beside them — see `ToolbarIconLabel`.
+                ToolbarIconMenu(
+                    systemImage: "line.3.horizontal.decrease",
+                    tint: store.hasActiveFilters ? Color.accentColor : nil
+                ) {
                     filterMenuContent
-                } label: {
-                    Image(systemName: "line.3.horizontal.decrease")
-                        .font(.system(size: OakStyle.Font.icon))
-                        .foregroundStyle(
-                            store.hasActiveFilters
-                                ? Color.accentColor
-                                : Color.primary.opacity(0.55)
-                        )
-                        .frame(width: OakStyle.Size.buttonStandard, height: OakStyle.Size.buttonStandard)
                 }
-                .menuStyle(.borderlessButton)
-                .fixedSize()
                 .help("Filter Library")
                 .accessibilityLabel("Filter Library")
 
-                // Sort menu
-                Menu {
+                ToolbarIconMenu(systemImage: "arrow.up.arrow.down") {
                     ForEach(LibrarySortOrder.allCases) { sort in
                         Button {
                             if store.currentSort == sort {
@@ -109,18 +101,7 @@ struct LibraryTableToolbar: View {
                             }
                         }
                     }
-                } label: {
-                    Image(systemName: "arrow.up.arrow.down")
-                        .font(.system(size: OakStyle.Font.icon))
-                        .foregroundStyle(Color.primary.opacity(0.55))
-                        .frame(width: OakStyle.Size.buttonStandard, height: OakStyle.Size.buttonStandard)
-                        .background(
-                            RoundedRectangle(cornerRadius: 5)
-                                .fill(Color.clear)
-                        )
                 }
-                .menuStyle(.borderlessButton)
-                .fixedSize()
                 .help("Sort Library")
                 .accessibilityLabel("Sort Library")
 
@@ -128,19 +109,8 @@ struct LibraryTableToolbar: View {
                 Button {
                     chooseFiles()
                 } label: {
-                    Image(systemName: "plus")
-                        // Same 0.55 grey as the filter/sort glyphs, but a heavier weight:
-                        // the thin + cross has little ink, so at the identical colour it
-                        // read fainter than the denser icons beside it. .semibold gives it
-                        // the matching visual weight without changing the hue.
-                        .font(.system(size: OakStyle.Font.icon, weight: .semibold))
-                        .foregroundStyle(Color.primary.opacity(0.55))
-                        .frame(width: OakStyle.Size.buttonStandard, height: OakStyle.Size.buttonStandard)
+                    ToolbarIconLabel(systemImage: "plus")
                 }
-                // `.plain` (not `.borderless`): the borderless button style tints/emphasises
-                // its template glyph, so the + rendered darker than the filter/sort menu
-                // glyphs despite the identical foregroundStyle. `.plain` renders the label
-                // exactly as specified, matching the 0.55 grey of the icons beside it.
                 .buttonStyle(.plain)
                 .help("Add files to Library")
                 .accessibilityLabel("Add files to Library")
@@ -149,7 +119,7 @@ struct LibraryTableToolbar: View {
             .frame(height: 44)
 
         }
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(OakStyle.Surface.card)
     }
 
     @ViewBuilder
@@ -283,5 +253,50 @@ struct LibraryTableToolbar: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Toolbar Icons
+
+/// One glyph spec for every icon in this toolbar, taken from `PillTabButton`
+/// (14pt medium, secondary label colour) so the view-mode pills and the
+/// filter / sort / add buttons read as one row. A hover fills the same
+/// capsule the pills use.
+private struct ToolbarIconLabel: View {
+    let systemImage: String
+    var tint: Color? = nil
+
+    @State private var isHovering = false
+
+    var body: some View {
+        Image(systemName: systemImage)
+            .font(.system(size: 14, weight: .medium))
+            .foregroundStyle(tint ?? Color(nsColor: .secondaryLabelColor))
+            .frame(width: 34, height: 26)
+            .background(Capsule().fill(Color.primary.opacity(isHovering ? 0.07 : 0)))
+            .contentShape(Capsule())
+            .onHover { isHovering = $0 }
+            .animation(OakStyle.Motion.fast, value: isHovering)
+    }
+}
+
+/// A `Menu` whose label is a `ToolbarIconLabel`. `.borderlessButton` re-tints
+/// the label to near-black and adds a chevron, so the menu is drawn as a
+/// plain button with the indicator hidden.
+private struct ToolbarIconMenu<Content: View>: View {
+    let systemImage: String
+    var tint: Color? = nil
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        Menu {
+            content()
+        } label: {
+            ToolbarIconLabel(systemImage: systemImage, tint: tint)
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
     }
 }

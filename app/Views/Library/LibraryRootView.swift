@@ -5,121 +5,112 @@ import UniformTypeIdentifiers
 struct LibraryRootView: View {
     @Bindable var appState: AppState
 
+    /// Width of the detail card. Nil until the user drags the gap, so the
+    /// first layout follows the window (0.382 of the browse width).
+    @State private var detailWidth: CGFloat?
+
     private var store: LibraryStore { appState.libraryStore }
 
     var body: some View {
         HStack(spacing: 0) {
-            // Left pane: Sidebar
+            // Left pane: Sidebar, on the surface base — chrome, not a card.
             if appState.isLibrarySidebarVisible {
                 LibrarySidebarView(appState: appState)
                     .frame(width: 280)
-                    .background(OakStyle.Colors.sidebarBackground)
-
-                Divider()
+            } else {
+                Color.clear.frame(width: OakStyle.Surface.gutter)
             }
 
             // Right side: the classic catalog browser.
             browsePanes
         }
-        .background(libraryChromeBackground)
+        .padding(.trailing, OakStyle.Surface.gutter)
+        .padding(.bottom, OakStyle.Surface.gutter)
+        .background(OakStyle.Surface.base)
         .onHover { inside in if inside { NSCursor.arrow.set() } }
     }
 
-    /// Middle + Right panes (golden ratio: table ≥ 0.382, detail ≤ 0.618).
+    /// Middle + Right cards (golden ratio: table ≥ 0.382, detail ≤ 0.618).
     private var browsePanes: some View {
         GeometryReader { geo in
             let available = geo.size.width
-            let tableMin = available * 0.382
+            let detailMin: CGFloat = 480
             let detailMax = available * 0.618
+            let detail = min(max(detailWidth ?? available * 0.382, detailMin), detailMax)
 
-            HSplitView {
-                tablePane(hasTrailingCorner: appState.libraryDetailTab == nil)
-                    .frame(minWidth: tableMin, maxWidth: .infinity, maxHeight: .infinity)
-                // Detail content panel (only when a tab is selected)
+            HStack(spacing: 0) {
+                tablePane
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .surfaceCard()
                 if appState.libraryDetailTab != nil {
+                    resizeHandle { delta in
+                        detailWidth = min(max(detail - delta, detailMin), detailMax)
+                    }
                     detailContentPanel
-                        .frame(minWidth: 480, idealWidth: available * 0.382, maxWidth: detailMax)
+                        .frame(width: detail)
+                        .surfaceCard()
                 }
             }
         }
     }
 
-    private var libraryChromeBackground: Color {
-        Color(nsColor: .controlBackgroundColor)
+    /// The gutter between the two cards, made draggable. Nothing is drawn.
+    private func resizeHandle(onDrag: @escaping (CGFloat) -> Void) -> some View {
+        Color.clear
+            .frame(width: OakStyle.Surface.gutter)
+            .contentShape(Rectangle())
+            .gesture(DragGesture(minimumDistance: 1).onChanged { onDrag($0.translation.width) })
+            .onHover { hovering in
+                if hovering { NSCursor.resizeLeftRight.set() } else { NSCursor.arrow.set() }
+            }
     }
 
-    private func tablePane(hasTrailingCorner: Bool) -> some View {
-        ZStack {
-            libraryChromeBackground
-
-            let paneShape = UnevenRoundedRectangle(
-                topLeadingRadius: OakStyle.Radius.standard,
-                bottomLeadingRadius: 0,
-                bottomTrailingRadius: 0,
-                topTrailingRadius: hasTrailingCorner ? OakStyle.Radius.standard : 0
-            )
-
-            VStack(spacing: 0) {
-                LibraryTableToolbar(appState: appState)
-                Divider()
-                switch store.viewMode {
-                case .list:
-                    LibraryTableView(appState: appState, selection: $appState.selectedLibraryItemIDs)
-                case .card:
-                    LibraryCardGridView(appState: appState, selection: $appState.selectedLibraryItemIDs)
-                }
+    private var tablePane: some View {
+        // No divider under the toolbar: the card's edge already frames it.
+        VStack(spacing: 0) {
+            LibraryTableToolbar(appState: appState)
+            switch store.viewMode {
+            case .list:
+                LibraryTableView(appState: appState, selection: $appState.selectedLibraryItemIDs)
+            case .card:
+                LibraryCardGridView(appState: appState, selection: $appState.selectedLibraryItemIDs)
             }
-            .background(Color(nsColor: .controlBackgroundColor), in: paneShape)
-            .clipShape(paneShape)
         }
     }
 
     @ViewBuilder
     private var detailContentPanel: some View {
-        ZStack {
-            libraryChromeBackground
-
-            let paneShape = UnevenRoundedRectangle(
-                topLeadingRadius: 0,
-                bottomLeadingRadius: 0,
-                bottomTrailingRadius: 0,
-                topTrailingRadius: OakStyle.Radius.standard
-            )
-
-            VStack(spacing: 0) {
-                // The tab decides what the panel is, then the selection decides
-                // what it is *about*. Chat is the exception: it is scoped to the
-                // collection, so a selected row does not change the surface —
-                // the row is something to `@`-mention, not something to replace it.
-                switch appState.libraryDetailTab {
-                case .chat:
-                    AIChatView(
-                        chatVM: appState.libraryChat,
-                        workspaceName: scopedCollectionName
-                    )
-                    // The chat follows the sidebar: its history and its `@`
-                    // completions are the selected collection's. The panel stays
-                    // mounted across a switch, so this cannot be left to onAppear.
-                    .onAppear { appState.libraryChat.rescope(toCollection: scopedCollectionId) }
-                    .onChange(of: scopedCollectionId) { _, id in
-                        appState.libraryChat.rescope(toCollection: id)
-                    }
-                case .metadata:
-                    if store.isDuplicatesSelected {
-                        DuplicatesMergeView(appState: appState)
-                    } else if let item = selectedItemInCurrentFilter {
-                        LibrarySidebarPanel(item: item, appState: appState)
-                    } else {
-                        LibraryCollectionSidebarPanel(appState: appState)
-                    }
-                case nil:
-                    EmptyView()
+        VStack(spacing: 0) {
+            // The tab decides what the panel is, then the selection decides
+            // what it is *about*. Chat is the exception: it is scoped to the
+            // collection, so a selected row does not change the surface —
+            // the row is something to `@`-mention, not something to replace it.
+            switch appState.libraryDetailTab {
+            case .chat:
+                AIChatView(
+                    chatVM: appState.libraryChat,
+                    workspaceName: scopedCollectionName
+                )
+                // The chat follows the sidebar: its history and its `@`
+                // completions are the selected collection's. The panel stays
+                // mounted across a switch, so this cannot be left to onAppear.
+                .onAppear { appState.libraryChat.rescope(toCollection: scopedCollectionId) }
+                .onChange(of: scopedCollectionId) { _, id in
+                    appState.libraryChat.rescope(toCollection: id)
                 }
+            case .metadata:
+                if store.isDuplicatesSelected {
+                    DuplicatesMergeView(appState: appState)
+                } else if let item = selectedItemInCurrentFilter {
+                    LibrarySidebarPanel(item: item, appState: appState)
+                } else {
+                    LibraryCollectionSidebarPanel(appState: appState)
+                }
+            case nil:
+                EmptyView()
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(nsColor: .textBackgroundColor), in: paneShape)
-            .clipShape(paneShape)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     /// The collection the chat is grounded in, or nil for the whole library.

@@ -49,6 +49,6 @@ struct MarkdownPreviewView: View {
             }
             viewModel.recordReadingPosition(metrics.offset / metrics.maxOffset)
         }
-        .background(Color(nsColor: .textBackgroundColor))
+        .background(OakStyle.Surface.card)
     }
 }

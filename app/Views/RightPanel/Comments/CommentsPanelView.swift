@@ -65,7 +65,7 @@ struct CommentsPanelView: View {
         // Same panel surface as the AI chat panel (AIChatView) — both side panels read
         // identical. The note card separates by its OWN faint fill (see CommentCardView),
         // mirroring how the chat separates its chips/bubbles, not by tinting the panel.
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(OakStyle.Surface.card)
         .task(id: viewModel.attachmentId) { await model.reload() }
         .onReceive(NotificationCenter.default.publisher(for: .commentsDidChange)) { note in
             guard (note.object as AnyObject) === viewModel else { return }
@@ -351,7 +351,7 @@ struct CommentsPanelView: View {
     /// Non-interactive so it never eats clicks on the cards beneath it.
     private func scrollEdgeFade(_ edge: VerticalEdge) -> some View {
         let isTop = edge == .top
-        let bg = Color(nsColor: .windowBackgroundColor)
+        let bg = OakStyle.Surface.card
         return LinearGradient(
             stops: [
                 .init(color: bg, location: 0),

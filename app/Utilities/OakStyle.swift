@@ -35,15 +35,45 @@ enum AppearanceMode: String, CaseIterable, Identifiable {
 }
 
 enum OakStyle {
+    // MARK: - Motion
+
+    /// Two springs, and one fade. That is the whole vocabulary.
+    ///
+    /// Dia's entire assistant surface animates from
+    /// `AssistantUI.AssistantAnimationUtilities.Springs`, which has exactly two
+    /// cases — `slow` and `fast`. The chat panel here had seven different
+    /// hand-tuned parameter sets instead, so a hover, a row insert and a banner
+    /// each moved on their own curve and nothing felt like one surface.
+    ///
+    /// Pick by what is moving, not by taste:
+    ///
+    ///   - `fast`  — something the pointer is driving: hover, press, a chip
+    ///     swapping its icon. It must land before the next input.
+    ///   - `slow`  — something the layout is driving: a row arriving, a banner,
+    ///     a panel opening. It carries distance, so it needs the extra beat.
+    ///   - `fade`  — a pure opacity change with nothing to carry.
+    ///
+    /// Reach for a bespoke curve only when a surface genuinely is not part of
+    /// this one, and say why in a comment.
+    enum Motion {
+        /// Pointer-driven. 0.2 s, barely any bounce.
+        static let fast = Animation.spring(duration: 0.2, bounce: 0.15)
+        /// Layout-driven. 0.34 s, enough bounce to read as physical.
+        static let slow = Animation.spring(duration: 0.34, bounce: 0.2)
+        /// Opacity only.
+        static let fade = Animation.easeInOut(duration: 0.18)
+    }
+
     // MARK: - Colors
     // Uses opacity-based tints for better light/dark mode adaptability.
 
     enum Colors {
         // Backgrounds (Dia gray scale: #F8F8F8 → #F2F2F2 → #EDEDED)
-        static let tabBarBackground = Color(nsColor: .windowBackgroundColor)
-        static let sidebarBackground = Color(nsColor: .windowBackgroundColor)
-        static let activeTabBackground = Color(nsColor: .textBackgroundColor)  // white — merges with content
-        static let contentBackground = Color(nsColor: .textBackgroundColor)
+        // Chrome sits on the tinted surface base; content sits on cards. See `Surface`.
+        static let tabBarBackground = Surface.base
+        static let sidebarBackground = Surface.base
+        static let activeTabBackground = Surface.card  // same white as the content card
+        static let contentBackground = Surface.card
 
         // Interactive states
         static let hoverBackground = Color.primary.opacity(0.06)
@@ -219,6 +249,48 @@ enum OakStyle {
         static let concave: CGFloat = 10
     }
 
+    // MARK: - Surface Cards
+
+    /// The window is built from layers, not lines: chrome (tab bar, left
+    /// sidebar) sits on a tinted `base`, and each content region (the document
+    /// or library view, the right panel) is a rounded `card` inset from the
+    /// window edge by `gutter`. The gap and the tonal step between `base` and
+    /// `card` do the separating, so the regions carry no divider lines.
+    ///
+    /// Prototype: https://claude.ai/artifact/W4fFWzaXysBADfV6j6pDyf
+    enum Surface {
+        static let baseNS = NSColor(name: "OakSurfaceBase") { appearance in
+            appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+                ? NSColor(srgbRed: 0x15 / 255.0, green: 0x15 / 255.0, blue: 0x16 / 255.0, alpha: 1)
+                : NSColor(srgbRed: 0xEC / 255.0, green: 0xED / 255.0, blue: 0xEF / 255.0, alpha: 1)
+        }
+        static let cardNS = NSColor(name: "OakSurfaceCard") { appearance in
+            appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+                ? NSColor(srgbRed: 0x25 / 255.0, green: 0x25 / 255.0, blue: 0x27 / 255.0, alpha: 1)
+                : NSColor.white
+        }
+        static let base = Color(nsColor: baseNS)
+        static let card = Color(nsColor: cardNS)
+
+        /// Space between cards, and between a card and the window edge.
+        static let gutter: CGFloat = 8
+        static let radius: CGFloat = 12
+    }
+
+    struct SurfaceCardModifier: ViewModifier {
+        func body(content: Content) -> some View {
+            let shape = RoundedRectangle(cornerRadius: Surface.radius, style: .continuous)
+            // No stroke: the active document tab merges into the card's top edge
+            // (BrowserTabShape), and a ring there draws a line under the tab. The
+            // tonal step to `base` frames the card; the shadow sits below only
+            // (radius == y), so nothing paints along the top edge either.
+            content
+                .background(Surface.card)
+                .clipShape(shape)
+                .background(shape.fill(Surface.card).shadow(color: .black.opacity(0.07), radius: 1, y: 1))
+        }
+    }
+
     // MARK: - View Modifiers
 
     struct CoverCardModifier: ViewModifier {
@@ -283,6 +355,11 @@ enum OakStyle {
 }
 
 extension View {
+    /// A content region on the window's surface base. See `OakStyle.Surface`.
+    func surfaceCard() -> some View {
+        modifier(OakStyle.SurfaceCardModifier())
+    }
+
     func coverCard(shadow: Bool) -> some View {
         modifier(OakStyle.CoverCardModifier(shadow: shadow))
     }

@@ -66,7 +66,7 @@ struct LibraryCardGridView: View {
                     .padding(outerPadding)
                 }
             }
-            .background(Color(nsColor: .controlBackgroundColor))
+            .background(OakStyle.Surface.card)
             .onDrop(of: [.pdf, .html, .plainText, .audio, .fileURL], isTargeted: nil) { providers in
                 handleDrop(providers)
                 return true

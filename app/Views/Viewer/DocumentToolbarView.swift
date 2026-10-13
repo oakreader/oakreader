@@ -25,7 +25,6 @@ struct DocumentToolbarView: View {
             }
         }
         .background(OakStyle.Colors.activeTabBackground)
-        .overlay(alignment: .bottom) { Divider() }
     }
 
     @ViewBuilder

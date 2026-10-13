@@ -45,7 +45,7 @@ struct NewTabView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .controlBackgroundColor))
+        .background(OakStyle.Surface.card)
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { fieldFocused = true }
         }

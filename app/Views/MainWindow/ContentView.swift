@@ -25,13 +25,15 @@ struct ContentView: View {
                 if viewModel.state.isSidebarVisible {
                     sidebarContentView
                         .frame(width: effectiveSidebarWidth)
-                        .background(Color(nsColor: .controlBackgroundColor))
+                        .background(OakStyle.Surface.base)
                         .onHover { inside in if inside { NSCursor.arrow.set() } }
 
-                    panelDivider { delta in
+                    resizeHandle { delta in
                         let range = sidebarWidthRange
                         sidebarWidth = min(max(effectiveSidebarWidth + delta, range.lowerBound), range.upperBound)
                     }
+                } else {
+                    Color.clear.frame(width: OakStyle.Surface.gutter)
                 }
 
                 // Main content column. The per-document toolbar sits at the
@@ -71,30 +73,24 @@ struct ContentView: View {
                     // the web view to stay inside the content column.
                     .clipped()
                 }
-                .background(OakStyle.Colors.contentBackground)
+                .surfaceCard()
 
-                // Right panel — draggable divider (full height under tab bar)
+                // Right panel — its own card; the gap before it is the resize handle.
                 if viewModel.state.rightPanelMode != nil {
-                    panelDivider { delta in
+                    resizeHandle { delta in
                         rightPanelWidth = min(max(rightPanelWidth - delta, 200), maxRightPanel)
                     }
 
                     RightPanelContentView(viewModel: viewModel)
                         .frame(width: min(rightPanelWidth, maxRightPanel))
-                        .background(Color(nsColor: .controlBackgroundColor))
+                        .surfaceCard()
                         .onHover { inside in if inside { NSCursor.arrow.set() } }
                 }
             }
-            .clipShape(
-                UnevenRoundedRectangle(
-                    topLeadingRadius: 2,
-                    bottomLeadingRadius: 0,
-                    bottomTrailingRadius: 0,
-                    topTrailingRadius: OakStyle.Radius.standard
-                )
-            )
+            .padding(.trailing, OakStyle.Surface.gutter)
+            .padding(.bottom, OakStyle.Surface.gutter)
         }
-        .background(Color(nsColor: .controlBackgroundColor))
+        .background(OakStyle.Surface.base)
         .alert("Error", isPresented: Binding(
             get: { viewModel.state.showError },
             set: { viewModel.state.showError = $0 }
@@ -158,17 +154,13 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Draggable Panel Divider
+    // MARK: - Resize Handle
 
-    /// 1px visible line with a wider invisible hit zone (11px) for easy dragging.
-    private func panelDivider(onDrag: @escaping (CGFloat) -> Void) -> some View {
-        Color.white
-            .frame(width: 11)
-            .overlay(
-                Rectangle()
-                    .fill(Color(nsColor: .separatorColor))
-                    .frame(width: 1)
-            )
+    /// The gutter between two surfaces, made draggable. Nothing is drawn: the
+    /// gap itself is the affordance, and the cursor confirms it on hover.
+    private func resizeHandle(onDrag: @escaping (CGFloat) -> Void) -> some View {
+        Color.clear
+            .frame(width: OakStyle.Surface.gutter)
             .contentShape(Rectangle())
             .gesture(
                 DragGesture(minimumDistance: 1)

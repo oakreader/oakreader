@@ -37,6 +37,7 @@ struct RootView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(OakStyle.Surface.base)
         .ignoresSafeArea(.container, edges: .top)
         .overlay {
             if isPresenting, let vm = appState.activeTab?.viewModel {
