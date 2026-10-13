@@ -59,6 +59,13 @@ final class CitationSourceRegistry: @unchecked Sendable {
 
     /// Point the registry at a different conversation, loading its table from disk.
     func activate(sessionId: UUID) {
+        // A switch cancels a streaming turn before its end-of-turn `save()`, which
+        // then writes the new session's table. Save the old one here, or its
+        // citations stop resolving when the chat is reopened.
+        lock.lock()
+        let switching = self.sessionId != sessionId
+        lock.unlock()
+        if switching { save() }
         lock.lock()
         guard self.sessionId != sessionId else { lock.unlock(); return }
         self.sessionId = sessionId

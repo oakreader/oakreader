@@ -256,8 +256,11 @@ struct ChatBubbleView: View, Equatable {
         guard let resolveCitation else { return theme }
         var theme = theme
         theme.citationLabel = { destination in
+            // A number the table does not hold was invented by the model, or its
+            // table was lost. It points nowhere, so it shows nothing: the raw
+            // `${OAK-SOURCE}` placeholder in the answer reads as a broken app.
             guard let url = URL(string: destination),
-                  let (_, anchor) = resolveCitation(url) else { return nil }
+                  let (_, anchor) = resolveCitation(url) else { return "" }
             return CitationHoverCard.locationLabel(for: anchor)
         }
         return theme

@@ -250,6 +250,7 @@ targets:
     sources:
       - path: tests
       - path: app/Services/AI/CitationSourceRegistry.swift
+      - path: app/Services/AI/CitationSourceRegistry+OakCLI.swift
     settings:
       base:
         SWIFT_STRICT_CONCURRENCY: minimal

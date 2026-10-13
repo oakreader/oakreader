@@ -171,7 +171,7 @@ async function itemsRead({ parsed, q, resolver, out }: Context): Promise<void> {
 
   if (out.json) {
     out.success("items.read", {
-      title: resolved.title, citeKey: resolved.citeKey,
+      id: resolved.id, title: resolved.title, citeKey: resolved.citeKey,
       contentType: location.contentType, pageCount: location.pageCount, content,
     });
     return;

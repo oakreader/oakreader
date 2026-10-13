@@ -186,4 +186,47 @@ final class CitationSourceRegistryTests: XCTestCase {
         let reopened = CitationSourceRegistry(sessionId: sessionId, directory: directory)
         XCTAssertNil(reopened.source(for: 1))
     }
+
+    // MARK: - oak CLI output
+
+    /// `items list` nests the id as `item.id`. Missing it left every row without a
+    /// handle, and the model invented numbers that resolved to nothing.
+    func testListRowsWithNestedItemGetAHandle() throws {
+        let out = registry.annotateOakOutput(
+            #"{"success":true,"results":[{"item":{"id":"ITEM-1","title":"T"},"attachments":[]}]}"#,
+            visibleChars: 8_000)
+        let rows = try XCTUnwrap(json(out)["results"] as? [[String: Any]])
+        let cite = try XCTUnwrap(rows.first?["cite"] as? String)
+        XCTAssertEqual(registry.source(for: Int(cite.dropFirst(4))!)?.itemId, "ITEM-1")
+    }
+
+    /// A read numbers its passages per page, after the pdf.js warnings that share
+    /// the pipe and come before the JSON.
+    func testReadNumbersPassagesByPageAfterStderrNoise() throws {
+        let passage = String(repeating: "Agents call tools to act on the world. ", count: 3)
+        // Escaped, as the CLI prints it: a raw newline is not valid inside a JSON string.
+        let content = #"--- Page 3 ---\n"# + passage
+        let body = #"{"success":true,"result":{"id":"ITEM-2","content":"\#(content)"}}"#
+        let out = registry.annotateOakOutput(
+            "Warning: Required \"glyf\" table is not found\n" + body, visibleChars: 8_000)
+        let result = try XCTUnwrap(json(out)["result"] as? [String: Any])
+        XCTAssertEqual(result["cite"] as? String, "oak:1")
+        let numbered = try XCTUnwrap(result["content"] as? String)
+        XCTAssertTrue(numbered.hasPrefix("--- Page 3 ---\n[2] "), numbered)
+        XCTAssertEqual(registry.source(for: 2)?.page, 2)
+        XCTAssertEqual(registry.source(for: 2)?.itemId, "ITEM-2")
+    }
+
+    /// A session switch saves the outgoing table, so a turn cancelled by the
+    /// switch does not lose the numbers it minted.
+    func testActivatingAnotherSessionSavesTheCurrentTable() {
+        registry.register(.init(itemId: "A", page: 0, time: nil, heading: nil, text: "x"))
+        registry.activate(sessionId: UUID())
+        let reopened = CitationSourceRegistry(sessionId: sessionId, directory: directory)
+        XCTAssertEqual(reopened.source(for: 1)?.itemId, "A")
+    }
+
+    private func json(_ text: String) -> [String: Any] {
+        (try? JSONSerialization.jsonObject(with: Data(text.utf8))) as? [String: Any] ?? [:]
+    }
 }

@@ -954,12 +954,14 @@ class ChatViewModel {
             await engine.deleteSession(oldSessionId)
             if hadRecord { await sessionService?.deleteSession(id: oldSessionId) }
         }
-        CitationSourceRegistry.deleteTable(sessionId: oldSessionId,
-                                           directory: CatalogDatabase.chatsDirectory)
         turns = []
         errorMessage = nil
         sessionId = UUID()
+        // Switch first: `activate` saves the outgoing table, which must not
+        // outlive the delete.
         citationSources.activate(sessionId: sessionId)
+        CitationSourceRegistry.deleteTable(sessionId: oldSessionId,
+                                           directory: CatalogDatabase.chatsDirectory)
         sessionRecordCreated = false
         titleGenerated = false
     }
@@ -978,14 +980,15 @@ class ChatViewModel {
             await sessionService?.deleteSession(id: id)
             await engine.deleteSession(id)
         }
-        CitationSourceRegistry.deleteTable(sessionId: id,
-                                           directory: CatalogDatabase.chatsDirectory)
         // Remove from local list
         sessionList.removeAll { $0.id == id }
         // If the deleted session is the current one, start fresh
         if sessionId == id {
             newSession()
         }
+        // After the switch: `activate` saves the outgoing table.
+        CitationSourceRegistry.deleteTable(sessionId: id,
+                                           directory: CatalogDatabase.chatsDirectory)
     }
 
     // MARK: - Skill Tags / Metadata Normalization

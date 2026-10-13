@@ -125,7 +125,7 @@ struct OakCLITool: AgentTool, Sendable {
                 arguments: arguments,
                 workingDirectory: context.workingDirectory)
 
-            var output = annotateWithCiteHandles(result.output)
+            var output = sources.annotateOakOutput(result.output, visibleChars: Self.maxOutputLength)
             if output.count > Self.maxOutputLength {
                 output = String(output.prefix(Self.maxOutputLength))
                     + "\n\n[output truncated at \(Self.maxOutputLength) characters]"
@@ -151,12 +151,6 @@ struct OakCLITool: AgentTool, Sendable {
         }
     }
 
-    /// Add a `cite` handle to every result row that names a library item, so the model can
-    /// cite a document straight out of a search or list without re-typing its identity.
-    ///
-    /// Done by rewriting the CLI's JSON rather than by teaching the CLI about chat sessions:
-    /// `oak` is a standalone binary that also runs outside the app, and citation handles are
-    /// a property of a conversation, not of the library.
     /// Run the embedded `oak` binary and collect what it said.
     ///
     /// Its own, rather than the agent's bash tool: this invokes one known
@@ -181,51 +175,6 @@ struct OakCLITool: AgentTool, Sendable {
         process.waitUntilExit()
 
         return (String(data: data, encoding: .utf8) ?? "", process.terminationStatus)
-    }
-
-    private func annotateWithCiteHandles(_ output: String) -> String {
-        guard let data = output.data(using: .utf8),
-              var envelope = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
-        else { return output }
-
-        // A command that names one item — `import`, most of it — answers with a
-        // single `result` object rather than a `results` array. It deserves a
-        // handle just as much: the model has just filed a document and should be
-        // able to link to it in the same breath.
-        if var single = envelope["result"] as? [String: Any],
-           let itemId = single["id"] as? String, !itemId.isEmpty {
-            let handle = sources.register(CitationSourceRegistry.Source(
-                itemId: itemId, page: nil, time: nil, heading: nil, text: nil))
-            single["cite"] = "oak:\(handle)"
-            envelope["result"] = single
-            guard let encoded = try? JSONSerialization.data(withJSONObject: envelope,
-                                                            options: [.sortedKeys]),
-                  let text = String(data: encoded, encoding: .utf8)
-            else { return output }
-            return text
-        }
-
-        guard var rows = envelope["results"] as? [[String: Any]], !rows.isEmpty
-        else { return output }
-
-        var annotated = false
-        for index in rows.indices {
-            // `search` rows carry `itemId`; `items list`/`items show` rows carry `id`.
-            guard let itemId = (rows[index]["itemId"] as? String) ?? (rows[index]["id"] as? String),
-                  !itemId.isEmpty else { continue }
-            let handle = sources.register(CitationSourceRegistry.Source(
-                itemId: itemId, page: nil, time: nil, heading: nil, text: nil))
-            rows[index]["cite"] = "oak:\(handle)"
-            annotated = true
-        }
-        guard annotated else { return output }
-
-        envelope["results"] = rows
-        guard let encoded = try? JSONSerialization.data(withJSONObject: envelope,
-                                                        options: [.sortedKeys]),
-              let text = String(data: encoded, encoding: .utf8)
-        else { return output }
-        return text
     }
 
     /// Split a command string into argv tokens, honoring single/double quotes and
