@@ -31,9 +31,10 @@ struct TranslationSettingsView: View {
         let translationRaw = defaults.string(forKey: "translationAIProvider")
         _translationUseChatDefault = State(initialValue: translationRaw == nil)
         _translationProviderId = State(initialValue: prefs.translationAIProviderId)
-        let tm = prefs.translationAIModel
-        _translationModel = State(initialValue: tm.isEmpty
-            ? (AIProviderCatalog.shared.provider(for: prefs.translationAIProviderId)?.defaultModel ?? "") : tm)
+        // Through the catalog, so an inherited chat model that has since gone away
+        // falls back to the provider's default instead of an empty picker.
+        _translationModel = State(initialValue: AIProviderCatalog.shared.resolvedModelId(
+            providerId: prefs.translationAIProviderId, stored: prefs.translationAIModel))
     }
 
     var body: some View {

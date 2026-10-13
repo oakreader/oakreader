@@ -336,8 +336,13 @@ final class Preferences {
         set { defaults.set(newValue, forKey: Keys.translationAIProvider) }
     }
 
+    /// Follows the chat model while translation follows the chat provider
+    /// ("Use Chat default"), so the two never pair one provider with another's default.
     var translationAIModel: String {
-        get { defaults.string(forKey: Keys.translationAIModel) ?? "" }
+        get {
+            if let stored = defaults.string(forKey: Keys.translationAIModel) { return stored }
+            return defaults.string(forKey: Keys.translationAIProvider) == nil ? aiModel : ""
+        }
         set { defaults.set(newValue, forKey: Keys.translationAIModel) }
     }
 
