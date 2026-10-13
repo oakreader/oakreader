@@ -136,7 +136,12 @@ struct SnapshotOverlayView: View {
                 } else if forNote {
                     viewModel.deliverAreaCaptureToNote(pngData, pageIndex: pageIndex)
                 } else {
-                    viewModel.deliverAreaCaptureToChat(pngData, pageIndex: pageIndex)
+                    // The text under the region goes with the pixels, as Chrome's
+                    // glic does with its region capture: the model then knows what
+                    // it is looking at and can cite the passage.
+                    let regionText = page.selection(for: pdfRect)?.string ?? ""
+                    viewModel.deliverAreaCaptureToChat(
+                        pngData, pageIndex: pageIndex, regionText: regionText)
                 }
             } else {
                 viewModel.setEditorMode(.viewer)

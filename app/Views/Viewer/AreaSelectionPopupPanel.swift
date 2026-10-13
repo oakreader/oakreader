@@ -188,7 +188,9 @@ class AreaSelectionPopupPanel: NSPanel, AppResignDismissable {
             dismiss()
             return
         }
-        viewModel.chat.addImageAttachment(pngData, pageIndex: pageIndex)
+        viewModel.chat.addImageAttachment(
+            pngData, pageIndex: pageIndex,
+            regionText: page.selection(for: pdfRect)?.string ?? "")
         viewModel.state.rightPanelMode = .aiChat
         dismiss()
     }

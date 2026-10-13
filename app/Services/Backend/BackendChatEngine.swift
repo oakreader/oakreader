@@ -298,6 +298,14 @@ actor BackendChatEngine {
                 }
             case .imageCapture:
                 if let imageData = attachment.imageData {
+                    // A region of a PDF page carries its page label and the text
+                    // under it. Only that path sets `textContent`, empty for a
+                    // figure with no text. Other images send pixels only.
+                    if let text = attachment.textContent {
+                        var context = "[\(attachment.label)]"
+                        if !text.isEmpty { context += "\nText inside the region:\n> \(text)" }
+                        parts.append(.text(context + "\n"))
+                    }
                     parts.append(.image(data: imageData.base64EncodedString(), mimeType: "image/png"))
                 }
             }

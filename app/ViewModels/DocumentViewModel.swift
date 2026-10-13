@@ -463,8 +463,8 @@ class DocumentViewModel {
 
     /// Deliver a finished area capture into the chat composer and leave snapshot
     /// mode. Used by the overlays when the capture was initiated for chat.
-    func deliverAreaCaptureToChat(_ pngData: Data, pageIndex: Int) {
-        chat.addImageAttachment(pngData, pageIndex: pageIndex)
+    func deliverAreaCaptureToChat(_ pngData: Data, pageIndex: Int, regionText: String? = nil) {
+        chat.addImageAttachment(pngData, pageIndex: pageIndex, regionText: regionText)
         state.rightPanelMode = .aiChat
         setEditorMode(.viewer)
     }

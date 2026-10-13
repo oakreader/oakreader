@@ -852,10 +852,24 @@ class ChatViewModel {
         pendingAttachments.append(attachment)
     }
 
-    func addImageAttachment(_ imageData: Data, pageIndex: Int) {
+    /// `regionText` is the page text under a PDF region, empty for a figure with
+    /// no text. It is numbered as a passage, so the model reads what the image
+    /// shows and can cite it. Nil means the capture is not of a PDF page: HTML
+    /// and video captures pass a placeholder `pageIndex` of 0 that means nothing.
+    func addImageAttachment(_ imageData: Data, pageIndex: Int, regionText: String? = nil) {
+        // Non-nil marks a PDF region, so the engine sends its page label.
+        var passage: String? = regionText == nil ? nil : ""
+        let normalized = regionText.map(CitationSourceRegistry.normalized) ?? ""
+        if !normalized.isEmpty {
+            let handle = citationSources.register(CitationSourceRegistry.Source(
+                itemId: parent?.libraryItem?.id.uuidString ?? "",
+                page: pageIndex, time: nil, heading: nil, text: normalized))
+            passage = "[\(handle)] \(normalized)"
+        }
         let attachment = TurnAttachment(
             type: .imageCapture,
             label: "Page \(pageIndex + 1), region capture",
+            textContent: passage,
             imageData: imageData,
             pageIndex: pageIndex
         )
