@@ -12,7 +12,6 @@ enum ChatPresentation {
 
 struct AIChatView: View {
     let chatVM: ChatViewModel
-    var voiceVM: VoiceViewModel?
 
     /// Layout mode. `.panel` (default) preserves the existing right-panel behavior;
     /// `.canvas` centers content into a comfortable reading column for the agent page.
@@ -26,7 +25,6 @@ struct AIChatView: View {
     private let canvasContentWidth: CGFloat = 760
 
     @Environment(\.isTabActive) private var isTabActive
-    @State private var playingTurnId: UUID?
     @State private var showUserMemory = false
 
     /// Body text size of the surrounding messages, so the composer and its token
@@ -57,7 +55,7 @@ struct AIChatView: View {
             }
             .clipped()
         }
-        .animation(.easeInOut(duration: 0.2), value: chatVM.showHistory)
+        .animation(OakStyle.Motion.fade, value: chatVM.showHistory)
         .onAppear {
             chatVM.refreshAtMentionItems()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -69,9 +67,6 @@ struct AIChatView: View {
             chatVM.pendingLibraryRef = nil
             let token = ChatCompletionItem.libraryReference(from: item)
             inputFocusRef.insertDroppedToken(token)
-        }
-        .onChange(of: voiceVM?.isSpeaking) { _, speaking in
-            if speaking == false { playingTurnId = nil }
         }
         .onChange(of: isTabActive) { _, active in
             if !active { inputFocusRef.dismissCompletion() }
@@ -128,7 +123,7 @@ struct AIChatView: View {
                         onDeny: { chatVM.denyToolCall() }
                     )
                     .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .animation(.spring(duration: 0.3, bounce: 0.15), value: chatVM.pendingToolConfirmation != nil)
+                    .animation(OakStyle.Motion.slow, value: chatVM.pendingToolConfirmation != nil)
                     .padding(.bottom, 4)
                 }
             }
@@ -141,7 +136,7 @@ struct AIChatView: View {
 
             canvasConstrained { inputBar }
         }
-        .animation(.spring(duration: 0.3, bounce: 0.15), value: chatVM.memoryNotice)
+        .animation(OakStyle.Motion.slow, value: chatVM.memoryNotice)
     }
 
     /// Dia-style pill announcing a memory write; tap to open the manager.
@@ -210,7 +205,7 @@ struct AIChatView: View {
 
             Spacer()
 
-            OakToolButton(systemImage: "plus.bubble", prominent: true, tooltip: "New Chat") {
+            OakToolButton(systemImage: "plus", prominent: true, tooltip: "New Chat") {
                 chatVM.newSession()
             }
         }
@@ -334,45 +329,61 @@ struct AIChatView: View {
     // scrollbar capsule alone — never the eager message list. This mirrors how
     // AppKit's NSScrollView scrolls content without re-running any view tree.
     @State private var scrollState = ChatScrollState()
-    @State private var scrollTask: Task<Void, Never>?
 
-    /// A soft "scroll edge" fade — messages dissolve into the panel background at the
-    /// top (under the header) and bottom (above the input bar) rather than being
-    /// clipped by a hard line. Opaque panel-background at the very edge → fully clear
-    /// where the content reads; the Liquid-Glass scroll-edge effect. Non-interactive
-    /// so it never eats clicks on the bubbles beneath it. Mirrors the Notes panel.
-    private func scrollEdgeFade(_ edge: VerticalEdge) -> some View {
-        let isTop = edge == .top
-        let bg = Color(nsColor: .windowBackgroundColor)
-        return LinearGradient(
-            stops: [
-                .init(color: bg, location: 0),
-                .init(color: bg.opacity(0), location: 1)
-            ],
-            startPoint: isTop ? .top : .bottom,
-            endPoint: isTop ? .bottom : .top
-        )
-        .frame(height: 16)
-        .frame(maxWidth: .infinity)
-        .allowsHitTesting(false)
+    /// Feather the scroll edges, the way Dia wraps its thread in
+    /// `ARCUI.FeatheredContainerView` (`featherSize`, `featherInset`).
+    ///
+    /// This replaces a gradient of `windowBackgroundColor` painted over the top and
+    /// bottom. Painting the background only works while the background really is
+    /// that colour; a mask takes the text's own alpha down, so it is right over any
+    /// surface, in either appearance.
+    ///
+    /// An edge only feathers when there is content past it. Dia's feather is
+    /// constant, which leaves the first line of a short answer looking dimmed for no
+    /// reason; the flags come from the scroll metrics that are already being
+    /// measured, so this costs nothing and invalidates the list only when an edge
+    /// actually changes state.
+    private func featherMask(top: Bool, bottom: Bool) -> some View {
+        VStack(spacing: 0) {
+            LinearGradient(
+                colors: [.black.opacity(top ? 0 : 1), .black],
+                startPoint: .top, endPoint: .bottom
+            )
+            .frame(height: Self.featherHeight)
+
+            Rectangle().fill(.black)
+
+            LinearGradient(
+                colors: [.black, .black.opacity(bottom ? 0 : 1)],
+                startPoint: .top, endPoint: .bottom
+            )
+            .frame(height: Self.featherHeight)
+        }
     }
+
+    private static let featherHeight: CGFloat = 28
 
     private var messageList: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                // Eager VStack (not Lazy): each bubble's prose is an AppKit NSTextView,
+                // Eager layout (not LazyVStack): each bubble's prose is an AppKit NSTextView,
                 // and LazyVStack dehydrates off-screen rows while a reply streams (content
                 // height changes every frame + scroll-to-bottom). Rehydrating an NSTextView
                 // means re-running makeNSView + TextKit layout + math/code image rendering,
                 // which blanks the whole history for ~1s at generation start/end. Keeping
                 // rows realized avoids the teardown/rebuild churn.
-                VStack(spacing: 12) {
+                //
+                // The thread pads its last exchange to the viewport height, so a sent
+                // message can scroll to the top and the reply grows into the space
+                // below it — nothing above the reply moves while it streams. See
+                // `ChatThreadLayout`.
+                ChatThreadLayout(
+                    spacing: 12,
+                    viewportHeight: max(scrollState.viewHeight - 2 * OakStyle.Spacing.sm, 0)
+                ) {
                     ForEach(chatVM.turns) { turn in
                         ChatBubbleView(
                             turn: turn,
-                            onPlayAudio: voiceVM != nil ? { t in playAudio(t) } : nil,
-                            isPlayingAudio: playingTurnId == turn.id && (voiceVM?.isSpeaking ?? false),
-                            onStopAudio: { stopAudio() },
                             resolveCitation: { chatVM.resolveCitation($0) },
                             onOpenCitation: { itemId, anchor in
                                 chatVM.openCitation(itemId: itemId, anchor: anchor)
@@ -381,11 +392,10 @@ struct AIChatView: View {
                         )
                             .equatable()
                             .id(turn.id)
+                            .layoutValue(key: StartsThreadTail.self, value: turn.id == lastUserTurnID)
                             .transition(
                                 .asymmetric(
-                                    insertion: .move(edge: .bottom)
-                                        .combined(with: .opacity)
-                                        .combined(with: .scale(scale: 0.98, anchor: turn.role == .user ? .trailing : .leading)),
+                                    insertion: .opacity.combined(with: .offset(y: 8)),
                                     removal: .opacity
                                 )
                             )
@@ -406,8 +416,8 @@ struct AIChatView: View {
                     Color.clear.frame(height: 1).id("bottom")
                 }
                 .padding(OakStyle.Spacing.sm)
-                .animation(.easeInOut(duration: 0.2), value: showWorkingIndicator)
-                .animation(.spring(duration: 0.35, bounce: 0.15), value: chatVM.turns.count)
+                .animation(OakStyle.Motion.fade, value: showWorkingIndicator)
+                .animation(OakStyle.Motion.fade, value: chatVM.turns.count)
                 .background(
                     GeometryReader { inner in
                         Color.clear
@@ -428,16 +438,18 @@ struct AIChatView: View {
             .coordinateSpace(name: "chatScroll")
             .scrollIndicators(.hidden)
             .scrollContentBackground(.hidden)
-            .defaultScrollAnchor(.bottom)
+            // Initial position only. Size changes must not re-anchor: the thread
+            // holds still while a reply streams, and following is decided below.
+            .defaultScrollAnchor(.bottom, for: .initialOffset)
+            // Mask before the scrollbar overlay, so the bar itself never fades.
+            .mask {
+                featherMask(top: !scrollState.isAtTop, bottom: !scrollState.isAtBottomEdge)
+                    .animation(OakStyle.Motion.fade, value: scrollState.isAtTop)
+                    .animation(OakStyle.Motion.fade, value: scrollState.isAtBottomEdge)
+            }
             .overlay(alignment: .trailing) {
                 ChatScrollbar(state: scrollState)
             }
-            // Soft scroll-edge fade: messages dissolve into the panel background as
-            // they scroll up under the header and down toward the input bar, instead
-            // of cutting off on a hard line — the same Liquid-Glass scroll-edge effect
-            // used by the Notes panel (`CommentsPanelView.scrollEdgeFade`).
-            .overlay(alignment: .top) { scrollEdgeFade(.top) }
-            .overlay(alignment: .bottom) { scrollEdgeFade(.bottom) }
             .onPreferenceChange(ScrollMetricsKey.self) { metrics in
                 // Guard redundant writes: during a pure scroll only `offset`
                 // changes, so only the scrollbar (which reads it) is invalidated.
@@ -446,46 +458,41 @@ struct AIChatView: View {
                 if heightChanged { scrollState.contentHeight = metrics.contentHeight }
                 scrollState.registerActivity()
 
-                // Re-evaluate follow intent only on a pure scroll (height stable). During
-                // content growth the offset lags the new height for a frame, so recomputing
-                // here would misread "not near bottom" and abandon the auto-follow.
-                if !heightChanged {
-                    let scrollable = metrics.contentHeight - scrollState.viewHeight
-                    scrollState.isNearBottom = scrollable <= 0 || (scrollable - metrics.offset) < 20
-                }
+                // Read the position only on a pure scroll (height stable). While content
+                // grows, the offset lags the new height by a frame, so reading it then
+                // would see "not at the bottom" for one frame: the follow would let go
+                // and the bottom feather would blink on every streamed chunk.
+                guard !heightChanged else { return }
+                let scrollable = metrics.contentHeight - scrollState.viewHeight
+                let fromBottom = scrollable - metrics.offset
+                scrollState.isNearBottom = scrollable <= 0 || fromBottom < 20
+                let atTop = metrics.offset <= 2
+                let atBottom = scrollable <= 0 || fromBottom <= 2
+                if scrollState.isAtTop != atTop { scrollState.isAtTop = atTop }
+                if scrollState.isAtBottomEdge != atBottom { scrollState.isAtBottomEdge = atBottom }
             }
-            .onChange(of: chatVM.turns.count) { _, _ in
-                withAnimation(.easeOut(duration: 0.2)) {
-                    proxy.scrollTo("bottom")
-                }
+            // A new message: bring it to the top, once. The reply then streams into
+            // the padded space below it. Opening a past conversation lands on the
+            // same spot, without the animation.
+            .onChange(of: lastUserTurnID) { _, id in
+                guard let id else { return }
                 scrollState.isNearBottom = true
-            }
-            .onChange(of: scrollState.contentHeight) { old, new in
-                guard new - old > 1 else { return }
-                // During streaming: always follow. Otherwise: respect user scroll.
-                guard chatVM.isStreaming || scrollState.isNearBottom else { return }
-                // Debounce: coalesce rapid height changes into one smooth scroll.
-                // Without this, 60fps height updates cause 60 discrete jumps.
-                scrollTask?.cancel()
-                scrollTask = Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(32))
-                    guard !Task.isCancelled else { return }
-                    // Instant follow during streaming. An *animated* scrollTo
-                    // restarts every tick as the content grows, so overlapping
-                    // 0.15s animations never settle and the scroll visibly
-                    // stutters — worse now that content commits in larger 15fps
-                    // steps. Height grows in small frequent steps, so instant
-                    // tracking reads as smooth continuous scroll.
-                    if chatVM.isStreaming {
-                        proxy.scrollTo("bottom")
-                    } else {
-                        withAnimation(.smooth(duration: 0.15)) {
-                            proxy.scrollTo("bottom")
-                        }
-                    }
+                withAnimation(chatVM.isStreaming ? OakStyle.Motion.slow : nil) {
+                    proxy.scrollTo(id, anchor: .top)
                 }
+            }
+            // The one follow. The thread's height is constant until the reply
+            // outgrows the viewport, so this fires only after that, and only while
+            // the reader is still at the bottom.
+            .onChange(of: scrollState.contentHeight) { old, new in
+                guard new > old, chatVM.isStreaming, scrollState.isNearBottom else { return }
+                proxy.scrollTo("bottom", anchor: .bottom)
             }
         }
+    }
+
+    private var lastUserTurnID: Turn.ID? {
+        chatVM.turns.last { $0.role == .user }?.id
     }
 
     // MARK: - Input Bar
@@ -616,85 +623,6 @@ struct AIChatView: View {
             })
         }
         return items
-    }
-
-    // MARK: - Audio Playback
-
-    private func playAudio(_ turn: Turn) {
-        guard let voiceVM else { return }
-        let text = Self.preprocessForTTS(turn.content)
-        guard !text.isEmpty else { return }
-        playingTurnId = turn.id
-        voiceVM.speakText(text)
-    }
-
-    private func stopAudio() {
-        voiceVM?.stopSpeaking()
-        playingTurnId = nil
-    }
-
-    // MARK: - TTS Text Preprocessing
-
-    /// Strips markup that should not be read aloud: citations, code blocks,
-    /// markdown formatting, and reference blocks.
-    static func preprocessForTTS(_ text: String) -> String {
-        var s = text
-
-        // 1. Remove <referenced-documents>...</referenced-documents> blocks
-        s = s.replacingOccurrences(
-            of: #"<referenced-documents>[\s\S]*?</referenced-documents>"#,
-            with: "",
-            options: .regularExpression
-        )
-
-        // 2. Remove fenced code blocks (```...```)
-        s = s.replacingOccurrences(
-            of: #"```[\s\S]*?```"#,
-            with: "",
-            options: .regularExpression
-        )
-
-        // 3. Remove inline code (`...`)
-        s = s.replacingOccurrences(
-            of: #"`[^`]+`"#,
-            with: "",
-            options: .regularExpression
-        )
-
-        // 4. Convert markdown links [text](url) → text (keep the label, drop the URL)
-        s = s.replacingOccurrences(
-            of: #"\[([^\]]+)\]\([^)]+\)"#,
-            with: "$1",
-            options: .regularExpression
-        )
-
-        // 5. Strip bold/italic markers
-        s = s.replacingOccurrences(of: "***", with: "")
-        s = s.replacingOccurrences(of: "**", with: "")
-        s = s.replacingOccurrences(of: "__", with: "")
-
-        // 6. Strip heading markers (e.g. "### ")
-        s = s.replacingOccurrences(
-            of: #"(?m)^#{1,6}\s+"#,
-            with: "",
-            options: .regularExpression
-        )
-
-        // 7. Strip horizontal rules
-        s = s.replacingOccurrences(
-            of: #"(?m)^[-*_]{3,}\s*$"#,
-            with: "",
-            options: .regularExpression
-        )
-
-        // 8. Collapse multiple blank lines
-        s = s.replacingOccurrences(
-            of: #"\n{3,}"#,
-            with: "\n\n",
-            options: .regularExpression
-        )
-
-        return s.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     // MARK: - File Upload
@@ -853,6 +781,58 @@ struct AIChatView: View {
     }
 }
 
+// MARK: - Thread layout
+
+/// Marks the first view of the thread's last exchange: the newest user message.
+private struct StartsThreadTail: LayoutValueKey {
+    static let defaultValue = false
+}
+
+/// A vertical stack whose last exchange is at least one viewport tall.
+///
+/// The padding goes after the last view, so scrolling the newest user message
+/// to the top always has room, and the reply below it grows into that padding
+/// instead of growing the content. The content height stays constant until the
+/// reply is taller than the viewport, which is what lets the thread hold still
+/// while it streams.
+///
+/// A layout, not two stacks for "history" and "tail": moving a turn from one
+/// stack to the other on each send would rebuild its NSTextView.
+private struct ChatThreadLayout: Layout {
+    var spacing: CGFloat
+    var viewportHeight: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? subviews.map { $0.sizeThatFits(.unspecified).width }.max() ?? 0
+        let heights = rowHeights(width: width, subviews: subviews)
+        let content = stackHeight(heights[...])
+        let tailStart = subviews.firstIndex { $0[StartsThreadTail.self] }
+        let tail = tailStart.map { stackHeight(heights[$0...]) } ?? 0
+        let padding = tailStart == nil ? 0 : max(viewportHeight - tail, 0)
+        return CGSize(width: width, height: content + padding)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let heights = rowHeights(width: bounds.width, subviews: subviews)
+        var y = bounds.minY
+        for (subview, height) in zip(subviews, heights) {
+            subview.place(
+                at: CGPoint(x: bounds.minX, y: y),
+                proposal: ProposedViewSize(width: bounds.width, height: height)
+            )
+            y += height + spacing
+        }
+    }
+
+    private func rowHeights(width: CGFloat, subviews: Subviews) -> [CGFloat] {
+        subviews.map { $0.sizeThatFits(ProposedViewSize(width: width, height: nil)).height }
+    }
+
+    private func stackHeight(_ heights: ArraySlice<CGFloat>) -> CGFloat {
+        heights.reduce(0, +) + spacing * CGFloat(max(heights.count - 1, 0))
+    }
+}
+
 // MARK: - Scroll metrics preference key
 
 private struct ScrollMetrics: Equatable {
@@ -881,6 +861,11 @@ final class ChatScrollState {
     var contentHeight: CGFloat = 0
     var viewHeight: CGFloat = 0
     var barOpacity: Double = 0
+    /// Scroll-edge state for the feather mask. Observed (unlike `offset`) because it
+    /// changes a handful of times per scroll, not every frame, so reading it in the
+    /// message list does not re-render the list on each frame.
+    var isAtTop = true
+    var isAtBottomEdge = true
     @ObservationIgnored var isNearBottom = true
 
     @ObservationIgnored private var fadeTask: Task<Void, Never>?

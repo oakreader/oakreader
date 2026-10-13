@@ -19,6 +19,9 @@ struct ProseBlockView: NSViewRepresentable {
     /// `StreamingMarkdownView.linkPreview`.
     var linkPreview: ((URL, String) -> AnyView?)?
 
+    /// Underline colour for the link under the pointer (`MarkdownTheme.linkHoverUnderline`).
+    var linkHoverUnderline: NSColor?
+
     func makeCoordinator() -> Coordinator { Coordinator(onOpenURL: onOpenURL, linkPreview: linkPreview) }
 
     final class Coordinator: NSObject, NSTextViewDelegate {
@@ -91,6 +94,7 @@ struct ProseBlockView: NSViewRepresentable {
         context.coordinator.onOpenURL = onOpenURL
         context.coordinator.linkPreview = linkPreview
         tv.linkPreview = linkPreview
+        tv.linkHoverUnderlineColor = linkHoverUnderline
         tv.isSelectable = selectable
         // Set before mutating storage so the first fade applies alpha 0 synchronously
         // (no full-opacity flash before the first animation frame).

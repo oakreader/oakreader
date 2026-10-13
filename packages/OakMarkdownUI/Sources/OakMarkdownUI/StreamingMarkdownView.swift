@@ -83,7 +83,8 @@ private struct BlockRow: View, Equatable {
                 selectable: !streaming,
                 animatesAppendedText: streaming && fadesAppendedText,
                 onOpenURL: onOpenURL,
-                linkPreview: linkPreview
+                linkPreview: linkPreview,
+                linkHoverUnderline: theme.linkHoverUnderline
             )
         case .code(let language):
             CodeBlockView(code: CodeFence.strip(block.text), language: language, theme: theme)

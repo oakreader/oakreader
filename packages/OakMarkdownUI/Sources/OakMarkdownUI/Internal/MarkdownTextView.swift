@@ -5,6 +5,12 @@ extension NSAttributedString.Key {
     /// Marks an inline-code run so `HuggingLayoutManager` draws it as a padded
     /// rounded pill rather than a bare selection-style rect.
     static let inlineCodePill = NSAttributedString.Key("OakMarkdownInlineCodePill")
+    /// Hairline color (`NSColor`) stroked around an inline-code pill. Dia's
+    /// `InlineCodeProperties.strokeColor`: on a tinted message background the fill
+    /// alone disappears, and the stroke is what keeps the pill legible.
+    static let inlineCodeStroke = NSAttributedString.Key("OakMarkdownInlineCodeStroke")
+    /// Corner radius (`NSNumber`) of that pill.
+    static let inlineCodeRadius = NSAttributedString.Key("OakMarkdownInlineCodeRadius")
     /// Fill color (`NSColor`) for a block-quote range — drawn as a rounded background.
     static let blockquoteFill = NSAttributedString.Key("OakMarkdownBlockquoteFill")
     /// Bar color (`NSColor`) for a block-quote range — drawn as a left vertical accent.
@@ -103,7 +109,19 @@ final class HuggingLayoutManager: NSLayoutManager {
             // A nil radius means capsule — the citation chip stays fully rounded at any
             // font size, where a fixed radius would read as a rectangle on a tall line.
             let radius = style.cornerRadius ?? height / 2
-            NSBezierPath(roundedRect: pill, xRadius: radius, yRadius: radius).fill()
+            let path = NSBezierPath(roundedRect: pill, xRadius: radius, yRadius: radius)
+            path.fill()
+            if let stroke = style.stroke {
+                // Inset by half the line width so the hairline sits inside the fill
+                // rather than straddling its edge and reading as two pixels.
+                let inset = NSBezierPath(roundedRect: pill.insetBy(dx: 0.5, dy: 0.5),
+                                         xRadius: max(radius - 0.5, 0),
+                                         yRadius: max(radius - 0.5, 0))
+                stroke.setStroke()
+                inset.lineWidth = 1
+                inset.stroke()
+                color.set()   // restore the fill colour for the next rect
+            }
         }
     }
 
@@ -116,6 +134,8 @@ final class HuggingLayoutManager: NSLayoutManager {
         let verticalPadding: CGFloat
         /// `nil` → capsule (radius derived from the drawn height).
         let cornerRadius: CGFloat?
+        /// `nil` → fill only.
+        let stroke: NSColor?
     }
 
     private func pillStyle(at charRange: NSRange, in storage: NSTextStorage) -> PillStyle? {
@@ -124,10 +144,13 @@ final class HuggingLayoutManager: NSLayoutManager {
             (storage.attribute(.font, at: index, effectiveRange: nil) as? NSFont) ?? fallback
         }
         if storage.attribute(.inlineCodePill, at: index, effectiveRange: nil) != nil {
+            let stroke = storage.attribute(.inlineCodeStroke, at: index, effectiveRange: nil) as? NSColor
+            let radius = storage.attribute(.inlineCodeRadius, at: index, effectiveRange: nil) as? NSNumber
             return PillStyle(font: font(.monospacedSystemFont(ofSize: 13, weight: .regular)),
                              expand: MarkdownInlineCodePill.horizontalPadding,
                              verticalPadding: 1.5,
-                             cornerRadius: 4)
+                             cornerRadius: radius.map { CGFloat($0.doubleValue) } ?? 4,
+                             stroke: (stroke?.alphaComponent ?? 0) > 0 ? stroke : nil)
         }
         return nil
     }
@@ -149,6 +172,16 @@ final class MarkdownTextView: NSTextView {
     private var hoverTrackingArea: NSTrackingArea?
     private var hoverPopover: NSPopover?
     private var hoveredLinkRange: NSRange?
+    /// The link the pointer is over, underline-wise. Tracked apart from
+    /// `hoveredLinkRange` because that one only exists when a preview is on offer,
+    /// and every link should answer the pointer whether or not it has a card.
+    private var underlinedLinkRange: NSRange?
+
+    /// Colour of a link's underline while the pointer is on it. Dia keeps hover
+    /// underline style and colour in `SupertabTextView.LinkAttributes`, separate
+    /// from the resting ones: the link answers the pointer without the text itself
+    /// changing colour, which would reflow nothing but still read as a flicker.
+    var linkHoverUnderlineColor: NSColor?
     private var hoverTimer: Timer?
 
     /// Dwell before the preview appears — long enough to ignore a cursor passing through.
@@ -164,7 +197,7 @@ final class MarkdownTextView: NSTextView {
 
     deinit {
         hoverTimer?.invalidate()
-        fadeTimer?.invalidate()
+        revealTimer?.invalidate()
         hoverPopover?.close()
     }
 
@@ -219,81 +252,214 @@ final class MarkdownTextView: NSTextView {
 
     // MARK: - Streaming fade-in
 
-    /// When true, character ranges handed to `fadeInAppendedText(_:)` animate their
-    /// opacity 0→1 instead of appearing instantly. This is Dia's reveal model: the
-    /// full text is laid out immediately (stable layout, no per-char reflow) and only
-    /// the *newly arrived* glyphs fade in. Set false to finish any in-flight fade at
-    /// full opacity (stream ended / reduce-motion).
+    /// When true, character ranges handed to `fadeInAppendedText(_:)` are revealed
+    /// instead of appearing instantly. Set false to finish any reveal still in
+    /// flight at full opacity (stream ended / reduce-motion).
     var fadesAppendedText = false {
-        didSet { if !fadesAppendedText { finishAllFades() } }
+        didSet {
+            if fadesAppendedText { isDraining = false } else { drainReveal() }
+        }
     }
 
-    /// How long a newly-appended run takes to fade from transparent to opaque.
-    /// Matches Dia's `TextFadeAnimator.fadeInDuration` feel (~0.2s).
-    private static let fadeDuration: TimeInterval = 0.22
+    // MARK: - Streaming reveal
+    //
+    // Dia's `AssistantUI.TextFadeAnimator` is the reference, and the thing worth
+    // taking from it is not the fade — it is the UNIT and the CADENCE. It reveals
+    // *line fragments*, each one scheduled off the previous (`nextLineTask`,
+    // `lineIntervalMultiplier`), with a cap on how long the trailing line may wait
+    // (`trailingLineRevealMaxDelay`). The text therefore arrives at a typographic
+    // rhythm rather than at the network's rhythm.
+    //
+    // Fading a whole delta as one block — what this did before — ties the reveal to
+    // chunk boundaries: a 300-character burst lights up at once, a 5-character one
+    // barely registers, and the answer pulses unevenly because the provider's
+    // packets are uneven. Lines are the unit a reader actually consumes.
+    //
+    // Two departures from Dia, both deliberate:
+    //
+    //   - The interval is derived from the backlog instead of being a constant with
+    //     a delay cap. Dia needs `trailingLineRevealMaxDelay` precisely because a
+    //     fixed cadence falls behind a fast stream; targeting a drain time instead
+    //     means the reveal relaxes to a reading pace when the model is slow and
+    //     accelerates when it is ahead, without ever snapping.
+    //   - A line is swept head-to-tail with a soft edge rather than cross-faded,
+    //     which is what Dia's per-line `CAGradientLayer` buys. Doing it with
+    //     temporary attributes keeps the mechanism unable to hide text: the worst
+    //     a bug here can do is leave a run dim, never invisible, which a CALayer
+    //     mask over the whole text view cannot promise.
 
-    private var activeFades: [(range: NSRange, start: TimeInterval)] = []
-    private var fadeTimer: Timer?
+    /// One line fragment waiting for, or in, its reveal.
+    private struct RevealLine {
+        let range: NSRange
+        /// Uptime when the sweep began; nil while queued.
+        var start: TimeInterval?
+        /// Uptime when it was enqueued, for the starvation cap.
+        let queuedAt: TimeInterval
+    }
 
-    /// Fade in a freshly-appended character range. Applies alpha 0 synchronously so the
-    /// run never flashes at full opacity before the first animation frame.
+    /// One line's sweep, head to tail.
+    private static let lineDuration: TimeInterval = 0.26
+    /// Share of `lineDuration` spent travelling; the rest is the edge's own fade,
+    /// so the leading edge stays soft instead of arriving as a hard wipe.
+    private static let sweepShare: Double = 0.6
+    /// Lines allowed to sweep at once. More than this and the page shimmers.
+    private static let maxConcurrentLines = 3
+    /// Backlog drains within this, however deep it is.
+    private static let targetDrain: TimeInterval = 0.45
+    /// Floor: a line never waits longer than this, whatever the scheduler thinks.
+    private static let maxQueueWait: TimeInterval = 1.0
+
+    private var revealLines: [RevealLine] = []
+    private var nextLineStart: TimeInterval = 0
+    private var revealTimer: Timer?
+    /// Stream ended with a backlog: drain at the fastest cadence rather than snap.
+    private var isDraining = false
+
+    /// Reveal a freshly-appended character range. Applies alpha 0 synchronously so
+    /// nothing flashes at full opacity before its turn comes.
     func fadeInAppendedText(_ range: NSRange) {
         guard fadesAppendedText, range.length > 0, let lm = layoutManager else { return }
         // The streamed tail can be rewritten (markdown reflow moves the divergence
-        // point back). Restore any overlapping in-flight fade to full opacity BEFORE
-        // dropping it — otherwise a run only partially covered by the new range stays
-        // stuck dim forever ("some text too light").
-        for fade in activeFades where NSIntersectionRange(fade.range, range).length > 0 {
-            clearFadeAlpha(fade.range, lm: lm)
+        // point back). Restore any overlapping line still in flight to full opacity
+        // BEFORE dropping it — otherwise a run only partially covered by the new
+        // range stays dim forever.
+        for line in revealLines where NSIntersectionRange(line.range, range).length > 0 {
+            clearFadeAlpha(line.range, lm: lm)
         }
-        activeFades.removeAll { NSIntersectionRange($0.range, range).length > 0 }
-        activeFades.append((range, ProcessInfo.processInfo.systemUptime))
+        revealLines.removeAll { NSIntersectionRange($0.range, range).length > 0 }
+
+        let now = ProcessInfo.processInfo.systemUptime
         applyFadeAlpha(0, to: range, lm: lm)
-        if fadeTimer == nil {
-            let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
-                self?.tickFades()
-            }
-            // .common so the fade keeps animating during scroll/event tracking
-            // instead of freezing mid-fade (which also reads as stuck-dim text).
-            RunLoop.main.add(timer, forMode: .common)
-            fadeTimer = timer
+        for lineRange in lineFragmentRanges(in: range) {
+            revealLines.append(RevealLine(range: lineRange, start: nil, queuedAt: now))
         }
+        startRevealTimer()
     }
 
-    /// Snap any in-flight fade that begins before `location` to full opacity and drop it.
-    /// Called when the streamed tail was rewritten (markdown reflow restyled already-visible
-    /// text): the stored fade ranges for that region are now stale, and letting `tickFades`
-    /// keep applying alpha to them re-dims text the reader has already seen — the flicker.
-    /// Restoring them to their real color and removing them leaves only the fresh tail fading.
+    /// Snap any reveal that begins before `location` to full opacity and drop it.
+    /// Called when the streamed tail was rewritten (markdown reflow restyled text
+    /// already on screen): those ranges are stale, and continuing to drive alpha
+    /// over them re-dims what the reader has already read.
     func finalizeFades(before location: Int) {
         guard let lm = layoutManager else { return }
-        var remaining: [(range: NSRange, start: TimeInterval)] = []
-        for fade in activeFades {
-            if fade.range.location < location {
-                clearFadeAlpha(fade.range, lm: lm)   // restore real color, full opacity
+        var remaining: [RevealLine] = []
+        for line in revealLines {
+            if line.range.location < location {
+                clearFadeAlpha(line.range, lm: lm)
             } else {
-                remaining.append(fade)
+                remaining.append(line)
             }
         }
-        activeFades = remaining
-        if activeFades.isEmpty { stopFadeTimer() }
+        revealLines = remaining
+        if revealLines.isEmpty { stopRevealTimer() }
     }
 
-    private func tickFades() {
-        guard let lm = layoutManager else { stopFadeTimer(); return }
+    /// Split a character range along its laid-out line fragments. Falls back to the
+    /// whole range when layout cannot answer — a reveal that is too coarse beats a
+    /// run that never reveals.
+    private func lineFragmentRanges(in range: NSRange) -> [NSRange] {
+        guard let lm = layoutManager, let container = textContainer else { return [range] }
+        let glyphRange = lm.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+        guard glyphRange.length > 0 else { return [range] }
+        var out: [NSRange] = []
+        lm.enumerateLineFragments(forGlyphRange: glyphRange) { _, _, _, lineGlyphRange, _ in
+            let overlap = NSIntersectionRange(lineGlyphRange, glyphRange)
+            guard overlap.length > 0 else { return }
+            out.append(lm.characterRange(forGlyphRange: overlap, actualGlyphRange: nil))
+        }
+        _ = container
+        return out.isEmpty ? [range] : out
+    }
+
+    /// Seconds between two line starts. Shorter the deeper the backlog, so a bursty
+    /// stream catches up without the reveal ever outrunning what has arrived.
+    private func lineInterval(queued: Int) -> TimeInterval {
+        if isDraining { return 0.03 }
+        return min(0.15, max(0.035, Self.targetDrain / Double(max(1, queued))))
+    }
+
+    private func startRevealTimer() {
+        guard revealTimer == nil else { return }
+        // .common so the reveal keeps running during scroll and event tracking
+        // instead of freezing mid-sweep.
+        let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
+            self?.tickReveal()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        revealTimer = timer
+    }
+
+    private func tickReveal() {
+        guard let lm = layoutManager else { stopRevealTimer(); return }
         let now = ProcessInfo.processInfo.systemUptime
-        var stillActive: [(range: NSRange, start: TimeInterval)] = []
-        for fade in activeFades {
-            let p = min(1.0, (now - fade.start) / Self.fadeDuration)
-            if p >= 1.0 {
-                clearFadeAlpha(fade.range, lm: lm)   // restore real color
+
+        // Start whatever is due.
+        var running = revealLines.reduce(into: 0) { if $1.start != nil { $0 += 1 } }
+        for index in revealLines.indices where revealLines[index].start == nil {
+            let starved = now - revealLines[index].queuedAt >= Self.maxQueueWait
+            guard starved || (running < Self.maxConcurrentLines && now >= nextLineStart) else { break }
+            revealLines[index].start = now
+            running += 1
+            let queued = revealLines.reduce(into: 0) { if $1.start == nil { $0 += 1 } }
+            nextLineStart = now + lineInterval(queued: queued)
+        }
+
+        // Advance the ones running.
+        var stillActive: [RevealLine] = []
+        for line in revealLines {
+            guard let start = line.start else {
+                stillActive.append(line)
+                continue
+            }
+            let progress = (now - start) / Self.lineDuration
+            if progress >= 1 {
+                clearFadeAlpha(line.range, lm: lm)
             } else {
-                applyFadeAlpha(p * p * (3 - 2 * p), to: fade.range, lm: lm)  // smoothstep
-                stillActive.append(fade)
+                applySweep(progress, to: line.range, lm: lm)
+                stillActive.append(line)
             }
         }
-        activeFades = stillActive
-        if activeFades.isEmpty { stopFadeTimer() }
+        revealLines = stillActive
+        if revealLines.isEmpty { stopRevealTimer() }
+    }
+
+    /// Sweep one line head to tail. The line is quantised into segments, each with
+    /// its own delayed fade, which is a soft-edged wipe at a bounded cost: a handful
+    /// of temporary-attribute writes per line per frame, not one per glyph.
+    private func applySweep(_ progress: Double, to range: NSRange, lm: NSLayoutManager) {
+        let segments = max(1, min(12, range.length / 3))
+        let travel = Self.sweepShare
+        let edge = 1 - travel
+        for index in 0..<segments {
+            let offset = travel * Double(index) / Double(segments)
+            let local = max(0, min(1, (progress - offset) / edge))
+            let eased = local * local * (3 - 2 * local)
+            let location = range.location + range.length * index / segments
+            let next = range.location + range.length * (index + 1) / segments
+            applyFadeAlpha(eased, to: NSRange(location: location, length: next - location), lm: lm)
+        }
+    }
+
+    /// Stream ended. Anything still queued finishes at the fastest cadence rather
+    /// than snapping, so the last paragraph lands the way the rest of it did.
+    private func drainReveal() {
+        guard !revealLines.isEmpty else {
+            finishAllFades()
+            return
+        }
+        isDraining = true
+        startRevealTimer()
+    }
+
+    private func finishAllFades() {
+        // Belt-and-suspenders: clear the overlay across the WHOLE text, not just
+        // tracked ranges, so no run can ever be left dim once the stream settles.
+        if let lm = layoutManager, let storage = textStorage, storage.length > 0 {
+            lm.removeTemporaryAttribute(.foregroundColor,
+                                        forCharacterRange: NSRange(location: 0, length: storage.length))
+        }
+        revealLines.removeAll()
+        stopRevealTimer()
     }
 
     /// Overlay a temporary foreground color at `alpha`, preserving each run's real color
@@ -316,20 +482,11 @@ final class MarkdownTextView: NSTextView {
         lm.removeTemporaryAttribute(.foregroundColor, forCharacterRange: clamped)
     }
 
-    private func finishAllFades() {
-        // Belt-and-suspenders: clear the fade overlay across the WHOLE text, not just
-        // tracked ranges, so no run can ever be left dim once the stream settles.
-        if let lm = layoutManager, let storage = textStorage, storage.length > 0 {
-            lm.removeTemporaryAttribute(.foregroundColor,
-                                        forCharacterRange: NSRange(location: 0, length: storage.length))
-        }
-        activeFades.removeAll()
-        stopFadeTimer()
-    }
-
-    private func stopFadeTimer() {
-        fadeTimer?.invalidate()
-        fadeTimer = nil
+    private func stopRevealTimer() {
+        revealTimer?.invalidate()
+        revealTimer = nil
+        isDraining = false
+        nextLineStart = 0
     }
 
     // MARK: - Link hover preview
@@ -364,8 +521,7 @@ final class MarkdownTextView: NSTextView {
     }
 
     private func handleHover(at point: NSPoint) {
-        guard let preview = linkPreview,
-              let lm = layoutManager, let container = textContainer,
+        guard let lm = layoutManager, let container = textContainer,
               let storage = textStorage, storage.length > 0 else { cancelHover(); return }
 
         let origin = textContainerOrigin
@@ -382,14 +538,20 @@ final class MarkdownTextView: NSTextView {
         guard let url = linkURL(in: storage, at: charIndex, effectiveRange: &range)
         else { cancelHover(); return }
         let label = storage.attributedSubstring(from: range).string
-        guard preview(url, label) != nil else { cancelHover(); return }
 
         // `glyphIndex(for:)` returns the *nearest* glyph, so confirm the point really
-        // lands on the link's glyphs before showing anything.
+        // lands on the link's glyphs before reacting at all.
         let glyphRange = lm.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
         let linkRect = lm.boundingRect(forGlyphRange: glyphRange, in: container)
         guard linkRect.contains(local) else { cancelHover(); return }
 
+        underlineHoveredLink(range)
+
+        // Only a link with something to show opens a card.
+        guard let preview = linkPreview, preview(url, label) != nil else {
+            cancelPreview()
+            return
+        }
         if hoveredLinkRange == range { return }  // already shown or scheduled for this link
 
         cancelHover()
@@ -416,11 +578,43 @@ final class MarkdownTextView: NSTextView {
     }
 
     private func cancelHover() {
+        clearHoverUnderline()
+        cancelPreview()
+    }
+
+    private func cancelPreview() {
         hoverTimer?.invalidate()
         hoverTimer = nil
         hoveredLinkRange = nil
         if hoverPopover?.isShown == true { hoverPopover?.close() }
         hoverPopover = nil
+    }
+
+    /// Thicken and recolour the hovered link's underline. A temporary attribute, so
+    /// it costs no relayout and cannot survive into the stored text.
+    private func underlineHoveredLink(_ range: NSRange) {
+        guard let color = linkHoverUnderlineColor, let lm = layoutManager else { return }
+        guard underlinedLinkRange != range else { return }
+        clearHoverUnderline()
+        lm.addTemporaryAttributes([
+            .underlineStyle: NSUnderlineStyle([.single, .thick]).rawValue,
+            .underlineColor: color,
+        ], forCharacterRange: range)
+        underlinedLinkRange = range
+    }
+
+    private func clearHoverUnderline() {
+        guard let range = underlinedLinkRange, let lm = layoutManager,
+              let storage = textStorage else {
+            underlinedLinkRange = nil
+            return
+        }
+        let clamped = NSIntersectionRange(range, NSRange(location: 0, length: storage.length))
+        if clamped.length > 0 {
+            lm.removeTemporaryAttribute(.underlineStyle, forCharacterRange: clamped)
+            lm.removeTemporaryAttribute(.underlineColor, forCharacterRange: clamped)
+        }
+        underlinedLinkRange = nil
     }
 
     private func linkURL(in storage: NSTextStorage, at index: Int,

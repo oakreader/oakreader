@@ -6,6 +6,33 @@ just the one that prompted them.
 
 ---
 
+## Two springs, and one fade
+
+**Rule.** Animate from `OakStyle.Motion` — `fast`, `slow`, `fade`. Do not write a
+bespoke `.spring(duration:bounce:)` in a view unless that surface genuinely is not
+part of the app's one surface, and say why in a comment next to it.
+
+Pick by what is moving:
+
+| token | for | value |
+|---|---|---|
+| `fast` | the pointer is driving it: hover, press, an icon swapping | `spring(duration: 0.2, bounce: 0.15)` |
+| `slow` | the layout is driving it: a row arriving, a banner, a panel | `spring(duration: 0.34, bounce: 0.2)` |
+| `fade` | opacity alone, nothing to carry | `easeInOut(duration: 0.18)` |
+
+**Why two.** Dia's whole assistant surface animates from
+`AssistantUI.AssistantAnimationUtilities.Springs`, which has exactly two cases,
+`slow` and `fast` (recovered from the binary — see
+`docs/references/dia-chat-implementation.md` §8). The chat panel here had seven
+hand-tuned parameter sets, so a hover, a row insert and a banner each moved on their
+own curve. Nothing was wrong individually; together they did not read as one surface.
+
+A reader cannot name a duration, but they can feel two things that should match and
+do not. The count is the point: adding a third token to fit one case is how a set of
+seven comes back.
+
+---
+
 ## Expand/collapse "pill" toolbars (active item reveals its label)
 
 **Pattern.** A row of icon-only buttons where the *selected* one expands into a

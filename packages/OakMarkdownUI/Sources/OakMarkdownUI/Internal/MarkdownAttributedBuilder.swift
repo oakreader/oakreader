@@ -118,6 +118,8 @@ enum MarkdownAttributedBuilder {
 private final class Renderer {
     let theme: MarkdownTheme
     private var listDepth = 0
+    /// Block-quote nesting, 1 inside the outermost quote. Drives the opacity ladder.
+    private var quoteDepth = 0
 
     init(theme: MarkdownTheme) { self.theme = theme }
 
@@ -190,6 +192,8 @@ private final class Renderer {
                 .foregroundColor: theme.textColor,
                 .backgroundColor: theme.inlineCodeBackground,
                 .inlineCodePill: true,
+                .inlineCodeStroke: theme.inlineCodeStroke,
+                .inlineCodeRadius: NSNumber(value: Double(theme.inlineCodeCornerRadius)),
             ])
         case CMARK_NODE_LINK:
             return link(node)
@@ -315,7 +319,9 @@ private final class Renderer {
         let idx = min(max(level, 1), theme.headingSizes.count) - 1
         m.addAttribute(.font, value: NSFont.systemFont(ofSize: theme.headingSizes[idx], weight: .semibold), range: full)
         let p = bodyParagraphStyle()
-        p.paragraphSpacingBefore = theme.paragraphSpacing * 0.5
+        // A heading belongs to the text under it: more room above than below.
+        p.paragraphSpacingBefore = theme.headingSpacingBefore[min(idx, theme.headingSpacingBefore.count - 1)]
+        p.paragraphSpacing = theme.headingSpacingAfter[min(idx, theme.headingSpacingAfter.count - 1)]
         m.addAttribute(.paragraphStyle, value: p, range: full)
         addInlineCodeSpacing(m)
         return m
@@ -422,7 +428,7 @@ private final class Renderer {
             line.append(renderInline(item))
             let p = bodyParagraphStyle(headIndent: indent + 18)
             p.firstLineHeadIndent = indent
-            p.paragraphSpacing = theme.paragraphSpacing * 0.3
+            p.paragraphSpacing = theme.listItemSpacing
             out.append(paragraphStyled(line, style: p))
             if i < items.count - 1 { out.append(NSAttributedString(string: "\n")) }
         }
@@ -430,9 +436,17 @@ private final class Renderer {
     }
 
     private func blockQuote(_ node: MarkdownAttributedBuilder.Node) -> NSAttributedString {
+        quoteDepth += 1
+        defer { quoteDepth -= 1 }
         let m = NSMutableAttributedString(attributedString: renderBlocks(node))
         let full = NSRange(location: 0, length: m.length)
-        m.addAttribute(.foregroundColor, value: theme.secondaryTextColor, range: full)
+        // One step dimmer per nesting level, never past the floor. Dia calls the
+        // floor `quoteLevelMinOpacity`; without one, a quote inside a quote inside a
+        // quote is unreadable, and with no ladder at all the nesting is invisible.
+        let step = pow(0.8, CGFloat(quoteDepth - 1))
+        let alpha = max(theme.quoteLevelMinOpacity, step)
+        m.addAttribute(.foregroundColor,
+                       value: theme.secondaryTextColor.withAlphaComponent(alpha), range: full)
         m.addAttribute(.paragraphStyle, value: bodyParagraphStyle(headIndent: 12), range: full)
         // Tag the range so `HuggingLayoutManager` paints a soft rounded fill behind
         // it (the drawing can't be expressed as text attributes). No left bar — the

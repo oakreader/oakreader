@@ -4,9 +4,6 @@ import OakMarkdownUI
 
 struct ChatBubbleView: View, Equatable {
     let turn: Turn
-    var onPlayAudio: ((Turn) -> Void)?
-    var isPlayingAudio: Bool = false
-    var onStopAudio: (() -> Void)?
     /// Resolves an `oak:N` citation link to the passage it names. Supplied by the host
     /// because the source table belongs to the conversation, not to the bubble.
     var resolveCitation: ((URL) -> (itemId: String, anchor: CitationAnchor)?)?
@@ -22,12 +19,11 @@ struct ChatBubbleView: View, Equatable {
     // @AppStorage still invalidate the view directly — EquatableView only
     // short-circuits re-renders propagated from the parent's body.
     static func == (lhs: ChatBubbleView, rhs: ChatBubbleView) -> Bool {
-        lhs.turn == rhs.turn && lhs.isPlayingAudio == rhs.isPlayingAudio
+        lhs.turn == rhs.turn
     }
 
     @State private var isHovered = false
     @State private var isCopyHovered = false
-    @State private var isPlayHovered = false
     @State private var showCopied = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -97,26 +93,8 @@ struct ChatBubbleView: View, Equatable {
                                 }
                             }
                             .onHover { isCopyHovered = $0 }
-                            .animation(.spring(duration: 0.25, bounce: 0.3), value: showCopied)
-                            .animation(.spring(duration: 0.2, bounce: 0.2), value: isCopyHovered)
-
-                            if onPlayAudio != nil {
-                                actionButton(
-                                    systemImage: isPlayingAudio ? "stop.fill" : "play.fill",
-                                    foregroundStyle: isPlayingAudio ? .accentColor : .secondary,
-                                    isHovered: isPlayHovered,
-                                    tooltip: isPlayingAudio ? "Stop" : "Play Audio"
-                                ) {
-                                    if isPlayingAudio {
-                                        onStopAudio?()
-                                    } else {
-                                        onPlayAudio?(turn)
-                                    }
-                                }
-                                .onHover { isPlayHovered = $0 }
-                                .animation(.spring(duration: 0.2, bounce: 0.2), value: isPlayingAudio)
-                                .animation(.spring(duration: 0.2, bounce: 0.2), value: isPlayHovered)
-                            }
+                            .animation(OakStyle.Motion.fast, value: showCopied)
+                            .animation(OakStyle.Motion.fast, value: isCopyHovered)
                         }
                     }
                 }
@@ -125,7 +103,7 @@ struct ChatBubbleView: View, Equatable {
             }
             .clipped()
             .onHover { isHovered = $0 }
-            .animation(.spring(duration: 0.2, bounce: 0.15), value: isHovered)
+            .animation(OakStyle.Motion.fast, value: isHovered)
         }
     }
 
@@ -341,8 +319,9 @@ struct ChatBubbleView: View, Equatable {
             .textSelection(.enabled)
             .tint(.accentColor)
             .environment(\.openURL, citationOpenURLAction)
+            // Hug the text: the bubble is as wide as its message, up to the row
+            // width (the leading Spacer keeps it right-aligned), and wraps after.
             .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// Parse the user message's inline markdown, preserving line breaks. Falls
@@ -594,7 +573,7 @@ private struct ThinkingDisclosureView: View {
                             .font(.system(size: 9, weight: .semibold))
                             .foregroundStyle(.secondary)
                             .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                            .animation(.easeInOut(duration: 0.2), value: isExpanded)
+                            .animation(OakStyle.Motion.fade, value: isExpanded)
                     }
 
                     if isStreaming {
