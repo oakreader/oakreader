@@ -26,11 +26,13 @@ struct ContentView: View {
             let inset = isCarded ? OakStyle.Surface.gutter : 0
 
             HStack(spacing: 0) {
-                // Left sidebar — full height
+                // Left sidebar — a card like the right panel, so its picker and
+                // list share one surface instead of floating on the base.
                 if viewModel.state.isSidebarVisible {
                     sidebarContentView
                         .frame(width: effectiveSidebarWidth)
-                        .background(OakStyle.Surface.base)
+                        .surfaceCard()
+                        .padding(.leading, inset)
                         .onHover { inside in if inside { NSCursor.arrow.set() } }
 
                     resizeHandle { delta in
