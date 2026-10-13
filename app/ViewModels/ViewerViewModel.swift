@@ -73,11 +73,6 @@ class ViewerViewModel {
         !searchResults.isEmpty
     }
 
-    var searchResultLabel: String {
-        guard hasSearchResults else { return "" }
-        return "\(currentSearchIndex + 1) of \(searchResults.count)"
-    }
-
     // MARK: - Navigation
 
     /// Move to `index` (0-based). `kind` decides whether the departure point is
@@ -213,8 +208,12 @@ class ViewerViewModel {
         }.value
 
         await MainActor.run {
+            // Search runs as the reader types, so an older query can finish after
+            // a newer one started. Only the latest query may publish results.
+            guard searchQuery == trimmed else { return }
+            for result in results { result.color = PDFDefaults.searchHighlightColor }
             searchResults = results
-            currentSearchIndex = results.isEmpty ? 0 : 0
+            currentSearchIndex = 0
             isSearching = false
             syncSearchStateToParent()
 
@@ -307,6 +306,13 @@ class ViewerViewModel {
         citationHighlight = nil
     }
 
+    func selectSearchResult(at index: Int) {
+        guard searchResults.indices.contains(index) else { return }
+        currentSearchIndex = index
+        navigateToCurrentSearchResult()
+        syncSearchStateToParent()
+    }
+
     func nextSearchResult() {
         guard !searchResults.isEmpty else { return }
         currentSearchIndex = (currentSearchIndex + 1) % searchResults.count
@@ -348,10 +354,7 @@ class ViewerViewModel {
 
     // MARK: - Selection
 
-    var currentSelection: PDFSelection? {
-        guard currentSearchIndex < searchResults.count else { return nil }
-        let selection = searchResults[currentSearchIndex]
-        selection.color = PDFDefaults.searchHighlightColor
-        return selection
+    var currentSearchSelection: PDFSelection? {
+        searchResults.indices.contains(currentSearchIndex) ? searchResults[currentSearchIndex] : nil
     }
 }

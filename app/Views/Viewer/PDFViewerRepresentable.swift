@@ -147,12 +147,22 @@ struct PDFViewerRepresentable: NSViewRepresentable {
             }
         }
 
-        // Highlight current search selection
-        if let selection = viewModel.viewer.currentSelection {
-            pdfView.setCurrentSelection(selection, animate: true)
-            if let page = selection.pages.first {
-                pdfView.go(to: selection.bounds(for: page), on: page)
+        // Show the current search match — only when it changes. Re-applying it on
+        // every update would also re-scroll to it, pulling the reader back while
+        // they scroll away.
+        let match = viewModel.viewer.currentSearchSelection
+        if match !== context.coordinator.shownSearchSelection {
+            if let match {
+                pdfView.setCurrentSelection(match, animate: true)
+                if let page = match.pages.first {
+                    pdfView.go(to: match.bounds(for: page), on: page)
+                }
+            } else if pdfView.currentSelection === context.coordinator.shownSearchSelection {
+                // Search cleared. Remove our highlight, but never a selection the
+                // reader has made since.
+                pdfView.clearSelection()
             }
+            context.coordinator.shownSearchSelection = match
         }
 
         // Scroll a freshly-clicked citation into view exactly once. The visible highlight
