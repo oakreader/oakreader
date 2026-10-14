@@ -7,6 +7,8 @@ struct ChatHistoryDrawer: View {
 
     @State private var hoveredSessionId: UUID?
     @State private var pendingDelete: ConversationMeta?
+    @State private var pendingRename: ConversationMeta?
+    @State private var renameDraft = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -18,6 +20,20 @@ struct ChatHistoryDrawer: View {
         }
         .onAppear {
             Task { await chatVM.loadSessionList() }
+        }
+        // Gemini renames from the row menu through a small dialog; a text
+        // field inside the row's button would fight it for clicks.
+        .alert("Rename Chat", isPresented: Binding(
+            get: { pendingRename != nil },
+            set: { if !$0 { pendingRename = nil } }
+        )) {
+            TextField("Chat name", text: $renameDraft)
+            Button("Cancel", role: .cancel) { pendingRename = nil }
+            Button("Rename") {
+                if let session = pendingRename { chatVM.renameSession(session.id, to: renameDraft) }
+                pendingRename = nil
+            }
+            .disabled(renameDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
         .confirmationDialog(
             "Delete this conversation?",
@@ -178,6 +194,13 @@ struct ChatHistoryDrawer: View {
             NSPasteboard.general.setString(path, forType: .string)
         } label: {
             Label("Copy File Path", systemImage: "square.on.square")
+        }
+
+        Button {
+            renameDraft = session.title
+            pendingRename = session
+        } label: {
+            Label("Rename…", systemImage: "pencil")
         }
 
         Divider()

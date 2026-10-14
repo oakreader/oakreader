@@ -63,6 +63,14 @@ class ChatViewModel {
     // History
     var sessionService: ConversationService?
     var sessionList: [ConversationMeta] = []
+    /// The open chat's title: the first line of its first message until a
+    /// generated title or a rename replaces it. Nil for a chat with no message.
+    private(set) var sessionTitle: String?
+    /// The user renamed the open chat; the generator must not replace it.
+    private var titleIsUserSet = false
+    /// The open chat's record being created. A title update waits for it:
+    /// updating a row that does not exist yet would drop the title.
+    private var sessionCreateTask: Task<Void, Never>?
     var showHistory: Bool = false
     /// The item ID to associate sessions with (set externally for document-scoped chat).
     var itemId: String?
@@ -674,22 +682,36 @@ class ChatViewModel {
     private func titleIfNeeded() {
         guard !titleGenerated, sessionRecordCreated else { return }
         let settled = turns.filter { !$0.isStreaming && $0.role != .system }
+        // The first assistant turn WITH text: an agent run starts with
+        // tool-only turns whose text is empty, and taking the first one left
+        // every such chat with its placeholder title forever.
         guard let firstUser = settled.first(where: { $0.role == .user })?.content,
-              let firstAssistant = settled.first(where: { $0.role == .assistant })?.content,
+              let firstAssistant = settled.first(where: {
+                  $0.role == .assistant && !$0.content.isEmpty })?.content,
               !firstUser.isEmpty, !firstAssistant.isEmpty
         else { return }
 
         titleGenerated = true
+        requestTitle(firstMessage: firstUser, reply: firstAssistant)
+    }
+
+    /// Generate a title in the background and apply it, unless the user
+    /// renamed the chat or switched away meanwhile.
+    private func requestTitle(firstMessage: String, reply: String?) {
         let sid = sessionId
         let cfg = researchConfig  // cheaper/faster model when `researchModel` is set; no thinking
-        let count = settled.count
 
         Task { @MainActor [weak self] in
             guard let self,
                   let title = await ChatTitleService.generate(
-                      firstUser: firstUser, firstAssistant: firstAssistant, config: cfg
-                  )
+                      firstMessage: firstMessage, reply: reply, config: cfg)
             else { return }
+            guard !(self.sessionId == sid && self.titleIsUserSet) else { return }
+            if self.sessionId == sid { self.sessionTitle = title }
+            let count = self.sessionId == sid
+                ? self.turns.filter { !$0.isStreaming }.count
+                : self.sessionList.first { $0.id == sid }?.messageCount ?? 0
+            if self.sessionId == sid { await self.sessionCreateTask?.value }
             // Persist and reflect into the in-memory list so the sidebar updates live.
             await self.sessionService?.updateSession(id: sid, title: title, messageCount: count)
             if let idx = self.sessionList.firstIndex(where: { $0.id == sid }) {
@@ -967,6 +989,8 @@ class ChatViewModel {
         citationSources.activate(sessionId: sessionId)
         sessionRecordCreated = false
         titleGenerated = false
+        sessionTitle = nil
+        titleIsUserSet = false
         selectedSkill = nil
         activeTokens = []
         pendingAttachments = []
@@ -981,6 +1005,8 @@ class ChatViewModel {
         citationSources.activate(sessionId: sessionId)
         sessionRecordCreated = true  // already exists in DB
         titleGenerated = true  // existing session already has a title; don't overwrite
+        sessionTitle = sessionList.first { $0.id == id }?.title
+        titleIsUserSet = false
         turns = []
         showHistory = false
         Task { @MainActor in
@@ -1010,6 +1036,8 @@ class ChatViewModel {
                                            directory: CatalogDatabase.chatsDirectory)
         sessionRecordCreated = false
         titleGenerated = false
+        sessionTitle = nil
+        titleIsUserSet = false
     }
 
     // MARK: - Session History
@@ -1146,21 +1174,60 @@ class ChatViewModel {
 
     // MARK: - Private — Session Persistence
 
+    /// First line of the first message, cut to 50 characters.
+    private static func placeholderTitle(_ message: String) -> String {
+        let line = message.split(separator: "\n").first.map(String.init) ?? message
+        return String(line.trimmingCharacters(in: .whitespaces).prefix(50))
+    }
+
+    /// Rename a chat. A user's title is final: the generator never replaces it.
+    func renameSession(_ id: UUID, to newTitle: String) {
+        let title = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else { return }
+        let listIndex = sessionList.firstIndex { $0.id == id }
+        if let listIndex { sessionList[listIndex].title = title }
+        if id == sessionId {
+            sessionTitle = title
+            titleIsUserSet = true
+            titleGenerated = true
+            // A chat with no message has no record yet; the title is used
+            // when the record is created.
+            guard sessionRecordCreated else { return }
+        }
+        let count = id == sessionId
+            ? turns.filter { !$0.isStreaming }.count
+            : listIndex.map { sessionList[$0].messageCount } ?? 0
+        Task { [sessionService] in
+            await sessionService?.updateSession(id: id, title: title, messageCount: count)
+        }
+    }
+
     private func persistSessionMetadata(firstUserMessage: String) {
         guard let service = sessionService else { return }
 
         if !sessionRecordCreated {
             // First message in this session — create the DB record
-            let title = String(firstUserMessage.prefix(50))
-            Task { [scope = conversationScope] in
+            // A rename before the first message wins over the placeholder.
+            let title = sessionTitle ?? Self.placeholderTitle(firstUserMessage)
+            sessionTitle = title
+            sessionCreateTask = Task { [sessionId, scope = conversationScope] in
                 await service.createSession(id: sessionId, title: title, scope: scope)
             }
             sessionRecordCreated = true
+            // Name the chat now, from the message alone. A skill-only message
+            // has no text; titleIfNeeded names it after the first reply.
+            let message = firstUserMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !message.isEmpty, !titleIsUserSet {
+                titleGenerated = true
+                requestTitle(firstMessage: message, reply: nil)
+            }
         } else {
             // Subsequent messages — update count and timestamp
             let messageCount = turns.filter { !$0.isStreaming }.count + 1 // +1 for this message
-            let title = turns.first(where: { $0.role == .user })?.content.prefix(50).description
-                ?? firstUserMessage.prefix(50).description
+            // Send the title the chat has now. Recomputing it from the first
+            // message here overwrote a generated or renamed title on every
+            // later message.
+            let title = sessionTitle ?? Self.placeholderTitle(firstUserMessage)
             Task { await service.updateSession(id: sessionId, title: title, messageCount: messageCount) }
         }
     }

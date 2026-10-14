@@ -212,14 +212,21 @@ struct AIChatView: View {
             if chatVM.showHistory {
                 Text("History")
                     .font(OakStyle.ChatFont.headerTitle)
-            } else if presentation == .canvas || workspaceName != nil {
-                // The panel earns the chip only when the chat is scoped to
-                // something — a collection. Document chat passes no scope and
-                // keeps its bare header.
-                workspaceChip
+            } else {
+                if presentation == .canvas || workspaceName != nil {
+                    // The panel earns the chip only when the chat is scoped to
+                    // something — a collection. Document chat passes no scope and
+                    // keeps its bare header.
+                    workspaceChip
+                }
+                // The chat's own name, once it has a message — Gemini's side
+                // panel shows the same.
+                if let title = chatVM.sessionTitle, !title.isEmpty {
+                    SessionTitleView(title: title) { chatVM.renameSession(chatVM.sessionId, to: $0) }
+                }
             }
 
-            Spacer()
+            Spacer(minLength: 0)
 
             OakToolButton(systemImage: "plus", prominent: true, tooltip: "New Chat") {
                 chatVM.newSession()
@@ -943,3 +950,73 @@ private struct ChatComposerAnchor: NSViewRepresentable {
         focusRef.composerView = nsView
     }
 }
+
+/// The open chat's title in the panel header.
+///
+/// - A long title fades out at the right edge instead of ending in an
+///   ellipsis, as in Gemini's side panel: the words that fit stay whole.
+/// - A new title cross-fades in over 0.3 s (Cursor's title transition).
+/// - Double-click, or "Rename Chat" in the context menu, edits it in place,
+///   as in Cursor: Return or clicking away saves, Escape cancels, and an
+///   empty name is ignored.
+private struct SessionTitleView: View {
+    let title: String
+    let onRename: (String) -> Void
+
+    @State private var isEditing = false
+    @State private var draft = ""
+    @FocusState private var fieldFocused: Bool
+
+    var body: some View {
+        Group {
+            if isEditing {
+                TextField("Chat name", text: $draft)
+                    .textFieldStyle(.plain)
+                    .font(OakStyle.ChatFont.headerTitle)
+                    .focused($fieldFocused)
+                    .onSubmit(commit)
+                    .onExitCommand { isEditing = false }
+                    .onChange(of: fieldFocused) { _, focused in
+                        if !focused && isEditing { commit() }
+                    }
+                    .onAppear { fieldFocused = true }
+            } else {
+                Text(title)
+                    .font(OakStyle.ChatFont.headerTitle)
+                    .lineLimit(1)
+                    .fixedSize()
+                    .contentTransition(.opacity)
+                    .animation(.easeInOut(duration: 0.3), value: title)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .clipped()
+                    .mask {
+                        HStack(spacing: 0) {
+                            Color.black
+                            LinearGradient(colors: [.black, .clear],
+                                           startPoint: .leading, endPoint: .trailing)
+                                .frame(width: 24)
+                        }
+                    }
+                    .contentShape(Rectangle())
+                    .onTapGesture(count: 2, perform: beginEditing)
+                    .contextMenu {
+                        Button("Rename Chat", action: beginEditing)
+                    }
+                    .help(title)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func beginEditing() {
+        draft = title
+        isEditing = true
+    }
+
+    private func commit() {
+        let name = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        isEditing = false
+        if !name.isEmpty, name != title { onRename(name) }
+    }
+}
+
