@@ -486,7 +486,7 @@ final class ChatNSTextView: NSTextView {
             dismissCompletionPanel()
             return false
         }
-        if isAttachmentMenu && ![53, 36, 126, 125].contains(event.keyCode) {
+        if isAttachmentMenu && ![53, 36, 48, 126, 125].contains(event.keyCode) {
             dismissCompletionPanel()
             return false
         }
@@ -495,7 +495,7 @@ final class ChatNSTextView: NSTextView {
         case 53:  // Escape
             dismissCompletionPanel()
             return true
-        case 36:  // Enter
+        case 36, 48:  // Enter, Tab: Tab completes, as in a shell or Xcode
             if panel.selectedItem != nil {
                 panel.selectCurrentItem()
             } else {
