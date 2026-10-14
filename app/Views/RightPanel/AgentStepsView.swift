@@ -118,7 +118,8 @@ struct AgentStepsView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         ForEach(steps) { liveRow($0) }
                     }
-                    .padding(.leading, 10)
+                    // Same left edge as the header label and the answer text.
+                    .padding(.leading, 4)
                 }
                 .transition(.chatReveal)
             } else if isExpanded {
