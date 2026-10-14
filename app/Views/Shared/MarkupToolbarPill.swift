@@ -72,6 +72,9 @@ struct MarkupToolbarPill: View {
                       : "\(armedTool.label) — click to arm, then drag across text")
                 .accessibilityLabel(isArmed ? "\(armedTool.label) armed" : "Arm \(armedTool.label)")
 
+                ToolbarPillDivider()
+                    .padding(.horizontal, 2)
+
                 Menu {
                     Picker("Colour", selection: colorBinding) {
                         ForEach(OakStyle.AnnotationColors.highlightColors, id: \.name) { swatch in
@@ -104,7 +107,8 @@ struct MarkupToolbarPill: View {
                 }
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
-                .frame(width: 20)
+                // Same box as the pen, so the divider sits in the middle.
+                .frame(width: 28, height: 28)
                 .help("Markup colour and style")
                 .accessibilityLabel("Markup colour and style")
             }
