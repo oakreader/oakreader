@@ -18,8 +18,6 @@ struct AIChatView: View {
     var presentation: ChatPresentation = .panel
     /// Name of the collection the agent is scoped to (nil = whole library). Canvas only.
     var workspaceName: String? = nil
-    /// When non-nil, a "clear" affordance on the workspace chip resets scope to the whole library.
-    var onClearWorkspace: (() -> Void)? = nil
 
     /// Width of the centered content column in `.canvas` mode.
     private let canvasContentWidth: CGFloat = 760
@@ -213,12 +211,6 @@ struct AIChatView: View {
                 Text("History")
                     .font(OakStyle.ChatFont.headerTitle)
             } else {
-                if presentation == .canvas || workspaceName != nil {
-                    // The panel earns the chip only when the chat is scoped to
-                    // something — a collection. Document chat passes no scope and
-                    // keeps its bare header.
-                    workspaceChip
-                }
                 // The chat's own name, once it has a message — Gemini's side
                 // panel shows the same.
                 if let title = chatVM.sessionTitle, !title.isEmpty {
@@ -239,34 +231,6 @@ struct AIChatView: View {
         // bar, so equal padding lines up the icon centers. Spacing.sm (10) here
         // pushed these icons 4px lower than the toolbar.
         .padding(.vertical, 6)
-    }
-
-    /// Pill in the header naming what the agent is scoped to (the selected
-    /// collection), with a clear affordance back to the whole library.
-    private var workspaceChip: some View {
-        HStack(spacing: 6) {
-            Image(systemName: workspaceName == nil ? "books.vertical" : "folder")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.secondary)
-            Text(workspaceName ?? "All Library")
-                .font(OakStyle.ChatFont.headerTitle)
-                .lineLimit(1)
-            if let onClearWorkspace, workspaceName != nil {
-                Button(action: onClearWorkspace) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.tertiary)
-                }
-                .buttonStyle(.plain)
-                .help("Clear workspace — chat across the whole library")
-            }
-        }
-        .padding(.leading, 10)
-        .padding(.trailing, workspaceName != nil && onClearWorkspace != nil ? 6 : 10)
-        .padding(.vertical, 4)
-        .background(
-            Capsule().fill(Color.primary.opacity(workspaceName == nil ? 0 : 0.06))
-        )
     }
 
     // MARK: - Empty State
@@ -972,7 +936,7 @@ private struct SessionTitleView: View {
             if isEditing {
                 TextField("Chat name", text: $draft)
                     .textFieldStyle(.plain)
-                    .font(OakStyle.ChatFont.headerTitle)
+                    .font(OakStyle.ChatFont.sessionTitle)
                     .focused($fieldFocused)
                     .onSubmit(commit)
                     .onExitCommand { isEditing = false }
@@ -982,7 +946,7 @@ private struct SessionTitleView: View {
                     .onAppear { fieldFocused = true }
             } else {
                 Text(title)
-                    .font(OakStyle.ChatFont.headerTitle)
+                    .font(OakStyle.ChatFont.sessionTitle)
                     .lineLimit(1)
                     .fixedSize()
                     .contentTransition(.opacity)

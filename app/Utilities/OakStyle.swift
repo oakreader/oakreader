@@ -216,6 +216,11 @@ enum OakStyle {
         static var headerTitle: SwiftUI.Font {
             .system(size: 16, weight: .semibold)
         }
+        /// The chat's own name in the header — regular weight: it is content,
+        /// not a section label.
+        static var sessionTitle: SwiftUI.Font {
+            .system(size: 16, weight: .regular)
+        }
         /// Chat model switcher label — weight .medium (500) for interactive elements.
         static var modelLabel: SwiftUI.Font {
             Font.styled(size: 13, weight: .medium)
