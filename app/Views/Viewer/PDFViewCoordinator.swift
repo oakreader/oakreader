@@ -909,7 +909,11 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
         let box = page.bounds(for: pdfView.displayBox)
         guard box.height > 0 else { return nil }
         let fromTop = (box.maxY - destination.point.y) / box.height
-        return Double(doc.index(for: page)) + Double(min(max(fromTop, 0), 0.999))
+        let index = doc.index(for: page)
+        // The top of the view is in the gap below this page: the reader is at
+        // the top of the next one, not at the bottom of this one.
+        if fromTop >= 1, index + 1 < doc.pageCount { return Double(index + 1) }
+        return Double(index) + Double(min(max(fromTop, 0), 0.999))
     }
 
     /// Scroll to the saved position, once. Runs after the first layout: a

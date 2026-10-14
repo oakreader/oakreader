@@ -616,7 +616,7 @@ final class AppState {
 
         tab.document?.close()
         openTabs.remove(at: index)
-        ReadingPositionStore.shared.flush()
+        Task { await ReadingPositionStore.shared.flush() }
 
         if activeTabID == tabID {
             let allTabs = combinedTabIDs

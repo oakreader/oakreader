@@ -79,10 +79,31 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             object: nil
         )
         oakServer?.stop()
-        ReadingPositionStore.shared.flush()
 
         let backend = NodeBackend.shared
         Task { await backend.shutdown() }
+    }
+
+    /// Hold the quit until the reading positions are written. The writes go
+    /// to the sidecar over RPC, so they cannot finish inside
+    /// `applicationWillTerminate`, which exits as soon as it returns. A stuck
+    /// sidecar would hold an RPC for 30 s, so the quit waits 3 s at most.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        var replied = false
+        let reply = { @MainActor in
+            guard !replied else { return }
+            replied = true
+            sender.reply(toApplicationShouldTerminate: true)
+        }
+        Task { @MainActor in
+            await ReadingPositionStore.shared.flush()
+            reply()
+        }
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(3))
+            reply()
+        }
+        return .terminateLater
     }
 
     func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool {
