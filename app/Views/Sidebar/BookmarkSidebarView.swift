@@ -27,6 +27,10 @@ struct BookmarkSidebarView: View {
                         }
                     }
                     .padding(.vertical, 4)
+                    // The overlay scroller floats over the trailing edge, where
+                    // the page numbers sit. Padding, not `contentMargins`: on
+                    // macOS that insets the scroller too, so it moves with them.
+                    .padding(.trailing, 14)
                 }
             }
         }
