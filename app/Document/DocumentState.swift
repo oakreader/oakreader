@@ -6,6 +6,9 @@ import AppKit
 class DocumentState {
     var currentPageIndex: Int = 0
     var zoomLevel: CGFloat = 1.0
+    /// Bumped to ask the PDF view to fit the page width. A counter, not a
+    /// flag: the view applies each new value once, and nothing resets it.
+    var fitWidthRequest: Int = 0
     var displayMode: PDFDisplayMode = .singlePageContinuous
     var searchQuery: String = ""
     var searchResults: [PDFSelection] = []

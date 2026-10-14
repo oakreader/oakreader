@@ -6,7 +6,7 @@ import AppKit
 /// vocabulary, so a PDF tab and a web tab read as the same application.
 ///
 ///     web   [‹ › ⟳]  [ address field…………… ]   [🔖]
-///     pdf   [⌃ 42/340 ⌄]  [ document title…… ]   [− 140% +]  [✎ ⌄]
+///     pdf   [⌃ 42/340 ⌄]  [ document title…… ]   [− ↔ +]  [✎ │ ⌄]
 ///
 /// **Why this exists after an overlay was built instead.** The first attempt was
 /// a floating pill at the bottom of the reader, on the argument that a page
@@ -119,31 +119,26 @@ struct PDFToolbarContent: View {
 
     // MARK: - Zoom
 
+    /// Preview's zoom group: three controls split by hairlines. The middle one
+    /// is Fit to Width, not a percentage readout. A number like "140%" tells
+    /// the reader nothing they act on; fitting the page is what they want back
+    /// after zooming.
     private var zoomPill: some View {
         ToolbarPill {
             HStack(spacing: 2) {
-                OakToolButton(systemImage: "minus", tooltip: "Zoom Out (⌘-)") {
+                OakToolButton(systemImage: "minus.magnifyingglass", tooltip: "Zoom Out (⌘-)") {
                     viewer.zoomOut()
                 }
-                Text(zoomPercent)
-                    .font(.system(size: 12).monospacedDigit())
-                    .foregroundStyle(.secondary)
-                    .frame(width: 40)
-                    .contentShape(Rectangle())
-                    .onTapGesture { viewer.zoomToFit() }
-                    .help("Zoom to Fit (⌘0)")
-                    .accessibilityLabel("Zoom \(zoomPercent). Activate to fit page.")
-                OakToolButton(systemImage: "plus", tooltip: "Zoom In (⌘=)") {
+                ToolbarPillDivider()
+                OakToolButton(systemImage: "arrow.left.and.right", tooltip: "Fit to Width (⌘0)") {
+                    viewer.fitToWidth()
+                }
+                ToolbarPillDivider()
+                OakToolButton(systemImage: "plus.magnifyingglass", tooltip: "Zoom In (⌘=)") {
                     viewer.zoomIn()
                 }
             }
         }
-    }
-
-    /// `PDFViewerRepresentable` keeps `state.zoomLevel` in sync with the real
-    /// `pdfView.scaleFactor`, so this is live rather than a guess.
-    private var zoomPercent: String {
-        "\(Int((state.zoomLevel * 100).rounded()))%"
     }
 
     // MARK: - Return chip

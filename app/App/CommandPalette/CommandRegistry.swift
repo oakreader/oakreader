@@ -91,9 +91,9 @@ enum CommandRegistry {
         ),
         PaletteCommand(
             id: "view.zoomToFit",
-            title: "Zoom to Fit",
+            title: "Fit to Width",
             category: .view,
-            icon: "arrow.up.left.and.arrow.down.right",
+            icon: "arrow.left.and.right",
             shortcut: "\u{2318}0",
             context: .anyDocument,
             action: .documentAction(.zoomToFit)

@@ -127,9 +127,22 @@ struct PDFViewerRepresentable: NSViewRepresentable {
             pdfView.displayMode = viewModel.state.displayMode
         }
 
+        // Fit to width. `autoScales` keeps the fit as the window resizes; the
+        // next explicit zoom sets `scaleFactor`, which turns it off. The zoom
+        // sync below is skipped this pass, or it would restore the old factor.
+        let fitRequest = viewModel.state.fitWidthRequest
+        let fitsNow = fitRequest != context.coordinator.appliedFitWidthRequest
+        if fitsNow {
+            context.coordinator.appliedFitWidthRequest = fitRequest
+            pdfView.autoScales = true
+            DispatchQueue.main.async {
+                viewModel.state.zoomLevel = pdfView.scaleFactor
+            }
+        }
+
         // Update zoom — only if the user explicitly changed it
         // (skip if autoScales just set the factor)
-        if !context.coordinator.isAutoScaling {
+        if !context.coordinator.isAutoScaling, !fitsNow {
             let targetZoom = viewModel.state.zoomLevel
             if abs(pdfView.scaleFactor - targetZoom) > 0.001 {
                 pdfView.scaleFactor = targetZoom

@@ -166,10 +166,10 @@ class ViewerViewModel {
         setZoom(zoomLevel - zoomStep)
     }
 
-    func zoomToFit() {
-        // Reset to a standard 1.0 level; actual fit-to-window
-        // is handled by the PDFView in the view layer
-        setZoom(1.0)
+    /// Fit the page width to the view, like Preview's ⌘0. The PDF view does the
+    /// fitting (`autoScales`) and keeps it on window resizes until the next zoom.
+    func fitToWidth() {
+        state?.fitWidthRequest += 1
     }
 
     func zoomToActualSize() {

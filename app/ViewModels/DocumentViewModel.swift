@@ -300,7 +300,8 @@ class DocumentViewModel {
         case .zoomOut:
             viewer.zoomOut()
         case .zoomToFit:
-            viewer.zoomToFit()
+            // Only a PDF has a page width to fit; elsewhere ⌘0 resets the zoom.
+            if contentType == .pdf { viewer.fitToWidth() } else { viewer.zoomToActualSize() }
         case .displaySingle:
             viewer.setDisplayMode(.singlePage)
         case .displaySingleContinuous:

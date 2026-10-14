@@ -7,6 +7,8 @@ class PDFViewCoordinator: NSObject, PDFViewDelegate {
     var viewModel: DocumentViewModel
     weak var pdfView: PDFView?
     var isAutoScaling = false
+    /// The last `state.fitWidthRequest` this view applied.
+    var appliedFitWidthRequest = 0
     /// Last citation-highlight sequence we scrolled to, so a citation recentres the view
     /// only once (not on every subsequent `updateNSView`).
     var lastScrolledCitationSeq = 0

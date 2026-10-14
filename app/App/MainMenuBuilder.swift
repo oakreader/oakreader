@@ -422,8 +422,8 @@ enum MainMenuBuilder {
             key: "-", icon: "minus.magnifyingglass", target: target
         ))
         viewMenu.addItem(actionItem(
-            "Zoom to Fit", action: .zoomToFit,
-            key: "0", icon: "arrow.up.left.and.arrow.down.right", target: target
+            "Fit to Width", action: .zoomToFit,
+            key: "0", icon: "arrow.left.and.right", target: target
         ))
         // Area capture (snapshot crop) used to live in the PDF toolbar's dashed-
         // rectangle button; with that toolbar gone, this is its menu home.

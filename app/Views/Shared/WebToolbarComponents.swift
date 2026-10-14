@@ -25,6 +25,16 @@ struct ToolbarPill<Content: View>: View {
     }
 }
 
+/// A hairline between the halves of a split pill, as in Preview's toolbar: it
+/// says the halves are two controls, not one.
+struct ToolbarPillDivider: View {
+    var body: some View {
+        Rectangle()
+            .fill(Color(nsColor: .separatorColor))
+            .frame(width: 1, height: 16)
+    }
+}
+
 /// Read-only URL display with the host emphasized and the path muted — the
 /// non-editable counterpart to the live address `TextField`. Used by the
 /// snapshot bar, where typing a URL would be meaningless (a frozen file has
