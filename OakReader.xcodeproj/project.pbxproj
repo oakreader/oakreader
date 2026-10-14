@@ -76,7 +76,6 @@
 		36E6CAD489F405C77C296B52 /* AnnotationCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = B87D7729365DE50DE6C6E33A /* AnnotationCatalog.swift */; };
 		37E1D7549A70847EA452C14B /* ReferenceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD1DAE24E40C0139F3FB1F2E /* ReferenceService.swift */; };
 		382B5B6DA5F0840A09ED2C7E /* NoteEditorModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19F2340729A85D5B298436E5 /* NoteEditorModel.swift */; };
-		382C58A589A5B07FE565E864 /* ToolCallGroupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4269BAEE5AF9C0D3C46B5B7 /* ToolCallGroupView.swift */; };
 		38632A04D663C59B3B92B8A5 /* ToolResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02858600656BB33124BD0DDC /* ToolResolver.swift */; };
 		38DD9341C49C0DE39EA68B6B /* MainMenuBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99A8973FD5C8BD93DB5148C8 /* MainMenuBuilder.swift */; };
 		3936CF01FE7FD4AB2A83C9DC /* QuickChatScreenshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E6F93F3B9805825C5E1BA66 /* QuickChatScreenshot.swift */; };
@@ -215,6 +214,7 @@
 		B08C2CA0733B73867D9B4374 /* ImageExportOptionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54C40414783EF25021D17DF1 /* ImageExportOptionsView.swift */; };
 		B1B0C174E22F08B0F06EE22A /* RecordingTranscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5977FDFEB8F507EAF0676D52 /* RecordingTranscriptionService.swift */; };
 		B1B909F6030B1F5DDBDF90E2 /* NoteEditorStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99C4AD48A36592D2A8F1DA60 /* NoteEditorStyle.swift */; };
+		B2A8FA8F02E059D7594BAF04 /* AgentStepsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3355C711669CE43E7FEEAF5A /* AgentStepsView.swift */; };
 		B32425C0174ECBA923543F2A /* ZoteroImportProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 434EC0BEC02C0CB9ADBD2F3D /* ZoteroImportProgressView.swift */; };
 		B37BEE2584AB24AB3E6726D5 /* PresentationOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F4B495A6B1B03338A4570E4 /* PresentationOverlayView.swift */; };
 		B4F35C65B68769F174C7044C /* PDFDocumentController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1092B663E555B223F151A2C6 /* PDFDocumentController.swift */; };
@@ -351,6 +351,7 @@
 		31AA86322A4D9F7512D829F1 /* ChatBubbleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatBubbleView.swift; sourceTree = "<group>"; };
 		32C18D2584869D5511C17241 /* LibraryTableToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryTableToolbar.swift; sourceTree = "<group>"; };
 		32EC3C8A287D8B1608066587 /* BookmarkModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarkModel.swift; sourceTree = "<group>"; };
+		3355C711669CE43E7FEEAF5A /* AgentStepsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentStepsView.swift; sourceTree = "<group>"; };
 		338377C049DCDAC12D3B1961 /* AreaSelectionPopupPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AreaSelectionPopupPanel.swift; sourceTree = "<group>"; };
 		339F20DA127315E9403ADD98 /* Log.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Log.swift; sourceTree = "<group>"; };
 		33F855D5CACDD8FFF69B4F59 /* AddProviderSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddProviderSheet.swift; sourceTree = "<group>"; };
@@ -539,7 +540,6 @@
 		CEF3D8FC404EE46B6C9FA6A3 /* NoteTagLayoutManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteTagLayoutManager.swift; sourceTree = "<group>"; };
 		D086AB60C416945D1DE86B83 /* OakStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OakStyle.swift; sourceTree = "<group>"; };
 		D0C7A8B0A6EDB82A72CD1B9E /* DocumentViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentViewModel.swift; sourceTree = "<group>"; };
-		D4269BAEE5AF9C0D3C46B5B7 /* ToolCallGroupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolCallGroupView.swift; sourceTree = "<group>"; };
 		D43EB7C93B82A6070B58E4F8 /* CitationHoverCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CitationHoverCard.swift; sourceTree = "<group>"; };
 		D65E7434D35D60436822FA4F /* OakAppIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OakAppIcon.swift; sourceTree = "<group>"; };
 		D6FDD9C9E62B4CD6F880FD68 /* TabBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabBarView.swift; sourceTree = "<group>"; };
@@ -762,6 +762,7 @@
 			isa = PBXGroup;
 			children = (
 				E2C5E8F62AFA7507B0716923 /* Comments */,
+				3355C711669CE43E7FEEAF5A /* AgentStepsView.swift */,
 				0CA025FB4DB9E7B91B032A38 /* AIChatView.swift */,
 				5A38ED6F379FD687AF848561 /* AttachmentPreviewStrip.swift */,
 				31AA86322A4D9F7512D829F1 /* ChatBubbleView.swift */,
@@ -776,7 +777,6 @@
 				AA237E65AF0728789822FE10 /* FannedAttachmentStack.swift */,
 				8CF2D7EA89226FC3BF559F32 /* ItemPanelView.swift */,
 				5B65029FF3B1D12181B8205F /* RightPanelView.swift */,
-				D4269BAEE5AF9C0D3C46B5B7 /* ToolCallGroupView.swift */,
 				94EDA6358C9F832CBDBD8EF6 /* ToolConfirmationBar.swift */,
 				587C372D1527AAC633871262 /* TranslationPanelView.swift */,
 				1077D5FE2FD0CCBB9A0F9D20 /* TranslationSourceTextView.swift */,
@@ -1449,6 +1449,7 @@
 				92AF42B9599214A65B42B1AE /* AccessibilityViewModel.swift in Sources */,
 				FC893F57858FF6EA5A4A04B3 /* AddProviderSheet.swift in Sources */,
 				53554C04FA1CD77F30742485 /* AgentSettingsView.swift in Sources */,
+				B2A8FA8F02E059D7594BAF04 /* AgentStepsView.swift in Sources */,
 				F9941CB9F26D23BA47D4DFFB /* AgentTool.swift in Sources */,
 				81855E70E1BF5F864449FA7B /* Analytics.swift in Sources */,
 				36E6CAD489F405C77C296B52 /* AnnotationCatalog.swift in Sources */,
@@ -1679,7 +1680,6 @@
 				E0EDE1268DE0B0A00953C114 /* TextSelectionPopupPanel.swift in Sources */,
 				C0E9B834FB46FD68529B3E19 /* ThumbnailSidebarView.swift in Sources */,
 				F98E56F96F482C4955000940 /* ToolCall.swift in Sources */,
-				382C58A589A5B07FE565E864 /* ToolCallGroupView.swift in Sources */,
 				DCA96A31EC70D23FD269C9D5 /* ToolConfirmationBar.swift in Sources */,
 				7E87200C385A2B017EC72A6C /* ToolExecutionContext.swift in Sources */,
 				3254D45FBC04AEC52A533561 /* ToolInput.swift in Sources */,

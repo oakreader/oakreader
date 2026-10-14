@@ -79,15 +79,31 @@ struct AIChatView: View {
     /// True while the agent is working but no per-turn animation (thinking
     /// stroke, tool-call shimmer, or streaming text cursor) is already on screen.
     /// Drives the universal footer spinner so the user always sees activity.
+    /// Only the wait for the first token. After that the live step group's
+    /// shimmering label, or the streaming text, shows the agent is working.
     private var showWorkingIndicator: Bool {
         guard chatVM.isStreaming else { return false }
         guard let last = chatVM.turns.last else { return true }
-        // Agent just received the user message and hasn't produced anything yet.
-        if last.role != .assistant { return true }
-        let hasExecutingTool = last.toolUses.contains { $0.status == .executing }
-        let isStreamingText = last.isStreaming && !last.content.isEmpty
-        let isThinking = last.isStreaming && last.content.isEmpty && (last.thinking?.isEmpty == false)
-        return !(hasExecutingTool || isStreamingText || isThinking)
+        return last.role != .assistant
+    }
+
+    @ViewBuilder
+    private func displayRow(_ item: ChatDisplayItem) -> some View {
+        switch item {
+        case .turn(let turn):
+            ChatBubbleView(
+                turn: turn,
+                resolveCitation: { chatVM.resolveCitation($0) },
+                onOpenCitation: { itemId, anchor in
+                    chatVM.openCitation(itemId: itemId, anchor: anchor)
+                },
+                markdownTheme: presentation == .canvas ? .dia : nil
+            )
+                .equatable()
+        case .steps(_, let steps, let isLive):
+            AgentStepsView(steps: steps, isLive: isLive,
+                           theme: presentation == .canvas ? .dia : .oak())
+        }
     }
 
     // MARK: - Chat Content
@@ -381,18 +397,10 @@ struct AIChatView: View {
                     spacing: 12,
                     viewportHeight: max(scrollState.viewHeight - 2 * OakStyle.Spacing.sm, 0)
                 ) {
-                    ForEach(chatVM.turns) { turn in
-                        ChatBubbleView(
-                            turn: turn,
-                            resolveCitation: { chatVM.resolveCitation($0) },
-                            onOpenCitation: { itemId, anchor in
-                                chatVM.openCitation(itemId: itemId, anchor: anchor)
-                            },
-                            markdownTheme: presentation == .canvas ? .dia : nil
-                        )
-                            .equatable()
-                            .id(turn.id)
-                            .layoutValue(key: StartsThreadTail.self, value: turn.id == lastUserTurnID)
+                    ForEach(ChatDisplayItem.build(from: chatVM.turns, isStreaming: chatVM.isStreaming)) { item in
+                        displayRow(item)
+                            .id(item.id)
+                            .layoutValue(key: StartsThreadTail.self, value: item.id == lastUserTurnID?.uuidString)
                             .transition(
                                 .asymmetric(
                                     insertion: .opacity.combined(with: .offset(y: 8)),

@@ -86,3 +86,12 @@ struct TailWindow<Content: View>: View {
 extension Animation {
     static let chatDisclosure = Animation.timingCurve(0.215, 0.61, 0.355, 1, duration: 0.15)
 }
+
+/// How disclosed content comes and goes: a fade in, an instant exit.
+///
+/// The layout removes a collapsed row at once, but a removal transition keeps
+/// drawing it for the length of the animation, over whatever moved up into
+/// its place. That showed as a ghost of the steps on every collapse.
+extension AnyTransition {
+    static let chatReveal = AnyTransition.asymmetric(insertion: .opacity, removal: .identity)
+}
