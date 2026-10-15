@@ -91,6 +91,7 @@ final class NoteEditorTextView: NSTextView {
     func handleTextChange() {
         editGeneration &+= 1
         lastAutoFormat = nil
+        renumberOrderedLists()
         // Slack's TextChangeQueue skips its formatting pass while an IME composition
         // is open and runs it on `compositionend`. Restyling marked text mid-pinyin
         // fights the input method, so math waits for the committed text here too.
@@ -255,7 +256,7 @@ final class NoteEditorTextView: NSTextView {
 
         // Backspace right after a markdown shortcut restores what was typed.
         if event.keyCode == 51, event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty,
-           revertLastAutoFormat() { return }
+           revertLastAutoFormat() || removeBlockAtCaretIfAtStart() { return }
 
         // Return is block-aware. Plain Return is quick-capture (save) in prose, but
         // inside a code block / list / quote it adds or continues a line instead —
@@ -877,12 +878,14 @@ final class NoteEditorTextView: NSTextView {
             range = NSRange(location: range.location, length: range.length + m.length)
         }
 
-        NoteEditorStyle.applyBlock(target, to: ts, range: range)
-        if target == .paragraph {
-            ts.addAttribute(.font, value: NoteEditorStyle.baseFont, range: range)
-            ts.removeAttribute(.backgroundColor, range: range)
-            ts.addAttribute(.foregroundColor, value: NSColor.labelColor, range: range)
+        // Leaving a heading, code or quote block: undo what that block implied.
+        // Before, only a switch to plain text reset anything — and it reset every
+        // font, erasing the user's bold — while heading → list kept the heading
+        // weight, which then saved as `- **Title**`.
+        if let current, let old = NoteBlock(rawValue: current), old != target {
+            resetImpliedStyle(of: old, in: range)
         }
+        NoteEditorStyle.applyBlock(target, to: ts, range: range)
         // Continue the block when typing onward (esp. toggled on an empty line).
         typingAttributes = blockTypingAttributes(target)
         // If we toggled a quote/code block onto an empty line, remember it so a click
@@ -1025,9 +1028,108 @@ final class NoteEditorTextView: NSTextView {
             ts.addAttribute(.foregroundColor, value: NSColor.labelColor, range: para)
             ts.removeAttribute(.backgroundColor, range: para)
         }
+        // Without this the selection-change pass (`maintainPendingBlock`) re-arms
+        // the quote/code block on the empty line, and the next keystroke lands in
+        // the block the user just left.
+        pendingEmptyBlock = nil
         typingAttributes = blockTypingAttributes(.paragraph)
         didChangeText()
         reportActiveFormats()
+    }
+
+    /// Backspace at the very start of a list item, quote, heading or code line:
+    /// drop the block and keep the text, as Slack's keyboard module does. Before,
+    /// the protected marker run swallowed the key and nothing happened, so a bullet
+    /// could not be deleted. Returns false when the caret is not at a block start.
+    private func removeBlockAtCaretIfAtStart() -> Bool {
+        guard let ts = textStorage else { return false }
+        let sel = selectedRange()
+        guard sel.length == 0 else { return false }
+        let block = caretBlock()
+        guard block != .paragraph else { return false }
+        let para = (string as NSString).paragraphRange(for: sel)
+        let marker = leadingMarkerLength(in: para) ?? 0
+        guard sel.location == para.location + marker else { return false }
+        guard shouldChangeText(in: para, replacementString: nil) else { return false }
+        var range = para
+        if marker > 0 {
+            ts.replaceCharacters(in: NSRange(location: para.location, length: marker), with: "")
+            range = NSRange(location: para.location, length: para.length - marker)
+        }
+        if range.length > 0 {
+            resetImpliedStyle(of: block, in: range)
+            NoteEditorStyle.applyBlock(.paragraph, to: ts, range: range)
+        }
+        pendingEmptyBlock = nil
+        setSelectedRange(NSRange(location: para.location, length: 0))
+        typingAttributes = blockTypingAttributes(.paragraph)
+        didChangeText()
+        reportActiveFormats()
+        return true
+    }
+
+    /// Undo what a block implied about its text — the heading weight, the code
+    /// face, the quote's grey — and nothing else, so inline bold or italic the
+    /// user applied survives the block change.
+    private func resetImpliedStyle(of block: NoteBlock, in range: NSRange) {
+        guard let ts = textStorage, range.length > 0 else { return }
+        switch block {
+        case .h1, .h2, .h3, .code:
+            ts.enumerateAttribute(.font, in: range, options: []) { value, r, _ in
+                // Inline code keeps its own monospace face.
+                if ts.attribute(.oakInlineCode, at: r.location, effectiveRange: nil) != nil { return }
+                let font = value as? NSFont
+                let italic = font?.fontDescriptor.symbolicTraits.contains(.italic) == true
+                var base = NoteEditorStyle.baseFont
+                if italic { base = base.withToggledTrait(.italic, on: true) }
+                ts.addAttribute(.font, value: base, range: r)
+            }
+            ts.removeAttribute(.backgroundColor, range: range)
+        case .quote:
+            ts.addAttribute(.foregroundColor, value: NSColor.labelColor, range: range)
+        case .paragraph, .bullet, .ordered:
+            break
+        }
+    }
+
+    /// Ordered-list markers are literal text, so a removed or inserted item left
+    /// the numbers wrong on screen. Rewrite any marker that no longer matches its
+    /// position in its run. Slack renumbers the same way after every change.
+    private var isRenumbering = false
+    private func renumberOrderedLists() {
+        guard !isRenumbering, let ts = textStorage, ts.length > 0 else { return }
+        isRenumbering = true
+        defer { isRenumbering = false }
+        var sel = selectedRange()
+        var loc = 0
+        var run = 0
+        while loc < ts.length {
+            let para = (ts.string as NSString).paragraphRange(for: NSRange(location: loc, length: 0))
+            let block = ts.attribute(.oakBlock, at: para.location, effectiveRange: nil) as? Int
+            if block == NoteBlock.ordered.rawValue, let len = leadingMarkerLength(in: para) {
+                run += 1
+                let markerRange = NSRange(location: para.location, length: len)
+                let want = "\(run).  "
+                if (ts.string as NSString).substring(with: markerRange) != want,
+                   shouldChangeText(in: markerRange, replacementString: want) {
+                    let m = NoteEditorStyle.listMarker(want)
+                    ts.replaceCharacters(in: markerRange, with: m)
+                    // A paragraph's block is read from its first character, the
+                    // marker: re-tag the line or it stops being a list item.
+                    let line = (ts.string as NSString).paragraphRange(for: NSRange(location: para.location, length: 0))
+                    NoteEditorStyle.applyBlock(.ordered, to: ts, range: line)
+                    let delta = m.length - len
+                    if sel.location >= NSMaxRange(markerRange) { sel.location += delta }
+                    setSelectedRange(sel)
+                    didChangeText()
+                }
+            } else {
+                run = 0
+            }
+            let next = (ts.string as NSString).paragraphRange(for: NSRange(location: para.location, length: 0))
+            loc = NSMaxRange(next)
+            if next.length == 0 { break }
+        }
     }
 
     // MARK: Active-format reporting
