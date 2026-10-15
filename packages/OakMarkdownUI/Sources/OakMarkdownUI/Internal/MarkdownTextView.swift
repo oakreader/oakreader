@@ -15,6 +15,8 @@ extension NSAttributedString.Key {
     static let blockquoteFill = NSAttributedString.Key("OakMarkdownBlockquoteFill")
     /// Bar color (`NSColor`) for a block-quote range — drawn as a left vertical accent.
     static let blockquoteBar = NSAttributedString.Key("OakMarkdownBlockquoteBar")
+    /// Width (`NSNumber`) of that bar.
+    static let blockquoteBarWidth = NSAttributedString.Key("OakMarkdownBlockquoteBarWidth")
 }
 
 enum MarkdownInlineCodePill {
@@ -68,10 +70,16 @@ final class HuggingLayoutManager: NSLayoutManager {
             NSBezierPath(roundedRect: fillRect, xRadius: 5, yRadius: 5).fill()
 
             if let bar {
-                let barRect = CGRect(x: fillRect.minX + 4, y: fillRect.minY + 3,
-                                     width: 3, height: fillRect.height - 6)
+                let barWidth = (storage.attribute(.blockquoteBarWidth, at: range.location,
+                                                  effectiveRange: nil) as? NSNumber)
+                    .map { CGFloat($0.doubleValue) } ?? 3
+                // With no fill the bar is the quote's edge, so it sits flush left.
+                let hasFill = fill.alphaComponent > 0
+                let barRect = CGRect(x: hasFill ? fillRect.minX + 4 : origin.x,
+                                     y: fillRect.minY + 3,
+                                     width: barWidth, height: fillRect.height - 6)
                 bar.setFill()
-                NSBezierPath(roundedRect: barRect, xRadius: 1.5, yRadius: 1.5).fill()
+                NSBezierPath(roundedRect: barRect, xRadius: barWidth / 2, yRadius: barWidth / 2).fill()
             }
         }
     }
@@ -197,7 +205,7 @@ final class MarkdownTextView: NSTextView {
 
     deinit {
         hoverTimer?.invalidate()
-        revealTimer?.invalidate()
+        revealLink?.invalidate()
         hoverPopover?.close()
     }
 
@@ -257,83 +265,97 @@ final class MarkdownTextView: NSTextView {
     /// flight at full opacity (stream ended / reduce-motion).
     var fadesAppendedText = false {
         didSet {
-            if fadesAppendedText { isDraining = false } else { drainReveal() }
+            if !fadesAppendedText { drainReveal() }
         }
     }
 
     // MARK: - Streaming reveal
     //
-    // Dia's `AssistantUI.TextFadeAnimator` is the reference, and the thing worth
-    // taking from it is not the fade — it is the UNIT and the CADENCE. It reveals
-    // *line fragments*, each one scheduled off the previous (`nextLineTask`,
-    // `lineIntervalMultiplier`), with a cap on how long the trailing line may wait
-    // (`trailingLineRevealMaxDelay`). The text therefore arrives at a typographic
-    // rhythm rather than at the network's rhythm.
+    // ChatGPT's native app (`OAIMarkdown.TextFadeAnimator`, read from the shipped
+    // 1.2026.183 binary) is the reference. Its fields say how it works, and three
+    // things from it are taken here:
     //
-    // Fading a whole delta as one block — what this did before — ties the reveal to
-    // chunk boundaries: a 300-character burst lights up at once, a 5-character one
-    // barely registers, and the answer pulses unevenly because the provider's
-    // packets are uneven. Lines are the unit a reader actually consumes.
+    //   - The clock is a display link (`ClosureDisplayLink`, `frameRate`,
+    //     `minimumFrameRate`), not a timer. A 60 Hz `Timer` drifts against vsync and
+    //     drops or doubles frames on a 120 Hz display; that beat is visible in a fade.
+    //   - The unit is a moving front over the characters (`insertionPartsByID`,
+    //     `lastFadedPartEndLocation`, `advanceBy`, `advanceDuration`), not a line.
+    //     Each slice the front passes fades on its own clock, so the leading edge is
+    //     a gradient as wide as `rate × fadeDuration` characters and it runs straight
+    //     on from one line to the next. A line sweep restarts at every wrap, and a
+    //     line that grows while it sweeps reveals in two pieces.
+    //   - Opacity is quantised (`lastAppliedRenderingUpdateBucket`; the binary
+    //     multiplies progress by 24 and rounds). A run is rewritten only when its
+    //     step changes, so a frame costs a handful of attribute writes at most.
     //
-    // Two departures from Dia, both deliberate:
+    // The front speeds up with the backlog (`flushDurationThreshold`,
+    // `flushMultiplier` in the reference). It works to a deadline: text is reached
+    // within `targetDrain` of arriving, so a burst drains at an even pace and ends
+    // on time, where a rate proportional to the backlog would slow as the backlog
+    // shrank and crawl at the end. With no deadline pressing it moves at `baseRate`.
     //
-    //   - The interval is derived from the backlog instead of being a constant with
-    //     a delay cap. Dia needs `trailingLineRevealMaxDelay` precisely because a
-    //     fixed cadence falls behind a fast stream; targeting a drain time instead
-    //     means the reveal relaxes to a reading pace when the model is slow and
-    //     accelerates when it is ahead, without ever snapping.
-    //   - A line is swept head-to-tail with a soft edge rather than cross-faded,
-    //     which is what Dia's per-line `CAGradientLayer` buys. Doing it with
-    //     temporary attributes keeps the mechanism unable to hide text: the worst
-    //     a bug here can do is leave a run dim, never invisible, which a CALayer
-    //     mask over the whole text view cannot promise.
+    // Temporary attributes, not a layer mask, stay the mechanism: the worst a bug
+    // here can do is leave a run dim, never invisible.
 
-    /// One line fragment waiting for, or in, its reveal.
-    private struct RevealLine {
-        let range: NSRange
-        /// Uptime when the sweep began; nil while queued.
-        var start: TimeInterval?
-        /// Uptime when it was enqueued, for the starvation cap.
-        let queuedAt: TimeInterval
+    /// One slice the front has passed, fading on its own clock.
+    private struct FadeRun {
+        var range: NSRange
+        let start: CFTimeInterval
+        /// Last opacity step written, in 0...`fadeSteps`.
+        var step: Int
     }
 
-    /// One line's sweep, head to tail.
-    private static let lineDuration: TimeInterval = 0.26
-    /// Share of `lineDuration` spent travelling; the rest is the edge's own fade,
-    /// so the leading edge stays soft instead of arriving as a hard wipe.
-    private static let sweepShare: Double = 0.6
-    /// Lines allowed to sweep at once. More than this and the page shimmers.
-    private static let maxConcurrentLines = 3
-    /// Backlog drains within this, however deep it is.
-    private static let targetDrain: TimeInterval = 0.45
-    /// Floor: a line never waits longer than this, whatever the scheduler thinks.
-    private static let maxQueueWait: TimeInterval = 1.0
+    /// One slice goes from clear to full in this.
+    private static let fadeDuration: CFTimeInterval = 0.32
+    /// Slowest the front moves while it has text to reveal, in characters per second.
+    private static let baseRate: Double = 140
+    /// The front never trails the arrived text by more than this.
+    private static let targetDrain: CFTimeInterval = 0.45
+    /// Stream ended with a backlog: finish within this instead of snapping.
+    private static let drainTarget: CFTimeInterval = 0.25
+    /// Opacity steps per fade.
+    private static let fadeSteps = 24
 
-    private var revealLines: [RevealLine] = []
-    private var nextLineStart: TimeInterval = 0
-    private var revealTimer: Timer?
-    /// Stream ended with a backlog: drain at the fastest cadence rather than snap.
-    private var isDraining = false
+    private var fadeRuns: [FadeRun] = []
+    /// Characters before this have started fading or were never hidden.
+    private var revealFront = 0
+    /// End of the text waiting for the front.
+    private var revealEnd = 0
+    /// Fractional characters the front has earned but not yet taken.
+    private var frontCarry: Double = 0
+    private var lastRevealTick: CFTimeInterval?
+    private var revealLink: CADisplayLink?
+    /// When the front must have reached `revealEnd`.
+    private var revealDeadline: CFTimeInterval = 0
 
-    /// Reveal a freshly-appended character range. Applies alpha 0 synchronously so
-    /// nothing flashes at full opacity before its turn comes.
+    /// The reveal's clock. Tests replace it to drive frames without a display:
+    /// a display link stops while the screen is locked or the window hidden.
+    var revealClock: () -> CFTimeInterval = { CACurrentMediaTime() }
+
+    private var hasPendingReveal: Bool { revealFront < revealEnd || !fadeRuns.isEmpty }
+
+    /// Hide a freshly-appended character range until the front reaches it. Applies
+    /// alpha 0 synchronously so nothing flashes at full opacity first.
     func fadeInAppendedText(_ range: NSRange) {
         guard fadesAppendedText, range.length > 0, let lm = layoutManager else { return }
         // The streamed tail can be rewritten (markdown reflow moves the divergence
-        // point back). Restore any overlapping line still in flight to full opacity
-        // BEFORE dropping it — otherwise a run only partially covered by the new
-        // range stays dim forever.
-        for line in revealLines where NSIntersectionRange(line.range, range).length > 0 {
-            clearFadeAlpha(line.range, lm: lm)
+        // point back). Restore any overlapping run still in flight to full opacity
+        // BEFORE dropping it — otherwise a run only partly covered stays dim.
+        for run in fadeRuns where NSIntersectionRange(run.range, range).length > 0 {
+            clearFadeAlpha(run.range, lm: lm)
         }
-        revealLines.removeAll { NSIntersectionRange($0.range, range).length > 0 }
+        fadeRuns.removeAll { NSIntersectionRange($0.range, range).length > 0 }
 
-        let now = ProcessInfo.processInfo.systemUptime
         applyFadeAlpha(0, to: range, lm: lm)
-        for lineRange in lineFragmentRanges(in: range) {
-            revealLines.append(RevealLine(range: lineRange, start: nil, queuedAt: now))
+        if revealFront >= revealEnd {
+            revealFront = range.location
+            revealEnd = range.upperBound
+        } else {
+            revealFront = min(revealFront, range.location)
+            revealEnd = max(revealEnd, range.upperBound)
         }
-        startRevealTimer()
+        revealDeadline = revealClock() + Self.targetDrain
+        startRevealLink()
     }
 
     /// Snap any reveal that begins before `location` to full opacity and drop it.
@@ -342,113 +364,102 @@ final class MarkdownTextView: NSTextView {
     /// over them re-dims what the reader has already read.
     func finalizeFades(before location: Int) {
         guard let lm = layoutManager else { return }
-        var remaining: [RevealLine] = []
-        for line in revealLines {
-            if line.range.location < location {
-                clearFadeAlpha(line.range, lm: lm)
+        var remaining: [FadeRun] = []
+        for run in fadeRuns {
+            if run.range.location < location {
+                clearFadeAlpha(run.range, lm: lm)
             } else {
-                remaining.append(line)
+                remaining.append(run)
             }
         }
-        revealLines = remaining
-        if revealLines.isEmpty { stopRevealTimer() }
-    }
-
-    /// Split a character range along its laid-out line fragments. Falls back to the
-    /// whole range when layout cannot answer — a reveal that is too coarse beats a
-    /// run that never reveals.
-    private func lineFragmentRanges(in range: NSRange) -> [NSRange] {
-        guard let lm = layoutManager, let container = textContainer else { return [range] }
-        let glyphRange = lm.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
-        guard glyphRange.length > 0 else { return [range] }
-        var out: [NSRange] = []
-        lm.enumerateLineFragments(forGlyphRange: glyphRange) { _, _, _, lineGlyphRange, _ in
-            let overlap = NSIntersectionRange(lineGlyphRange, glyphRange)
-            guard overlap.length > 0 else { return }
-            out.append(lm.characterRange(forGlyphRange: overlap, actualGlyphRange: nil))
+        fadeRuns = remaining
+        // Text between the front and `location` is still hidden where the rewrite
+        // did not reach it. Show it, so nothing before `location` stays clear.
+        if revealFront < location {
+            clearFadeAlpha(NSRange(location: revealFront, length: location - revealFront), lm: lm)
+            revealFront = location
+            revealEnd = max(revealEnd, location)
+            frontCarry = 0
         }
-        _ = container
-        return out.isEmpty ? [range] : out
+        if !hasPendingReveal { stopRevealLink() }
     }
 
-    /// Seconds between two line starts. Shorter the deeper the backlog, so a bursty
-    /// stream catches up without the reveal ever outrunning what has arrived.
-    private func lineInterval(queued: Int) -> TimeInterval {
-        if isDraining { return 0.03 }
-        return min(0.15, max(0.035, Self.targetDrain / Double(max(1, queued))))
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        // A display link follows the window's screen, so it is made per window.
+        // Off-window there is nothing to watch: settle at full opacity.
+        stopRevealLink()
+        if window == nil {
+            finishAllFades()
+        } else if hasPendingReveal {
+            startRevealLink()
+        }
     }
 
-    private func startRevealTimer() {
-        guard revealTimer == nil else { return }
+    private func startRevealLink() {
+        guard revealLink == nil, window != nil else { return }
+        let link = displayLink(target: RevealLinkTarget(self), selector: #selector(RevealLinkTarget.step(_:)))
         // .common so the reveal keeps running during scroll and event tracking
-        // instead of freezing mid-sweep.
-        let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
-            self?.tickReveal()
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        revealTimer = timer
+        // instead of freezing mid-fade.
+        link.add(to: .main, forMode: .common)
+        revealLink = link
+        lastRevealTick = nil
     }
 
-    private func tickReveal() {
-        guard let lm = layoutManager else { stopRevealTimer(); return }
-        let now = ProcessInfo.processInfo.systemUptime
+    func tickReveal() {
+        guard let lm = layoutManager, let storage = textStorage else { stopRevealLink(); return }
+        let now = revealClock()
+        let dt = min(max(now - (lastRevealTick ?? now), 0), 0.1)
+        lastRevealTick = now
 
-        // Start whatever is due.
-        var running = revealLines.reduce(into: 0) { if $1.start != nil { $0 += 1 } }
-        for index in revealLines.indices where revealLines[index].start == nil {
-            let starved = now - revealLines[index].queuedAt >= Self.maxQueueWait
-            guard starved || (running < Self.maxConcurrentLines && now >= nextLineStart) else { break }
-            revealLines[index].start = now
-            running += 1
-            let queued = revealLines.reduce(into: 0) { if $1.start == nil { $0 += 1 } }
-            nextLineStart = now + lineInterval(queued: queued)
+        // Advance the front.
+        revealEnd = min(revealEnd, storage.length)
+        revealFront = min(revealFront, revealEnd)
+        let backlog = revealEnd - revealFront
+        if backlog > 0 {
+            let remaining = max(revealDeadline - now, 1.0 / 120.0)
+            frontCarry += max(Self.baseRate, Double(backlog) / remaining) * dt
+            let taken = min(Int(frontCarry), backlog)
+            if taken > 0 {
+                frontCarry -= Double(taken)
+                fadeRuns.append(FadeRun(range: NSRange(location: revealFront, length: taken),
+                                        start: now, step: 0))
+                revealFront += taken
+            }
+        } else {
+            frontCarry = 0
         }
 
-        // Advance the ones running.
-        var stillActive: [RevealLine] = []
-        for line in revealLines {
-            guard let start = line.start else {
-                stillActive.append(line)
+        // Fade what it has passed. Write only when a run's step changes.
+        var stillFading: [FadeRun] = []
+        for var run in fadeRuns {
+            let progress = (now - run.start) / Self.fadeDuration
+            if progress >= 1 {
+                clearFadeAlpha(run.range, lm: lm)
                 continue
             }
-            let progress = (now - start) / Self.lineDuration
-            if progress >= 1 {
-                clearFadeAlpha(line.range, lm: lm)
-            } else {
-                applySweep(progress, to: line.range, lm: lm)
-                stillActive.append(line)
+            let eased = progress * progress * (3 - 2 * progress)
+            let step = Int((eased * Double(Self.fadeSteps)).rounded())
+            if step != run.step {
+                applyFadeAlpha(CGFloat(step) / CGFloat(Self.fadeSteps), to: run.range, lm: lm)
+                run.step = step
             }
+            stillFading.append(run)
         }
-        revealLines = stillActive
-        if revealLines.isEmpty { stopRevealTimer() }
+        fadeRuns = stillFading
+        if showsTypingDot { updateTypingDot() }
+        if !hasPendingReveal { stopRevealLink() }
     }
 
-    /// Sweep one line head to tail. The line is quantised into segments, each with
-    /// its own delayed fade, which is a soft-edged wipe at a bounded cost: a handful
-    /// of temporary-attribute writes per line per frame, not one per glyph.
-    private func applySweep(_ progress: Double, to range: NSRange, lm: NSLayoutManager) {
-        let segments = max(1, min(12, range.length / 3))
-        let travel = Self.sweepShare
-        let edge = 1 - travel
-        for index in 0..<segments {
-            let offset = travel * Double(index) / Double(segments)
-            let local = max(0, min(1, (progress - offset) / edge))
-            let eased = local * local * (3 - 2 * local)
-            let location = range.location + range.length * index / segments
-            let next = range.location + range.length * (index + 1) / segments
-            applyFadeAlpha(eased, to: NSRange(location: location, length: next - location), lm: lm)
-        }
-    }
-
-    /// Stream ended. Anything still queued finishes at the fastest cadence rather
-    /// than snapping, so the last paragraph lands the way the rest of it did.
+    /// Stream ended. Anything still hidden finishes at the drain pace rather than
+    /// snapping, so the last paragraph lands the way the rest of it did.
     private func drainReveal() {
-        guard !revealLines.isEmpty else {
+        guard hasPendingReveal, window != nil else {
             finishAllFades()
             return
         }
-        isDraining = true
-        startRevealTimer()
+        revealDeadline = min(revealDeadline, revealClock() + Self.drainTarget)
+        startRevealLink()
     }
 
     private func finishAllFades() {
@@ -458,8 +469,9 @@ final class MarkdownTextView: NSTextView {
             lm.removeTemporaryAttribute(.foregroundColor,
                                         forCharacterRange: NSRange(location: 0, length: storage.length))
         }
-        revealLines.removeAll()
-        stopRevealTimer()
+        fadeRuns.removeAll()
+        revealFront = revealEnd
+        stopRevealLink()
     }
 
     /// Overlay a temporary foreground color at `alpha`, preserving each run's real color
@@ -482,11 +494,71 @@ final class MarkdownTextView: NSTextView {
         lm.removeTemporaryAttribute(.foregroundColor, forCharacterRange: clamped)
     }
 
-    private func stopRevealTimer() {
-        revealTimer?.invalidate()
-        revealTimer = nil
-        isDraining = false
-        nextLineStart = 0
+    private func stopRevealLink() {
+        revealLink?.invalidate()
+        revealLink = nil
+        lastRevealTick = nil
+        frontCarry = 0
+    }
+
+    // MARK: - Typing dot
+
+    /// Show ChatGPT's breathing dot after the last revealed character. Only the
+    /// trailing block of a streaming answer sets this.
+    var showsTypingDot = false {
+        didSet { if showsTypingDot != oldValue { updateTypingDot() } }
+    }
+    private var typingDotLayer: CALayer?
+
+    /// Place the dot after the reveal front — not after text that is still
+    /// hidden, which would leave it floating ahead of the words.
+    func updateTypingDot() {
+        guard showsTypingDot, let lm = layoutManager, let container = textContainer,
+              let storage = textStorage else {
+            typingDotLayer?.removeFromSuperlayer()
+            typingDotLayer = nil
+            return
+        }
+        wantsLayer = true
+        let dot: CALayer
+        if let existing = typingDotLayer {
+            dot = existing
+        } else {
+            dot = CALayer()
+            layer?.addSublayer(dot)
+            TypingDot.animate(dot)
+            typingDotLayer = dot
+        }
+
+        let end = min(hasPendingReveal ? revealFront : storage.length, storage.length)
+        let font = (end > 0 ? storage.attribute(.font, at: end - 1, effectiveRange: nil) as? NSFont : nil)
+            ?? self.font ?? .systemFont(ofSize: 14)
+        let size = (font.pointSize * 0.62).rounded()
+        var center = CGPoint(x: size / 2, y: font.ascender - font.xHeight / 2)
+        if end > 0 {
+            let glyph = lm.glyphIndexForCharacter(at: end - 1)
+            let line = lm.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
+            let glyphRect = lm.boundingRect(forGlyphRange: NSRange(location: glyph, length: 1), in: container)
+            let baseline = line.minY + lm.location(forGlyphAt: glyph).y
+            // Sits on the x-height, a letter-space after the last glyph.
+            center = CGPoint(x: glyphRect.maxX + size * 0.75, y: baseline - font.xHeight / 2)
+        }
+        let origin = textContainerOrigin
+        let x = min(center.x + origin.x, bounds.width - size / 2)
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            dot.backgroundColor = (self.textColor ?? .labelColor).cgColor
+        }
+        dot.cornerRadius = size / 2
+        dot.bounds = CGRect(x: 0, y: 0, width: size, height: size)
+        dot.position = CGPoint(x: x, y: center.y + origin.y)
+        CATransaction.commit()
+    }
+
+    override func layout() {
+        super.layout()
+        if showsTypingDot { updateTypingDot() }
     }
 
     // MARK: - Link hover preview
@@ -624,5 +696,25 @@ final class MarkdownTextView: NSTextView {
         if let url = value as? URL { return url }
         if let string = value as? String { return URL(string: string) }
         return nil
+    }
+}
+
+/// Display-link target that does not keep its text view alive: a display link
+/// retains its target until invalidated.
+private final class RevealLinkTarget: NSObject {
+    private weak var owner: MarkdownTextView?
+
+    init(_ owner: MarkdownTextView) {
+        self.owner = owner
+    }
+
+    @objc func step(_ link: CADisplayLink) {
+        MainActor.assumeIsolated {
+            guard let owner else {
+                link.invalidate()
+                return
+            }
+            owner.tickReveal()
+        }
     }
 }

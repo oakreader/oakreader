@@ -3,11 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Bundles for the OakReader app's embedded WKWebViews — built into ../../app/Resources/Preview.bundle/js (committed artifacts, no Xcode build phase).",
+  "description": "Bundles for the OakReader app's embedded WKWebViews \u2014 built into ../../app/Resources/Preview.bundle/js (committed artifacts, no Xcode build phase).",
   "scripts": {
     "build:defuddle": "rollup -c rollup.defuddle.config.js",
     "build:cite-anchor": "rollup -c rollup.cite-anchor.config.js",
-    "build:all": "pnpm run build:defuddle && pnpm run build:cite-anchor"
+    "build:all": "pnpm run build:defuddle && pnpm run build:cite-anchor && pnpm run build:genui",
+    "build:genui": "rollup -c rollup.genui.config.js"
   },
   "dependencies": {
     "@xyflow/react": "^12.8.6",

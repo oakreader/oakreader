@@ -11,6 +11,10 @@ struct ChatBubbleView: View, Equatable {
     /// Optional markdown theme override (e.g. `.dia` for the agent canvas).
     /// When nil, falls back to the user-configured `.oak` theme.
     var markdownTheme: MarkdownTheme? = nil
+    /// What a model-written widget in this turn asked for. nil shows widgets as code.
+    var onWidgetAction: ((GenUIAction) -> Void)?
+    /// Names the document an item id refers to, for the sources pill.
+    var sourceTitle: ((String) -> String?)?
 
     // Memoization for `.equatable()`: only the parent-supplied inputs that change
     // the rendered output drive a re-render. Closures are stable per host, and
@@ -47,12 +51,16 @@ struct ChatBubbleView: View, Equatable {
                         messageBubble
                     }
 
-                    // Streaming cursor — only while text is streaming, not while a
-                    // tool-only turn is executing (the tool-call shimmer covers that).
-                    if turn.isStreaming && shouldShowMessageBubble {
-                        StreamingCursor()
-                            .padding(.leading, 4)
+                    if let sources = citedSources {
+                        ChatSourcesPill(sources: sources) { itemId, anchor in
+                            onOpenCitation?(itemId, anchor)
+                        }
+                        .padding(.top, 2)
                     }
+
+                    // While text streams, the breathing dot sits after its last
+                    // word (`showsTypingDot`), as ChatGPT draws it — not on a row
+                    // of its own under the answer.
 
                     // Error indicator
                     if let error = turn.error {
@@ -116,6 +124,15 @@ struct ChatBubbleView: View, Equatable {
     /// finishes on its own ~0.2s after the last delta; we don't gate UI on it.)
     private var isRevealing: Bool {
         turn.isStreaming
+    }
+
+    /// The passages this answer cites, once it has finished. nil when it cites none.
+    private var citedSources: ChatCitedSources? {
+        guard turn.role == .assistant, !turn.isStreaming, turn.content.contains("oak:"),
+              let resolveCitation else { return nil }
+        let sources = ChatCitedSources(markdown: turn.content, resolve: resolveCitation,
+                                       title: { sourceTitle?($0) })
+        return sources.passageCount > 0 ? sources : nil
     }
 
     // MARK: - Citation hover card
@@ -215,6 +232,7 @@ struct ChatBubbleView: View, Equatable {
             theme: citationAware(markdownTheme ?? .oak()),
             isStreaming: streaming,
             fadesAppendedText: fadesAppendedText,
+            showsTypingDot: streaming,
             onOpenURL: { url in
                 // Intercept oak:// citation links; let everything else open in the browser.
                 guard let (itemId, anchor) = resolveCitation?(url) else { return false }
@@ -229,6 +247,16 @@ struct ChatBubbleView: View, Equatable {
                 // repeating that quote adds nothing; a page/heading/timestamp still does.
                 guard Self.citationCardAddsInfo(anchor, label: label) else { return nil }
                 return AnyView(CitationHoverCard(anchor: anchor))
+            },
+            widget: onWidgetAction.map { onAction in
+                { source, isComplete, index in
+                    // A closed fence that is not a widget shows as code, the way
+                    // ChatGPT falls back to markdown for a payload it cannot use.
+                    if isComplete, GenUIWidgetView.payload(from: source) == nil { return nil }
+                    return AnyView(GenUIWidgetView(source: source, isComplete: isComplete,
+                                                   stateKey: "\(turn.id)-\(index)",
+                                                   onAction: onAction))
+                }
             }
         )
     }
@@ -433,16 +461,17 @@ struct ChatBubbleView: View, Equatable {
 
     private func skillBadge(_ skillId: String) -> some View {
         let skill = SkillStore.shared.skill(matching: skillId)
-        // Mirrors the input composer's token chip (ChatTokenAttachment): blue
-        // words and glyph on nothing, so a skill reads the same after it is
-        // sent as it did while you were typing it.
+        // Grey, unlike the blue chip in the composer (ChatTokenAttachment). There
+        // the colour confirms, while typing, that the skill was recognised; once
+        // sent it is history, and an accent-coloured label became the loudest
+        // thing in the thread.
         return HStack(spacing: 3) {
             Image(systemName: skill?.symbolName ?? "sparkles")
                 .font(OakStyle.ChatFont.modelLabel)
             Text(skill?.title ?? skillId)
                 .font(OakStyle.ChatFont.modelLabel)
         }
-        .foregroundStyle(OakStyle.Colors.skillChip)
+        .foregroundStyle(.secondary)
         .padding(.vertical, 2)
         .fixedSize()
     }
@@ -530,50 +559,37 @@ private extension View {
     }
 }
 
-// MARK: - Thinking Disclosure View
-
-/// Collapsible section showing extended thinking content from reasoning models.
-/// Collapsed by default. Shows elapsed time and a chevron toggle.
-/// While streaming, displays a cursive "oak" handwriting stroke animation
-/// alongside a "Thinking..." label.
-// MARK: - Streaming Cursor (Three-Dot Wave)
+// MARK: - Streaming Cursor (pulsing dot)
 //
-// Three dots in a row, each doing a small staggered vertical bob with a coupled
-// opacity lift — Dia's gentle "typing" wobble. Driven entirely by **Core
-// Animation** (infinite `CAKeyframeAnimation` with staggered `beginTime`), so it
-// runs on the render server and stays smooth even while the main thread is
-// saturated streaming + re-laying-out markdown — a main-thread `Timer` driver
-// stutters under that load. Honors Reduce Motion (static dots). Reimplemented
-// from a read-only study of the shipped app, not copied.
+// ChatGPT's working indicator is one dot that breathes (`TypingDotView`,
+// `isDotBallLoadingIndicatorEnabled`), not a row of bouncing dots. The same
+// dot sits at the end of the text while an answer streams (see
+// `StreamingMarkdownView.showsTypingDot`), so the wait before the first word and
+// the writing after it read as one thing. Driven by Core Animation, so it stays
+// smooth while the main thread lays out markdown. Static under Reduce Motion.
 struct StreamingCursor: NSViewRepresentable {
-    fileprivate static let dotSize: CGFloat = 5.0
-    fileprivate static let gap: CGFloat = 4.5
-    fileprivate static let amplitude: CGFloat = 3.0
-    fileprivate static let cycle: CFTimeInterval = 1.2
-    fileprivate static let count = 3
-    fileprivate static var contentWidth: CGFloat { dotSize * CGFloat(count) + gap * CGFloat(count - 1) }
-    fileprivate static var contentHeight: CGFloat { dotSize + amplitude * 2 }
+    fileprivate static let size: CGFloat = 10
 
-    func makeNSView(context: Context) -> DotRowView { DotRowView() }
-    func updateNSView(_ nsView: DotRowView, context: Context) {}
+    func makeNSView(context: Context) -> DotView { DotView() }
+    func updateNSView(_ nsView: DotView, context: Context) {}
 
-    func sizeThatFits(_ proposal: ProposedViewSize, nsView: DotRowView, context: Context) -> CGSize? {
-        CGSize(width: Self.contentWidth, height: Self.contentHeight)
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: DotView, context: Context) -> CGSize? {
+        CGSize(width: Self.size, height: Self.size)
     }
 
-    final class DotRowView: NSView {
-        private var dots: [CALayer] = []
+    final class DotView: NSView {
+        private let dot = CALayer()
 
         override var intrinsicContentSize: NSSize {
-            NSSize(width: StreamingCursor.contentWidth, height: StreamingCursor.contentHeight)
+            NSSize(width: StreamingCursor.size, height: StreamingCursor.size)
         }
 
         override init(frame frameRect: NSRect) {
             super.init(frame: frameRect)
             wantsLayer = true
-            buildDots()
-            layoutDots()
-            // Re-evaluate when the user toggles "Reduce Motion" mid-session.
+            dot.cornerRadius = StreamingCursor.size / 2
+            layer?.addSublayer(dot)
+            applyColor()
             NSWorkspace.shared.notificationCenter.addObserver(
                 self, selector: #selector(reduceMotionChanged),
                 name: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil)
@@ -583,18 +599,19 @@ struct StreamingCursor: NSViewRepresentable {
         deinit { NSWorkspace.shared.notificationCenter.removeObserver(self) }
 
         @objc private func reduceMotionChanged() {
-            if window != nil { animate() }
+            if window != nil { TypingDot.animate(dot) }
         }
 
         override func layout() {
             super.layout()
-            layoutDots()
+            let s = StreamingCursor.size
+            dot.frame = CGRect(x: (bounds.width - s) / 2, y: (bounds.height - s) / 2, width: s, height: s)
         }
 
         // CA strips animations when a layer leaves the window; re-add on (re)attach.
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
-            if window != nil { animate() }
+            if window != nil { TypingDot.animate(dot) }
         }
 
         override func viewDidChangeEffectiveAppearance() {
@@ -602,72 +619,9 @@ struct StreamingCursor: NSViewRepresentable {
             applyColor()
         }
 
-        private func buildDots() {
-            dots = (0..<StreamingCursor.count).map { _ in
-                let l = CALayer()
-                l.cornerRadius = StreamingCursor.dotSize / 2
-                l.opacity = 0.35
-                layer?.addSublayer(l)
-                return l
-            }
-            applyColor()
-        }
-
         private func applyColor() {
-            let cg = NSColor.labelColor.cgColor
-            for d in dots { d.backgroundColor = cg }
-        }
-
-        private func layoutDots() {
-            let d = StreamingCursor.dotSize, g = StreamingCursor.gap
-            let y = (bounds.height - d) / 2   // rest at vertical center; bob room above
-            for i in 0..<dots.count {
-                dots[i].frame = CGRect(x: CGFloat(i) * (d + g), y: y, width: d, height: d)
-            }
-        }
-
-        private func animate() {
-            guard let host = layer else { return }
-
-            // Reduce Motion: no bobbing — quiet, evenly-dimmed dots.
-            dots.forEach { $0.removeAllAnimations() }
-            if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
-                for d in dots {
-                    d.opacity = 0.35
-                    d.transform = CATransform3DIdentity
-                }
-                return
-            }
-
-            let cycle = StreamingCursor.cycle
-            let amp = StreamingCursor.amplitude
-            let now = host.convertTime(CACurrentMediaTime(), from: nil)
-            let stagger = cycle / Double(dots.count)   // each dot trails the last by a third
-            let ease = CAMediaTimingFunction(name: .easeInEaseOut)
-            let keyTimes: [NSNumber] = [0.0, 0.5, 1.0]
-
-            for (i, dot) in dots.enumerated() {
-                let begin = now + Double(i) * stagger - cycle   // staggered, already mid-loop
-
-                let bob = CAKeyframeAnimation(keyPath: "transform.translation.y")
-                bob.values = [0, amp, 0]
-                bob.keyTimes = keyTimes
-                bob.timingFunctions = [ease, ease]
-                bob.duration = cycle
-                bob.repeatCount = .infinity
-                bob.beginTime = begin
-                bob.isRemovedOnCompletion = false
-                dot.add(bob, forKey: "wobble.y")
-
-                let op = CAKeyframeAnimation(keyPath: "opacity")
-                op.values = [0.35, 0.70, 0.35]
-                op.keyTimes = keyTimes
-                op.timingFunctions = [ease, ease]
-                op.duration = cycle
-                op.repeatCount = .infinity
-                op.beginTime = begin
-                op.isRemovedOnCompletion = false
-                dot.add(op, forKey: "wobble.opacity")
+            effectiveAppearance.performAsCurrentDrawingAppearance {
+                dot.backgroundColor = NSColor.labelColor.cgColor
             }
         }
     }

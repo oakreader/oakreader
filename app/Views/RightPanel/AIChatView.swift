@@ -95,12 +95,14 @@ struct AIChatView: View {
                 onOpenCitation: { itemId, anchor in
                     chatVM.openCitation(itemId: itemId, anchor: anchor)
                 },
-                markdownTheme: presentation == .canvas ? .dia : nil
+                markdownTheme: .chatGPT,
+                onWidgetAction: { handleWidgetAction($0) },
+                sourceTitle: { chatVM.citationSourceTitle(itemId: $0) }
             )
                 .equatable()
         case .steps(_, let steps, let isLive):
             AgentStepsView(steps: steps, isLive: isLive,
-                           theme: presentation == .canvas ? .dia : .oak())
+                           theme: .chatGPT)
         }
     }
 
@@ -467,6 +469,30 @@ struct AIChatView: View {
                 guard new > old, chatVM.isStreaming, scrollState.isNearBottom else { return }
                 proxy.scrollTo("bottom", anchor: .bottom)
             }
+        }
+    }
+
+    /// A widget's request. `send` posts the next user turn, unless a reply is
+    /// already streaming — the composer is busy then, and a second turn would
+    /// interleave with the first.
+    private func handleWidgetAction(_ action: GenUIAction) {
+        switch action {
+        case .send(let text):
+            guard !chatVM.isStreaming else { return }
+            // `send()` takes whatever is in the composer. Set the reader's own
+            // draft, chips and attachments aside, so a tap sends only the
+            // widget's text, and put them back after.
+            let draft = (chatVM.inputText, chatVM.activeTokens, chatVM.pendingAttachments)
+            chatVM.activeTokens = []
+            chatVM.pendingAttachments = []
+            chatVM.inputText = text
+            chatVM.send()
+            (chatVM.inputText, chatVM.activeTokens, chatVM.pendingAttachments) = draft
+        case .openURL(let url):
+            NSWorkspace.shared.open(url)
+        case .copy(let text):
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
         }
     }
 

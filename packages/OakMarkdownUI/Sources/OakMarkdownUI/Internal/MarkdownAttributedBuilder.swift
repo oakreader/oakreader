@@ -407,7 +407,10 @@ private final class Renderer {
         }
 
         m.addAttribute(.foregroundColor, value: theme.linkColor, range: full)
-        m.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: full)
+        m.addAttribute(.underlineStyle, value: theme.linkUnderlineStyle.rawValue, range: full)
+        if let underline = theme.linkUnderlineColor {
+            m.addAttribute(.underlineColor, value: underline, range: full)
+        }
         return m
     }
 
@@ -447,11 +450,16 @@ private final class Renderer {
         let alpha = max(theme.quoteLevelMinOpacity, step)
         m.addAttribute(.foregroundColor,
                        value: theme.secondaryTextColor.withAlphaComponent(alpha), range: full)
-        m.addAttribute(.paragraphStyle, value: bodyParagraphStyle(headIndent: 12), range: full)
+        m.addAttribute(.paragraphStyle, value: bodyParagraphStyle(headIndent: theme.blockquoteIndent), range: full)
         // Tag the range so `HuggingLayoutManager` paints a soft rounded fill behind
-        // it (the drawing can't be expressed as text attributes). No left bar — the
-        // fill alone reads as a quote; the bar on top of it was redundant chrome.
+        // it (the drawing can't be expressed as text attributes). The bar is off by
+        // default — the fill alone reads as a quote. A theme with no fill (ChatGPT's)
+        // turns the bar on instead.
         m.addAttribute(.blockquoteFill, value: theme.blockquoteBackground, range: full)
+        if theme.blockquoteBarWidth > 0 {
+            m.addAttribute(.blockquoteBar, value: theme.blockquoteBar, range: full)
+            m.addAttribute(.blockquoteBarWidth, value: theme.blockquoteBarWidth as NSNumber, range: full)
+        }
         return m
     }
 }
