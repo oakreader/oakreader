@@ -29,15 +29,15 @@ extension NoteEditorTextView {
 
         // Skip when nothing math-relevant changed: a single command fires this 2–3×
         // and every caret move calls it, but only a text edit or a selection move
-        // that crosses a formula needs work. The (length + content-hash + selection)
+        // that crosses a formula needs work. The (edit generation + selection)
         // fingerprint makes those redundant calls — the source of the toolbar lag —
-        // near-free, and never touches `beginEditing` (which invalidates layout).
-        let signature = "\(str.utf16.count)|\(str.hashValue)|\(sel.location)|\(sel.length)"
-        if signature == lastMathSignature { return }
-        lastMathSignature = signature
+        // free, and never touches `beginEditing` (which invalidates layout).
+        if let last = lastMathSignature, last.generation == editGeneration,
+           NSEqualRanges(last.selection, sel) { return }
+        lastMathSignature = (editGeneration, sel)
 
         // Fast path: no `$` and no live math runs ⇒ nothing to render or clean up.
-        if !str.contains("$"), !hasMathRuns(ts) { return }
+        if (str as NSString).range(of: "$").location == NSNotFound, !hasCollapsedMath { return }
 
         isRestylingMath = true
         defer { isRestylingMath = false }
@@ -58,6 +58,7 @@ extension NoteEditorTextView {
         }
 
         // 2. Collapse every inactive run into its image.
+        var collapsed = false
         let fontSize = NoteEditorStyle.baseFont.pointSize
         for m in Self.mathRegex.matches(in: ts.string, range: full) {
             let runRange = m.range
@@ -83,17 +84,9 @@ extension NoteEditorTextView {
             let firstChar = NSRange(location: runRange.location, length: 1)
             ts.addAttribute(.oakMathImage, value: image, range: firstChar)
             ts.addAttribute(.kern, value: image.size.width, range: firstChar)   // reserve the image width
+            collapsed = true
         }
         ts.endEditing()
-    }
-
-    /// Whether any collapsed-math run is still present — so the no-`$` fast path
-    /// still cleans up a stale hidden run left behind when a delimiter was deleted.
-    private func hasMathRuns(_ ts: NSTextStorage) -> Bool {
-        var found = false
-        ts.enumerateAttribute(.oakMath, in: NSRange(location: 0, length: ts.length), options: []) { value, _, stop in
-            if value != nil { found = true; stop.pointee = true }
-        }
-        return found
+        hasCollapsedMath = collapsed
     }
 }

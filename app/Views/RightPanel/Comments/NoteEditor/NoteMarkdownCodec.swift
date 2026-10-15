@@ -209,7 +209,10 @@ enum NoteMarkdownCodec {
                 prevOrdered = false
                 continue
             }
-            let inline = serializeInline(attr.attributedSubstring(from: range))
+            // A heading's font is already semibold; reading that as bold saved every
+            // heading as `## **Title**`.
+            let isHeading = block == .h1 || block == .h2 || block == .h3
+            let inline = serializeInline(attr.attributedSubstring(from: range), boldIsImplicit: isHeading)
             let text: String
             switch block {
             case .h1: text = "# " + inline
@@ -246,7 +249,7 @@ enum NoteMarkdownCodec {
         return (prev == next && tight.contains(prev)) ? "\n" : "\n\n"
     }
 
-    private static func serializeInline(_ para: NSAttributedString) -> String {
+    private static func serializeInline(_ para: NSAttributedString, boldIsImplicit: Bool = false) -> String {
         let ns = para.string as NSString
         guard ns.length > 0 else { return "" }
         var out = ""
@@ -261,7 +264,7 @@ enum NoteMarkdownCodec {
             }
             var pre = "", suf = ""
             if let f = attrs[.font] as? NSFont {
-                if f.hasBold { pre += "**"; suf = "**" + suf }
+                if f.hasBold, !boldIsImplicit { pre += "**"; suf = "**" + suf }
                 if f.hasItalic { pre += "*"; suf = "*" + suf }
             }
             if attrs[.strikethroughStyle] != nil { pre += "~~"; suf = "~~" + suf }

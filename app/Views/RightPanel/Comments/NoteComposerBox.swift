@@ -95,6 +95,7 @@ struct NoteComposerBox: View {
                 charCount: $charCount,
                 height: $height,
                 activeFormats: $activeFormats,
+                reportsCharCount: mode == .edit,
                 onSubmit: send,
                 references: memos,
                 tags: tags

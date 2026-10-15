@@ -46,6 +46,9 @@ struct NativeNoteEditorView: NSViewRepresentable {
     @Binding var charCount: Int
     @Binding var height: CGFloat
     @Binding var activeFormats: Set<String>
+    /// Whether the host shows `charCount`. Counting walks the whole note on every
+    /// key, so the create composer, which shows no count, turns it off.
+    var reportsCharCount = true
     var minHeight: CGFloat = 44
     var maxHeight: CGFloat = 220
     var onSubmit: () -> Void = {}
@@ -84,6 +87,7 @@ struct NativeNoteEditorView: NSViewRepresentable {
 
         let tv = NoteEditorTextView(frame: .zero, textContainer: container)
         tv.maxAutoGrowHeight = maxHeight
+        tv.reportsCharCount = reportsCharCount
         tv.delegate = context.coordinator
         tv.drawsBackground = false
         tv.isRichText = true
@@ -144,10 +148,9 @@ struct NativeNoteEditorView: NSViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
+    // No `textDidChange` here: `NoteEditorTextView.didChangeText` already runs
+    // `handleTextChange`, and handling the notification too ran it twice per key.
     final class Coordinator: NSObject, NSTextViewDelegate {
-        func textDidChange(_ notification: Notification) {
-            (notification.object as? NoteEditorTextView)?.handleTextChange()
-        }
         func textViewDidChangeSelection(_ notification: Notification) {
             (notification.object as? NoteEditorTextView)?.reportActiveFormats()
         }
