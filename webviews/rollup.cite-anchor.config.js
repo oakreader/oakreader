@@ -11,7 +11,7 @@ export default [
   {
     input: "src/oak-cite-anchor-entry.js",
     output: {
-      file: "../../app/Resources/Preview.bundle/js/oak-cite-anchor.js",
+      file: "../app/Resources/Preview.bundle/js/oak-cite-anchor.js",
       format: "iife",
     },
     plugins: [resolve({ browser: true }), commonjs(), terser()],
