@@ -156,6 +156,16 @@ class ChatViewModel {
                                               time: source.time, text: source.text))
     }
 
+    /// The title of the document a citation's item id names. An empty id is
+    /// the open document, the only source a passage can have without one.
+    func citationSourceTitle(itemId: String) -> String? {
+        if itemId.isEmpty || parent?.libraryItem?.id.uuidString == itemId {
+            return parent?.libraryItem?.title
+        }
+        guard let uuid = UUID(uuidString: itemId) else { return nil }
+        return appState?.libraryStore.findItem(byId: uuid)?.title
+    }
+
     // MARK: - Configuration
 
     var config: AIRequestConfig {

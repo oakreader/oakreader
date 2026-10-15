@@ -13,33 +13,42 @@ struct CodeBlockView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text((language?.isEmpty == false ? language! : "code"))
-                    .font(.system(size: 11, weight: .medium))
+            // ChatGPT's code header (`MarkdownCodeBlockHeader`): language on the
+            // left, copy on the right, inset (6, 16, 0, 16), and no rule under it.
+            // The code starts directly below, inset (0, 16, 16, 16).
+            HStack(spacing: 8) {
+                Text((language?.isEmpty == false ? language! : "code").lowercased())
+                    .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                 Spacer()
                 Button(action: copy) {
-                    Text(copied ? "Copied" : "Copy")
-                        .font(.system(size: 11, weight: .medium))
+                    HStack(spacing: 4) {
+                        Image(systemName: copied ? "checkmark" : "square.on.square")
+                            .font(.system(size: 11))
+                        Text(copied ? "Copied" : "Copy")
+                            .font(.system(size: 12))
+                    }
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
+                .help("Copy code")
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-
-            Divider().opacity(0.5)
+            .frame(minHeight: 22)
+            .padding(.top, 6)
+            .padding(.horizontal, theme.codeBlockPadding.width)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 CodeTextView(attributed: highlighted)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
+                    .padding(.horizontal, theme.codeBlockPadding.width)
+                    .padding(.top, 6)
+                    .padding(.bottom, theme.codeBlockPadding.height)
             }
         }
         .background(Color(nsColor: theme.codeBlockBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(RoundedRectangle(cornerRadius: theme.codeBlockCornerRadius))
         .overlay(
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: theme.codeBlockCornerRadius)
                 .strokeBorder(Color(nsColor: theme.codeBlockBorder), lineWidth: 1)
         )
     }

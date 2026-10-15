@@ -10,6 +10,8 @@ struct ProseBlockView: NSViewRepresentable {
     /// When true, text appended since the last render fades in (Dia's glyph reveal)
     /// instead of appearing instantly. Only the streaming trailing block sets this.
     var animatesAppendedText: Bool = false
+    /// Show the breathing dot after the last revealed word.
+    var showsTypingDot: Bool = false
     /// Called when a link is clicked. Return `true` if handled (the click is
     /// consumed); return `false` to let the text view open it normally (system
     /// browser). Lets the host intercept custom schemes (e.g. `oak://`) that the
@@ -99,6 +101,9 @@ struct ProseBlockView: NSViewRepresentable {
         // Set before mutating storage so the first fade applies alpha 0 synchronously
         // (no full-opacity flash before the first animation frame).
         tv.fadesAppendedText = animatesAppendedText
+        tv.showsTypingDot = showsTypingDot
+        // The text below may move the end of the line: follow it.
+        defer { tv.updateTypingDot() }
         guard let ts = tv.textStorage else { return }
         if ts.length == 0 {
             ts.setAttributedString(attributed)

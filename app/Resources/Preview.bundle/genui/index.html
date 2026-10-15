@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<!-- Widgets come from a model. No script but our own bundle, no network but images. -->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src https: data:; font-src 'none'; connect-src 'none'; form-action 'none'; frame-src 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>genui</title>
+<style>
+/* Colours are ChatGPT's native asset catalog values (com.openai.chat 1.2026.183):
+   OneOff/TextMessageBot, ChatGPT/text/*, ChatGPT/border/*, ChatGPT/bg/*. */
+:root {
+  --genui-primary: #111111;
+  --genui-secondary: #5D5D5D;
+  --genui-tertiary: #8F8F8F;
+  --genui-accent: #3A83F7;
+  --genui-success: #1F9D55;
+  --genui-danger: #E02E2A;
+  --genui-warning: #C77700;
+  --genui-border: rgba(0, 0, 0, 0.10);
+  --genui-border-heavy: rgba(0, 0, 0, 0.15);
+  --genui-bg-surface: transparent;
+  --genui-bg-secondary: #F3F3F3;
+  --genui-bg-tertiary: #E8E8E8;
+  --genui-bg-accent: rgba(58, 131, 247, 0.10);
+  --genui-button-fg: #FFFFFF;
+  --genui-button-bg: #0D0D0D;
+  --genui-chart-1: #3A83F7;
+  --genui-chart-2: #F2994A;
+  --genui-chart-3: #27AE60;
+  --genui-chart-4: #9B51E0;
+  --genui-chart-5: #EB5757;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --genui-primary: #FFFFFF;
+  --genui-secondary: #CDCDCD;
+  --genui-tertiary: #AFAFAF;
+  --genui-accent: #63A8F8;
+  --genui-success: #4CC38A;
+  --genui-danger: #FF6B66;
+  --genui-warning: #F5B14C;
+  --genui-border: rgba(255, 255, 255, 0.15);
+  --genui-border-heavy: rgba(255, 255, 255, 0.20);
+  --genui-bg-secondary: #303030;
+  --genui-bg-tertiary: #414141;
+  --genui-bg-accent: rgba(99, 168, 248, 0.16);
+  --genui-button-fg: #0D0D0D;
+  --genui-button-bg: #FFFFFF;
+  color-scheme: dark;
+}
+html, body { margin: 0; padding: 0; background: transparent; }
+body {
+  font: 14px/1.35 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  color: var(--genui-primary);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+* { box-sizing: border-box; }
+.genui-root { display: flex; flex-direction: column; gap: 8px; padding: 1px; }
+.genui-text, .genui-caption, .genui-title, .genui-card-title { margin: 0; }
+.genui-pre { white-space: pre-wrap; }
+.genui-title { font-weight: 600; line-height: 1.25; }
+.genui-caption { color: var(--genui-secondary); }
+.genui-card {
+  display: flex; flex-direction: column;
+  border: 1px solid var(--genui-border);
+  border-radius: 16px;
+}
+.genui-card-title { font-size: 15px; font-weight: 600; }
+.genui-grid { display: grid; }
+.genui-divider { border: 0; border-top: 1px solid var(--genui-border); width: 100%; }
+.genui-row { display: flex; gap: 8px; align-items: center; }
+.genui-badge {
+  display: inline-block; align-self: flex-start;
+  padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 500;
+  background: var(--genui-bg-secondary); color: var(--genui-secondary);
+}
+.genui-badge-success { color: var(--genui-success); }
+.genui-badge-danger { color: var(--genui-danger); }
+.genui-badge-warning { color: var(--genui-warning); }
+.genui-badge-accent { color: var(--genui-accent); background: var(--genui-bg-accent); }
+.genui-image { display: block; max-width: 100%; }
+.genui-button {
+  font: inherit; font-weight: 500; cursor: pointer;
+  padding: 6px 14px; border-radius: 999px; border: 1px solid transparent;
+  align-self: flex-start;
+}
+.genui-button:disabled { opacity: 0.4; cursor: default; }
+.genui-solid { background: var(--genui-button-bg); color: var(--genui-button-fg); }
+.genui-solid.genui-color-danger { background: var(--genui-danger); color: #fff; }
+.genui-soft { background: var(--genui-bg-secondary); color: var(--genui-primary); }
+.genui-outline { background: transparent; color: var(--genui-primary); border-color: var(--genui-border-heavy); }
+.genui-ghost { background: transparent; color: var(--genui-secondary); }
+.genui-field { display: flex; flex-direction: column; gap: 4px; }
+.genui-label { font-size: 12px; color: var(--genui-secondary); }
+.genui-input {
+  font: inherit; color: inherit; width: 100%;
+  padding: 7px 10px; border-radius: 10px;
+  border: 1px solid var(--genui-border-heavy); background: transparent;
+}
+/* No spinner: it crowds the field, and ChatGPT's inputs have none. */
+.genui-input::-webkit-inner-spin-button, .genui-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.genui-input:focus { outline: 2px solid var(--genui-accent); outline-offset: -1px; }
+.genui-segmented {
+  display: inline-flex; padding: 2px; gap: 2px; align-self: flex-start;
+  border-radius: 999px; background: var(--genui-bg-secondary);
+}
+.genui-segmented button {
+  font: inherit; border: 0; background: transparent; color: var(--genui-secondary);
+  padding: 4px 12px; border-radius: 999px; cursor: pointer;
+}
+.genui-segmented button.is-on { background: var(--genui-button-bg); color: var(--genui-button-fg); }
+.genui-check { display: flex; gap: 8px; align-items: center; }
+.genui-slider { flex: 1; accent-color: var(--genui-accent); }
+.genui-slider-value { min-width: 4ch; padding-right: 2px; text-align: right; font-variant-numeric: tabular-nums; }
+.genui-form { display: flex; flex-direction: column; gap: 10px; }
+.genui-table-wrap { overflow-x: auto; border: 1px solid var(--genui-border); border-radius: 8px; }
+.genui-table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.genui-table th { font-weight: 600; background: var(--genui-bg-secondary); }
+.genui-table th, .genui-table td { padding: 8px 12px; border-bottom: 1px solid var(--genui-border); text-align: left; }
+.genui-table tr:last-child td { border-bottom: 0; }
+.genui-chart, .genui-pie { margin: 0; }
+.genui-chart svg { width: 100%; display: block; }
+.genui-axis { stroke: var(--genui-border-heavy); }
+.genui-tick { fill: var(--genui-tertiary); font-size: 11px; }
+.genui-xlabels { display: flex; justify-content: space-between; font-size: 11px; color: var(--genui-tertiary); padding-left: 36px; }
+.genui-legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--genui-secondary); margin-top: 6px; }
+.genui-legend-col { flex-direction: column; gap: 4px; }
+.genui-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; }
+.genui-pie { display: flex; gap: 16px; align-items: center; }
+.genui-timer { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.genui-timer-face { font-size: 32px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.genui-native-slot { width: 100%; }
+.genui-loading {
+  border-radius: 8px; background: var(--genui-bg-secondary);
+  animation: genui-pulse 1.4s ease-in-out infinite;
+}
+@keyframes genui-pulse { 50% { opacity: 0.5; } }
+@media (prefers-reduced-motion: reduce) { .genui-loading { animation: none; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="oak-genui.js"></script>
+</body>
+</html>

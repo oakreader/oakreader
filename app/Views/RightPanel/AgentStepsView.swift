@@ -161,6 +161,11 @@ struct AgentStepsView: View {
         } label: {
             HStack(spacing: 4) {
                 if isLive {
+                    // ChatGPT leads its live reasoning label with the same
+                    // breathing dot it shows while writing
+                    // (`usesPulsingDotForCoTV5Thinking`).
+                    StreamingCursor()
+                        .padding(.trailing, 4)
                     ShimmerText(text: liveLabel)
                 } else {
                     Text(summary)
@@ -172,8 +177,10 @@ struct AgentStepsView: View {
                         .font(.system(size: 9, weight: .semibold))
                         .foregroundStyle(.secondary)
                         .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                        // Cursor hides the chevron until hover or open.
-                        .opacity(isHovered || isExpanded ? 1 : 0)
+                        // Always shown, as ChatGPT's "Thought for 12s ›": a
+                        // chevron that appears only on hover hides that the
+                        // line opens at all.
+                        .opacity(isHovered || isExpanded ? 1 : 0.6)
                 }
                 Spacer(minLength: 0)
             }

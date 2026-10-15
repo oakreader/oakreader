@@ -50,6 +50,23 @@ public struct MarkdownTheme {
     /// `quoteLevelMinOpacity` — the floor is what keeps a level-4 quote readable.
     public var quoteLevelMinOpacity: CGFloat = 0.55
 
+    /// Underline drawn under a resting link. ChatGPT uses a dotted line in the
+    /// secondary text colour, so a link is marked without being blue.
+    public var linkUnderlineStyle: NSUnderlineStyle = .single
+    /// nil underlines in the link's own colour.
+    public var linkUnderlineColor: NSColor? = nil
+
+    /// Left inset of a block quote's text.
+    public var blockquoteIndent: CGFloat = 12
+    /// Width of the bar at a quote's leading edge. 0 draws no bar: the fill alone
+    /// marks the quote.
+    public var blockquoteBarWidth: CGFloat = 0
+
+    /// Corner radius of a fenced code block.
+    public var codeBlockCornerRadius: CGFloat = 8
+    /// Inset of the code inside its block, horizontal and vertical.
+    public var codeBlockPadding: CGSize = CGSize(width: 12, height: 8)
+
     public var textColor: NSColor
     public var secondaryTextColor: NSColor
     public var linkColor: NSColor
@@ -161,6 +178,67 @@ public struct MarkdownTheme {
                 : NSColor(srgbRed: 0.059, green: 0.094, blue: 0.173, alpha: 0.08)
         }
         return t
+    }
+
+    /// Mirrors the chat preset of ChatGPT's native Mac app (`OAIMarkdown.MarkdownOptions`,
+    /// 1.2026.183, built from the iOS codebase), read from the shipped binary and its
+    /// asset catalog.
+    ///
+    /// Observed: body = system 14 pt with line-height multiple 1.35; code and
+    /// tables 13 pt; list items 4 apart; quote = 4 pt bar, no fill, 15 pt indent;
+    /// code block radius 16, insets 16; links in the text colour with a dotted
+    /// underline in the secondary colour; inline code without a pill; colours from
+    /// `OneOff/TextMessageBot`, `ChatGPT/text/*`, `OneOff/CodeBlockBackground`.
+    ///
+    /// Not observed, chosen here: heading point sizes (the binary maps H1–H3 to the
+    /// `title` styles and H4+ to `headline` but stores no sizes; macOS's `headline`
+    /// is smaller than this body, so H4+ use the body size), and the 16 pt gap
+    /// between paragraphs (the binary's 16 pt block gap; its 24 pt paragraph spacing
+    /// is measured under a layout this view does not have).
+    public static var chatGPT: MarkdownTheme {
+        let bodySize: CGFloat = 14
+        let body = NSFont.systemFont(ofSize: bodySize, weight: .regular)
+        let natural = body.ascender - body.descender + body.leading
+        var t = MarkdownTheme(
+            bodyFont: body,
+            codeFont: .monospacedSystemFont(ofSize: 13, weight: .regular),
+            headingSizes: [22, 17, 15, bodySize, bodySize, bodySize],
+            bodyLineHeight: (natural * 1.35).rounded(),
+            paragraphSpacing: 16,
+            codeLineHeightMultiple: 1.35,
+            textColor: .dynamic(light: 0x111111, dark: 0xFFFFFF),
+            secondaryTextColor: .dynamic(light: 0x5D5D5D, dark: 0xCDCDCD),
+            linkColor: .dynamic(light: 0x0D0D0D, dark: 0xFFFFFF),
+            inlineCodeBackground: .clear,
+            codeBlockBackground: .dynamic(light: 0xF8F8F8, dark: 0x212121),
+            codeBlockBorder: .dynamic(light: 0x000000, dark: 0xFFFFFF, alpha: 0.05),
+            blockquoteBar: .dynamic(light: 0xE8E8E8, dark: 0x303030),
+            blockquoteBackground: .clear,
+            codeThemeLight: "xcode",
+            codeThemeDark: "atom-one-dark"
+        )
+        t.listItemSpacing = 4
+        t.linkUnderlineStyle = [.single, .patternDot]
+        t.linkUnderlineColor = .dynamic(light: 0x5D5D5D, dark: 0xCDCDCD)
+        t.linkHoverUnderline = t.linkColor
+        t.blockquoteIndent = 15
+        t.blockquoteBarWidth = 4
+        t.codeBlockCornerRadius = 16
+        t.codeBlockPadding = CGSize(width: 16, height: 16)
+        return t
+    }
+}
+
+extension NSColor {
+    /// An appearance-aware colour from two sRGB hex values.
+    static func dynamic(light: UInt32, dark: UInt32, alpha: CGFloat = 1) -> NSColor {
+        func rgb(_ hex: UInt32) -> NSColor {
+            NSColor(srgbRed: CGFloat((hex >> 16) & 0xFF) / 255,
+                    green: CGFloat((hex >> 8) & 0xFF) / 255,
+                    blue: CGFloat(hex & 0xFF) / 255,
+                    alpha: alpha)
+        }
+        return NSColor(name: nil) { $0.isDark ? rgb(dark) : rgb(light) }
     }
 }
 

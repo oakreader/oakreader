@@ -25,26 +25,43 @@ public struct StreamingMarkdownView: View {
     /// glyph reveal). The host gates this (e.g. off for Reduce Motion).
     public var fadesAppendedText: Bool
 
+    /// Renders a model-written widget: a fenced block tagged `genui`. Gets the
+    /// fence body, whether its closing fence has arrived, and the block's index.
+    /// Return nil to show the block as code instead — no renderer, or a body
+    /// that is not a widget. The renderer lives in the host because it is a web
+    /// view over the host's bundled runtime; this package stays app-agnostic.
+    public var widget: ((_ source: String, _ isComplete: Bool, _ index: Int) -> AnyView?)?
+
+    /// ChatGPT's breathing dot after the last word while the answer streams.
+    /// Drawn only when the last block is prose.
+    public var showsTypingDot: Bool
+
     public init(markdown: String, theme: MarkdownTheme = .oak(), isStreaming: Bool = false,
                 fadesAppendedText: Bool = false,
+                showsTypingDot: Bool = false,
                 onOpenURL: ((URL) -> Bool)? = nil,
-                linkPreview: ((URL, String) -> AnyView?)? = nil) {
+                linkPreview: ((URL, String) -> AnyView?)? = nil,
+                widget: ((_ source: String, _ isComplete: Bool, _ index: Int) -> AnyView?)? = nil) {
         self.markdown = markdown
         self.theme = theme
         self.isStreaming = isStreaming
         self.fadesAppendedText = fadesAppendedText
         self.onOpenURL = onOpenURL
         self.linkPreview = linkPreview
+        self.widget = widget
+        self.showsTypingDot = showsTypingDot
     }
 
     public var body: some View {
         let blocks = MarkdownBlockSplitter.split(markdown)
+        let lastID = blocks.last?.id
         VStack(alignment: .leading, spacing: theme.paragraphSpacing) {
             ForEach(blocks) { block in
                 BlockRow(block: block, theme: theme,
                          streaming: isStreaming && !block.isSettled,
                          fadesAppendedText: fadesAppendedText,
-                         onOpenURL: onOpenURL, linkPreview: linkPreview)
+                         typingDot: showsTypingDot && isStreaming && block.id == lastID,
+                         onOpenURL: onOpenURL, linkPreview: linkPreview, widget: widget)
                     .equatable()
             }
         }
@@ -59,14 +76,17 @@ private struct BlockRow: View, Equatable {
     let theme: MarkdownTheme
     let streaming: Bool
     let fadesAppendedText: Bool
+    let typingDot: Bool
     // Excluded from `==`: the handler is stable per host, and a closure isn't
     // Equatable. Only block text/kind and streaming state drive re-rendering.
     var onOpenURL: ((URL) -> Bool)?
     var linkPreview: ((URL, String) -> AnyView?)?
+    var widget: ((String, Bool, Int) -> AnyView?)?
 
     static func == (lhs: BlockRow, rhs: BlockRow) -> Bool {
         lhs.block == rhs.block && lhs.streaming == rhs.streaming
             && lhs.fadesAppendedText == rhs.fadesAppendedText
+            && lhs.typingDot == rhs.typingDot
     }
 
     @ViewBuilder
@@ -82,12 +102,18 @@ private struct BlockRow: View, Equatable {
                     theme: theme),
                 selectable: !streaming,
                 animatesAppendedText: streaming && fadesAppendedText,
+                showsTypingDot: typingDot,
                 onOpenURL: onOpenURL,
                 linkPreview: linkPreview,
                 linkHoverUnderline: theme.linkHoverUnderline
             )
         case .code(let language):
-            CodeBlockView(code: CodeFence.strip(block.text), language: language, theme: theme)
+            if language?.lowercased() == CodeFence.widgetLanguage,
+               let view = widget?(CodeFence.strip(block.text), CodeFence.isClosed(block.text), block.id) {
+                view
+            } else {
+                CodeBlockView(code: CodeFence.strip(block.text), language: language, theme: theme)
+            }
         case .mathDisplay:
             MathBlockView(latex: MathDelimiters.stripDisplay(block.text), theme: theme)
         case .table:
@@ -99,6 +125,18 @@ private struct BlockRow: View, Equatable {
 }
 
 enum CodeFence {
+    /// Fence tag of a model-written widget.
+    static let widgetLanguage = "genui"
+
+    /// True once the block's closing fence has arrived.
+    static func isClosed(_ text: String) -> Bool {
+        let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        guard lines.count >= 2, let last = lines.last else { return false }
+        return last.hasPrefix("```") || last.hasPrefix("~~~")
+    }
+
     /// Drop the opening ```/~~~ (with language) and the closing fence line.
     static func strip(_ text: String) -> String {
         var lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
