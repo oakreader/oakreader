@@ -54,7 +54,10 @@ struct NoteComposerBox: View {
     /// Slack-style: the inline-format row (B/I/U/S, link, lists, quote, code) is
     /// collapsed by default and toggled by the `Aa` button on the action row, so
     /// the always-visible bar stays a clean capture surface (#, @, image, send).
-    @State private var showFormatBar = false
+    /// Whether the formatting bar is open. Remembered app-wide, like Slack's
+    /// "Show formatting": open it once and every composer — a new note, another
+    /// document, the next launch — opens with it.
+    @AppStorage("noteComposerShowsFormatBar") private var showFormatBar = false
     @State private var showLink = false
     @State private var linkURL = ""
     @FocusState private var linkFieldFocused: Bool
@@ -227,13 +230,32 @@ struct NoteComposerBox: View {
     /// own capture actions (#, @, image), then count/cancel/send.
     private var toolbar: some View {
         HStack(spacing: 2) {
-            toolButton("textformat", active: showFormatBar) {
+            Button {
                 // Bounded easeOut, never a spring: a spring's long settling tail keeps
                 // re-rendering the view graph, which on a non-base locale snowballs into
                 // the SF-Symbol accessibility CPU-peg (see [[sfsymbol-a11y-locale-hang]]).
                 withAnimation(.easeOut(duration: 0.12)) { showFormatBar.toggle() }
+            } label: {
+                Image(systemName: "textformat")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 26, height: 24)
+                    // Slack marks "Show formatting" as on with a line under "Aa", not a
+                    // fill: the fill is how the format buttons say "this text is bold",
+                    // and the toggle is a different kind of state.
+                    .overlay(alignment: .bottom) {
+                        if showFormatBar {
+                            Capsule()
+                                .fill(Color.secondary)
+                                .frame(width: 15, height: 1.5)
+                                .offset(y: -3)
+                        }
+                    }
+                    .contentShape(Rectangle())
+                    .accessibilityHidden(true)
             }
-            .help("Formatting")
+            .buttonStyle(ToolButtonStyle())
+            .help(showFormatBar ? "Hide formatting" : "Show formatting")
 
             toolButton("number") { controller.cmd("tag") }
                 .help("Tag")
