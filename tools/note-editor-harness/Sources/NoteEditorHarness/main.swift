@@ -254,7 +254,8 @@ var failures = 0
              check("S38 *x* becomes italic", r.md, "a *x*")
              r.tv.undoManager?.undo()
              check("S38b undo brings back the typed *x*", r.tv.string, "a *x*")
-             checkTrue("S38c ... as plain text, not italic", !(r.tv.textStorage!.attribute(.font, at: 3, effectiveRange: nil) as! NSFont).fontDescriptor.symbolicTraits.contains(.italic)) }
+             let font = r.tv.textStorage?.attribute(.font, at: 3, effectiveRange: nil) as? NSFont
+             checkTrue("S38c ... as plain text, not italic", font?.fontDescriptor.symbolicTraits.contains(.italic) == false) }
 
         do { let r = Rig(""); r.cmd("codeBlock"); r.type("a"); r.ret(); r.ret(); r.type("b")
              check("S39 one empty line stays in the code block", r.md, "```\na\n\nb\n```")

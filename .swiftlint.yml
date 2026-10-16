@@ -25,6 +25,8 @@ excluded:
   # build phase for minutes while emitting thousands of violations for code we
   # do not own.
   - .claude
+  # Same reason: the note-editor harness's SwiftPM build checks out vendored packages.
+  - tools/note-editor-harness/.build
 
 identifier_name:
   min_length: 1
