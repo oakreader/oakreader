@@ -111,11 +111,10 @@ enum OakStyle {
         static let skillTint = Color(nsColor: skillTintNS)
 
         // A skill, wherever it appears: the token in the composer and the badge
-        // on a sent message. Blue text and glyph on nothing — the words are the
-        // chip, so a fill behind them only boxes in something already legible.
-        // The system accent rather than a muted blend, because without a fill a
-        // dulled blue reads as disabled.
-        static let skillChipNS = NSColor.controlAccentColor
+        // on a sent message. Grey text and glyph on nothing, the same colour as
+        // the sent badge (`.secondary`), so a skill looks the same before and
+        // after it is sent.
+        static let skillChipNS = NSColor.secondaryLabelColor
         static let skillChip = Color(nsColor: skillChipNS)
 
         // A library reference, which is passive context rather than a command:

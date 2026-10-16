@@ -75,7 +75,7 @@ private final class ChatTokenCell: NSTextAttachmentCell {
     // MARK: - Drawing
 
     override func draw(withFrame cellFrame: NSRect, in controlView: NSView?) {
-        // A skill is a command: blue words and glyph, no fill. A library
+        // A skill is a command: grey words and glyph, no fill. A library
         // reference is passive context, so it keeps a quiet grey chip — the
         // difference in weight is the difference in what they do. Both mirror
         // the sent-message badges exactly (ChatBubbleView).

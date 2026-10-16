@@ -461,9 +461,8 @@ struct ChatBubbleView: View, Equatable {
 
     private func skillBadge(_ skillId: String) -> some View {
         let skill = SkillStore.shared.skill(matching: skillId)
-        // Grey, unlike the blue chip in the composer (ChatTokenAttachment). There
-        // the colour confirms, while typing, that the skill was recognised; once
-        // sent it is history, and an accent-coloured label became the loudest
+        // Grey, the same colour as the composer chip (ChatTokenAttachment,
+        // `OakStyle.Colors.skillChip`). An accent-coloured label was the loudest
         // thing in the thread.
         return HStack(spacing: 3) {
             Image(systemName: skill?.symbolName ?? "sparkles")
