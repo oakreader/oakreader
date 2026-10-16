@@ -587,6 +587,13 @@ private struct CommentCardView: View {
                     .accessibilityLabel(Text("More"))
             }
             .buttonStyle(.plain)
+            // Shown only while the pointer is on the card, as Slack shows a
+            // message's actions: a column of ⋯ on every card was chrome the reader
+            // looks past. It stays while its menu is open, since the menu takes the
+            // pointer off the card. Faded rather than removed, so the header never
+            // shifts when it appears.
+            .opacity(isHovering || showActions ? 1 : 0)
+            .animation(.easeOut(duration: 0.12), value: isHovering || showActions)
             // Pop a REAL `NSMenu` from the button (not a SwiftUI `Menu`, which
             // mis-frames inside the scrolling card list, nor a hand-rolled popover,
             // which can't match the system look). A manual `popUp` is positioned at

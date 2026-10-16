@@ -1,0 +1,1 @@
+../../../../app/Views/RightPanel/Comments/NoteEditor/NoteEditorTextView+Paste.swift

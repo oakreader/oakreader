@@ -128,11 +128,20 @@ struct ChatCompletionItem: Identifiable, Equatable {
     }
 
     /// Matches a filter query against label and description (case-insensitive).
-    func matches(query: String) -> Bool {
+    /// How well this item matches `query`: 0 prefix of a name, 1 a word in a
+    /// name starts with it, 2 a name contains it, 3 only the description does.
+    /// nil when it does not match at all.
+    func matchRank(query: String) -> Int? {
         let q = query.lowercased()
-        return displayText.lowercased().contains(q)
-            || displayLabel.lowercased().contains(q)
-            || label.lowercased().contains(q)
-            || description.lowercased().contains(q)
+        let names = [displayText, displayLabel, label].map { $0.lowercased() }
+        if names.contains(where: { $0.hasPrefix(q) }) { return 0 }
+        let wordStart = names.contains { name in
+            name.split(whereSeparator: { !$0.isLetter && !$0.isNumber }).contains { $0.hasPrefix(q) }
+        }
+        if wordStart { return 1 }
+        if names.contains(where: { $0.contains(q) }) { return 2 }
+        if description.lowercased().contains(q) { return 3 }
+        return nil
     }
+
 }

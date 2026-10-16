@@ -34,9 +34,29 @@ final class NoteEditorTextView: NSTextView {
     /// Re-entrancy guard for the math restyle pass (see `NoteEditorTextView+Math`).
     /// `internal` so that extension — in a separate file — can read it.
     var isRestylingMath = false
-    /// Cheap (text + selection) fingerprint of the last math pass, so the 2–3 calls
-    /// a single command fires — and no-op caret moves — skip the expensive rescan.
-    var lastMathSignature = ""
+    /// Bumped once per text change. With the selection it fingerprints the last math
+    /// pass in O(1), so the 2–3 calls a single command fires — and no-op caret
+    /// moves — skip the rescan without hashing the whole note on every keystroke.
+    private(set) var editGeneration = 0
+    var lastMathSignature: (generation: Int, selection: NSRange)?
+    /// Whether the last math pass left any collapsed run behind (so the no-`$` fast
+    /// path still knows to clean up after a deleted delimiter).
+    var hasCollapsedMath = false
+
+    /// Whether the host shows a live character count. Counting grapheme clusters
+    /// walks the whole note, so the create composer (which shows no count) skips it.
+    var reportsCharCount = true
+
+    /// Quote/code decorations from the previous change, so a repaint also erases a
+    /// box that just disappeared.
+    private var hadBlockDecorations = false
+    /// Set by `measureVisualContentHeight`, which already walks the decorations.
+    private var hasBlockDecorations = false
+
+    /// The last markdown shortcut this editor applied (Slack parity): Backspace right
+    /// after it restores the literal characters the user typed. Cleared by any other
+    /// edit or caret move.
+    private var lastAutoFormat: (range: NSRange, literal: NSAttributedString)?
 
     /// A quote/code block toggled on an *empty* paragraph lives only in
     /// `typingAttributes` — an empty line has no character to hold the `.oakBlock`
@@ -46,7 +66,7 @@ final class NoteEditorTextView: NSTextView {
     /// here and re-arm it whenever the caret is back on an empty line, until a real
     /// character anchors it. Lists don't need this — their inserted marker run is a
     /// real character that already carries the block.
-    private var pendingEmptyBlock: NoteBlock?
+    var pendingEmptyBlock: NoteBlock?
 
     /// Active `ChatCompletionPanel` (the same component the chat composer uses) and
     /// the trigger char + its location, so a selection can replace `<trigger><query>`.
@@ -67,16 +87,27 @@ final class NoteEditorTextView: NSTextView {
 
     // MARK: Change plumbing
 
+    /// Runs once per text change. Keep it cheap: it sits on the keystroke path.
     func handleTextChange() {
-        restyleMath()
-        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
-        onChange?(trimmed.isEmpty, string.count)
+        editGeneration &+= 1
+        lastAutoFormat = nil
+        renumberOrderedLists()
+        // Slack's TextChangeQueue skips its formatting pass while an IME composition
+        // is open and runs it on `compositionend`. Restyling marked text mid-pinyin
+        // fights the input method, so math waits for the committed text here too.
+        if !hasMarkedText() { restyleMath() }
+        let ns = string as NSString
+        let empty = ns.rangeOfCharacter(from: CharacterSet.whitespacesAndNewlines.inverted).location == NSNotFound
+        onChange?(empty, reportsCharCount ? string.count : 0)
         reportHeight()
         // Block decorations (quote/code fills + the code border) are drawn full-width
         // and a few points beyond the glyphs, so AppKit's per-edit glyph-rect
         // invalidation doesn't cover them — a reflow or toggle leaves a stale "ghost"
-        // box behind. Force a full repaint so only the current decoration is drawn.
-        needsDisplay = true
+        // box behind. Repaint the whole view, but only when a box exists or just went
+        // away; plain prose relies on AppKit's own per-line invalidation.
+        if hasBlockDecorations || hadBlockDecorations || pendingEmptyBlock != nil { needsDisplay = true }
+        hadBlockDecorations = hasBlockDecorations
+        if completionPanel != nil, !hasMarkedText() { updateFilter() }
         reconcileScrollPosition()
         DispatchQueue.main.async { [weak self] in self?.reconcileScrollPosition() }
     }
@@ -125,9 +156,13 @@ final class NoteEditorTextView: NSTextView {
         lm.ensureLayout(for: tc)
         let used = lm.usedRect(for: tc)
         var maxY = used.maxY
+        hasBlockDecorations = false
         if let lm = lm as? NoteTagLayoutManager {
             let decorations = lm.blockDecorationBoundingRect()
-            if !decorations.isNull { maxY = max(maxY, decorations.maxY) }
+            if !decorations.isNull {
+                maxY = max(maxY, decorations.maxY)
+                hasBlockDecorations = true
+            }
         }
         let height = ceil(maxY + textContainerInset.height * 2)
         visualContentHeight = height
@@ -207,11 +242,51 @@ final class NoteEditorTextView: NSTextView {
         lm.drawBlockSurface(pb, box: box, fullWidth: container.size.width, origin: origin)
     }
 
+    // MARK: Formatting shortcuts (Slack's `getFormattingBindings`)
+
+    /// ⌘B bold · ⌘I italic · ⌘⇧X strikethrough · ⌘⇧C inline code ·
+    /// ⌘⇧7 numbered list · ⌘⇧8 bulleted list · ⌘⇧9 quote · ⌘⌥⇧C code block.
+    /// Matched by key code, as Slack does, so they work on any keyboard layout.
+    /// Only while this editor has focus; ⌘B/⌘I go through `runCommand` rather
+    /// than the font panel so the toolbar's active state follows.
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        guard window?.firstResponder === self, !hasMarkedText() else { return super.performKeyEquivalent(with: event) }
+        let mods = event.modifierFlags.intersection([.command, .shift, .option, .control])
+        let command: String?
+        switch (mods, event.keyCode) {
+        case ([.command], 11): command = "bold"            // B
+        case ([.command], 34): command = "italic"          // I
+        case ([.command, .shift], 7): command = "strikethrough"   // X
+        case ([.command, .shift], 8): command = "code"     // C
+        case ([.command, .shift], 26): command = "orderedList"    // 7
+        case ([.command, .shift], 28): command = "bulletList"     // 8
+        case ([.command, .shift], 25): command = "quote"   // 9
+        case ([.command, .option, .shift], 8): command = "codeBlock"   // C
+        default: command = nil
+        }
+        guard let command else { return super.performKeyEquivalent(with: event) }
+        // Inline marks do not apply inside literal code (the toolbar disables them too).
+        let inline = ["bold", "italic", "strikethrough", "code"].contains(command)
+        if inline, caretBlock() == .code { return true }
+        runCommand(command)
+        return true
+    }
+
     // MARK: Key handling + completion triggers
 
     override func keyDown(with event: NSEvent) {
+        // An open IME composition (pinyin, kana, …) owns every key: Return and Space
+        // commit or pick a candidate there. Intercepting them saved a half-typed note
+        // or ended a `#` tag on the raw pinyin. Slack's keyboard module skips its
+        // bindings while composing for the same reason.
+        if hasMarkedText() { super.keyDown(with: event); return }
+
         // Route to the completion panel first when it's open.
         if completionPanel != nil, handleCompletionKey(event) { return }
+
+        // Backspace right after a markdown shortcut restores what was typed.
+        if event.keyCode == 51, event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty,
+           revertLastAutoFormat() || removeBlockAtCaretIfAtStart() { return }
 
         // Return is block-aware. Plain Return is quick-capture (save) in prose, but
         // inside a code block / list / quote it adds or continues a line instead —
@@ -225,9 +300,27 @@ final class NoteEditorTextView: NSTextView {
             if mods.contains(.shift) { insertSoftParagraph(); return }
             switch caretBlock() {
             case .code:
-                if caretParagraphIsEmpty() { exitCurrentBlock() } else { insertNewline(nil) }
-            case .bullet, .ordered, .quote:
+                // Slack's "code exit": a code block may hold one blank line; Return on
+                // a second consecutive blank line leaves the block and drops the
+                // extra blank. Exiting on the first blank made blank lines in code
+                // impossible.
+                if caretParagraphIsEmpty(), removePrecedingBlankLine(in: .code) {
+                    exitCurrentBlock()
+                } else {
+                    insertNewline(nil)
+                    typingAttributes = blockTypingAttributes(.code)
+                    pendingEmptyBlock = caretParagraphIsEmpty() ? .code : nil
+                }
+            case .bullet, .ordered:
                 if caretParagraphIsEmpty() { exitCurrentBlock() } else { continueBlock(caretBlock()) }
+            case .quote:
+                // Slack exits a quote, like a code block, on the second blank line, so
+                // one quote can hold several paragraphs.
+                if caretParagraphIsEmpty(), removePrecedingBlankLine(in: .quote) {
+                    exitCurrentBlock()
+                } else {
+                    continueBlock(.quote)
+                }
             case .paragraph, .h1, .h2, .h3:
                 onSubmit?()
             }
@@ -245,47 +338,219 @@ final class NoteEditorTextView: NSTextView {
             case "#" where atWordBoundary(selectedRange().location):
                 super.keyDown(with: event); showPanel(trigger: "#"); return
             case " ":
-                // Markdown input rule: a space may complete a `- `/`* `/`1. ` list
-                // prefix — insert it first, then convert if the line now matches.
-                super.keyDown(with: event); applyListInputRuleIfNeeded(); return
+                // Markdown input rule: a space may complete a `- `/`1. `/`> `/`# `
+                // block prefix — insert it first, then convert if the line now matches.
+                super.keyDown(with: event); applyBlockInputRuleIfNeeded(); return
+            case "`", "*", "_", "~":
+                // A closing marker may complete an inline shortcut (`code`, **bold**,
+                // *italic*, ~~strike~~) or a ``` code-block fence.
+                super.keyDown(with: event); applyInlineInputRuleIfNeeded(chars.first!); return
             default: break
             }
         }
         super.keyDown(with: event)
     }
 
-    /// Input rule (Notion/Bear/CommonMark parity): typing `- `, `* `, `+ ` or `N. ` at
-    /// the very start of a plain paragraph turns it into a bullet / ordered list. Runs
-    /// after the space is inserted; a no-op unless the whole line is exactly that prefix
-    /// and the line isn't already inside a list/quote/code block. We delete the typed
-    /// markers and route through `runCommand` so the result is identical to using the
-    /// toolbar / `/` menu (real marker run + block attributes), never a ghost bullet.
-    private func applyListInputRuleIfNeeded() {
+    /// Block input rule (Slack/Notion/Bear parity): typing `- `, `* `, `+ `, `N. `,
+    /// `> `, `# `, `## ` or `### ` at the very start of a plain paragraph turns it into
+    /// the matching block. Runs after the space is inserted; a no-op unless the whole
+    /// line is exactly that prefix and the line isn't already inside another block. We
+    /// delete the typed markers and route through `runCommand`/`toggleBlock` so the
+    /// result is identical to using the toolbar or `/` menu (real marker run + block
+    /// attributes), never a ghost bullet.
+    private func applyBlockInputRuleIfNeeded() {
         guard let ts = textStorage else { return }
         let sel = selectedRange()
         guard sel.length == 0 else { return }
         let ns = string as NSString
         let para = ns.paragraphRange(for: sel)
         let prefixLen = sel.location - para.location
-        guard prefixLen > 0 else { return }
+        guard prefixLen > 0, prefixLen <= 4 else { return }
         // Don't fire inside an existing non-paragraph block.
         if let raw = ts.attribute(.oakBlock, at: para.location, effectiveRange: nil) as? Int,
            raw != NoteBlock.paragraph.rawValue { return }
         let prefix = ns.substring(with: NSRange(location: para.location, length: prefixLen))
         let target: NoteBlock
-        if prefix == "- " || prefix == "* " || prefix == "+ " {
-            target = .bullet
-        } else if prefix.range(of: #"^\d+\.\s$"#, options: .regularExpression) != nil {
+        switch prefix {
+        case "- ", "* ", "+ ": target = .bullet
+        case "> ": target = .quote
+        case "# ": target = .h1
+        case "## ": target = .h2
+        case "### ": target = .h3
+        default:
+            guard prefix.range(of: #"^\d+\.\s$"#, options: .regularExpression) != nil else { return }
             target = .ordered
-        } else {
-            return
         }
+        let literal = ts.attributedSubstring(from: NSRange(location: para.location, length: prefixLen))
+        beginShortcutUndoStep()
         guard shouldChangeText(in: NSRange(location: para.location, length: prefixLen), replacementString: "") else { return }
         ts.replaceCharacters(in: NSRange(location: para.location, length: prefixLen), with: "")
         setSelectedRange(NSRange(location: para.location, length: 0))
         didChangeText()
-        runCommand(target == .bullet ? "bulletList" : "orderedList")
+        switch target {
+        case .bullet: runCommand("bulletList")
+        case .ordered: runCommand("orderedList")
+        default:
+            toggleBlock(target)
+            handleTextChange()
+            reportActiveFormats()
+        }
+        // Backspace now undoes the conversion. Lists insert a marker run, so the
+        // block's own text starts after it; quote/heading start at the paragraph.
+        let blockStart = selectedRange().location
+        lastAutoFormat = (NSRange(location: para.location, length: blockStart - para.location), literal)
     }
+
+    /// Inline input rule (Slack parity): typing the closing marker of `` `code` ``,
+    /// `**bold**`, `*italic*`, `_italic_` or `~~strike~~` converts the run, and
+    /// ```` ``` ```` alone on a line opens a code block. Like Slack, the rule only
+    /// looks at the current paragraph up to the caret, never the whole note, and
+    /// never fires inside code.
+    private func applyInlineInputRuleIfNeeded(_ marker: Character) {
+        guard let ts = textStorage, !hasMarkedText() else { return }
+        let sel = selectedRange()
+        guard sel.length == 0, sel.location > 0 else { return }
+        let ns = string as NSString
+        let para = ns.paragraphRange(for: NSRange(location: sel.location - 1, length: 0))
+        let head = NSRange(location: para.location, length: sel.location - para.location)
+        let line = ns.substring(with: head)
+        let block = caretBlock()
+        guard block != .code else { return }
+
+        // ``` on an otherwise empty plain paragraph → code block.
+        if marker == "`", line == "```", block == .paragraph {
+            let literal = ts.attributedSubstring(from: head)
+            beginShortcutUndoStep()
+            guard shouldChangeText(in: head, replacementString: "") else { return }
+            ts.replaceCharacters(in: head, with: "")
+            setSelectedRange(NSRange(location: para.location, length: 0))
+            didChangeText()
+            runCommand("codeBlock")
+            lastAutoFormat = (NSRange(location: para.location, length: 0), literal)
+            return
+        }
+
+        guard let rule = Self.inlineRules.first(where: { $0.marker == marker && $0.matches(line) }),
+              let match = rule.regex.firstMatch(in: line, range: NSRange(location: 0, length: (line as NSString).length))
+        else { return }
+        let whole = NSRange(location: head.location + match.range.location, length: match.range.length)
+        let content = NSRange(location: head.location + match.range(at: 1).location, length: match.range(at: 1).length)
+        guard content.length > 0, !containsAtomicRun(whole) else { return }
+
+        let literal = ts.attributedSubstring(from: whole)
+        let styled = NSMutableAttributedString(attributedString: ts.attributedSubstring(from: content))
+        let all = NSRange(location: 0, length: styled.length)
+        switch rule.format {
+        case .bold, .italic:
+            let trait: NSFontDescriptor.SymbolicTraits = rule.format == .bold ? .bold : .italic
+            styled.enumerateAttribute(.font, in: all, options: []) { value, r, _ in
+                let f = (value as? NSFont) ?? NoteEditorStyle.baseFont
+                styled.addAttribute(.font, value: f.withToggledTrait(trait, on: true), range: r)
+            }
+        case .strike:
+            styled.addAttribute(.strikethroughStyle, value: NSUnderlineStyle.single.rawValue, range: all)
+        case .code:
+            styled.addAttributes([.oakInlineCode: true, .font: NoteEditorStyle.monoFont], range: all)
+        }
+        beginShortcutUndoStep()
+        guard shouldChangeText(in: whole, replacementString: styled.string) else { return }
+        ts.replaceCharacters(in: whole, with: styled)
+        setSelectedRange(NSRange(location: whole.location + styled.length, length: 0))
+        // Text typed after the run is plain again (Slack's afterTextChangeQueue
+        // turns the applied format off at the caret).
+        typingAttributes = blockTypingAttributes(caretBlock())
+        didChangeText()
+        reportActiveFormats()
+        lastAutoFormat = (NSRange(location: whole.location, length: styled.length), literal)
+    }
+
+    /// Make the shortcut about to be applied its own undo step, apart from the
+    /// typing that triggered it — so ⌘Z after `*x*` → *x* brings back `*x*`, not
+    /// an empty line. Slack sets Quill's history delay to 0 around markdown for
+    /// the same result. Typing and conversion share one key event, so the
+    /// event's undo group is closed and a fresh one opened.
+    private func beginShortcutUndoStep() {
+        breakUndoCoalescing()
+        guard let um = undoManager, um.groupingLevel > 0 else { return }
+        um.endUndoGrouping()
+        um.beginUndoGrouping()
+    }
+
+    /// Backspace straight after a shortcut: put back the characters the user typed
+    /// (Slack restores the literal markers). Returns false when there is nothing to
+    /// revert, so Backspace deletes normally.
+    private func revertLastAutoFormat() -> Bool {
+        guard let last = lastAutoFormat, let ts = textStorage,
+              NSMaxRange(last.range) <= ts.length,
+              selectedRange() == NSRange(location: NSMaxRange(last.range), length: 0),
+              shouldChangeText(in: last.range, replacementString: last.literal.string) else { return false }
+        lastAutoFormat = nil
+        let wasBlock = caretBlock() != .paragraph
+        ts.replaceCharacters(in: last.range, with: last.literal)
+        let restored = NSRange(location: last.range.location, length: last.literal.length)
+        if wasBlock {
+            // A block shortcut: the line goes back to a plain paragraph with its prefix.
+            let para = (string as NSString).paragraphRange(for: restored)
+            NoteEditorStyle.applyBlock(.paragraph, to: ts, range: para)
+            ts.addAttribute(.font, value: NoteEditorStyle.baseFont, range: para)
+            ts.addAttribute(.foregroundColor, value: NSColor.labelColor, range: para)
+            ts.removeAttribute(.backgroundColor, range: para)
+            pendingEmptyBlock = nil
+        }
+        setSelectedRange(NSRange(location: NSMaxRange(restored), length: 0))
+        typingAttributes = blockTypingAttributes(caretBlock())
+        didChangeText()
+        reportActiveFormats()
+        return true
+    }
+
+    /// Tags, references, links and math are single tokens; a shortcut must not split
+    /// or restyle them.
+    private func containsAtomicRun(_ range: NSRange) -> Bool {
+        guard let ts = textStorage else { return true }
+        var found = false
+        ts.enumerateAttributes(in: range, options: []) { attrs, _, stop in
+            if attrs[.oakTag] != nil || attrs[.link] != nil || attrs[.oakMath] != nil
+                || attrs[.oakInlineCode] != nil || attrs[.oakListMarker] != nil {
+                found = true; stop.pointee = true
+            }
+        }
+        return found
+    }
+
+    private enum InlineFormat { case bold, italic, strike, code }
+
+    private struct InlineRule {
+        let marker: Character
+        let format: InlineFormat
+        let regex: NSRegularExpression
+        /// Cheap suffix test before the regex runs.
+        let suffix: String
+        func matches(_ line: String) -> Bool { line.hasSuffix(suffix) }
+    }
+
+    /// Ordered: `**bold**` must win over `*italic*`. Content may not start or end
+    /// with a space (so "2 * 3 * 4" stays math), and `_` needs a non-word char
+    /// before it (so snake_case_names stay literal).
+    // swiftlint:disable force_try
+    private static let inlineRules: [InlineRule] = [
+        InlineRule(marker: "*", format: .bold,
+                   regex: try! NSRegularExpression(pattern: #"(?<![*\\])\*\*(?!\s)([^*]+?)(?<!\s)\*\*$"#),
+                   suffix: "**"),
+        InlineRule(marker: "*", format: .italic,
+                   regex: try! NSRegularExpression(pattern: #"(?<![*\\])\*(?![\s*])([^*]+?)(?<![\s*])\*$"#),
+                   suffix: "*"),
+        InlineRule(marker: "_", format: .italic,
+                   regex: try! NSRegularExpression(pattern: #"(?<![_\w\\])_(?![\s_])([^_]+?)(?<![\s_])_$"#),
+                   suffix: "_"),
+        InlineRule(marker: "~", format: .strike,
+                   regex: try! NSRegularExpression(pattern: #"(?<![~\\])~~(?!\s)([^~]+?)(?<!\s)~~$"#),
+                   suffix: "~~"),
+        InlineRule(marker: "`", format: .code,
+                   regex: try! NSRegularExpression(pattern: #"(?<![`\\])`([^`]+)`$"#),
+                   suffix: "`"),
+    ]
+    // swiftlint:enable force_try
 
     /// Toolbar `#`/`@` buttons: insert the trigger char, then open the panel —
     /// identical to typing it, so selection consumes `<trigger><query>`.
@@ -348,7 +613,13 @@ final class NoteEditorTextView: NSTextView {
         default:
             if let c = event.characters, !c.isEmpty {
                 // Space ends a `#` tag (create-from-query); otherwise just filters.
-                if c == " ", triggerChar == "#" { createTagFromQuery(); return true }
+                // A query of only `#`s is a heading prefix, not a tag: close the panel
+                // and let the space through so `# `/`## `/`### ` can become a heading
+                // (before, the space was swallowed and `##` became a tag named "#").
+                if c == " ", triggerChar == "#" {
+                    if tagQueryIsHeadingPrefix() { dismissPanel(); return false }
+                    createTagFromQuery(); return true
+                }
                 super.keyDown(with: event); updateFilter(); return true
             }
             return false
@@ -419,6 +690,12 @@ final class NoteEditorTextView: NSTextView {
             let refId = String(id.dropFirst("ref:".count))
             replace(range, with: referenceToken(label: refLabel(item.label), href: NoteLink.href(refId)))
         }
+    }
+
+    /// Whether the text typed after the `#` trigger is empty or more `#`s.
+    private func tagQueryIsHeadingPrefix() -> Bool {
+        let query = (string as NSString).substring(with: triggerRange).dropFirst()
+        return query.allSatisfy { $0 == "#" }
     }
 
     private func createTagFromQuery() {
@@ -500,7 +777,7 @@ final class NoteEditorTextView: NSTextView {
         }
     }
 
-    private func linkAttributes(_ url: String) -> [NSAttributedString.Key: Any] {
+    func linkAttributes(_ url: String) -> [NSAttributedString.Key: Any] {
         var attrs: [NSAttributedString.Key: Any] = [
             .font: NoteEditorStyle.baseFont,
             .foregroundColor: NoteEditorStyle.accent,
@@ -521,12 +798,21 @@ final class NoteEditorTextView: NSTextView {
     // MARK: Code-context exclusivity (Slack parity)
 
     /// The block kind at the caret (falls back to typing attributes when empty).
-    private func caretBlock() -> NoteBlock {
+    /// The block of the caret's own paragraph, read from that paragraph's first
+    /// character. An empty last line has no character: its block is the pending
+    /// block or the typing attributes. Reading the character before the caret, as
+    /// this did, took the block of the line ABOVE an empty last line — so Return on
+    /// a fresh empty quote line was treated as prose and saved the note.
+    func caretBlock() -> NoteBlock {
         if let ts = textStorage, ts.length > 0 {
-            let loc = max(0, min(selectedRange().location, ts.length - 1))
-            if let raw = ts.attribute(.oakBlock, at: loc, effectiveRange: nil) as? Int,
+            let loc = min(selectedRange().location, ts.length)
+            let para = (string as NSString).paragraphRange(for: NSRange(location: loc, length: 0))
+            if para.location < ts.length, para.length > 0,
+               let raw = ts.attribute(.oakBlock, at: para.location, effectiveRange: nil) as? Int,
                let b = NoteBlock(rawValue: raw) { return b }
+            if para.length > 0 { return .paragraph }
         }
+        if let pending = pendingEmptyBlock { return pending }
         if let raw = typingAttributes[.oakBlock] as? Int, let b = NoteBlock(rawValue: raw) { return b }
         return .paragraph
     }
@@ -664,12 +950,14 @@ final class NoteEditorTextView: NSTextView {
             range = NSRange(location: range.location, length: range.length + m.length)
         }
 
-        NoteEditorStyle.applyBlock(target, to: ts, range: range)
-        if target == .paragraph {
-            ts.addAttribute(.font, value: NoteEditorStyle.baseFont, range: range)
-            ts.removeAttribute(.backgroundColor, range: range)
-            ts.addAttribute(.foregroundColor, value: NSColor.labelColor, range: range)
+        // Leaving a heading, code or quote block: undo what that block implied.
+        // Before, only a switch to plain text reset anything — and it reset every
+        // font, erasing the user's bold — while heading → list kept the heading
+        // weight, which then saved as `- **Title**`.
+        if let current, let old = NoteBlock(rawValue: current), old != target {
+            resetImpliedStyle(of: old, in: range)
         }
+        NoteEditorStyle.applyBlock(target, to: ts, range: range)
         // Continue the block when typing onward (esp. toggled on an empty line).
         typingAttributes = blockTypingAttributes(target)
         // If we toggled a quote/code block onto an empty line, remember it so a click
@@ -679,7 +967,7 @@ final class NoteEditorTextView: NSTextView {
     }
 
     /// Typing attributes matching a block so text typed after a toggle inherits it.
-    private func blockTypingAttributes(_ block: NoteBlock) -> [NSAttributedString.Key: Any] {
+    func blockTypingAttributes(_ block: NoteBlock) -> [NSAttributedString.Key: Any] {
         var attrs: [NSAttributedString.Key: Any] = [
             .paragraphStyle: NoteEditorStyle.paragraphStyle(block),
             .oakBlock: block.rawValue,
@@ -812,9 +1100,126 @@ final class NoteEditorTextView: NSTextView {
             ts.addAttribute(.foregroundColor, value: NSColor.labelColor, range: para)
             ts.removeAttribute(.backgroundColor, range: para)
         }
+        // Without this the selection-change pass (`maintainPendingBlock`) re-arms
+        // the quote/code block on the empty line, and the next keystroke lands in
+        // the block the user just left.
+        pendingEmptyBlock = nil
         typingAttributes = blockTypingAttributes(.paragraph)
         didChangeText()
         reportActiveFormats()
+    }
+
+    /// When the line above the caret is an empty line of `block`, delete it and
+    /// return true: the caret's line is then the second blank in a row.
+    private func removePrecedingBlankLine(in block: NoteBlock) -> Bool {
+        guard let ts = textStorage else { return false }
+        let ns = string as NSString
+        let para = ns.paragraphRange(for: selectedRange())
+        guard para.location > 0 else { return false }
+        let prev = ns.paragraphRange(for: NSRange(location: para.location - 1, length: 0))
+        let text = ns.substring(with: prev).trimmingCharacters(in: .newlines)
+        guard text.isEmpty,
+              ts.attribute(.oakBlock, at: prev.location, effectiveRange: nil) as? Int == block.rawValue,
+              shouldChangeText(in: prev, replacementString: "") else { return false }
+        ts.replaceCharacters(in: prev, with: "")
+        setSelectedRange(NSRange(location: prev.location, length: 0))
+        didChangeText()
+        return true
+    }
+
+    /// Backspace at the very start of a list item, quote, heading or code line:
+    /// drop the block and keep the text, as Slack's keyboard module does. Before,
+    /// the protected marker run swallowed the key and nothing happened, so a bullet
+    /// could not be deleted. Returns false when the caret is not at a block start.
+    private func removeBlockAtCaretIfAtStart() -> Bool {
+        guard let ts = textStorage else { return false }
+        let sel = selectedRange()
+        guard sel.length == 0 else { return false }
+        let block = caretBlock()
+        guard block != .paragraph else { return false }
+        let para = (string as NSString).paragraphRange(for: sel)
+        let marker = leadingMarkerLength(in: para) ?? 0
+        guard sel.location == para.location + marker else { return false }
+        guard shouldChangeText(in: para, replacementString: nil) else { return false }
+        var range = para
+        if marker > 0 {
+            ts.replaceCharacters(in: NSRange(location: para.location, length: marker), with: "")
+            range = NSRange(location: para.location, length: para.length - marker)
+        }
+        if range.length > 0 {
+            resetImpliedStyle(of: block, in: range)
+            NoteEditorStyle.applyBlock(.paragraph, to: ts, range: range)
+        }
+        pendingEmptyBlock = nil
+        setSelectedRange(NSRange(location: para.location, length: 0))
+        typingAttributes = blockTypingAttributes(.paragraph)
+        didChangeText()
+        reportActiveFormats()
+        return true
+    }
+
+    /// Undo what a block implied about its text — the heading weight, the code
+    /// face, the quote's grey — and nothing else, so inline bold or italic the
+    /// user applied survives the block change.
+    private func resetImpliedStyle(of block: NoteBlock, in range: NSRange) {
+        guard let ts = textStorage, range.length > 0 else { return }
+        switch block {
+        case .h1, .h2, .h3, .code:
+            ts.enumerateAttribute(.font, in: range, options: []) { value, r, _ in
+                // Inline code keeps its own monospace face.
+                if ts.attribute(.oakInlineCode, at: r.location, effectiveRange: nil) != nil { return }
+                let font = value as? NSFont
+                let italic = font?.fontDescriptor.symbolicTraits.contains(.italic) == true
+                var base = NoteEditorStyle.baseFont
+                if italic { base = base.withToggledTrait(.italic, on: true) }
+                ts.addAttribute(.font, value: base, range: r)
+            }
+            ts.removeAttribute(.backgroundColor, range: range)
+        case .quote:
+            ts.addAttribute(.foregroundColor, value: NSColor.labelColor, range: range)
+        case .paragraph, .bullet, .ordered:
+            break
+        }
+    }
+
+    /// Ordered-list markers are literal text, so a removed or inserted item left
+    /// the numbers wrong on screen. Rewrite any marker that no longer matches its
+    /// position in its run. Slack renumbers the same way after every change.
+    private var isRenumbering = false
+    private func renumberOrderedLists() {
+        guard !isRenumbering, let ts = textStorage, ts.length > 0 else { return }
+        isRenumbering = true
+        defer { isRenumbering = false }
+        var sel = selectedRange()
+        var loc = 0
+        var run = 0
+        while loc < ts.length {
+            let para = (ts.string as NSString).paragraphRange(for: NSRange(location: loc, length: 0))
+            let block = ts.attribute(.oakBlock, at: para.location, effectiveRange: nil) as? Int
+            if block == NoteBlock.ordered.rawValue, let len = leadingMarkerLength(in: para) {
+                run += 1
+                let markerRange = NSRange(location: para.location, length: len)
+                let want = "\(run).  "
+                if (ts.string as NSString).substring(with: markerRange) != want,
+                   shouldChangeText(in: markerRange, replacementString: want) {
+                    let m = NoteEditorStyle.listMarker(want)
+                    ts.replaceCharacters(in: markerRange, with: m)
+                    // A paragraph's block is read from its first character, the
+                    // marker: re-tag the line or it stops being a list item.
+                    let line = (ts.string as NSString).paragraphRange(for: NSRange(location: para.location, length: 0))
+                    NoteEditorStyle.applyBlock(.ordered, to: ts, range: line)
+                    let delta = m.length - len
+                    if sel.location >= NSMaxRange(markerRange) { sel.location += delta }
+                    setSelectedRange(sel)
+                    didChangeText()
+                }
+            } else {
+                run = 0
+            }
+            let next = (ts.string as NSString).paragraphRange(for: NSRange(location: para.location, length: 0))
+            loc = NSMaxRange(next)
+            if next.length == 0 { break }
+        }
     }
 
     // MARK: Active-format reporting
@@ -823,7 +1228,12 @@ final class NoteEditorTextView: NSTextView {
         // A click into an empty quote/code line wipes typingAttributes — re-arm the
         // pending block first so the caret stays "in" the block (selection changes
         // route here, including the one a mouse click fires).
+        let hadPendingBlock = pendingEmptyBlock != nil
         maintainPendingBlock()
+        // A caret move ends the chance to undo a shortcut with Backspace.
+        if let last = lastAutoFormat, selectedRange() != NSRange(location: NSMaxRange(last.range), length: 0) {
+            lastAutoFormat = nil
+        }
         // Re-fold/unfold math as the caret moves (reveals the source of the run the
         // caret enters, re-renders the one it leaves).
         restyleMath()
@@ -868,6 +1278,7 @@ final class NoteEditorTextView: NSTextView {
         onActiveFormats?(set)
         // Selection changes route here — repaint so the empty-block surface (drawn in
         // `draw(_:)`) appears/erases as the caret enters or leaves the pending line.
-        needsDisplay = true
+        // Only that surface needs it; a plain caret move repaints nothing.
+        if hadPendingBlock || pendingEmptyBlock != nil { needsDisplay = true }
     }
 }

@@ -17,9 +17,17 @@ enum NoteMarkdownCodec {
         var first = true
         var orderedNum = 0
 
+        var previous = NoteBlock.paragraph
         func append(_ inline: NSAttributedString, block: NoteBlock) {
-            if !first { out.append(NSAttributedString(string: "\n")) }
+            // The newline ends the PREVIOUS paragraph, so it carries that paragraph's
+            // block. An empty quote or code line has no other character to hold it.
+            if !first {
+                let newline = NSMutableAttributedString(string: "\n")
+                NoteEditorStyle.applyBlock(previous, to: newline, range: NSRange(location: 0, length: 1))
+                out.append(newline)
+            }
             first = false
+            previous = block
             let start = out.length
             out.append(inline)
             NoteEditorStyle.applyBlock(block, to: out, range: NSRange(location: start, length: out.length - start))
@@ -181,7 +189,9 @@ enum NoteMarkdownCodec {
         var paras: [(range: NSRange, block: NoteBlock)] = []
         ns.enumerateSubstrings(in: NSRange(location: 0, length: ns.length), options: [.byParagraphs]) { _, range, _, _ in
             var block = NoteBlock.paragraph
-            if range.length > 0,
+            // An empty line has no characters of its own; its block lives on its
+            // newline. Reading nothing there split a code block at every blank line.
+            if range.location < ns.length,
                let raw = attr.attribute(.oakBlock, at: range.location, effectiveRange: nil) as? Int,
                let b = NoteBlock(rawValue: raw) {
                 block = b
@@ -209,7 +219,10 @@ enum NoteMarkdownCodec {
                 prevOrdered = false
                 continue
             }
-            let inline = serializeInline(attr.attributedSubstring(from: range))
+            // A heading's font is already semibold; reading that as bold saved every
+            // heading as `## **Title**`.
+            let isHeading = block == .h1 || block == .h2 || block == .h3
+            let inline = serializeInline(attr.attributedSubstring(from: range), boldIsImplicit: isHeading)
             let text: String
             switch block {
             case .h1: text = "# " + inline
@@ -219,7 +232,7 @@ enum NoteMarkdownCodec {
             case .ordered:
                 orderedN = prevOrdered ? orderedN + 1 : 1
                 text = "\(orderedN). " + inline
-            case .quote: text = "> " + inline
+            case .quote: text = inline.isEmpty ? ">" : "> " + inline
             case .paragraph, .code: text = inline
             }
             segments.append((block, text))
@@ -246,7 +259,7 @@ enum NoteMarkdownCodec {
         return (prev == next && tight.contains(prev)) ? "\n" : "\n\n"
     }
 
-    private static func serializeInline(_ para: NSAttributedString) -> String {
+    private static func serializeInline(_ para: NSAttributedString, boldIsImplicit: Bool = false) -> String {
         let ns = para.string as NSString
         guard ns.length > 0 else { return "" }
         var out = ""
@@ -261,7 +274,7 @@ enum NoteMarkdownCodec {
             }
             var pre = "", suf = ""
             if let f = attrs[.font] as? NSFont {
-                if f.hasBold { pre += "**"; suf = "**" + suf }
+                if f.hasBold, !boldIsImplicit { pre += "**"; suf = "**" + suf }
                 if f.hasItalic { pre += "*"; suf = "*" + suf }
             }
             if attrs[.strikethroughStyle] != nil { pre += "~~"; suf = "~~" + suf }
