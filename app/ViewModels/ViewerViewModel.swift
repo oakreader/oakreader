@@ -35,10 +35,6 @@ class ViewerViewModel {
     /// returning lands at the top of the origin page.
     private var jumpOrigins: [Int] = []
 
-    /// The page `jumpBack()` would return to, or `nil` when the reader hasn't
-    /// jumped. Drives the "Back to p. N" affordance.
-    var returnPage: Int? { jumpOrigins.last }
-
     // MARK: - Zoom Constants
 
     private let minZoom: CGFloat = 0.1

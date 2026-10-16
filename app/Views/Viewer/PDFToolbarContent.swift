@@ -26,9 +26,6 @@ struct PDFToolbarContent: View {
         HStack(spacing: 8) {
             pageNavPill
             locationLabel
-            if let origin = viewer.returnPage {
-                returnChip(origin: origin)
-            }
             zoomPill
             MarkupToolbarPill(viewModel: viewModel)
         }
@@ -139,30 +136,5 @@ struct PDFToolbarContent: View {
                 }
             }
         }
-    }
-
-    // MARK: - Return chip
-
-    /// Appears only after a deliberate jump (a chat citation, an outline entry, a
-    /// search hit). Naming the destination beats a chevron that cannot say where
-    /// it goes — and ordinary page turns no longer file a return point, so this
-    /// stays rare enough to be meaningful. See ADR-050.
-    private func returnChip(origin: Int) -> some View {
-        Button { viewer.jumpBack() } label: {
-            HStack(spacing: 5) {
-                Image(systemName: "arrow.uturn.backward")
-                    .font(.system(size: 11))
-                Text("Back to p. \(origin + 1)")
-                    .font(.system(size: 12, weight: .medium))
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(Capsule(style: .continuous).fill(OakStyle.Colors.buttonBackground))
-            .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .help("Return to page \(origin + 1), where you jumped from")
-        .accessibilityLabel("Back to page \(origin + 1)")
-        .fixedSize()
     }
 }
