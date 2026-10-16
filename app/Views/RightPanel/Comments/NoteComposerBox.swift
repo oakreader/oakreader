@@ -288,7 +288,10 @@ struct NoteComposerBox: View {
             // B/I/S don't apply to literal code — disabled in any code context. No
             // Underline: Markdown has none (it serializes to raw `<u>` HTML, which the
             // card renderer doesn't display), and underlined text reads as a link.
-            toolButton("bold", active: activeFormats.contains("bold"), disabled: inCodeContext) { controller.cmd("bold") }
+            // Bold is also off in a heading, whose text is already bold (Slack's
+            // `shouldDisableButton`); toggling it there saved as `## **x**`.
+            toolButton("bold", active: activeFormats.contains("bold"),
+                       disabled: inCodeContext || activeFormats.contains("heading")) { controller.cmd("bold") }
                 .help("Bold")
             toolButton("italic", active: activeFormats.contains("italic"), disabled: inCodeContext) { controller.cmd("italic") }
                 .help("Italic")
