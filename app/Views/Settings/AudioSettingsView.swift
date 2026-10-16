@@ -280,18 +280,20 @@ struct AudioSettingsView: View {
             ttsSection
         }
         .formStyle(.grouped)
-        .onAppear {
-            loadVolumes()
-            refreshPocketTTSState()
-        }
-        .onDisappear { pocketTTSDownloadTask?.cancel() }
+        .settingsPageLifecycle(
+            onShow: {
+                loadVolumes()
+                refreshPocketTTSState()
+            },
+            onHide: {
+                pocketTTSDownloadTask?.cancel()
+                stopMicTest()
+                stopSpeakerTest()
+                save()
+            }
+        )
         .onChange(of: outputDeviceUID) { _, _ in loadVolumes() }
         .onChange(of: inputDeviceUID) { _, _ in loadVolumes() }
-        .onDisappear {
-            stopMicTest()
-            stopSpeakerTest()
-            save()
-        }
     }
 
     // MARK: - Voice Chat LLM

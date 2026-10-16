@@ -57,7 +57,7 @@ struct AISettingsView: View {
             await catalog.refresh()
             modelsFile = await catalog.modelsFile()
         }
-        .onDisappear { save() }
+        .settingsPageLifecycle(onHide: { save() })
     }
 
     // MARK: - Providers Section

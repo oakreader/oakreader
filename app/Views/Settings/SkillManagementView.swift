@@ -69,8 +69,6 @@ struct SkillManagementView: View {
                             )
                         }
                     }
-
-                    openFolderFooter
                 }
             }
             .frame(maxWidth: 920)
@@ -79,7 +77,7 @@ struct SkillManagementView: View {
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .background(Color(nsColor: .windowBackgroundColor))
-        .onAppear { reload() }
+        .settingsPageLifecycle(onShow: { reload() })
     }
 
     private var header: some View {
@@ -157,21 +155,6 @@ struct SkillManagementView: View {
             .buttonStyle(.plain)
             .fixedSize()
         }
-    }
-
-    /// Bottom-of-page action to reveal the installed-skills folder in Finder.
-    private var openFolderFooter: some View {
-        HStack {
-            Spacer()
-            Button {
-                openSkillsFolder()
-            } label: {
-                Label("Open Folder", systemImage: "folder")
-            }
-            .controlSize(.regular)
-            Spacer()
-        }
-        .padding(.top, 6)
     }
 
     private var emptyState: some View {
@@ -380,7 +363,10 @@ struct SkillManagementView: View {
             .joined(separator: " ")
     }
 
-    private func openSkillsFolder() {
+    /// Reveals the installed-skills folder in Finder. Settings puts this in the
+    /// window toolbar while the Skills page is shown; at the foot of the page
+    /// it sat below every skill, where nobody scrolls to look for it.
+    static func openSkillsFolder() {
         let fm = FileManager.default
         if !fm.fileExists(atPath: Self.installedDir.path) {
             try? fm.createDirectory(at: Self.installedDir, withIntermediateDirectories: true)

@@ -50,6 +50,22 @@ struct SettingsView: View {
             }
         }
 
+        /// The filled glyph the settings sidebar draws. `icon` stays the outline
+        /// form for the command palette, which sits among outline symbols.
+        var sidebarSymbol: String {
+            switch self {
+            case .general: return "gearshape.fill"
+            case .library: return "books.vertical.fill"
+            case .ai: return "cpu.fill"
+            case .agent: return "brain.head.profile.fill"
+            case .audio: return "speaker.wave.2.fill"
+            case .extensions: return "puzzlepiece.extension.fill"
+            case .skills: return "hammer.fill"
+            case .webSearch: return "globe.americas.fill"
+            case .extensionTranslation, .extensionQuickChatSkills: return icon
+            }
+        }
+
         /// Custom icon asset name from the extension, if any.
         var iconAsset: String? {
             appExtension?.iconAsset
@@ -63,6 +79,12 @@ struct SettingsView: View {
             default: return nil
             }
         }
+
+        /// Whether the page stays built, hidden, once left. A page with its
+        /// own `NavigationStack` cannot: its stack keeps setting the window
+        /// title while hidden, so the LLM page's title showed over every other
+        /// page. It is rebuilt each time instead, as every page used to be.
+        var staysBuilt: Bool { self != .ai }
 
         /// Tabs exposed in the command palette for deep-linking.
         static let paletteTabs: [Tab] = [.general, .library, .ai, .agent, .audio, .extensions, .webSearch]
@@ -82,6 +104,8 @@ struct SettingsView: View {
     @State private var selectedTab: Tab = .general
     @State private var pluginTabs: [Tab] = Self.enabledPluginTabs()
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    /// Every page opened since the window did. Each stays built once opened.
+    @State private var builtTabs: [Tab] = [.general]
 
     /// Extension panes that are currently enabled (shown under the Extensions group).
     private static func enabledPluginTabs() -> [Tab] {
@@ -90,43 +114,62 @@ struct SettingsView: View {
             .compactMap { Tab.tab(for: $0) }
     }
 
+    private var sidebarGroups: [SettingsSidebar.Group] {
+        [
+            .init(title: nil, tabs: [.general, .library]),
+            .init(title: "Models", tabs: [.ai, .audio]),
+            .init(title: "Agent", tabs: [.agent, .skills, .webSearch]),
+            .init(title: "Extensions", tabs: [.extensions] + pluginTabs),
+        ]
+    }
+
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            List(selection: $selectedTab) {
-                Section {
-                    tabRow(.general)
-                    tabRow(.library)
-                }
-
-                Section("Models") {
-                    tabRow(.ai)
-                    tabRow(.audio)
-                }
-
-                Section("Agent") {
-                    tabRow(.agent)
-                    tabRow(.skills)
-                    tabRow(.webSearch)
-                }
-
-                Section("Extensions") {
-                    tabRow(.extensions)
-                    ForEach(pluginTabs) { tabRow($0) }
+            SettingsSidebar(groups: sidebarGroups, selection: $selectedTab)
+                .navigationSplitViewColumnWidth(min: 175, ideal: 195, max: 215)
+        } detail: {
+            // Pages are kept, not rebuilt: switching only changes which one is
+            // visible. Obry's settings do the same (`SettingsKeptPage`), and it
+            // is what lets a page keep its scroll position and lets the switch
+            // be a cross-fade instead of a cut.
+            ZStack(alignment: .topLeading) {
+                ForEach(builtTabs) { tab in
+                    let isShown = tab == selectedTab
+                    page(for: tab)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .opacity(isShown ? 1 : 0)
+                        .allowsHitTesting(isShown)
+                        .accessibilityHidden(!isShown)
+                        .environment(\.settingsPageIsShown, isShown)
                 }
             }
-            .listStyle(.sidebar)
-            .navigationSplitViewColumnWidth(min: 175, ideal: 195, max: 215)
-        } detail: {
-            settingsContent
-                .id(selectedTab)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .navigationTitle(selectedTab.label)
+            .animation(OakStyle.Motion.fade, value: selectedTab)
+            .navigationTitle(selectedTab.label)
+            // Page actions live here, keyed on the selection, not inside the
+            // pages: a kept page's own toolbar would stay up while it is hidden.
+            .toolbar {
+                if selectedTab == .skills {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button {
+                            SkillManagementView.openSkillsFolder()
+                        } label: {
+                            Label("Open Folder", systemImage: "folder")
+                                .labelStyle(.titleAndIcon)
+                        }
+                        .help("Show installed skills in Finder")
+                    }
+                }
+            }
         }
         .navigationSplitViewStyle(.balanced)
         .toolbar(removing: .sidebarToggle)
         .onChange(of: columnVisibility) { _, _ in
             // Prevent sidebar from being collapsed
             columnVisibility = .all
+        }
+        .onChange(of: selectedTab) { old, tab in
+            if !old.staysBuilt { builtTabs.removeAll { $0 == old } }
+            if !builtTabs.contains(tab) { builtTabs.append(tab) }
         }
         .frame(minWidth: 900, minHeight: 620)
         .onReceive(NotificationCenter.default.publisher(for: Preferences.appExtensionToggleNotification)) { _ in
@@ -136,6 +179,8 @@ struct SettingsView: View {
                     selectedTab = .extensions
                 }
                 pluginTabs = updated
+                // A disabled extension's page must not stay built behind the others.
+                builtTabs.removeAll { $0.appExtension != nil && !updated.contains($0) }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .settingsNavigateToTab)) { notification in
@@ -147,25 +192,8 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
-    private func tabRow(_ tab: Tab) -> some View {
-        Label {
-            Text(tab.label)
-        } icon: {
-            if let asset = tab.iconAsset {
-                Image(asset)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: 16, height: 16)
-            } else {
-                Image(systemName: tab.icon)
-            }
-        }
-        .tag(tab)
-    }
-
-    @ViewBuilder
-    private var settingsContent: some View {
-        switch selectedTab {
+    private func page(for tab: Tab) -> some View {
+        switch tab {
         case .general:
             GeneralSettingsView()
         case .library:

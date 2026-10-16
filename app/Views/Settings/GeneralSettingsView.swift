@@ -122,13 +122,13 @@ struct GeneralSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .onAppear {
-            dataDirectory = dataDirectoryPath()
-            permissionStatus.refresh()
-        }
-        .onDisappear {
-            permissionStatus.stopPolling()
-        }
+        .settingsPageLifecycle(
+            onShow: {
+                dataDirectory = dataDirectoryPath()
+                permissionStatus.refresh()
+            },
+            onHide: { permissionStatus.stopPolling() }
+        )
         .sheet(isPresented: $showUninstall) {
             UninstallConfirmationView()
         }
