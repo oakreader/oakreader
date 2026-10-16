@@ -59,7 +59,7 @@ final class MarkdownMathSplitterTests: XCTestCase {
 
     func testUnclosedMathWhileStreamingStaysOpen() {
         let blocks = MarkdownBlockSplitter.split("如$$\nx = 1")
-        XCTAssertEqual(blocks.map(\.kind), [.prose, .prose])
+        XCTAssertEqual(blocks.map(\.kind), [.prose, .mathDisplayOpen])
         XCTAssertEqual(blocks.last?.text, "$$\nx = 1")
         XCTAssertFalse(blocks.last!.isSettled)
     }

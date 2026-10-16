@@ -89,24 +89,36 @@ private struct BlockRow: View, Equatable {
             && lhs.typingDot == rhs.typingDot
     }
 
+    private var prose: some View {
+        ProseBlockView(
+            // While streaming, optimistically close a half-arrived trailing link so
+            // a citation shows its short label instead of flashing the bare `oak:14`
+            // destination until the closing `)` lands. See StreamingMarkdownSanitizer.
+            attributed: MarkdownAttributedBuilder.attributedString(
+                for: streaming ? StreamingMarkdownSanitizer.completeTrailingLink(block.text) : block.text,
+                theme: theme),
+            selectable: !streaming,
+            animatesAppendedText: streaming && fadesAppendedText,
+            showsTypingDot: typingDot,
+            onOpenURL: onOpenURL,
+            linkPreview: linkPreview,
+            linkHoverUnderline: theme.linkHoverUnderline
+        )
+    }
+
     @ViewBuilder
     var body: some View {
         switch block.kind {
         case .prose:
-            ProseBlockView(
-                // While streaming, optimistically close a half-arrived trailing link so
-                // a citation shows its short label instead of flashing the bare `oak:14`
-                // destination until the closing `)` lands. See StreamingMarkdownSanitizer.
-                attributed: MarkdownAttributedBuilder.attributedString(
-                    for: streaming ? StreamingMarkdownSanitizer.completeTrailingLink(block.text) : block.text,
-                    theme: theme),
-                selectable: !streaming,
-                animatesAppendedText: streaming && fadesAppendedText,
-                showsTypingDot: typingDot,
-                onOpenURL: onOpenURL,
-                linkPreview: linkPreview,
-                linkHoverUnderline: theme.linkHoverUnderline
-            )
+            prose
+        case .mathDisplayOpen:
+            // While the reply streams, draw what has arrived instead of the source.
+            // A finished reply with an unclosed `$$` keeps it as typed.
+            if streaming {
+                StreamingMathBlockView(latex: MathDelimiters.stripOpenDisplay(block.text), theme: theme)
+            } else {
+                prose
+            }
         case .code(let language):
             if language?.lowercased() == CodeFence.widgetLanguage,
                let view = widget?(CodeFence.strip(block.text), CodeFence.isClosed(block.text), block.id) {
@@ -156,6 +168,15 @@ enum MathDelimiters {
         var t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if t.hasPrefix("$$") { t.removeFirst(2) }
         if t.hasSuffix("$$") { t.removeLast(2) }
+        return t.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// The body of a display span still streaming: the opening `$$` and the first
+    /// `$` of a half-arrived close removed.
+    static func stripOpenDisplay(_ text: String) -> String {
+        var t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if t.hasPrefix("$$") { t.removeFirst(2) }
+        if t.hasSuffix("$"), !t.hasSuffix("\\$") { t.removeLast() }
         return t.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

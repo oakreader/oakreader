@@ -20,6 +20,12 @@ let package = Package(
                 .product(name: "Highlightr", package: "Highlightr"),
                 .product(name: "SwiftUIMath", package: "swiftui-math"),
                 .product(name: "CMarkGFM", package: "swift-cmark-gfm"),
+            ],
+            // KaTeX alone, for formulas SwiftUIMath cannot draw. No CSS or fonts:
+            // it emits MathML and WebKit draws that natively. See MathFallback.swift.
+            resources: [
+                .copy("Resources/katex.min.js"),
+                .copy("Resources/katex-LICENSE.txt"),
             ]
         ),
         .testTarget(

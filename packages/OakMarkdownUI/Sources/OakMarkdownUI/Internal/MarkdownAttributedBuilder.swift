@@ -6,7 +6,8 @@ import SwiftUIMath
 /// Converts a markdown prose block into an `NSAttributedString` by walking the
 /// cmark-gfm AST (same parser the app already ships — no new dependency). Handles
 /// headings, paragraphs, emphasis/strong, inline code, links, lists, blockquotes,
-/// breaks; inline `$…$` becomes a SwiftUIMath image attachment.
+/// breaks; `$…$` becomes a math image attachment. Math is swapped for tokens before
+/// cmark parses (see `MathPlaceholders`), so cmark never reads LaTeX as markdown.
 /// (Fenced code & display math are split out upstream into their own block views.)
 @MainActor
 enum MarkdownAttributedBuilder {
@@ -25,22 +26,33 @@ enum MarkdownAttributedBuilder {
         if let strikethrough = cmark_find_syntax_extension("strikethrough") {
             cmark_parser_attach_syntax_extension(parser, strikethrough)
         }
-        let bytes = Array(markdown.utf8)
+        let (protected, math) = MathPlaceholders.protect(markdown)
+        let bytes = Array(MarkdownCompat.shimCJKEmphasis(protected).utf8)
         cmark_parser_feed(parser, bytes, bytes.count)
         guard let document = cmark_parser_finish(parser) else {
             return NSAttributedString(string: markdown, attributes: baseAttributes(theme))
         }
         defer { cmark_node_free(document) }
-        let renderer = Renderer(theme: theme)
-        return renderer.renderBlocks(document)
+        let renderer = Renderer(theme: theme, math: math)
+        return stripShims(renderer.renderBlocks(document))
+    }
+
+    /// Drop the zero-width spaces `MarkdownCompat.shimCJKEmphasis` added, so they
+    /// never reach selection, copy, or caret movement.
+    private static func stripShims(_ text: NSAttributedString) -> NSAttributedString {
+        guard text.string.contains(MarkdownCompat.shim) else { return text }
+        let out = NSMutableAttributedString(attributedString: text)
+        out.mutableString.replaceOccurrences(
+            of: MarkdownCompat.shim, with: "", options: [], range: NSRange(location: 0, length: out.length))
+        return out
     }
 
     /// Render the inline contents of a cmark-gfm `table_cell` node into an attributed
     /// string. The caller (TableBlockView) owns the cmark document — we just walk the
     /// cell's children using the same inline rules used everywhere else.
-    static func renderTableCell(_ cellNode: Node, theme: MarkdownTheme) -> NSAttributedString {
-        let renderer = Renderer(theme: theme)
-        return renderer.renderTableCell(cellNode)
+    static func renderTableCell(_ cellNode: Node, math: [MathSpan], theme: MarkdownTheme) -> NSAttributedString {
+        let renderer = Renderer(theme: theme, math: math)
+        return stripShims(renderer.renderTableCell(cellNode))
     }
 
     // MARK: shared attributes
@@ -49,37 +61,25 @@ enum MarkdownAttributedBuilder {
         [.font: theme.bodyFont, .foregroundColor: theme.textColor]
     }
 
-    // MARK: inline math ($…$) — cmark doesn't parse it, so scan TEXT literals
+    // MARK: math
 
-    private static let inlineMathRegex = try! NSRegularExpression(
-        pattern: #"(?<!\$)\$(?!\$)([^$\n]+?)\$(?!\$)"#
-    )
-
-    static func renderInlineMath(in string: String, theme: MarkdownTheme) -> NSAttributedString {
-        let ns = string as NSString
+    /// A cmark text literal, with its math tokens drawn as attachments. A formula no
+    /// engine can draw, or one still rendering, shows as typed.
+    static func renderText(_ literal: String, math: [MathSpan], theme: MarkdownTheme) -> NSAttributedString {
         let base = baseAttributes(theme)
-        guard ns.length > 0 else { return NSAttributedString(string: string, attributes: base) }
-        let matches = inlineMathRegex.matches(in: string, range: NSRange(location: 0, length: ns.length))
-        if matches.isEmpty { return NSAttributedString(string: string, attributes: base) }
-
-        let out = NSMutableAttributedString()
-        var cursor = 0
-        for m in matches {
-            if m.range.location > cursor {
-                out.append(NSAttributedString(
-                    string: ns.substring(with: NSRange(location: cursor, length: m.range.location - cursor)),
-                    attributes: base))
-            }
-            let latex = ns.substring(with: m.range(at: 1))
-            if let attachment = mathAttachment(latex: latex, theme: theme) {
-                out.append(attachment)
-            } else {
-                out.append(NSAttributedString(string: ns.substring(with: m.range), attributes: base))
-            }
-            cursor = m.range.location + m.range.length
+        let pieces = MathPlaceholders.pieces(in: literal, spans: math)
+        if case .text(let text) = pieces.first, pieces.count == 1 {
+            return NSAttributedString(string: text, attributes: base)
         }
-        if cursor < ns.length {
-            out.append(NSAttributedString(string: ns.substring(from: cursor), attributes: base))
+        let out = NSMutableAttributedString()
+        for piece in pieces {
+            switch piece {
+            case .text(let text):
+                out.append(NSAttributedString(string: text, attributes: base))
+            case .math(let span):
+                out.append(mathAttachment(latex: span.latex, display: span.display, theme: theme)
+                    ?? NSAttributedString(string: span.source, attributes: base))
+            }
         }
         return out
     }
@@ -88,24 +88,32 @@ enum MarkdownAttributedBuilder {
     // same formula every commit.
     private static var imageCache: [String: NSImage] = [:]
 
-    static func mathAttachment(latex: String, theme: MarkdownTheme) -> NSAttributedString? {
+    /// SwiftUIMath first; KaTeX drawn by WebKit when SwiftUIMath cannot (see `MathRoute`).
+    static func mathAttachment(latex: String, display: Bool = false, theme: MarkdownTheme) -> NSAttributedString? {
         let size = theme.bodyFont.pointSize
-        let key = "\(latex)|\(size)"
-        let image: NSImage
+        let key = "\(display ? "D" : "T")|\(latex)|\(size)"
+        let attachment = NSTextAttachment()
         if let cached = imageCache[key] {
-            image = cached
-        } else {
-            let view = Math(latex)
+            attachment.image = cached
+        } else if MathRoute.nativeCanDraw(latex, display: display, fontSize: size) {
+            let view = Math(MarkdownCompat.normalizeLaTeX(latex))
+                .mathTypesettingStyle(display ? .display : .text)
                 .mathFont(.init(name: .latinModern, size: size))
                 .foregroundStyle(Color(nsColor: theme.textColor))
             let renderer = ImageRenderer(content: view)
             renderer.scale = NSScreen.main?.backingScaleFactor ?? 2
             guard let rendered = renderer.nsImage else { return nil }
             imageCache[key] = rendered
-            image = rendered
+            attachment.image = rendered
+        } else {
+            guard case .ready(let rendered) = MathMLRenderer.shared.lookup(
+                latex: latex, display: display, fontSize: size, color: theme.textColor) else { return nil }
+            attachment.image = rendered.image
+            attachment.bounds = CGRect(x: 0, y: -rendered.descent,
+                                       width: rendered.image.size.width, height: rendered.image.size.height)
+            return NSAttributedString(attachment: attachment)
         }
-        let attachment = NSTextAttachment()
-        attachment.image = image
+        let image = attachment.image!
         let y = (theme.bodyFont.capHeight - image.size.height) / 2
         attachment.bounds = CGRect(x: 0, y: y, width: image.size.width, height: image.size.height)
         return NSAttributedString(attachment: attachment)
@@ -117,11 +125,16 @@ enum MarkdownAttributedBuilder {
 @MainActor
 private final class Renderer {
     let theme: MarkdownTheme
+    /// Math lifted out before parsing; text literals carry tokens indexing into it.
+    let math: [MathSpan]
     private var listDepth = 0
     /// Block-quote nesting, 1 inside the outermost quote. Drives the opacity ladder.
     private var quoteDepth = 0
 
-    init(theme: MarkdownTheme) { self.theme = theme }
+    init(theme: MarkdownTheme, math: [MathSpan]) {
+        self.theme = theme
+        self.math = math
+    }
 
     private func children(_ node: MarkdownAttributedBuilder.Node) -> [MarkdownAttributedBuilder.Node] {
         var result: [MarkdownAttributedBuilder.Node] = []
@@ -133,7 +146,12 @@ private final class Renderer {
         return result
     }
 
+    /// The node's literal with any math put back as typed: right for code and HTML.
     private func literal(_ node: MarkdownAttributedBuilder.Node) -> String {
+        MathPlaceholders.restoreSource(rawLiteral(node), spans: math)
+    }
+
+    private func rawLiteral(_ node: MarkdownAttributedBuilder.Node) -> String {
         guard let pointer = cmark_node_get_literal(node) else { return "" }
         return String(cString: pointer)
     }
@@ -167,7 +185,7 @@ private final class Renderer {
     private func render(_ node: MarkdownAttributedBuilder.Node) -> NSAttributedString {
         switch cmark_node_get_type(node) {
         case CMARK_NODE_TEXT:
-            return MarkdownAttributedBuilder.renderInlineMath(in: literal(node), theme: theme)
+            return MarkdownAttributedBuilder.renderText(rawLiteral(node), math: math, theme: theme)
         case CMARK_NODE_SOFTBREAK:
             // A single newline should SHOW as a line break — note/chat content is
             // hand-typed, not hard-wrapped prose, so "what you type is what you see".
