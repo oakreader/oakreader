@@ -249,7 +249,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let windowWidth = screenFrame.width * 0.85
         let windowHeight = screenFrame.height * 0.9
 
-        let window = NSWindow(
+        let window = MainWindow(
             contentRect: NSRect(
                 x: screenFrame.origin.x + (screenFrame.width - windowWidth) / 2,
                 y: screenFrame.origin.y + (screenFrame.height - windowHeight) / 2,
@@ -298,21 +298,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         ) { [weak self] _ in
             self?.applyAppearanceMode()
         }
-
-        // Center traffic lights vertically with the tab bar
-        centerTrafficLights()
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(windowDidResize(_:)),
-            name: NSWindow.didResizeNotification,
-            object: window
-        )
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(windowDidResize(_:)),
-            name: NSWindow.didEndLiveResizeNotification,
-            object: window
-        )
     }
 
     // MARK: - Appearance
@@ -327,29 +312,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             window.appearance = NSAppearance(named: .darkAqua)
         default:
             window.appearance = nil
-        }
-    }
-
-    // MARK: - Traffic Light Positioning
-
-    @objc private func windowDidResize(_ notification: Notification) {
-        centerTrafficLights()
-    }
-
-    private func centerTrafficLights() {
-        guard let window = mainWindow else { return }
-        let tabBarHeight: CGFloat = 38.0 // OakStyle.Size.tabBarHeight
-
-        for buttonType: NSWindow.ButtonType in [.closeButton, .miniaturizeButton, .zoomButton] {
-            guard let button = window.standardWindowButton(buttonType) else { continue }
-            guard let titleBarView = button.superview else { continue }
-            let titleBarHeight = titleBarView.frame.height
-            let buttonHeight = button.frame.height
-            // Center button in tab bar: convert from tab bar top-down to NSView bottom-up
-            let desiredCenterFromTop = tabBarHeight / 2
-            let centerFromBottom = titleBarHeight - desiredCenterFromTop
-            let buttonY = centerFromBottom - buttonHeight / 2
-            button.setFrameOrigin(NSPoint(x: button.frame.origin.x, y: buttonY))
         }
     }
 

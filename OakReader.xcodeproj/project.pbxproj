@@ -118,6 +118,7 @@
 		5B17A5915BA3761D882A5765 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53FB43E9CEBAFCAEFB44CEB1 /* SidebarView.swift */; };
 		5B3ABF061339751A32F59B5E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 27290988776913ED1DA822F8 /* Assets.xcassets */; };
 		5B4E7E6CE10D33B0655D331D /* TTSAudioCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E54023E672116A6690405BF /* TTSAudioCache.swift */; };
+		5B9214FA9B0859ACDE9F2AC1 /* MainWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29796970FB2C2B2461C012A0 /* MainWindow.swift */; };
 		5CB7E5E2EE685A89D172781C /* EmbedCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3D94A7162913FBC4260A24 /* EmbedCardView.swift */; };
 		5E203AE21E16EA6F26B580B6 /* PostHog in Frameworks */ = {isa = PBXBuildFile; productRef = FD8515630C748A9B57C93804 /* PostHog */; };
 		5E2F47CE3588CD4A28566F01 /* JSONValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = E61FA25C1770E4A7C778F863 /* JSONValue.swift */; };
@@ -346,6 +347,7 @@
 		27290988776913ED1DA822F8 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		275072AA6F2235BEC367D640 /* LibrarySidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibrarySidebarView.swift; sourceTree = "<group>"; };
 		2781D3BACDC448CA4822441F /* ChatCompletionPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatCompletionPanel.swift; sourceTree = "<group>"; };
+		29796970FB2C2B2461C012A0 /* MainWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindow.swift; sourceTree = "<group>"; };
 		298783341416DEEA040FE323 /* WebTOCSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebTOCSidebarView.swift; sourceTree = "<group>"; };
 		298FCA1BB56FB1E0BF0C26D9 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		2A2A6A4D88229137627AB296 /* LibraryPropertyStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryPropertyStore.swift; sourceTree = "<group>"; };
@@ -675,6 +677,7 @@
 				AC4677A02899C6C081CD3381 /* AppState.swift */,
 				DD2837C1A7501966BA7381F7 /* main.swift */,
 				99A8973FD5C8BD93DB5148C8 /* MainMenuBuilder.swift */,
+				29796970FB2C2B2461C012A0 /* MainWindow.swift */,
 				E666F42F1E88F429DA822457 /* OakReaderApp.swift */,
 			);
 			path = App;
@@ -1597,6 +1600,7 @@
 				138DD1BFCD7F94A2ECB71679 /* Log.swift in Sources */,
 				627213A59CB00EF5AD99B337 /* LookupCardRow.swift in Sources */,
 				38DD9341C49C0DE39EA68B6B /* MainMenuBuilder.swift in Sources */,
+				5B9214FA9B0859ACDE9F2AC1 /* MainWindow.swift in Sources */,
 				92B6E50D4A6406080B955238 /* MarkdownDocument.swift in Sources */,
 				27086434E7DDDC59A7810718 /* MarkdownOutlineSidebarView.swift in Sources */,
 				712A56EF5A5E258945F16E9E /* MarkdownPreviewView.swift in Sources */,
@@ -1854,7 +1858,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.20.1;
+				MARKETING_VERSION = 0.20.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.oakreader.OakReader.dev;
 				PRODUCT_MODULE_NAME = OakReader;
 				PRODUCT_NAME = "OakReader-Dev";
@@ -1945,7 +1949,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.20.1;
+				MARKETING_VERSION = 0.20.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.oakreader.OakReader;
 				PRODUCT_MODULE_NAME = OakReader;
 				PRODUCT_NAME = OakReader;
