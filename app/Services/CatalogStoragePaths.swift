@@ -66,19 +66,19 @@ extension CatalogDatabase {
         dataDirectory.appendingPathComponent("chats", isDirectory: true)
     }
 
-    /// ~/OakReader/chats/attachments/
-    static var chatAttachmentsDirectory: URL {
-        chatsDirectory.appendingPathComponent("attachments", isDirectory: true)
-    }
-
     /// ~/OakReader/chats/{sessionId}.jsonl
     static func chatFileURL(sessionId: UUID) -> URL {
         chatsDirectory.appendingPathComponent("\(sessionId.uuidString).jsonl")
     }
 
-    /// ~/OakReader/chats/attachments/{sessionId}/
-    static func chatAttachmentDirectory(sessionId: UUID) -> URL {
-        chatAttachmentsDirectory.appendingPathComponent(sessionId.uuidString, isDirectory: true)
+    /// What a chat from before pi sessions left beside its file: the original
+    /// transcript the core kept when it converted it (`backend/src/legacy-chats.ts`)
+    /// and the captured images it read from. Deleted with the chat.
+    static func legacyChatFiles(sessionId: UUID) -> [URL] {
+        [
+            chatsDirectory.appendingPathComponent("legacy-v1/\(sessionId.uuidString).jsonl"),
+            chatsDirectory.appendingPathComponent("attachments/\(sessionId.uuidString)", isDirectory: true),
+        ]
     }
 
     static func createBaseDirectories() throws {
@@ -86,7 +86,6 @@ extension CatalogDatabase {
         try FileManager.default.createDirectory(at: storageDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: logsDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: chatsDirectory, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: chatAttachmentsDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: agentDirectory, withIntermediateDirectories: true)
         bootstrapAgentFiles()
     }

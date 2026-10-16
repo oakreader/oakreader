@@ -1,10 +1,14 @@
 import Foundation
 
 /// Drop-in replacement for OakAgent's old in-process `AgentSession`: same
-/// `send(...)` surface, same `SessionEvent` semantics, same JSONL persistence —
-/// but the LLM loop runs in the Node sidecar. Tools still execute here, in
-/// Swift, against local app state: the backend asks via `tool_exec` events and
-/// this engine replies with `tool_result` after the confirmation gate.
+/// `send(...)` surface, same `SessionEvent` semantics — but the LLM loop runs
+/// in the Node sidecar. Tools still execute here, in Swift, against local app
+/// state: the backend asks via `tool/execute` and this engine answers after
+/// the confirmation gate.
+///
+/// History is a pi session file the core owns: it reads the file, runs the
+/// loop and appends each entry, sending the same entry on `chat/entry`. This
+/// engine only sends the user's message and reads the file back to draw it.
 actor BackendChatEngine {
     private let store: SessionStore
 
@@ -17,12 +21,10 @@ actor BackendChatEngine {
     func send(
         userContent: String,
         attachments: [TurnAttachment],
-        history: [Turn],
         sessionId: UUID,
         config: AIRequestConfig,
         systemPrompt: String,
         turnMetadata: [String: String] = [:],
-        additionalUserTurns: [Turn] = [],
         tools: [any AgentTool]? = nil,
         toolContext: ToolExecutionContext? = nil,
         maxIterations: Int = 10,
@@ -31,32 +33,16 @@ actor BackendChatEngine {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    // 1. Build + persist the user turn(s)
+                    // 1. The user turn. The core stores it as a pi user message.
                     try Task.checkCancellation()
                     let userTurn = Turn(
                         role: .user, content: userContent,
                         metadata: turnMetadata, attachments: attachments
                     )
-                    try await store.appendTurn(userTurn, sessionId: sessionId)
                     continuation.yield(.finished(userTurn))
+                    let userMessage = PiMessage.user(PiMessage.userParts(for: userTurn), at: userTurn.timestamp)
 
-                    for additionalTurn in additionalUserTurns {
-                        try Task.checkCancellation()
-                        try await store.appendTurn(additionalTurn, sessionId: sessionId)
-                        continuation.yield(.finished(additionalTurn))
-                    }
-
-                    // 2. The system prompt arrives complete: the core composes
-                    //    policy, mixins and the skills listing together.
-                    let finalPrompt = systemPrompt
-
-                    // 3. Wire history
-                    let wireMessages = Self.buildWireMessages(
-                        history: history, userTurn: userTurn,
-                        additionalUserTurns: additionalUserTurns
-                    )
-
-                    // 4. Tools
+                    // 2. Tools
                     let activeTools = tools ?? []
                     var toolsByName: [String: any AgentTool] = [:]
                     for tool in activeTools { toolsByName[tool.name] = tool }
@@ -68,12 +54,16 @@ actor BackendChatEngine {
                         )
                     }
 
-                    // 5. Run the backend loop, executing tools as it asks.
+                    // 3. Run the backend loop, executing tools as it asks. The
+                    //    system prompt arrives complete: the core composes
+                    //    policy, mixins and the skills listing together.
                     let params = RPC.ChatParams(
                         providerId: config.providerId,
                         model: config.model,
-                        system: finalPrompt,
-                        messages: wireMessages,
+                        system: systemPrompt,
+                        sessionId: sessionId.uuidString,
+                        user: userMessage,
+                        display: PiSession.display(for: userTurn),
                         tools: toolDefs,
                         maxTokens: nil,
                         reasoning: config.reasoningEffort,
@@ -82,7 +72,10 @@ actor BackendChatEngine {
 
                     var assistantTurn = Turn(role: .assistant, content: "", isStreaming: true)
                     var iterationRecords: [ToolUseRecord] = []
-                    var expectedToolCalls = 0
+                    // The calls the last assistant message made, and how many
+                    // of their results have arrived.
+                    var pendingCalls: [ToolCall] = []
+                    var settledCalls = 0
                     // Uptime of this iteration's first thinking token, until the
                     // first answer token or tool call ends the thinking.
                     var thinkingStart: TimeInterval?
@@ -94,18 +87,17 @@ actor BackendChatEngine {
                         continuation.yield(.thinkingFinished(seconds: seconds))
                     }
 
-                    func finishIteration() async throws {
+                    func finishIteration() {
                         assistantTurn.isStreaming = false
                         if !iterationRecords.isEmpty { assistantTurn.toolUses = iterationRecords }
-                        try await store.appendTurn(assistantTurn, sessionId: sessionId)
                         continuation.yield(.finished(assistantTurn))
                         assistantTurn = Turn(role: .assistant, content: "", isStreaming: true)
                         iterationRecords = []
-                        expectedToolCalls = 0
+                        pendingCalls = []
+                        settledCalls = 0
                         thinkingStart = nil
                     }
 
-                    do {
                     for try await streamEvent in await NodeBackend.shared.stream(
                         RPC.Method.chat, params: params
                     ) {
@@ -135,14 +127,42 @@ actor BackendChatEngine {
                                     id: p.callId, name: p.name,
                                     input: ToolInput(jsonObject: p.args.mapValues(\.anyValue))))
 
-                            case RPC.Method.chatAssistant:
-                                // Authoritative snapshot of this iteration.
-                                guard let p = try? RPCCoding.decode(RPC.ChatAssistantParams.self, from: raw) else { break }
-                                endThinking()
-                                assistantTurn.content = p.text
-                                if let thinking = p.thinking { assistantTurn.thinking = thinking }
-                                expectedToolCalls = p.toolCalls.count
-                                if expectedToolCalls == 0 { try await finishIteration() }
+                            case RPC.Method.chatEntry:
+                                // The core already wrote this entry to the session
+                                // file. Only messages change what is drawn.
+                                guard let p = try? RPCCoding.decode(RPC.ChatEntryParams.self, from: raw),
+                                      p.entry["type"]?.stringValue == "message",
+                                      let message = p.entry["message"] else { break }
+                                switch PiMessage.role(message) {
+                                case "assistant":
+                                    // Authoritative: replaces what the deltas built.
+                                    endThinking()
+                                    assistantTurn.content = PiMessage.text(message)
+                                    if let thinking = PiMessage.thinking(message) { assistantTurn.thinking = thinking }
+                                    if let failure = PiMessage.failure(message) { assistantTurn.error = failure }
+                                    pendingCalls = PiMessage.toolCalls(message)
+                                    if pendingCalls.isEmpty { finishIteration() }
+
+                                case "toolResult":
+                                    let callId = message["toolCallId"]?.stringValue
+                                    // pi answers some calls itself, such as one whose
+                                    // arguments failed validation. Show those too.
+                                    if !iterationRecords.contains(where: { $0.id == callId }),
+                                       let call = pendingCalls.first(where: { $0.id == callId }) {
+                                        var record = ToolUseRecord(from: call)
+                                        record.result = PiMessage.text(message)
+                                        record.isError = message["isError"]?.boolValue ?? false
+                                        record.status = .completed
+                                        iterationRecords.append(record)
+                                        continuation.yield(.toolUseCompleted(record))
+                                    }
+                                    settledCalls += 1
+                                    // The last result of the iteration settles the turn.
+                                    if settledCalls == pendingCalls.count { finishIteration() }
+
+                                default:
+                                    break
+                                }
 
                             default:
                                 break
@@ -210,27 +230,17 @@ actor BackendChatEngine {
 
                             await NodeBackend.shared.respond(
                                 to: rpcId,
-                                with: RPC.ToolExecuteResult(content: resultContent, isError: resultIsError))
-
-                            // Last tool of the iteration settles the turn.
-                            if iterationRecords.count == expectedToolCalls {
-                                try await finishIteration()
-                            }
+                                with: RPC.ToolExecuteResult(
+                                    content: resultContent, isError: resultIsError, denied: !approved))
                         }
-                    }
-                    } catch let streamError where !(streamError is CancellationError) {
-                        // Persist the partial turn with the error so a reloaded
-                        // session still shows what streamed before the failure.
-                        assistantTurn.isStreaming = false
-                        assistantTurn.error = streamError.localizedDescription
-                        try? await store.appendTurn(assistantTurn, sessionId: sessionId)
-                        throw streamError
                     }
                     continuation.finish()
                 } catch is CancellationError {
                     continuation.finish()
                 } catch {
-                    // Persist the partial turn with the error so history shows it.
+                    // A provider failure is already in the session file as a
+                    // failed reply. A failure before the loop, such as an
+                    // unknown model, is shown here and not stored.
                     continuation.yield(.error(error))
                     continuation.finish(throwing: error)
                 }
@@ -249,93 +259,5 @@ actor BackendChatEngine {
 
     func deleteSession(_ sessionId: UUID) async {
         await store.deleteSession(sessionId)
-    }
-
-    // MARK: - Wire building (mirrors the old AgentSession.buildMessages)
-
-    static func buildWireMessages(
-        history: [Turn], userTurn: Turn, additionalUserTurns: [Turn] = []
-    ) -> [WireMessage] {
-        var messages: [WireMessage] = []
-
-        for turn in history where turn.role != .system {
-            if turn.role == .assistant && !turn.toolUses.isEmpty {
-                messages.append(.assistant(
-                    text: turn.content,
-                    thinking: nil,
-                    toolCalls: turn.toolUses.map {
-                        WireToolCall(id: $0.id, name: $0.name, args: AnyJSONObject($0.input.jsonObject))
-                    }
-                ))
-                for record in turn.toolUses {
-                    messages.append(.toolResult(
-                        callId: record.id, name: record.name,
-                        content: record.result ?? "", isError: record.isError
-                    ))
-                }
-            } else if turn.role == .user {
-                // Carry attachments (e.g. captured images) through history so
-                // follow-up questions can still reference them.
-                messages.append(.user(parts: userContentParts(for: turn)))
-            } else {
-                messages.append(.assistant(text: modelText(from: turn.content), thinking: nil, toolCalls: []))
-            }
-        }
-
-        messages.append(.user(parts: userContentParts(for: userTurn)))
-        for turn in additionalUserTurns {
-            messages.append(.user(parts: [.text(modelText(from: turn.content))]))
-        }
-        return messages
-    }
-
-    /// UI-only skill marker (`[[skill:id]]`) must not leak to providers; when the
-    /// user only selected a skill and typed nothing, send the skill id instead of
-    /// an empty message.
-    private static func modelText(from content: String) -> String {
-        var remaining = content
-        var skillIds: [String] = []
-
-        while true {
-            let trimmed = remaining.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard trimmed.hasPrefix("[[skill:") else { break }
-            guard let closeRange = trimmed.range(of: "]]") else { break }
-            let valueStart = trimmed.index(trimmed.startIndex, offsetBy: "[[skill:".count)
-            let rawSkill = String(trimmed[valueStart..<closeRange.lowerBound])
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            if !rawSkill.isEmpty { skillIds.append(rawSkill) }
-            remaining = String(trimmed[closeRange.upperBound...])
-        }
-
-        let text = remaining.trimmingCharacters(in: .whitespacesAndNewlines)
-        if skillIds.isEmpty { return text.isEmpty ? "Go" : text }
-        return (text.isEmpty || text == "/") ? (skillIds.first ?? "Go") : text
-    }
-
-    /// Attachments (text selections + captured images) followed by the typed text.
-    private static func userContentParts(for turn: Turn) -> [WirePart] {
-        var parts: [WirePart] = []
-        for attachment in turn.attachments {
-            switch attachment.type {
-            case .textSelection:
-                if let text = attachment.textContent {
-                    parts.append(.text("[\(attachment.label)]\n> \(text)\n"))
-                }
-            case .imageCapture:
-                if let imageData = attachment.imageData {
-                    // A region of a PDF page carries its page label and the text
-                    // under it. Only that path sets `textContent`, empty for a
-                    // figure with no text. Other images send pixels only.
-                    if let text = attachment.textContent {
-                        var context = "[\(attachment.label)]"
-                        if !text.isEmpty { context += "\nText inside the region:\n> \(text)" }
-                        parts.append(.text(context + "\n"))
-                    }
-                    parts.append(.image(data: imageData.base64EncodedString(), mimeType: "image/png"))
-                }
-            }
-        }
-        parts.append(.text(modelText(from: turn.content)))
-        return parts
     }
 }

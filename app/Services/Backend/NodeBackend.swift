@@ -290,6 +290,9 @@ actor NodeBackend {
             // documents, and phase 1 made the sidecar the only process that
             // opens the second one.
             "--library", CatalogDatabase.dataDirectory.appendingPathComponent("library.sqlite").path,
+            // Chat transcripts: pi session files the sidecar writes and the
+            // shell reads.
+            "--chats-dir", CatalogDatabase.chatsDirectory.path,
         ]
         // Prompt and skill files, when the bundle carries them. Absent in a
         // checkout build, where the sidecar finds them by walking up from its

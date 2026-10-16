@@ -325,7 +325,6 @@ class ChatViewModel {
         // passages). `currentSkill` is also reused for `turnMetadata`.
         let currentSkill = effectiveSkill
 
-        let currentHistory = turns.filter { !$0.isStreaming }
         let currentSessionId = sessionId
         let turnMetadata: [String: String] = currentSkill.map { ["skill": $0.id] } ?? [:]
 
@@ -448,7 +447,6 @@ class ChatViewModel {
                 let stream = await engine.send(
                     userContent: userContent,
                     attachments: attachments,
-                    history: currentHistory,
                     sessionId: currentSessionId,
                     config: currentConfig,
                     systemPrompt: systemPrompt,

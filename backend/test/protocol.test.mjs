@@ -64,7 +64,8 @@ await new Promise((r) => mock.listen(0, "127.0.0.1", r));
 const port = mock.address().port;
 
 // --- Spawn backend --------------------------------------------------------
-const child = spawn(join(root, "dist", "oak-backend"), ["--data-dir", dataDir], {
+const chatsDir = join(dataDir, "chats");
+const child = spawn(join(root, "dist", "oak-backend"), ["--data-dir", dataDir, "--chats-dir", chatsDir], {
   stdio: ["pipe", "pipe", "pipe"],
 });
 child.stderr.on("data", (d) => process.stderr.write(`  [stderr] ${d}`));
@@ -171,7 +172,8 @@ try {
     providerId: "ollama",
     model: "mock-model",
     system: "You are a test.",
-    messages: [{ role: "user", parts: [{ type: "text", text: "What time is it?" }] }],
+    sessionId: "session-1",
+    user: { role: "user", content: [{ type: "text", text: "What time is it?" }], timestamp: Date.now() },
     tools: [{
       name: "get_time",
       description: "Get the current time",
@@ -190,8 +192,13 @@ try {
   assert(typeof exec.id === "string" && exec.id !== "c1",
     `reverse call has its own envelope id (${exec.id})`);
 
-  const snapshot = notificationsFor("c1", "chat/assistant")[0];
-  assert(snapshot?.toolCalls.length === 1, "chat/assistant snapshot lists the tool call");
+  const messagesSent = () => notificationsFor("c1", "chat/entry")
+    .map((p) => p.entry).filter((e) => e.type === "message").map((e) => e.message);
+  const asked = messagesSent().find((m) => m.role === "assistant");
+  assert(asked?.content.some((b) => b.type === "toolCall"),
+    "chat/entry carries the assistant Message with its tool call");
+  assert(asked?.provider === "ollama" && asked.model === "mock-model" && asked.usage !== undefined,
+    "the Message keeps the model that wrote it and its usage");
 
   answer(exec.id, { content: "12:34 UTC", isError: false });
 
@@ -200,6 +207,15 @@ try {
   assert(chatResult.stopReason === "stop", `chat resolved with stopReason ${chatResult.stopReason}`);
   const answered = notificationsFor("c1", "chat/delta").map((p) => p.text).join("");
   assert(answered.includes("12:34 UTC"), `final answer streamed ("${answered}")`);
+  const roles = messagesSent().map((m) => m.role);
+  assert(roles.join(",") === "system,user,assistant,toolResult,assistant",
+    `every finished Message went out, in order (${roles.join(",")})`);
+  // The session file on disk holds exactly the entries that went out.
+  const onDisk = readFileSync(join(chatsDir, "session-1.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  const sentEntries = notificationsFor("c1", "chat/entry").map((p) => p.entry);
+  assert(JSON.stringify(onDisk) === JSON.stringify(sentEntries),
+    `the session file and chat/entry hold the same ${onDisk.length} lines`);
+  assert(onDisk[0].type === "session" && onDisk[0].version === 3, "the file starts with a pi session header");
 
   // 6. base-url override persists in settings.json
   call("b1", "config/setBaseUrl", { providerId: "deepseek", baseUrl: "https://relay.example.com" });

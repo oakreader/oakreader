@@ -1,14 +1,13 @@
 /**
  * Chat-session metadata.
  *
- * Only the metadata: the messages themselves are JSONL files the shell writes
- * and reads, and this table is the index over them. That split predates the
- * migration and is worth keeping — a conversation's transcript is an append-only
- * log, which a row in a relational table is a poor fit for.
+ * Only the metadata: the messages themselves are pi session files (see
+ * session.ts), and this table is the index over them. A conversation's
+ * transcript is an append-only log, which a row in a relational table is a
+ * poor fit for.
  *
- * So the snippet shown in the history list stays shell-side too. It comes from
- * reading a bounded prefix of the JSONL file, which belongs with whoever owns
- * those files, not with whoever owns the catalog.
+ * The snippet shown in the history list is the shell's: it reads a bounded
+ * prefix of the session file.
  */
 import type { Database } from "bun:sqlite";
 
@@ -112,7 +111,7 @@ export class ConversationStore {
   }
 
   /**
-   * Remove the row. The JSONL transcript is the shell's to delete — this table
+   * Remove the row. The shell deletes the session file with it — this table
    * only indexes it.
    */
   delete(id: string): void {

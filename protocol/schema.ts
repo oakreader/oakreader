@@ -10,7 +10,7 @@
  * fails if the committed output is stale.
  */
 
-export const PROTOCOL_VERSION = 13;
+export const PROTOCOL_VERSION = 15;
 
 export type FieldType =
   | { k: "string" }
@@ -53,7 +53,12 @@ const int: FieldType = { k: "int" };
 const double: FieldType = { k: "double" };
 const bool: FieldType = { k: "bool" };
 const json: FieldType = { k: "json" };
-const wireMessage: FieldType = { k: "ref", ts: "WireMessage", swift: "WireMessage" };
+/** A pi Message, verbatim. Swift holds it as raw JSON and reads only what it draws. */
+const piMessage: FieldType = { k: "ref", ts: "PiMessage", swift: "JSONValue" };
+/** A pi user Message. The one message the shell builds. */
+const piUserMessage: FieldType = { k: "ref", ts: "PiUserMessage", swift: "JSONValue" };
+/** One line of a pi session file, verbatim: the header or an entry. */
+const sessionEntry: FieldType = { k: "ref", ts: "FileEntry", swift: "JSONValue" };
 const wireToolDef: FieldType = { k: "ref", ts: "WireToolDef", swift: "WireToolDef" };
 
 /**
@@ -84,7 +89,7 @@ export const METHODS: Method[] = [
       { name: "providerId", type: str },
       { name: "model", type: str },
       { name: "system", type: str, optional: true },
-      { name: "messages", type: { k: "array", of: wireMessage, min: 1 } },
+      { name: "messages", type: { k: "array", of: piMessage, min: 1 } },
       { name: "maxTokens", type: int, default: "4096" },
       { name: "apiKey", type: str, optional: true,
         doc: "Explicit key for Test Connection, before anything is saved." },
@@ -94,12 +99,19 @@ export const METHODS: Method[] = [
   },
   {
     name: "chat", type: "Chat", kind: "request", from: "client",
-    doc: "The agentic loop. Streams chat/* notifications and calls tool/execute back.",
+    doc: "The agentic loop over one pi session file. Streams chat/* notifications " +
+         "and calls tool/execute back.",
     params: [
       { name: "providerId", type: str },
       { name: "model", type: str },
       { name: "system", type: str, optional: true },
-      { name: "messages", type: { k: "array", of: wireMessage, min: 1 } },
+      { name: "sessionId", type: str,
+        doc: "The conversation. Its pi session file holds the history; the core " +
+             "reads it and appends to it." },
+      { name: "user", type: piUserMessage },
+      { name: "display", type: json, optional: true,
+        doc: "What the shell draws for `user` beyond the message. Stored as a " +
+             "`custom` entry of type oakreader.display." },
       { name: "tools", type: { k: "array", of: wireToolDef }, default: "[]" },
       { name: "maxTokens", type: int, default: "8192" },
       { name: "reasoning",
@@ -592,6 +604,8 @@ export const METHODS: Method[] = [
     result: [
       { name: "content", type: str },
       { name: "isError", type: bool, default: "false" },
+      { name: "denied", type: bool, default: "false",
+        doc: "The user refused the call. Stored on the tool result as `details.denied`." },
     ],
   },
   {
@@ -631,15 +645,11 @@ export const METHODS: Method[] = [
     ],
   },
   {
-    name: "chat/assistant", type: "ChatAssistant", kind: "notification", from: "server",
-    doc: "Authoritative snapshot of one iteration's assistant message.",
-    params: [
-      token,
-      { name: "text", type: str },
-      { name: "thinking", type: str, optional: true },
-      { name: "toolCalls",
-        type: { k: "array", of: { k: "ref", ts: "EventToolCall", swift: "BackendToolCall" } } },
-    ],
+    name: "chat/entry", type: "ChatEntry", kind: "notification", from: "server",
+    doc: "One line the core just appended to the session file, the same object " +
+         "that is on disk: the header, a message entry (system, user, assistant " +
+         "or tool result), a model or thinking level change, or a display entry.",
+    params: [token, { name: "entry", type: sessionEntry }],
   },
   {
     name: "oauth/notify", type: "OAuthNotify", kind: "notification", from: "server",

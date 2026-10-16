@@ -2,10 +2,10 @@
 // Run `pnpm protocol:generate` after changing the schema.
 
 import { z } from "zod";
-import { WireMessage, WireToolDef, WordLookup, Annotation, Conversation, Collection, Item, Property, PropertyOption, Skill, SkillAdvisory, SkillBin, SkillEnv, ToolDefinition, type ProviderSummary, type EventToolCall, type PromptOption } from "./protocol.base.js";
+import { PiMessage, PiUserMessage, WireToolDef, WordLookup, Annotation, Conversation, Collection, Item, Property, PropertyOption, Skill, SkillAdvisory, SkillBin, SkillEnv, ToolDefinition, type ProviderSummary, type PromptOption, type FileEntry } from "./protocol.base.js";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- refs used by generated shapes
 
-export const PROTOCOL_VERSION = 13;
+export const PROTOCOL_VERSION = 15;
 
 /** JSON-RPC 2.0 error codes. Below -32000 is ours; the rest is the spec's. */
 export const RpcError = {
@@ -56,7 +56,7 @@ export const CompleteParams = z.object({
   providerId: z.string(),
   model: z.string(),
   system: z.string().optional(),
-  messages: z.array(WireMessage).min(1),
+  messages: z.array(PiMessage).min(1),
   maxTokens: z.number().int().positive().default(4096),
   /** Explicit key for Test Connection, before anything is saved. */
   apiKey: z.string().optional(),
@@ -67,12 +67,16 @@ export type CompleteResult = {
   stopReason: string;
 };
 
-/** `chat` — The agentic loop. Streams chat/* notifications and calls tool/execute back. */
+/** `chat` — The agentic loop over one pi session file. Streams chat/* notifications and calls tool/execute back. */
 export const ChatParams = z.object({
   providerId: z.string(),
   model: z.string(),
   system: z.string().optional(),
-  messages: z.array(WireMessage).min(1),
+  /** The conversation. Its pi session file holds the history; the core reads it and appends to it. */
+  sessionId: z.string(),
+  user: PiUserMessage,
+  /** What the shell draws for `user` beyond the message. Stored as a `custom` entry of type oakreader.display. */
+  display: z.record(z.string(), z.any()).optional(),
   tools: z.array(WireToolDef).default([]),
   maxTokens: z.number().int().positive().default(8192),
   reasoning: z.enum(["minimal", "low", "medium", "high", "xhigh", "max"]).optional(),
@@ -560,6 +564,8 @@ export type ToolExecuteParams = {
 export type ToolExecuteResult = {
   content: string;
   isError: boolean;
+  /** The user refused the call. Stored on the tool result as `details.denied`. */
+  denied: boolean;
 };
 
 /** `oauth/prompt` — Asks the shell for one piece of user input during a login. */
@@ -600,13 +606,11 @@ export type ChatToolCallParams = {
   done: boolean;
 };
 
-/** `chat/assistant` — Authoritative snapshot of one iteration's assistant message. */
-export type ChatAssistantParams = {
+/** `chat/entry` — One line the core just appended to the session file, the same object that is on disk: the header, a message entry (system, user, assistant or tool result), a model or thinking level change, or a display entry. */
+export type ChatEntryParams = {
   /** Id of the request this belongs to. */
   token: string;
-  text: string;
-  thinking?: string;
-  toolCalls: EventToolCall[];
+  entry: FileEntry;
 };
 
 /** `oauth/notify` */
@@ -752,6 +756,6 @@ export type ServerNotificationMethod =
   | "chat/delta"
   | "chat/thinking"
   | "chat/toolcall"
-  | "chat/assistant"
+  | "chat/entry"
   | "oauth/notify"
   ;
