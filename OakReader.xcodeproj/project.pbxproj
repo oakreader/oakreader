@@ -29,6 +29,7 @@
 		0DC3A49D563A44F4ECE5D61C /* FannedAttachmentStack.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA237E65AF0728789822FE10 /* FannedAttachmentStack.swift */; };
 		0EE654F326D3C66231C78461 /* ChatStreamingChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0500389E63145F54BCC7DD6F /* ChatStreamingChrome.swift */; };
 		10E122CEA530A02295C1779D /* ReadingPositionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F950FC37AE40C9EED71D8A68 /* ReadingPositionStore.swift */; };
+		1177BB6102999305BE81A5FF /* SettingsPageLifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = A245169E46538B0A00943B9C /* SettingsPageLifecycle.swift */; };
 		11F9FFA5B28E93D145B9D0DE /* CatalogDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9F631481D70E6E3856F1EA5 /* CatalogDatabase.swift */; };
 		1333A5FB9975D7CDDFB40D29 /* AnnotationPropertyPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 868B33EDCCB1FBCAEE83A36A /* AnnotationPropertyPanel.swift */; };
 		138DD1BFCD7F94A2ECB71679 /* Log.swift in Sources */ = {isa = PBXBuildFile; fileRef = 339F20DA127315E9403ADD98 /* Log.swift */; };
@@ -225,6 +226,7 @@
 		B77AB6B9C842AE76D6177E79 /* BrowserTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FDD500E4D126E8275F27500 /* BrowserTools.swift */; };
 		B7F69146D24C49AF21D04D6C /* NewTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C662EF33E244F9EB373CF2E /* NewTabView.swift */; };
 		B81B9BA647234E09506AC8D5 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = F10B728DCD9CF1D3612369BE /* Sparkle */; };
+		B8FA077E0BD5FED2B9EA257F /* SettingsSidebar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1751524DA41A8DA779456916 /* SettingsSidebar.swift */; };
 		BAC31BE436456855B115CAFD /* AIChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CA025FB4DB9E7B91B032A38 /* AIChatView.swift */; };
 		BAF71CFD5D2ACEFB9A46741D /* ChatContextSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C1F2473E6868DDEE3F4AD42 /* ChatContextSnapshot.swift */; };
 		BCB20CCAEAE4E5D6BD7CCA21 /* PDFRenderingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B385FFCAA6F36331DF44350 /* PDFRenderingService.swift */; };
@@ -328,6 +330,7 @@
 		1492996C1330F0358D6FAE8D /* AnnotationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationViewModel.swift; sourceTree = "<group>"; };
 		15AFF30B33D00CFE356594F1 /* ViewerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewerViewModel.swift; sourceTree = "<group>"; };
 		166A5AD13537E60218059C3E /* OakCLITool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OakCLITool.swift; sourceTree = "<group>"; };
+		1751524DA41A8DA779456916 /* SettingsSidebar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSidebar.swift; sourceTree = "<group>"; };
 		179FBB2D6079BC574E6102FC /* CompletionClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionClient.swift; sourceTree = "<group>"; };
 		19F2340729A85D5B298436E5 /* NoteEditorModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteEditorModel.swift; sourceTree = "<group>"; };
 		1A63D86443ACAE5AC839FCAA /* OakReader-release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "OakReader-release.xcconfig"; sourceTree = "<group>"; };
@@ -495,6 +498,7 @@
 		9DFBA31776ED91B65DFBC300 /* ChatSourcesPill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatSourcesPill.swift; sourceTree = "<group>"; };
 		A13FA82615DF1237FE57AF1C /* OakReaderDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OakReaderDocument.swift; sourceTree = "<group>"; };
 		A15CEC695D0A0C7DDDA25CB4 /* ChatTitleService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatTitleService.swift; sourceTree = "<group>"; };
+		A245169E46538B0A00943B9C /* SettingsPageLifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPageLifecycle.swift; sourceTree = "<group>"; };
 		A2AC38E3EEFEBF72D47FB3E9 /* ImageLightbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageLightbox.swift; sourceTree = "<group>"; };
 		A508F4FFB36333D8C6ACF7A1 /* ChatInputTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatInputTextView.swift; sourceTree = "<group>"; };
 		A5180811E78B858BC5D80477 /* ExportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSheet.swift; sourceTree = "<group>"; };
@@ -630,6 +634,8 @@
 				7E40574E80CDE912316B7002 /* LibrarySettingsView.swift */,
 				AA646E8315CCE95E44676F14 /* MemoryManagerView.swift */,
 				5091B705785DCF003CDD722C /* QuickChatSettingsView.swift */,
+				A245169E46538B0A00943B9C /* SettingsPageLifecycle.swift */,
+				1751524DA41A8DA779456916 /* SettingsSidebar.swift */,
 				537214EDB1CDA6D76E3AF0ED /* SettingsView.swift */,
 				E5F51769F0F2907C06833C49 /* SkillManagementView.swift */,
 				B97A66899E801C35CA5CFB83 /* TranslationSettingsView.swift */,
@@ -1679,6 +1685,8 @@
 				6BD1A427AD54CE70C11C75FA /* SerperSearchProvider.swift in Sources */,
 				6E008EBA3AA7B17CB02DAAC2 /* SessionEvent.swift in Sources */,
 				35D7B2098BFF7E66D409D1A5 /* SessionStore.swift in Sources */,
+				1177BB6102999305BE81A5FF /* SettingsPageLifecycle.swift in Sources */,
+				B8FA077E0BD5FED2B9EA257F /* SettingsSidebar.swift in Sources */,
 				0CF9F961D8DD5DB257B2D4A5 /* SettingsView.swift in Sources */,
 				1C5D42E2D98AC58929981F29 /* SharingService.swift in Sources */,
 				5B17A5915BA3761D882A5765 /* SidebarView.swift in Sources */,
@@ -1846,7 +1854,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.20.0;
+				MARKETING_VERSION = 0.20.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.oakreader.OakReader.dev;
 				PRODUCT_MODULE_NAME = OakReader;
 				PRODUCT_NAME = "OakReader-Dev";
@@ -1937,7 +1945,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.20.0;
+				MARKETING_VERSION = 0.20.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.oakreader.OakReader;
 				PRODUCT_MODULE_NAME = OakReader;
 				PRODUCT_NAME = OakReader;

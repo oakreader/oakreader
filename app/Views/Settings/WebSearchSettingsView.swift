@@ -13,8 +13,7 @@ struct WebSearchSettingsView: View {
             apiKeysSection
         }
         .formStyle(.grouped)
-        .onAppear { loadKeys() }
-        .onDisappear { saveSelection() }
+        .settingsPageLifecycle(onShow: { loadKeys() }, onHide: { saveSelection() })
     }
 
     // MARK: - Provider Selection

@@ -80,8 +80,10 @@ struct AgentSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .onAppear { userFactCount = MemoryStore.load().count }
-        .onDisappear { save() }
+        .settingsPageLifecycle(
+            onShow: { userFactCount = MemoryStore.load().count },
+            onHide: { save() }
+        )
         .sheet(isPresented: $showUserMemory, onDismiss: { userFactCount = MemoryStore.load().count }) {
             MemoryManagerView()
         }

@@ -44,7 +44,7 @@ struct TranslationSettingsView: View {
             exportSection
         }
         .formStyle(.grouped)
-        .onDisappear { saveLLM() }
+        .settingsPageLifecycle(onHide: { saveLLM() })
     }
 
     // MARK: - Default Languages Section

@@ -28,10 +28,10 @@ struct QuickChatSettingsView: View {
         .onReceive(NotificationCenter.default.publisher(for: .quickChatSkillsChanged)) { _ in
             hidden = QuickChatBindings.hiddenSkills
         }
-        .onAppear {
+        .settingsPageLifecycle(onShow: {
             isTrusted = QuickChatAccessibility.isTrusted
             hidden = QuickChatBindings.hiddenSkills
-        }
+        })
     }
 
     // MARK: - Trigger
