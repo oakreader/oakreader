@@ -5,70 +5,16 @@ import Foundation
 /// `BackendCommand` and `BackendEvent` are NOT here — they are generated from
 /// protocol/schema.ts into BackendProtocol.generated.swift, together with the
 /// backend's zod schemas, so the two sides cannot drift. What stays here are
-/// the types whose Swift and TypeScript shapes genuinely differ: WireMessage
-/// encodes through a custom `Encodable`, and JSONFragment/AnyJSONObject are
-/// Swift-specific JSON passthroughs.
+/// the types whose Swift and TypeScript shapes genuinely differ: JSONFragment
+/// and AnyJSONObject are Swift-specific JSON passthroughs. Chat history needs
+/// no type here: it is pi's own Message, carried as `JSONValue` (see
+/// PiTranscript.swift).
 ///
 /// v2: the backend owns the provider catalog, credentials, OAuth, endpoint
 /// overrides, and the agentic chat loop. Swift sends provider/model ids and
 /// executes tools when the backend asks (`tool_exec` → `tool_result`).
-// MARK: - Wire messages (Turn history → backend)
 
-enum WirePart: Encodable {
-    case text(String)
-    case image(data: String, mimeType: String)
-
-    private enum CodingKeys: String, CodingKey { case type, text, data, mimeType }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        switch self {
-        case .text(let text):
-            try container.encode("text", forKey: .type)
-            try container.encode(text, forKey: .text)
-        case .image(let data, let mimeType):
-            try container.encode("image", forKey: .type)
-            try container.encode(data, forKey: .data)
-            try container.encode(mimeType, forKey: .mimeType)
-        }
-    }
-}
-
-struct WireToolCall: Encodable {
-    var id: String
-    var name: String
-    var args: AnyJSONObject
-}
-
-enum WireMessage: Encodable {
-    case user(parts: [WirePart])
-    case assistant(text: String, thinking: String?, toolCalls: [WireToolCall])
-    case toolResult(callId: String, name: String, content: String, isError: Bool)
-
-    private enum CodingKeys: String, CodingKey {
-        case role, parts, text, thinking, toolCalls, callId, name, content, isError
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        switch self {
-        case .user(let parts):
-            try container.encode("user", forKey: .role)
-            try container.encode(parts, forKey: .parts)
-        case .assistant(let text, let thinking, let toolCalls):
-            try container.encode("assistant", forKey: .role)
-            try container.encode(text, forKey: .text)
-            try container.encodeIfPresent(thinking, forKey: .thinking)
-            try container.encode(toolCalls, forKey: .toolCalls)
-        case .toolResult(let callId, let name, let content, let isError):
-            try container.encode("toolResult", forKey: .role)
-            try container.encode(callId, forKey: .callId)
-            try container.encode(name, forKey: .name)
-            try container.encode(content, forKey: .content)
-            try container.encode(isError, forKey: .isError)
-        }
-    }
-}
+// MARK: - Tool declarations
 
 struct WireToolDef: Encodable {
     var name: String
@@ -180,12 +126,6 @@ struct CatalogAnnotation: Codable {
 }
 
 // MARK: - Event payloads
-
-struct BackendToolCall: Decodable {
-    var id: String
-    var name: String
-    var args: [String: JSONFragment]
-}
 
 struct BackendPromptOption: Decodable, Identifiable {
     var id: String

@@ -77,8 +77,9 @@ extension LibraryStore {
             // Files, now that nothing references them.
             for id in transcripts {
                 try? FileManager.default.removeItem(at: CatalogDatabase.chatFileURL(sessionId: id))
-                try? FileManager.default.removeItem(
-                    at: CatalogDatabase.chatAttachmentDirectory(sessionId: id))
+                for url in CatalogDatabase.legacyChatFiles(sessionId: id) {
+                    try? FileManager.default.removeItem(at: url)
+                }
             }
             for item in items {
                 try? FileManager.default.removeItem(

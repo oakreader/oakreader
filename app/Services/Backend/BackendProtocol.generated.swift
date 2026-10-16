@@ -9,7 +9,7 @@ import Foundation
 /// Reverse calls (tool/execute, oauth/prompt) are ordinary requests in the
 /// other direction, so they need no separate machinery.
 enum RPC {
-    static let version = 13
+    static let version = 15
 
     /// JSON-RPC error codes. The shell branches on these: re-authenticate
     /// is a different affordance from retry, and the old single error string
@@ -99,7 +99,7 @@ enum RPC {
         static let chatDelta = "chat/delta"
         static let chatThinking = "chat/thinking"
         static let chatToolCall = "chat/toolcall"
-        static let chatAssistant = "chat/assistant"
+        static let chatEntry = "chat/entry"
         static let oAuthNotify = "oauth/notify"
     }
 
@@ -122,7 +122,7 @@ enum RPC {
         var providerId: String
         var model: String
         var system: String?
-        var messages: [WireMessage]
+        var messages: [JSONValue]
         var maxTokens: Int?
         /// Explicit key for Test Connection, before anything is saved.
         var apiKey: String?
@@ -133,12 +133,19 @@ enum RPC {
     }
 
     // MARK: chat
-    /// The agentic loop. Streams chat/* notifications and calls tool/execute back.
+    /// The agentic loop over one pi session file. Streams chat/* notifications and calls
+    /// tool/execute back.
     struct ChatParams: Encodable {
         var providerId: String
         var model: String
         var system: String?
-        var messages: [WireMessage]
+        /// The conversation. Its pi session file holds the history; the core reads it and appends
+        /// to it.
+        var sessionId: String
+        var user: JSONValue
+        /// What the shell draws for `user` beyond the message. Stored as a `custom` entry of type
+        /// oakreader.display.
+        var display: AnyJSONObject?
         var tools: [WireToolDef]?
         var maxTokens: Int?
         var reasoning: String?
@@ -700,6 +707,8 @@ enum RPC {
     struct ToolExecuteResult: Encodable {
         var content: String
         var isError: Bool?
+        /// The user refused the call. Stored on the tool result as `details.denied`.
+        var denied: Bool?
     }
 
     // MARK: oauth/prompt
@@ -743,14 +752,14 @@ enum RPC {
         var done: Bool?
     }
 
-    // MARK: chat/assistant
-    /// Authoritative snapshot of one iteration's assistant message.
-    struct ChatAssistantParams: Decodable {
+    // MARK: chat/entry
+    /// One line the core just appended to the session file, the same object that is on disk: the
+    /// header, a message entry (system, user, assistant or tool result), a model or thinking level
+    /// change, or a display entry.
+    struct ChatEntryParams: Decodable {
         /// Id of the request this belongs to.
         var token: String
-        var text: String
-        var thinking: String?
-        var toolCalls: [BackendToolCall]
+        var entry: JSONValue
     }
 
     // MARK: oauth/notify

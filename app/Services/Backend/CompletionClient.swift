@@ -50,8 +50,8 @@ struct NodeCompletionClient: CompletionStreaming {
 
     /// Images first, then the text — the order every vision API expects, so the
     /// words read as being about the picture rather than the other way round.
-    private static func parts(for request: CompletionRequest) -> [WirePart] {
-        var parts: [WirePart] = request.images.map {
+    private static func parts(for request: CompletionRequest) -> [PiMessage.Part] {
+        var parts: [PiMessage.Part] = request.images.map {
             .image(data: $0.base64EncodedString(), mimeType: "image/png")
         }
         parts.append(.text(request.user))
@@ -66,7 +66,7 @@ struct NodeCompletionClient: CompletionStreaming {
                         providerId: request.providerId,
                         model: request.model,
                         system: request.system,
-                        messages: [.user(parts: Self.parts(for: request))],
+                        messages: [PiMessage.user(Self.parts(for: request))],
                         maxTokens: request.maxTokens,
                         apiKey: request.overrideCredential,
                         baseUrl: request.overrideBaseUrl

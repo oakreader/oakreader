@@ -1,13 +1,11 @@
 import type {
   Api,
   AssistantMessage,
-  Context,
   Message,
   Model,
   Models,
   ThinkingLevel,
-  Tool,
-  ToolCall,
+  UserMessage,
 } from "@earendil-works/pi-ai";
 import { agentLoop } from "@earendil-works/pi-agent-core";
 import type {
@@ -15,71 +13,18 @@ import type {
   AgentTool,
   AgentToolResult,
 } from "@earendil-works/pi-agent-core";
-import type { WireMessage } from "./protocol.js";
-
-/** Convert Swift wire history into pi-ai Context messages. */
-export function toPiMessages(wire: WireMessage[], model: Model<Api>): Message[] {
-  const messages: Message[] = [];
-  for (const m of wire) {
-    switch (m.role) {
-      case "user":
-        messages.push({
-          role: "user",
-          content: m.parts.map((p) =>
-            p.type === "text"
-              ? { type: "text" as const, text: p.text }
-              : { type: "image" as const, data: p.data, mimeType: p.mimeType },
-          ),
-          timestamp: Date.now(),
-        });
-        break;
-      case "assistant": {
-        const content: AssistantMessage["content"] = [];
-        if (m.thinking) content.push({ type: "thinking", thinking: m.thinking });
-        if (m.text) content.push({ type: "text", text: m.text });
-        for (const call of m.toolCalls) {
-          content.push({ type: "toolCall", id: call.id, name: call.name, arguments: call.args });
-        }
-        // Replayed history — synthesize the bookkeeping fields pi requires.
-        messages.push({
-          role: "assistant",
-          content,
-          api: model.api,
-          provider: model.provider,
-          model: model.id,
-          usage: emptyUsage(),
-          stopReason: m.toolCalls.length > 0 ? "toolUse" : "stop",
-          timestamp: Date.now(),
-        });
-        break;
-      }
-      case "toolResult":
-        messages.push({
-          role: "toolResult",
-          toolCallId: m.callId,
-          toolName: m.name,
-          content: [{ type: "text", text: m.content }],
-          isError: m.isError,
-          timestamp: Date.now(),
-        });
-        break;
-    }
-  }
-  return messages;
-}
-
-function emptyUsage(): AssistantMessage["usage"] {
-  return {
-    input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0,
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-  };
-}
+import { SessionFile } from "./session.js";
 
 export interface ChatRun {
   id: string;
   model: Model<Api>;
   system?: string;
-  messages: WireMessage[];
+  /** The conversation's pi session file. History comes from it; every new message goes to it. */
+  session: SessionFile;
+  /** The message the user just sent. */
+  user: UserMessage;
+  /** What the shell draws for `user` beyond the message: stored as a display entry. */
+  display?: Record<string, unknown>;
   tools: { name: string; description: string; inputSchema: Record<string, unknown> }[];
   maxTokens: number;
   reasoning?: ThinkingLevel;
@@ -96,7 +41,7 @@ export interface ChatCallbacks {
    */
   executeTool(
     name: string, args: Record<string, unknown>, callId: string,
-  ): Promise<{ content: string; isError: boolean }>;
+  ): Promise<{ content: string; isError: boolean; denied?: boolean }>;
 }
 
 /**
@@ -108,8 +53,11 @@ export interface ChatCallbacks {
  * tools read local app state (GRDB, the live WebView DOM, the open PDF).
  * pi never runs them itself.
  *
- * Progress is notifications (chat/delta, chat/thinking, chat/assistant) tagged
- * with this run's request id. The stop reason is the RETURN VALUE, not an
+ * Progress is notifications (chat/delta, chat/thinking, chat/toolcall) tagged
+ * with this run's request id. History is the session file: every message pi's
+ * loop finishes, the user's included, is appended to it as a pi message entry,
+ * and the session sends each entry to the shell on chat/entry. Nothing pi
+ * recorded is rebuilt or lost between turns. The stop reason is the RETURN VALUE, not an
  * event: it is the answer to the request that started the loop, and a provider
  * failure throws so it becomes a JSON-RPC error with a code the shell can act on.
  */
@@ -142,16 +90,35 @@ export async function runChat(
       // model is better served seeing the message than an opaque failure.
       return {
         content: [{ type: "text", text: result.content }],
-        details: undefined,
+        // pi's record of what happened beyond the text: the shell draws a
+        // denied call differently from a failed one.
+        details: result.denied ? { denied: true } : undefined,
         isError: result.isError,
       } as AgentToolResult<unknown>;
     },
   }));
 
+  // pi keeps the prompt and the tool declarations in the transcript as system
+  // messages. A new prompt goes in as a system message ahead of the user's;
+  // pi's loop adds any tool change to it, or adds one of its own.
+  const { session } = run;
+  session.noteSettings(run.model.provider, run.model.id, run.reasoning ?? "off");
+  const history = session.context().messages;
+  const promptUpdate = SessionFile.promptUpdate(history, run.system ?? "");
+  const prompts: Message[] = promptUpdate ? [promptUpdate, run.user] : [run.user];
   const context: AgentContext = {
-    systemPrompt: run.system ?? "",
-    messages: toPiMessages(run.messages, run.model),
+    messages: history,
     ...(tools.length > 0 ? { tools } : {}),
+  };
+
+  // Thinking time of the reply being streamed: from its first thinking token
+  // to its first answer token or tool call.
+  let thinkingStart: number | undefined;
+  let thinkingSeconds: number | undefined;
+  const endThinking = () => {
+    if (thinkingStart === undefined) return;
+    thinkingSeconds = (performance.now() - thinkingStart) / 1000;
+    thinkingStart = undefined;
   };
 
   let lastStopReason = "stop";
@@ -172,7 +139,7 @@ export async function runChat(
   };
 
   const stream = agentLoop(
-    [],
+    prompts,
     context,
     {
       model: run.model,
@@ -189,37 +156,39 @@ export async function runChat(
     switch (event.type) {
       case "message_update": {
         const inner = event.assistantMessageEvent;
-        if (inner.type === "text_delta") notify("chat/delta", { token, text: inner.delta });
-        else if (inner.type === "thinking_delta") notify("chat/thinking", { token, text: inner.delta });
-        else if (inner.type === "toolcall_start" || inner.type === "toolcall_delta") {
+        if (inner.type === "text_delta") {
+          endThinking();
+          notify("chat/delta", { token, text: inner.delta });
+        } else if (inner.type === "thinking_delta") {
+          if (thinkingStart === undefined && thinkingSeconds === undefined) thinkingStart = performance.now();
+          notify("chat/thinking", { token, text: inner.delta });
+        } else if (inner.type === "toolcall_start" || inner.type === "toolcall_delta") {
+          endThinking();
           sendToolcall(inner.partial, inner.contentIndex, false);
         } else if (inner.type === "toolcall_end") {
           sendToolcall(inner.partial, inner.contentIndex, true);
         }
         break;
       }
+      case "message_start":
+        thinkingStart = undefined;
+        thinkingSeconds = undefined;
+        break;
       case "message_end": {
-        const message = event.message as AssistantMessage;
+        const message = event.message as Message;
+        // Stored before the error check: a failed reply is history too, and
+        // pi skips it on replay.
+        const entry = session.appendMessage(message);
+        if (message.role === "user" && run.display) {
+          session.appendDisplay({ ...run.display, targetId: entry.id });
+        }
         if (message.role !== "assistant") break;
+        endThinking();
+        if (thinkingSeconds !== undefined) session.appendDisplay({ targetId: entry.id, thinkingSeconds });
         if (message.stopReason === "error") {
           throw new Error(message.errorMessage ?? "provider error");
         }
         lastStopReason = message.stopReason ?? "stop";
-        const text = message.content
-          .filter((b): b is { type: "text"; text: string } => b.type === "text")
-          .map((b) => b.text)
-          .join("");
-        const thinking = message.content
-          .filter((b): b is { type: "thinking"; thinking: string } => b.type === "thinking")
-          .map((b) => b.thinking)
-          .join("");
-        const toolCalls = message.content.filter((b): b is ToolCall => b.type === "toolCall");
-        notify("chat/assistant", {
-          token,
-          text,
-          ...(thinking ? { thinking } : {}),
-          toolCalls: toolCalls.map((c) => ({ id: c.id, name: c.name, args: c.arguments })),
-        });
         break;
       }
       default:

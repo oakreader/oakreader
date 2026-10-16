@@ -11,12 +11,11 @@ enum ConversationScope: Equatable {
     case library
 }
 
-/// Chat-session metadata, indexed by the core; transcripts are JSONL files here.
+/// Chat-session metadata, indexed by the core.
 ///
-/// The split is older than the migration and worth keeping: a transcript is an
-/// append-only log, which a relational row models badly. So the core owns the
-/// index and this owns the files — including `snippet`, which reads a bounded
-/// prefix of one to produce the history list's teaser.
+/// A transcript is an append-only log, which a relational row models badly,
+/// so it is a pi session file beside the index: the core writes it, and this
+/// reads the start of one to produce the history list's teaser (`snippet`).
 struct ConversationService {
     // MARK: - Fetch
 
@@ -41,37 +40,40 @@ struct ConversationService {
 
     // MARK: - Snippet
 
-    /// Minimal projection of a persisted JSONL turn — just enough to find the
-    /// first user message for the history list's teaser line.
-    private struct SnippetTurn: Decodable {
-        let role: String
-        let content: String
-    }
-
-    /// Extracts a short teaser (first user message) from a session's JSONL file.
-    /// Reads only a bounded prefix so a long conversation doesn't cost a full file read.
+    /// The first user message of a session file, as the user typed it.
+    ///
+    /// Reads a bounded prefix. The prompt's system message comes first and
+    /// can be large; 4 MB covers it and the first user message in practice.
     private func snippet(forId idString: String) -> String {
         guard let id = UUID(uuidString: idString) else { return "" }
         let url = CatalogDatabase.chatFileURL(sessionId: id)
         guard let handle = try? FileHandle(forReadingFrom: url) else { return "" }
         defer { try? handle.close() }
 
-        // The first user turn is almost always the first line; 64 KB covers it.
-        let prefix = (try? handle.read(upToCount: 64 * 1024)) ?? Data()
-        guard let text = String(data: prefix, encoding: .utf8) else { return "" }
-
-        // Only consider complete lines (drop a possibly-truncated trailing line).
-        let lines = text.split(separator: "\n", omittingEmptySubsequences: true)
-        let completeLines = text.hasSuffix("\n") ? lines : lines.dropLast()
+        let prefix = (try? handle.read(upToCount: 4 * 1024 * 1024)) ?? Data()
+        // Only complete lines: the last one may be cut off.
+        var lines = prefix.split(separator: UInt8(ascii: "\n"), omittingEmptySubsequences: true)
+        if prefix.last != UInt8(ascii: "\n") { lines = lines.dropLast() }
 
         let decoder = JSONDecoder()
-        for line in completeLines {
-            guard let data = line.data(using: .utf8),
-                  let turn = try? decoder.decode(SnippetTurn.self, from: data),
-                  turn.role == "user" else { continue }
-            return Self.cleanSnippet(turn.content)
+        var firstUser: (id: String, text: String)?
+        for line in lines {
+            guard let entry = try? decoder.decode(JSONValue.self, from: Data(line)) else { continue }
+            if let user = firstUser {
+                // The display entry right after it holds the typed text.
+                if entry["customType"]?.stringValue == PiSession.displayType,
+                   entry["data"]?["targetId"]?.stringValue == user.id,
+                   let typed = entry["data"]?["content"]?.stringValue {
+                    return Self.cleanSnippet(typed)
+                }
+                return Self.cleanSnippet(user.text)
+            }
+            if entry["type"]?.stringValue == "message", let m = entry["message"],
+               PiMessage.role(m) == "user", let entryId = entry["id"]?.stringValue {
+                firstUser = (entryId, PiMessage.text(m))
+            }
         }
-        return ""
+        return firstUser.map { Self.cleanSnippet($0.text) } ?? ""
     }
 
     /// Strips inline skill tags and collapses whitespace into a single tidy line.

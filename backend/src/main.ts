@@ -10,7 +10,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { homedir } from "node:os";
-import type { AuthEvent, AuthPrompt, ThinkingLevel } from "@earendil-works/pi-ai";
+import type { AuthEvent, AuthPrompt, Message, ThinkingLevel, UserMessage } from "@earendil-works/pi-ai";
 // pi-ai loads each OAuth flow through a variable import specifier, so that
 // bundlers cannot follow it into Node-only flow code. `bun build --compile`
 // then ships a binary without those modules, and a login dies with
@@ -59,7 +59,9 @@ import { RpcPeer, RpcFailure } from "./rpc.js";
 import { ConfigStore, FileCredentialStore, dataPaths, migrateLegacyLayout } from "./store.js";
 import { ProviderRegistry, toPiId } from "./providers.js";
 import { ModelsConfig, MODELS_JSON_TEMPLATE } from "./modelsConfig.js";
-import { runChat, toPiMessages } from "./chat.js";
+import { runChat } from "./chat.js";
+import { SessionFile } from "./session.js";
+import { migrateLegacyChats } from "./legacy-chats.js";
 import { PromptLibrary } from "./prompts.js";
 import { PORTABLE_TOOLS, runTool } from "./tools.js";
 import {
@@ -121,6 +123,15 @@ reloadModelsConfig();
  * for opening it, and because a bad path should fail the first catalog call
  * rather than the whole process at startup.
  */
+/**
+ * Where chat transcripts live: one pi session file per conversation. The core
+ * writes them; the shell reads them to draw a conversation.
+ */
+const chatsFlag = process.argv.indexOf("--chats-dir");
+const chatsDir = chatsFlag !== -1 && process.argv[chatsFlag + 1]
+  ? process.argv[chatsFlag + 1]
+  : join(homedir(), "OakReader", "chats");
+
 const libraryFlag = process.argv.indexOf("--library");
 const libraryPath = libraryFlag !== -1 ? process.argv[libraryFlag + 1] : undefined;
 let catalogHandle: Catalog | undefined;
@@ -192,7 +203,8 @@ async function handleComplete(cmd: CompleteParams, id: string): Promise<Complete
     }
     const context = {
       ...(cmd.system ? { systemPrompt: cmd.system } : {}),
-      messages: toPiMessages(cmd.messages, model),
+      // zod checked the border; the shape is pi's own.
+      messages: cmd.messages as Message[],
     };
     const stream = registry.models.streamSimple(model, context, {
       signal: controller.signal,
@@ -217,13 +229,17 @@ async function handleChat(cmd: ChatParams, id: string): Promise<ChatResult> {
   aborts.set(id, controller);
   try {
     const model = registry.resolveModel(cmd.providerId, cmd.model);
+    const session = SessionFile.open(chatsDir, cmd.sessionId, (entry) => peer.notify("chat/entry", { token: id, entry }));
     const stopReason = await runChat(
       registry.models,
       {
         id,
         model,
         system: cmd.system,
-        messages: cmd.messages,
+        session,
+        // zod checked the border; the shape is pi's own.
+        user: cmd.user as UserMessage,
+        ...(cmd.display ? { display: cmd.display } : {}),
         tools: cmd.tools,
         maxTokens: cmd.maxTokens,
         reasoning: cmd.reasoning as ThinkingLevel | undefined,
@@ -235,7 +251,7 @@ async function handleChat(cmd: ChatParams, id: string): Promise<ChatResult> {
         // A reverse request. Correlation is the envelope id, so there is no
         // waiter table to build here and none to scan on the way out.
         executeTool: async (name, args, callId) => {
-          const result = await peer.callClient<{ content: string; isError: boolean }>(
+          const result = await peer.callClient<{ content: string; isError: boolean; denied?: boolean }>(
             "tool/execute", { token: id, name, args, callId });
           return result;
         },
@@ -750,6 +766,14 @@ function handleLine(line: string): void {
   const trimmed = line.endsWith("\r") ? line.slice(0, -1) : line;
   if (trimmed === "") return;
   void peer.handleLine(trimmed);
+}
+
+// Chats written before transcripts became pi sessions, converted before the
+// first request so no reader ever sees the old format. See legacy-chats.ts.
+try {
+  migrateLegacyChats(chatsDir, log);
+} catch (err) {
+  log(`chat migration failed: ${errorMessage(err)}`);
 }
 
 // Strict JSONL framing: split on LF bytes only. Node's readline also splits on

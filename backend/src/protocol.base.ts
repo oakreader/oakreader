@@ -1,4 +1,6 @@
 import { z } from "zod";
+import type { Message, UserMessage } from "@earendil-works/pi-ai";
+export type { FileEntry } from "@earendil-works/pi-coding-agent";
 
 /**
  * Hand-written wire types shared by both directions.
@@ -9,7 +11,8 @@ import { z } from "zod";
  *
  * Protocol v2: JSONL over stdio, LF-delimited (never split on U+2028/U+2029).
  * The Swift mirror lives in app/Services/Backend/BackendProtocol.swift —
- * keep the two in sync.
+ * keep the two in sync. Chat history is pi's own session format, so it has
+ * no Swift mirror: the shell carries messages and entries as raw JSON.
  *
  * v2 moves provider/credential resolution into the backend: requests carry an
  * OakReader providerId + model id; keys, OAuth tokens, endpoint overrides and
@@ -23,36 +26,48 @@ import { z } from "zod";
  */
 
 // ---------------------------------------------------------------------------
-// Wire messages (Swift Turn history → backend)
+// Transcript messages (shell <-> backend)
 
-export const WirePart = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("text"), text: z.string() }),
-  z.object({ type: z.literal("image"), data: z.string(), mimeType: z.string() }),
-]);
-
-export const WireToolCall = z.object({
-  id: z.string(),
-  name: z.string(),
-  args: z.record(z.string(), z.any()).default({}),
+/**
+ * A pi `Message` the shell sends: the user turn of a chat, or the messages of
+ * a one-shot completion.
+ *
+ * Only the role and the fields pi itself requires are checked. Everything
+ * else passes through untouched, including any field a later pi adds. Chat
+ * history never crosses this way: the core reads it from the session file.
+ * System messages never cross: the core writes them into the session.
+ */
+const Block = z.looseObject({ type: z.string() });
+const UserShape = z.looseObject({
+  role: z.literal("user"),
+  content: z.union([z.string(), z.array(Block)]),
+  timestamp: z.number(),
 });
-
-export const WireMessage = z.discriminatedUnion("role", [
-  z.object({ role: z.literal("user"), parts: z.array(WirePart).min(1) }),
-  z.object({
+export const PiUserMessage = UserShape;
+export type PiUserMessage = UserMessage;
+export const PiMessage = z.discriminatedUnion("role", [
+  UserShape,
+  z.looseObject({
     role: z.literal("assistant"),
-    text: z.string().default(""),
-    thinking: z.string().optional(),
-    toolCalls: z.array(WireToolCall).default([]),
+    content: z.array(Block),
+    api: z.string(),
+    provider: z.string(),
+    model: z.string(),
+    usage: z.looseObject({}),
+    stopReason: z.string(),
+    timestamp: z.number(),
   }),
-  z.object({
+  z.looseObject({
     role: z.literal("toolResult"),
-    callId: z.string(),
-    name: z.string(),
-    content: z.string(),
-    isError: z.boolean().default(false),
+    toolCallId: z.string(),
+    toolName: z.string(),
+    content: z.array(Block),
+    isError: z.boolean(),
+    timestamp: z.number(),
   }),
 ]);
-export type WireMessage = z.infer<typeof WireMessage>;
+/** The validated shape is pi's own; zod only guards the border. */
+export type PiMessage = Message;
 
 export const WireToolDef = z.object({
   name: z.string(),
@@ -83,13 +98,6 @@ export interface ProviderSummary {
   custom: boolean;
   baseUrlOverride?: string;
   localUrl?: string;
-}
-
-/** One tool call inside an `assistant` event. */
-export interface EventToolCall {
-  id: string;
-  name: string;
-  args: Record<string, unknown>;
 }
 
 /** One selectable option inside an `oauth_prompt` event. */
