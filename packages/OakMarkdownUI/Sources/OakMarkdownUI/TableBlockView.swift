@@ -341,7 +341,9 @@ enum TableParser {
         if let strikethrough = cmark_find_syntax_extension("strikethrough") {
             cmark_parser_attach_syntax_extension(parser, strikethrough)
         }
-        let bytes = Array(source.utf8)
+        // Before cmark, so a `|` inside `$…$` does not split the cell.
+        let (protected, math) = MathPlaceholders.protect(source)
+        let bytes = Array(MarkdownCompat.shimCJKEmphasis(protected).utf8)
         cmark_parser_feed(parser, bytes, bytes.count)
         guard let document = cmark_parser_finish(parser) else { return empty }
         defer { cmark_node_free(document) }
@@ -381,7 +383,7 @@ enum TableParser {
                 var cellNode = cmark_node_first_child(row)
                 while let cell = cellNode {
                     if String(cString: cmark_node_get_type_string(cell)) == "table_cell" {
-                        cells.append(MarkdownAttributedBuilder.renderTableCell(cell, theme: theme))
+                        cells.append(MarkdownAttributedBuilder.renderTableCell(cell, math: math, theme: theme))
                     }
                     cellNode = cmark_node_next(cell)
                 }

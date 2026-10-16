@@ -33,6 +33,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         )
         // Let the markdown renderer resolve note images' relocatable oak://image URLs.
         OakMarkdownImage.urlResolver = { OakNoteImageURL.resolveToFile($0) }
+        // Which renderer drew each formula, and which LaTeX commands were unknown.
+        // Only outcomes and command names leave the app, never the formula.
+        MathRenderStats.sink = { Analytics.capture($0, properties: $1) }
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {

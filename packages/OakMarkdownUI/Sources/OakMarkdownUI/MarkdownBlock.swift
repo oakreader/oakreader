@@ -5,6 +5,7 @@ public enum MarkdownBlockKind: Equatable {
     case prose                          // paragraphs, headings, lists, blockquotes, inline code/math
     case code(language: String?)        // fenced code → CodeBlockView (Highlightr)
     case mathDisplay                    // standalone $$…$$ → MathBlockView (SwiftMath)
+    case mathDisplayOpen                // trailing `$$…` whose close has not arrived yet
     case table                          // GFM pipe table → TableBlockView (SwiftUI Grid)
     case image(url: String, alt: String) // standalone ![alt](url) → ImageBlockView (fullscreen-able)
 }
@@ -267,6 +268,10 @@ public enum MarkdownBlockSplitter {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.count >= 4, trimmed.hasPrefix("$$"), trimmed.hasSuffix("$$") {
             return .mathDisplay
+        }
+        // `isolateDisplayMath` leaves an unclosed `$$` only at the end of the reply.
+        if trimmed.hasPrefix("$$") {
+            return .mathDisplayOpen
         }
         if isPipeTable(lines: lines) {
             return .table

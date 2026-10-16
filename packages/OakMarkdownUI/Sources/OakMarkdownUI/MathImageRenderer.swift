@@ -39,7 +39,7 @@ public enum MathImageRenderer {
         let key = Key(latex: trimmed, fontSize: fontSize, isDark: isDark, colorRGBA: color.rgbaFingerprint)
         if let hit = cache[key] { return hit }
 
-        let view = Math(trimmed)
+        let view = Math(MarkdownCompat.normalizeLaTeX(trimmed))
             .mathTypesettingStyle(display ? .display : .text)
             .mathFont(.init(name: .latinModern, size: fontSize))
             .foregroundStyle(Color(nsColor: color))
