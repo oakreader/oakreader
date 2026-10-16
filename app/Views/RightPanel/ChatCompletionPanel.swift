@@ -213,7 +213,13 @@ final class ChatCompletionPanel: NSPanel, AppResignDismissable {
         if query.isEmpty {
             filtered = allItems
         } else {
-            filtered = allItems.filter { $0.matches(query: query) }
+            // Ranked, not just filtered (Slack's tiered search): a prefix match
+            // first, then a word-start match, then anywhere. Ties keep the
+            // caller's order, which is already its own relevance order.
+            filtered = allItems.enumerated()
+                .compactMap { index, item in item.matchRank(query: query).map { (rank: $0, index: index, item: item) } }
+                .sorted { ($0.rank, $0.index) < ($1.rank, $1.index) }
+                .map(\.item)
         }
         selectedIndex = filtered.isEmpty ? -1 : 0
         buildRows()
